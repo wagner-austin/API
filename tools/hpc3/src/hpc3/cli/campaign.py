@@ -21,9 +21,16 @@ There is no state kept between runs -- the artifacts that exist and the jobs
 that are live are both facts the cluster will tell you, and neither goes stale
 the way the four hand-written resume documents of 2026-08-28 did.
 
+DONE MEANS FINISHED, NOT MERELY PRESENT. A member counts as done when its
+artifact exists AND a job that declared it reached COMPLETED. Existence alone
+was the first version and it was wrong: ``bases-kk`` was preempted at 1273
+seconds having already written ``kk_best.pt``, because a training loop writes
+its best checkpoint whenever validation improves. The campaign called it done
+and would have left a silently under-trained member in a finished experiment.
+
 WHAT IT WILL NOT DO. It does not cancel, it does not delete, and it does not
-overwrite: a member whose artifact exists is left alone, and a member a live
-job is writing is left alone. Converging DOWN -- deciding a finished run
+overwrite: a member that is genuinely finished is left alone, and a member a
+live job is writing is left alone. Converging DOWN -- deciding a finished run
 should be redone -- is a decision about the experiment, so it is made by
 removing the artifact, not by a flag here that would eventually be passed by
 someone who meant something else.
@@ -48,6 +55,7 @@ from hpc3.core import ledger, submit
 from hpc3.core.budget import check_projection
 from hpc3.core.campaign import (
     existence_command,
+    finished_artifacts,
     parse_existence,
     plan_campaign,
     require_every_member_declares_an_artifact,
@@ -55,6 +63,7 @@ from hpc3.core.campaign import (
 from hpc3.core.inflight import claimed_artifacts
 from hpc3.core.remote import run_remote
 from hpc3.core.squeue import account_command, parse_account_output
+from hpc3.core.status import parse_sacct_output, sacct_command
 
 _RUN_FLAG = "--run"
 _FLAGS = (_config.CONFIG_FLAG, _RUN_FLAG)
@@ -93,12 +102,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifacts = require_every_member_declares_an_artifact(specs)
 
     host = workspace["host"]
+    recorded = ledger.read(pathlib.Path(workspace["ledger"]), cluster)
     present = parse_existence(run_remote(host, existence_command(artifacts)))
-    claimed = claimed_artifacts(
-        ledger.read(pathlib.Path(workspace["ledger"]), cluster),
-        parse_account_output(run_remote(host, account_command())),
+    claimed = claimed_artifacts(recorded, parse_account_output(run_remote(host, account_command())))
+
+    # Asked of accounting, not read from the closure file. Closures are
+    # written by `hpc3-triage`, and a campaign that quietly depended on
+    # someone having run another command would resubmit finished work
+    # whenever they had not. Restricted to the jobs that declared one of THIS
+    # campaign's artifacts, so the query is the size of the campaign rather
+    # than of the ledger.
+    wanted = set(artifacts)
+    candidates = [entry["job_id"] for entry in recorded if entry["artifact"] in wanted]
+    states: dict[str, str] = {}
+    if candidates != []:
+        states = {
+            status["job_id"]: status["state"]
+            for status in parse_sacct_output(run_remote(host, sacct_command(candidates)), cluster)
+        }
+    plan = plan_campaign(
+        specs,
+        present=present,
+        finished=finished_artifacts(recorded, states),
+        claimed=claimed,
     )
-    plan = plan_campaign(specs, present=present, claimed=claimed)
 
     for label in plan["done"]:
         _test_hooks.emit(f"done      {label}")

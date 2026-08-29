@@ -32,14 +32,16 @@ from hpc3.cli import campaign as campaign_cli
 from hpc3.contracts.job import JobSpec
 from hpc3.core.campaign import (
     existence_command,
+    finished_artifacts,
     parse_existence,
     plan_campaign,
     require_every_member_declares_an_artifact,
 )
-from tests.against_hpc3 import decode_job_spec, read_ledger
+from tests.against_hpc3 import decode_job_spec, decode_ledger_entry, read_ledger
 from tests.conftest import (
     FakeRun,
     gpus,
+    ledger_row,
     project_config,
     script_healthy_cluster,
     workspace_document,
@@ -135,31 +137,92 @@ class TestAskingWhichArtifactsExist:
         assert excinfo.value.code is Hpc3ErrorCode.SACCT_FIELD_UNPARSABLE
 
 
+class TestWhichArtifactsAJobActuallyFinished:
+    def test_a_completed_job_finishes_its_artifact(self) -> None:
+        entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.tr", artifact=_TR))]
+        assert finished_artifacts(entries, {"1": "COMPLETED"}) == {_TR}
+
+    def test_a_preempted_job_does_not(self) -> None:
+        """kk_best.pt after a preemption at 1273 seconds is a real file that
+        no run finished."""
+        entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR))]
+        assert finished_artifacts(entries, {"1": "PREEMPTED"}) == set()
+
+    def test_a_failed_or_cancelled_job_does_not_either(self) -> None:
+        entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR))]
+        for state in ("FAILED", "CANCELLED", "TIMEOUT"):
+            assert finished_artifacts(entries, {"1": state}) == set()
+
+    def test_a_job_with_no_state_has_no_claim(self) -> None:
+        entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.tr", artifact=_TR))]
+        assert finished_artifacts(entries, {}) == set()
+
+    def test_a_job_declaring_no_artifact_finishes_nothing(self) -> None:
+        entries = [decode_ledger_entry(ledger_row(job_id="1", name="abl.p6", artifact=None))]
+        assert finished_artifacts(entries, {"1": "COMPLETED"}) == set()
+
+    def test_one_completed_attempt_is_enough(self) -> None:
+        """A member preempted twice and then finished is finished."""
+        entries = [
+            decode_ledger_entry(ledger_row(job_id="1", name="abl.kk", artifact=_TR)),
+            decode_ledger_entry(ledger_row(job_id="2", name="abl.kk-r2", artifact=_TR)),
+        ]
+        assert finished_artifacts(entries, {"1": "PREEMPTED", "2": "COMPLETED"}) == {_TR}
+
+
 class TestThePlan:
     def test_a_member_whose_artifact_exists_is_done(self) -> None:
-        plan = plan_campaign([_spec("tr", _TR)], present={_TR}, claimed={})
+        plan = plan_campaign([_spec("tr", _TR)], present={_TR}, finished={_TR}, claimed={})
         assert plan["done"] == ["abl.tr"]
         assert plan["missing"] == []
 
     def test_a_member_a_live_job_is_writing_is_in_flight(self) -> None:
-        plan = plan_campaign([_spec("uz", _TR)], present=set(), claimed={_TR: "abl.uz-r3"})
+        plan = plan_campaign(
+            [_spec("uz", _TR)],
+            present=set(),
+            finished=set(),
+            claimed={_TR: "abl.uz-r3"},
+        )
         assert plan["in_flight"] == {"abl.uz": "abl.uz-r3"}
         assert plan["missing"] == []
 
     def test_a_member_that_is_neither_is_submitted(self) -> None:
-        plan = plan_campaign([_spec("tr", _TR)], present=set(), claimed={})
+        plan = plan_campaign([_spec("tr", _TR)], present=set(), finished=set(), claimed={})
+        assert [s["name"] for s in plan["missing"]] == ["tr"]
+
+    def test_a_checkpoint_from_a_killed_run_is_not_done(self) -> None:
+        """The real defect, and the first thing this command got wrong.
+
+        `bases-kk` was preempted at 1273 seconds having written `kk_best.pt`,
+        because a training loop writes its best checkpoint whenever validation
+        improves rather than at the end. The campaign reported it done and
+        would have stopped resubmitting a member that was under-trained.
+        """
+        plan = plan_campaign([_spec("kk", _TR)], present={_TR}, finished=set(), claimed={})
+        assert plan["done"] == []
+        assert [s["name"] for s in plan["missing"]] == ["kk"]
+
+    def test_a_finished_run_whose_output_is_gone_is_resubmitted(self) -> None:
+        """The other half of the conjunction. Completion without the file is a
+        result someone moved or deleted, and redoing it is right."""
+        plan = plan_campaign([_spec("tr", _TR)], present=set(), finished={_TR}, claimed={})
         assert [s["name"] for s in plan["missing"]] == ["tr"]
 
     def test_in_flight_beats_present(self) -> None:
         """A file existing while a job writes it is a partially-written file,
         not a finished one."""
-        plan = plan_campaign([_spec("tr", _TR)], present={_TR}, claimed={_TR: "abl.tr-r2"})
+        plan = plan_campaign(
+            [_spec("tr", _TR)],
+            present={_TR},
+            finished={_TR},
+            claimed={_TR: "abl.tr-r2"},
+        )
         assert plan["done"] == []
         assert plan["in_flight"] == {"abl.tr": "abl.tr-r2"}
 
     def test_the_three_groups_partition_the_members(self) -> None:
         specs = [_spec("tr", _TR), _spec("az", _AZ), _spec("kk", "/pub/kk.pt")]
-        plan = plan_campaign(specs, present={_TR}, claimed={_AZ: "abl.az-r1"})
+        plan = plan_campaign(specs, present={_TR}, finished={_TR}, claimed={_AZ: "abl.az-r1"})
         assert plan["done"] == ["abl.tr"]
         assert plan["in_flight"] == {"abl.az": "abl.az-r1"}
         assert [s["name"] for s in plan["missing"]] == ["kk"]
@@ -189,11 +252,44 @@ class TestTheCommand:
         config = write_workspace(tmp_path / "hpc3.json", workspace_document())
         return ["--config", config, "--run", str(tmp_path / "sweep.json")]
 
+    def _ran(self, tmp_path: pathlib.Path, fake_run: FakeRun, *, finished: list[str]) -> None:
+        """Record a job per artifact and say how each of them ended.
+
+        Existence alone no longer means done, so a test that wants a member
+        to read as finished has to supply what makes that true: a ledger row
+        declaring the artifact, and an accounting state for that job.
+
+        Args:
+            tmp_path: Directory holding the ledger.
+            fake_run: The runner to script the accounting reply on.
+            finished: Artifacts whose job COMPLETED. Any other artifact gets
+                a job that was PREEMPTED, which is the kk_best.pt case: a
+                real file written by a run that did not finish.
+        """
+        rows = [
+            ledger_row(job_id=f"90{index}", name=f"abl.prior-{index}", artifact=artifact)
+            for index, artifact in enumerate((_TR, _AZ))
+        ]
+        write_file(
+            tmp_path / "ledger.jsonl",
+            b"".join(dump_json_str(row).encode("utf-8") + b"\n" for row in rows),
+        )
+        fake_run.add(
+            "sacct",
+            stdout="".join(
+                f"90{index}|abl.prior-{index}|free-gpu|"
+                f"{'COMPLETED' if artifact in finished else 'PREEMPTED'}"
+                "|60|billing=8,gres/gpu=1|n1\n"
+                for index, artifact in enumerate((_TR, _AZ))
+            ),
+        )
+
     def test_it_submits_only_what_is_missing(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
     ) -> None:
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nABSENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="")
+        self._ran(tmp_path, fake_run, finished=[_TR])
         script_healthy_cluster(fake_run)
 
         assert campaign_cli.main(self._document(tmp_path)) == 0
@@ -206,10 +302,12 @@ class TestTheCommand:
     ) -> None:
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nABSENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="")
+        self._ran(tmp_path, fake_run, finished=[_TR])
         script_healthy_cluster(fake_run)
 
         campaign_cli.main(self._document(tmp_path))
-        assert [e["name"] for e in read_ledger(tmp_path / "ledger.jsonl")] == ["abl.bases-az"]
+        names = [e["name"] for e in read_ledger(tmp_path / "ledger.jsonl")]
+        assert names == ["abl.prior-0", "abl.prior-1", "abl.bases-az"]
 
     def test_a_finished_campaign_submits_nothing_and_succeeds(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
@@ -218,6 +316,7 @@ class TestTheCommand:
         once finished could not be run on a schedule."""
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nPRESENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="")
+        self._ran(tmp_path, fake_run, finished=[_TR, _AZ])
 
         assert campaign_cli.main(self._document(tmp_path)) == 0
         assert emitted[-1] == "2 done, 0 in flight, 0 submitted, 0 remaining"
@@ -244,13 +343,31 @@ class TestTheCommand:
             }
         )
         args = self._document(tmp_path)
-        write_file(tmp_path / "ledger.jsonl", ledger_line.encode("utf-8") + b"\n")
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nABSENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="55646157|abl.bases-az-r2|RUNNING\n")
+        # tr is genuinely finished; the live az-r2 row is appended after, so
+        # az reads as in flight rather than as anything else.
+        self._ran(tmp_path, fake_run, finished=[_TR])
+        path = tmp_path / "ledger.jsonl"
+        write_file(path, path.read_bytes() + ledger_line.encode("utf-8") + b"\n")
 
         assert campaign_cli.main(args) == 0
         assert emitted[1] == "in flight abl.bases-az <- abl.bases-az-r2"
         assert not any("sbatch" in command for command in fake_run.commands())
+
+    def test_a_campaign_no_job_has_ever_touched_asks_accounting_nothing(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
+    ) -> None:
+        """The first run of a new experiment: an empty ledger means there is
+        no job to ask about, and `sacct` with no ids would report the whole
+        cluster's history rather than nothing."""
+        fake_run.add("PRESENT|", stdout=f"ABSENT|{_TR}\nABSENT|{_AZ}\n")
+        fake_run.add("squeue --me", stdout="")
+        script_healthy_cluster(fake_run)
+
+        assert campaign_cli.main(self._document(tmp_path)) == 0
+        assert not any(command.startswith("sacct") for command in fake_run.commands())
+        assert emitted[-1] == "0 done, 0 in flight, 2 submitted, 2 remaining"
 
     def test_a_member_with_no_artifact_is_refused_before_any_query(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
@@ -299,6 +416,7 @@ class TestTheCommand:
         )
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nABSENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="")
+        self._ran(tmp_path, fake_run, finished=[_TR])
         script_healthy_cluster(fake_run)
 
         assert campaign_cli.main(["--config", config, "--run", str(tmp_path / "sweep.json")]) == 0
@@ -323,6 +441,7 @@ class TestTheCommand:
     ) -> None:
         fake_run.add("PRESENT|", stdout=f"PRESENT|{_TR}\nPRESENT|{_AZ}\n")
         fake_run.add("squeue --me", stdout="")
+        self._ran(tmp_path, fake_run, finished=[_TR, _AZ])
         argv[:] = ["prog", *self._document(tmp_path)]
         with pytest.raises(SystemExit) as excinfo:
             campaign_cli.entrypoint()

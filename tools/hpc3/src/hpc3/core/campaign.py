@@ -18,7 +18,8 @@ A CAMPAIGN IS THE SAME DOCUMENT, RUN AGAIN. It takes the sweep document that
 already exists -- no new shape to learn, and every committed sweep is already
 one -- and instead of submitting all members, it computes what is missing:
 
-* **done** -- the member's artifact exists on the cluster. Nothing to do.
+* **done** -- the member's artifact exists on the cluster AND a job that
+  declared it reached ``COMPLETED``. Both halves are load-bearing, see below.
 * **in flight** -- a live job is already writing it. Nothing to do, and
   submitting would be the ``uz_best.pt`` race (:mod:`hpc3.core.inflight`).
 * **missing** -- neither. Submit it.
@@ -29,8 +30,23 @@ keep between runs because the cluster holds it -- the artifacts that exist and
 the jobs that are live are both facts you can ask for, and neither can go
 stale the way a transcription does.
 
+EXISTENCE IS NOT COMPLETION, and assuming it was is the first thing this
+command got wrong. ``turkic-lstm.bases-kk`` was preempted at 1273 seconds,
+having written ``kk_best.pt`` -- because a training loop writes its best
+checkpoint whenever validation improves, not at the end. The file existed and
+the run had not finished, and the campaign called it done: it would have
+stopped resubmitting a member that was silently under-trained, and reported
+the experiment complete. A checkpoint is a progress marker that happens to
+live at the artifact's path.
+
+So a member is done when the artifact exists AND some job that declared it
+reached ``COMPLETED``. The states are asked of the cluster rather than read
+from the closure file alone, because closures are written by ``hpc3-triage``
+and a campaign that silently depended on someone having run another command
+would resubmit finished work whenever they had not.
+
 EVERY MEMBER MUST DECLARE AN ARTIFACT, and this is the one thing a campaign
-refuses. "Done" is defined as the artifact existing; a member that writes no
+refuses. Done is defined in terms of the artifact; a member that writes no
 file of its own has no done, so every run would resubmit it forever. That is
 not a hypothetical -- every ``cleargbm`` sweep member runs ``--no-save-model``
 and declares ``null``, correctly. Those sweeps are perfectly good sweeps and
@@ -41,13 +57,17 @@ like enthusiasm.
 from __future__ import annotations
 
 import shlex
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 from typing_extensions import TypedDict
 
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
+from hpc3.contracts.ledger import LedgerEntry
+
+FINISHED_STATE = "COMPLETED"
+"""The only terminal state that means the artifact is the finished thing."""
 
 _PRESENT = "PRESENT|"
 _ABSENT = "ABSENT|"
@@ -163,22 +183,62 @@ def parse_existence(output: str) -> set[str]:
     return present
 
 
+def finished_artifacts(entries: Sequence[LedgerEntry], states: Mapping[str, str]) -> set[str]:
+    """Find artifacts some job actually ran to completion.
+
+    Args:
+        entries: The whole ledger, which maps a job to the artifact it
+            declared.
+        states: Terminal state by job id, however obtained -- accounting,
+            the closure file, or both merged. A job absent from it has no
+            claim to having finished.
+
+    Returns:
+        The artifacts with at least one ``COMPLETED`` job behind them.
+        PREEMPTED, FAILED and CANCELLED are all absent deliberately: each of
+        them can leave a plausible file at the artifact's path, and
+        ``kk_best.pt`` after a preemption at 1273 seconds is exactly such a
+        file.
+    """
+    finished: set[str] = set()
+    for entry in entries:
+        artifact = entry["artifact"]
+        if artifact is None:
+            continue
+        if states.get(entry["job_id"]) == FINISHED_STATE:
+            finished.add(artifact)
+    return finished
+
+
 def plan_campaign(
-    specs: Sequence[JobSpec], *, present: set[str], claimed: dict[str, str]
+    specs: Sequence[JobSpec],
+    *,
+    present: set[str],
+    finished: set[str],
+    claimed: dict[str, str],
 ) -> CampaignPlan:
     """Split the members into finished, running, and still to do.
 
     Args:
         specs: The expanded members, every one declaring an artifact.
         present: Artifacts that exist on the cluster.
+        finished: Artifacts a job ran to completion, from
+            :func:`finished_artifacts`.
         claimed: Artifact to the live job writing it, from
             :func:`~hpc3.core.inflight.claimed_artifacts`.
 
     Returns:
-        The three groups. A member that is BOTH present and in flight counts
-        as in flight, because that is the state that forbids submitting: the
-        file existing while a job writes it is a partially-written file, not a
-        finished one.
+        The three groups.
+
+        A member is done only when its artifact is in BOTH sets. Present
+        alone is a checkpoint from a run that was killed; finished alone is a
+        run whose output has since been moved or deleted, and resubmitting
+        that is right.
+
+        A member that is both present and in flight counts as in flight,
+        because that is the state that forbids submitting: a file being
+        written by a live job is a partially-written file whatever else is
+        true of it.
     """
     done: list[str] = []
     in_flight: dict[str, str] = {}
@@ -189,7 +249,7 @@ def plan_campaign(
         holder = claimed.get(artifact) if artifact is not None else None
         if holder is not None:
             in_flight[label] = holder
-        elif artifact in present:
+        elif artifact in present and artifact in finished:
             done.append(label)
         else:
             missing.append(spec)
@@ -197,8 +257,10 @@ def plan_campaign(
 
 
 __all__ = [
+    "FINISHED_STATE",
     "CampaignPlan",
     "existence_command",
+    "finished_artifacts",
     "parse_existence",
     "plan_campaign",
     "require_every_member_declares_an_artifact",
