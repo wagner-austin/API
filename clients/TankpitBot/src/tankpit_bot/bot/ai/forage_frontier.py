@@ -62,6 +62,17 @@ the field has had time to repopulate. Same respawn rationale as
 _ARRIVE_TILES = 2
 """Standing within this of the goal counts as having looked at it."""
 
+_GOAL_ATTEMPT_CAP = 3
+"""Travel dispatches a latched goal survives before it is tombstoned.
+
+The displacement law can bounce every landing far from an unlandable
+block center, so arrival never fires and the latch re-throws forever:
+arterial (2026-08-28 20:52, run bot-20260828-205052) paid 14+
+teleports at (120,104) with every landing 9-25 tiles out. Three
+attempts prove the block unlandable; the tombstone sends the circuit
+on and the TTL retries it later.
+"""
+
 
 def _equipment_deficient(ctx: DecideCtx) -> bool:
     """Return True when the restock bars are not yet met.
@@ -204,6 +215,11 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
     if goal_live and max(abs(sx - goal_x), abs(sy - goal_y)) <= _ARRIVE_TILES:
         ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
         goal_live = False
+    if goal_live and base_state["forage_goal_attempts"] >= _GOAL_ATTEMPT_CAP:
+        # Every landing bounced away from the center: the block is
+        # unlandable, and re-throwing burns ~20 fuel per attempt.
+        ctx.ws.forage_visited[f"{goal_x},{goal_y}"] = ctx.timestamp_ms
+        goal_live = False
     candidates = _stale_block_centers(ctx, terrain)
     if goal_live:
         candidates = [(goal_x, goal_y)] + [c for c in candidates if c != (goal_x, goal_y)]
@@ -240,6 +256,11 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
                     **base_state,
                     "forage_goal_x": target_x,
                     "forage_goal_y": target_y,
+                    "forage_goal_attempts": (
+                        base_state["forage_goal_attempts"] + 1
+                        if goal_live and (target_x, target_y) == (goal_x, goal_y)
+                        else 1
+                    ),
                 }
             ),
             ctx.equip,

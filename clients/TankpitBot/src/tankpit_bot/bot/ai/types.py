@@ -285,6 +285,13 @@ class AIStateDict(TypedDict):
             19:31:00). Released by arrival (the block is tombstoned)
             or by the goal failing its own qualification.
         forage_goal_y: Y of that latched goal (-1 when none).
+        forage_goal_attempts: Travel dispatches served toward the
+            latched goal. The displacement law can bounce a landing
+            far from an unlandable block center; without a cap the
+            goal never comes within the arrival radius and the
+            frontier re-throws forever (arterial 2026-08-28 20:52:
+            14+ teleports at (120,104), every landing 9-25 tiles
+            out). At the cap the block is tombstoned as unlandable.
     """
 
     config: AIConfigDict
@@ -329,6 +336,7 @@ class AIStateDict(TypedDict):
     maroon_pan_y: int
     forage_goal_x: int
     forage_goal_y: int
+    forage_goal_attempts: int
 
 
 def make_respawn_ai_state(previous: AIStateDict) -> AIStateDict:
@@ -428,6 +436,7 @@ def make_initial_ai_state(
         maroon_pan_y=-1,
         forage_goal_x=-1,
         forage_goal_y=-1,
+        forage_goal_attempts=0,
     )
 
 

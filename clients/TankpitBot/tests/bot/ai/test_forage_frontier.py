@@ -244,6 +244,52 @@ def test_unwalkable_in_window_center_is_passed_over() -> None:
     assert plan_forage_frontier_hop(ctx, ctx.base) is None
 
 
+def test_goal_attempts_increment_and_reset() -> None:
+    """Serving the standing goal counts up; a fresh goal starts at 1."""
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "forage_goal_x": 136,
+            "forage_goal_y": 104,
+            "forage_goal_attempts": 1,
+        }
+    )
+    ctx = _frontier_ctx(ai_state=ai_state)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert decision["updated_ai_state"]["forage_goal_attempts"] == 2
+
+
+def test_unlandable_goal_is_tombstoned_at_the_attempt_cap() -> None:
+    """Three bounced throws prove the block unlandable and move on.
+
+    Arterial (2026-08-28 20:52) paid 14+ teleports at (120,104) with
+    every landing displaced 9-25 tiles out: arrival never fired, the
+    latch never released, and each re-throw burned ~20 fuel.
+    """
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "forage_goal_x": 136,
+            "forage_goal_y": 104,
+            "forage_goal_attempts": 3,
+        }
+    )
+    ws = WorldService()
+    ctx = _frontier_ctx(ai_state=ai_state, ws=ws, stale_blocks=((8, 6), (6, 5)))
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    assert ws.forage_visited["136,104"] == _NOW
+    if decision is None:
+        raise AssertionError("expected a fresh frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (104, 88)
+    assert decision["updated_ai_state"]["forage_goal_attempts"] == 1
+
+
 def test_arrival_tombstones_the_goal_and_picks_fresh() -> None:
     """Standing within two tiles of the goal releases and tombstones it."""
     ai_state = AIStateDict(
