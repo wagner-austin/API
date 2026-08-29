@@ -25,6 +25,7 @@ nothing owned this step.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from typing_extensions import TypedDict
@@ -423,8 +424,40 @@ def decode_run_record(value: JSONValue) -> RunRecord:
     )
 
 
+RUN_RECORD_SUFFIX = ".runrecord.json"
+"""Appended to a result file's name to name its record.
+
+A sidecar rather than fields inside the result: the fingerprint and the
+observations are facts about the whole run, and repeating them on every row
+of a CSV or inside a manifest's per-seed list invites the reading that they
+vary per row.
+
+Defined here rather than per experiment because it is the same fact every
+time, and a convention spelled out separately in each repository is one that
+has already drifted somewhere.
+"""
+
+
+def run_record_sidecar(result_path: Path) -> Path:
+    """Name the record that belongs beside a result file.
+
+    Args:
+        result_path: The result the record describes -- a CSV, a manifest,
+            whatever the experiment writes.
+
+    Returns:
+        The sidecar path, next to it. The suffix is APPENDED rather than
+        substituted, so ``bench.json`` gives ``bench.json.runrecord.json``
+        and the result's own extension stays visible: two experiments whose
+        results are ``x.json`` and ``x.csv`` must not name one sidecar
+        between them.
+    """
+    return result_path.with_name(result_path.name + RUN_RECORD_SUFFIX)
+
+
 __all__ = [
     "NO_PAYLOAD",
+    "RUN_RECORD_SUFFIX",
     "Observation",
     "ObservationAgreement",
     "ObservationDelta",
@@ -436,4 +469,5 @@ __all__ = [
     "decode_run_record",
     "encode_run_record",
     "run_record",
+    "run_record_sidecar",
 ]

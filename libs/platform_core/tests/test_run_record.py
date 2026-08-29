@@ -9,17 +9,21 @@ finding and a comparison that omits it looks complete.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from platform_core.comparability import Calibration, RunFingerprint
 from platform_core.determinism_record import TRUE, determinism_record
 from platform_core.json_utils import JSONTypeError
 from platform_core.run_record import (
+    RUN_RECORD_SUFFIX,
     Observation,
     compare_run_records,
     decode_run_record,
     encode_run_record,
     run_record,
+    run_record_sidecar,
 )
 from platform_core.testing import sample_run_fingerprint
 
@@ -217,3 +221,24 @@ def test_decode_rejects_a_broken_nested_fingerprint_and_a_non_object() -> None:
         decode_run_record(encoded)
     with pytest.raises(JSONTypeError):
         decode_run_record("armA")
+
+
+class TestNamingTheSidecar:
+    """The record lives beside the result it describes.
+
+    A sidecar rather than fields inside the result: the fingerprint and the
+    observations are facts about the whole run, and repeating them on every
+    row of a CSV invites the reading that they vary per row.
+    """
+
+    def test_the_suffix_is_appended_not_substituted(self) -> None:
+        """Two experiments whose results are `x.json` and `x.csv` must not
+        name one sidecar between them, so the result's own extension stays."""
+        assert run_record_sidecar(Path("bench.json")).name == "bench.json.runrecord.json"
+        assert run_record_sidecar(Path("bench.csv")).name == "bench.csv.runrecord.json"
+
+    def test_it_stays_in_the_results_directory(self) -> None:
+        assert run_record_sidecar(Path("out/nested/bench.json")).parent == Path("out/nested")
+
+    def test_a_result_with_no_extension_still_gets_one(self) -> None:
+        assert run_record_sidecar(Path("results")).name == "results" + RUN_RECORD_SUFFIX

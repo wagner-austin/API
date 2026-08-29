@@ -22,6 +22,7 @@ from platform_core.determinism_cpu import apply_cpu_determinism
 from platform_core.determinism_env import SINGLE_THREAD
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
+from platform_core.run_record import encode_run_record, run_record_sidecar
 
 # NOTHING FROM covenant_ml IS IMPORTED AT MODULE SCOPE, and that is a
 # correctness requirement rather than a preference. `covenant_ml/__init__`
@@ -166,7 +167,10 @@ def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
         render_report,
         run_benchmark,
     )
-    from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+    from covenant_ml.benchmarking.provenance import (
+        benchmark_fingerprint,
+        benchmark_run_record,
+    )
 
     # Read through the config layer, not os.environ. Writing a variable a
     # native library requires is a different act from reading configuration,
@@ -223,6 +227,20 @@ def main(argv: list[str] | None = None, pin: PinProtocol = _real_pin) -> int:
         document = dump_json_str(encode_benchmark_manifest(manifest), indent=1)
         out_path.write_text(document, encoding="utf-8")
         _write(f"\nmanifest -> {out_path}\n")
+
+        # Written BESIDE the manifest, not instead of it. The manifest holds
+        # the per-seed detail this benchmark exists to produce; the record
+        # holds the few numbers someone will subtract, in the vocabulary the
+        # comparability layer already checks. Neither contains the other, and
+        # a benchmark that emitted only the manifest is one no cross-
+        # experiment contrast can read -- which is the gap the fingerprint
+        # alone did not close.
+        record_path = run_record_sidecar(out_path)
+        record_path.write_text(
+            dump_json_str(encode_run_record(benchmark_run_record(manifest)), indent=1),
+            encoding="utf-8",
+        )
+        _write(f"run record -> {record_path}\n")
 
     return 0
 

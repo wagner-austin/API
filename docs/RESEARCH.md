@@ -189,14 +189,27 @@ Real research, producing numbers that get compared, reachable by no tool.
 
 ### `sirius` — declared as an example, never run
 
-- **Repo:** unconfirmed. `examples/chain-sirius-zodiac.json` runs the SIRIUS
-  `formula` and `zodiac` subcommands, which are metabolomics tools;
-  `~/PROJECTS/metabolomics-dashboard` contains `cho_formulas_assigned.csv`,
-  which is consistent with being the destination, but nothing states the link
-  and it should be confirmed before being relied on.
-- **Status:** appears only in `tools/hpc3/examples/`, with zero ledger rows.
-  A second PI's work (accounts are per-PI; see the account comment in LSTM's
-  `slurm/train_base.sub`) that was scoped and never onboarded.
+- **Repo:** none. **Confirmed 2026-08-29, and the answer is negative** — the
+  entry above used to say "unconfirmed … consistent with being the
+  destination, but nothing states the link and it should be confirmed before
+  being relied on." It has now been checked, and the link does not hold:
+  `~/PROJECTS/metabolomics-dashboard` contains **zero** occurrences of
+  `sirius` or `zodiac` in any `.py`, `.R`, `.Rmd`, `.md` or `.json` file. It
+  assigns formulas with **MFAssignR in R** (`run_stage1.R`,
+  `run_mfassignr.Rmd`, `stage1_state.RData`). `cho_formulas_assigned.csv` is
+  MFAssignR's output, not SIRIUS's.
+- **Not on the cluster either.** `/pub/wagnera3/envs/sirius` and
+  `/pub/wagnera3/sirius` do not exist, `sirius` is not on `PATH`, and no
+  `sirius` module is available.
+- **Status: deliberately NOT onboarded, and this is the finding rather than a
+  task left undone.** Registering it would declare a project whose
+  environment does not exist, running a tool the repo it names does not use.
+  That is the failure `c38fcc52` documents on this index's own first day —
+  a script read as practice and asserted — reproduced on purpose. The
+  `sirius` entries in `tools/hpc3/README.md` and
+  `examples/chain-sirius-zodiac.json` are ILLUSTRATIONS of the chain shape
+  and nothing more; they are kept because the shape is worth showing, and
+  they are named here so nobody mistakes them for a registration.
 
 ---
 
@@ -207,12 +220,37 @@ to emit: an experiment name, a label, named observations, a payload digest,
 and a `RunFingerprint` saying what produced them. `platform_core.comparability`
 then decides whether two of them may be subtracted.
 
-Its consumers today are Model-Trainer's CLIs and nothing else. `covenant_ml`
-benchmarking has a fingerprint but its own record shape; `covenant-radar-api`'s
-optimisation history has neither; LSTM and RustedWarfareBot cannot adopt it at
-all, because `platform_core` is not installable outside this monorepo.
+Its consumers, as of 2026-08-29:
 
-That is the gap this index exists to make visible rather than to hide.
+- **Model-Trainer's CLIs** — the original adopters.
+- **`covenant_ml` benchmarking** — emits one beside every manifest it writes
+  (`benchmark_run_record`). The manifest holds the per-seed detail; the
+  record holds the claim, in the vocabulary `compare_run_records` checks. It
+  had a fingerprint and its own record shape until now, which is why nothing
+  could read its numbers beside another experiment's.
+- **LSTM** — `char_lstm.provenance` writes a `.runrecord.json` beside every
+  results CSV.
+
+Still outstanding, stated precisely:
+
+- **`covenant-radar-api`'s optimisation history** carries an explicit
+  three-state `fingerprint` per row but no `RunRecord`. Its entry point now
+  pins the BLAS thread count (2026-08-29), so future rows are at least
+  reproducible against each other; the 3,068 rows written before that are
+  not, and their `fingerprint: null` says so.
+- **RustedWarfareBot** has neither.
+
+THE CLAIM THAT USED TO STAND HERE WAS FALSE. This paragraph said "LSTM and
+RustedWarfareBot cannot adopt it at all, because `platform_core` is not
+installable outside this monorepo." Both halves are wrong: LSTM adopted it on
+2026-08-28 via a git dependency pinned by its lock file, and RustedWarfareBot
+is IN this monorepo — its sibling `clients/TankpitBot` already declares
+`platform-core = { path = "../../libs/platform_core", develop = true }`. The
+obstacle was never installability.
+
+That is the gap this index exists to make visible rather than to hide, and
+the sentence above is what happens when it is described from memory instead
+of checked.
 
 ## Adding a research project
 

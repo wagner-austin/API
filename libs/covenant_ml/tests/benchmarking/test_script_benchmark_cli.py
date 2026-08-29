@@ -16,8 +16,10 @@ from platform_core.determinism_cpu import CPU_STACK, NativeLibrariesAlreadyLoade
 from platform_core.determinism_env import BLAS_THREAD_ENV_VARS, SINGLE_THREAD
 from platform_core.determinism_record import DeterminismRecord, determinism_record
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_core.run_record import decode_run_record, run_record_sidecar
 from scripts.benchmark_cleargbm_vs_lightgbm import DEFAULT_CSV, build_parser, main
 
+from covenant_ml.benchmarking.provenance import BENCHMARK_EXPERIMENT
 from covenant_ml.benchmarking.types import (
     MANIFEST_SCHEMA_VERSION,
     BenchmarkManifest,
@@ -220,3 +222,48 @@ def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
             runpy.run_path(str(script), run_name="__main__")
     finally:
         sys.argv = original_argv
+
+
+def test_run_writes_a_run_record_beside_the_manifest(tmp_path: Path) -> None:
+    """A benchmark that emitted only its manifest is one no cross-experiment
+    contrast can read.
+
+    The manifest and the record are both written because neither contains the
+    other: the manifest holds the per-seed detail, the record holds the claim
+    in the vocabulary `platform_core.run_record` checks comparability in.
+    """
+    csv_path = write_dataset(tmp_path)
+    out_path = tmp_path / "manifest.json"
+    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+
+    assert exit_code == 0
+    sidecar = run_record_sidecar(out_path)
+    assert sidecar.is_file()
+
+    record = decode_run_record(
+        narrow_json_to_dict(load_json_str(sidecar.read_text(encoding="utf-8")))
+    )
+    assert record["experiment"] == BENCHMARK_EXPERIMENT
+    names = {observation["name"] for observation in record["observations"]}
+    assert "normalized_ratio" in names
+    assert "cleargbm.mean_fit_s" in names
+
+
+def test_the_record_carries_the_same_fingerprint_the_manifest_does(tmp_path: Path) -> None:
+    """Two files describing one run must not disagree about what ran it."""
+    csv_path = write_dataset(tmp_path)
+    out_path = tmp_path / "manifest.json"
+    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+
+    record = decode_run_record(
+        narrow_json_to_dict(load_json_str(run_record_sidecar(out_path).read_text(encoding="utf-8")))
+    )
+    assert record["fingerprint"] == read_manifest(out_path)["fingerprint"]
+
+
+def test_no_out_path_writes_neither_file(tmp_path: Path) -> None:
+    """The record follows the manifest: asked for nothing, it writes nothing
+    rather than dropping a sidecar next to a file that does not exist."""
+    csv_path = write_dataset(tmp_path)
+    assert main(cli_args(csv_path), pin=_stand_in_pin) == 0
+    assert list(tmp_path.glob("*.runrecord.json")) == []

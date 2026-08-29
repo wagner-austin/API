@@ -13,6 +13,8 @@ from types import ModuleType
 import pytest
 import scripts._test_hooks as _hooks
 from covenant_ml.types import BackendName
+from platform_core.determinism_cpu import NativeLibrariesAlreadyLoadedError
+from platform_core.determinism_record import DeterminismRecord, determinism_record
 from scripts._test_hooks import (
     LoadingProgressCallbackProtocol,
     PhaseProgressCallbackProtocol,
@@ -20,7 +22,8 @@ from scripts._test_hooks import (
     TrialProgressInfo,
     UnifiedOptimizationResult,
 )
-from scripts.optimize import main
+from scripts.optimize.__main__ import pin, run
+from scripts.optimize.main import main
 
 from .conftest import make_fake_lightgbm_result, make_fake_result
 
@@ -241,8 +244,20 @@ class TestMain:
 class TestModuleEntry:
     """Tests for module entry point."""
 
-    def test_module_main_entry_with_help(self) -> None:
-        """Test __main__ entry point via runpy."""
+    def test_module_main_entry_refuses_once_the_natives_are_loaded(self) -> None:
+        """Running as ``__main__`` pins first, and refuses if it cannot.
+
+        This asserted ``--help`` exited 0 until 2026-08-29, when the entry
+        point started pinning the BLAS thread count above its first numeric
+        import. A pytest worker has already imported numpy, scipy, sklearn
+        and pandas, so the pin correctly refuses here -- the variables have
+        been read and writing them now would record a posture the process
+        does not have.
+
+        That is the behaviour worth pinning: not that the entry point is
+        lenient, but that it will not run a search whose arithmetic it cannot
+        state. A real shell has none of those loaded and the pin succeeds.
+        """
         import runpy
 
         modules_to_clear = [k for k in sys.modules if k.startswith("scripts.optimize")]
@@ -253,12 +268,59 @@ class TestModuleEntry:
         original_argv = sys.argv
         sys.argv = ["optimize", "--help"]
         try:
-            with pytest.raises(SystemExit) as exc_info:
+            with pytest.raises(NativeLibrariesAlreadyLoadedError, match="already imported"):
                 runpy.run_module("scripts.optimize", run_name="__main__", alter_sys=True)
-            assert exc_info.value.code == 0
         finally:
             sys.argv = original_argv
             sys.modules.update(saved_modules)
+
+    def test_a_pinned_run_reaches_the_optimizer(self) -> None:
+        """The success path, with the pin stated rather than performed.
+
+        ``--help`` is answered by argparse, so this proves the entry point
+        gets past its pin and into ``main`` without running a search.
+        """
+        pinned: list[DeterminismRecord] = []
+
+        def fake_pin() -> DeterminismRecord:
+            record = determinism_record("cpu", {"OMP_NUM_THREADS": "1"})
+            pinned.append(record)
+            return record
+
+        with pytest.raises(SystemExit) as exc_info:
+            run(["--help"], pin_cpu=fake_pin)
+
+        assert exc_info.value.code == 0
+        assert len(pinned) == 1
+
+    def test_the_pin_happens_before_the_optimizer_is_imported(self) -> None:
+        """The ordering the whole arrangement exists for.
+
+        A pin after the import is a pin nobody reads, and that was the state
+        of this entry point for its entire history: ``__init__`` pulled
+        ``runner``, ``runner`` pulled numpy, and numpy read the variables.
+        """
+        seen: list[bool] = []
+
+        def watching_pin() -> DeterminismRecord:
+            seen.append("scripts.optimize.main" in sys.modules)
+            return determinism_record("cpu", {"OMP_NUM_THREADS": "1"})
+
+        sys.modules.pop("scripts.optimize.main", None)
+        with pytest.raises(SystemExit):
+            run(["--help"], pin_cpu=watching_pin)
+
+        assert seen == [False]
+
+    def test_pinning_is_refused_when_a_native_library_is_loaded(self) -> None:
+        """Stated through the injected module table rather than by unloading
+        numpy from a worker other tests are sharing."""
+        with pytest.raises(NativeLibrariesAlreadyLoadedError):
+            pin({"numpy"})
+
+    def test_pinning_succeeds_when_nothing_numeric_is_loaded(self) -> None:
+        record = pin(set())
+        assert record["stack"] == "cpu"
 
     def test_dunder_main_module_import_does_not_execute_main(self) -> None:
         """Test importing __main__.py directly doesn't execute main."""
