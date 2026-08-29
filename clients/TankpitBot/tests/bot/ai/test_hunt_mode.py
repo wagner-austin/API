@@ -294,6 +294,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
     the regression guard expects.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((140, 100),)
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=190, y=100, name="red-50"),
     }
@@ -316,7 +317,6 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
         100000,
         None,
         "",
-        ((140, 100),),
         ws=ws,
     )
 

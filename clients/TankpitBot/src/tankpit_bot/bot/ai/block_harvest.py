@@ -18,9 +18,9 @@ from tankpit_bot.bot.ai.collect_pickups import pickup_not_worth_walk
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
-    set_resource_target,
 )
 from tankpit_bot.bot.ai.equipment import is_container_pursuable
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_within_bounds
 from tankpit_bot.bot.ai.types import AIStateDict

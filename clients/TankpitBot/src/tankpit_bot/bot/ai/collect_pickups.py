@@ -9,11 +9,12 @@ harvest live in :mod:`collect_hops`; lock continuation in
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
-from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
+from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import (
     find_equipment_candidates,
     find_fuel_candidates,
 )
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.mine_clearance import (
     find_mine_clearance_shot,
     find_walk_clearance_shot,

@@ -437,9 +437,13 @@ def _decide_hunt_acquire_fresh(
     # no_viable_targets on a phantom "fresh empty map" — the final
     # open completed on an orphan flag while the dying wire delivered
     # no data, so "I asked 2 s ago" was read as "I heard 2 s ago"
-    # while all 27 practice bots sat rejected as stale_map_data.
-    map_age_ms = ctx.timestamp_ms - ctx.ws.map_data_ingested_ms
-    if ctx.ws.map_data_ingested_ms > 0 and map_age_ms <= ctx.config["map_intel_horizon_ms"]:
+    # while all 27 practice bots sat rejected as stale_map_data. The
+    # stamp is the ctx SNAPSHOT, not the live ``ws`` field: the
+    # sniffer ingests concurrently, and judging this tick's map view
+    # by a stamp from a later moment is the exit-races-answer TOCTOU
+    # (run bot-20260828-182401's out_of_fuel twin).
+    map_age_ms = ctx.timestamp_ms - ctx.map_data_ingested_ms
+    if ctx.map_data_ingested_ms > 0 and map_age_ms <= ctx.config["map_intel_horizon_ms"]:
         relay = relay_toward_unaffordable_enemy(ctx, ai_state)
         if relay is not None:
             return relay

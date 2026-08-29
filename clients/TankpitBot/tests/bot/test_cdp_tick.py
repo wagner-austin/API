@@ -238,7 +238,6 @@ class TestBotTickOnce:
             timestamp_ms: int,
             terrain: TerrainMapProtocol | None,
             combat_feedback: CombatFeedback = "",
-            map_fuel_dots: tuple[tuple[int, int], ...] = (),
             *,
             ws: WorldService,
         ) -> TickDecisionDict:
@@ -250,7 +249,6 @@ class TestBotTickOnce:
                 timestamp_ms,
                 terrain,
                 combat_feedback,
-                map_fuel_dots,
                 ws,
             )
             return decision
@@ -334,7 +332,6 @@ class TestBotTickOnce:
             timestamp_ms: int,
             terrain: TerrainMapProtocol | None,
             combat_feedback: CombatFeedback = "",
-            map_fuel_dots: tuple[tuple[int, int], ...] = (),
             *,
             ws: WorldService,
         ) -> TickDecisionDict:
@@ -346,7 +343,6 @@ class TestBotTickOnce:
                 timestamp_ms,
                 terrain,
                 combat_feedback,
-                map_fuel_dots,
                 ws,
             )
             return decision

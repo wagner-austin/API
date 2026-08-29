@@ -14,7 +14,6 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     locked_resource_target,
     make_decision,
-    set_resource_target,
 )
 from tankpit_bot.bot.ai.equipment import (
     is_fuel_lock_release_warranted,
@@ -25,7 +24,7 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_nearest_equipment,
 )
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
-from tankpit_bot.bot.ai.intent import release_collect_plan
+from tankpit_bot.bot.ai.intent import release_collect_plan, set_resource_target
 from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile

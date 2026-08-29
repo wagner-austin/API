@@ -138,7 +138,7 @@ def test_harvest_declines_while_a_lock_is_held() -> None:
     re-target the committed-intent design forbids. While a lock is
     held, its continuation owns the pursuit.
     """
-    from tankpit_bot.bot.ai.context import set_resource_target
+    from tankpit_bot.bot.ai.intent import set_resource_target
 
     equipment = make_container_state(
         x=112, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW, failed_pickups=0

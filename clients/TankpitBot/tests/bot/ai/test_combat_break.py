@@ -298,6 +298,7 @@ def test_latched_break_escapes_even_when_the_projection_recovers() -> None:
     """
     ws = WorldService()
     base_ctx = _engage_ctx(fuel=300)
+    ws.map_fuel_dots = base_ctx.map_fuel_dots
     latched_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
@@ -306,7 +307,6 @@ def test_latched_break_escapes_even_when_the_projection_recovers() -> None:
         base_ctx.timestamp_ms,
         base_ctx.terrain,
         base_ctx.combat_feedback,
-        base_ctx.map_fuel_dots,
         ws=ws,
     )
     decision = decide_hunt_mode(latched_ctx)
@@ -431,6 +431,7 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     ws = WorldService()
     seed_confirmed_incoming(ws, 5, weapon=0, damage=-45)
     base_ctx = _engage_ctx(fuel=500, damage_state=1)
+    ws.map_fuel_dots = base_ctx.map_fuel_dots
     close_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
@@ -439,7 +440,6 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
         base_ctx.timestamp_ms,
         base_ctx.terrain,
         base_ctx.combat_feedback,
-        base_ctx.map_fuel_dots,
         ws=ws,
     )
     decision = decide_hunt_mode(close_ctx)
@@ -516,6 +516,7 @@ def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
     ws = WorldService()
     seed_confirmed_incoming(ws, 5)
     base_ctx = _engage_ctx(fuel=800)
+    ws.map_fuel_dots = base_ctx.map_fuel_dots
     close_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
@@ -524,7 +525,6 @@ def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
         base_ctx.timestamp_ms,
         base_ctx.terrain,
         base_ctx.combat_feedback,
-        base_ctx.map_fuel_dots,
         ws=ws,
     )
     decision = decide_hunt_mode(close_ctx)
@@ -537,6 +537,7 @@ def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
     """Fuel at the stored floor clears the latch and the fight resumes."""
     ws = WorldService()
     base_ctx = _engage_ctx(fuel=800)
+    ws.map_fuel_dots = base_ctx.map_fuel_dots
     latched_ctx = DecideCtx(
         base_ctx.world,
         base_ctx.self_state,
@@ -545,7 +546,6 @@ def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
         base_ctx.timestamp_ms,
         base_ctx.terrain,
         base_ctx.combat_feedback,
-        base_ctx.map_fuel_dots,
         ws=ws,
     )
     decision = decide_hunt_mode(latched_ctx)

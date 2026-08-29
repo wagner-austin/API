@@ -14,11 +14,11 @@ from tankpit_bot.bot.ai.collect_hops import (
 )
 from tankpit_bot.bot.ai.collect_locks import continue_or_release_lock
 from tankpit_bot.bot.ai.collect_mode_outcomes import (
-    _desync_rescan_decision,
-    _escape_under_fire_decision,
-    _exhausted_collect_outcome,
-    _mine_reveal_scan_decision,
-    _scan_on_landing_decision,
+    desync_rescan_decision,
+    escape_under_fire_decision,
+    exhausted_collect_outcome,
+    mine_reveal_scan_decision,
+    scan_on_landing_decision,
 )
 from tankpit_bot.bot.ai.collect_pickups import (
     mine_clearance_decision,
@@ -158,9 +158,10 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     # above declined -- known stock preempts scanning structurally.
     # A mid-sweep reveal is collected next tick; the movement aborts
     # the sweep's remainder via the anchor latch, making the sweep an
-    # incremental scan-until-found. Since 2026-08-28 it is also
-    # hoard-gated: below the radar hunt bar it declines outright and
-    # the atlas hop above is the discovery strategy.
+    # incremental scan-until-found. It runs on its extras economics
+    # (the 2026-08-28 hoard gate was reverted by operator order the
+    # same day); the atlas hop above simply outranks it for
+    # equipment discovery.
     sweep_decision = plan_quad_sweep(ctx, base_state)
     if sweep_decision is not None:
         return sweep_decision
@@ -184,7 +185,7 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if search is not None:
         return search
 
-    return _exhausted_collect_outcome(ctx, base_state)
+    return exhausted_collect_outcome(ctx, base_state)
 
 
 def _known_stock_pursuit(
@@ -263,7 +264,7 @@ def _sense_and_safety_gates(
         ``None`` when all gates pass) and the state the remaining
         cascade must thread.
     """
-    landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
+    landing_scan, base_state = scan_on_landing_decision(ctx, base_state)
     if landing_scan is not None:
         return landing_scan, base_state
 
@@ -271,15 +272,15 @@ def _sense_and_safety_gates(
     if return_fire is not None:
         return return_fire, base_state
 
-    under_fire = _escape_under_fire_decision(ctx, base_state)
+    under_fire = escape_under_fire_decision(ctx, base_state)
     if under_fire is not None:
         return under_fire, base_state
 
-    mine_reveal = _mine_reveal_scan_decision(ctx, base_state)
+    mine_reveal = mine_reveal_scan_decision(ctx, base_state)
     if mine_reveal is not None:
         return mine_reveal, base_state
 
-    return _desync_rescan_decision(ctx, base_state), base_state
+    return desync_rescan_decision(ctx, base_state), base_state
 
 
 __all__ = [

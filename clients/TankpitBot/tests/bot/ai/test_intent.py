@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONTypeError
 
-from tankpit_bot.bot.ai.context import set_resource_target
 from tankpit_bot.bot.ai.intent import (
     CollectPlanDict,
     current_collect_plan,
@@ -13,6 +12,7 @@ from tankpit_bot.bot.ai.intent import (
     encode_collect_plan,
     plan_completes_here,
     release_collect_plan,
+    set_resource_target,
     validate_collect_plan,
 )
 from tankpit_bot.bot.ai.types import make_initial_ai_state

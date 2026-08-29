@@ -196,7 +196,6 @@ def _process_tick_batch(
         inventory,
         timestamp_ms,
         terrain,
-        map_fuel_dots=ws.map_fuel_dots,
         ws=ws,
     )
 

@@ -32,10 +32,10 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    clear_resource_target,
     make_decision,
     radar_spend_worthwhile,
 )
+from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.movement import plan_viewport_walk
 from tankpit_bot.bot.ai.scoring_types import BehaviorMode
 from tankpit_bot.bot.ai.types import AIStateDict

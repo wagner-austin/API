@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.tactics import combat_radar_min
+from tankpit_bot.bot.config import resolve_weapon_resume_slack
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.naming import is_human_name
 
@@ -255,8 +256,6 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
         minus the configured slack and extra radars are at least
         ``combat_radar_min(rank)``.
     """
-    from tankpit_bot.bot.config import resolve_weapon_resume_slack
-
     if ctx.config["role"] == "gatherer":
         # The doctrinal backstop of the router's role gate
         # ([[fleet-coordination]]): a gatherer's ticks NEVER permit

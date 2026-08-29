@@ -210,22 +210,14 @@ def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
         "locked target %s left viewport - firing toward last wire position",
         pursuit["name"],
     )
-    stamped_ctx = DecideCtx(
-        ctx.world,
-        ctx.self_state,
+    stamped_ctx = ctx.derive(
         AIStateDict(
             **{
                 **ctx.ai_state,
                 "pursuit_shot_target_id": pursuit["tank_id"],
                 "pursuit_shot_ms": ctx.timestamp_ms,
             }
-        ),
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-        ws=ctx.ws,
+        )
     )
     return engage_target(stamped_ctx, pursuit)
 
@@ -243,17 +235,7 @@ def release_break_latch(ctx: DecideCtx) -> DecideCtx:
     if latch <= 0 or ctx.fuel < latch:
         return ctx
     emit_ai("break latch released (fuel %d >= floor %d)", ctx.fuel, latch)
-    return DecideCtx(
-        ctx.world,
-        ctx.self_state,
-        AIStateDict(**{**ctx.ai_state, "break_escape_until_fuel": 0}),
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-        ws=ctx.ws,
-    )
+    return ctx.derive(AIStateDict(**{**ctx.ai_state, "break_escape_until_fuel": 0}))
 
 
 def continue_break_escape(ctx: DecideCtx) -> TickDecisionDict | None:
@@ -404,21 +386,13 @@ def _break_losing_engagement(
                 release_at,
                 resume_floor,
             )
-            human_latched_ctx = DecideCtx(
-                ctx.world,
-                ctx.self_state,
+            human_latched_ctx = ctx.derive(
                 AIStateDict(
                     **{
                         **ctx.ai_state,
                         "break_escape_until_fuel": resume_floor,
                     }
-                ),
-                ctx.inventory,
-                ctx.timestamp_ms,
-                ctx.terrain,
-                ctx.combat_feedback,
-                ctx.map_fuel_dots,
-                ws=ctx.ws,
+                )
             )
             return refuel_for_hunt(human_latched_ctx, target)
         # Even a full tank cannot fund this fight -- the projection
@@ -433,21 +407,13 @@ def _break_losing_engagement(
             capacity,
         )
         return block_combat_target_and_replan(ctx, target)
-    latched_ctx = DecideCtx(
-        ctx.world,
-        ctx.self_state,
+    latched_ctx = ctx.derive(
         AIStateDict(
             **{
                 **ctx.ai_state,
                 "break_escape_until_fuel": release_at,
             }
-        ),
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-        ws=ctx.ws,
+        )
     )
     return refuel_for_hunt(latched_ctx, target)
 

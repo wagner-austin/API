@@ -27,7 +27,8 @@ from platform_core.json_utils import JSONValue, load_json_str
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
-from tankpit_bot.bot.ai.context import DecideCtx, clear_resource_target, make_decision
+from tankpit_bot.bot.ai.context import DecideCtx, make_decision
+from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.tactics import combat_radar_min
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict

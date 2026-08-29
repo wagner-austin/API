@@ -179,6 +179,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     """Refresh delegates to fuel recovery when combat teleport is unaffordable."""
     ws = WorldService()
+    ws.map_fuel_dots = ((140, 100),)
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=190, y=100, name="red-50"),
     }
@@ -203,7 +204,6 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
         100000,
         None,
         "",
-        ((140, 100),),
         ws=ws,
     )
 
@@ -267,6 +267,7 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
 def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
     """Close state delegates to fuel recovery when combat teleport is unaffordable."""
     ws = WorldService()
+    ws.map_fuel_dots = ((140, 100),)
     tanks: dict[str, TankStateDict] = {
         "50": make_enemy_tank(x=190, y=100, name="red-50"),
     }
@@ -291,7 +292,6 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
         100000,
         None,
         "",
-        ((140, 100),),
         ws=ws,
     )
 

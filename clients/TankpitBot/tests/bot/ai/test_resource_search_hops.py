@@ -27,6 +27,7 @@ class TestHarvestMemoryVeto:
     ) -> DecideCtx:
         """Build a ctx whose single dot lands on a viewport with one belief."""
         ws = WorldService()
+        ws.map_fuel_dots = ((150, 100),)
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
         world["containers"]["152,101"] = make_container_state(
             x=152,
@@ -54,7 +55,6 @@ class TestHarvestMemoryVeto:
             now_ms,
             None,
             "",
-            ((150, 100),),
             ws=ws,
         )
 
@@ -105,6 +105,7 @@ class TestPreHuntTopOffBias:
         from tankpit_bot.state.types import make_tank_state
 
         ws = WorldService()
+        ws.map_fuel_dots = ((120, 100), (121, 100), (100, 120))
         world, self_state = make_world(self_x=100, self_y=100, fuel=fuel, block_scanned=False)
         world["tanks"]["50"] = make_tank_state(
             tank_id=50,
@@ -126,7 +127,6 @@ class TestPreHuntTopOffBias:
             100000,
             None,
             "",
-            ((120, 100), (121, 100), (100, 120)),
             ws=ws,
         )
 
@@ -267,6 +267,7 @@ class TestBarrenScanVeto:
         from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
 
         ws = WorldService()
+        ws.map_fuel_dots = ((150, 100),)
         now_ms = 1000000
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
         # Sweep age must exceed the forage TTL in every test here, so the
@@ -295,7 +296,6 @@ class TestBarrenScanVeto:
             now_ms,
             None,
             "",
-            ((150, 100),),
             ws=ws,
         )
 

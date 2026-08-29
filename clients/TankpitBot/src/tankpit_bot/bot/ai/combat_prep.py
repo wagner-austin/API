@@ -99,17 +99,7 @@ def refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict
     # this module at import time.
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 
-    locked_ctx = DecideCtx(
-        ctx.world,
-        ctx.self_state,
-        _set_combat_target(ctx.base, target),
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-        ws=ctx.ws,
-    )
+    locked_ctx = ctx.derive(_set_combat_target(ctx.base, target))
     decision = decide_collect_mode(locked_ctx)
     if decision is None:
         emit_ai(

@@ -5,9 +5,10 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
+from tankpit_bot.bot.ai.collect_mode_outcomes import _MAP_ANSWER_WAIT_MS
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.maroon_walk import _maroon_pan_toward
-from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
@@ -24,6 +25,7 @@ def _marooned_ctx(
     *,
     fuel: int = 88,
     map_fuel_dots: tuple[tuple[int, int], ...] = (),
+    map_data_ingested_ms: int = 99500,
     with_blacklisted_sliver: bool = False,
 ) -> DecideCtx:
     """A broke tank in a scanned viewport with nothing hoppable.
@@ -33,11 +35,14 @@ def _marooned_ctx(
     opened so the dot-hop path cannot learn anything new.
     """
     ws = WorldService()
-    # The open at 99000 was ANSWERED (the premise "the map recently
-    # opened so the dot-hop path cannot learn anything new" requires
-    # the answer to have landed) -- without this stamp the exit
-    # correctly defers behind the in-flight map answer.
-    ws.map_data_ingested_ms = 99500
+    # The open at 99000 was ANSWERED by default (the premise "the map
+    # recently opened so the dot-hop path cannot learn anything new"
+    # requires the answer to have landed) -- with a stamp before the
+    # open the exit correctly defers behind the in-flight map answer.
+    # The ctx snapshots stamp and dots from the world service as a
+    # pair, so both live here.
+    ws.map_data_ingested_ms = map_data_ingested_ms
+    ws.map_fuel_dots = map_fuel_dots
     containers = {}
     if with_blacklisted_sliver:
         sliver = make_container_state(
@@ -67,7 +72,6 @@ def _marooned_ctx(
         100000,
         InMemoryTerrainMap(),
         "",
-        map_fuel_dots,
         ws=ws,
     )
 
@@ -138,20 +142,21 @@ def test_marooned_exit_stands_when_all_fuel_is_beyond_the_walk_cap() -> None:
 
 def test_marooned_exit_ignores_blacklisted_containers() -> None:
     """A failed-pickup sliver never anchors the walk (run -091209)."""
+    ctx = _marooned_ctx(with_blacklisted_sliver=True)
+
     with pytest.raises(SessionExitError, match="out_of_fuel"):
-        decide_collect_mode(_marooned_ctx(with_blacklisted_sliver=True))
+        decide_collect_mode(ctx)
 
 
 def test_exit_defers_while_a_map_answer_is_in_flight() -> None:
     """A pending map-for-dots answer holds the out_of_fuel exit.
 
     The islet marooning (arterial 2026-08-26 06:01): the exit fired
-    3 s after dispatching the open, inside the measured 2-6 s answer
+    3 s after dispatching the open, inside the measured answer
     latency — the exit racing its own rescue, the phantom-exit
     disease. With the open unanswered the tick holds instead.
     """
-    ctx = _marooned_ctx()
-    ctx.ws.map_data_ingested_ms = 98000  # before the 99000 open
+    ctx = _marooned_ctx(map_data_ingested_ms=98000)  # before the 99000 open
 
     decision = decide_collect_mode(ctx)
 
@@ -161,14 +166,43 @@ def test_exit_defers_while_a_map_answer_is_in_flight() -> None:
     assert decision["command"]["cmd_type"] == "hold"
 
 
+def test_exit_ignores_an_answer_that_lands_after_the_snapshot() -> None:
+    """Run bot-20260828-182401: the answer landed mid-tick, after the
+    ctx snapshot. The live ``ws`` stamp then said "answered" while the
+    snapshot held zero dots, and the old live-read condition exited
+    out_of_fuel in the very second the 471-dot rescue arrived. The
+    deferral must judge only the snapshot pair: a stamp mutated after
+    construction changes nothing, and the next tick's ctx carries the
+    dots instead."""
+    ctx = _marooned_ctx(map_data_ingested_ms=98000)
+    ctx.ws.map_data_ingested_ms = 100000  # the mid-tick ingestion
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected the await-map-answer hold")
+    assert decision["behavior"]["reason_kind"] == "await_map_answer"
+
+
 def test_exit_stands_when_the_map_answer_wait_lapses() -> None:
-    """An open past the wait budget no longer defers the exit."""
-    ctx = _marooned_ctx()
-    ctx.ws.map_data_ingested_ms = 0
-    ctx.base["last_map_open_ms"] = 89000  # 11 s ago, budget is 10 s
+    """An unanswered open past the wait budget no longer defers."""
+    ctx = _marooned_ctx(map_data_ingested_ms=0)
+    ctx.base["last_map_open_ms"] = 95500  # 4.5 s ago, budget is 4 s
 
     with pytest.raises(SessionExitError, match="out_of_fuel"):
         decide_collect_mode(ctx)
+
+
+def test_answer_wait_budget_undercuts_the_reopen_cooldown() -> None:
+    """The exit must be reachable when the server never answers.
+
+    Past ``map_open_cooldown_ms`` a dotless map re-opens and restamps
+    ``last_map_open_ms``, so a wait budget at or above the cooldown
+    would re-arm the deferral forever — a map-open livelock with no
+    exit. The exit fires only in the (wait, cooldown] gap, which this
+    pin keeps non-empty.
+    """
+    assert make_default_ai_config()["map_open_cooldown_ms"] > _MAP_ANSWER_WAIT_MS
 
 
 def _edge_ctx(
@@ -185,6 +219,7 @@ def _edge_ctx(
     exhausted and only a free pan can make progress.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((130, 100),)
     # The 99000 open was answered -- see the _marooned_ctx note.
     ws.map_data_ingested_ms = 99500
     world, self_state = make_world(self_x=100, self_y=100, fuel=88, scanned=True)
@@ -211,7 +246,6 @@ def _edge_ctx(
         100000,
         None if terrain_blind else (terrain if terrain is not None else InMemoryTerrainMap()),
         "",
-        ((130, 100),),
         ws=ws,
     )
 
@@ -313,6 +347,7 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
     desperation hop's remaining niche.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((120, 115),)
     containers = {
         "110,100": make_container_state(
             x=110,
@@ -348,7 +383,6 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
         100000,
         terrain,
         "",
-        ((120, 115),),
         ws=ws,
     )
 
@@ -425,6 +459,7 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
 def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> None:
     """A landing costing more than the tank holds falls through to walk."""
     ws = WorldService()
+    ws.map_fuel_dots = ((130, 100),)
     containers = {
         "150,100": make_container_state(
             x=150,
@@ -452,7 +487,6 @@ def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> Non
         100000,
         InMemoryTerrainMap(),
         "",
-        ((130, 100),),
         ws=ws,
     )
 

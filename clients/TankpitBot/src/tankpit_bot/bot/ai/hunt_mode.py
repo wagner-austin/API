@@ -162,17 +162,7 @@ def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
 def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
     """Leave confirm-kill by reacquiring with cleared combat state."""
     cleared = clear_combat_target(ctx.base)
-    cleared_ctx = DecideCtx(
-        ctx.world,
-        ctx.self_state,
-        cleared,
-        ctx.inventory,
-        ctx.timestamp_ms,
-        ctx.terrain,
-        ctx.combat_feedback,
-        ctx.map_fuel_dots,
-        ws=ctx.ws,
-    )
+    cleared_ctx = ctx.derive(cleared)
     return decide_hunt_acquire(cleared_ctx)
 
 

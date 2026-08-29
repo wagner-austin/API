@@ -48,13 +48,19 @@ from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 # thing in both places.
 _SUSTAINED_FIRE_HIT_FLOOR = 3
 
-_MAP_ANSWER_WAIT_MS = 10_000
+_MAP_ANSWER_WAIT_MS = 4_000
 """How long the out-of-fuel exit waits on an in-flight map answer.
 
-The map-open stall budget: answers measure 2-6 s of latency and the
+The map-open stall budget: answers land 1-3 s after the open and the
 walk-for-fuel rung eats exactly the dots the answer carries, so an
 exit inside this window is the exit racing its own rescue (arterial's
-islet exit came 3 s after the open, 2026-08-26 06:01)."""
+islet exit came 3 s after the open, 2026-08-26 06:01; bot-20260828's
+answer landed in the open's own second). MUST stay below
+``map_open_cooldown_ms`` (5000): past the cooldown a dotless map
+re-opens and restamps ``last_map_open_ms``, so a wait budget at or
+above the cooldown makes the exit unreachable -- the session would
+livelock re-opening the map every cooldown forever. The exit fires
+only in the (wait, cooldown] gap between the two windows."""
 
 # Movement-dead floor: this many server cant_go refusals inside the
 # fire window mean the tank cannot walk ANYWHERE right now (boxed by
@@ -76,7 +82,7 @@ _MOVEMENT_DEAD_REJECTION_FLOOR = 2
 _ESCAPE_CLEARANCE_TILES = 16
 
 
-def _exhausted_collect_outcome(
+def exhausted_collect_outcome(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
@@ -146,16 +152,24 @@ def _exhausted_collect_outcome(
         return walk
 
     if (
-        base_state["last_map_open_ms"] > ctx.ws.map_data_ingested_ms
+        not ctx.map_fuel_dots
+        and base_state["last_map_open_ms"] > ctx.map_data_ingested_ms
         and ctx.timestamp_ms - base_state["last_map_open_ms"] <= _MAP_ANSWER_WAIT_MS
     ):
-        # A map-for-dots answer is still in flight (measured latency
-        # 2-6 s, [[map-data-decode]]) and its dots are exactly what
-        # the walk rung above eats. The islet marooning (arterial
-        # 06:01:47-50, 2026-08-26) exited out_of_fuel THREE seconds
-        # after dispatching the open -- the same exit-races-answer
-        # disease as the phantom no_viable_targets exit. Hold the
-        # tick; the ingestion stamp or the wait budget ends the hold.
+        # The map open is a request and the 0x4C answer is its
+        # completion event: an open newer than the SNAPSHOTTED
+        # ingestion stamp means the answer is still in flight, and its
+        # dots are exactly what the walk rung above eats. The islet
+        # marooning (arterial 06:01:47-50, 2026-08-26) exited
+        # out_of_fuel THREE seconds after dispatching the open; run
+        # bot-20260828-182401 quit in the very second the 471-dot
+        # answer was ingested, because the old condition read the LIVE
+        # ``ws`` stamp against a stale dot snapshot. Both stamp and
+        # dots now come from the same ctx snapshot, so the hold ends
+        # the moment the answer lands in the next tick's ctx (a
+        # zero-dot answer exits immediately -- no idling on a dotless
+        # map); the wait budget only covers an answer the server never
+        # sends.
         emit_ai(
             "out-of-fuel exit deferred: map answer in flight (%d ms since open)",
             ctx.timestamp_ms - base_state["last_map_open_ms"],
@@ -207,7 +221,7 @@ def _hop_escapes_attacker(
     return separation >= _ESCAPE_CLEARANCE_TILES
 
 
-def _escape_under_fire_decision(
+def escape_under_fire_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
@@ -294,10 +308,10 @@ def _escape_under_fire_decision(
     trapped_fallback = larder_under_fire if larder_under_fire is not None else escape_hop
     if trapped_fallback is not None:
         return trapped_fallback
-    return _exhausted_collect_outcome(ctx, base_state)
+    return exhausted_collect_outcome(ctx, base_state)
 
 
-def _desync_rescan_decision(
+def desync_rescan_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
@@ -348,7 +362,7 @@ def _desync_rescan_decision(
     )
 
 
-def _mine_reveal_scan_decision(
+def mine_reveal_scan_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
@@ -393,7 +407,7 @@ def _mine_reveal_scan_decision(
     )
 
 
-def _scan_on_landing_decision(
+def scan_on_landing_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> tuple[TickDecisionDict | None, AIStateDict]:
@@ -551,4 +565,10 @@ def _scan_on_landing_decision(
     return decision, base_state
 
 
-__all__ = []
+__all__ = [
+    "desync_rescan_decision",
+    "escape_under_fire_decision",
+    "exhausted_collect_outcome",
+    "mine_reveal_scan_decision",
+    "scan_on_landing_decision",
+]

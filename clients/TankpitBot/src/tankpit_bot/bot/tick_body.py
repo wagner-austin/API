@@ -163,7 +163,6 @@ def _tick_once(bot: Bot) -> None:
         now,
         terrain,
         combat_feedback,
-        bot.world.map_fuel_dots,
         ws=bot.world,
     )
 

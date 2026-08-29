@@ -76,6 +76,7 @@ class TestRecoverEquipmentSearch:
         the search hop instead of re-firing the radar.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((140, 100),)
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -93,7 +94,6 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((140, 100),),
             ws=ws,
         )
 
@@ -159,6 +159,7 @@ class TestRecoverEquipmentSearch:
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers to fuel recovery when fuel is already low."""
         ws = WorldService()
+        ws.map_fuel_dots = ((140, 100),)
         world, self_state = make_world(fuel=150)
         ai_state = AIStateDict(
             **{
@@ -177,7 +178,6 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((140, 100),),
             ws=ws,
         )
 
@@ -284,6 +284,7 @@ class TestRecoverEquipmentSearch:
         wire-side radar handler.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((116, 100),)
         world, self_state = make_world(fuel=150, scanned=False)
         viewport_left = world["viewport"]["left"]
         viewport_top = world["viewport"]["top"]
@@ -305,7 +306,6 @@ class TestRecoverEquipmentSearch:
             None,
             # In-block dot stays: at fuel 150 the sweep is gated off
             # (fuel-low), and a farther dot would be unaffordable.
-            map_fuel_dots=((116, 100),),
             ws=ws,
         )
 
@@ -395,6 +395,7 @@ class TestRecoverEquipmentSearch:
     def test_locked_combat_with_zero_dual_releases_to_equipment(self) -> None:
         """Combat lock releases once dual shots are critically depleted."""
         ws = WorldService()
+        ws.map_fuel_dots = ((140, 100),)
         world, self_state = make_world(fuel=800, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
@@ -416,7 +417,6 @@ class TestRecoverEquipmentSearch:
             inventory,
             100000,
             None,
-            map_fuel_dots=((140, 100),),
             ws=ws,
         )
 

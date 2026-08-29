@@ -29,10 +29,10 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_afford_teleport,
-    clear_resource_target,
     make_decision,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.scoring_types import (
     BehaviorMode,

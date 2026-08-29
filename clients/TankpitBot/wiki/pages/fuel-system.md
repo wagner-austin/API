@@ -225,7 +225,21 @@ collapsed 2026-06-24[^5]). The owner runs a single cascade per tick
    so a dotless map cannot loop. When no dot qualifies the owner ends
    the session with exit reason ``out_of_fuel`` (``SessionExitError``,
    2026-07-02; previously an uncaught ``ValueError`` crash) rather
-   than idle silently. (Dot hop replaced the blind 16-candidate
+   than idle silently. The exit is event-gated on the open's own
+   answer (2026-08-28): ``DecideCtx`` snapshots
+   (``map_data_ingested_ms``, ``map_fuel_dots``) as a consistent pair
+   at construction (stamp read first — the sniffer ingests
+   concurrently, and the tear direction must err toward waiting), and
+   an open newer than the snapshotted stamp holds the tick as
+   ``await_map_answer`` instead of quitting. Run bot-20260828-182401
+   quit ``out_of_fuel`` in the very second its 471-dot answer was
+   ingested because the old condition read the LIVE stamp against a
+   stale dot snapshot. A zero-dot answer exits immediately; the 4 s
+   ``_MAP_ANSWER_WAIT_MS`` cap covers only a never-sent answer and
+   MUST stay below ``map_open_cooldown_ms`` (5 s) or the re-open
+   restamps the clock before the deferral can lapse and the exit
+   becomes unreachable (pinned by
+   ``test_answer_wait_budget_undercuts_the_reopen_cooldown``). (Dot hop replaced the blind 16-candidate
    compass-ring hop 2026-07-03; that in turn replaced the
    first-qualifying-direction hop 2026-07-01.)[^7]
 

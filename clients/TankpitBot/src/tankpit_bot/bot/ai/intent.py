@@ -25,10 +25,12 @@ migration); what lives here is the interpretation:
   events stream instead of silent ([[flag-triage-20260729]] s8-2;
   [[committed-intent]]).
 
-Raw field mutation stays in :mod:`tankpit_bot.bot.ai.context`
-(``set_resource_target`` / ``clear_resource_target``); this layer
-adds meaning, not a parallel mechanism. Phase 2 extends the same
-shape to hunt plans (close/pursuit) per [[committed-intent]].
+Raw field mutation lives here too (``set_resource_target`` /
+``clear_resource_target``) — one owner for the lock mechanism and its
+meaning. They moved in from ``context`` 2026-08-28: keeping mechanism
+there forced ``context`` to late-import this module's validity pass
+(the context->intent->context cycle). Phase 2 extends the same shape
+to hunt plans (close/pursuit) per [[committed-intent]].
 """
 
 from __future__ import annotations
@@ -43,7 +45,6 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.bot.ai.context import clear_resource_target
 from tankpit_bot.bot.ai.equipment import is_container_pursuable
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.runtime_logging import emit_diagnostic
@@ -105,6 +106,52 @@ movement law 2026-07-30: "walking is 1 tick ... you only take one
 hit") — so re-deriving instead of continuing can only waste the tick
 the s8-2 receipt paid.
 """
+
+
+def clear_resource_target(ai_state: AIStateDict) -> AIStateDict:
+    """Return AI state with any locked resource target cleared.
+
+    Args:
+        ai_state: Current AI state.
+
+    Returns:
+        New AIStateDict with resource target fields zeroed.
+    """
+    return AIStateDict(
+        **{
+            **ai_state,
+            "resource_target_kind": "",
+            "resource_target_x": 0,
+            "resource_target_y": 0,
+        },
+    )
+
+
+def set_resource_target(
+    ai_state: AIStateDict,
+    kind: str,
+    tx: int,
+    ty: int,
+) -> AIStateDict:
+    """Return AI state with a locked resource target set.
+
+    Args:
+        ai_state: Current AI state.
+        kind: Resource kind ("fuel" or "equipment").
+        tx: Target X coordinate.
+        ty: Target Y coordinate.
+
+    Returns:
+        New AIStateDict with the specified resource target locked.
+    """
+    return AIStateDict(
+        **{
+            **ai_state,
+            "resource_target_kind": kind,
+            "resource_target_x": tx,
+            "resource_target_y": ty,
+        },
+    )
 
 
 class CollectPlanDict(TypedDict):
@@ -303,10 +350,12 @@ __all__ = [
     "CollectPlanDict",
     "CollectPlanKind",
     "PlanReleaseReason",
+    "clear_resource_target",
     "current_collect_plan",
     "decode_collect_plan",
     "encode_collect_plan",
     "plan_completes_here",
     "release_collect_plan",
+    "set_resource_target",
     "validate_collect_plan",
 ]

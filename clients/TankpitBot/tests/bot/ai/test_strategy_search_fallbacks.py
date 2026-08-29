@@ -31,6 +31,7 @@ class TestEquipmentSearchHopFallback:
     def test_equipment_search_hops_to_nearest_dot_when_viewport_scanned(self) -> None:
         """Equipment search dot-hops to fresh ground when viewport scanned and no radar."""
         ws = self.ws
+        ws.map_fuel_dots = ((150, 100),)
         world, self_state = _make_world(fuel=800, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -52,7 +53,6 @@ class TestEquipmentSearchHopFallback:
             inventory,
             100000,
             None,
-            map_fuel_dots=((150, 100),),
             ws=ws,
         )
 
@@ -74,6 +74,7 @@ class TestEquipmentSearchHopFallback:
         import pytest
 
         ws = self.ws
+        ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=150, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -94,7 +95,6 @@ class TestEquipmentSearchHopFallback:
                 inventory,
                 100000,
                 None,
-                map_fuel_dots=((250, 100),),
                 ws=ws,
             )
         assert exc_info.value.reason == "out_of_fuel"
@@ -111,6 +111,7 @@ class TestEquipmentSearchHopFallback:
         hunt owner.
         """
         ws = self.ws
+        ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -129,7 +130,6 @@ class TestEquipmentSearchHopFallback:
             inventory,
             100000,
             None,
-            map_fuel_dots=((250, 100),),
             ws=ws,
         )
 
@@ -148,6 +148,7 @@ class TestEquipmentSearchHopFallback:
         from tankpit_bot.bot.session_exit import SessionExitError
 
         ws = self.ws
+        ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=1100, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -168,7 +169,6 @@ class TestEquipmentSearchHopFallback:
                 inventory,
                 100000,
                 None,
-                map_fuel_dots=((250, 100),),
                 ws=ws,
             )
 
@@ -177,6 +177,7 @@ class TestEquipmentSearchHopFallback:
     def test_wind_down_breaks_a_held_hunt_and_collects(self) -> None:
         """Winding down below full bars disengages HUNT into COLLECT."""
         ws = self.ws
+        ws.map_fuel_dots = ((150, 100),)
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -196,7 +197,6 @@ class TestEquipmentSearchHopFallback:
             inventory,
             100000,
             None,
-            map_fuel_dots=((150, 100),),
             ws=ws,
         )
 
@@ -213,6 +213,7 @@ class TestEquipmentSearchHopFallback:
         from tankpit_bot.state.types import make_tank_state
 
         ws = self.ws
+        ws.map_fuel_dots = ((150, 100),)
         world, self_state = _make_world(fuel=900, scanned=True)
         world["tanks"]["511"] = make_tank_state(
             tank_id=511,
@@ -248,7 +249,6 @@ class TestEquipmentSearchHopFallback:
             inventory,
             100000,
             None,
-            map_fuel_dots=((150, 100),),
             ws=ws,
         )
 
@@ -261,6 +261,7 @@ class TestEquipmentSearchHopFallback:
         from tankpit_bot.bot.session_exit import SessionExitError
 
         ws = self.ws
+        ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -281,7 +282,6 @@ class TestEquipmentSearchHopFallback:
                 inventory,
                 100000,
                 None,
-                map_fuel_dots=((250, 100),),
                 ws=ws,
             )
 
@@ -299,6 +299,7 @@ class TestEquipmentSearchHopFallback:
         ``no_productive_collect`` instead of engaging under-armed.
         """
         ws = self.ws
+        ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -320,7 +321,6 @@ class TestEquipmentSearchHopFallback:
                 inventory,
                 100000,
                 None,
-                map_fuel_dots=((250, 100),),
                 ws=ws,
             )
 
@@ -371,6 +371,7 @@ class TestFuelSearchFallbacks:
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
         ws = self.ws
+        ws.map_fuel_dots = ((120, 100),)
         world, self_state = _make_world(fuel=150, scanned=True, block_scanned=False)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
@@ -382,7 +383,6 @@ class TestFuelSearchFallbacks:
             inventory,
             100000,
             None,
-            map_fuel_dots=((120, 100),),
             ws=ws,
         )
 
@@ -410,8 +410,10 @@ class TestFuelSearchFallbacks:
         # the in-flight map answer (the islet fix, 2026-08-26).
         ws.map_data_ingested_ms = 96500
         world, self_state = _make_world(fuel=30, scanned=True)
-        # Recent map open: the dot atlas is empty and a re-open inside
-        # the cooldown teaches nothing, so the hop declines.
+        # Map open 4 s ago: inside the re-open cooldown (5 s), so a
+        # re-open teaches nothing -- and already answered (stamp
+        # 96500), so the empty atlas is a real answer, not an
+        # in-flight one, and the exit is not deferred.
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_map_open_ms": 96000})
         inventory = _make_inventory()
 
@@ -443,8 +445,10 @@ class TestFuelSearchFallbacks:
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         # Fuel below the short-hop cost so no teleport is affordable.
         world, self_state = _make_world(fuel=30, scanned=True)
-        # Recent map open: the dot atlas is empty and a re-open inside
-        # the cooldown teaches nothing, so the hop declines.
+        # Map open 4 s ago: inside the re-open cooldown (5 s), so a
+        # re-open teaches nothing -- and already answered (stamp
+        # 96500), so the empty atlas is a real answer, not an
+        # in-flight one, and the exit is not deferred.
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_map_open_ms": 96000})
         inventory = _make_inventory()
 

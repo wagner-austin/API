@@ -8,6 +8,7 @@ rather than from ``ai_strategy`` to avoid circular dependencies.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.intent import validate_collect_plan
 from tankpit_bot.bot.ai.scoring_types import (
     BehaviorMode,
     ReasonKind,
@@ -52,6 +53,7 @@ class DecideCtx:
         "fuel",
         "inventory",
         "killed",
+        "map_data_ingested_ms",
         "map_fuel_dots",
         "mode",
         "mode_started_ms",
@@ -72,7 +74,6 @@ class DecideCtx:
         timestamp_ms: int,
         terrain: TerrainMapProtocol | None,
         combat_feedback: CombatFeedback,
-        map_fuel_dots: tuple[tuple[int, int], ...] = (),
         *,
         ws: WorldService,
     ) -> None:
@@ -83,9 +84,17 @@ class DecideCtx:
         self.timestamp_ms = timestamp_ms
         self.terrain = terrain
         self.combat_feedback = combat_feedback
-        # 0x4C fuel-dot atlas (session-constant like ``terrain``):
-        # empty until the first map open of the session.
-        self.map_fuel_dots = map_fuel_dots
+        # 0x4C map-answer snapshot, read HERE as a pair so every
+        # decision step judges a consistent (stamp, dots) view. The
+        # sniffer thread ingests concurrently; run bot-20260828-182401
+        # quit out_of_fuel in the very second the 471-dot answer
+        # landed, because the exit read the dots from one moment and
+        # the ingestion stamp from another. Stamp FIRST, dots second:
+        # that read order bounds the tear -- a stale stamp can only
+        # under-report "answered", which defers one extra tick, never
+        # exits on an empty atlas whose answer already arrived.
+        self.map_data_ingested_ms = ws.map_data_ingested_ms
+        self.map_fuel_dots = ws.map_fuel_dots
         # The session's world service. The planner is otherwise pure over
         # the ``world`` snapshot, but several decision steps genuinely
         # need live session bookkeeping the snapshot does not carry --
@@ -122,11 +131,38 @@ class DecideCtx:
                 "last_shot_target_name": "",
             },
         )
-        # Late import: intent.py imports this module's raw lock
-        # accessors, so the validity pass resolves at call time.
-        from tankpit_bot.bot.ai.intent import validate_collect_plan
-
         self.base = validate_collect_plan(self.base, self.filtered)
+
+    def derive(self, ai_state: AIStateDict) -> DecideCtx:
+        """Clone this ctx with a rewritten AI state.
+
+        The map-answer snapshot pair (``map_data_ingested_ms``,
+        ``map_fuel_dots``) is COPIED from the parent, never re-read
+        from ``ws``: the sniffer ingests concurrently, and a derived
+        ctx mid-decision must judge the same world view as the tick
+        that spawned it (the exit-races-answer TOCTOU, run
+        bot-20260828-182401).
+
+        Args:
+            ai_state: Replacement AI state for the derived ctx.
+
+        Returns:
+            A ctx identical to this one except for the AI state and
+            its derived fields.
+        """
+        derived = DecideCtx(
+            self.world,
+            self.self_state,
+            ai_state,
+            self.inventory,
+            self.timestamp_ms,
+            self.terrain,
+            self.combat_feedback,
+            ws=self.ws,
+        )
+        derived.map_data_ingested_ms = self.map_data_ingested_ms
+        derived.map_fuel_dots = self.map_fuel_dots
+        return derived
 
 
 # =============================================================================
@@ -177,52 +213,6 @@ def make_decision(
 # =============================================================================
 # Resource target helpers
 # =============================================================================
-
-
-def clear_resource_target(ai_state: AIStateDict) -> AIStateDict:
-    """Return AI state with any locked resource target cleared.
-
-    Args:
-        ai_state: Current AI state.
-
-    Returns:
-        New AIStateDict with resource target fields zeroed.
-    """
-    return AIStateDict(
-        **{
-            **ai_state,
-            "resource_target_kind": "",
-            "resource_target_x": 0,
-            "resource_target_y": 0,
-        },
-    )
-
-
-def set_resource_target(
-    ai_state: AIStateDict,
-    kind: str,
-    tx: int,
-    ty: int,
-) -> AIStateDict:
-    """Return AI state with a locked resource target set.
-
-    Args:
-        ai_state: Current AI state.
-        kind: Resource kind ("fuel" or "equipment").
-        tx: Target X coordinate.
-        ty: Target Y coordinate.
-
-    Returns:
-        New AIStateDict with the specified resource target locked.
-    """
-    return AIStateDict(
-        **{
-            **ai_state,
-            "resource_target_kind": kind,
-            "resource_target_x": tx,
-            "resource_target_y": ty,
-        },
-    )
 
 
 def locked_resource_target(
@@ -513,7 +503,6 @@ def require_command(
 __all__ = [
     "DecideCtx",
     "can_afford_teleport",
-    "clear_resource_target",
     "compute_equipment",
     "expire_kills",
     "filter_killed_tanks",
@@ -521,7 +510,6 @@ __all__ = [
     "locked_resource_target",
     "make_decision",
     "require_command",
-    "set_resource_target",
     "target_position_is_fresh",
     "teleport_fuel_cost_to",
 ]

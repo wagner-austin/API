@@ -41,6 +41,10 @@ def _ctx(
 ) -> DecideCtx:
     """Build a DecideCtx with a clean default world and optional overrides."""
     ws = WorldService()
+    # The ctx snapshots the dot atlas from the world service, so the
+    # fixture's dots live there (paired with an answered stamp).
+    ws.map_fuel_dots = map_fuel_dots
+    ws.map_data_ingested_ms = 99500
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel)
     if scanned_viewport_origins:
         world["scanned_tiles"].update(_fully_cover_viewport_origins(scanned_viewport_origins))
@@ -52,6 +56,5 @@ def _ctx(
         100000,
         terrain,
         "",
-        map_fuel_dots,
         ws=ws,
     )

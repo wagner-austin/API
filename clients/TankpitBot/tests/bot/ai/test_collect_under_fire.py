@@ -187,7 +187,8 @@ class TestEscapePlanContinuity:
         the pickup is the escape continuation.
         """
         from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
-        from tankpit_bot.bot.ai.context import DecideCtx, set_resource_target
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai.intent import set_resource_target
         from tankpit_bot.bot.ai.types import AIStateDict
         from tankpit_bot.state.types import make_container_state
         from tests.bot.ai._support import (
@@ -244,7 +245,8 @@ class TestEscapePlanContinuity:
     def test_fuel_plan_at_cardinal_reach_is_finished_under_fire(self) -> None:
         """A fuel plan one tile away under fire dispatches its pickup."""
         from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
-        from tankpit_bot.bot.ai.context import DecideCtx, set_resource_target
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai.intent import set_resource_target
         from tankpit_bot.bot.ai.types import AIStateDict
         from tankpit_bot.state.types import make_container_state
         from tests.bot.ai._support import (
@@ -305,7 +307,8 @@ class TestEscapePlanContinuity:
         the in-viewport fuel walk still wins the tick.
         """
         from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
-        from tankpit_bot.bot.ai.context import DecideCtx, set_resource_target
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai.intent import set_resource_target
         from tankpit_bot.bot.ai.types import AIStateDict
         from tankpit_bot.state.types import make_container_state
         from tests.bot.ai._support import (
@@ -519,6 +522,7 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
     )
 
     ws = WorldService()
+    ws.map_fuel_dots = ((101, 101),)
     seed_confirmed_incoming(ws, 3)
     world, self_state = make_world(fuel=1200)
     ctx = DecideCtx(
@@ -529,7 +533,6 @@ def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> N
         100000,
         None,
         "",
-        map_fuel_dots=((101, 101),),
         ws=ws,
     )
 

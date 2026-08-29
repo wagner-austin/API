@@ -33,9 +33,9 @@ from tankpit_bot.bot.ai.context import (
     RADAR_RESERVE_REVEAL_FLOOR_TILES,
     RADAR_SPEND_REVEAL_FLOOR_TILES,
     DecideCtx,
-    clear_resource_target,
     make_decision,
 )
+from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (

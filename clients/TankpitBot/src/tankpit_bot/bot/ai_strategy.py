@@ -48,7 +48,6 @@ def decide(
     timestamp_ms: int,
     terrain: TerrainMapProtocol | None,
     combat_feedback: CombatFeedback = "",
-    map_fuel_dots: tuple[tuple[int, int], ...] = (),
     *,
     ws: WorldService,
 ) -> TickDecisionDict:
@@ -62,10 +61,10 @@ def decide(
         timestamp_ms: Current game timestamp in milliseconds.
         terrain: Optional terrain map for reachability and landing checks.
         combat_feedback: Protocol-level hit or miss feedback for the last shot.
-        map_fuel_dots: 0x4C fuel-dot atlas positions (empty before the
-            first map open of the session).
         ws: The session's world service, for the live bookkeeping the
-            ``world`` snapshot does not carry.
+            ``world`` snapshot does not carry; the 0x4C fuel-dot atlas
+            and its ingestion stamp are snapshotted from it as a
+            consistent pair at ctx construction.
 
     Returns:
         Tick decision produced by the selected durable owner.
@@ -90,7 +89,6 @@ def decide(
             world, terrain, timestamp_ms, ws.hostile_landing_keys(timestamp_ms)
         ),
         combat_feedback,
-        map_fuel_dots,
         ws=ws,
     )
     mode = _resolve_owner_mode(ctx, manual)

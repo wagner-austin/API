@@ -27,6 +27,7 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
     toward the HUMAN, not a teleport at the bot.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((150, 100),)
     consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
@@ -51,7 +52,6 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
         None,
         "",
         # (150,100) closes distance to Yuppler and is affordable.
-        ((150, 100),),
         ws=ws,
     )
 
@@ -105,6 +105,7 @@ def test_recruit_human_is_not_pursued() -> None:
     is farmed normally.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((150, 100),)
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": make_tank_state(
@@ -138,7 +139,6 @@ def test_recruit_human_is_not_pursued() -> None:
         100000,
         None,
         "",
-        ((150, 100),),
         ws=ws,
     )
 
@@ -159,6 +159,7 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
     (never-drop rides through every leg).
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((150, 100),)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -183,7 +184,6 @@ def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
         100000,
         None,
         "",
-        ((150, 100),),
         ws=ws,
     )
 
@@ -205,6 +205,7 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
     gate on the new relay branch.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((150, 100),)
     tanks: dict[str, TankStateDict] = {
         "90": make_map_known_enemy(tank_id=90, x=240, y=100, name="red-9"),
     }
@@ -229,7 +230,6 @@ def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
         100000,
         None,
         "",
-        ((150, 100),),
         ws=ws,
     )
 
@@ -285,6 +285,7 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
     progress dot at ~300.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((230, 100), (150, 100))
     ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: honestly fresh
     consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
@@ -310,7 +311,6 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
         "",
         # (230,100): most progress, cost ~780 -- beyond the 450 leg cap.
         # (150,100): cost 300 -- the correct capped leg.
-        ((230, 100), (150, 100)),
         ws=ws,
     )
 
@@ -440,6 +440,7 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     would leave 100 < the 200 floor -- the cheaper dot wins instead.
     """
     ws = WorldService()
+    ws.map_fuel_dots = ((150, 100), (110, 100))
     ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: honestly fresh
     consent_human(ws, 90)
     tanks: dict[str, TankStateDict] = {
@@ -463,7 +464,6 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
         100000,
         None,
         "",
-        ((150, 100), (110, 100)),
         ws=ws,
     )
 

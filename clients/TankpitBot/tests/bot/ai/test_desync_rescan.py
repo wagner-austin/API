@@ -258,7 +258,7 @@ class TestDisplacedLandingScanEconomics:
     def test_displaced_landing_in_live_coverage_skips_the_radar(self) -> None:
         """Flag s9-2: a displaced harvest landing in fully-scanned
         ground latched WITHOUT spending an extra."""
-        from tankpit_bot.bot.ai.collect_mode_outcomes import _scan_on_landing_decision
+        from tankpit_bot.bot.ai.collect_mode_outcomes import scan_on_landing_decision
 
         ws = WorldService()
         world, self_state = make_world(
@@ -288,7 +288,7 @@ class TestDisplacedLandingScanEconomics:
         )
         ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
 
-        decision, updated = _scan_on_landing_decision(ctx, ctx.base)
+        decision, updated = scan_on_landing_decision(ctx, ctx.base)
 
         assert decision is None
         assert updated["last_landing_scan_viewport"] != ""

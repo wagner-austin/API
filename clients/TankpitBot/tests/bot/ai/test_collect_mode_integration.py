@@ -55,6 +55,7 @@ class TestRecoverEquipmentPriority:
     def test_no_equipment_when_none_visible(self) -> None:
         """Critical equipment depletion searches when no actionable target is visible."""
         ws = WorldService()
+        ws.map_fuel_dots = ((140, 100),)
         world, self_state = make_world(fuel=800, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
@@ -76,7 +77,6 @@ class TestRecoverEquipmentPriority:
             inventory,
             100000,
             None,
-            map_fuel_dots=((140, 100),),
             ws=ws,
         )
 
@@ -88,6 +88,7 @@ class TestRecoverEquipmentPriority:
     def test_equipment_at_break_threshold_relocates_in_scanned_viewport(self) -> None:
         """Break-threshold equipment depletion still enters recovery."""
         ws = WorldService()
+        ws.map_fuel_dots = ((140, 100),)
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
         inventory = make_inventory(dual_count=3, dual_enabled=True, default_count=30)
         inventory["extra_radars"]["count"] = 30
@@ -104,7 +105,6 @@ class TestRecoverEquipmentPriority:
             inventory,
             100000,
             None,
-            map_fuel_dots=((140, 100),),
             ws=ws,
         )
 

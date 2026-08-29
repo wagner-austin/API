@@ -175,8 +175,10 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
-            # Recent map open: the dot atlas is empty and a re-open
-            # inside the cooldown teaches nothing, so the hop declines.
+            # Map open 4 s ago: inside the re-open cooldown (5 s), so
+            # a re-open teaches nothing -- and already answered (stamp
+            # 96500), so the empty atlas is a real answer, not an
+            # in-flight one, and the exit is not deferred.
             "last_map_open_ms": 96000,
         }
     )
@@ -227,8 +229,10 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
-            # Recent map open: the dot atlas is empty and a re-open
-            # inside the cooldown teaches nothing, so the hop declines.
+            # Map open 4 s ago: inside the re-open cooldown (5 s), so
+            # a re-open teaches nothing -- and already answered (stamp
+            # 96500), so the empty atlas is a real answer, not an
+            # in-flight one, and the exit is not deferred.
             "last_map_open_ms": 96000,
         }
     )

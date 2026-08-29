@@ -251,7 +251,7 @@ def test_collect_cascade_serves_the_atlas_hop() -> None:
     """End to end: with nothing believed collectible, COLLECT hops the atlas.
 
     The cascade position pins the doctrine: known stock preempts the
-    hop, and the hop preempts the (hoard-gated) quad sweep.
+    hop, and the hop preempts the quad sweep.
     """
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 

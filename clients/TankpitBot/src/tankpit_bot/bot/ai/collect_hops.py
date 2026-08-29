@@ -14,9 +14,10 @@ from tankpit_bot.bot.ai.collect_common import (
     COLLECT_SCORE,
     emit_hop_declined,
 )
-from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
+from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.larder import WALK_DOMINANT_RANGE, select_fuel_larder_hop
 from tankpit_bot.bot.ai.mode_gates import (
     hunt_entry_permitted,

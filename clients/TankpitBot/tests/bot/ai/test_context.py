@@ -6,9 +6,9 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_afford_teleport,
     locked_resource_target,
-    set_resource_target,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_service import WorldService

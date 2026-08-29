@@ -131,6 +131,7 @@ class TestBeyondRefuelReachRelay:
         a dot_relay leg with the lock held.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((60, 150),)
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -154,7 +155,6 @@ class TestBeyondRefuelReachRelay:
             100000,
             None,
             "",
-            ((60, 150),),
             ws=ws,
         )
 
@@ -180,6 +180,7 @@ class TestBeyondRefuelReachRelay:
         thousands of times cheaper.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((101, 100), (60, 150))
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -203,7 +204,6 @@ class TestBeyondRefuelReachRelay:
             100000,
             None,
             "",
-            ((101, 100), (60, 150)),
             ws=ws,
         )
 
@@ -222,6 +222,7 @@ class TestBeyondRefuelReachRelay:
         so the next pass finds closer prey instead of treadmilling.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((101, 100),)
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -245,7 +246,6 @@ class TestBeyondRefuelReachRelay:
             100000,
             None,
             "",
-            ((101, 100),),
             ws=ws,
         )
 
@@ -263,6 +263,7 @@ class TestBeyondRefuelReachRelay:
         and the map was just opened, so the hop declines outright.
         """
         ws = WorldService()
+        ws.map_fuel_dots = ((100, 100),)
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -292,7 +293,6 @@ class TestBeyondRefuelReachRelay:
             100000,
             None,
             "",
-            ((100, 100),),
             ws=ws,
         )
 
