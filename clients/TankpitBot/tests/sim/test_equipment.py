@@ -252,18 +252,20 @@ def test_enemy_killers_take_their_bundle_silently() -> None:
 def test_production_bot_restocks_ammo_over_the_seam() -> None:
     """The full pipeline: radar reveal -> pickup -> 0x67 -> belief rises.
 
-    The seam world starts the client at 8 extra radars (below the
-    contract's collect-ASAP threshold) with an equipment container in
-    viewport range. Over the rounds the PRODUCTION bot must discover
-    it and collect it — the world model's last named gap, closed.
+    The seam world starts the client AT the radar hunt bar (20 at
+    Private -- the 2026-08-28 hoard rule disables paid scanning in the
+    band below it, so the radar-reveal pipeline this test exercises
+    only exists at/above the bar or in HUNT) with an equipment
+    container in viewport range. Over the rounds the PRODUCTION bot
+    must discover it and collect it.
     """
     bot, server, link, _table = boot_seam(
-        counts=(25, 25, 25, 25, 8),
+        counts=(25, 25, 25, 25, 20),
         containers=RICH_CONTAINERS,
         equipment=((103, 103), (98, 98)),
     )
     ws = bot.world
-    start_extras = 8
+    start_extras = 20
     for _ in range(14):
         _tick_once(bot)
         deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)

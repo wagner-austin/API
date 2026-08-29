@@ -201,7 +201,9 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 1
+    # 0 extras: the only stock level where the built-in 5x5 serves
+    # free (2026-08-28 hoard rule -- band stock cannot scan at all).
+    inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "", ws=ws)
 
     decision = decide_collect_mode(ctx)

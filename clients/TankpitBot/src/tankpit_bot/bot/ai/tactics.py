@@ -106,6 +106,35 @@ def should_proactive_radar(
     return fuel <= config["fuel_low_threshold"]
 
 
+def radar_slot_enabled(mode: str, extra_radars_count: int, rank: int) -> bool:
+    """Return True when the extra-radar slot should be enabled.
+
+    The RADAR HOARD rule (user grid-walk doctrine 2026-06-16 + the
+    2026-08-28 income-burn deadlock), refined by the same day's trial:
+    a press with the slot DISABLED is a total no-op — no extras, no
+    fuel, no scan — so the slot must be ON whenever pressing should
+    scan, and OFF exactly in the hoard band:
+
+    * HUNT: always on while stocked — combat scanning is what the bar
+      was saved for.
+    * Zero extras: on — the built-in free 5x5 (the grid-walk half of
+      the doctrine) only serves with the slot enabled, and there is
+      no stock to protect.
+    * At or above the hunt bar: on — rich enough to spend.
+    * Between one extra and the bar, outside HUNT: OFF — every press
+      would consume an extra the restock is trying to accumulate.
+
+    Args:
+        mode: Current AI behavior mode name.
+        extra_radars_count: Extra radars remaining.
+        rank: Wire rank (sets the hunt bar).
+
+    Returns:
+        True when the slot should be enabled.
+    """
+    return mode == "HUNT" or extra_radars_count == 0 or extra_radars_count >= combat_radar_min(rank)
+
+
 def compute_desired_equipment(
     mode: str,
     fuel: int,
@@ -119,15 +148,8 @@ def compute_desired_equipment(
 
     Returns the set of slot numbers (1-5) that should be active.
     Dual shots (2) and homing shots (4) stay enabled while stocked;
-    shields and missiles stay off. The extra-radar slot (5) follows
-    the RADAR HOARD rule (user grid-walk doctrine 2026-06-16 +
-    2026-08-28 income-burn deadlock): outside HUNT, the slot enables
-    only at or above the hunt bar (:func:`combat_radar_min`), so
-    every restock-phase press serves the free built-in 5x5 and stock
-    provably climbs to the bar. In HUNT the slot stays enabled while
-    stocked — combat scanning is what the bar was saved FOR. The
-    2026-08-28 validation run burned all 16 gained radars mid-restock
-    (9 in one 60 s quad-sweep burst) and never reached the bar.
+    shields and missiles stay off. The extra-radar slot follows
+    :func:`radar_slot_enabled` (the RADAR HOARD rule).
 
     Args:
         mode: Current AI behavior mode name.
@@ -141,7 +163,7 @@ def compute_desired_equipment(
         Set of equipment slot numbers that should be enabled.
     """
     desired: set[int] = set()
-    if mode == "HUNT" or extra_radars_count >= combat_radar_min(rank):
+    if radar_slot_enabled(mode, extra_radars_count, rank):
         desired.add(5)
 
     # Dual shots when we have stock (avoids "You can't do this" when depleted)
@@ -156,5 +178,6 @@ def compute_desired_equipment(
 __all__ = [
     "combat_radar_min",
     "compute_desired_equipment",
+    "radar_slot_enabled",
     "should_proactive_radar",
 ]

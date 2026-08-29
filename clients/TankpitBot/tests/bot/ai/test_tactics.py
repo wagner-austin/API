@@ -229,3 +229,14 @@ class TestRadarHoardRule:
         assert combat_radar_min(0) == 15
         assert combat_radar_min(1) == 20
         assert combat_radar_min(8) == 55
+
+    def test_zero_extras_enables_the_free_builtin_scan(self) -> None:
+        """At zero stock the slot is on: the free 5x5 only serves enabled.
+
+        The 2026-08-28 trial proved a press with the slot disabled is
+        a total no-op (no extras, no fuel, no scan) -- 369 dead
+        presses; the free grid-walk half of the doctrine lives at
+        exactly zero stock.
+        """
+        result = compute_desired_equipment("COLLECT", 800, extra_radars_count=0, rank=1)
+        assert 5 in result

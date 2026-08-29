@@ -13,7 +13,7 @@ from tankpit_bot.bot.ai.scoring_types import (
     ReasonKind,
     make_behavior_score,
 )
-from tankpit_bot.bot.ai.tactics import compute_desired_equipment
+from tankpit_bot.bot.ai.tactics import compute_desired_equipment, radar_slot_enabled
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -419,6 +419,31 @@ collapses to the built-in radius-2 scan and restock stalls
 ([[radar-mechanics]] "Death spiral at 0 extras")."""
 
 
+def radar_press_scans(ctx: DecideCtx) -> bool:
+    """Return True when a radar press would actually serve a scan.
+
+    The radar-hoard rule toggles the slot OFF between one extra and
+    the hunt bar outside HUNT (:func:`tankpit_bot.bot.ai.tactics.
+    radar_slot_enabled`), and the 2026-08-28 trial proved a press
+    with the slot disabled is a total no-op — no extras, no fuel, NO
+    SCAN (369 dead presses, seven 50-press book windows billing
+    [-510,-500] against a residual of 0). Every scan decider must
+    decline while pressing cannot scan, or the cascade scan-loops on
+    coverage that never arrives.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when the slot is (or will be) enabled for this press.
+    """
+    return radar_slot_enabled(
+        ctx.mode,
+        ctx.inventory["extra_radars"]["count"],
+        ctx.self_state["rank"],
+    )
+
+
 def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
     """Return True when a radar dispatch is worth its cost right now.
 
@@ -426,13 +451,17 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         ctx: Decision context (coverage map + inventory).
 
     Returns:
-        With extras above the reserve: True when the current viewport
-        has at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
+        False whenever a press would not scan at all
+        (:func:`radar_press_scans` — the hoard band). Otherwise, with
+        extras above the reserve: True when the current viewport has
+        at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
         tiles. At the reserve (the last extra): True only from
         :data:`RADAR_RESERVE_REVEAL_FLOOR_TILES` uncovered tiles.
         Without extras: True when any tile is uncovered (the built-in
         radar is free).
     """
+    if not radar_press_scans(ctx):
+        return False
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     uncovered = viewport_uncovered_count(
         ctx.world["scanned_tiles"],

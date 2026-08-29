@@ -204,7 +204,11 @@ class TestRadarSpendEconomics:
         for dy in range(2, 5):
             for dx in range(2, 16):
                 del world["scanned_tiles"][f"{left + dx},{top + dy}"]
-        ai_state = make_scanned_ai_state()
+        # HUNT: the only mode where band stock (1-2 extras) still
+        # scans -- the 2026-08-28 hoard rule disables the slot in the
+        # band outside combat, so the reserve economics are a combat
+        # law now.
+        ai_state = AIStateDict(**{**make_scanned_ai_state(), "mode": "HUNT"})
 
         two_left = DecideCtx(
             world,
@@ -236,7 +240,7 @@ class TestRadarSpendEconomics:
 
         ws = WorldService()
         world, self_state = make_world(scanned=False)
-        ai_state = make_scanned_ai_state()
+        ai_state = AIStateDict(**{**make_scanned_ai_state(), "mode": "HUNT"})
 
         last_extra = DecideCtx(
             world,
@@ -349,3 +353,29 @@ class TestMineRevealScan:
         ws.mark_radar_scan_complete()
 
         assert ws.mine_reveal_pending() is False
+
+
+def test_band_stock_outside_hunt_cannot_scan_at_all() -> None:
+    """In the hoard band the slot is off and a press is a no-op.
+
+    The 2026-08-28 trial: 369 dead presses, seven 50-press book
+    windows billing [-510,-500] against residual 0. Every scan
+    decider must decline through this gate.
+    """
+    from tankpit_bot.bot.ai.context import radar_press_scans, radar_spend_worthwhile
+
+    ws = WorldService()
+    world, self_state = make_world(scanned=False)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(default_count=5),
+        100000,
+        None,
+        "",
+        ws=ws,
+    )
+
+    assert radar_press_scans(ctx) is False
+    assert radar_spend_worthwhile(ctx) is False

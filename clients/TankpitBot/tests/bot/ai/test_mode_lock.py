@@ -149,7 +149,9 @@ def test_invalid_mode_state_reselects_recover_equipment_when_reserves_are_broken
     inventory = make_inventory(default_count=30)
     inventory["dual_shots"]["count"] = 5
     inventory["homing_shots"]["count"] = 5
-    inventory["extra_radars"]["count"] = 5
+    # 0 extras keeps the landing scan servable under the
+    # 2026-08-28 hoard rule (band stock cannot scan).
+    inventory["extra_radars"]["count"] = 0
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
@@ -197,7 +199,9 @@ def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
     inventory = make_inventory(default_count=30)
     inventory["dual_shots"]["count"] = 5
     inventory["homing_shots"]["count"] = 5
-    inventory["extra_radars"]["count"] = 5
+    # 0 extras keeps the landing scan servable under the
+    # 2026-08-28 hoard rule (band stock cannot scan).
+    inventory["extra_radars"]["count"] = 0
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
@@ -223,7 +227,9 @@ def test_hunt_mode_switches_to_recover_equipment_when_reserves_break() -> None:
     inventory = make_inventory(default_count=30)
     inventory["dual_shots"]["count"] = 5
     inventory["homing_shots"]["count"] = 5
-    inventory["extra_radars"]["count"] = 5
+    # 0 extras keeps the landing scan servable under the
+    # 2026-08-28 hoard rule (band stock cannot scan).
+    inventory["extra_radars"]["count"] = 0
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None, ws=ws)
 
