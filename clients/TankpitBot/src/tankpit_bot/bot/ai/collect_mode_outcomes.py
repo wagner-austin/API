@@ -29,7 +29,6 @@ from tankpit_bot.bot.ai.intent import (
     release_collect_plan,
 )
 from tankpit_bot.bot.ai.maroon_walk import (
-    WALK_FOR_FUEL_MAX_TILES,
     walk_for_fuel_last_resort,
 )
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
@@ -189,8 +188,8 @@ def exhausted_collect_outcome(
         "out_of_fuel",
         f"COLLECT owner produced no decision at "
         f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
-        f"forager exhausted, no affordable search hop, no walkable fuel "
-        f"within {WALK_FOR_FUEL_MAX_TILES} tiles.",
+        f"forager exhausted, no affordable search hop, no walkable "
+        f"known fuel anywhere.",
     )
 
 

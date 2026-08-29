@@ -62,17 +62,16 @@ class TestEquipmentSearchHopFallback:
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
 
-    def test_equipment_search_exits_when_no_dot_affordable_at_low_fuel(self) -> None:
-        """The COLLECT owner exits ``out_of_fuel`` when marooned at low fuel.
+    def test_equipment_search_walks_when_no_dot_affordable_at_low_fuel(self) -> None:
+        """A marooned tank walks toward the unaffordable dot, never quits.
 
         The only atlas dot is 150 tiles away (teleport cost 900 vs
-        fuel 150), fuel is at or below ``fuel_low_threshold`` (200),
-        and lock / pickup / sense / hop all decline, so the session
-        ends instead of gambling on a blind hop (user contract
-        2026-07-02/03).
+        fuel 150) and every hop declines. The pre-2026-08-28 law
+        exited ``out_of_fuel`` here; the walk-for-fuel rung now
+        reaches for known fuel at ANY distance (the 48-tile cap
+        stranded Artax permanently in the (4,128) fuel desert --
+        operator directive: walk the window, pan it, keep going).
         """
-        import pytest
-
         ws = self.ws
         ws.map_fuel_dots = ((250, 100),)
         world, self_state = _make_world(fuel=150, scanned=True)
@@ -87,17 +86,18 @@ class TestEquipmentSearchHopFallback:
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
         inventory = _make_inventory(default_count=15, radar_count=13)
 
-        with pytest.raises(SessionExitError) as exc_info:
-            decide(
-                world,
-                self_state,
-                ai_state,
-                inventory,
-                100000,
-                None,
-                ws=ws,
-            )
-        assert exc_info.value.reason == "out_of_fuel"
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            ws=ws,
+        )
+
+        assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
+        assert decision["command"]["cmd_type"] == "move"
 
     def test_exhausted_collect_yields_to_hunt_at_healthy_fuel(self) -> None:
         """An exhausted COLLECT cascade hands the tick to HUNT when combat-ready.

@@ -134,10 +134,30 @@ def test_marooned_walk_targets_a_believed_container_too() -> None:
     assert decision["command"]["cmd_type"] == "move"
 
 
-def test_marooned_exit_stands_when_all_fuel_is_beyond_the_walk_cap() -> None:
-    """Nothing within 48 tiles: the out_of_fuel exit is unchanged."""
-    with pytest.raises(SessionExitError, match="no walkable fuel within 48 tiles"):
-        decide_collect_mode(_marooned_ctx(map_fuel_dots=((200, 200),)))
+def test_marooned_walk_reaches_for_fuel_at_any_distance() -> None:
+    """A far dot is walked toward, never abandoned (no distance cap).
+
+    The former 48-tile cap permanently stranded Artax at (4,128) on
+    2026-08-28: all 471 dots beyond it, every session spawned there,
+    burned ~20 fuel, and quit. A leg is ONE command with instant
+    relocation and walking bills +0 at fuel 0 ([[walk-mechanics]]),
+    so distance costs a handful of walk/pan commands, not exposure.
+    Operator directive 2026-08-28: walk the window, pan it, keep
+    going.
+    """
+    decision = decide_collect_mode(_marooned_ctx(map_fuel_dots=((200, 200),)))
+
+    if decision is None:
+        raise AssertionError("expected walk-for-fuel decision")
+    assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
+    assert decision["command"]["cmd_type"] == "move"
+
+
+def test_marooned_exit_stands_when_no_fuel_is_known_anywhere() -> None:
+    """Zero candidates (answered empty atlas, no believed containers):
+    the out_of_fuel exit is the honest terminal."""
+    with pytest.raises(SessionExitError, match="no walkable known fuel anywhere"):
+        decide_collect_mode(_marooned_ctx())
 
 
 def test_marooned_exit_ignores_blacklisted_containers() -> None:

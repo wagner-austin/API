@@ -32,12 +32,6 @@ from tankpit_bot.runtime_logging import (
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
-WALK_FOR_FUEL_MAX_TILES = 48
-"""Farthest known fuel a marooned tank will walk toward (~96 s of
-2 s-per-tile walking). Beyond this the out_of_fuel exit stands -- the
-2026-07-25 exposure rule caps how long a broke tank crawls in the
-open, even in the practice room where bots never initiate."""
-
 
 def _maroon_pan_toward(
     ctx: DecideCtx,
@@ -151,10 +145,9 @@ def walk_for_fuel_last_resort(
 
     Returns:
         A one-leg walk (or window pan) decision, or ``None`` when no
-        known fuel is inside the walk cap or no leg is walkable (the
-        exit stands). The caller guarantees critical fuel -- the
-        healthy-fuel tick resolved via the hunt handoff before this
-        rung.
+        known fuel exists or no leg is walkable (the exit stands).
+        The caller guarantees critical fuel -- the healthy-fuel tick
+        resolved via the hunt handoff before this rung.
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     candidates: list[tuple[int, int, int]] = []
@@ -169,14 +162,20 @@ def walk_for_fuel_last_resort(
             (abs(container["x"] - sx) + abs(container["y"] - sy), container["x"], container["y"])
         )
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    # Nearest-first over EVERY candidate inside the cap: in a shore
+    # Nearest-first over EVERY candidate, at ANY distance: in a shore
     # corner the closest entries are water-locked containers whose leg
     # resolves to a teleport fallback, not a walk (run
     # bot-20260728-092357 gave up after trying only the nearest and
-    # exited with dots in walking range further down the list).
-    for _, target_x, target_y in sorted(
-        c for c in candidates if 0 < c[0] <= WALK_FOR_FUEL_MAX_TILES
-    ):
+    # exited with dots in walking range further down the list). The
+    # former 48-tile cap (the 2026-07-25 exposure rule) permanently
+    # stranded Artax in the (4,128) fuel desert on 2026-08-28: all
+    # 471 dots sat beyond it, and every session spawned there, burned
+    # ~20 fuel, and quit. The cap's time math was stale anyway -- a
+    # leg is ONE command with instant relocation ([[walk-mechanics]]),
+    # so a cross-map walk is ~20 walk/pan commands, and walking bills
+    # +0 at fuel 0, so distance cannot deepen the stranding. Operator
+    # directive 2026-08-28: walk the window, pan it, keep going.
+    for _, target_x, target_y in sorted(c for c in candidates if c[0] > 0):
         terrain = ctx.terrain
         if terrain is not None and not terrain.is_passable(target_x, target_y):
             continue
@@ -220,6 +219,5 @@ def walk_for_fuel_last_resort(
 
 
 __all__ = [
-    "WALK_FOR_FUEL_MAX_TILES",
     "walk_for_fuel_last_resort",
 ]
