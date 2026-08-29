@@ -359,6 +359,126 @@
       },
       "expected": 6.250983715057373,
       "tolerance": 0.0
+    },
+    {
+      "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+      "fingerprint": {
+        "image_digest": "55651342e15d2a8652ea00e7c90c3b0d6bb6f9d3351350dc6a7afc415d76c437",
+        "gpu_model": "NVIDIA A30",
+        "driver_version": "580.82.07",
+        "determinism": {
+          "stack": "torch",
+          "settings": {
+            "cublas_workspace_config": ":4096:8",
+            "cudnn_benchmark": "false",
+            "cudnn_deterministic": "true",
+            "cudnn_tf32": "false",
+            "deterministic_algorithms": "true",
+            "matmul_tf32": "false"
+          }
+        },
+        "host": {
+          "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+          "machine": "x86_64",
+          "logical_cores": 32
+        },
+        "packages": [
+          {
+            "name": "numpy",
+            "version": "2.3.5"
+          },
+          {
+            "name": "torch",
+            "version": "2.6.0+cu124"
+          },
+          {
+            "name": "transformers",
+            "version": "4.46.3"
+          }
+        ]
+      },
+      "expected": 6.250983715057373,
+      "tolerance": 0.0
+    },
+    {
+      "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+      "fingerprint": {
+        "image_digest": "55651342e15d2a8652ea00e7c90c3b0d6bb6f9d3351350dc6a7afc415d76c437",
+        "gpu_model": "NVIDIA L40S",
+        "driver_version": "580.82.07",
+        "determinism": {
+          "stack": "torch",
+          "settings": {
+            "cublas_workspace_config": ":4096:8",
+            "cudnn_benchmark": "false",
+            "cudnn_deterministic": "true",
+            "cudnn_tf32": "false",
+            "deterministic_algorithms": "true",
+            "matmul_tf32": "false"
+          }
+        },
+        "host": {
+          "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+          "machine": "x86_64",
+          "logical_cores": 48
+        },
+        "packages": [
+          {
+            "name": "numpy",
+            "version": "2.3.5"
+          },
+          {
+            "name": "torch",
+            "version": "2.6.0+cu124"
+          },
+          {
+            "name": "transformers",
+            "version": "4.46.3"
+          }
+        ]
+      },
+      "expected": 6.250983715057373,
+      "tolerance": 0.0
+    },
+    {
+      "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
+      "fingerprint": {
+        "image_digest": "55651342e15d2a8652ea00e7c90c3b0d6bb6f9d3351350dc6a7afc415d76c437",
+        "gpu_model": "Tesla V100-FHHL-16GB",
+        "driver_version": "580.82.07",
+        "determinism": {
+          "stack": "torch",
+          "settings": {
+            "cublas_workspace_config": ":4096:8",
+            "cudnn_benchmark": "false",
+            "cudnn_deterministic": "true",
+            "cudnn_tf32": "false",
+            "deterministic_algorithms": "true",
+            "matmul_tf32": "false"
+          }
+        },
+        "host": {
+          "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+          "machine": "x86_64",
+          "logical_cores": 40
+        },
+        "packages": [
+          {
+            "name": "numpy",
+            "version": "2.3.5"
+          },
+          {
+            "name": "torch",
+            "version": "2.6.0+cu124"
+          },
+          {
+            "name": "transformers",
+            "version": "4.46.3"
+          }
+        ]
+      },
+      "expected": 6.250983715057373,
+      "tolerance": 0.0
     }
   ]
 }
