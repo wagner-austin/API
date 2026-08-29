@@ -318,10 +318,22 @@ release:
 	@Write-Host "==> release (frozen runnable snapshot for the fleet)" -ForegroundColor Cyan
 	$$sha = (git rev-parse --short HEAD).Trim(); $$ver = (Select-String -Path pyproject.toml -Pattern 'version = .(\d+\.\d+\.\d+).').Matches[0].Groups[1].Value; $$dest = "C:\Users\Test\PROJECTS\tankpit-releases\v$$ver-$$sha"; if (Test-Path $$dest) { Write-Host "[release] $$dest already exists; nothing to do" -ForegroundColor Yellow } else { New-Item -ItemType Directory -Force $$dest | Out-Null; git -C ..\.. archive --format=zip HEAD clients/TankpitBot libs/platform_core libs/monorepo_guards -o "$$dest\snapshot.zip"; Expand-Archive "$$dest\snapshot.zip" -DestinationPath $$dest; Remove-Item "$$dest\snapshot.zip";Copy-Item accounts.json "$$dest\clients\TankpitBot\"; Copy-Item .env "$$dest\clients\TankpitBot\"; New-Item -ItemType Directory -Force "$$dest\clients\TankpitBot\runs" | Out-Null; Push-Location "$$dest\clients\TankpitBot"; poetry install --only main; Pop-Location; Write-Host "[release] built $$dest" -ForegroundColor Green; Write-Host "[release] activate: restart the fleet manager from that folder (kill the 27300 listener, then run 'poetry run tankpit-fleet' there, detached)" -ForegroundColor DarkGray }
 
-fleet: install
+# ``make fleet`` runs the manager FROM THE NEWEST RELEASE SNAPSHOT,
+# not this working tree: live sessions import code at spawn time, so
+# a fleet on the hot tree crashes when the tree is operated on
+# (2026-08-28: a deleted runtime-read file killed a live session; a
+# mid-surgery import shipped a half-built planner). The operator's
+# one command stays ``make fleet`` -- the folder hop is this
+# target's job. ``make release`` first if none exists;
+# ``make fleet-dev`` deliberately runs the hot tree.
+fleet:
 	@Write-Host ""
-	@Write-Host "==> fleet (AI-operated fleet manager)" -ForegroundColor Cyan
-	@Write-Host "  Listens on 127.0.0.1:27300 (TANKPIT_FLEET_PORT overrides); Ctrl+C to stop." -ForegroundColor DarkGray
+	@Write-Host "==> fleet (AI-operated fleet manager, newest release)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[fleet] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Running from $$($$rel.Name); listens on 127.0.0.1:27300; Ctrl+C to stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet; Pop-Location
+
+fleet-dev: install
+	@Write-Host ""
+	@Write-Host "==> fleet-dev (HOT TREE -- live sessions can break under mid-surgery edits)" -ForegroundColor Yellow
 	poetry run tankpit-fleet
 
 run: install
