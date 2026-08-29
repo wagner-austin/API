@@ -182,10 +182,17 @@ Real research, producing numbers that get compared, reachable by no tool.
 - **Compares:** seeded runs across parameter sweeps against a stated goal —
   "100% win rate against the built-in AI at Impossible and every rung below,
   measured".
-- **Provenance:** its own notion — the README says it "pins every claim to the
-  build it was measured on", which is the right instinct and a different
-  vocabulary from `RunFingerprint`.
-- **Runs locally**, not on the cluster.
+- **Provenance:** `rw_bot.provenance`, since 2026-08-29 — a `RunFingerprint`
+  per sweep and a `RunRecord` per arm, in the shared vocabulary. The README's
+  instinct ("pins every claim to the build it was measured on") was right and
+  is now executed rather than described: the build is a digest of
+  `.game/game-lib.jar`, so it is read off the bytes rather than maintained by
+  hand. Its observations are the arm's win rate with the counts beside it —
+  three wins from three and thirty from thirty are both 1.0, and only one is
+  evidence — plus extractor drops, median worth, unengageable targets and
+  intercepts.
+- **Still not registered as an hpc3 project**, and correctly so: it runs
+  locally against a windowed game, not on the cluster.
 
 ### `sirius` — declared as an example, never run
 
@@ -230,6 +237,16 @@ Its consumers, as of 2026-08-29:
   could read its numbers beside another experiment's.
 - **LSTM** — `char_lstm.provenance` writes a `.runrecord.json` beside every
   results CSV.
+- **RustedWarfareBot** — `rw_bot.provenance` builds one per sweep arm.
+  Its fingerprint's load-bearing axis is neither a card nor a library: it is
+  the **game jar**, recorded in the packages axis as a SHA-256 of
+  `.game/game-lib.jar`. The project already knew the build decides
+  everything — every wiki page pins `game_version` "because the jar is
+  obfuscated and class names change silently between releases" — but that
+  pin is a hand-maintained string on documentation, and silent renaming is
+  exactly the case a maintained label notices last. The digest is read off
+  the bytes that ran. Two arms measured against different builds now refuse
+  to subtract.
 
 Still outstanding, stated precisely:
 
@@ -238,7 +255,6 @@ Still outstanding, stated precisely:
   pins the BLAS thread count (2026-08-29), so future rows are at least
   reproducible against each other; the 3,068 rows written before that are
   not, and their `fingerprint: null` says so.
-- **RustedWarfareBot** has neither.
 
 THE CLAIM THAT USED TO STAND HERE WAS FALSE. This paragraph said "LSTM and
 RustedWarfareBot cannot adopt it at all, because `platform_core` is not

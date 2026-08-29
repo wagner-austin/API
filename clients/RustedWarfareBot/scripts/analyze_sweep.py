@@ -15,6 +15,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from rw_bot.provenance import summarize_arm
+
 LABEL_WIDTH = 15
 
 EXIT_OK = 0
@@ -137,16 +139,13 @@ def main(
         )
     sys.stdout.write("\n")
     for arm in sorted({str(r["arm"]) for r in rows}):
-        sub = [r for r in rows if r["arm"] == arm]
-        wins = sum(1 for r in sub if r["verdict"] == "won")
-        losses = sum(1 for r in sub if r["verdict"] in ("defeated", "wiped"))
-        med = sorted(int(str(r["worth_end"])) for r in sub)[len(sub) // 2]
-        dropped = sum(int(str(r["dropped"])) for r in sub)
-        gap = sum(int(str(r["targets_end"])) - int(str(r["engageable"])) for r in sub)
-        icpt = sum(int(str(r["intercepted"])) for r in sub)
+        summary = summarize_arm(rows, arm)
         sys.stdout.write(
-            f"{arm:8}  won {wins}/{len(sub)}  lost {losses}  drops {dropped}  "
-            f"median worth {med}  unengageable {gap}  intercepts {icpt}\n"
+            f"{arm:8}  won {summary['wins']}/{summary['matches']}  "
+            f"lost {summary['losses']}  drops {summary['drops']}  "
+            f"median worth {summary['median_worth']}  "
+            f"unengageable {summary['unengageable']}  "
+            f"intercepts {summary['intercepts']}\n"
         )
     return EXIT_OK
 
