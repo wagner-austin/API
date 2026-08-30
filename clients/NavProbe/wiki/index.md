@@ -28,7 +28,7 @@ patched and unpatched agree bit for bit on both devices
 ([[tactile-alias-is-inert-with-live-taxels]]). But on that same mesh/multiccd model the
 deterministic mode **drops every contact** and the body falls through the geom it should
 rest on, silently and exit 0
-([[deterministic-mode-drops-contacts-on-mesh-collision]]). The sphere family above is
+([[deterministic-mode-drops-contacts-in-convex-narrowphase]]). The sphere family above is
 unaffected and its ten-scene table was re-checked with contact counts and survives —
 which is worth knowing precisely because this instrument scores a zero-contact run as
 `deterministic: true` ([[a-determinism-verdict-needs-a-correctness-oracle]]).

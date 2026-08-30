@@ -1,7 +1,7 @@
 ---
 title: The tactile alias patch is semantically inert once the taxels actually execute
 tags: [warp, determinism, tactile, finding, upstream, patch]
-related: ["[[tactile-alias-patch-clears-warp-deterministic-compile]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[deterministic-mode-drops-contacts-on-mesh-collision]]"]
+related: ["[[tactile-alias-patch-clears-warp-deterministic-compile]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[deterministic-mode-drops-contacts-in-convex-narrowphase]]"]
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
@@ -49,7 +49,7 @@ The two arms genuinely compiled different code. Warp logged `mujoco_warp._src.se
 
 Holding the world fixed — every repetition rebuilding `Data` from the same keyframe and calling `sensor_acc` alone, with no `step`, no solver and no integrator, so the contact set is identical by construction — the patched kernel under `RUN_TO_RUN` on `cuda:0` returns one distinct digest from eight repetitions, at `0.199289039`, matching the MuJoCo CPU reference to 2.81 × 10⁻⁸.[^4]
 
-That matters because the stepped runs under the same mode return zeros and disagree with each other. The sensor is not the cause: see [[deterministic-mode-drops-contacts-on-mesh-collision]], where the world itself is what varies.
+That matters because the stepped runs under the same mode return zeros and disagree with each other. The sensor is not the cause: see [[deterministic-mode-drops-contacts-in-convex-narrowphase]], where the world itself is what varies.
 
 ## What this establishes for the upstream fix
 

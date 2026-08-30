@@ -6,7 +6,7 @@ source_paths:
   - "wiki/log.md"
 source_git_blobs:
   "wiki/log.md": "cebbc930c6e6ace87cbff5328cca025f92811f7e"
-fact_checked: 2026-08-19
+fact_checked: 2026-08-30
 confidence: high
 hubs: [instrument-design]
 ---
@@ -29,21 +29,27 @@ Warp's deterministic modes would make most of this wiki's findings a *setting* r
 
 **The equivalence check this question deferred is now done, and it opened question 1b.** The patch was trusted for *compilation* only; whether the aliased writes changed any numbers was untested because the scene family has `nsensor = 0`. Measured 2026-08-29 on the vendor's own tactile fixture: they do not — patched and unpatched are bit-identical on both devices with 12 live taxels ([[tactile-alias-is-inert-with-live-taxels]]). The patch is safe to file. What the check found instead is below.
 
-## 1b. Which kernel drops the contacts on a mesh/multiccd model under deterministic mode?
+## 1b. Which kernel drops the contacts under deterministic mode? — ANSWERED 2026-08-30: the convex narrowphase
 
-Under `RUN_TO_RUN` the vendor tactile fixture generates **zero contacts** and the body falls through the box it should rest on — reproducibly, at adequate buffer capacity, with no exception and exit 0 ([[deterministic-mode-drops-contacts-on-mesh-collision]]). The sphere family is unaffected, so this is specific to the mesh-vs-box collision path, not to deterministic mode in general.
+**Answered, with a mechanism and a locator.** The failure follows `MJ_COLLISION_TABLE` exactly: every geometry pair routing to `CollisionType.CONVEX` loses all its contacts under `RUN_TO_RUN`, and every pair routing to `CollisionType.PRIMITIVE` is untouched — six for six across sphere/plane, sphere/box, mesh/plane, mesh/box, mesh/mesh and box/box. Broadphase is clean (identical `d.ncollision` in both modes); the narrowphase discards 20 candidate pairs and emits nothing. The cause is a consumed-return atomic at `collision_convex.py:288` whose two-pass counter-replay lowering returns 0 when the counter helper is absent, so `nccd` never increments and the CCD kernel runs over zero work — and the only diagnostic on that path hangs off the `>= naccdmax` branch, which a zero index never takes. Full detail and citations: [[deterministic-mode-drops-contacts-in-convex-narrowphase]].
 
-This is the highest-value open item on this page, because it is a **correctness** failure rather than a reproducibility one, and because it decides how an upstream bug report is scoped.
+Three hypotheses died on the way and are recorded so nobody re-runs them: `multiccd` (removing the flag changes nothing), buffer capacity (4096 makes the wrong answer *reproducible*, not correct), and meshes (mesh-on-plane is a primitive pair and is completely clean).
 
-**`multiccd` is ruled out, 2026-08-29.** It was the obvious suspect and the cheapest test, so it went first: rebuilding the identical fixture without `<flag multiccd="enable"/>` changes nothing in either mode — default keeps its 60 contacts and final z 1.149779, `RUN_TO_RUN` still drops to zero contacts and 0.981754, one distinct digest from six repetitions in all four cells. The flag does not affect this scene at all and removing it does not rescue the contacts.
+**What is still open here** is narrow: whether the counter helper is genuinely absent or present-but-wrong — that reading comes from the macro plus the missing overflow bit, not from inspecting generated code — and what the fix should be, which is upstream's call. A `GPU_TO_GPU` sweep across the six pairs is also unmeasured; only mesh-on-box was checked there, where it fails identically.
 
-**What would answer the rest, cheapest first:**
+## 1c. Is the published `deterministic_max_records = 64` hiding a silent truncation?
 
-1. **Bisect the deterministic lowering by kernel.** Warp intercepts atomics per kernel; a build that leaves `collision_driver`'s kernels on ordinary atomics while the rest stays deterministic would locate the failure to a module. This is now the next experiment.
-2. **Vary the geometry pair.** The sphere family (primitive-vs-plane, primitive-vs-primitive) is clean and this fixture (mesh-vs-box) is not. A mesh-vs-plane and a primitive-vs-box arm would say whether "mesh" or "box" is the operative half, which is one more axis the bug report can name.
-3. **`_preprocess_tactile_contacts` is a bystander, not a suspect.** It consumes an `atomic_add` *return value* as a slot index — the two-pass counter-replay lowering, the most fragile construct in the pipeline. But it runs downstream of `d.nacon`, which is already zero, so it never had contacts to deduplicate. Noted here so the next reader does not re-open it.
+Question 1 adopted 64 and this wiki still publishes it. On the vendor tactile fixture 64 is
+demonstrably too small: it yields four distinct digests from eight repetitions where 4096
+yields one. Nothing is *known* to be wrong in the runs that produced the ten-scene table --
+they pass a contact check ([[a-determinism-verdict-needs-a-correctness-oracle]]) -- but the
+guard that would have complained is skipped while a CUDA stream is capturing, and MuJoCo-Warp
+captures. So "no error was raised" is not evidence, and the ten-scene table's numbers were
+taken at 64.
 
-**Also unresolved and worth stating:** whether `deterministic_max_records = 64` — the value question 1 adopted and this wiki still publishes — silently truncated anything in the runs that produced the ten-scene table. Those runs pass a contact check ([[a-determinism-verdict-needs-a-correctness-oracle]]), so nothing is known to be wrong; but the guard that would have said so is skipped under CUDA graph capture, so "no error was raised" is not evidence.
+**What would answer it:** re-run the published ten-scene sweep at 4096 and diff the reference
+digests against the table. Identical digests retire the question; any difference means the
+published digests describe a truncated solve and the table needs re-stating.
 
 ## 2. Do the findings hold on another GPU architecture?
 

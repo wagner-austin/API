@@ -1,7 +1,7 @@
 ---
 title: A determinism verdict cannot tell "reproducible" from "reproducibly broken", and the ten-scene table was checked against that
 tags: [instrument-design, determinism, methodology, finding]
-related: ["[[deterministic-mode-drops-contacts-on-mesh-collision]]", "[[tactile-alias-patch-clears-warp-deterministic-compile]]", "[[passing-test-can-miss-its-own-premise]]", "[[bit-equality-is-a-leading-indicator]]"]
+related: ["[[deterministic-mode-drops-contacts-in-convex-narrowphase]]", "[[tactile-alias-patch-clears-warp-deterministic-compile]]", "[[passing-test-can-miss-its-own-premise]]", "[[bit-equality-is-a-leading-indicator]]"]
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
@@ -25,7 +25,7 @@ hubs: [determinism-measurement, instrument-design]
 
 This instrument answers one question: given a fixed seed and a fixed action sequence, do repeated rollouts produce the same bytes? `comparison.py` folds two run records into agree-or-disagree; `experiment.py` reports whether every repetition matched the first. **Nothing in that chain ever asks whether the trajectory was physically right.**
 
-That is a design choice, and mostly a good one — an instrument that needed a physics oracle would need a reference implementation and would stop being vendor-agnostic. But it has a failure mode with teeth, and 2026-08-29 produced a live instance of it: on the vendor tactile fixture, `RUN_TO_RUN` at adequate buffer capacity returns **one distinct digest from eight repetitions while generating zero contacts**, the body falling through the geom every time, identically ([[deterministic-mode-drops-contacts-on-mesh-collision]]).
+That is a design choice, and mostly a good one — an instrument that needed a physics oracle would need a reference implementation and would stop being vendor-agnostic. But it has a failure mode with teeth, and 2026-08-29 produced a live instance of it: on the vendor tactile fixture, `RUN_TO_RUN` at adequate buffer capacity returns **one distinct digest from eight repetitions while generating zero contacts**, the body falling through the geom every time, identically ([[deterministic-mode-drops-contacts-in-convex-narrowphase]]).
 
 Scored by this instrument, that run is `deterministic: true`. It is also completely wrong. **Reproducible and correct are different properties, and only the first one is measured.**
 
