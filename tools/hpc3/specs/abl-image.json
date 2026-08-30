@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "ab9867aad8216283e2088d38d048379cf70d5b50",
+  "git_commit": "e5bbe3762552bed9128f6dace78d5a183ef1a034",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -227,6 +227,18 @@
     {
       "module": "model_trainer.core.services.model.gemm_shapes",
       "attribute": "GEMM_BOUNDARY"
+    },
+    {
+      "module": "model_trainer.core.services.model.deterministic_gemm",
+      "attribute": "matmul_by_arm"
+    },
+    {
+      "module": "model_trainer.core.services.model.kernel_arm_modules",
+      "attribute": "use_kernel_arm"
+    },
+    {
+      "module": "model_trainer.core.services.model.kernel_arm_modules",
+      "attribute": "ArmConv1D"
     }
   ],
   "smoke_commands": [
@@ -238,14 +250,16 @@
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/gemm.json')); b = json.load(open('/tmp/gemm-rank1.json')); assert a['label'] == 'gemm-attribution-v2-none-cublas', a['label']; assert b['label'] == 'gemm-attribution-v2-both-rank1', b['label']; ka = {o['name'] for o in a['observations']}; assert ka == {o['name'] for o in b['observations']}, 'arms must probe the same shapes'; assert any('large-attn-qkv-M3840-K1280' in n for n in ka), 'the shape the v24 trace broke on is missing'\"",
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import cublas_addmm, rank1_addmm; torch.manual_seed(42); b = torch.randn(384); x = torch.randn(64, 128); w = torch.randn(128, 384); r = rank1_addmm(b, x, w); assert torch.equal(r, rank1_addmm(b, x, w)), 'rank1 did not reproduce itself'; acc = torch.zeros(64, 384); [acc.addr_(x[:, k], w[k, :]) for k in range(128)]; assert torch.equal(r, b + acc), 'rank1 is not an ascending-k accumulation with the bias last'; assert (r - cublas_addmm(b, x, w)).abs().max().item() < 1e-3, 'rank1 is not the same product'\"",
     "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
-    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json --controls none",
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json --controls none --kernel cublas",
     "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.train_cost import TRAIN_SHAPES, run_train_step, train_step_setup; row = [s for s in TRAIN_SHAPES if s['name'] == 'gate-tiny-b1-s64'][0]; run_train_step(train_step_setup(row, 'cpu'))\"",
     "/opt/env/bin/python -c \"from platform_core.determinism_record import UNPINNED_STACK, determinism_record; from model_trainer.core.run_fingerprint import capture_run_fingerprint; f = capture_run_fingerprint('cpu', determinism_record(UNPINNED_STACK, {})); assert f['host']['logical_cores'] >= 1, f['host']; assert [p['name'] for p in f['packages']] == ['numpy', 'torch', 'transformers'], f['packages']\"",
     "/opt/env/bin/python -m model_trainer.cli.legacy_gemm_probe --device cpu --out /tmp/lmhead.json",
     "/opt/env/bin/python -c \"import torch.backends.cuda as c; from model_trainer.core._test_hooks import _default_apply_determinism as pin; s = dict(pin(remove_split_k=True, math_attention=True)['settings']); assert s['cublaslt_split_k'] == 'removed', s; assert s['sdpa_backends'] == 'math', s; assert (c.math_sdp_enabled(), c.flash_sdp_enabled(), c.mem_efficient_sdp_enabled(), c.cudnn_sdp_enabled()) == (True, False, False, False), 'sdp switches did not take'\"",
     "/opt/env/bin/python -c \"from model_trainer.cli.known_answer_probe import probe_determinism; s = dict(probe_determinism('cpu', remove_split_k=False, math_attention=False)['settings']); assert 'cublaslt_split_k' not in s, s; assert 'sdpa_backends' not in s, s\"",
-    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace-both.json --controls both"
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace-both.json --controls both --kernel cublas",
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace-rank1.json --controls both --kernel rank1",
+    "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/trace-both.json')); b = json.load(open('/tmp/trace-rank1.json')); assert a['label'].endswith('-cublas'), a['label']; assert b['label'].endswith('-rank1'), b['label']; ca = {p[4] for p in (o['name'].split('|') for o in a['observations']) if len(p) == 7}; cb = {p[4] for p in (o['name'].split('|') for o in b['observations']) if len(p) == 7}; assert 'Conv1D' in ca and 'ArmConv1D' not in ca, sorted(ca); assert 'ArmConv1D' in cb and 'Conv1D' not in cb, sorted(cb); assert len(a['observations']) == len(b['observations']), 'the arms traced different numbers of tensors'\""
   ],
   "labels": {
     "org.corvis.project": "mi",

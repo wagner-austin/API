@@ -547,11 +547,23 @@ class TestTheCommittedSpec:
             ),
             (
                 "model_trainer.core.services.model.deterministic_gemm",
+                "matmul_by_arm",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
                 "rank1_addmm",
             ),
             ("model_trainer.core.services.model.forward_cost", "release_row"),
             ("model_trainer.core.services.model.forward_trace", "traced_forward"),
             ("model_trainer.core.services.model.gemm_shapes", "GEMM_BOUNDARY"),
+            (
+                "model_trainer.core.services.model.kernel_arm_modules",
+                "ArmConv1D",
+            ),
+            (
+                "model_trainer.core.services.model.kernel_arm_modules",
+                "use_kernel_arm",
+            ),
             (
                 "model_trainer.core.services.model.known_answer_probe",
                 "probe_forward_loss",
