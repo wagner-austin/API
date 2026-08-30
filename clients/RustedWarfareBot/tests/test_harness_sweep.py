@@ -8,9 +8,17 @@ from __future__ import annotations
 
 import pytest
 
+from rw_bot.harness import play_match_cli
 from rw_bot.harness.match import MatchConfig
+from rw_bot.harness.results_layout import (
+    SWEEP_ROOT,
+    TRACE_ROOT,
+    match_log_path,
+    trace_path,
+)
 from rw_bot.harness.sweep import (
     JOB_FIELDS,
+    LAUNCHER_MODULE,
     SweepError,
     SweepJob,
     assigned,
@@ -23,11 +31,45 @@ from rw_bot.harness.sweep import (
     parse_jobs,
     play_args,
     scorecard,
-    trace_path,
 )
 from rw_bot.policy.ledger import Outlay, Reach
 from rw_bot.policy.match_report import MatchReport, format_report
 from rw_bot.validation import DecodeError
+
+#: The interpreter a sweep launches its matches with. Stated, because the
+#: harness passes its own rather than naming one.
+PY = "/venv/bin/python"
+
+#: Where this batch files, and the two paths a launch is told rather than
+#: composing for itself. Built through the layout module the runner uses, so a
+#: test cannot pass against a spelling nothing produces.
+BATCH = "demo"
+OUT_DIR = f"{SWEEP_ROOT}/{BATCH}"
+LOG = f"{OUT_DIR}/logs/tank-s777.log"
+TRACE = f"{TRACE_ROOT}/{BATCH}/tank-s777.ndjson"
+
+#: A clone's leased channel port.
+PORT = 27512
+
+#: The X display that clone leases.
+DISPLAY = 91
+
+
+def _flag(argv: tuple[str, ...], name: str) -> str | None:
+    """Return the value a command line gives one flag.
+
+    Args:
+        argv: The command.
+        name: The flag to read.
+
+    Returns:
+        Its value, or None when the flag is absent. Absence is a real answer
+        here: several options are omitted rather than passed as zero, because
+        a frozen tree predating one rejects the unknown key.
+    """
+    if name not in argv:
+        return None
+    return argv[argv.index(name) + 1]
 
 
 def _job(
@@ -139,7 +181,10 @@ def test_a_worker_index_outside_the_pool_is_refused(index: int) -> None:
 def test_the_planner_argument_list_carries_every_arm_variable() -> None:
     """Samples, the doctrine that is the whole of the style, and the trace."""
     assert (
-        play_args(_job(doctrine="doctrines/mass25.doctrine"), "demo")
+        play_args(
+            _job(doctrine="doctrines/mass25.doctrine"),
+            trace_path(TRACE_ROOT, BATCH, _job(doctrine="doctrines/mass25.doctrine")),
+        )
         == "1500 doctrines/mass25.doctrine runs/traces/demo/tank-s1.ndjson"
     )
 
@@ -152,20 +197,20 @@ def test_a_chosen_match_is_carried_to_every_job_in_the_batch() -> None:
     rather than to a job line ([[policy-determinism]]).
     """
     duel = MatchConfig(map_path="maps/skirmish/[p2]duel_lake.tmx", opponents=1, difficulty=-2)
-    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", duel)
-    assert argv[-3:] == (
-        "PLAY_MAP=maps/skirmish/[p2]duel_lake.tmx",
-        "PLAY_OPPONENTS=1",
-        "PLAY_DIFFICULTY=-2",
-    )
+    argv = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, duel)
+    assert _flag(argv, "--map") == "maps/skirmish/[p2]duel_lake.tmx"
+    assert _flag(argv, "--opponents") == "1"
+    assert _flag(argv, "--difficulty") == "-2"
 
 
 def test_no_chosen_match_leaves_the_engines_own_default() -> None:
     """Absent means the hardcoded ten-player free-for-all, which is what every
     measurement before the duel was taken in ([[policy-determinism]]).
     """
-    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo")
-    assert not [element for element in argv if element.startswith("PLAY_MAP")]
+    argv = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY)
+    assert _flag(argv, "--map") is None
+    assert _flag(argv, "--opponents") is None
+    assert _flag(argv, "--difficulty") is None
 
 
 def test_every_match_records_a_trace_named_after_its_job() -> None:
@@ -176,24 +221,78 @@ def test_every_match_records_a_trace_named_after_its_job() -> None:
     before collapsing. None of that survives in the scorecard, and re-running
     to recover it produces a different match ([[policy-trace]]).
     """
-    assert trace_path(_job(seed=777), "demo") == "runs/traces/demo/tank-s777.ndjson"
-    assert trace_path(_job(label="air"), "other") == "runs/traces/other/air-s1.ndjson"
+    assert trace_path(TRACE_ROOT, BATCH, _job(seed=777)) == TRACE
+    assert trace_path(TRACE_ROOT, "other", _job(label="air")) == "runs/traces/other/air-s1.ndjson"
+
+
+def test_a_launch_is_told_where_to_write_rather_than_deriving_it() -> None:
+    """Both paths used to be built inside ``make_argv`` against
+    repository-relative roots, while the runner created the directories from
+    an absolute ``out_dir``. The two agreed only while the process started in
+    the repository, so on a compute node the directory that existed and the
+    directory written to were different ones -- and the trace, which is the
+    entire measurement of a replication panel, went where nothing looked.
+    """
+    cluster_out = "/pub/wagnera3/rusted/runs/sweeps/demo"
+    argv = make_argv(
+        PY,
+        _job(seed=777),
+        ".game-w2",
+        75,
+        match_log_path(cluster_out, _job(seed=777)),
+        trace_path("/pub/wagnera3/rusted/runs/traces", BATCH, _job(seed=777)),
+        PORT,
+        DISPLAY,
+    )
+    assert _flag(argv, "--play-log") == f"{cluster_out}/logs/tank-s777.log"
+    played = _flag(argv, "--play-args")
+    if played is None:
+        raise AssertionError("a launch must always carry its planner arguments")
+    assert played.endswith("/pub/wagnera3/rusted/runs/traces/demo/tank-s777.ndjson")
+
+
+def test_the_log_path_hangs_off_the_batchs_own_results_directory() -> None:
+    assert match_log_path(OUT_DIR, _job(seed=777)) == LOG
 
 
 def test_the_command_pins_the_seed_the_clone_and_the_lockstep() -> None:
     """Lockstep is passed per job rather than left to the recipe: free running,
     parallel matches under CPU contention sample at different game-times.
     """
-    assert make_argv(_job(seed=777), ".game-w2", 75, "demo") == (
-        "make",
-        "play",
-        "GAME_DIR=.game-w2",
-        "PLAY_SEED=777",
-        "PLAY_SAMPLES=1500",
-        "PLAY_LOCKSTEP=75",
-        "PLAY_LOG=runs/sweeps/demo/logs/tank-s777.log",
-        "PLAY_ARGS=1500 doctrines/default.doctrine runs/traces/demo/tank-s777.ndjson",
+    assert make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY) == (
+        PY,
+        "-m",
+        "rw_bot.harness.play_match_cli",
+        "--port",
+        str(PORT),
+        "--display",
+        str(DISPLAY),
+        "--game-dir",
+        ".game-w2",
+        "--seed",
+        "777",
+        "--lockstep",
+        "75",
+        "--play-log",
+        "runs/sweeps/demo/logs/tank-s777.log",
+        "--play-args",
+        "1500 doctrines/default.doctrine runs/traces/demo/tank-s777.ndjson",
     )
+
+
+def test_the_command_is_this_packages_launcher_not_make() -> None:
+    """It used to be a ``make play`` line, which put the whole launch behind a
+    PowerShell recipe and a PowerShell script -- neither of which can start a
+    match on a Linux compute node."""
+    argv = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY)
+    assert argv[0] == PY
+    assert "make" not in argv
+
+
+def test_the_launcher_name_is_read_off_the_module_it_names() -> None:
+    """Written out, the string and the module drift apart silently and the
+    sweep launches something that no longer exists."""
+    assert play_match_cli.__name__ == LAUNCHER_MODULE
 
 
 def test_a_frozen_tree_is_carried_to_every_job_in_the_batch() -> None:
@@ -201,8 +300,10 @@ def test_a_frozen_tree_is_carried_to_every_job_in_the_batch() -> None:
     landed mid-batch meant later matches ran different code from earlier ones
     -- the working tree was frozen for the batch's whole runtime
     ([[policy-loop]])."""
-    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", tree="runs/sweeps/demo/.tree")
-    assert "PLAY_TREE=runs/sweeps/demo/.tree" in argv
+    argv = make_argv(
+        PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, tree="runs/sweeps/demo/.tree"
+    )
+    assert _flag(argv, "--tree") == "runs/sweeps/demo/.tree"
 
 
 def test_a_pinned_batch_says_so_and_an_unpinned_one_stays_silent() -> None:
@@ -210,20 +311,20 @@ def test_a_pinned_batch_says_so_and_an_unpinned_one_stays_silent() -> None:
     an agent that rejects the unknown key, so an unpinned batch must not
     mention the variable at all ([[policy-determinism]]).
     """
-    pinned = make_argv(_job(seed=777), ".game-w2", 75, "demo", pin_delta=3)
-    assert "PLAY_PINDELTA=3" in pinned
-    unpinned = make_argv(_job(seed=777), ".game-w2", 75, "demo")
-    assert not [element for element in unpinned if element.startswith("PLAY_PINDELTA")]
+    pinned = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, pin_delta=3)
+    assert _flag(pinned, "--pin-delta") == "3"
+    unpinned = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY)
+    assert _flag(unpinned, "--pin-delta") is None
 
 
 def test_a_fast_batch_says_so_and_a_realtime_one_stays_silent() -> None:
     """The gym knob rides the same silence rule as the pin: certified
     bit-exact at 10x (log 2026-08-06), but a tree frozen before the option
     existed runs an agent that rejects the unknown key."""
-    fast = make_argv(_job(seed=777), ".game-w2", 75, "demo", fast_forward=10)
-    assert "PLAY_FASTFORWARD=10" in fast
-    realtime = make_argv(_job(seed=777), ".game-w2", 75, "demo")
-    assert not [element for element in realtime if element.startswith("PLAY_FASTFORWARD")]
+    fast = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, fast_forward=10)
+    assert _flag(fast, "--fast-forward") == "10"
+    realtime = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY)
+    assert _flag(realtime, "--fast-forward") is None
 
 
 def test_a_frozen_tree_owns_the_doctrine_path_too() -> None:
@@ -231,15 +332,17 @@ def test_a_frozen_tree_owns_the_doctrine_path_too() -> None:
     frozen code but read the working tree's doctrine file, a field was added
     mid-batch, and the frozen parser refused it on sixteen straight matches.
     A doctrine file is as much the experiment as the code is."""
-    frozen = play_args(_job(doctrine="doctrines/mass25.doctrine"), "demo", "runs/sweeps/demo/.tree")
+    job = _job(doctrine="doctrines/mass25.doctrine")
+    frozen = play_args(job, trace_path(TRACE_ROOT, BATCH, job), f"{SWEEP_ROOT}/{BATCH}/.tree")
     assert frozen == (
         "1500 runs/sweeps/demo/.tree/doctrines/mass25.doctrine runs/traces/demo/tank-s1.ndjson"
     )
-    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", tree="runs/sweeps/demo/.tree")
-    assert (
-        "PLAY_ARGS=1500 runs/sweeps/demo/.tree/doctrines/default.doctrine "
-        "runs/traces/demo/tank-s777.ndjson"
-    ) in argv
+    argv = make_argv(
+        PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, tree="runs/sweeps/demo/.tree"
+    )
+    assert _flag(argv, "--play-args") == (
+        "1500 runs/sweeps/demo/.tree/doctrines/default.doctrine runs/traces/demo/tank-s777.ndjson"
+    )
 
 
 def _report() -> MatchReport:
@@ -355,11 +458,19 @@ def test_a_transcript_without_a_verdict_is_not_a_result() -> None:
     assert is_complete(scorecard(["verdict        survived (sample_limit)"]))
 
 
-def test_a_leased_batch_names_its_port_and_an_unleased_one_stays_silent() -> None:
-    """The port rides the same silence rule as the pin: absent, the recipe
-    draws its own -- present, the lease's exclusivity replaces the draw
-    (imp-creep12's bind collision, 2026-08-08)."""
-    leased = make_argv(_job(seed=777), ".game-w2", 75, "demo", port=27512)
-    assert "PLAY_PORT=27512" in leased
-    drawn = make_argv(_job(seed=777), ".game-w2", 75, "demo")
-    assert not [element for element in drawn if element.startswith("PLAY_PORT")]
+def test_a_sweep_job_carries_the_port_its_clone_leases() -> None:
+    """The lease's exclusivity is what replaces a draw. It used to be optional,
+    with an absent one meaning "let the recipe draw" -- and two concurrent
+    draws collided the first time eight matches launched in one instant, with
+    both dying on the bind (imp-creep12, 2026-08-08)."""
+    leased = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, 27512, DISPLAY)
+    assert leased[leased.index("--port") + 1] == "27512"
+
+
+def test_a_job_with_no_lease_is_refused_rather_than_drawn_for() -> None:
+    """There is no draw left to fall back to: a launcher that invented a port
+    here would collide with a live match's lease and take BOTH matches down,
+    which is strictly worse than not starting."""
+    with pytest.raises(SweepError) as caught:
+        make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, 0, DISPLAY)
+    assert caught.value.code == "RW-SWEEP-005"

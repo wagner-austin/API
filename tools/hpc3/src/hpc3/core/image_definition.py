@@ -26,6 +26,17 @@ from hpc3.core.image_layout import (
     WHEEL_DIR,
 )
 
+#: How every apt call in a rendered definition is spelled.
+#:
+#: ``APT::Sandbox::User=root`` is not a convenience. Apt normally re-executes
+#: its download method as the unprivileged ``_apt`` user, which an
+#: unprivileged container build cannot permit -- there is no uid to drop to
+#: inside a root-mapped namespace, so the call fails and the fetch dies rather
+#: than degrading. Set as an option rather than written into
+#: ``/etc/apt/apt.conf.d`` so the built image carries no configuration that
+#: outlives the build.
+_APT = "apt-get -o APT::Sandbox::User=root"
+
 
 def render_requirements(spec: ImageSpec) -> str:
     """Render the pinned third-party layer as a pip requirements file.
@@ -45,19 +56,65 @@ def render_requirements(spec: ImageSpec) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _render_post(env: str) -> list[str]:
+def _render_system_packages(packages: list[str]) -> list[str]:
+    """Render the operating-system layer, or nothing when there is none.
+
+    Args:
+        packages: Exactly pinned package specifications.
+
+    Returns:
+        The lines installing them, or an empty list. An image whose whole
+        dependency set is wheels renders no apt call at all rather than an
+        install of nothing -- ``apt-get update`` alone costs a minute of
+        build time and a network dependency for no result.
+
+        ``--no-install-recommends`` because a recommended package is by
+        definition one nothing declared, and the spec is meant to be the
+        whole list. The lists are removed afterwards so the layer does not
+        carry a package index nothing will read.
+    """
+    if not packages:
+        return []
+    return [
+        "    # Operating-system layer. Some dependencies are not wheels: a JVM,",
+        "    # an X server and a software GL stack cannot be pip-installed.",
+        "    export DEBIAN_FRONTEND=noninteractive",
+        "",
+        "    # APT drops privileges to the '_apt' user before fetching, and in",
+        "    # an unprivileged apptainer build that is not allowed: HPC3 lists",
+        "    # no subuid mapping for the user and ships no fakeroot, so the",
+        "    # build runs in a root-mapped namespace where seteuid(42) fails",
+        "    # and apt's http method dies with 'Sub-process http returned an",
+        "    # error code (112)'. Measured on the first image to declare an OS",
+        "    # layer at all (job 55662349, 2026-08-30). Telling apt not to drop",
+        "    # privileges is the whole fix; as real root it is a no-op, so one",
+        "    # rendering serves a privileged build and an unprivileged one.",
+        f"    {_APT} update",
+        f"    {_APT} install -y --no-install-recommends \\",
+        *[f"        {package} \\" for package in packages[:-1]],
+        f"        {packages[-1]}",
+        "    rm -rf /var/lib/apt/lists/*",
+        "",
+    ]
+
+
+def _render_post(spec: ImageSpec, env: str) -> list[str]:
     """Render the ``%post`` section.
 
     Args:
+        spec: The image being built.
         env: Absolute container path receiving the virtualenv.
 
     Returns:
-        The section's lines, including its header.
+        The section's lines, including its header. The operating-system layer
+        comes first because the interpreter the virtualenv is built from may
+        itself be one of its packages.
     """
     return [
         "%post",
         "    set -eu",
         "",
+        *_render_system_packages(spec["system_packages"]),
         f"    python -m venv {env}",
         f"    {env}/bin/pip install --no-cache-dir --upgrade pip",
         "",
@@ -110,7 +167,7 @@ def render_definition(spec: ImageSpec) -> str:
         f"    {COMMIT_NAME} {SPEC_DIR}/{COMMIT_NAME}",
         f"    wheels {WHEEL_DIR}",
         "",
-        *_render_post(env),
+        *_render_post(spec, env),
         "",
         "%environment",
         f"    export PATH={env}/bin:$PATH",

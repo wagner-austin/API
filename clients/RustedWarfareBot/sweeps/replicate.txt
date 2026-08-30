@@ -1,0 +1,52 @@
+# The replication panel: the first thing to run on the cluster, and not an
+# experiment.
+#
+# Twelve seeds, each played TWICE under two labels, because results are filed
+# by label and a batch cannot otherwise hold one configuration twice
+# (the same shape sweeps/noise.txt uses). The two members of a pair are
+# identical in every field, so their traces must agree frame for frame.
+#
+# WHAT IT IS FOR. Bit-exact replication across separate invocations was
+# certified on 2026-08-07 -- 250 samples at 10x, 150 realtime, and 10x against
+# realtime -- and every one of those runs happened on this Windows workstation
+# under the depot's Java 13. The cluster runs the LINUX depot, which ships
+# Java 8. The mechanism was deliberately made JIT-independent (the
+# stack-walking draw classifier was deleted precisely because consulting the
+# JIT-shaped frame stream is process-varying), which is the property most
+# likely to break across virtual machines -- but nobody has measured it there.
+#
+# So this panel certifies the regime before any number is written down. Run a
+# real sweep first and its results would be under a regime nobody had checked.
+#
+# Compare with `python -m scripts.replicate replicate`.
+#
+# 250 samples: the fork points the determinism campaign found sat at frames
+# 7050-9525, which at lockstep 75 is samples 94-127. This runs well past them
+# without paying for a full 4000-sample match.
+#
+# The seeds are the twelve this project already plays, so a pair that forks
+# can be compared against the workstation runs of the same seed.
+repA|12345|doctrines/default.doctrine|250
+repB|12345|doctrines/default.doctrine|250
+repA|777|doctrines/default.doctrine|250
+repB|777|doctrines/default.doctrine|250
+repA|4242|doctrines/default.doctrine|250
+repB|4242|doctrines/default.doctrine|250
+repA|31337|doctrines/default.doctrine|250
+repB|31337|doctrines/default.doctrine|250
+repA|8675309|doctrines/default.doctrine|250
+repB|8675309|doctrines/default.doctrine|250
+repA|90210|doctrines/default.doctrine|250
+repB|90210|doctrines/default.doctrine|250
+repA|555|doctrines/default.doctrine|250
+repB|555|doctrines/default.doctrine|250
+repA|1337|doctrines/default.doctrine|250
+repB|1337|doctrines/default.doctrine|250
+repA|24601|doctrines/default.doctrine|250
+repB|24601|doctrines/default.doctrine|250
+repA|8128|doctrines/default.doctrine|250
+repB|8128|doctrines/default.doctrine|250
+repA|60613|doctrines/default.doctrine|250
+repB|60613|doctrines/default.doctrine|250
+repA|99991|doctrines/default.doctrine|250
+repB|99991|doctrines/default.doctrine|250

@@ -167,6 +167,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         base_image=cli_args.require_flag(parsed, _BASE_IMAGE_FLAG),
         env_prefix=cli_args.require_flag(parsed, _ENV_PREFIX_FLAG),
         git_commit=cli_args.require_flag(parsed, _COMMIT_FLAG),
+        # Empty for the same reason smoke_commands is, and not because
+        # emptiness is a sensible default. Capture probes a PYTHON
+        # environment: it asks importlib.metadata what distributions are
+        # installed, which cannot see a JVM or an X server. Guessing the
+        # operating-system layer from a pip listing would record packages
+        # nobody chose, so the layer is declared by hand or not at all.
+        system_packages=[],
         extra_index_urls=[cli_args.require_flag(parsed, _EXTRA_INDEX_FLAG)],
         requirements=requirements,
         wheels=wheels,

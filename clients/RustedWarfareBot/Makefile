@@ -138,6 +138,21 @@ JAVAC ?= $(GAME_DIR)/jvm64/bin/javac.exe
 JAVA ?= $(GAME_DIR)/jvm64/bin/java.exe
 JAR ?= $(GAME_DIR)/jvm64/bin/jar.exe
 AGENT_JAR := agent/build/rw-agent.jar
+
+# Bytecode level the agent is compiled to, and it is NOT a preference.
+#
+# The oldest JVM the agent must load into is the Linux depot's JRE 1.8.0_131,
+# whose class-file ceiling is 52. A class above a JVM's level does not
+# degrade -- it fails at load with UnsupportedClassVersionError, fatally,
+# before the game starts.
+#
+# This recipe built with `--release 11` until 2026-08-30 while
+# rw_bot.harness.agent_build.JAVA_RELEASE said 8, and the jar that ships is
+# this recipe's. The staged agent was class version 55 and aborted the JVM on
+# the first Linux launch. The two are held equal by
+# tests/test_agent_release.py, which is what makes this comment load-bearing
+# rather than decorative.
+AGENT_RELEASE := 8
 AGENT_CP := $(AGENT_JAR);$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*
 
 # Builds the runtime jar, which is what a game attaches with -javaagent.
@@ -156,8 +171,8 @@ AGENT_CP := $(AGENT_JAR);$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*
 # it open.
 agent:
 	@Write-Host ""
-	@Write-Host "==> agent (javac --release 11, zero third-party deps)" -ForegroundColor Cyan
-	& scripts/make/agent.ps1 -Javac "$(JAVAC)" -Jar "$(JAR)" -AgentJar "$(AGENT_JAR)"
+	@Write-Host "==> agent (javac --release $(AGENT_RELEASE), zero third-party deps)" -ForegroundColor Cyan
+	& scripts/make/agent.ps1 -Javac "$(JAVAC)" -Jar "$(JAR)" -AgentJar "$(AGENT_JAR)" -Release "$(AGENT_RELEASE)"
 	@Write-Host "[agent] built $(AGENT_JAR)" -ForegroundColor Green
 
 # Patches every Targets entry in the real pinned jar and DEFINES each result,
@@ -310,6 +325,12 @@ PLAY_SETTLE ?= 22
 # was reported as never firing, because the confirmation was grepped for in the
 # game's file rather than the agent's.
 PLAY_LOG ?= runs/play.log
+# Owned by rw_bot.harness.launch (CATALOGUE / TYPE_DUMP), which is what the
+# play launcher defaults to and what a sweep therefore runs under. These two
+# remain only because `host` and `watch` are still PowerShell recipes -- they
+# drive an interactive session on this workstation and have no cluster
+# equivalent, so they were deliberately not ported with `play`. Keep them
+# equal to the module's constants until those recipes follow.
 CATALOGUE := wiki/sources/m0-probe/printunits.log
 TYPE_DUMP := wiki/sources/m11-pools/type-flags.ndjson
 
@@ -371,13 +392,26 @@ INCOME_STAGES ?= 4
 INCOME_IDLE ?= 200
 INCOME_LOG ?= runs/income.log
 
-# The body lives in scripts/make/play.ps1 -- launch plumbing, read from the
-# working tree like this Makefile itself, while what the match RUNS comes from
-# the frozen tree when PLAY_TREE is set ([[policy-loop]]).
+# The body lives in rw_bot.harness.play_match_cli -- launch plumbing, read
+# from the working tree like this Makefile itself, while what the match RUNS
+# comes from the frozen tree when PLAY_TREE is set ([[policy-loop]]).
+#
+# It was scripts/make/play.ps1 until the cluster port. PowerShell cannot start
+# a match on a Linux compute node, and a second shell script beside the first
+# would be two launchers to keep in step -- with a missed edit meaning a batch
+# that runs the wrong configuration and still files a scorecard. One launcher,
+# both platforms; this recipe is now just the variables it is given.
+#
+# The optional flags are appended with $(if ...) rather than passed empty.
+# Make hands the recipe to PowerShell, which DROPS an empty argument entirely
+# -- so `--map ""` arrived as a bare `--map` and swallowed the next flag as
+# its value ("--map requires a value, got the flag '--opponents'"). Omitting
+# them is also what a sweep does (rw_bot.harness.sweep.make_argv), so both
+# callers now spell "not asked for" the same way: absent.
 play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
-	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -FastForward $(PLAY_FASTFORWARD) -RngTap $(PLAY_RNGTAP) -ExtraAgentArgs "$(PLAY_EXTRA_AGENT)" -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
+	poetry run python -m rw_bot.harness.play_match_cli --port $(PLAY_PORT) --game-dir "$(GAME_DIR)" --seed $(PLAY_SEED) --lockstep $(PLAY_LOCKSTEP) --settle $(PLAY_SETTLE) --play-log "$(PLAY_LOG)" --opponents $(PLAY_OPPONENTS) --difficulty $(PLAY_DIFFICULTY) --pin-delta $(PLAY_PINDELTA) --fast-forward $(PLAY_FASTFORWARD) --rng-tap $(PLAY_RNGTAP) --module $(PLAY_MODULE) --play-args "$(PLAY_ARGS)"$(if $(PLAY_MAP), --map "$(PLAY_MAP)")$(if $(PLAY_TREE), --tree "$(PLAY_TREE)")$(if $(PLAY_EXTRA_AGENT), --extra-agent-args "$(PLAY_EXTRA_AGENT)")
 
 # Host a LAN game the bot plays in, for a human to join. The join address is
 # printed at launch; the match starts the moment a player connects. Sparring

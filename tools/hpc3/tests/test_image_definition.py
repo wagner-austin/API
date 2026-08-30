@@ -34,6 +34,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         "base_image": "python:3.11.16-slim-bookworm",
         "env_prefix": "/opt/env",
         "git_commit": "d11efacd231ef92426eaf92483c33a8504bd770f",
+        "system_packages": [],
         "extra_index_urls": ["https://download.pytorch.org/whl/cu124"],
         "requirements": ["torch==2.6.0+cu124", "transformers==4.46.3"],
         "wheels": ["model_trainer_server-0.1.0-py3-none-any.whl"],
@@ -44,6 +45,60 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
     }
     base.update(overrides)
     return decode_image_spec(base)
+
+
+class TestTheOperatingSystemLayer:
+    """Not every dependency is a wheel: a JVM, an X server and a software GL
+    stack cannot be pip-installed, and an image that could only describe its
+    Python layer forced a hand-built base nobody could reproduce."""
+
+    def test_an_image_with_no_packages_renders_no_apt_call_at_all(self) -> None:
+        """``apt-get update`` alone costs a minute of build time and a network
+        dependency, for no result."""
+        rendered = render_definition(_spec(system_packages=[]))
+        assert "apt-get" not in rendered
+
+    def test_the_declared_packages_are_installed(self) -> None:
+        packages: JSONValue = [
+            "xvfb=2:21.1.4-2ubuntu1.7",
+            "openjdk-17-jre-headless=17.0.13+11-2",
+        ]
+        rendered = render_definition(_spec(system_packages=packages))
+        assert "xvfb=2:21.1.4-2ubuntu1.7" in rendered
+        assert "openjdk-17-jre-headless=17.0.13+11-2" in rendered
+
+    def test_it_installs_before_the_virtualenv_is_built(self) -> None:
+        """The interpreter the virtualenv is built from may itself be one of
+        these packages, so the order is load-bearing rather than tidy."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        assert rendered.index("install -y --no-install-recommends") < rendered.index(
+            "python -m venv"
+        )
+
+    def test_nothing_recommended_is_installed(self) -> None:
+        """A recommended package is by definition one nothing declared, and
+        the spec is meant to be the whole list."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        assert "--no-install-recommends" in rendered
+
+    def test_the_package_index_is_not_left_in_the_layer(self) -> None:
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        assert "rm -rf /var/lib/apt/lists/*" in rendered
+
+    def test_the_install_is_non_interactive(self) -> None:
+        """A build job has no terminal; a package that asks a question would
+        hang until the scheduler killed it."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        assert "DEBIAN_FRONTEND=noninteractive" in rendered
+
+    def test_a_single_package_needs_no_trailing_continuation(self) -> None:
+        """A dangling backslash before ``rm`` would swallow the next line."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        lines = [line.strip() for line in rendered.splitlines()]
+        assert "xvfb=2:21.1.4-2ubuntu1.7" in lines
+
+    def test_the_definition_still_ends_with_a_newline(self) -> None:
+        assert render_definition(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"])).endswith("\n")
 
 
 class TestRequirements:
@@ -150,3 +205,45 @@ class TestDefinition:
 
     def test_it_ends_with_a_newline(self) -> None:
         assert render_definition(_spec()).endswith("\n")
+
+
+class TestAptRunsWithoutDroppingPrivileges:
+    """The first image to declare an OS layer failed on this and nothing else.
+
+    Apt re-executes its download method as the unprivileged ``_apt`` user.
+    An unprivileged apptainer build has no uid to drop to -- HPC3 lists no
+    subuid mapping for the user and ships no fakeroot -- so ``seteuid(42)``
+    fails and the fetch dies:
+
+        E: setgroups 65534 failed - setgroups (1: Operation not permitted)
+        E: Method http has died unexpectedly!
+        E: Sub-process http returned an error code (112)
+
+    Measured as job 55662349 on 2026-08-30, which reached the ``%post``
+    section and got no further.
+    """
+
+    def test_every_apt_call_disables_the_sandbox(self) -> None:
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.7-3+deb12u13"]))
+        calls = [line for line in rendered.splitlines() if "apt-get" in line]
+        assert calls != []
+        for call in calls:
+            assert "-o APT::Sandbox::User=root" in call, call
+
+    def test_both_the_update_and_the_install_carry_it(self) -> None:
+        """One without the other still dies: the update fetches too."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.7-3+deb12u13"]))
+        assert "apt-get -o APT::Sandbox::User=root update" in rendered
+        assert "apt-get -o APT::Sandbox::User=root install -y" in rendered
+
+    def test_an_image_with_no_os_layer_runs_no_apt_at_all(self) -> None:
+        """The option is on the calls, not on the image: a wheels-only image
+        renders no apt line to carry it."""
+        rendered = render_definition(_spec(system_packages=[]))
+        assert "apt-get" not in rendered
+
+    def test_nothing_is_written_into_the_built_image(self) -> None:
+        """Set as an option rather than into /etc/apt/apt.conf.d, so the
+        image carries no configuration that outlives its own build."""
+        rendered = render_definition(_spec(system_packages=["xvfb=2:21.1.7-3+deb12u13"]))
+        assert "apt.conf" not in rendered

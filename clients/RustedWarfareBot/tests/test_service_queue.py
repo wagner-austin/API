@@ -36,6 +36,7 @@ _MATCH = decode_match_config(
 _CONFIG = decode_sweep_config(
     {
         "out_dir": "runs/sweeps/demo",
+        "traces": "runs/traces",
         "workers": 1,
         "lockstep": 75,
         "clone_prefix": ".game-w",
@@ -236,6 +237,7 @@ def test_a_batch_without_a_match_round_trips_none() -> None:
     config = decode_sweep_config(
         {
             "out_dir": "runs/sweeps/demo2",
+            "traces": "runs/traces",
             "workers": 1,
             "lockstep": 75,
             "clone_prefix": ".game-w",

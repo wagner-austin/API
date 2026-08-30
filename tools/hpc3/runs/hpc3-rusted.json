@@ -1,0 +1,32 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "rusted": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 1,
+      "mem_gb": 2,
+      "minutes": 45,
+      "requeue": false,
+      "checkpoint_steps": 0,
+      "image": {
+        "path": "/pub/wagnera3/rusted/images/v2/rusted.sif",
+        "sha256": "d194314c892645f05c6d50ea03b554960fa4081d6e3fcaffa07eba24e8667541",
+        "binds": ["/pub/wagnera3"]
+      },
+      "env_path": "/opt/env",
+      "pinned_packages": {},
+      "deterministic": false,
+      "budget": {
+        "self_imposed_gpu_hours": 0.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../../clients/RustedWarfareBot"
+    }
+  }
+}

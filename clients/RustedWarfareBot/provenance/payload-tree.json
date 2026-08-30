@@ -1,0 +1,2067 @@
+{
+  "git_commit": "7fc59eda039a06b395935bba00618b775744ec4b",
+  "carries": [
+    "scripts",
+    "doctrines",
+    "sweeps",
+    "agent/build/rw-agent.jar",
+    "wiki/sources/m0-probe/printunits.log",
+    "wiki/sources/m11-pools/type-flags.ndjson"
+  ],
+  "entries": [
+    {
+      "path": ".complete",
+      "sha256": "7df47f7b246fea3ffd24d7156553888a9b1d0fa1c52211d2955052a55e9c77c3",
+      "size_bytes": 8
+    },
+    {
+      "path": "doctrines/aa-counter-guard-aa.doctrine",
+      "sha256": "8c6ecbcd9cfb3a08d68564b65a5ac437fd38d2a058160c1c21c1490ad44e6792",
+      "size_bytes": 792
+    },
+    {
+      "path": "doctrines/aa-counter-guard-amphib.doctrine",
+      "sha256": "7b439de8b7fbb8909faeedbf9dca7f7e7ac5aebb102de637ff2aa4705eac03e1",
+      "size_bytes": 1037
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-aa.doctrine",
+      "sha256": "d5723a8fb027aeee0ad40f5feb35e1f79520286719f6d84435710b70a416995f",
+      "size_bytes": 1111
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-mass40.doctrine",
+      "sha256": "5e8db06b424b5079d1163cf7729e5f4713654e4daf61eacf4c4c3661b9090f4c",
+      "size_bytes": 802
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-mm.doctrine",
+      "sha256": "a94121d64845b2db9f9e821d6ba06cc63ab6abc142b1ec38025fa9fd6b9cefb0",
+      "size_bytes": 953
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-noicpt.doctrine",
+      "sha256": "22134de07c98a3368c9cc34f555868f61772f40b1676fabe7d9fe8a15d50313b",
+      "size_bytes": 1026
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-raid.doctrine",
+      "sha256": "52c086493d01d40dd7a08b8f2cec2d691a85203a0fd2d914ee085903b5d4fa97",
+      "size_bytes": 891
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty-scout.doctrine",
+      "sha256": "5090c4e31c245d8fb3c973b760b8330378add9c996ba4e47e6df358e6604b763",
+      "size_bytes": 924
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty.doctrine",
+      "sha256": "d8a2a61c10db14c05aa611e3fb08f0a599c8e6350e0e8eba11968129f4297596",
+      "size_bytes": 1081
+    },
+    {
+      "path": "doctrines/aa-counter-guard-arty2.doctrine",
+      "sha256": "5e1cd79da98f019e26ac95aa1388950efb44244c310b9983c5069e1ddb15335c",
+      "size_bytes": 727
+    },
+    {
+      "path": "doctrines/aa-counter-guard-cap.doctrine",
+      "sha256": "a33a1764c65a7c59427f0283a8002800518e8a5adb0c09992386728c50de6e1e",
+      "size_bytes": 1010
+    },
+    {
+      "path": "doctrines/aa-counter-guard-fwd.doctrine",
+      "sha256": "c39347484144a8e2986e55435823152a3e0057b805f8d38ff0218f6a9d2b60ef",
+      "size_bytes": 811
+    },
+    {
+      "path": "doctrines/aa-counter-guard-hovarty.doctrine",
+      "sha256": "28994875ea7e0b80589322c8843ef093d3908c36ab4b1d2232f86a8be66031b9",
+      "size_bytes": 997
+    },
+    {
+      "path": "doctrines/aa-counter-guard-hover.doctrine",
+      "sha256": "ce4a899cdc5683fc6f30ddd2211245dd48c1b6c8fb95037c7d9ce916824b7511",
+      "size_bytes": 706
+    },
+    {
+      "path": "doctrines/aa-counter-guard-mass40.doctrine",
+      "sha256": "4126b2ecea5a1a4d08d3e0d3ea591a8a912314eaaffec38d088338d79596d7e5",
+      "size_bytes": 827
+    },
+    {
+      "path": "doctrines/aa-counter-guard-nocover.doctrine",
+      "sha256": "ce40b3c57e96b4090d11852d297dee233e60056a7b559346ec4bd7e6c46d8569",
+      "size_bytes": 838
+    },
+    {
+      "path": "doctrines/aa-counter-guard-raid.doctrine",
+      "sha256": "0b6549ec03726bc3b18012e298d52ce99ab93654b763f96c055ba00eb229a172",
+      "size_bytes": 706
+    },
+    {
+      "path": "doctrines/aa-counter-guard-raid5.doctrine",
+      "sha256": "f513410809fefa8d76e8dce1c410e050ae43de9504b6d54380ab7183f012a8e0",
+      "size_bytes": 802
+    },
+    {
+      "path": "doctrines/aa-counter-guard-scout.doctrine",
+      "sha256": "09c6ffe3464a49b037e2610dff8ba02dae2db4133bdc1e718839f4daa2cc6dab",
+      "size_bytes": 676
+    },
+    {
+      "path": "doctrines/aa-counter-guard.doctrine",
+      "sha256": "3c28b37ee80a1650cf0f271536aefdd633bfcb7ba0a7c312e50d5e51a346a12b",
+      "size_bytes": 730
+    },
+    {
+      "path": "doctrines/aa-counter.doctrine",
+      "sha256": "7a240e05cc781dfd0a1ec0c309a5628f1fc7b6ff26abc825b00b14f3c7b7f0f5",
+      "size_bytes": 761
+    },
+    {
+      "path": "doctrines/aa.doctrine",
+      "sha256": "ef3a1b683d663eb9652977d186de67bdd051da8da95b83dc6728d2796e20120f",
+      "size_bytes": 775
+    },
+    {
+      "path": "doctrines/air-rush.doctrine",
+      "sha256": "f089eb750cc3c935cebf900b3b656a656bc3fcfe8993c19846851a374a5ff380",
+      "size_bytes": 865
+    },
+    {
+      "path": "doctrines/allin300.doctrine",
+      "sha256": "f306e9ab07b550f60da010884c9226ef03a54b45e039bde0ad19520e94d80efd",
+      "size_bytes": 782
+    },
+    {
+      "path": "doctrines/allin600.doctrine",
+      "sha256": "de3a7085482b87aefdee92627fb9802bed17f63c3f7f6a90bb711a5f036a5266",
+      "size_bytes": 782
+    },
+    {
+      "path": "doctrines/allin900.doctrine",
+      "sha256": "00631e4c1b95f36da31af840f88cd3160ec898de6c05b10872df3dd0178bcfd4",
+      "size_bytes": 782
+    },
+    {
+      "path": "doctrines/bastion.doctrine",
+      "sha256": "e0d5e371373475529299083d393f17ce5ca38f675212664efc1e41b8d97c3f8c",
+      "size_bytes": 817
+    },
+    {
+      "path": "doctrines/counter.doctrine",
+      "sha256": "46fdd5034ee57ccd06dea3cc11b1743f92e92f2535e1bd7a25d75d29c4e30b5d",
+      "size_bytes": 880
+    },
+    {
+      "path": "doctrines/creeper.doctrine",
+      "sha256": "cee4691af5d1b9da25b9753ae8594eac69f84be529280144c166d7dc6915da80",
+      "size_bytes": 936
+    },
+    {
+      "path": "doctrines/default.doctrine",
+      "sha256": "43e2d6f9cab2cb8da1f5acd2e441f71b3787945be25a642a527f7cd7001af634",
+      "size_bytes": 802
+    },
+    {
+      "path": "doctrines/flame-battery1.doctrine",
+      "sha256": "ae554e01eec75ae3dbef47737a108656d017cf01a057f1f16f3f740f8ba9e6b6",
+      "size_bytes": 715
+    },
+    {
+      "path": "doctrines/flame-close.doctrine",
+      "sha256": "b20deb9e32411bb4ab45b175d5f279b80cddd1a88bf92d7130471f62596478b7",
+      "size_bytes": 723
+    },
+    {
+      "path": "doctrines/flame-creep.doctrine",
+      "sha256": "b7165c2633737fd53333b1a35be4d613dc26f2a61bf6789a836c8d0df797881d",
+      "size_bytes": 724
+    },
+    {
+      "path": "doctrines/flame-decoys.doctrine",
+      "sha256": "e2a6fb0b0e3e7afab0cebf11089ca780ba0e86e8eafd8e5583a88a2dd01f9dde",
+      "size_bytes": 724
+    },
+    {
+      "path": "doctrines/flame-early.doctrine",
+      "sha256": "e2a0a50c25c3f6ae892676c5f5e391041b9d0b0c2e43c92c08d52a0ab2ce6b21",
+      "size_bytes": 729
+    },
+    {
+      "path": "doctrines/flame-flee30.doctrine",
+      "sha256": "aa9f4206763961015aaefbbefeed8244cdd0aa1b1373f2415bb515135651a5df",
+      "size_bytes": 711
+    },
+    {
+      "path": "doctrines/flame-hold50.doctrine",
+      "sha256": "a9a3082c2e184251a9f4a0a147754b1d08d675977198a6ad96191ba3fa3fc76e",
+      "size_bytes": 656
+    },
+    {
+      "path": "doctrines/flame-kite.doctrine",
+      "sha256": "40d765adb40bea217d47b75e1104d9f75d704c310842ca627b54d87abf058141",
+      "size_bytes": 714
+    },
+    {
+      "path": "doctrines/flame-ladder.doctrine",
+      "sha256": "e3823c6e7215521c10edbd3fe581a2ab0d3ce3d5a872e535728851600d4c36ae",
+      "size_bytes": 933
+    },
+    {
+      "path": "doctrines/flame-med.doctrine",
+      "sha256": "626dcae44de1b768b987d4a5b94af7a68d385898b98857c6ab5382e539fbf7f9",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/flame-medics2.doctrine",
+      "sha256": "c9fb18a65dafc276c35b0ae56c86f823ab5d210e8e7be8190f27f75482ed34ae",
+      "size_bytes": 719
+    },
+    {
+      "path": "doctrines/flame-navblood.doctrine",
+      "sha256": "ed7f5f92b4e520089605445210fd1d2fe7841edb14b6e145f8fb316aaf779efe",
+      "size_bytes": 733
+    },
+    {
+      "path": "doctrines/flame-navdoom.doctrine",
+      "sha256": "8c64b8b09d88980c53a1e87d8175907a3e6e0c53ac655d1545d7f5c1739013f9",
+      "size_bytes": 717
+    },
+    {
+      "path": "doctrines/flame-navgate.doctrine",
+      "sha256": "14d509d35634378e8bd159baaada54b7049dce1dbe35c1ca78785c8f8d3a01b9",
+      "size_bytes": 591
+    },
+    {
+      "path": "doctrines/flame-navy2.doctrine",
+      "sha256": "69f7f4492718626fe509c5b29a74c97caa6d915a4af832fd0e46b64bd8a5db94",
+      "size_bytes": 767
+    },
+    {
+      "path": "doctrines/flame-nocover.doctrine",
+      "sha256": "82dc275de84d2a36350e8caf30ad1fb3562210aa609289b1600d4f8da8a06948",
+      "size_bytes": 725
+    },
+    {
+      "path": "doctrines/flame-nuke.doctrine",
+      "sha256": "df43b003f3ae68d3008250cc575ba1e0befd4711886c71fdbdf60bb620ebed5c",
+      "size_bytes": 869
+    },
+    {
+      "path": "doctrines/flame-raid12.doctrine",
+      "sha256": "692e4484fee44318d707160054d10c4edd2c8c617a4d162f377e518a6849be15",
+      "size_bytes": 547
+    },
+    {
+      "path": "doctrines/flame-raid6.doctrine",
+      "sha256": "e0352cd381b4016d5fd31e07fca91f68fea21bda2cb61ed2cfdae5f5ed465729",
+      "size_bytes": 723
+    },
+    {
+      "path": "doctrines/flame-raid8.doctrine",
+      "sha256": "ea4ed71b6e0c4be1c457de534df91ff9348e3a1a4c5026a9c9c4b01ef9a408d6",
+      "size_bytes": 717
+    },
+    {
+      "path": "doctrines/flame-raidkite.doctrine",
+      "sha256": "f52a0fc1c63cd047e7e3e5d4b7da4a549a94e205a0484c6678003a1e6a08d093",
+      "size_bytes": 555
+    },
+    {
+      "path": "doctrines/flame-riposte.doctrine",
+      "sha256": "d9dfe6bb758bd492468b5cbdc8815b73fe2b3c5435c63611bb3415831f99a296",
+      "size_bytes": 721
+    },
+    {
+      "path": "doctrines/flame-scouted.doctrine",
+      "sha256": "abe66da3b595a0256050249e82e22caf491d3f8a3604e8c6b829cd98448f5856",
+      "size_bytes": 609
+    },
+    {
+      "path": "doctrines/flame-siege.doctrine",
+      "sha256": "f600951455804d99802e1f6484363dbfbb20d6de9adafc0b1f99a89560882579",
+      "size_bytes": 724
+    },
+    {
+      "path": "doctrines/flame-strike.doctrine",
+      "sha256": "94350b0fd4a7ac9de7c2217f28cef2156d38d5ae4e8e03eea1a78f418d0879c1",
+      "size_bytes": 727
+    },
+    {
+      "path": "doctrines/flame-strike2.doctrine",
+      "sha256": "887529c7e6c128ab5cbc1f1c6f3f16b6e57bf46d19e83e81985e350a203cf983",
+      "size_bytes": 728
+    },
+    {
+      "path": "doctrines/flame-strike5.doctrine",
+      "sha256": "d118a4ce65cb222df6437dccfe45ba9314347dbd5d17e004535b1b29f824a66c",
+      "size_bytes": 725
+    },
+    {
+      "path": "doctrines/flame-t3.doctrine",
+      "sha256": "3ae41c4146491fd83bce5c56c68109ff2cc903b4f979c20886374f88f78e1be6",
+      "size_bytes": 720
+    },
+    {
+      "path": "doctrines/flame-wall.doctrine",
+      "sha256": "1eefc3441490c96f2c60d1049398775816e907d1723c1246ad4fabf660a98058",
+      "size_bytes": 723
+    },
+    {
+      "path": "doctrines/fortress-creep.doctrine",
+      "sha256": "69821d2aa30f6d83067e7edc6510fd74e75571e5343e5a7b162b3681167c541d",
+      "size_bytes": 1172
+    },
+    {
+      "path": "doctrines/fortress-nuke.doctrine",
+      "sha256": "54c46512bfdaa0f9336c607854b8f14298660de6061b11d0dfd8513c44d78f1f",
+      "size_bytes": 991
+    },
+    {
+      "path": "doctrines/fortress.doctrine",
+      "sha256": "643a393774ba7cba9d19e242db65251c9c3ccab074ae6cbb1f61355558728007",
+      "size_bytes": 1055
+    },
+    {
+      "path": "doctrines/hospital.doctrine",
+      "sha256": "d37e7d3b3b29c21204b7ea3cbb87ffaa5fd1850aed083e743738b2944fc22aae",
+      "size_bytes": 720
+    },
+    {
+      "path": "doctrines/legion.doctrine",
+      "sha256": "50537779eb76182152e536b0b446ccfb3e992a8c57a5bb3d5ef63110635523ce",
+      "size_bytes": 887
+    },
+    {
+      "path": "doctrines/no-expand.doctrine",
+      "sha256": "1b99706a30223b623c179b620da3bf4ce980ad00fe3e53ec271555c95e9e8a96",
+      "size_bytes": 557
+    },
+    {
+      "path": "doctrines/playbook.doctrine",
+      "sha256": "4b0f7e0af035f03fe449e00077a08a6aeb8403b4199615232eb96c53f5b9e7af",
+      "size_bytes": 756
+    },
+    {
+      "path": "doctrines/punch.doctrine",
+      "sha256": "c82dadafc2f55a679c2a35c7aaa7e1c869c36a35cfa9c30eec23529679402907",
+      "size_bytes": 950
+    },
+    {
+      "path": "doctrines/reflex-flee.doctrine",
+      "sha256": "377773837c986f49eec09b6434cb73cebe563eccee9ef0a99f601e0250caaa98",
+      "size_bytes": 827
+    },
+    {
+      "path": "doctrines/reflex-kite.doctrine",
+      "sha256": "34808898576d5e430ad9748bfc8ac1b908527bad54c79d1035f5e3e80cb5f2cc",
+      "size_bytes": 826
+    },
+    {
+      "path": "doctrines/reflex.doctrine",
+      "sha256": "a8fd842e6536a2fd197460a1373ea1b2bd4687b85d818fd1a719d6be51e658c2",
+      "size_bytes": 822
+    },
+    {
+      "path": "doctrines/riposte-champ.doctrine",
+      "sha256": "e53bd72c1f9a3f22099f54f773e716d516574d63ee6e04838610d715bcd43278",
+      "size_bytes": 776
+    },
+    {
+      "path": "doctrines/rush.doctrine",
+      "sha256": "1ab6bb5a8dcf3e8cac2c0d647cf0d3fed30a662b90e9432620bff053bd0b91b2",
+      "size_bytes": 1112
+    },
+    {
+      "path": "doctrines/scatter.doctrine",
+      "sha256": "1fa9decb182af61ebdb098fd3d9d3dc28f9256d5c79015563cb16ae832a412d8",
+      "size_bytes": 857
+    },
+    {
+      "path": "doctrines/search/close0-raid0.doctrine",
+      "sha256": "a595bee7400ad5d62e7ded8f917220d8b856561e4e7e71d02f0e6c5fd5e5210f",
+      "size_bytes": 434
+    },
+    {
+      "path": "doctrines/search/close0.doctrine",
+      "sha256": "94ea2c3a3a0345a7774d9d2f51301fe9e88429cdfec16a5636c4644cf139f2e2",
+      "size_bytes": 428
+    },
+    {
+      "path": "doctrines/search/close6-flame0.doctrine",
+      "sha256": "7ba909dacae27659036e8506ad5650dd792751d26d81ad54c5236905f69afbf6",
+      "size_bytes": 435
+    },
+    {
+      "path": "doctrines/search/close6-medics1.doctrine",
+      "sha256": "330c5830635d07849f01afe7bb755f18c01f5b429175ccd7f1f63751a64046c7",
+      "size_bytes": 436
+    },
+    {
+      "path": "doctrines/search/close6.doctrine",
+      "sha256": "ff39f74ab844eb15cf63f019ec61cf740f80e223c0b892b07509353bf8254326",
+      "size_bytes": 428
+    },
+    {
+      "path": "doctrines/search/decoys2-flame0.doctrine",
+      "sha256": "69e6da94e2ca9141686781900b8abb3a41abc365474b542f0f4de65287cb849b",
+      "size_bytes": 436
+    },
+    {
+      "path": "doctrines/search/decoys2.doctrine",
+      "sha256": "4fcb985aa92f70a1b0cf9bb74637dec8c0675e0a22054ec217dbbd04da330c2c",
+      "size_bytes": 429
+    },
+    {
+      "path": "doctrines/search/flame0.doctrine",
+      "sha256": "ec8fac8558e6e16db0d4a9910b91585a28373ecbab632902c7d770cfbe53a107",
+      "size_bytes": 428
+    },
+    {
+      "path": "doctrines/search/flame4-tech0.doctrine",
+      "sha256": "315a8c4711d713042492a62668ded81b25437a8411e6f3cc5806898a4ae8b0fb",
+      "size_bytes": 434
+    },
+    {
+      "path": "doctrines/search/flame4.doctrine",
+      "sha256": "ec717307925422335b60eadbfdbe0dfce39701b6474f12bd6c4c4ed85b621d48",
+      "size_bytes": 428
+    },
+    {
+      "path": "doctrines/search/medics1-tech2.doctrine",
+      "sha256": "2b8c709011354e17cfabb17a0108176bb8f4af703a926b3a3f24b3e23588aec1",
+      "size_bytes": 435
+    },
+    {
+      "path": "doctrines/search/medics1.doctrine",
+      "sha256": "ce73c3e1821c5d2c24e157561a7f5d37602897cd5d61108f63ce00c0fcb47c5f",
+      "size_bytes": 429
+    },
+    {
+      "path": "doctrines/search/raid0.doctrine",
+      "sha256": "f4a0865cc1a8e61b5b96df4c05ac164670f9d22fd2df29ec6651bfc532fa4f98",
+      "size_bytes": 427
+    },
+    {
+      "path": "doctrines/search/raid6.doctrine",
+      "sha256": "056b38e2cfbe56891ccfda2a2cef59a8777f83aad24a74a0c4db3363752d9832",
+      "size_bytes": 427
+    },
+    {
+      "path": "doctrines/search/tech0.doctrine",
+      "sha256": "4a98f215053556a5a3f2fa1a981d6013f843d00a3d4e255a1bdae03068619400",
+      "size_bytes": 427
+    },
+    {
+      "path": "doctrines/search/tech2.doctrine",
+      "sha256": "d101aed97ede6d59e29556bf95cbf856df064e17d49b7e50ed53ebb5d02bd00b",
+      "size_bytes": 427
+    },
+    {
+      "path": "doctrines/striker.doctrine",
+      "sha256": "130f8e71fdfe5550acf803d42c3d7523698beaa9da84acc79ddf499493ea1f0a",
+      "size_bytes": 839
+    },
+    {
+      "path": "doctrines/tech-cover.doctrine",
+      "sha256": "0d485e80ea2f4fd876368591d3ff02850fe307f78efb0ab3fd22c73e008221a8",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/tech-early.doctrine",
+      "sha256": "e54632703b6cd772600a3fb13f62da7bb23b0e8a127f794efe0ec1c59f9da2b8",
+      "size_bytes": 857
+    },
+    {
+      "path": "doctrines/tech-fab.doctrine",
+      "sha256": "f05aea1690d938a1e5cfbfb70001ca1b4d1f001e85d32141972ba602a9bd06fc",
+      "size_bytes": 955
+    },
+    {
+      "path": "doctrines/tech-flame.doctrine",
+      "sha256": "c4edfaa33d9275b01a732576d75f48b5ab88d2590fd8276b0e4132c6e4a4b88a",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/tech-lurk.doctrine",
+      "sha256": "ff97b9f395fcad300a4937ae432644920c64afac4ff7a1d8513f9d697c0feffa",
+      "size_bytes": 862
+    },
+    {
+      "path": "doctrines/tech-mass40.doctrine",
+      "sha256": "7d2b3f020cb36dad7463f15d836a0c14cd57d69cedaadf9a6172990448adac80",
+      "size_bytes": 723
+    },
+    {
+      "path": "doctrines/tech-mass60.doctrine",
+      "sha256": "206c71b5020053eef946ee224f0639433aac0add96b6fabb62b6f22e3ca3879e",
+      "size_bytes": 723
+    },
+    {
+      "path": "doctrines/tech-mech.doctrine",
+      "sha256": "36339e90936910a5462e7af56ba2dbd6df52f12482cbc3990da04bb63a5b40eb",
+      "size_bytes": 1087
+    },
+    {
+      "path": "doctrines/tech-mech2.doctrine",
+      "sha256": "7369d4676d8d31120d67a781b7fe64b00f63f7b9a60dc56315392fce9bc22bcc",
+      "size_bytes": 1089
+    },
+    {
+      "path": "doctrines/tech-mech3.doctrine",
+      "sha256": "065f5c30b08576d57695df6e7869d8ae8dee2be52b38c129341d65c7e11991c1",
+      "size_bytes": 993
+    },
+    {
+      "path": "doctrines/tech-mecharty.doctrine",
+      "sha256": "622e55081322461fd7d1d250ef732d41772e7febc4d0792fa2dd54adab42d531",
+      "size_bytes": 1104
+    },
+    {
+      "path": "doctrines/tech-noicpt.doctrine",
+      "sha256": "5086cf161bf363c7491198a528f158b6b7ec747fa4104f446656988c7b8817cc",
+      "size_bytes": 736
+    },
+    {
+      "path": "doctrines/tech-raid6.doctrine",
+      "sha256": "ed0b174128f852d6d1be9dff5bbd37a4d18cc9e31d29791c67d746e2a63be440",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/tech-riposte.doctrine",
+      "sha256": "77c5a0a11e866ab0e2647e700356fc58ab2cfda51af24b5d84c35cdb8b1a6e9d",
+      "size_bytes": 803
+    },
+    {
+      "path": "doctrines/tech-scout.doctrine",
+      "sha256": "82d1e121df95843ba721802e1584d167a7abc2da2eb5b9a83025f83c176ea453",
+      "size_bytes": 830
+    },
+    {
+      "path": "doctrines/tech-siege.doctrine",
+      "sha256": "f8551aa4d16de7109ff1363824fa6a391e71b2e5f95bb8ee784fa9c3cde0b398",
+      "size_bytes": 966
+    },
+    {
+      "path": "doctrines/techprobe-all.doctrine",
+      "sha256": "8228216d094f04f5b12fe9ffe5bb94f6d96f98cfd171f3fad377474b0f4b6b7c",
+      "size_bytes": 721
+    },
+    {
+      "path": "doctrines/techprobe.doctrine",
+      "sha256": "89187977f3805b0af6ec7676fc014f5f68e85113502ec0320aff66dec3c7c522",
+      "size_bytes": 842
+    },
+    {
+      "path": "doctrines/techroster.doctrine",
+      "sha256": "806a1a669e5fad00866d43717f4b192e92a7f8bac855705cc92aa20930dd58af",
+      "size_bytes": 863
+    },
+    {
+      "path": "doctrines/vh-close2.doctrine",
+      "sha256": "fe8955d4981e65bb80073cc85ea47769ad4d008e5cfb3b2e2d6391f77b40aacf",
+      "size_bytes": 721
+    },
+    {
+      "path": "doctrines/vh-helo.doctrine",
+      "sha256": "87551c3f535df31c933d82ecf3b0bc53004034dbc943938b1b17483a01034f43",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/vh-heloadd.doctrine",
+      "sha256": "e39829a9f14977a88cc2de8f4980e6904694df80e158a0539024bec98815594e",
+      "size_bytes": 735
+    },
+    {
+      "path": "doctrines/vh-heloheavy.doctrine",
+      "sha256": "7c56ea3277a72196d97575c5677dbc2fb252b52efe2e12a6c1afe14be646dfc7",
+      "size_bytes": 727
+    },
+    {
+      "path": "doctrines/vh-heloplus.doctrine",
+      "sha256": "31cd728298befaf5c726c0a8a93a965c0b0aa0e87c30c5095b407eaf15680aa8",
+      "size_bytes": 736
+    },
+    {
+      "path": "doctrines/vh-navtilt.doctrine",
+      "sha256": "d90538f2b0f8d5419d1738c3742ab8cd021d8a58f45dd594a3ee266cdbeccdaf",
+      "size_bytes": 722
+    },
+    {
+      "path": "doctrines/vh-raid5.doctrine",
+      "sha256": "bed37aaba9e8de1a86c70dee4a7fc07d20be7116e51fd96e3fb7b3b146c53b4a",
+      "size_bytes": 720
+    },
+    {
+      "path": "doctrines/vh-workers10.doctrine",
+      "sha256": "235ab8307f8b6cce9a47100fb21fa979fbe75cbc0f53274ef084e6b69d88af6d",
+      "size_bytes": 725
+    },
+    {
+      "path": "doctrines/warden.doctrine",
+      "sha256": "be7f66cf3a3d3c58218b958bdf7b8b9a2b86e8bdfe7e87c59b4362cea945006c",
+      "size_bytes": 977
+    },
+    {
+      "path": "doctrines/zone.doctrine",
+      "sha256": "f4e8b78e08f8d8280e3291c070b17d73762870c81d9237c150257f738f954603",
+      "size_bytes": 752
+    },
+    {
+      "path": "doctrines/zone2.doctrine",
+      "sha256": "f6f08b442908caeae3b6ae1edf79da3c5d8e7829a378432e1290423007b177f3",
+      "size_bytes": 777
+    },
+    {
+      "path": "printunits.log",
+      "sha256": "17c937728c19f30f9d8b6b34ba431e942a52715bbbc1bc29f486176c39e169bd",
+      "size_bytes": 46032
+    },
+    {
+      "path": "rw-agent.jar",
+      "sha256": "4a07dc81f975ca5b18c9d7623f1208bc7b649e1a4e38ce72ee6a6aec2798b706",
+      "size_bytes": 127019
+    },
+    {
+      "path": "scripts/__init__.py",
+      "sha256": "e8f5bf999bf5a69e5d536357bec33cac2254b31dc887e6cb4f866cd3f785437b",
+      "size_bytes": 145
+    },
+    {
+      "path": "scripts/analyze_sweep.py",
+      "sha256": "d494eb7082dbf0a6a6c17f0207f195c4001ba9b17d930912ce8368c063549a72",
+      "size_bytes": 3130
+    },
+    {
+      "path": "scripts/attackmove_probe.py",
+      "sha256": "964b35c36da0bbc916e0882b0901379c37dc1a01897c17f84cbdbd2e8929484e",
+      "size_bytes": 7479
+    },
+    {
+      "path": "scripts/autopsy.py",
+      "sha256": "c1b2aa16c2818c0c12f877479bc90427482a86eb6a9c1c52a792acbce86784ad",
+      "size_bytes": 9107
+    },
+    {
+      "path": "scripts/campaign_doc.py",
+      "sha256": "d6223ce21fee6074a176340ee3aa21bf64638bade1eb24b0ad3c836141be0d64",
+      "size_bytes": 8811
+    },
+    {
+      "path": "scripts/detprobe.py",
+      "sha256": "51e058e6f4a87d12f31e2e42b3ed729eba86ec9906e8c86e0a0b133930ea4237",
+      "size_bytes": 2890
+    },
+    {
+      "path": "scripts/export_matches.py",
+      "sha256": "dc0082b809c85aa61b93ea33bf3d246c48487820bf2a99517bfac6b9b827d676",
+      "size_bytes": 9179
+    },
+    {
+      "path": "scripts/guard.py",
+      "sha256": "351e2bc050717adaaec6a834a2e90180e61bb82557cd4fba2b2cd7cee48bab32",
+      "size_bytes": 1756
+    },
+    {
+      "path": "scripts/gun_probe.py",
+      "sha256": "691ddc507ff590af336cd809a03fdfe37da367fbaecccd73af62d94b086bcd1e",
+      "size_bytes": 4315
+    },
+    {
+      "path": "scripts/gun_probe2.py",
+      "sha256": "837f0dd6630404522327a7bd408179cb0984ec0aefe5f54f3a02dfe85fa69eae",
+      "size_bytes": 6704
+    },
+    {
+      "path": "scripts/income.py",
+      "sha256": "0df5a0074c520acdf1d24b0dce42674fadd1d2380d24c474be3c94087313b35e",
+      "size_bytes": 9013
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "4790356cb8c47e86c27f38b452f64f78d557927b0a6610be886464787df7970a",
+      "size_bytes": 3061
+    },
+    {
+      "path": "scripts/make/agent.ps1",
+      "sha256": "31b14ad5ec369eaeb4d1569716bb537467d7da2f19a21f8bd4afba0b861697d6",
+      "size_bytes": 2265
+    },
+    {
+      "path": "scripts/make/door.ps1",
+      "sha256": "2047d1b8d527d648065c8d639dcf6ad2aaba7d59cc3166fb982c7ba310a02a41",
+      "size_bytes": 2480
+    },
+    {
+      "path": "scripts/make/fleet-up.ps1",
+      "sha256": "8f1f0752716940bd0d2214f8da0643b125e78ae9e64e1ea376f29c1c9ea176aa",
+      "size_bytes": 2388
+    },
+    {
+      "path": "scripts/make/host.ps1",
+      "sha256": "b8a086ab0812667b2157676c3f9ef24703f8c00be4201fe66734a5638b6a6516",
+      "size_bytes": 4260
+    },
+    {
+      "path": "scripts/make/probe.ps1",
+      "sha256": "43be7c7355fb4759b2b84b605c3cb97d337a51755e5bae24e43dda33e38a096e",
+      "size_bytes": 1225
+    },
+    {
+      "path": "scripts/make/selftest.ps1",
+      "sha256": "e58569a902ce92c31f5830d42113d6cc66ea8126ff122f5c6b9340f6de9e341f",
+      "size_bytes": 1335
+    },
+    {
+      "path": "scripts/make/watch.ps1",
+      "sha256": "83fb151fbce727ef9e62fd33e9f90bc09c2c30e30fb602f49ee901bd7ff9a836",
+      "size_bytes": 3855
+    },
+    {
+      "path": "scripts/margin.py",
+      "sha256": "ea3e9ff22f0a7a8579c4fabf76a33dde7a6c998a7377c33e37c9cfc5751a419b",
+      "size_bytes": 1300
+    },
+    {
+      "path": "scripts/match_service.py",
+      "sha256": "2b336548a665ca4aeb0a698c89205c653c269410639098a57d804f6c4d50a262",
+      "size_bytes": 5228
+    },
+    {
+      "path": "scripts/match_worker.py",
+      "sha256": "7c785de4d4d14a17fb595fd5c67b009e65c209c41fc8f2860467b87cd4ac29e9",
+      "size_bytes": 2194
+    },
+    {
+      "path": "scripts/nuke_probe.py",
+      "sha256": "ad443b2a42d7570be722790ba6935a7527c02b24df68509f3440fe6e74fb6f0a",
+      "size_bytes": 13122
+    },
+    {
+      "path": "scripts/pairs.py",
+      "sha256": "efac0e200d8f1714ec532624fdb11031a73175f7ccc71d347679e6d508b328e4",
+      "size_bytes": 5246
+    },
+    {
+      "path": "scripts/planner_probe.py",
+      "sha256": "d2a9c03b607dd17d208390fd2a572c8544bec9a517408f822f16bb73870788a6",
+      "size_bytes": 3137
+    },
+    {
+      "path": "scripts/play.py",
+      "sha256": "11cf31fc1f7cd8c5b3db2eaceff831707317e9828b216d7d866f4317b81bd551",
+      "size_bytes": 20964
+    },
+    {
+      "path": "scripts/py.typed",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "scripts/replicate.py",
+      "sha256": "d94a53a805db31d7d52393d669856db9c8e0ce4f7806274384954a9105b52e30",
+      "size_bytes": 6551
+    },
+    {
+      "path": "scripts/results.py",
+      "sha256": "1c6c508f76396a7ffa092d108ca924f6364bc5edb5ca926992788cf0a32749c9",
+      "size_bytes": 10197
+    },
+    {
+      "path": "scripts/sea_probe.py",
+      "sha256": "3b7c22788633e8783fac19d1de878b09e7f1ca44993fde00cf00232ab66e2d93",
+      "size_bytes": 6579
+    },
+    {
+      "path": "scripts/search.py",
+      "sha256": "0879c6c254a323eeff4a1943fb781d387c94663d7d5160c0381e52abd69fa49a",
+      "size_bytes": 10786
+    },
+    {
+      "path": "scripts/stage_payload.py",
+      "sha256": "bd3aa5524e9a6317d3753b0e6c27f81b9d98ecfc36d7acaf5d466aa4a7b1f328",
+      "size_bytes": 8461
+    },
+    {
+      "path": "scripts/stage_tree.py",
+      "sha256": "42c2a11dc6eff95fa98ccea6e80075e78ffd411d375b75349eb5935832797e4a",
+      "size_bytes": 12383
+    },
+    {
+      "path": "scripts/submit_batch.py",
+      "sha256": "fb7ca67b969e21344a89d9276b9c06da18d776fc4b013ac9971034d6a7a617d7",
+      "size_bytes": 2868
+    },
+    {
+      "path": "scripts/sweep.py",
+      "sha256": "9741d7fb35e40f918d295690aab3ff043c626086be65b73c1a606f7a3f562c37",
+      "size_bytes": 6856
+    },
+    {
+      "path": "scripts/turret_probe.py",
+      "sha256": "4c0aeac66431acc2e25cab63f7d17cc5e66a544303e2fa86798682659b0024bf",
+      "size_bytes": 10649
+    },
+    {
+      "path": "scripts/upgrade_probe.py",
+      "sha256": "04318d25807539c39c47d4235980db82ade181024348253d0a94ec9fef5837b3",
+      "size_bytes": 3245
+    },
+    {
+      "path": "scripts/wiki_check.py",
+      "sha256": "edc25194e3b9317cdc9bd0e1d966e17fa86aaecd1d74f31489541948199da293",
+      "size_bytes": 8009
+    },
+    {
+      "path": "src/rw_bot/__init__.py",
+      "sha256": "f00dff72cd5a77008be3d1425c3362bc7648d3e8acc14bec41f00b15226ce4d9",
+      "size_bytes": 1401
+    },
+    {
+      "path": "src/rw_bot/control/__init__.py",
+      "sha256": "1f65812743f0935151002af679dca4864233143dc01322581dfeaf5be3aba082",
+      "size_bytes": 239
+    },
+    {
+      "path": "src/rw_bot/control/_test_hooks.py",
+      "sha256": "0c4d33ebda91a907e1d4e42211f48d73fd739537c4bf6f5621ace45dcea782a3",
+      "size_bytes": 3404
+    },
+    {
+      "path": "src/rw_bot/control/channel.py",
+      "sha256": "c338547dcf5c077d9f7b41726eefd6dd11dcf6fa94deef32c56eedb45e067510",
+      "size_bytes": 8262
+    },
+    {
+      "path": "src/rw_bot/harness/__init__.py",
+      "sha256": "ea0f4205575cbda923a1e644674234b3aa912ca38edcc8fc3c54e8d5bf60bf83",
+      "size_bytes": 258
+    },
+    {
+      "path": "src/rw_bot/harness/_hook_defaults.py",
+      "sha256": "9fca693ed24447576052ebea8c7793ead577f9498578242afd3d891172883575",
+      "size_bytes": 16151
+    },
+    {
+      "path": "src/rw_bot/harness/_hook_protocols.py",
+      "sha256": "3f31c03833f8b482cd689b37a5736311b514a25f5932dc0cb2446e83d5374bfd",
+      "size_bytes": 13492
+    },
+    {
+      "path": "src/rw_bot/harness/_test_hooks.py",
+      "sha256": "8a47264b1beda186f6c801688300ccf24fb4e2541de75b3801b338e0b66ec74a",
+      "size_bytes": 4319
+    },
+    {
+      "path": "src/rw_bot/harness/agent_build.py",
+      "sha256": "e9f83e2a3b5e2f03a8f521f963c9be5dee9fd6de62a550be02e0a1579d8eee75",
+      "size_bytes": 5093
+    },
+    {
+      "path": "src/rw_bot/harness/boot_log.py",
+      "sha256": "57352c4b291ade40be7a3c7da7df70c5f503baaaafbdf8ac10eb0b323d354a45",
+      "size_bytes": 11024
+    },
+    {
+      "path": "src/rw_bot/harness/boot_log_cli.py",
+      "sha256": "110a32b968bb5e866dc6a268db954ffec90f20d7c387d78577c19d5809a41b88",
+      "size_bytes": 3444
+    },
+    {
+      "path": "src/rw_bot/harness/campaign.py",
+      "sha256": "40eb00689d1b8e5a6233826e59adc0a64bd3dc63de62262eb97e72f2668ce787",
+      "size_bytes": 9056
+    },
+    {
+      "path": "src/rw_bot/harness/campaign_match.py",
+      "sha256": "60781097b88c0813bbbb818e33c5864bf257f07b9cdd616007f9fc5f3ff630bf",
+      "size_bytes": 12709
+    },
+    {
+      "path": "src/rw_bot/harness/clone.py",
+      "sha256": "70c5f68e97d54dd25878fe8b35388c25a467aec84d9c21a6312327ee59fb0f76",
+      "size_bytes": 12377
+    },
+    {
+      "path": "src/rw_bot/harness/fleet.py",
+      "sha256": "649850c6a03d52307888c6461ba902f0dbcd0236878a0589e23424f1462eed37",
+      "size_bytes": 13807
+    },
+    {
+      "path": "src/rw_bot/harness/fleet_http.py",
+      "sha256": "7fac1bfba47c26dc81b0726960ab4885d3ca36d9cbe65bb7551afae42e83abff",
+      "size_bytes": 11469
+    },
+    {
+      "path": "src/rw_bot/harness/fleet_page.py",
+      "sha256": "28a55fff44a4419bb3be7b7658445d4107c5ce116c7962b9b1f7148ab1934be2",
+      "size_bytes": 6867
+    },
+    {
+      "path": "src/rw_bot/harness/jvm.py",
+      "sha256": "59e23ecad7d5e811929b5ec54d3693903a17c2e913ec9dbafd619ee8d5462dd1",
+      "size_bytes": 13054
+    },
+    {
+      "path": "src/rw_bot/harness/launch.py",
+      "sha256": "204bcf63468b79ef36fbf20b46162267395fe26bf0390ee6b54d39eef8a1aebb",
+      "size_bytes": 21100
+    },
+    {
+      "path": "src/rw_bot/harness/margin.py",
+      "sha256": "38d74ef5f12a71d9aedbb2713bfdc7a37c83b789174896315ad07cb70a9be715",
+      "size_bytes": 7087
+    },
+    {
+      "path": "src/rw_bot/harness/match.py",
+      "sha256": "b1a8040a4c6f7e68884f7c55d420fd053c787d7c5fd41224dd0f8a7be3b1cda2",
+      "size_bytes": 6352
+    },
+    {
+      "path": "src/rw_bot/harness/play_match.py",
+      "sha256": "a72ab1a27193cf359cca1d3db63b0147701fa7892af9f8b2645217162ca77c9d",
+      "size_bytes": 10228
+    },
+    {
+      "path": "src/rw_bot/harness/play_match_cli.py",
+      "sha256": "a840a1625ea881dc3ecb29a33c3be7bfcf5186d18757edb232c88d08c294a6d7",
+      "size_bytes": 11368
+    },
+    {
+      "path": "src/rw_bot/harness/process_tree.py",
+      "sha256": "931929847ea00b43f445e8015e455066971ce7628b6815c2ef8f84e2c0c276f3",
+      "size_bytes": 11193
+    },
+    {
+      "path": "src/rw_bot/harness/records.py",
+      "sha256": "ae4e121df69476286820ff7bc2f6cb7f8a55e53039bf40e7d19220ee489e8f99",
+      "size_bytes": 7726
+    },
+    {
+      "path": "src/rw_bot/harness/replication.py",
+      "sha256": "e97339c4dd09a08efa01fdb872c4b621e93d82095af50d8d70964780ccfbc36c",
+      "size_bytes": 8835
+    },
+    {
+      "path": "src/rw_bot/harness/results_layout.py",
+      "sha256": "7f12f3e972f061006a87d0a7603a46b459b9a28c63be3b73adc9d75ad32b9012",
+      "size_bytes": 9653
+    },
+    {
+      "path": "src/rw_bot/harness/runner.py",
+      "sha256": "ed2b6222345f7de60f5687182c49119997272bb64f65b006aa5a78cb07a24e81",
+      "size_bytes": 23775
+    },
+    {
+      "path": "src/rw_bot/harness/scorecards.py",
+      "sha256": "5edd2353f1946a5b64bc98ccc1d9f70569ae1e090c99219ab57a8ae6501f9336",
+      "size_bytes": 8454
+    },
+    {
+      "path": "src/rw_bot/harness/search.py",
+      "sha256": "59bf7a507b2344c30ba8db910c10dd5d611c33f8fdaa378a55abc14665e0cad0",
+      "size_bytes": 5785
+    },
+    {
+      "path": "src/rw_bot/harness/sweep.py",
+      "sha256": "90a638368e47211f6c6f37738bf0ad95e72f4d018a2625a726e4e9f48fad4052",
+      "size_bytes": 20927
+    },
+    {
+      "path": "src/rw_bot/mechanics/__init__.py",
+      "sha256": "6f51342ae00f0d0d0a27061e32d70b2b49d764a7f0ecfa7decbf00632459897a",
+      "size_bytes": 62
+    },
+    {
+      "path": "src/rw_bot/mechanics/build_tree.py",
+      "sha256": "4f01570495ede0773ca2dd50a700809c94d40342793d5c7c7dc06f1b65c4d787",
+      "size_bytes": 4279
+    },
+    {
+      "path": "src/rw_bot/mechanics/catalogue.py",
+      "sha256": "cac186147a46c6ec4080efab44b438b2ce511dc45ce0bf273f762cde9321d346",
+      "size_bytes": 16321
+    },
+    {
+      "path": "src/rw_bot/mechanics/combat_profile.py",
+      "sha256": "598f155babc8464573d26d6a7bd46f437fe8cf6d632d4e92e5ad114d84a704bd",
+      "size_bytes": 9973
+    },
+    {
+      "path": "src/rw_bot/mechanics/income.py",
+      "sha256": "8862bd9d758547ef52d251b4194bd3743db5534aa07d2f570dd09ead41970ce7",
+      "size_bytes": 6598
+    },
+    {
+      "path": "src/rw_bot/mechanics/placement.py",
+      "sha256": "c501e17dfa90248f8e27f6658cf85fc6bd099db6cc1cd882ee5bda60cf48139c",
+      "size_bytes": 4090
+    },
+    {
+      "path": "src/rw_bot/mechanics/registry_dump.py",
+      "sha256": "b502be1d388badeb6ee8b66bc6e6874ab2629e519ce66f2efaba37857686db92",
+      "size_bytes": 4437
+    },
+    {
+      "path": "src/rw_bot/mechanics/upgrades.py",
+      "sha256": "697c7886ec6b40d1da3ab194b9e4c0d2fc96228aed5c59ed48bd6a10da3f210e",
+      "size_bytes": 8197
+    },
+    {
+      "path": "src/rw_bot/platform_id.py",
+      "sha256": "58c765f27978bc897e81263942fe1d70a644b15b80d7da1edd3e4430640f8423",
+      "size_bytes": 3732
+    },
+    {
+      "path": "src/rw_bot/policy/__init__.py",
+      "sha256": "5730ccd5cbe0069961750aeb652e23e6734f306d1dd213770167ca2f721c79c2",
+      "size_bytes": 251
+    },
+    {
+      "path": "src/rw_bot/policy/assess.py",
+      "sha256": "761618883f6f87d85a611c3bb28e4d266bd9b37a3cdcfc12d5d9d1c8e1c3a123",
+      "size_bytes": 2257
+    },
+    {
+      "path": "src/rw_bot/policy/battery.py",
+      "sha256": "4adc6c910b07528b634d358f94b4cbfc0c3f131d38315faebee6648e0edf3d7a",
+      "size_bytes": 16349
+    },
+    {
+      "path": "src/rw_bot/policy/budget.py",
+      "sha256": "8d896bd8200d5f8691d82a4a30191a24b994e1972edc0b267f0c01499c116880",
+      "size_bytes": 12174
+    },
+    {
+      "path": "src/rw_bot/policy/build_order.py",
+      "sha256": "17dda85716c04dc2bbe63ad0cf9d151446ce29a79abbfab2bcb566d96d54050e",
+      "size_bytes": 22717
+    },
+    {
+      "path": "src/rw_bot/policy/campaign.py",
+      "sha256": "74fc9a012083410f371b4baa6946b738d71fe0b6895f41b560802684adb554d0",
+      "size_bytes": 27263
+    },
+    {
+      "path": "src/rw_bot/policy/combat.py",
+      "sha256": "782fd9c73a7bb20c22ec82d477bd6669ef998770b8241aa3d854bd54b5460f00",
+      "size_bytes": 25065
+    },
+    {
+      "path": "src/rw_bot/policy/convert.py",
+      "sha256": "af92e54800ebdda404ef63e3941bb4833ee086e14d26f977184ebde485171aa7",
+      "size_bytes": 12874
+    },
+    {
+      "path": "src/rw_bot/policy/counter.py",
+      "sha256": "49f7fcda5aa6d5eb9c894385cd6469416f4c097ace271ab7f2160dbd9cc045fd",
+      "size_bytes": 14072
+    },
+    {
+      "path": "src/rw_bot/policy/creep.py",
+      "sha256": "b26ea242f7dd76f530417c95b6dea69bafb52d4326f8f3051a79d9ef55ff456e",
+      "size_bytes": 9728
+    },
+    {
+      "path": "src/rw_bot/policy/decoy.py",
+      "sha256": "bb2bab6726faf08893545d4d944d925e8c2d95f305e312e28fa19f58ef55875c",
+      "size_bytes": 5805
+    },
+    {
+      "path": "src/rw_bot/policy/defence.py",
+      "sha256": "db22075a14c6c06b147c0a6a09697ef4d13aa830c738d7345ea96b88a37ee7e0",
+      "size_bytes": 12221
+    },
+    {
+      "path": "src/rw_bot/policy/dispatch.py",
+      "sha256": "8f024228e4601d9e70820090b302791752202a42f8401e4d22c3a20a31dfc945",
+      "size_bytes": 21420
+    },
+    {
+      "path": "src/rw_bot/policy/dispatching.py",
+      "sha256": "44ffb4846071757e302af5326c65b874708a20655ddccdaac2968a1f22bbda8f",
+      "size_bytes": 13493
+    },
+    {
+      "path": "src/rw_bot/policy/doctrine.py",
+      "sha256": "21ea48464b9fbb508897b99cf7279c1b9d22b2a3b4d335f5f4220327c86d0907",
+      "size_bytes": 20829
+    },
+    {
+      "path": "src/rw_bot/policy/doctrine_codecs.py",
+      "sha256": "3179c9120466f66b8c40c065063e6c81181aeb163e1155ab272b0cef70c12b43",
+      "size_bytes": 9323
+    },
+    {
+      "path": "src/rw_bot/policy/doctrine_file.py",
+      "sha256": "8ea15a4245574905ea360620d3af210c8bc0bd12800988f7c994fa91b0cdc512",
+      "size_bytes": 3953
+    },
+    {
+      "path": "src/rw_bot/policy/doom.py",
+      "sha256": "ad721ee51cb1cebc7143a624b0c0519f0eeb50ef87a99b1923980840942b44c4",
+      "size_bytes": 10817
+    },
+    {
+      "path": "src/rw_bot/policy/economy.py",
+      "sha256": "b834abea6c7f54298db20842a20be235a76e8928841b8c1737371e6a3a2ab24a",
+      "size_bytes": 22353
+    },
+    {
+      "path": "src/rw_bot/policy/expand.py",
+      "sha256": "5a336e3a5cdb1138b9c9045dfb56d3f2f845c40f355a33e5a0e33554c5ec4d30",
+      "size_bytes": 6055
+    },
+    {
+      "path": "src/rw_bot/policy/expander.py",
+      "sha256": "edc8c25453fdb49a09a734f4ee53830f5fd37f1818666e687002f35ea006f4df",
+      "size_bytes": 30702
+    },
+    {
+      "path": "src/rw_bot/policy/field.py",
+      "sha256": "7e0c9293918b2d04e715b233197ab839d39424678bd9643eaf7d33052c86d3e2",
+      "size_bytes": 5184
+    },
+    {
+      "path": "src/rw_bot/policy/guard.py",
+      "sha256": "a087ea4b4850c670b1ec24d7766fee5bdabcea2da9c3e12f07af56d5f323eba8",
+      "size_bytes": 4058
+    },
+    {
+      "path": "src/rw_bot/policy/intel.py",
+      "sha256": "1be674f73df40083212fbb28e947162400948552890656bb9047b5af20080817",
+      "size_bytes": 5998
+    },
+    {
+      "path": "src/rw_bot/policy/ledger.py",
+      "sha256": "904a61528f370b4cf3c7e3cb3ef5fffd0a0d1b2c504190bd7e05bacd903d70ab",
+      "size_bytes": 8563
+    },
+    {
+      "path": "src/rw_bot/policy/lurk.py",
+      "sha256": "4348cc24a9188e799a1538eb775ea89059f5bde1e7ad1575a4577f5f253ff3b7",
+      "size_bytes": 9555
+    },
+    {
+      "path": "src/rw_bot/policy/match_report.py",
+      "sha256": "550047d97e4139ad0d0476dbcd74be6db167d431ea967ec23783fc550df5bc1f",
+      "size_bytes": 15797
+    },
+    {
+      "path": "src/rw_bot/policy/medic.py",
+      "sha256": "5e5357485a676a75408c9975458419fc18d83ff71a3604a0c83f2e49b20039da",
+      "size_bytes": 5845
+    },
+    {
+      "path": "src/rw_bot/policy/navy.py",
+      "sha256": "d9129f5d68ff8c541a9be5c589098b985882930607d4203b869d7d7c80a94c83",
+      "size_bytes": 11188
+    },
+    {
+      "path": "src/rw_bot/policy/nuker.py",
+      "sha256": "e75bfa4a3e2b3077c057646fc74d4eaf53fcba5a17a821a03b0652be1a3e068c",
+      "size_bytes": 14338
+    },
+    {
+      "path": "src/rw_bot/policy/observation.py",
+      "sha256": "574afa84290e5960d4b33995af1126728e81b6bab109373e4bc044926552859d",
+      "size_bytes": 2763
+    },
+    {
+      "path": "src/rw_bot/policy/production.py",
+      "sha256": "6463a70725373ec432bcce99f28261d140a2ecd119ce42f26631cec85ed6d0de",
+      "size_bytes": 16348
+    },
+    {
+      "path": "src/rw_bot/policy/progress.py",
+      "sha256": "e46f182358d77ea20368a8c115a404c944bebe904685f41a709dfa639cefd50c",
+      "size_bytes": 5770
+    },
+    {
+      "path": "src/rw_bot/policy/quartermaster.py",
+      "sha256": "33ea847cb01a8d216cdf8306e92a792e415444038b46ea69ac63fa9226164b63",
+      "size_bytes": 5752
+    },
+    {
+      "path": "src/rw_bot/policy/raid.py",
+      "sha256": "0a706b2b9ae68539054b20aac763dc1f5d8c5d342ac9d16e50f869a25e39438c",
+      "size_bytes": 11063
+    },
+    {
+      "path": "src/rw_bot/policy/recorder.py",
+      "sha256": "5bd7cd02e4cabc5c3f4875a4f6409da4e12ba63a6d06455075e881426f2013cf",
+      "size_bytes": 6358
+    },
+    {
+      "path": "src/rw_bot/policy/runner.py",
+      "sha256": "76c4246b2a6ca5fac4e171fcdfd53c49a61982f06b138275ef464c04cf10af98",
+      "size_bytes": 15441
+    },
+    {
+      "path": "src/rw_bot/policy/rush.py",
+      "sha256": "02a1f5a5da06acefa15e74d87aecd6f55a4bcf621bef711dc59064f2a492fab2",
+      "size_bytes": 7987
+    },
+    {
+      "path": "src/rw_bot/policy/scoreboard.py",
+      "sha256": "96703222115ace2207116018c1db6ca2e73bdaa7f29a0972ff06ae5cb38f212a",
+      "size_bytes": 8370
+    },
+    {
+      "path": "src/rw_bot/policy/scorekeeper.py",
+      "sha256": "be5dbf29f4748b713e52a71e385532bd62adc3647068158bcd00a3e143f02333",
+      "size_bytes": 14262
+    },
+    {
+      "path": "src/rw_bot/policy/scouting.py",
+      "sha256": "4b1165b7d905faa8d6839e41691b61faf02600caf7da240b3aa24ce7acc8be92",
+      "size_bytes": 6313
+    },
+    {
+      "path": "src/rw_bot/policy/siting.py",
+      "sha256": "628cce26ccb6742e28ee772939fe94f7f6b858bff8425d3edcb620e7e8e8d8dd",
+      "size_bytes": 21031
+    },
+    {
+      "path": "src/rw_bot/policy/situation.py",
+      "sha256": "5c333abaaba38bf888fc36736459ef12a9e44a430f7e35638c85e288f44ef601",
+      "size_bytes": 9199
+    },
+    {
+      "path": "src/rw_bot/policy/spending.py",
+      "sha256": "5f854586b24306368660c22560114b9da8620a7103c0f5f9695be86a6c747480",
+      "size_bytes": 25156
+    },
+    {
+      "path": "src/rw_bot/policy/threat.py",
+      "sha256": "f4eb6155b2c8c276372e360fa9813fb1ac38e8e5dc4e86774a93c67c5bdf8081",
+      "size_bytes": 5895
+    },
+    {
+      "path": "src/rw_bot/policy/trace.py",
+      "sha256": "e79994252541a1501b2ad497632b3a0f160c343993b62037060d8f231812c378",
+      "size_bytes": 13141
+    },
+    {
+      "path": "src/rw_bot/policy/verdict.py",
+      "sha256": "3a4863c6c317bfbaaffff9f6940d4197ec7f34cbf314c155d4363f3c54d70683",
+      "size_bytes": 3256
+    },
+    {
+      "path": "src/rw_bot/policy/workforce.py",
+      "sha256": "bc1e809e9e78e16936825e0fccec6e6fb8eeb5b5a7cf3e4a4718bd7d973f5a3c",
+      "size_bytes": 11878
+    },
+    {
+      "path": "src/rw_bot/provenance.py",
+      "sha256": "946a7455f4e779888990df79af4809e713722963868b26bcffb4fcbd95d46356",
+      "size_bytes": 17377
+    },
+    {
+      "path": "src/rw_bot/py.typed",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "src/rw_bot/service/__init__.py",
+      "sha256": "e1b13d13e1ae28b28efe5d478e85b1cf384e0dc0b52a596df835d7cd576bae70",
+      "size_bytes": 808
+    },
+    {
+      "path": "src/rw_bot/service/_test_hooks.py",
+      "sha256": "ee6fd5a34d6b4c4489dfbab28fa926489aeb5c196f415f96bb217eecbd052545",
+      "size_bytes": 4235
+    },
+    {
+      "path": "src/rw_bot/service/dashboard.py",
+      "sha256": "fa79526d8c337f5121fb722e016398301e847f6e305471bd4c202946edf9a19f",
+      "size_bytes": 6504
+    },
+    {
+      "path": "src/rw_bot/service/http.py",
+      "sha256": "de34eccbff882a3ebf7f44935489d7ab9adf5243e468b525800a272494971cea",
+      "size_bytes": 5655
+    },
+    {
+      "path": "src/rw_bot/service/queue.py",
+      "sha256": "518d2ad2fc0214b53907510376529af31b6fb1e419ad4389bce72fe47e1f6378",
+      "size_bytes": 18212
+    },
+    {
+      "path": "src/rw_bot/service/queue_rows.py",
+      "sha256": "8a45e17f5b47a4f62fc4f9ab9f14e508812a3c282ab0a75b3ee81916c7c26e8b",
+      "size_bytes": 5443
+    },
+    {
+      "path": "src/rw_bot/service/submit.py",
+      "sha256": "2952f5fc70928a688b573ea41004200e0a79621d113de34176c6f2e2753d33f7",
+      "size_bytes": 2559
+    },
+    {
+      "path": "src/rw_bot/service/worker.py",
+      "sha256": "c615555fa3729699b6b21976466e3aacebed29644437692f407b606d1eeabe26",
+      "size_bytes": 3511
+    },
+    {
+      "path": "src/rw_bot/stage_record.py",
+      "sha256": "e1ddd943a4c9c3a3a5c86a4f7336add7af2293cabb171e8fb9c73c1fe2b8cb57",
+      "size_bytes": 1975
+    },
+    {
+      "path": "src/rw_bot/staged_tree.py",
+      "sha256": "81e9acd86a7186b26114d17af581028eb77ed9195e7030b61de4c66a12672a82",
+      "size_bytes": 21340
+    },
+    {
+      "path": "src/rw_bot/tree_archive.py",
+      "sha256": "1f182b72cc57c60609899e08a6f1410c3bef6b72d766cbab8432d6a6880c2869",
+      "size_bytes": 8756
+    },
+    {
+      "path": "src/rw_bot/tree_identity.py",
+      "sha256": "0145a131a8a3255c25ed2b20b1c0fadd7b624c3b57c9cca72eaef92e0f8fc9b3",
+      "size_bytes": 14257
+    },
+    {
+      "path": "src/rw_bot/validation.py",
+      "sha256": "c959e12334fa95164eb56ba3b64d764eed906488b4f8e01fe4bd379bdcd2a60a",
+      "size_bytes": 9338
+    },
+    {
+      "path": "src/rw_bot/wire/__init__.py",
+      "sha256": "033c4cc2fff135bcc22dd4264c0f1440621130ea5dbdb00afe49c0edba0919d1",
+      "size_bytes": 71
+    },
+    {
+      "path": "src/rw_bot/wire/codec.py",
+      "sha256": "5c4adf8ab7292d08b3bb63b42ae42af545eedb10a62175d37516e003167b287d",
+      "size_bytes": 19694
+    },
+    {
+      "path": "src/rw_bot/wire/command.py",
+      "sha256": "1def44cdc8290a03eedd1c970e9ce3783e6a1111a46cdbfd1af4b5c547eb27d8",
+      "size_bytes": 16773
+    },
+    {
+      "path": "src/rw_bot/wire/ndjson.py",
+      "sha256": "f54d3b15e065f8e4f4b69db25fad15fa2c30bfdc2e79094a8a119b981a4a01c1",
+      "size_bytes": 11940
+    },
+    {
+      "path": "src/rw_bot/wire/posture.py",
+      "sha256": "91b3fca9fa79c5d5e9681088bdfd1c5c644d42011b6df7f0cbd689ec11d14e92",
+      "size_bytes": 3684
+    },
+    {
+      "path": "src/rw_bot/wire/state.py",
+      "sha256": "60329afdfc40c87f659ba257062183e15fa7265aa93a5526d0b3986082d2ea27",
+      "size_bytes": 14273
+    },
+    {
+      "path": "sweeps/aa-cover.txt",
+      "sha256": "3274595bf63a55373d73e4d969d280033119fcd12c4b9895055b0d2737af11a9",
+      "size_bytes": 2145
+    },
+    {
+      "path": "sweeps/aa24.txt",
+      "sha256": "0c09b7a2aba71d1e83ef9af5039bdc410bc5cc3246d7e69eccedfe04a9e0beb8",
+      "size_bytes": 3262
+    },
+    {
+      "path": "sweeps/aggression.txt",
+      "sha256": "944a158fe226cdb1d570126d6e23aeda2067f08ef4d37f31586ff0816ad3f32f",
+      "size_bytes": 1385
+    },
+    {
+      "path": "sweeps/all-arms.txt",
+      "sha256": "6731a560e0ff0b9d9398e875af079ba8264e7df20ccfa8885d96482e60d5cf79",
+      "size_bytes": 4138
+    },
+    {
+      "path": "sweeps/antiair.txt",
+      "sha256": "d1b6b240e20026d2d5dca142421905cdd5a905e4e0772f86961b7a1504d33143",
+      "size_bytes": 1440
+    },
+    {
+      "path": "sweeps/army-mix.txt",
+      "sha256": "7c322112bb9675af4e14895770d1eecb7d47395f38b6a60a7c76f1ba778a061d",
+      "size_bytes": 2598
+    },
+    {
+      "path": "sweeps/battery96.txt",
+      "sha256": "ea4b40dc8b24c396d80f85a5aca3b95c5d385d4c61f4aedde04e2d8075b5e2d3",
+      "size_bytes": 5365
+    },
+    {
+      "path": "sweeps/cap-raid5.txt",
+      "sha256": "2c60c7faa8a7d0b2a8530c37473df3be89c06c24cc37399247530a2420392076",
+      "size_bytes": 2780
+    },
+    {
+      "path": "sweeps/certify12.txt",
+      "sha256": "c1ce66ee9b5d0b81c533568c98cf1368a03db0bd3d33072cd00b611d844ebafc",
+      "size_bytes": 1439
+    },
+    {
+      "path": "sweeps/comp-arms.txt",
+      "sha256": "54409cb63d913a4cb20cabdd6d185939b30c18148d3939324c53368d7b6fcc6d",
+      "size_bytes": 2247
+    },
+    {
+      "path": "sweeps/comps.txt",
+      "sha256": "0ff9b991a5fe8d159e92db25a57dda20d71f2f88c61241baf37d6a9810b62893",
+      "size_bytes": 2646
+    },
+    {
+      "path": "sweeps/counter-ab.txt",
+      "sha256": "b924874e2678a91110301631ab49449962c81c4cc4b24ee7dac4877813214e5f",
+      "size_bytes": 2167
+    },
+    {
+      "path": "sweeps/cover24.txt",
+      "sha256": "bb834107ec10a7d6b9dab524958869429b3bd31239e29a9f2b80e0c702ff8232",
+      "size_bytes": 3446
+    },
+    {
+      "path": "sweeps/diag.txt",
+      "sha256": "8271d618f534d124073e43a46fa76202ccdb7e72f2587f20c54ab756c1b9c836",
+      "size_bytes": 347
+    },
+    {
+      "path": "sweeps/duel-aa-medium.txt",
+      "sha256": "fca3c0a8e0bb49d64f0ee4da79b28954844e2a107bf8fe0d5a2daf087f7ce24f",
+      "size_bytes": 3009
+    },
+    {
+      "path": "sweeps/duel-aa.txt",
+      "sha256": "c8826538ed495247b0ef29a841e9ffa5b96db93f2da463d71d62ba95febb9cf6",
+      "size_bytes": 2980
+    },
+    {
+      "path": "sweeps/duel-arty.txt",
+      "sha256": "aa0d43f720aeed916a18432147faf99ee54fbdc418fbcd058d4d5204c21304cb",
+      "size_bytes": 3051
+    },
+    {
+      "path": "sweeps/duel-mech.txt",
+      "sha256": "6eccdde8d8d141f24a393eb8ec27031cbc81c8fc20e9481b3580359cfe1512ff",
+      "size_bytes": 4013
+    },
+    {
+      "path": "sweeps/duel-mechgun.txt",
+      "sha256": "c3b75a8cb1dc7dafe05cbe110d029b3ce7bbbea824a9b7bf3c325666adc47dbf",
+      "size_bytes": 2432
+    },
+    {
+      "path": "sweeps/duel.txt",
+      "sha256": "7bb9376fa2b0b98ef7570a3c877371f6aa2fe508ce85701a94b6ce4ac002b21e",
+      "size_bytes": 2198
+    },
+    {
+      "path": "sweeps/duration.txt",
+      "sha256": "262a5690f000c83ccc7b8d09323035317c580b30db2198a6a81f74ad975fd064",
+      "size_bytes": 1050
+    },
+    {
+      "path": "sweeps/duration6.txt",
+      "sha256": "8316abba38b79b48f5babdf6e48aa239c48440048f24d3bf7fd4b9194fc1ab11",
+      "size_bytes": 1234
+    },
+    {
+      "path": "sweeps/floor-duel.txt",
+      "sha256": "e71712abfe135a37aa6c9f4c82391e8e2f80756ab68bc85e67e46bfd23de430f",
+      "size_bytes": 364
+    },
+    {
+      "path": "sweeps/fwd24.txt",
+      "sha256": "2e8b8bf4ff9843c61accfff4202efd085b0f1780f45561526ec5f8b12ab7eeea",
+      "size_bytes": 3271
+    },
+    {
+      "path": "sweeps/grad1-close0raid0.txt",
+      "sha256": "eafcd425278b10ffb6592b6cb6e07afc1df67216f81b0046967d7341d41ef91e",
+      "size_bytes": 5609
+    },
+    {
+      "path": "sweeps/grad2-close0raid0.txt",
+      "sha256": "e48168fadb63451518cbed84d7460dbe4991eab2592710e6ad2aab1805287f12",
+      "size_bytes": 5555
+    },
+    {
+      "path": "sweeps/guard-ab.txt",
+      "sha256": "6bdc6c0cb302327bfa5bb01f1d974477681a56b2f48e348bf72a3ae57e6d61b3",
+      "size_bytes": 2364
+    },
+    {
+      "path": "sweeps/guard-certify2.txt",
+      "sha256": "c55fe7f4dc4e26066f7552fdafe7eed5062863af68f0c8971e116ad70649049c",
+      "size_bytes": 98
+    },
+    {
+      "path": "sweeps/guard-smoke.txt",
+      "sha256": "ac534e118724e5bd23cc35157e9066dc49d926598fd9d3992fef50996a0ae86c",
+      "size_bytes": 102
+    },
+    {
+      "path": "sweeps/guard-veryhard.txt",
+      "sha256": "a76d32efef80ce205918920c842824b7e3391c0cd323d7ceb08de21274909c09",
+      "size_bytes": 2051
+    },
+    {
+      "path": "sweeps/hard24.txt",
+      "sha256": "ddede9d453519986b80738119cb31191abbc0e0ec174cbfa00f99174ad328140",
+      "size_bytes": 2113
+    },
+    {
+      "path": "sweeps/imp-bridge12.txt",
+      "sha256": "2b5f121ad267dd603e539c336ee53291321fc51bf2df880a828781bd7fdc7a02",
+      "size_bytes": 795
+    },
+    {
+      "path": "sweeps/imp-bridgehold24.txt",
+      "sha256": "6ebb5a09c2c05a2aae2a6876223ead1c1454530487695b53c8be8ac7145a7e92",
+      "size_bytes": 1415
+    },
+    {
+      "path": "sweeps/imp-combo36.txt",
+      "sha256": "42a4025aa88e9984559b5d64534e1a49c22769411be214d2aca6cc111a46b214",
+      "size_bytes": 2116
+    },
+    {
+      "path": "sweeps/imp-creep12.txt",
+      "sha256": "3d1198082b5ee9c59ce27aafd873f91d22ca4240b25922050830c3fbd2806443",
+      "size_bytes": 975
+    },
+    {
+      "path": "sweeps/imp-duel12b.txt",
+      "sha256": "a3610360f5543403b7fbbfb6d0a30fdc9db65d81e74eb8c6b2627a16526ae38a",
+      "size_bytes": 794
+    },
+    {
+      "path": "sweeps/imp-fast12.txt",
+      "sha256": "43f71c1a54b72e40b09b9d342ac3e35de2f8e252f444c5258fcef866e367706c",
+      "size_bytes": 956
+    },
+    {
+      "path": "sweeps/imp-flame.txt",
+      "sha256": "e844a8029dc64897d682802a298ef026016d5fff366d6528041bf62f8fea202f",
+      "size_bytes": 1753
+    },
+    {
+      "path": "sweeps/imp-fortress12.txt",
+      "sha256": "f7482dce2155c2687aa69a309b83d9bb81b0fe675e7efe3818bade4b6647a42a",
+      "size_bytes": 641
+    },
+    {
+      "path": "sweeps/imp-hands84.txt",
+      "sha256": "ed06da791f8cb53a5aad30cacd6a62f523d72c2a0ae94d50a932463e68d74a69",
+      "size_bytes": 4610
+    },
+    {
+      "path": "sweeps/imp-hills12.txt",
+      "sha256": "c48f884ac46b59b53c1dfa59ada247474c0883873aa8b487222505aaa20b8f78",
+      "size_bytes": 782
+    },
+    {
+      "path": "sweeps/imp-ladder12.txt",
+      "sha256": "738bb2ff27986999b896e39a34db8a0fd9452c1aca907e5f19466edfe1c828ba",
+      "size_bytes": 861
+    },
+    {
+      "path": "sweeps/imp-navy24.txt",
+      "sha256": "b0bfe9c5866204635b42a249682b12410b7dc3fc33711db07e18c522ccdb298c",
+      "size_bytes": 1343
+    },
+    {
+      "path": "sweeps/imp-nocover12.txt",
+      "sha256": "1a6102d2b66686116f89a79804cdc07c60177fd50ca0d31be3e522a6795c3514",
+      "size_bytes": 689
+    },
+    {
+      "path": "sweeps/imp-nuke.txt",
+      "sha256": "51e08e87ed82485ebf634f1ecb7425b546b27422f0290736b69f36f355cd8f9a",
+      "size_bytes": 353
+    },
+    {
+      "path": "sweeps/imp-playbook.txt",
+      "sha256": "c14d4491fcd926a9aef6f7cc216e2cff724a1294ffb80bc8e6940766a2c3caa4",
+      "size_bytes": 648
+    },
+    {
+      "path": "sweeps/imp-raid6.txt",
+      "sha256": "75f1a351f7b6226638a814ceb7056fa6882f788bc81b6cd71c23fb7ed085bb7e",
+      "size_bytes": 898
+    },
+    {
+      "path": "sweeps/imp-raid8x48.txt",
+      "sha256": "23bd58768963dd3b1b3816b196f45c1b0bd2e3bb1529be7f4ddfcadd7ec5d9e7",
+      "size_bytes": 2701
+    },
+    {
+      "path": "sweeps/imp-scout24.txt",
+      "sha256": "73c423b632115c4f47dd1189659d2ff10d63ef9920411c250e30532b33daa7ec",
+      "size_bytes": 1317
+    },
+    {
+      "path": "sweeps/imp-screen2.txt",
+      "sha256": "063dec15bee50bde8ac63e6709b99288d3d190f5389bc9d10af2099818570cfc",
+      "size_bytes": 1316
+    },
+    {
+      "path": "sweeps/imp-straight12.txt",
+      "sha256": "2f5b361c2a6e0c76296e4529066af68fc48d7f120497fe5d3de73f3527fbde1c",
+      "size_bytes": 821
+    },
+    {
+      "path": "sweeps/imp-triage.txt",
+      "sha256": "2b9b923b6390e3cb2b10666885e4aff10fcc3453e8459c34c383702b40b8f904",
+      "size_bytes": 748
+    },
+    {
+      "path": "sweeps/imp-zone.txt",
+      "sha256": "c3ccdc33f77f34077481139f9d7363b39305985a780fbd15f92c88389bac2401",
+      "size_bytes": 369
+    },
+    {
+      "path": "sweeps/impossible24.txt",
+      "sha256": "ad8682258b77bb0f217989f3d46169bf38ee787f7503ce7dcaa45850b473ffd4",
+      "size_bytes": 3344
+    },
+    {
+      "path": "sweeps/mech-ab.txt",
+      "sha256": "9d39df2d9e4767e4008e4a87933be7fca1416d886b08af8de9770b65dec6e085",
+      "size_bytes": 3503
+    },
+    {
+      "path": "sweeps/mlprobe.txt",
+      "sha256": "a19024bbc960e5b990f49eda2337d144fba81e5382f00a672ede8a0ed3772d06",
+      "size_bytes": 162
+    },
+    {
+      "path": "sweeps/mlprobe2.txt",
+      "sha256": "3a66bb9eebfd0c39696133973264b35fae7c7d93321eac95bfd7fbb73be2472a",
+      "size_bytes": 162
+    },
+    {
+      "path": "sweeps/navblood96.txt",
+      "sha256": "8d1ccb5357929ac6d57658eba1044083a5ebfb3d68fb0676bc96604118644c1f",
+      "size_bytes": 5429
+    },
+    {
+      "path": "sweeps/navdoom96.txt",
+      "sha256": "a657fe3448a9533437c5fe93ec555b5ed07f7f05233241d77fd43dda2c7b45fb",
+      "size_bytes": 5366
+    },
+    {
+      "path": "sweeps/navgate96.txt",
+      "sha256": "283042d7eb1e4abf528c7129cca27aba71e3582e27ed12b33e60b94f19167355",
+      "size_bytes": 5327
+    },
+    {
+      "path": "sweeps/navpair48.txt",
+      "sha256": "e7cdb96bfc91ee2071ea697c92e9e70f551aa025e2211d654d0fccfbc9219291",
+      "size_bytes": 5370
+    },
+    {
+      "path": "sweeps/navy96.txt",
+      "sha256": "e5ff542fa4ddad72478ad0acab6fef686b4a1dbb55304ac0a2d02c1f2e5a222f",
+      "size_bytes": 5137
+    },
+    {
+      "path": "sweeps/navy96b.txt",
+      "sha256": "9b0a8ff6205312c36dfb6c573c90d4e44903adafb8dfc15d417d9536537257a3",
+      "size_bytes": 5196
+    },
+    {
+      "path": "sweeps/navy96c.txt",
+      "sha256": "ef49dd538c01ce2ab0090364c16a9765c939c9c3c4a7fef0016863e489239158",
+      "size_bytes": 5266
+    },
+    {
+      "path": "sweeps/navy96d.txt",
+      "sha256": "d12ac70352186771076537957f82d16fa2204937d6adf63cc99bc36a267d9cb7",
+      "size_bytes": 5176
+    },
+    {
+      "path": "sweeps/navy96e.txt",
+      "sha256": "ff90e8b1ad59f82b4b857c45e2a85fe73ff2d00b8caa561f960f2c02cfd56cfb",
+      "size_bytes": 5363
+    },
+    {
+      "path": "sweeps/navy96f.txt",
+      "sha256": "3e9d6600d17d48e68e1110cad0491d419975796bb83045886a45fbd1a4a8154f",
+      "size_bytes": 5372
+    },
+    {
+      "path": "sweeps/noise-held.txt",
+      "sha256": "d8538b46e04b3f02493a85f18de10509ac2ec7b9203ef1b2605e4a45eb415745",
+      "size_bytes": 1560
+    },
+    {
+      "path": "sweeps/noise.txt",
+      "sha256": "6dfb3e76b39358d237baba4c37e06e0054695600e76313bcebf2eed89d1ab8db",
+      "size_bytes": 1840
+    },
+    {
+      "path": "sweeps/raid2-ab.txt",
+      "sha256": "08afc737c6f16b012f7aac16857b49afca6ae454d9c0c2fb68d8a5dc0a90b17b",
+      "size_bytes": 2242
+    },
+    {
+      "path": "sweeps/replicate.txt",
+      "sha256": "394fcb3e79a1343890bb23e8383af409a708b4c7aab65c825fdac7f2c0f0d3e2",
+      "size_bytes": 2547
+    },
+    {
+      "path": "sweeps/run-floor.sh",
+      "sha256": "a92c31285f2d669830717b564d270cb76c2454490a2506e503eab39c2ea63646",
+      "size_bytes": 993
+    },
+    {
+      "path": "sweeps/run-mltrace.sh",
+      "sha256": "acd393f878b7f109b7a10b34ae352e6c95fd006ab61f5f9b21ca8233cd35949f",
+      "size_bytes": 1087
+    },
+    {
+      "path": "sweeps/run-xmap-1v1.sh",
+      "sha256": "4fbd7a264c1b5604d6b80e8f90fb89638550da37a29f20933fef613ffb523e1f",
+      "size_bytes": 828
+    },
+    {
+      "path": "sweeps/run-xmap.sh",
+      "sha256": "ed2b1939e33f034c06c3714c42646c1a76373b5895ed0d156353c8dbdf0f55dd",
+      "size_bytes": 696
+    },
+    {
+      "path": "sweeps/scout-ab.txt",
+      "sha256": "54f9895507655f6d75cac1230584e4916d299981745ea334fc424dbf7bc360d9",
+      "size_bytes": 2362
+    },
+    {
+      "path": "sweeps/screen-imp3.txt",
+      "sha256": "46d0af554122fa26136a11d6973f7be084b6c72140996bd8998c8d18d28f5d4c",
+      "size_bytes": 505
+    },
+    {
+      "path": "sweeps/screen-imp3b.txt",
+      "sha256": "cac9c9de4368d667919cbde2694973afd28ae84f8b9fe7dd9eb13d4be13b0b7e",
+      "size_bytes": 477
+    },
+    {
+      "path": "sweeps/screen-imp4.txt",
+      "sha256": "942f9a4fd8468169e40cce9ddfe0ba729b0213190be82e9384134e738498e6de",
+      "size_bytes": 564
+    },
+    {
+      "path": "sweeps/screen-imp5.txt",
+      "sha256": "f163d6837cd0e5154b528cd521921cb412b3ba54081c594a768977c8ee54bc5d",
+      "size_bytes": 860
+    },
+    {
+      "path": "sweeps/screen-imp6.txt",
+      "sha256": "890c8d7a304820a981a6ad6900bca648cad5831e0fa3db03f5f786a0213addd2",
+      "size_bytes": 616
+    },
+    {
+      "path": "sweeps/screen-vh9.txt",
+      "sha256": "b5695a388d566ab4ece5eb2d32bc301e504ade6b3371521d6db894e924bfb069",
+      "size_bytes": 1159
+    },
+    {
+      "path": "sweeps/screen-vh9b.txt",
+      "sha256": "c010e91a3e47d402409a9e1cba88d630888c9f90d0b3c0583439cc9d89768a4f",
+      "size_bytes": 763
+    },
+    {
+      "path": "sweeps/screen-vh9c.txt",
+      "sha256": "afd2fc3de2e7c75e0a1daf3019dff171a25f696fe6ffd3a94ef259188fe601a4",
+      "size_bytes": 879
+    },
+    {
+      "path": "sweeps/screen-vh9d.txt",
+      "sha256": "290913dcc92f30ac74d3966bf0b8a8167f15001665b8d042c3a3ec9a31b567de",
+      "size_bytes": 759
+    },
+    {
+      "path": "sweeps/screen-vh9e.txt",
+      "sha256": "c804268c716d99b44e9fe7426220834bc62be006cc687cadaaf1889a57e75516",
+      "size_bytes": 613
+    },
+    {
+      "path": "sweeps/screen-vh9f.txt",
+      "sha256": "5de155eb37721f09039f6c5782e4921314cbbb1bbd383fd5d1733859105e9568",
+      "size_bytes": 673
+    },
+    {
+      "path": "sweeps/screen-vh9g.txt",
+      "sha256": "f211b6316bc8193fe08e88f096268d17188cfb7c472a5d56f33e27f939b8df7f",
+      "size_bytes": 644
+    },
+    {
+      "path": "sweeps/screen-vh9h.txt",
+      "sha256": "e7f934dc4c13bbc9d93a7e9c98f85acb37e03eedabc54e69c07bdc93d37c006a",
+      "size_bytes": 607
+    },
+    {
+      "path": "sweeps/screen-vh9i.txt",
+      "sha256": "27d9374fb3a9528e54b02db00ef01b52caab995d6125a2fada1542dea053cb3b",
+      "size_bytes": 564
+    },
+    {
+      "path": "sweeps/screen-vh9j.txt",
+      "sha256": "a5f35fb5adc2879fab9137febc0862f76db30770027a46876396b7d62511a600",
+      "size_bytes": 660
+    },
+    {
+      "path": "sweeps/screen-vh9k.txt",
+      "sha256": "78fe048acfdaa149a89ec9eb34db6da0da7289b8a79540068170fe4d68b155e3",
+      "size_bytes": 679
+    },
+    {
+      "path": "sweeps/screen-vh9l.txt",
+      "sha256": "98e6c767d697c50253213f512c8e7029e8915f0bb84f4171d089ee903294f5e2",
+      "size_bytes": 686
+    },
+    {
+      "path": "sweeps/screen-vh9m.txt",
+      "sha256": "e11c0149b98c7e8227b774317815943b7eaf5bf785b816088029e53326fae991",
+      "size_bytes": 617
+    },
+    {
+      "path": "sweeps/screen-vh9n.txt",
+      "sha256": "f8288309e72055701ab9570c1f5f343d1da83617d163726c58fabd738db59b93",
+      "size_bytes": 664
+    },
+    {
+      "path": "sweeps/screen-vh9o.txt",
+      "sha256": "fd4a89fabf839487dc17e8074a6ae5c2791f17dd9254b71a08eb88542dcc4e26",
+      "size_bytes": 709
+    },
+    {
+      "path": "sweeps/screen-vh9p.txt",
+      "sha256": "bd98fdb0f128f3008bb5ccb76fe63473b56cb71d19694b514ebeabd6184e337c",
+      "size_bytes": 647
+    },
+    {
+      "path": "sweeps/screen-vh9q.txt",
+      "sha256": "c8ce7aa51bb068b550dac9e29fc6fb78f8b1132e0a14a2fec13f58139505973f",
+      "size_bytes": 693
+    },
+    {
+      "path": "sweeps/screen-vh9r.txt",
+      "sha256": "194e21258077a9895e79ac3df417d4fb52d700cc8ebfcfa3f13516788429f351",
+      "size_bytes": 561
+    },
+    {
+      "path": "sweeps/service-smoke.txt",
+      "sha256": "fcb5d54c68c1e7c7113d93f5c8c1b9c19437d43bfce7f7a4990a2b1985081337",
+      "size_bytes": 98
+    },
+    {
+      "path": "sweeps/vh-chal.txt",
+      "sha256": "7250b8b1b4f0d31b564586121ffee5c457bdf3e66592c5fa962949f4919bbc1f",
+      "size_bytes": 1490
+    },
+    {
+      "path": "sweeps/vh-close.txt",
+      "sha256": "451683117c1947f0858fe3663c634dae57eff3dfb3aa0c5c43d38cbe2187ae21",
+      "size_bytes": 1308
+    },
+    {
+      "path": "sweeps/vh-close2.txt",
+      "sha256": "adecc26aa14aa8d166c88f2a80890249365781f227a5a41132033ef9ac39b612",
+      "size_bytes": 1224
+    },
+    {
+      "path": "sweeps/vh-closer.txt",
+      "sha256": "563dcc228dbb81d20d20f2375923686365efad8bf53b4ddf70a644ab24207f98",
+      "size_bytes": 1703
+    },
+    {
+      "path": "sweeps/vh-debounce.txt",
+      "sha256": "84932c0a95ec53c670bd9562af5d362d705219666a66d8ff309a2e193963beeb",
+      "size_bytes": 1704
+    },
+    {
+      "path": "sweeps/vh-final.txt",
+      "sha256": "5db2a575b2d2637f3d03b48a741c23b5b6b5ac18c7ba5f106bfee60669c6d480",
+      "size_bytes": 1628
+    },
+    {
+      "path": "sweeps/vh-floor.txt",
+      "sha256": "4a965ee7ee3ec2a177bae485748f9b4e880ba11433f43aecf2f601724081996a",
+      "size_bytes": 650
+    },
+    {
+      "path": "sweeps/vh-helo.txt",
+      "sha256": "ede91244e0a78af4c72f38f32aa103f8b43fc06a9724a79a8e56fddf34647ea8",
+      "size_bytes": 1128
+    },
+    {
+      "path": "sweeps/vh-heloadd.txt",
+      "sha256": "7f3f7272f921d2574abe3fd1690e338551368aea879647b29f201fddd69ec77a",
+      "size_bytes": 1272
+    },
+    {
+      "path": "sweeps/vh-heloheavy.txt",
+      "sha256": "3eb65d052a0d52ebd459ac5b16873672e6a5131ba1b3071e78e92bc85b1fc235",
+      "size_bytes": 1368
+    },
+    {
+      "path": "sweeps/vh-heloplus.txt",
+      "sha256": "98afb0625eed419aa222539b98c5202bb37fd2c598939553b3951ff8cb01df42",
+      "size_bytes": 1320
+    },
+    {
+      "path": "sweeps/vh-latch.txt",
+      "sha256": "2757b5fbad0249d67d337fbe53427086dd2432c8973603150eaeaa6575d8dcdd",
+      "size_bytes": 1649
+    },
+    {
+      "path": "sweeps/vh-navtilt24.txt",
+      "sha256": "1258ed99b41e67b16aba000080a8510ed97ff0e86527cc55adadfe37b0bcdd1e",
+      "size_bytes": 1272
+    },
+    {
+      "path": "sweeps/vh-nocover24.txt",
+      "sha256": "e8c7988b2f1375631c67d1c80d43b1914ad80b4661e508ddbb0205e8bee2d302",
+      "size_bytes": 1416
+    },
+    {
+      "path": "sweeps/vh-nuke.txt",
+      "sha256": "3f53ce1e3779547c91d3145a36edb24efd95ed6e50b7bc4c0ef27dd343fea28a",
+      "size_bytes": 335
+    },
+    {
+      "path": "sweeps/vh-raid5.txt",
+      "sha256": "896cf03c2560941688af153c60fe526e53f6f9071e7ae599fb7b8a7bc30e913c",
+      "size_bytes": 1176
+    },
+    {
+      "path": "sweeps/vh-sag.txt",
+      "sha256": "165214b3d0138496df993ff525eec43c3b4cddd82bebf6a589f15dd0c708694f",
+      "size_bytes": 737
+    },
+    {
+      "path": "sweeps/vh-siege.txt",
+      "sha256": "29bafa2742c3e7fbc183d5bf7a81d8fb75bf009d3b82f57366446d6a29c73162",
+      "size_bytes": 635
+    },
+    {
+      "path": "sweeps/vh-solo.txt",
+      "sha256": "b47cf93519756195797210809d6e300282301f1a49b9b88d08a30986ec7e9ced",
+      "size_bytes": 644
+    },
+    {
+      "path": "sweeps/vh-solo24.txt",
+      "sha256": "37366dede19107d28280abbc1c3cb90d305de3d176977e3fc02d0ce0f1c0c475",
+      "size_bytes": 1720
+    },
+    {
+      "path": "sweeps/vh-solobase.txt",
+      "sha256": "ee0a2c9738a9c3212d34e5b72dcbc3ef4789fec0f3377b968789742bf5c0a224",
+      "size_bytes": 797
+    },
+    {
+      "path": "sweeps/vh-t3.txt",
+      "sha256": "d213eed48de4135c05c7790789cf8816a686128412f4f69bad5dbf6378131b53",
+      "size_bytes": 1700
+    },
+    {
+      "path": "sweeps/vh-t3b.txt",
+      "sha256": "3ffd4b4e28a9fe8ad02a0e8379432cd062bc8a875863d6dce58a2df48c6392dd",
+      "size_bytes": 642
+    },
+    {
+      "path": "sweeps/vh-verdict.txt",
+      "sha256": "b431042f77fdf4fd9eed09efe429d864bfa426d20495796275a82c8d547688e1",
+      "size_bytes": 1590
+    },
+    {
+      "path": "sweeps/vh-wall.txt",
+      "sha256": "72c9f8ff9221cb7838de471deb6ac37a4627831e414d9f47337742529f4554ee",
+      "size_bytes": 791
+    },
+    {
+      "path": "sweeps/vh-workers10.txt",
+      "sha256": "d52c5597b1bcc9ce9edc1a3ada7f802cc9d4b5d3f0eda6c11293681c39061dbd",
+      "size_bytes": 1368
+    },
+    {
+      "path": "sweeps/vh-zone.txt",
+      "sha256": "3f69260a9024ce0edd7814e7e7bfa9b27401abfdae8afceca419606c0d7d3be0",
+      "size_bytes": 574
+    },
+    {
+      "path": "sweeps/vh-zone2.txt",
+      "sha256": "5f909c7dd0ee441124d8c5d6a15cbe37502856e36cdd8616d9ee912be82be1e6",
+      "size_bytes": 706
+    },
+    {
+      "path": "sweeps/vh24-arc.txt",
+      "sha256": "63e35205cf77663d2d90ccc8a758dd5ffe154e5540729631a4ae36884c3dd7dd",
+      "size_bytes": 3536
+    },
+    {
+      "path": "sweeps/vh24-flame.txt",
+      "sha256": "6a29907e87fbe04b4e2f92c123a29a8e04d19318b13c9b1b1e2cb754ce153778",
+      "size_bytes": 1569
+    },
+    {
+      "path": "sweeps/vh24-tech.txt",
+      "sha256": "49a6f55e3f2c56765e25696425e55f695f4aa257eae5984ec69c5a74deda22d2",
+      "size_bytes": 1723
+    },
+    {
+      "path": "sweeps/vhdoom48c.txt",
+      "sha256": "cb026f3111e3ca1ff34bf2e0f9da73cbb9fa9f9b7f5dd443b9779be1ce1561a4",
+      "size_bytes": 2573
+    },
+    {
+      "path": "sweeps/vhdoom96.txt",
+      "sha256": "7493f5027a931827110fbae3ab159a779eb2e329ad3d26775dfecc4f38f1d373",
+      "size_bytes": 5159
+    },
+    {
+      "path": "sweeps/vhdoom96b.txt",
+      "sha256": "81f480d493b455caffeafaee0d791eba6c119dbac890279d730fbc7cca065423",
+      "size_bytes": 5090
+    },
+    {
+      "path": "sweeps/wave-mass.txt",
+      "sha256": "650f564a839c401d8f27fba610ba2a10ed01e8bde849356d6172c4fa5e411f18",
+      "size_bytes": 1577
+    },
+    {
+      "path": "sweeps/worker-ceiling.txt",
+      "sha256": "25c1cffa4b8d17c7f24df3352b2c4890b4419d2823ba52159e750ddb54b82c68",
+      "size_bytes": 1273
+    },
+    {
+      "path": "sweeps/workers-ab.txt",
+      "sha256": "82e054899e7b603e1e019e6da31089b2336c34ddbee7ee5081f5596c478f3320",
+      "size_bytes": 2261
+    },
+    {
+      "path": "sweeps/xmap-jobs.txt",
+      "sha256": "84e6154dec216a85f5fe0451cd23ef55c9aac064de4194d23d2ec7234721d813",
+      "size_bytes": 199
+    },
+    {
+      "path": "sweeps/xmap3-jobs.txt",
+      "sha256": "41cc80b39d28164547cd92e7aba305c0f3230c385c57ffbe1a7257add91060ba",
+      "size_bytes": 236
+    },
+    {
+      "path": "type-flags.ndjson",
+      "sha256": "2f928fd979b0fbc6e129b8492be5c10d60ea68739363eb0b6a7fc4a6b277cfcf",
+      "size_bytes": 70007
+    }
+  ],
+  "tree_sha256": "e0f00a566a6695c4ca4aa664cbcf80667908a139de52edc77dbcb7cbf4d45fc6",
+  "archive_name": "rw-payload.tar",
+  "archive_sha256": "4bc31668036f3331445b87fc5efbe6e7affc82b34168697f5444eb38d306cc91",
+  "archive_size_bytes": 2242560
+}

@@ -20,6 +20,7 @@ from tests.service_fakes import FakeConnection
 _CONFIG = decode_sweep_config(
     {
         "out_dir": "runs/sweeps/demo",
+        "traces": "runs/traces",
         "workers": 1,
         "lockstep": 75,
         "clone_prefix": ".game-w",

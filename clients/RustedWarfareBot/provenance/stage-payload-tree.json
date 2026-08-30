@@ -1,0 +1,18 @@
+{
+  "destination": "/pub/wagnera3/rusted/staging",
+  "files": [
+    {
+      "name": "rw-payload.tar",
+      "sha256": "4bc31668036f3331445b87fc5efbe6e7affc82b34168697f5444eb38d306cc91",
+      "size_bytes": 2242560
+    }
+  ],
+  "provenance": {
+    "git_commit": "7fc59eda039a06b395935bba00618b775744ec4b",
+    "carries": "scripts, doctrines, sweeps, agent/build/rw-agent.jar, wiki/sources/m0-probe/printunits.log, wiki/sources/m11-pools/type-flags.ndjson",
+    "tree_sha256": "e0f00a566a6695c4ca4aa664cbcf80667908a139de52edc77dbcb7cbf4d45fc6",
+    "entries": "410",
+    "agent_bytecode": "java 8 (class 52), the Linux depot JRE ceiling",
+    "described_by": "provenance/payload-tree.json"
+  }
+}

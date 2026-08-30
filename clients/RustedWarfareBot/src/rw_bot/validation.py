@@ -21,9 +21,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from math import isfinite
-from pathlib import PureWindowsPath
+from pathlib import PurePosixPath, PureWindowsPath
 
 from rw_bot import RwBotError
+from rw_bot.platform_id import is_windows
 
 _MISSING = "RW-DECODE-001"
 _WRONG_TYPE = "RW-DECODE-002"
@@ -100,25 +101,30 @@ def require_non_empty_str(payload: Mapping[str, str | int | float | bool], field
     return value
 
 
-def require_absolute_path(payload: Mapping[str, str | int | float | bool], field: str) -> str:
-    """Narrow one field to a non-blank absolute Windows path.
+def require_absolute_path(
+    payload: Mapping[str, str | int | float | bool], field: str, platform: str
+) -> str:
+    """Narrow one field to a non-blank absolute path for a platform.
 
     Absoluteness is a correctness requirement here rather than a style
     preference. Every path in a launch configuration is consumed by the game
     process, which runs with the game directory as its working directory, so a
     relative path silently resolves against the pinned game tree instead of the
-    caller's location.
+    caller's location. That reasoning holds on every platform.
 
-    Windows semantics are applied explicitly rather than inherited from the
-    host: the engine ships a Windows ``java.exe`` and the whole harness is
-    pinned to that platform, so ``PureWindowsPath`` is the accurate reading and
-    keeps the rule identical wherever the test suite runs. A drive-rooted path
-    with no drive letter (``/runs/x``) is relative under those semantics and is
-    rejected.
+    WHAT "ABSOLUTE" MEANS DOES NOT. The two families disagree about the exact
+    case that matters here: ``/runs/x`` is a complete path on POSIX and a
+    drive-RELATIVE one on Windows, and ``C:\\runs\\x`` is the reverse. Reading
+    a path under the wrong family therefore does not merely mis-parse it -- it
+    inverts this check, accepting exactly the values it exists to reject. The
+    platform is taken as an argument rather than read from the running machine
+    so the rule stays a pure function and both families are provable from
+    either.
 
     Args:
         payload: The payload being decoded.
         field: Field name to read.
+        platform: A ``sys.platform`` value naming the family to read under.
 
     Returns:
         The field value as an absolute path.
@@ -126,15 +132,16 @@ def require_absolute_path(payload: Mapping[str, str | int | float | bool], field
     Raises:
         DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when not a
             ``str``, ``RW-DECODE-003`` when blank, ``RW-DECODE-005`` when the
-            value is not absolute.
+            value is not absolute under that platform's reading.
     """
     value = require_non_empty_str(payload, field)
-    if not PureWindowsPath(value).is_absolute():
+    reader = PureWindowsPath if is_windows(platform) else PurePosixPath
+    if not reader(value).is_absolute():
         raise DecodeError(
             _NOT_ABSOLUTE,
-            f"field {field!r} must be an absolute path, got {value!r}: the game process "
-            "runs with the game directory as its working directory, so a relative path "
-            "resolves against the game tree rather than the caller",
+            f"field {field!r} must be an absolute path on {platform}, got {value!r}: "
+            "the game process runs with the game directory as its working directory, "
+            "so a relative path resolves against the game tree rather than the caller",
         )
     return value
 

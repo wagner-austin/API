@@ -17,23 +17,32 @@ from pathlib import Path
 from typing import TypedDict
 
 from rw_bot.harness import _test_hooks
+from rw_bot.harness.agent_build import FROZEN_AGENT_JAR
 from rw_bot.harness.clone import (
-    REQUIRED_ENTRIES,
     VOLATILE_FILES,
     clone_name,
     entries_to_copy,
+    leased_display,
     leased_port,
+    required_entries,
     verify,
 )
+from rw_bot.harness.launch import (
+    CATALOGUE,
+    FROZEN_CATALOGUE,
+    FROZEN_TYPE_DUMP,
+    TYPE_DUMP,
+)
 from rw_bot.harness.match import MatchConfig, describe
+from rw_bot.harness.results_layout import match_log_path, trace_path
 from rw_bot.harness.sweep import (
+    SweepError,
     SweepJob,
     assigned,
     is_complete,
     job_name,
     make_argv,
     scorecard,
-    trace_path,
 )
 from rw_bot.validation import require_int, require_non_empty_str, require_positive_int
 
@@ -43,6 +52,12 @@ class SweepConfig(TypedDict):
 
     Attributes:
         out_dir: Where results are filed, one file per match.
+        traces: Where per-sample traces are filed, namespaced by batch under
+            it. A separate root from the results because that is where the
+            analyser reads them from, and an explicit one because a compute
+            node resolves ``runs/traces`` against a home directory rather than
+            against this repository -- so the trace, which for a replication
+            panel is the entire measurement, went somewhere nothing looked.
         workers: How many matches to play at once. Bounded by memory rather
             than cores: a headless match holds about 430 MB and uses roughly
             one core.
@@ -75,6 +90,7 @@ class SweepConfig(TypedDict):
     """
 
     out_dir: str
+    traces: str
     workers: int
     lockstep: int
     clone_prefix: str
@@ -119,6 +135,7 @@ def decode_sweep_config(
     """
     return SweepConfig(
         out_dir=require_non_empty_str(payload, "out_dir"),
+        traces=require_non_empty_str(payload, "traces"),
         workers=require_positive_int(payload, "workers"),
         lockstep=require_positive_int(payload, "lockstep"),
         clone_prefix=require_non_empty_str(payload, "clone_prefix"),
@@ -141,6 +158,7 @@ def encode_sweep_config(config: SweepConfig) -> dict[str, str | int]:
     """
     return {
         "out_dir": config["out_dir"],
+        "traces": config["traces"],
         "workers": config["workers"],
         "lockstep": config["lockstep"],
         "clone_prefix": config["clone_prefix"],
@@ -187,17 +205,56 @@ def encode_sweep_outcome(outcome: SweepOutcome) -> dict[str, int]:
     }
 
 
-#: What a batch freezes: everything a match imports or reads at launch that is
-#: also under active development. The archived registry dumps (catalogue, type
-#: flags) are deliberately absent -- they are generated artifacts pinned to the
-#: game build, not code that changes between batches.
-TREE_SOURCES = ("scripts", "doctrines", "agent/build/rw-agent.jar")
+#: What a batch freezes: everything a match imports or reads at launch.
+#:
+#: ``sweeps`` joined when the tree became a STAGED artifact. A compute node
+#: reads its job file from the payload like everything else, and the file
+#: naming which arms and seeds a batch played is as much the experiment as the
+#: doctrines are -- the same argument that put those here.
+#:
+#: The two registry dumps joined for the same reason and were the last to.
+#: They had been left out on the reasoning that a dump is an artifact of the
+#: game build rather than code that changes between batches -- true, and not
+#: the question the tree answers. The question is whether a match can READ it
+#: where the match runs, and the first cluster member to reach the planner
+#: died on ``FileNotFoundError: 'wiki/sources/m0-probe/printunits.log'``
+#: having already patched, seeded and held the world at frame one. A compute
+#: node has no repository for a repository-relative path to mean anything
+#: against (job 55663569, 2026-08-30).
+TREE_SOURCES = (
+    "scripts",
+    "doctrines",
+    "sweeps",
+    "agent/build/rw-agent.jar",
+    CATALOGUE,
+    TYPE_DUMP,
+)
 
 #: The frozen tree's directory name, under the batch's results directory.
 TREE_DIR = ".tree"
 
 #: Written into the tree last, so its presence certifies a complete freeze.
 TREE_MARKER = ".complete"
+
+#: A frozen tree handed to a run was incomplete.
+_TREE_INCOMPLETE = "RW-SWEEP-006"
+
+#: What a match actually READS out of a frozen tree, as it is laid out inside
+#: one. Not the same strings as :data:`TREE_SOURCES`: a copy lands under its
+#: own basename, so ``agent/build/rw-agent.jar`` arrives flat as
+#: ``rw-agent.jar`` -- which is where
+#: :data:`~rw_bot.harness.agent_build.FROZEN_AGENT_JAR` looks for it. Checking
+#: the source spelling instead would refuse every tree ever frozen, and that
+#: is exactly what the first version of this did.
+FROZEN_ENTRIES = (
+    "src/rw_bot/__init__.py",
+    "doctrines",
+    "scripts",
+    "sweeps",
+    FROZEN_AGENT_JAR,
+    FROZEN_CATALOGUE,
+    FROZEN_TYPE_DUMP,
+)
 
 
 def prepare_tree(config: SweepConfig) -> None:
@@ -239,6 +296,41 @@ def prepare_tree(config: SweepConfig) -> None:
     _test_hooks.write_line(f"[sweep] tree frozen at {config['tree']}")
 
 
+def check_frozen_tree(tree: Path) -> None:
+    """Raise unless a tree carries everything a match reads out of it.
+
+    The counterpart to :func:`prepare_tree` for a run that does NOT freeze its
+    own. A cluster member is handed a tree that was frozen before submission
+    and staged, so it must check what it was given rather than build it: the
+    sources ``prepare_tree`` copies from are repository-relative, and a
+    compute node has no repository, so a freeze there would report success
+    having copied nothing.
+
+    The marker alone is not enough. It certifies that every copy BEFORE it
+    finished, and says nothing about a source that was absent when the copy
+    ran -- the agent jar is the case, because ``make agent`` builds it and the
+    repository does not carry it.
+
+    Args:
+        tree: The frozen tree.
+
+    Raises:
+        SweepError: ``RW-SWEEP-006`` naming every missing entry rather than
+            the first. The failure it replaces is a member dying on a node
+            with an import error, and one look should account for all of it.
+    """
+    absent = [
+        name for name in (TREE_MARKER, *FROZEN_ENTRIES) if not _test_hooks.path_exists(tree / name)
+    ]
+    if absent:
+        raise SweepError(
+            _TREE_INCOMPLETE,
+            f"the frozen tree at {tree} is missing {', '.join(absent)}: a match reads its "
+            "planner, its doctrines and its agent jar from here, and none of them can be "
+            "rebuilt on a compute node -- the Linux depot ships a JRE with no compiler",
+        )
+
+
 def prepare_clone(index: int, config: SweepConfig) -> str:
     """Give one worker its own copy of the game directory.
 
@@ -268,9 +360,19 @@ def prepare_clone(index: int, config: SweepConfig) -> str:
     synced = _sync_maps(source, destination)
     if synced:
         _test_hooks.write_line(f"[sweep] {name} synced {synced} map(s) from {source}")
+    # The platform decides what the JDK's tools are called, so it decides what
+    # a complete clone even is; asked once and passed to both halves so the
+    # check and the requirement it checks against cannot disagree.
+    platform = _test_hooks.read_platform()
+    # A batch with a frozen tree carries its agent jar and compiles nothing,
+    # so it must not demand a compiler the Linux depot's JRE does not ship.
+    compiles_agent = not config["tree"]
+    needed = required_entries(platform, compiles_agent=compiles_agent)
     verify(
         name,
-        [needed for needed in REQUIRED_ENTRIES if _test_hooks.path_exists(destination / needed)],
+        [entry for entry in needed if _test_hooks.path_exists(destination / entry)],
+        platform,
+        compiles_agent=compiles_agent,
     )
     return name
 
@@ -354,28 +456,44 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
     # results are filed -- one name for both artifacts, so a result and its
     # trace can never belong to different experiments.
     batch = out_dir.name
+    # Composed once, here, and passed to the launcher. Both used to be built
+    # inside `make_argv` from the batch name against repository-relative
+    # roots, while these two `make_dirs` calls used the absolute `out_dir` --
+    # so the directory created and the directory written to agreed only while
+    # the process started in the repository.
+    trace = trace_path(config["traces"], batch, job)
+    play_log = match_log_path(config["out_dir"], job)
     # The planner opens the trace for writing and does not create its parent,
     # so the directory has to exist before the match starts rather than after
     # it has run for twenty minutes and failed to file anything.
-    _test_hooks.make_dirs(Path(trace_path(job, batch)).parent)
+    _test_hooks.make_dirs(Path(trace).parent)
     # The game redirects its stdout into the log path's directory at launch
     # and does not create it.
-    _test_hooks.make_dirs(out_dir / "logs")
+    _test_hooks.make_dirs(Path(play_log).parent)
     reset_volatile_files(game_dir, config)
     _test_hooks.write_line(f"[sweep] {game_dir} playing {name}")
     _, output = _test_hooks.run_capture(
         make_argv(
+            # The planner runs in the environment the sweep is already running
+            # in, rather than under whatever Python a launcher script names --
+            # which is what lets this work inside an image with no poetry.
+            _test_hooks.read_executable(),
             job,
             game_dir,
             config["lockstep"],
-            batch,
+            play_log,
+            trace,
+            # The lease owns the port: two concurrent random draws collided
+            # and both matches died on the bind (imp-creep12, 2026-08-08).
+            leased_port(game_dir, config["clone_prefix"]),
+            # And the display, for the same reason: -nodisplay still opens
+            # one, so on a headless node concurrent matches would otherwise
+            # share an X server they each expect to own.
+            leased_display(game_dir, config["clone_prefix"]),
             config["match"],
             config["tree"],
             config["pin_delta"],
             config["fast_forward"],
-            # The lease owns the port: two concurrent random draws collided
-            # and both matches died on the bind (imp-creep12, 2026-08-08).
-            leased_port(game_dir, config["clone_prefix"]),
         )
     )
     card = scorecard(output)

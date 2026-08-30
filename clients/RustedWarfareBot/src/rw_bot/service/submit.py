@@ -8,19 +8,10 @@ batch ([[harness-match-service]]).
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from rw_bot.harness.clone import CLONE_PREFIX
 from rw_bot.harness.match import MatchConfig, decode_match_config
+from rw_bot.harness.results_layout import PINNED_GAME_DIR, SWEEP_ROOT, TRACE_ROOT
 from rw_bot.harness.runner import TREE_DIR, SweepConfig, decode_sweep_config
-
-#: Where batches file, identical to the sweep CLI's constant.
-SWEEP_ROOT = "runs/sweeps"
-
-#: The clone prefix every worker shares with the sweep harness.
-CLONE_PREFIX = ".game-w"
-
-#: The pinned game dir clones copy from.
-SOURCE_GAME_DIR = ".game"
 
 #: One opponent: the duel, whose count the map caps anyway.
 DUEL_OPPONENTS = 1
@@ -57,15 +48,21 @@ def batch_config(
         match = decode_match_config(
             {"map_path": map_path, "opponents": DUEL_OPPONENTS, "difficulty": difficulty}
         )
-    out_dir = Path(SWEEP_ROOT) / name
+    # Forward-slashed rather than through `Path`, whose str() is backslashed
+    # on Windows: this goes into the batch's config and out again into every
+    # path composed from it, one of which a child process is handed.
+    out_dir = f"{SWEEP_ROOT}/{name}"
     return decode_sweep_config(
         {
-            "out_dir": str(out_dir),
+            "out_dir": out_dir,
+            # The repository-relative root: the fleet service runs where the
+            # repository is, unlike a cluster member.
+            "traces": TRACE_ROOT,
             "workers": 1,
             "lockstep": lockstep,
             "clone_prefix": CLONE_PREFIX,
-            "source_game_dir": SOURCE_GAME_DIR,
-            "tree": str(out_dir / TREE_DIR),
+            "source_game_dir": PINNED_GAME_DIR,
+            "tree": f"{out_dir}/{TREE_DIR}",
             "pin_delta": pin_delta,
             "fast_forward": fast_forward,
         },

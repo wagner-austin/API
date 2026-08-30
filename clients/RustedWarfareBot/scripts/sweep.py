@@ -16,7 +16,10 @@ from functools import partial
 from pathlib import Path
 
 from rw_bot.harness import _test_hooks
+from rw_bot.harness.clone import CLONE_PREFIX
 from rw_bot.harness.match import decode_match_config, describe
+from rw_bot.harness.records import batch_fingerprint, read_batch_rows, write_arm_records
+from rw_bot.harness.results_layout import PINNED_GAME_DIR, SWEEP_ROOT, TRACE_ROOT
 from rw_bot.harness.runner import (
     TREE_DIR,
     SweepConfig,
@@ -32,14 +35,10 @@ from rw_bot.harness.sweep import parse_jobs
 #: two-player map would give one whatever was asked.
 DUEL_OPPONENTS = 1
 
-#: Where a batch's results are filed, under the run artifacts directory.
-SWEEP_ROOT = "runs/sweeps"
-
-#: The pinned game directory worker copies are taken from.
-SOURCE_GAME_DIR = ".game"
-
-#: Leading part of every worker copy's directory name.
-CLONE_PREFIX = ".game-w"
+#: The pinned game directory worker copies are taken from. The workstation's
+#: own; the cluster's staged copy is named per member instead, because a
+#: compute node has no repository to be relative to.
+SOURCE_GAME_DIR = PINNED_GAME_DIR
 
 #: Engine frames between samples, defaulting to the observed free-running rate
 #: so a locked match covers the same ground as the unlocked ones already
@@ -92,16 +91,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     jobs = parse_jobs(_test_hooks.read_text_lines(Path(args[0])))
-    out_dir = Path(SWEEP_ROOT) / args[1]
-    _test_hooks.make_dirs(out_dir)
-    todo = outstanding(jobs, out_dir)
+    # Forward-slashed rather than through `Path`, whose str() is
+    # backslashed on Windows. It goes into the batch's own config and out
+    # again into every path composed from it, including one the launcher
+    # hands to a child process.
+    out_dir = f"{SWEEP_ROOT}/{args[1]}"
+    _test_hooks.make_dirs(Path(out_dir))
+    todo = outstanding(jobs, Path(out_dir))
 
     # Never more workers than there are matches, so a batch of two does not copy
     # the game four times to leave two of the copies idle.
     asked = int(args[2]) if len(args) >= 3 else DEFAULT_WORKERS
     config: SweepConfig = decode_sweep_config(
         {
-            "out_dir": str(out_dir),
+            "out_dir": out_dir,
+            # The repository-relative root, which is what a workstation batch
+            # has always used. A cluster member is told an absolute one
+            # instead, because its process does not start here.
+            "traces": TRACE_ROOT,
             "workers": min(asked, len(todo)) if todo else asked,
             "lockstep": int(args[3]) if len(args) >= 4 else DEFAULT_LOCKSTEP,
             "clone_prefix": CLONE_PREFIX,
@@ -109,7 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             # Under the results directory, so a batch and the code it ran are
             # one artifact -- resuming a batch resumes its code, whatever has
             # happened to the working tree since ([[policy-loop]]).
-            "tree": str(out_dir / TREE_DIR),
+            "tree": f"{out_dir}/{TREE_DIR}",
             # Zero leaves the engine on the wall clock, which is what a tree
             # frozen before the option existed requires; a pinned batch says
             # so explicitly ([[policy-determinism]]).
@@ -140,6 +147,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             played = sum(counts)
 
     _test_hooks.write_line(f"[sweep] {already + played}/{len(jobs)} matches have results")
+
+    # Recomputed over EVERY filed result, not just the ones this pass played:
+    # a run that finishes the last four matches of a twelve-match batch must
+    # leave a record covering all twelve. The scorecards are the store, so
+    # deriving from them is what keeps the record from disagreeing with them.
+    rows = read_batch_rows(Path(out_dir), Path(TRACE_ROOT), args[1])
+    if rows:
+        arms = write_arm_records(Path(out_dir), args[1], rows, batch_fingerprint(SOURCE_GAME_DIR))
+        _test_hooks.write_line(f"[sweep] recorded {len(arms)} arm(s): {', '.join(arms)}")
+
     return EXIT_OK if already + played == len(jobs) else EXIT_INCOMPLETE
 
 

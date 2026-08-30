@@ -8,18 +8,36 @@ project already knew that mattered: the wiki pins ``game_version`` on every
 page "because the jar is obfuscated and class names change silently between
 releases". It just had no way to say it about a RESULT.
 
-THE JAR IS THE SUBJECT, SO THE JAR IS THE AXIS. A boosting benchmark records
+THE GAME IS THE SUBJECT, SO THE GAME IS THE AXIS. A boosting benchmark records
 lightgbm's version because a bump in lightgbm moves the comparison; this
-project's equivalent is the game build, which moves everything and is not a
-Python distribution at all. :data:`GAME_DISTRIBUTION` puts it in the packages
-axis, which is exactly what that axis is for -- the things whose behaviour
-decides the numbers.
+project's equivalent is the game it played, which moves everything and is not
+a Python distribution at all. The packages axis is exactly what that is for --
+the things whose behaviour decides the numbers.
 
-Recorded as a DIGEST OF THE JAR rather than the wiki's version string. The
-string is maintained by hand and verified by re-reading; the digest is read
-off the bytes that ran. Two builds that a human labelled identically are
-distinguishable here, and that is the failure mode obfuscation creates: the
-class names change silently, so the label is the last thing to notice.
+THREE OF THEM, NOT ONE, and the two that were missing were missing for the
+same reason: a jar is one file and the others are trees, so recording them
+needed :mod:`rw_bot.tree_identity` before it could be done at all.
+
+* :data:`GAME_DISTRIBUTION` -- the engine's code, ``game-lib.jar``.
+* :data:`JVM_DISTRIBUTION` -- the runtime that executes it. The two platforms
+  ship DIFFERENT MAJOR VERSIONS, Java 8 on Linux and Java 13 on Windows, so
+  this is not a formality. Today the host axis separates those two by
+  accident, because the operating systems differ; two Linux runs either side
+  of a depot that bumped its bundled JRE would fingerprint identically and be
+  silently incomparable.
+* :data:`ASSETS_DISTRIBUTION` -- the maps, mods and unit definitions the
+  simulation reads. A jar digest does not cover them, and this project has
+  already lost a batch family to exactly that gap: a map missing from a clone
+  sent the engine to its boot sandbox, and every scorecard was void with the
+  jar digest matching throughout.
+
+Each recorded as a DIGEST rather than a version string, for the reason the jar
+was first: the string is a label somebody maintains and the digest is read off
+the bytes that ran. The runtime carries both -- its vendor-shipped
+``JAVA_VERSION`` in front of its digest -- because unlike the wiki's game
+version that label is not one this project can get wrong, and a reader asking
+why two batches differ is better served by ``1.8.0_131`` than by two hex
+strings that merely differ.
 
 WHAT IT DOES NOT CLAIM. There is no GPU and no image, so both axes are the
 stated-absent :data:`~platform_core.comparability.NO_VALUE` rather than
@@ -30,7 +48,7 @@ of one arm are two runs of the same configuration.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from hashlib import sha256
 from pathlib import Path
 from typing import TypedDict
@@ -41,28 +59,48 @@ from platform_core.environment_record import (
     HostProbe,
     PackageVersion,
     capture_host_record,
+    package_versions,
 )
 from platform_core.run_record import Observation, RunRecord, run_record
 
-#: Name the game build is recorded under in the packages axis.
+from rw_bot.harness.jvm import JVM_RELEASE_FILE, jvm_dir, release_version
+from rw_bot.harness.scorecards import MatchRow
+from rw_bot.tree_identity import digest_tree
+
+#: Names the three parts of the game are recorded under in the packages axis.
+#: Distinct rather than one compound value, because the axis compares
+#: package-by-package: a batch played on new maps and an unchanged engine
+#: should report which of the two moved, not merely that something did.
 GAME_DISTRIBUTION = "rusted-warfare"
+JVM_DISTRIBUTION = "rusted-warfare-jvm"
+ASSETS_DISTRIBUTION = "rusted-warfare-assets"
 
-#: The jar every claim about engine internals is pinned to. Relative, because
-#: the harness runs from the client root and ``.game/`` is a working copy that
-#: is deliberately not in the repository.
-GAME_JAR = Path(".game") / "game-lib.jar"
+#: What the game's own code is called inside a game directory. Named apart
+#: from any one path so a caller holding a different game directory -- a
+#: worker's clone, a staged tree -- composes the jar without writing the
+#: filename a second time.
+GAME_JAR_NAME = "game-lib.jar"
 
-#: How many hex characters of the jar digest are recorded. Full length would
+#: Where the maps, mods, unit definitions and translations live inside a game
+#: directory. The simulation's INPUT, as against the jar's code.
+GAME_ASSETS_DIR = "assets"
+
+#: How many hex characters of a digest are recorded. Full length would
 #: dominate every rendering of the axis; sixteen is far past the point where
 #: two real builds collide.
 DIGEST_LENGTH = 16
 
+#: What separates a runtime's stated version from its digest, e.g.
+#: ``1.8.0_131+9f2c...``. The spelling PEP 440 gives a local version, which is
+#: how ``torch==2.6.0+cu124`` reads in this monorepo's own pinned images.
+VERSION_DIGEST_SEPARATOR = "+"
 
-def game_build(jar: Path = GAME_JAR) -> PackageVersion:
+
+def game_build(jar: Path) -> PackageVersion:
     """Identify the game binary a run played against.
 
     Args:
-        jar: The game jar. Defaults to :data:`GAME_JAR`.
+        jar: The game jar.
 
     Returns:
         The build, named :data:`GAME_DISTRIBUTION` and versioned by the first
@@ -80,11 +118,104 @@ def game_build(jar: Path = GAME_JAR) -> PackageVersion:
     )
 
 
+def bundled_runtime(game_dir: Path, platform: str) -> PackageVersion:
+    """Identify the JVM a run's simulation actually executed on.
+
+    Args:
+        game_dir: The game directory the run played from.
+        platform: A ``sys.platform`` value, which decides the runtime's
+            directory name -- ``jvm64`` on Windows and ``jvm-linux``
+            elsewhere. Passed rather than read from the running interpreter so
+            a Windows workstation can state what a Linux node's record would
+            say.
+
+    Returns:
+        The runtime, named :data:`JVM_DISTRIBUTION` and versioned by its own
+        ``JAVA_VERSION`` followed by :data:`DIGEST_LENGTH` characters of the
+        digest of its whole tree. The version makes the record legible and the
+        digest makes it true: a runtime repackaged under an unchanged version
+        string is a different runtime and differs here.
+
+    Raises:
+        JvmReleaseError: ``RW-JVM-002`` when the runtime states no version.
+        TreeIdentityError: ``RW-TREE-001`` when the runtime's directory is
+            absent, ``RW-TREE-003`` when it holds a symbolic link.
+        OSError: When the release file or a file under the runtime cannot be
+            read.
+    """
+    root = game_dir / jvm_dir(platform)
+    version = release_version((root / JVM_RELEASE_FILE).read_text(encoding="utf-8").splitlines())
+    digest = digest_tree(root)[:DIGEST_LENGTH]
+    return PackageVersion(
+        name=JVM_DISTRIBUTION,
+        version=f"{version}{VERSION_DIGEST_SEPARATOR}{digest}",
+    )
+
+
+def asset_tree(game_dir: Path) -> PackageVersion:
+    """Identify the data the simulation read.
+
+    Args:
+        game_dir: The game directory the run played from.
+
+    Returns:
+        The asset tree, named :data:`ASSETS_DISTRIBUTION` and versioned by
+        :data:`DIGEST_LENGTH` characters of its tree digest. There is no
+        version string to put in front of it, because nothing in ``assets/``
+        states one -- which is the point: a mod folder edited between two
+        batches announces itself nowhere else.
+
+    Raises:
+        TreeIdentityError: ``RW-TREE-001`` when the directory is absent,
+            ``RW-TREE-002`` when it is empty, ``RW-TREE-003`` on a symlink.
+        OSError: When a file under the tree cannot be read.
+    """
+    return PackageVersion(
+        name=ASSETS_DISTRIBUTION,
+        version=digest_tree(game_dir / GAME_ASSETS_DIR)[:DIGEST_LENGTH],
+    )
+
+
+def game_packages(game_dir: Path, platform: str) -> tuple[PackageVersion, ...]:
+    """Name everything about the game whose behaviour decides the numbers.
+
+    Args:
+        game_dir: The game directory the run played from.
+        platform: A ``sys.platform`` value, for the runtime's directory name.
+
+    Returns:
+        The code, the runtime and the data, in the shared axis's canonical
+        order. Ordered by :func:`~platform_core.environment_record.package_versions`
+        rather than here, because that is what the record's own decoder will
+        put them in: a tuple assembled in any other order does not equal its
+        own round trip, which is how this was found. They are READ engine
+        outwards, so the first failure a caller meets is the jar's.
+
+    Raises:
+        FileNotFoundError: When the jar or the release file is absent.
+        JvmReleaseError: ``RW-JVM-002`` when the runtime states no version.
+        TreeIdentityError: When a tree is absent, empty or holds a symlink.
+        OSError: When a file under either tree cannot be read.
+        ValueError: When a digest or a stated version came back empty.
+    """
+    code = game_build(game_dir / GAME_JAR_NAME)
+    runtime = bundled_runtime(game_dir, platform)
+    assets = asset_tree(game_dir)
+    return package_versions(
+        {
+            code["name"]: code["version"],
+            runtime["name"]: runtime["version"],
+            assets["name"]: assets["version"],
+        }
+    )
+
+
 def sweep_fingerprint(
     determinism: DeterminismRecord,
     get_env: Callable[[str], str | None],
     probe: HostProbe,
-    jar: Path = GAME_JAR,
+    game_dir: Path,
+    platform: str,
 ) -> RunFingerprint:
     """Describe the configuration a sweep's numbers were produced under.
 
@@ -94,7 +225,11 @@ def sweep_fingerprint(
             digest a launcher would export. This project runs on a
             workstation, so it is normally absent and recorded as such.
         probe: Reader for the machine's own facts.
-        jar: The game jar, for the build axis.
+        game_dir: The game directory the sweep played from. The DIRECTORY, not
+            the jar it holds: two of the three package axes are trees beside
+            that jar, and a signature taking only the jar could not have
+            reached them.
+        platform: A ``sys.platform`` value, for the runtime's directory name.
 
     Returns:
         The fingerprint. The GPU axes are stated absent rather than omitted:
@@ -102,13 +237,16 @@ def sweep_fingerprint(
         differs from every real value instead of matching all of them.
 
     Raises:
-        FileNotFoundError: When the jar is absent.
+        FileNotFoundError: When the jar or the release file is absent.
+        JvmReleaseError: ``RW-JVM-002`` when the runtime states no version.
+        TreeIdentityError: When a tree is absent, empty or holds a symlink.
+        OSError: When a file under either tree cannot be read.
     """
     return cpu_run_fingerprint(
         determinism,
         get_env,
         capture_host_record(probe),
-        (game_build(jar),),
+        game_packages(game_dir, platform),
     )
 
 
@@ -139,7 +277,7 @@ class ArmSummary(TypedDict):
     intercepts: int
 
 
-def summarize_arm(rows: list[dict[str, str | int]], arm: str) -> ArmSummary:
+def summarize_arm(rows: Sequence[MatchRow], arm: str) -> ArmSummary:
     """Aggregate one arm's matches.
 
     Lives here rather than in the analyser that prints it, so the numbers a
@@ -166,10 +304,10 @@ def summarize_arm(rows: list[dict[str, str | int]], arm: str) -> ArmSummary:
         matches=len(sub),
         wins=sum(1 for row in sub if row["verdict"] == "won"),
         losses=sum(1 for row in sub if row["verdict"] in ("defeated", "wiped")),
-        drops=sum(int(str(row["dropped"])) for row in sub),
-        median_worth=sorted(int(str(row["worth_end"])) for row in sub)[len(sub) // 2],
-        unengageable=sum(int(str(row["targets_end"])) - int(str(row["engageable"])) for row in sub),
-        intercepts=sum(int(str(row["intercepted"])) for row in sub),
+        drops=sum(row["dropped"] for row in sub),
+        median_worth=sorted(row["worth_end"] for row in sub)[len(sub) // 2],
+        unengageable=sum(row["targets_end"] - row["engageable"] for row in sub),
+        intercepts=sum(row["intercepted"] for row in sub),
     )
 
 
@@ -261,16 +399,23 @@ def arm_run_record(
 
 
 __all__ = [
+    "ASSETS_DISTRIBUTION",
     "DIGEST_LENGTH",
+    "GAME_ASSETS_DIR",
     "GAME_DISTRIBUTION",
-    "GAME_JAR",
+    "GAME_JAR_NAME",
+    "JVM_DISTRIBUTION",
     "NO_VALUE",
     "SWEEP_EXPERIMENT",
+    "VERSION_DIGEST_SEPARATOR",
     "ArmSummary",
     "arm_label",
     "arm_observations",
     "arm_run_record",
+    "asset_tree",
+    "bundled_runtime",
     "game_build",
+    "game_packages",
     "summarize_arm",
     "sweep_fingerprint",
 ]

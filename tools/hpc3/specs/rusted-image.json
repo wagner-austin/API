@@ -1,0 +1,58 @@
+{
+  "base_image": "python:3.11-slim-bookworm@sha256:0bee7276f83efd4a1ee05bbbf4281d95ed28e079220a9457f25a93e3f1e3c31b",
+  "env_prefix": "/opt/env",
+  "git_commit": "7fc59eda039a06b395935bba00618b775744ec4b",
+  "system_packages": [
+    "xvfb=2:21.1.7-3+deb12u13",
+    "xauth=1:1.1.2-1",
+    "x11-xserver-utils=7.7+9+b1",
+    "libgl1=1.6.0-1",
+    "libgl1-mesa-dri=22.3.6-1+deb12u2",
+    "libx11-6=2:1.8.4-2+deb12u2",
+    "libxext6=2:1.3.4-1+b1",
+    "libxcursor1=1:1.2.1-1",
+    "libxrandr2=2:1.5.2-2+b1",
+    "libxxf86vm1=1:1.1.4-1+b2",
+    "libxi6=2:1.8-1+b1",
+    "libxtst6=2:1.2.3-1.1",
+    "iproute2=6.1.0-3",
+    "procps=2:4.0.2-3"
+  ],
+  "extra_index_urls": [],
+  "requirements": [
+    "typing_extensions==4.16.0"
+  ],
+  "wheels": [
+    "platform_core-0.1.0-py3-none-any.whl",
+    "hpc3-0.1.0-py3-none-any.whl",
+    "rusted_warfare_bot-0.1.0-py3-none-any.whl"
+  ],
+  "expected_versions": {
+    "typing_extensions": "4.16.0",
+    "platform_core": "0.1.0",
+    "hpc3": "0.1.0",
+    "rusted-warfare-bot": "0.1.0"
+  },
+  "required_symbols": [
+    { "module": "rw_bot.harness.campaign_match", "attribute": "main" },
+    { "module": "rw_bot.harness.results_layout", "attribute": "PAYLOAD_DIR" },
+    { "module": "rw_bot.harness.replication", "attribute": "compare_pair" },
+    { "module": "rw_bot.harness.runner", "attribute": "check_frozen_tree" },
+    { "module": "rw_bot.tree_identity", "attribute": "digest_record" },
+    { "module": "rw_bot.provenance", "attribute": "game_packages" },
+    { "module": "rw_bot.harness.agent_build", "attribute": "JAVA_RELEASE" }
+  ],
+  "smoke_commands": [
+    "xvfb-run -a --server-args=\"-screen 0 800x600x24\" xrandr",
+    "/opt/env/bin/python -c \"from rw_bot.harness.agent_build import JAVA_RELEASE; assert JAVA_RELEASE == '8', JAVA_RELEASE\"",
+    "/opt/env/bin/python -c \"from rw_bot.harness.jvm import jvm_dir, has_module_system, bundled_tools; assert jvm_dir('linux') == 'jvm-linux'; assert has_module_system('linux') is False; assert bundled_tools('linux') == ('java',)\"",
+    "/opt/env/bin/python -c \"import shlex; from rw_bot.harness.campaign import member_command, member_artifact; from rw_bot.harness.results_layout import clones_path; from rw_bot.harness.match import MatchConfig; from rw_bot.harness.sweep import SweepJob; job = SweepJob(label='repA', seed=12345, doctrine='doctrines/default.doctrine', samples=250); match = MatchConfig(map_path='maps/skirmish/[p2]Lake (2p).tmx', opponents=1, difficulty=-2); argv = shlex.split(member_command('/opt/env/bin/python', '/pub/wagnera3', 'rusted', 'sweeps/replicate.txt', 'replicate', job, 75, match)); assert argv[argv.index('--map') + 1] == 'maps/skirmish/[p2]Lake (2p).tmx'; assert argv[argv.index('--result') + 1] == member_artifact('/pub/wagnera3', 'rusted', 'replicate', job); assert argv[argv.index('--clones') + 1] == clones_path('/pub/wagnera3', 'rusted', 'replicate'); assert argv[argv.index('--tree') + 1].startswith('/pub/')\"",
+    "/opt/env/bin/python -c \"import pathlib; from rw_bot.tree_identity import tree_entries, tree_digest; root = pathlib.Path('/tmp/smoke-tree'); root.mkdir(parents=True, exist_ok=True); (root / 'game.txt').write_bytes(b'one'); assert tree_digest(tree_entries(root)) == 'c30d9d9d6a5315f6c714199204adbf66e779c43d85bedc27715f0754741b7c2e'\""
+  ],
+  "labels": {
+    "org.corvis.project": "rusted",
+    "org.corvis.game-build": "1.15 (code 176, build #28)",
+    "org.corvis.game-tree": "/pub/wagnera3/rusted/game",
+    "org.corvis.payload-tree": "/pub/wagnera3/rusted/payload"
+  }
+}

@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from rw_bot import RwBotError
+from rw_bot.harness.jvm import bundled_tools, tool_path
 
 _INCOMPLETE = "RW-CLONE-001"
 _NOT_POSITIVE = "RW-CLONE-002"
@@ -55,21 +56,44 @@ UNUSED_DIRS = ("jvm",)
 #: between arms rather than as an error ([[policy-determinism]]).
 VOLATILE_FILES = ("preferences.ini",)
 
-#: Paths that must exist in a clone before it is handed to a worker.
+#: The one tool every match needs, whether or not it builds an agent.
+JAVA_TOOL = "java"
+
+#: Paths a clone must have whatever it runs on.
 #:
-#: The launcher runs ``<GAME_DIR>/jvm64/bin/java.exe`` and compiles the agent
-#: with the JDK beside it. A clone missing any of them fails ninety seconds
-#: later as "the agent never opened port N", which reads like a fault in the
-#: agent rather than a truncated copy -- so the copy is checked where the
-#: message can still be accurate.
-REQUIRED_ENTRIES = (
-    "jvm64/bin/java.exe",
-    "jvm64/bin/javac.exe",
-    "jvm64/bin/jar.exe",
-    "game-lib.jar",
-    "libs",
-    "assets",
-)
+#: The game's own code, the libraries it loads beside it, and the assets a map
+#: is read from. None of the three is named differently on any platform, which
+#: is what separates them from the JDK tools listed with them.
+REQUIRED_CONTENT = ("game-lib.jar", "libs", "assets")
+
+
+def required_entries(platform: str, *, compiles_agent: bool) -> tuple[str, ...]:
+    """Return the paths that must exist in a clone before a worker gets it.
+
+    A clone missing any of them fails ninety seconds later as "the agent never
+    opened port N", which reads like a fault in the agent rather than a
+    truncated copy -- so the copy is checked here, where the message can still
+    be accurate.
+
+    THE COMPILER IS NOT ALWAYS REQUIRED, and demanding it was wrong. Every
+    match runs ``java`` out of the clone; only a match that BUILDS its agent
+    needs ``javac`` and ``jar`` beside it. The Linux depot ships a JRE with
+    neither, so requiring them unconditionally rejected every valid Linux tree
+    -- and a batch does not need them there anyway, because it compiles its
+    agent once and carries the jar inside its frozen tree.
+
+    Args:
+        platform: A ``sys.platform`` value.
+        compiles_agent: Whether this run builds its own agent. False for a
+            batch reusing a frozen snapshot, which is every cluster member.
+
+    Returns:
+        The required paths, JDK tools first, in declaration order. Only the
+        tools the platform's bundled runtime actually carries are ever asked
+        for (:func:`~rw_bot.harness.jvm.bundled_tools`).
+    """
+    tools = bundled_tools(platform) if compiles_agent else (JAVA_TOOL,)
+    return (*(tool_path(tool, platform) for tool in tools), *REQUIRED_CONTENT)
 
 
 class CloneError(RwBotError):
@@ -106,6 +130,15 @@ def clone_name(prefix: str, index: int) -> str:
 #: can never collide either.
 PLAY_PORT_BASE = 27510
 
+#: Leading part of every worker copy's directory name.
+#:
+#: Here rather than beside the sweep entry point that used to hold it: the
+#: cluster's single-match entry runs from the installed package, which cannot
+#: import ``scripts/`` because ``scripts/`` is not in the wheel. Two spellings
+#: of one prefix would have meant a clone leasing a port under one name and
+#: being looked for under another.
+CLONE_PREFIX = ".game-w"
+
 
 def leased_port(game_dir: str, prefix: str) -> int:
     """Return the channel port a cloned game directory owns, or zero.
@@ -127,12 +160,70 @@ def leased_port(game_dir: str, prefix: str) -> int:
         play in the pinned directory itself, and their recipe keeps its
         random draw.
     """
-    if not game_dir.startswith(prefix):
+    ordinal = _clone_ordinal(game_dir, prefix)
+    if ordinal is None:
         return 0
+    return PLAY_PORT_BASE + ordinal
+
+
+#: First X display of the leased band; clone ordinal N runs on BASE + N.
+#:
+#: Well clear of ``:0``, which is a physical console. A headless match must
+#: never take that one -- on a workstation it is somebody's desktop, and on a
+#: login node it is whatever the last interactive session left behind.
+DISPLAY_BASE = 90
+
+#: What :func:`leased_display` returns for a directory that is not a numbered
+#: clone: no X server is to be started.
+#:
+#: Zero rather than a separate flag because display ``:0`` is never a legal
+#: answer here anyway (see :data:`DISPLAY_BASE`), so the number has a spare
+#: value and a second field would be a second thing to keep in step.
+NO_DISPLAY = 0
+
+
+def leased_display(game_dir: str, prefix: str) -> int:
+    """Return the X display a cloned game directory owns, or zero.
+
+    The same argument as :func:`leased_port`, for the same reason. Under
+    ``-nodisplay`` the engine still opens a Slick2D display and creates
+    framebuffer objects, so on a machine with no X server every concurrent
+    match needs one of its own ([[harness-nodisplay]]). Two matches sharing a
+    display number race exactly as two matches sharing a port do, and the
+    clone's ordinal is already an exclusive lease.
+
+    Args:
+        game_dir: The game directory the match plays in.
+        prefix: Shared leading part of every clone's name.
+
+    Returns:
+        :data:`DISPLAY_BASE` plus the clone's ordinal, or :data:`NO_DISPLAY`
+        when the directory is not a numbered clone -- the single-match entry
+        points run wherever the caller already has a display, which on a
+        workstation is the desktop and needs no server started for it.
+    """
+    ordinal = _clone_ordinal(game_dir, prefix)
+    if ordinal is None:
+        return NO_DISPLAY
+    return DISPLAY_BASE + ordinal
+
+
+def _clone_ordinal(game_dir: str, prefix: str) -> int | None:
+    """Return the worker number a clone directory names.
+
+    Args:
+        game_dir: The game directory.
+        prefix: Shared leading part of every clone's name.
+
+    Returns:
+        The ordinal, or None when the directory is not a numbered clone.
+    """
+    if not game_dir.startswith(prefix):
+        return None
     ordinal = game_dir[len(prefix) :]
     if not ordinal.isdigit():
-        return 0
-    return PLAY_PORT_BASE + int(ordinal)
+        return None
+    return int(ordinal)
 
 
 def entries_to_copy(present: Sequence[str]) -> tuple[str, ...]:
@@ -153,33 +244,44 @@ def entries_to_copy(present: Sequence[str]) -> tuple[str, ...]:
     return tuple(name for name in present if name not in skip)
 
 
-def missing_requirements(present: Sequence[str]) -> tuple[str, ...]:
+def missing_requirements(
+    present: Sequence[str], platform: str, *, compiles_agent: bool
+) -> tuple[str, ...]:
     """Return the required paths a finished clone does not have.
 
     Args:
         present: Paths that exist in the clone, relative to it, with forward
             slashes.
+        platform: A ``sys.platform`` value, which decides what the JDK's tools
+            are called.
+        compiles_agent: Whether this run builds its own agent.
 
     Returns:
         The required paths that are absent, in declaration order.
     """
     have = set(present)
-    return tuple(needed for needed in REQUIRED_ENTRIES if needed not in have)
+    return tuple(
+        needed
+        for needed in required_entries(platform, compiles_agent=compiles_agent)
+        if needed not in have
+    )
 
 
-def verify(name: str, present: Sequence[str]) -> None:
+def verify(name: str, present: Sequence[str], platform: str, *, compiles_agent: bool) -> None:
     """Raise unless a clone carries everything a match needs.
 
     Args:
         name: The clone's directory name, for the message.
         present: Paths that exist in the clone, relative to it, with forward
             slashes.
+        platform: A ``sys.platform`` value.
+        compiles_agent: Whether this run builds its own agent.
 
     Raises:
         CloneError: ``RW-CLONE-001`` when anything required is absent, naming
             every missing path rather than only the first.
     """
-    missing = missing_requirements(present)
+    missing = missing_requirements(present, platform, compiles_agent=compiles_agent)
     if missing:
         raise CloneError(
             _INCOMPLETE,
@@ -189,15 +291,21 @@ def verify(name: str, present: Sequence[str]) -> None:
 
 
 __all__ = [
+    "CLONE_PREFIX",
+    "DISPLAY_BASE",
+    "JAVA_TOOL",
+    "NO_DISPLAY",
     "PLAY_PORT_BASE",
-    "REQUIRED_ENTRIES",
+    "REQUIRED_CONTENT",
     "UNUSED_DIRS",
     "VOLATILE_DIRS",
     "VOLATILE_FILES",
     "CloneError",
     "clone_name",
     "entries_to_copy",
+    "leased_display",
     "leased_port",
     "missing_requirements",
+    "required_entries",
     "verify",
 ]

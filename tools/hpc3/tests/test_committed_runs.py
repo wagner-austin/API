@@ -156,13 +156,14 @@ class TestTheCommittedWorkspaces:
     """Three documents, one per project, sharing one ledger file."""
 
     def test_they_declare_every_project_exactly_once(self) -> None:
-        assert sorted(_by_project()) == ["cleargbm", "floor", "mi", "turkic-lstm"]
+        assert sorted(_by_project()) == ["cleargbm", "floor", "mi", "rusted", "turkic-lstm"]
 
     def test_each_workspace_declares_the_project_its_filename_implies(self) -> None:
         declared = {name: sorted(w["projects"]) for name, w in _workspaces().items()}
         assert declared == {
             "hpc3-floor.json": ["floor"],
             "hpc3-mi.json": ["mi"],
+            "hpc3-rusted.json": ["rusted"],
             "hpc3-turkic-lstm.json": ["turkic-lstm"],
             "hpc3.json": ["cleargbm"],
         }
@@ -208,13 +209,18 @@ class TestTheResearchIndexNamesEveryProject:
         """The entries no tool can see are the ones a reader most needs.
 
         ``LSTM`` was named here until it was onboarded as ``turkic-lstm`` on
-        2026-08-28, at which point asserting its presence in this section
-        would have kept a true sentence in a section that had stopped
-        applying to it. The section itself is what must not disappear.
+        2026-08-28, and ``RustedWarfareBot`` until it was onboarded as
+        ``rusted`` on 2026-08-29. Each time, asserting its presence in this
+        section would have kept a true sentence in a section that had stopped
+        applying to it. Twice is the pattern: what must not disappear is the
+        SECTION, and the entries in it are expected to leave one at a time.
+
+        ``sirius`` is what remains, and it is a different case again -- it is
+        named there as a deliberate non-registration rather than as a backlog
+        item, so it does not leave by being onboarded.
         """
         text = _INDEX.read_text(encoding="utf-8")
         unregistered = text.split("## Not registered anywhere")[1]
-        assert "RustedWarfareBot" in unregistered
         assert "sirius" in unregistered
 
 

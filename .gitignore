@@ -123,6 +123,17 @@ services/covenant-radar-api/data/external/kaggle_prosper_loans/
 **/corpus_cache/
 **/artifacts/
 **/runs/
+# But an hpc3 workspace document is configuration, not a result. It declares a
+# project's partition, wall clock, image digest and cluster root -- a clone
+# without it has no projects at all and every campaign refuses. Four of them
+# survive here only because they were committed before this rule existed, and
+# git ignores untracked files rather than tracked ones; the fifth (rusted) was
+# silently never committed. Re-including the directory and then its contents
+# is the only shape that works: git will not descend into an excluded
+# directory, so a bare negation of the files alone has no effect.
+!tools/hpc3/runs/
+tools/hpc3/runs/*
+!tools/hpc3/runs/hpc3*.json
 **/corpus/
 
 # But allow source code directories named "data"

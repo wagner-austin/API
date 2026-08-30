@@ -6,6 +6,14 @@ that drives the installation is what keeps the assertions and the thing they
 assert about in one document: a definition that installs one torch and a
 check that expects another is a disagreement this makes unrepresentable.
 
+VERSIONS COME FROM THE INSTALLATION, NOT FROM A MODULE ATTRIBUTE. This read
+``__version__`` until 2026-08-30, which works only for packages that follow
+that convention. ``typing_extensions`` does not define one, so the first
+image whose entire third-party layer was that single package could not state
+a version assertion at all -- and the field is required to be non-empty.
+Distribution metadata is the sharper question anyway: it is what pip
+resolved, where ``__version__`` is whatever the package chose to write down.
+
 Ordering is the whole value. An image that cannot import its own trainer is
 cheap to discover at build time and expensive to discover after a job has
 queued, waited for an A100, and died before its first step -- which is what
@@ -28,7 +36,21 @@ _HEADER = (
     "from __future__ import annotations",
     "",
     "import importlib",
+    "import importlib.metadata",
     "import sys",
+    "",
+    "#: What pip actually installed, by canonical distribution name.",
+    "#:",
+    "#: Asked of the INSTALLATION rather than of a module's ``__version__``,",
+    "#: which is a convention and not a guarantee: ``typing_extensions``",
+    "#: defines none, so an image whose whole third-party layer was that one",
+    "#: package could not state a single version assertion. Distribution",
+    "#: metadata is also the sharper question -- it is what pip resolved,",
+    "#: where ``__version__`` is whatever the package chose to write down.",
+    "_INSTALLED = {",
+    '    (_dist.metadata["Name"] or "").lower().replace("_", "-"): _dist.version',
+    "    for _dist in importlib.metadata.distributions()",
+    "}",
     "",
     "",
     "def _fail(message: str) -> None:",
@@ -65,21 +87,42 @@ _FOOTER = (
 )
 
 
+def canonical_distribution(name: str) -> str:
+    """Return the name a distribution is looked up by.
+
+    Python packaging treats ``typing_extensions`` and ``typing-extensions``
+    as one distribution and compares case-insensitively, so a spec may spell
+    a name either way and mean the same thing. Normalised here rather than in
+    the generated script, because the script runs in an image where nothing
+    but the standard library exists.
+
+    Args:
+        name: The name as the spec spells it.
+
+    Returns:
+        Lowercase, with underscores as hyphens.
+    """
+    return name.lower().replace("_", "-")
+
+
 def _render_version_assertion(package: str, version: str) -> list[str]:
     """Render one version assertion as indented Python statements.
 
     Args:
-        package: Importable module whose ``__version__`` is checked.
+        package: Distribution whose installed version is checked.
         version: Exact version the built image must report.
 
     Returns:
-        The statement lines, already indented for a function body.
-        ``importlib`` is used because the module name is a value from the
-        spec, and a value cannot be written as an ``import`` statement.
+        The statement lines, already indented for a function body. Read from
+        distribution metadata rather than from a module's ``__version__``: an
+        absent distribution reports itself as such instead of raising
+        ``PackageNotFoundError`` out of the check, and a package that defines
+        no ``__version__`` -- which ``typing_extensions`` does not -- can
+        still be asserted.
     """
+    canonical = canonical_distribution(package)
     return [
-        f"    _mod = importlib.import_module({package!r})",
-        '    _found = getattr(_mod, "__version__", "<no __version__>")',
+        f'    _found = _INSTALLED.get({canonical!r}, "<not installed>")',
         f"    if _found != {version!r}:",
         f"        _fail({package!r} + ' is ' + str(_found) + ', expected ' + {version!r})",
     ]
@@ -126,4 +169,4 @@ def render_selfcheck(spec: ImageSpec) -> str:
     return "\n".join(lines) + "\n"
 
 
-__all__ = ["render_selfcheck"]
+__all__ = ["canonical_distribution", "render_selfcheck"]

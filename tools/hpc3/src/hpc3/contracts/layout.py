@@ -108,6 +108,25 @@ def project_of(job_name: str) -> str | None:
     return project
 
 
+def project_dir(root: str, project: str) -> str:
+    """Locate everything one project owns on the cluster.
+
+    The directory the two below are derived from, and the one a project's own
+    data belongs under. Extracted when a third caller appeared rather than
+    kept as a repeated expression: a project that placed its corpora beside
+    its scripts by writing the join itself would be a fourth place for the
+    convention to drift.
+
+    Args:
+        root: Absolute directory holding every project's work.
+        project: Validated project name.
+
+    Returns:
+        ``<root>/<project>``.
+    """
+    return f"{root.rstrip('/')}/{project}"
+
+
 def script_dir(root: str, project: str) -> str:
     """Locate a project's batch scripts.
 
@@ -118,7 +137,7 @@ def script_dir(root: str, project: str) -> str:
     Returns:
         ``<root>/<project>/scripts``.
     """
-    return f"{root.rstrip('/')}/{project}/scripts"
+    return f"{project_dir(root, project)}/scripts"
 
 
 def log_dir(root: str, project: str) -> str:
@@ -131,7 +150,7 @@ def log_dir(root: str, project: str) -> str:
     Returns:
         ``<root>/<project>/logs``.
     """
-    return f"{root.rstrip('/')}/{project}/logs"
+    return f"{project_dir(root, project)}/logs"
 
 
 def require_root(parsed_root: str) -> str:
@@ -160,6 +179,7 @@ def require_root(parsed_root: str) -> str:
 __all__ = [
     "MAX_PROJECT_LENGTH",
     "log_dir",
+    "project_dir",
     "project_of",
     "qualified_name",
     "require_project",

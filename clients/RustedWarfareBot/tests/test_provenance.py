@@ -24,18 +24,32 @@ from platform_core.run_record import (
 )
 from platform_core.testing import SAMPLE_HOST, FakeHostProbe
 
+from rw_bot.harness.jvm import JVM_RELEASE_FILE, JvmReleaseError, jvm_dir
+from rw_bot.harness.scorecards import MatchRow
 from rw_bot.provenance import (
+    ASSETS_DISTRIBUTION,
     DIGEST_LENGTH,
     GAME_DISTRIBUTION,
+    JVM_DISTRIBUTION,
     SWEEP_EXPERIMENT,
+    VERSION_DIGEST_SEPARATOR,
     ArmSummary,
     arm_label,
     arm_observations,
     arm_run_record,
+    asset_tree,
+    bundled_runtime,
     game_build,
+    game_packages,
     summarize_arm,
     sweep_fingerprint,
 )
+from rw_bot.tree_identity import TreeIdentityError
+from tests.sample_game import LINUX, SAMPLE_JAVA_VERSION, write_sample_game
+
+#: The other platform, so the runtime axis is exercised as both from whichever
+#: one the suite happens to be running on.
+WINDOWS = "win32"
 
 _PINNED = determinism_record("cpu", {"OMP_NUM_THREADS": SINGLE_THREAD})
 
@@ -71,29 +85,48 @@ def _jar(tmp_path: Path, contents: bytes = b"pretend this is a game") -> Path:
     return jar
 
 
-def _row(arm: str, verdict: str, **numbers: int) -> dict[str, str | int]:
-    """Build one match row the way the analyser does.
+def _row(
+    arm: str,
+    verdict: str,
+    dropped: int = 0,
+    worth_end: int = 1000,
+    targets_end: int = 0,
+    engageable: int = 0,
+    intercepted: int = 0,
+) -> MatchRow:
+    """Build one match row the way a batch reader produces it.
+
+    Typed rather than a scratch dictionary: every consumer used to narrow each
+    field itself, so a misspelled key read as a missing figure instead of an
+    error.
 
     Args:
         arm: Which arm played it.
         verdict: How it ended.
-        **numbers: Figures to override.
+        dropped: Extractors lost between peak and end.
+        worth_end: Total worth at the end.
+        targets_end: Enemies visible at the end.
+        engageable: How many of those could be fought.
+        intercepted: Interceptions made.
 
     Returns:
         The row.
     """
-    row: dict[str, str | int] = {
-        "arm": arm,
-        "seed": "12345",
-        "verdict": verdict,
-        "dropped": 0,
-        "worth_end": 1000,
-        "targets_end": 0,
-        "engageable": 0,
-        "intercepted": 0,
-    }
-    row.update(numbers)
-    return row
+    return MatchRow(
+        arm=arm,
+        seed=12345,
+        verdict=verdict,
+        extr_end=0,
+        peak=0,
+        dropped=dropped,
+        worth_end=worth_end,
+        rival_end=0,
+        dip=0,
+        targets_end=targets_end,
+        engageable=engageable,
+        intercepted=intercepted,
+        income="18/s",
+    )
 
 
 class TestTheGameBuildIsAnAxis:
@@ -128,21 +161,138 @@ class TestTheGameBuildIsAnAxis:
             game_build(tmp_path / "not-here.jar")
 
 
+class TestTheBundledRuntimeIsAnAxis:
+    """Linux runs Java 8 and Windows runs Java 13, so the runtime that
+    executed the simulation is not a formality."""
+
+    def test_it_is_named_as_a_distribution(self, tmp_path: Path) -> None:
+        runtime = bundled_runtime(write_sample_game(tmp_path), LINUX)
+        assert runtime["name"] == JVM_DISTRIBUTION
+
+    def test_the_version_leads_with_what_the_runtime_says_about_itself(
+        self, tmp_path: Path
+    ) -> None:
+        """Unlike the game's version -- which this project maintains by hand
+        on a wiki page -- ``JAVA_VERSION`` is vendor-shipped, so a reader
+        asking why two batches differ is better served by ``1.8.0_131`` than
+        by two hex strings that merely differ."""
+        runtime = bundled_runtime(write_sample_game(tmp_path), LINUX)
+        version, _, digest = runtime["version"].partition(VERSION_DIGEST_SEPARATOR)
+        assert version == SAMPLE_JAVA_VERSION
+        assert len(digest) == DIGEST_LENGTH
+
+    def test_a_repackaged_runtime_under_one_version_string_still_differs(
+        self, tmp_path: Path
+    ) -> None:
+        """Why the digest is there at all: the label alone would call these
+        two the same runtime."""
+        left = bundled_runtime(write_sample_game(tmp_path / "a", runtime=b"build one"), LINUX)
+        right = bundled_runtime(write_sample_game(tmp_path / "b", runtime=b"build two"), LINUX)
+        assert left["version"] != right["version"]
+        assert left["version"].split(VERSION_DIGEST_SEPARATOR)[0] == SAMPLE_JAVA_VERSION
+        assert right["version"].split(VERSION_DIGEST_SEPARATOR)[0] == SAMPLE_JAVA_VERSION
+
+    def test_two_java_versions_differ(self, tmp_path: Path) -> None:
+        left = bundled_runtime(write_sample_game(tmp_path / "a", java_version="1.8.0_131"), LINUX)
+        right = bundled_runtime(write_sample_game(tmp_path / "b", java_version="13.0.1"), LINUX)
+        assert left["version"] != right["version"]
+
+    def test_the_directory_read_is_the_platform_s_own(self, tmp_path: Path) -> None:
+        """A Windows tree carries ``jvm64`` and a Linux one ``jvm-linux``, so
+        reading the wrong name finds no runtime at all rather than the wrong
+        one."""
+        game = write_sample_game(tmp_path, platform=WINDOWS)
+        assert bundled_runtime(game, WINDOWS)["name"] == JVM_DISTRIBUTION
+        with pytest.raises(FileNotFoundError):
+            bundled_runtime(game, LINUX)
+
+    def test_a_runtime_that_states_no_version_is_refused(self, tmp_path: Path) -> None:
+        """A runtime that will not identify itself is not one two results may
+        be compared across, and recording "unknown" would let them be."""
+        game = write_sample_game(tmp_path)
+        (game / jvm_dir(LINUX) / JVM_RELEASE_FILE).write_text('OS_ARCH="amd64"\n', encoding="utf-8")
+        with pytest.raises(JvmReleaseError) as caught:
+            bundled_runtime(game, LINUX)
+        assert caught.value.code == "RW-JVM-002"
+
+    def test_a_release_naming_an_empty_version_is_refused(self, tmp_path: Path) -> None:
+        game = write_sample_game(tmp_path, java_version="")
+        with pytest.raises(JvmReleaseError) as caught:
+            bundled_runtime(game, LINUX)
+        assert caught.value.code == "RW-JVM-002"
+
+
+class TestTheAssetsAreAnAxis:
+    """A map missing from a clone sent the engine to its boot sandbox and
+    voided a batch family, with the jar digest matching throughout."""
+
+    def test_it_is_named_as_a_distribution(self, tmp_path: Path) -> None:
+        assert asset_tree(write_sample_game(tmp_path))["name"] == ASSETS_DISTRIBUTION
+
+    def test_the_version_is_a_bare_digest_prefix(self, tmp_path: Path) -> None:
+        """Nothing in ``assets/`` states a version, which is the point: a mod
+        folder edited between two batches announces itself nowhere else."""
+        version = asset_tree(write_sample_game(tmp_path))["version"]
+        assert len(version) == DIGEST_LENGTH
+        assert set(version) <= set("0123456789abcdef")
+
+    def test_an_edited_map_moves_it(self, tmp_path: Path) -> None:
+        left = asset_tree(write_sample_game(tmp_path / "a", assets=b"eight extractors"))
+        right = asset_tree(write_sample_game(tmp_path / "b", assets=b"nine extractors"))
+        assert left["version"] != right["version"]
+
+    def test_an_absent_asset_tree_is_refused(self, tmp_path: Path) -> None:
+        with pytest.raises(TreeIdentityError) as caught:
+            asset_tree(tmp_path / "no-such-game")
+        assert caught.value.code == "RW-TREE-001"
+
+
+class TestTheThreePackages:
+    def test_they_are_the_code_the_runtime_and_the_data(self, tmp_path: Path) -> None:
+        packages = game_packages(write_sample_game(tmp_path), LINUX)
+        assert {package["name"] for package in packages} == {
+            GAME_DISTRIBUTION,
+            JVM_DISTRIBUTION,
+            ASSETS_DISTRIBUTION,
+        }
+
+    def test_they_come_back_in_the_order_the_shared_decoder_will_put_them_in(
+        self, tmp_path: Path
+    ) -> None:
+        """Not the order they are read in. The axis canonicalises by name, so
+        a tuple assembled engine-outwards does not equal its own round trip --
+        which is how this was found, by the codec test below failing."""
+        packages = game_packages(write_sample_game(tmp_path), LINUX)
+        assert [package["name"] for package in packages] == sorted(
+            [GAME_DISTRIBUTION, JVM_DISTRIBUTION, ASSETS_DISTRIBUTION]
+        )
+
+
 class TestTheFingerprint:
-    def test_it_carries_the_game_build(self, tmp_path: Path) -> None:
-        fingerprint = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path))
-        assert [p["name"] for p in fingerprint["packages"]] == [GAME_DISTRIBUTION]
+    def test_it_carries_the_code_the_runtime_and_the_data(self, tmp_path: Path) -> None:
+        fingerprint = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX
+        )
+        assert {p["name"] for p in fingerprint["packages"]} == {
+            GAME_DISTRIBUTION,
+            JVM_DISTRIBUTION,
+            ASSETS_DISTRIBUTION,
+        }
 
     def test_it_carries_the_machine(self, tmp_path: Path) -> None:
         """A match is a wall-clock simulation; the box it ran on is not
         incidental to how far it got."""
-        fingerprint = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path))
+        fingerprint = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX
+        )
         assert fingerprint["host"] == SAMPLE_HOST
 
     def test_a_run_outside_any_image_states_no_card_and_no_digest(self, tmp_path: Path) -> None:
         """The ordinary case: a workstation, headless, no card. Empty differs
         from every real value rather than matching all of them."""
-        fingerprint = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path))
+        fingerprint = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX
+        )
         assert fingerprint["image_digest"] == NO_VALUE
         assert fingerprint["gpu_model"] == NO_VALUE
         assert fingerprint["driver_version"] == NO_VALUE
@@ -150,14 +300,53 @@ class TestTheFingerprint:
     def test_a_launcher_that_named_an_image_is_believed(self, tmp_path: Path) -> None:
         digest = "sha256:" + "ab" * 32
         fingerprint = sweep_fingerprint(
-            _PINNED, {IMAGE_DIGEST_ENV_VAR: digest}.get, _probe(), _jar(tmp_path)
+            _PINNED,
+            {IMAGE_DIGEST_ENV_VAR: digest}.get,
+            _probe(),
+            write_sample_game(tmp_path),
+            LINUX,
         )
         assert fingerprint["image_digest"] == digest
 
     def test_two_game_builds_do_not_compare_equal(self, tmp_path: Path) -> None:
         """The whole reason the jar is on the axis."""
-        left = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path / "a", b"28"))
-        right = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path / "b", b"29"))
+        left = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "a", jar=b"28"), LINUX
+        )
+        right = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "b", jar=b"29"), LINUX
+        )
+        assert left != right
+
+    def test_two_bundled_runtimes_do_not_compare_equal(self, tmp_path: Path) -> None:
+        """The gap this closed. Today the host axis separates Windows from
+        Linux by accident; two Linux runs either side of a depot that bumped
+        its bundled JRE used to fingerprint identically."""
+        left = sweep_fingerprint(
+            _PINNED,
+            _NO_ENV.get,
+            _probe(),
+            write_sample_game(tmp_path / "a", java_version="1.8.0_131"),
+            LINUX,
+        )
+        right = sweep_fingerprint(
+            _PINNED,
+            _NO_ENV.get,
+            _probe(),
+            write_sample_game(tmp_path / "b", java_version="1.8.0_202"),
+            LINUX,
+        )
+        assert left != right
+
+    def test_two_asset_trees_do_not_compare_equal(self, tmp_path: Path) -> None:
+        """The other gap. An edited map changes the simulation and used to
+        change nothing in the record."""
+        left = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "a", assets=b"m1"), LINUX
+        )
+        right = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "b", assets=b"m2"), LINUX
+        )
         assert left != right
 
 
@@ -223,7 +412,7 @@ class TestTheRecord:
         record = arm_run_record(
             "aggression",
             self._summary(),
-            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path)),
+            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX),
             NO_PAYLOAD,
         )
         assert record["experiment"] == SWEEP_EXPERIMENT
@@ -248,14 +437,16 @@ class TestTheRecord:
         record = arm_run_record(
             "aggression",
             self._summary(),
-            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path)),
+            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX),
             NO_PAYLOAD,
         )
         assert decode_run_record(encode_run_record(record)) == record
 
     def test_two_arms_on_one_build_are_subtractable(self, tmp_path: Path) -> None:
         """The comparison this project makes constantly and could not state."""
-        fingerprint = sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path))
+        fingerprint = sweep_fingerprint(
+            _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path), LINUX
+        )
         left = arm_run_record("aggression", self._summary(wins=3), fingerprint, NO_PAYLOAD)
         right = arm_run_record(
             "aggression",
@@ -284,13 +475,17 @@ class TestTheRecord:
         left = arm_run_record(
             "aggression",
             self._summary(),
-            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path / "a", b"28")),
+            sweep_fingerprint(
+                _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "a", jar=b"28"), LINUX
+            ),
             NO_PAYLOAD,
         )
         right = arm_run_record(
             "aggression",
             self._summary(wins=1),
-            sweep_fingerprint(_PINNED, _NO_ENV.get, _probe(), _jar(tmp_path / "b", b"29")),
+            sweep_fingerprint(
+                _PINNED, _NO_ENV.get, _probe(), write_sample_game(tmp_path / "b", jar=b"29"), LINUX
+            ),
             NO_PAYLOAD,
         )
         assert compare_run_records(left, right, ())["kind"] == "uncalibrated"

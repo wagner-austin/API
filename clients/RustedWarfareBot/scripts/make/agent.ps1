@@ -11,7 +11,13 @@
 param(
     [Parameter(Mandatory = $true)][string]$Javac,
     [Parameter(Mandatory = $true)][string]$Jar,
-    [Parameter(Mandatory = $true)][string]$AgentJar
+    [Parameter(Mandatory = $true)][string]$AgentJar,
+    # Required, never defaulted. The bytecode level decides whether the agent
+    # can load into the Linux depot's JRE 8 at all, and a default here would
+    # be a second answer to a question rw_bot.harness.agent_build already
+    # answers. It was hardcoded to 11 while that said 8, and the jar this
+    # script writes is the one that ships.
+    [Parameter(Mandatory = $true)][string]$Release
 )
 
 $stamp = [System.Guid]::NewGuid().ToString("N").Substring(0, 8)
@@ -20,7 +26,7 @@ $tmpJar = "$AgentJar.$stamp.new"
 $failed = ""
 try {
     New-Item -ItemType Directory -Force $classesDir | Out-Null
-    & $Javac --release 11 -Xlint:all -Werror -d $classesDir (
+    & $Javac --release $Release -Xlint:all -Werror -d $classesDir (
         Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $_.FullName })
     if ($LASTEXITCODE -ne 0) {
         $failed = "javac failed"

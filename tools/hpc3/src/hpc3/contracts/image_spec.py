@@ -40,6 +40,15 @@ from hpc3.contracts.image import HOST_BOUND_ROOTS, require_json_object
 
 _PIN_SEPARATOR = "=="
 
+#: How a distribution's package manager spells an exact pin. One ``=``, not
+#: two: ``apt-get install xvfb=2:21.1.4-2ubuntu1.7`` is the syntax, and
+#: writing pip's separator here installs nothing and reports success.
+_SYSTEM_PIN_SEPARATOR = "="
+
+#: Characters that would turn one package specification into something else
+#: once interpolated into the build script.
+_SHELL_METACHARACTERS = (" ", "\t", ";", "&", "|", "$", "`", "(", ")", "<", ">", "\n")
+
 
 class SymbolCheck(TypedDict):
     """One attribute whose presence proves a fresh wheel was baked.
@@ -78,6 +87,21 @@ class ImageSpec(TypedDict):
         extra_index_urls: Additional package indexes, in order. Present
             because a local version such as ``torch==2.6.0+cu124`` is
             published only on the PyTorch index.
+        system_packages: Operating-system packages the image installs before
+            anything else, every entry an exact ``=`` pin in the distribution's
+            own syntax (``xvfb=2:21.1.4-2ubuntu1.7``).
+
+            Present because not every dependency is a wheel. A JVM, an X
+            server and a software OpenGL stack cannot be pip-installed, and an
+            image that could only describe its Python layer forced the
+            alternative: a hand-built base image nobody could reproduce, which
+            is the drift this whole document exists to remove. Empty is the
+            ordinary case and is a recorded decision, not an omission.
+
+            Pinned for exactly the reason the pip layer is: an unpinned
+            ``apt-get install`` resolves at build time against whatever the
+            distribution is serving that day, and it does so successfully, so
+            two images built a week apart differ with nothing to say they do.
         requirements: Third-party layer, every line an exact ``==`` pin.
         wheels: First-party wheel filenames, installed with dependencies
             already pinned above.
@@ -104,6 +128,7 @@ class ImageSpec(TypedDict):
     base_image: str
     env_prefix: str
     git_commit: str
+    system_packages: list[str]
     extra_index_urls: list[str]
     requirements: list[str]
     wheels: list[str]
@@ -217,6 +242,63 @@ def _require_pinned_requirements(obj: JSONObject, key: str) -> list[str]:
             )
         lines.append(line)
     return lines
+
+
+def _require_pinned_system_packages(obj: JSONObject, key: str) -> list[str]:
+    """Read the operating-system layer, refusing anything not exactly pinned.
+
+    Args:
+        obj: Object being decoded.
+        key: Field name.
+
+    Returns:
+        The package specifications, in order.
+
+    Raises:
+        JSONTypeError: If the field is missing, not a list, holds a
+            non-string, holds a blank entry, holds an entry without an exact
+            ``=`` pin, or holds a shell metacharacter.
+
+            The pin check is the same argument as the pip layer's: an
+            unpinned ``apt-get install`` resolves against whatever the
+            distribution serves that day and SUCCEEDS, so two images built a
+            week apart differ with nothing recording that they do.
+
+            The metacharacter check is not about a hostile spec -- these are
+            written by whoever builds the image -- but about a spec that is
+            wrong in a way the shell would act on. These names are
+            interpolated into the build script, so a stray space or semicolon
+            becomes a second command rather than a package that does not
+            exist, and the build reports success having installed nothing.
+
+    Note:
+        Empty is permitted: an image whose whole dependency set is wheels is
+        the ordinary case, and requiring a package would force one to be
+        invented.
+    """
+    raw = require_list(obj, key)
+    packages: list[str] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, str):
+            raise JSONTypeError(
+                f"Field '{key}[{index}]' must be a string, got {type(item).__name__}"
+            )
+        entry = item.strip()
+        if entry == "":
+            raise JSONTypeError(f"Field '{key}[{index}]' must not be blank")
+        if _SYSTEM_PIN_SEPARATOR not in entry:
+            raise JSONTypeError(
+                f"Field '{key}[{index}]' must pin an exact version with "
+                f"'{_SYSTEM_PIN_SEPARATOR}', got {entry!r}"
+            )
+        found = [character for character in _SHELL_METACHARACTERS if character in entry]
+        if found:
+            raise JSONTypeError(
+                f"Field '{key}[{index}]' must not contain {''.join(found)!r}: the entry is "
+                f"interpolated into the build script, got {entry!r}"
+            )
+        packages.append(entry)
+    return packages
 
 
 def _require_bare_filenames(obj: JSONObject, key: str) -> list[str]:
@@ -381,6 +463,7 @@ def encode_image_spec(spec: ImageSpec) -> JSONObject:
         "base_image": spec["base_image"],
         "env_prefix": spec["env_prefix"],
         "git_commit": spec["git_commit"],
+        "system_packages": list(spec["system_packages"]),
         "extra_index_urls": list(spec["extra_index_urls"]),
         "requirements": list(spec["requirements"]),
         "wheels": list(spec["wheels"]),
@@ -414,6 +497,7 @@ def decode_image_spec(value: JSONValue) -> ImageSpec:
         base_image=_require_non_empty_str(obj, "base_image"),
         env_prefix=_require_container_dir(obj, "env_prefix"),
         git_commit=_require_non_empty_str(obj, "git_commit"),
+        system_packages=_require_pinned_system_packages(obj, "system_packages"),
         extra_index_urls=_require_str_list(obj, "extra_index_urls"),
         requirements=_require_pinned_requirements(obj, "requirements"),
         wheels=_require_bare_filenames(obj, "wheels"),

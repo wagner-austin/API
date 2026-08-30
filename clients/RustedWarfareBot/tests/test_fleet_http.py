@@ -19,7 +19,11 @@ from socketserver import BaseServer
 import pytest
 
 from rw_bot.harness import _test_hooks
-from rw_bot.harness._test_hooks import _kill_tree_impl, _spawn_match_impl
+from rw_bot.harness._hook_defaults import (
+    _kill_tree_impl,
+    _serve_forever_impl,
+    _spawn_match_impl,
+)
 from rw_bot.harness.fleet import FleetError, FleetManager
 from rw_bot.harness.fleet_http import (
     FLEET_PORT_DEFAULT,
@@ -264,7 +268,7 @@ class _RecordingServer(BaseServer):
 def test_real_serve_forever_drives_the_accept_loop() -> None:
     """The production hook delegates to the server's own loop."""
     recorder = _RecordingServer()
-    _test_hooks._serve_forever_impl(recorder)
+    _serve_forever_impl(recorder)
     assert recorder.served is True
 
 

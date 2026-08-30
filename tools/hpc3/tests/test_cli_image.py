@@ -39,6 +39,7 @@ def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         "base_image": "python:3.11.16-slim-bookworm",
         "env_prefix": "/opt/env",
         "git_commit": _COMMIT,
+        "system_packages": [],
         "extra_index_urls": ["https://download.pytorch.org/whl/cu124"],
         "requirements": ["torch==2.6.0+cu124", "transformers==4.46.3"],
         "wheels": ["model_trainer_server-0.1.0-py3-none-any.whl"],

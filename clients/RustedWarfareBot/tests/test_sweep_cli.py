@@ -25,11 +25,34 @@ def _plant(host: FakeHost, *lines: str) -> None:
 
 
 def _results(host: FakeHost) -> list[str]:
+    prefix = "runs/sweeps/demo/"
     return sorted(
-        key.rsplit("/", 1)[1]
+        key[len(prefix) :]
         for key in host.files
-        if key.startswith("runs/sweeps/demo/") and key.endswith(".txt")
+        # Immediate children only, which is what the reader sees: it lists the
+        # directory rather than walking it. Matching everything beneath used
+        # to be harmless and stopped being so when the frozen tree started
+        # carrying the batch's own job file -- ``.tree/sweeps/demo.txt`` then
+        # read as a thirteenth result.
+        if key.startswith(prefix) and key.endswith(".txt") and "/" not in key[len(prefix) :]
     )
+
+
+def _flag(argv: tuple[str, ...], name: str) -> str | None:
+    """Return the value a launch command gives one flag.
+
+    Args:
+        argv: The command a sweep composed.
+        name: The flag to read.
+
+    Returns:
+        Its value, or None when the flag is absent. Absence is a real answer:
+        an option a frozen tree predates must not be mentioned at all, so
+        "off" and "not given" are the same thing on the command line.
+    """
+    if name not in argv:
+        return None
+    return argv[argv.index(name) + 1]
 
 
 @pytest.mark.parametrize("args", [[], ["one"], ["a", "b", "c", "d", "e"]])
@@ -50,8 +73,8 @@ def test_a_duel_is_asked_for_by_map_and_difficulty() -> None:
     with FakeHost() as host:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "-2"]) == EXIT_OK
-        assert "PLAY_MAP=maps/skirmish/[p2]duel_lake.tmx" in host.commands[0]
-        assert "PLAY_DIFFICULTY=-2" in host.commands[0]
+        assert _flag(host.commands[0], "--map") == "maps/skirmish/[p2]duel_lake.tmx"
+        assert _flag(host.commands[0], "--difficulty") == "-2"
         # Named by its handicap, because "difficulty -2" says nothing about
         # what it does and "0.4x AI income" says all of it.
         assert any("0.4x AI income" in line for line in host.printed)
@@ -69,12 +92,12 @@ def test_a_pinned_batch_passes_the_delta_to_every_match() -> None:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3"])
         assert code == EXIT_OK
-        assert "PLAY_PINDELTA=3" in host.commands[0]
+        assert _flag(host.commands[0], "--pin-delta") == "3"
         host.commands.clear()
         del host.files["runs/sweeps/demo/duel-s1.txt"]
 
         assert main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1"]) == EXIT_OK
-        assert not [part for part in host.commands[0] if part.startswith("PLAY_PINDELTA")]
+        assert _flag(host.commands[0], "--pin-delta") is None
 
 
 def test_a_fast_batch_passes_the_multiple_to_every_match() -> None:
@@ -85,14 +108,14 @@ def test_a_fast_batch_passes_the_multiple_to_every_match() -> None:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3", "10"])
         assert code == EXIT_OK
-        assert "PLAY_FASTFORWARD=10" in host.commands[0]
-        assert "PLAY_PINDELTA=3" in host.commands[0]
+        assert _flag(host.commands[0], "--fast-forward") == "10"
+        assert _flag(host.commands[0], "--pin-delta") == "3"
         host.commands.clear()
         del host.files["runs/sweeps/demo/duel-s1.txt"]
 
         code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3"])
         assert code == EXIT_OK
-        assert not [part for part in host.commands[0] if part.startswith("PLAY_FASTFORWARD")]
+        assert _flag(host.commands[0], "--fast-forward") is None
 
 
 def test_every_match_in_the_file_is_played_once() -> None:
@@ -124,7 +147,7 @@ def test_a_second_run_replays_only_what_is_missing() -> None:
 
         assert main([_JOBS, "demo", "2"]) == EXIT_OK
         assert len(host.commands) == 1
-        assert "PLAY_SEED=2" in host.commands[0]
+        assert _flag(host.commands[0], "--seed") == "2"
         assert any("1 already played" in line for line in host.printed)
 
 
@@ -153,14 +176,14 @@ def test_every_match_is_locked_to_the_tick_by_default() -> None:
     with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1"]) == EXIT_OK
-        assert "PLAY_LOCKSTEP=75" in host.commands[0]
+        assert _flag(host.commands[0], "--lockstep") == "75"
 
 
 def test_the_lockstep_is_an_argument_so_an_arm_can_change_it() -> None:
     with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1", "40"]) == EXIT_OK
-        assert "PLAY_LOCKSTEP=40" in host.commands[0]
+        assert _flag(host.commands[0], "--lockstep") == "40"
 
 
 def test_the_worker_count_defaults_when_not_given() -> None:

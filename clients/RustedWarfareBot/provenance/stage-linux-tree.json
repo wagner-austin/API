@@ -1,0 +1,19 @@
+{
+  "destination": "/pub/wagnera3/rusted/staging",
+  "files": [
+    {
+      "name": "rusted-warfare-linux.tar",
+      "sha256": "6656807056754f8fc4d6853d77a763f8f3916f18c3d0cf4f74e25f19201fb744",
+      "size_bytes": 323225600
+    }
+  ],
+  "provenance": {
+    "app_id": "647960",
+    "build_id": "9902063",
+    "content_depot": "647961@9090535937117498741",
+    "linux_depot": "647963@223921525878913700",
+    "tree_sha256": "dd9148e4dc78d1b5ec5fb56364f5d5228a6dccc711dea40823765a70a9199d36",
+    "entries": "1774",
+    "described_by": "clients/RustedWarfareBot/provenance/linux-tree.json"
+  }
+}

@@ -38,9 +38,11 @@ def _config(
     match: MatchConfig | None = None,
     pin_delta: int = 0,
     fast_forward: int = 0,
+    traces: str = "runs/traces",
 ) -> SweepConfig:
     return SweepConfig(
         out_dir=out_dir,
+        traces=traces,
         workers=workers,
         lockstep=75,
         clone_prefix=".game-w",
@@ -288,4 +290,5 @@ def test_a_cloned_match_plays_on_the_port_its_lease_owns() -> None:
     matches can no more share a port than a directory."""
     with FakeHost() as host:
         assert play_job(_job(seed=42), ".game-w3", _config()) is True
-        assert f"PLAY_PORT={PLAY_PORT_BASE + 3}" in host.commands[0]
+        command = host.commands[0]
+        assert command[command.index("--port") + 1] == str(PLAY_PORT_BASE + 3)

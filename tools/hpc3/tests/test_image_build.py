@@ -31,6 +31,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         "base_image": "python:3.11.16-slim-bookworm",
         "env_prefix": "/opt/env",
         "git_commit": _COMMIT,
+        "system_packages": [],
         "extra_index_urls": [],
         "requirements": ["torch==2.6.0+cu124"],
         "wheels": ["w-0.1.0-py3-none-any.whl"],

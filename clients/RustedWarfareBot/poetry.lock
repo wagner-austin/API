@@ -223,6 +223,24 @@ files = [
 ]
 
 [[package]]
+name = "hpc3"
+version = "0.1.0"
+description = "Submit digest-verified training jobs to UCI's HPC3 Slurm cluster without billing or losing them"
+optional = false
+python-versions = "^3.11"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+platform-core = {path = "../../libs/platform_core", develop = true}
+typing-extensions = "^4.12.2"
+
+[package.source]
+type = "directory"
+url = "../../tools/hpc3"
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 description = "A minimal low-level HTTP client."
@@ -1030,4 +1048,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "30f3ae08bf2c284bd0718c3c4162f0211dd0f54010e66a381d6dd3a70cf3e8cc"
+content-hash = "95b054cddf414763584b2d44e2ea757a528ddc36e04bb5218db0ebe707d4c8c7"

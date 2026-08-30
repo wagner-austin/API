@@ -34,13 +34,25 @@ from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
 from rw_bot import RwBotError
+from rw_bot.harness import play_match_cli
+from rw_bot.harness.launch import FROZEN_CATALOGUE, FROZEN_TYPE_DUMP
 from rw_bot.harness.match import MatchConfig
 from rw_bot.validation import require_int, require_non_empty_str, require_positive_int
+
+#: The module a sweep launches each of its matches by.
+#:
+#: Read off the module itself rather than written out, so the name a sweep
+#: invokes cannot drift from the module that answers. The import is also what
+#: wires the launcher into the graph the architecture test walks -- a
+#: subprocess invocation is not an import edge, and a launcher reachable only
+#: by string would read as an unwired module.
+LAUNCHER_MODULE = play_match_cli.__name__
 
 _FIELD_COUNT = "RW-SWEEP-001"
 _NOT_A_NUMBER = "RW-SWEEP-002"
 _NO_WORKERS = "RW-SWEEP-003"
 _BAD_INDEX = "RW-SWEEP-004"
+_NO_PORT = "RW-SWEEP-005"
 
 #: Fields of a job line, in order, as they appear in a sweep file.
 #:
@@ -234,31 +246,7 @@ def assigned(jobs: Sequence[SweepJob], index: int, workers: int) -> tuple[SweepJ
     return tuple(job for position, job in enumerate(jobs) if position % workers == index)
 
 
-#: Where a match's per-sample record is written, relative to the repository.
-TRACE_ROOT = "runs/traces"
-
-
-def trace_path(job: SweepJob, batch: str) -> str:
-    """Return where one job's per-sample trace is written.
-
-    Namespaced by batch, because a job's own name is only unique within one.
-    Two sweeps that shared an arm label used to overwrite each other's traces
-    -- re-running an arm for a new A/B silently destroyed the record the old
-    batch's findings were read from, and only run-to-run determinism kept
-    that from mattering ([[policy-trace]]).
-
-    Args:
-        job: The job.
-        batch: The sweep this job belongs to, as the results directory names
-            it.
-
-    Returns:
-        A path under :data:`TRACE_ROOT`, named after the batch and the job.
-    """
-    return f"{TRACE_ROOT}/{batch}/{job_name(job)}.ndjson"
-
-
-def play_args(job: SweepJob, batch: str, tree: str = "") -> str:
+def play_args(job: SweepJob, trace: str, tree: str = "") -> str:
     """Return the planner's positional argument list for one job.
 
     **Every match records a trace now, where sweeps used to pass ``-``.** The
@@ -281,9 +269,17 @@ def play_args(job: SweepJob, batch: str, tree: str = "") -> str:
     and a doctrine file is as much the experiment as the code is
     (log: 2026-07-29).
 
+    **The trace path is given, not composed here.** It used to be built from
+    the batch name against a repository-relative root, which is a path that
+    only means what it says when the process starts in the repository. A
+    compute node's does not, so the trace went somewhere nothing would look
+    -- and for a replication panel the trace IS the measurement. Composition
+    belongs to :mod:`rw_bot.harness.results_layout`, which knows which root
+    this run is filing under.
+
     Args:
         job: The job.
-        batch: The sweep this job belongs to, for the trace namespace.
+        trace: Where this match writes its per-sample trace.
         tree: The batch's frozen snapshot, or empty to read the job's doctrine
             path as written.
 
@@ -291,21 +287,37 @@ def play_args(job: SweepJob, batch: str, tree: str = "") -> str:
         The value of ``PLAY_ARGS``: samples, doctrine path, trace path.
     """
     doctrine = f"{tree}/{job['doctrine']}" if tree else job["doctrine"]
-    return f"{job['samples']} {doctrine} {trace_path(job, batch)}"
+    return f"{job['samples']} {doctrine} {trace}"
 
 
 def make_argv(
+    interpreter: str,
     job: SweepJob,
     game_dir: str,
     lockstep: int,
-    batch: str,
+    play_log: str,
+    trace: str,
+    port: int,
+    display: int,
     match: MatchConfig | None = None,
     tree: str = "",
     pin_delta: int = 0,
     fast_forward: int = 0,
-    port: int = 0,
 ) -> tuple[str, ...]:
     """Return the command that plays one match.
+
+    **The command is this package's own launcher, not ``make``.** It used to
+    be a ``make play`` line, which put the whole launch behind a PowerShell
+    recipe and a PowerShell script -- neither of which can start a match on a
+    Linux compute node. The composition now lives in
+    :mod:`rw_bot.harness.launch` and this names the module that runs it, so
+    one description of a launch serves both platforms
+    ([[harness-parallel-matches]]).
+
+    **The interpreter is the harness's own.** The recipe ran the planner under
+    ``poetry run python``; a batch inside a container image has no poetry in
+    it, and the environment the planner must run in is the one the sweep is
+    already running in. Passing it removes a second answer to "which Python".
 
     Lockstep is passed on every job rather than defaulted by the recipe.
     Free-running, the sample exchange is paced by a wall clock, so parallel
@@ -327,9 +339,30 @@ def make_argv(
     ([[policy-loop]]).
 
     Args:
+        interpreter: The Python the launcher and the planner run under.
         job: The job.
         game_dir: The cloned game directory this worker owns.
         lockstep: Engine frames between samples.
+        play_log: Where the engine's and the agent's own logs go.
+        trace: Where this match writes its per-sample trace.
+
+            Both are GIVEN rather than composed from the batch name, and that
+            is not tidiness. They used to be built here against
+            repository-relative roots while the runner created the directories
+            against an absolute one, so on a compute node -- where the two
+            differ -- the directory that existed and the directory written to
+            were not the same. On this workstation they always agreed, because
+            the process starts in the repository, which is exactly why nothing
+            caught it.
+        port: The channel port this match's clone leases. Required rather than
+            drawn: two concurrent random draws collided the first time eight
+            matches launched in one instant and both died on the bind
+            (imp-creep12, 2026-08-08; :func:`~rw_bot.harness.clone.leased_port`).
+        display: The X display this match's clone leases, or zero to use the
+            machine's own. Leased for the same reason the port is: under
+            ``-nodisplay`` the engine still opens a display, so on a headless
+            node every concurrent match needs one to itself
+            (:func:`~rw_bot.harness.clone.leased_display`).
         match: Which match to play, or None for the engine's own default.
         tree: The batch's frozen code snapshot, or empty to import the working
             tree -- the single-match entry points' behaviour.
@@ -343,44 +376,65 @@ def make_argv(
             simulation N times as fast, certified bit-exact against realtime
             at 10 (log 2026-08-06). Zero for the same frozen-tree reason as
             the pin: an older agent rejects the unknown key.
-        port: The channel port this match's lease owns, or zero to let the
-            recipe draw one at random. Concurrent matches must pass their
-            leased port: two random draws collided the first time eight
-            matches launched in one instant, and both died on the bind
-            (imp-creep12, 2026-08-08; :func:`~rw_bot.harness.clone.leased_port`).
 
     Returns:
-        The argument vector, program first.
+        The argument vector, the interpreter first.
+
+    Raises:
+        SweepError: ``RW-SWEEP-005`` when the port is not a real lease.
     """
+    if port <= 0:
+        raise SweepError(
+            _NO_PORT,
+            f"a sweep job needs the channel port its clone leases, got {port}: two "
+            "concurrent random draws collided the first time eight matches launched "
+            "in one instant, and both died on the bind (imp-creep12, 2026-08-08)",
+        )
     argv = [
-        "make",
-        "play",
-        f"GAME_DIR={game_dir}",
-        f"PLAY_SEED={job['seed']}",
-        f"PLAY_SAMPLES={job['samples']}",
-        f"PLAY_LOCKSTEP={lockstep}",
-        # Into the batch directory, not the shared runs/ floor: engine and
-        # agent logs are the deep-debug layer -- one of them named the
-        # placeholder bug outright -- and the shared floor overwrote them
-        # across batches and replays (log: 2026-07-31).
-        f"PLAY_LOG=runs/sweeps/{batch}/logs/{job_name(job)}.log",
-        f"PLAY_ARGS={play_args(job, batch, tree)}",
+        interpreter,
+        "-m",
+        LAUNCHER_MODULE,
+        "--port",
+        str(port),
+        "--display",
+        str(display),
+        "--game-dir",
+        game_dir,
+        "--seed",
+        str(job["seed"]),
+        "--lockstep",
+        str(lockstep),
+        "--play-log",
+        play_log,
+        "--play-args",
+        play_args(job, trace, tree),
     ]
     if tree:
-        argv.append(f"PLAY_TREE={tree}")
-    if port:
-        argv.append(f"PLAY_PORT={port}")
+        argv.extend(("--tree", tree))
+        # The planner reads both of these by path at startup, and the
+        # launcher's defaults for them are repository-relative. That is only
+        # ever true where a repository is: on a compute node the process
+        # starts in a home directory and the first member to reach the
+        # planner died on FileNotFoundError for the catalogue, having already
+        # patched the engine, seeded it and held the world at frame one. The
+        # frozen tree carries both now, so a batch reads them from the same
+        # snapshot it imports its code and its doctrine from.
+        argv.extend(("--catalogue", f"{tree}/{FROZEN_CATALOGUE}"))
+        argv.extend(("--type-dump", f"{tree}/{FROZEN_TYPE_DUMP}"))
     if pin_delta:
-        argv.append(f"PLAY_PINDELTA={pin_delta}")
+        argv.extend(("--pin-delta", str(pin_delta)))
     if fast_forward:
-        argv.append(f"PLAY_FASTFORWARD={fast_forward}")
+        argv.extend(("--fast-forward", str(fast_forward)))
     if match is not None:
         argv.extend(
-            [
-                f"PLAY_MAP={match['map_path']}",
-                f"PLAY_OPPONENTS={match['opponents']}",
-                f"PLAY_DIFFICULTY={match['difficulty']}",
-            ]
+            (
+                "--map",
+                match["map_path"],
+                "--opponents",
+                str(match["opponents"]),
+                "--difficulty",
+                str(match["difficulty"]),
+            )
         )
     return tuple(argv)
 
@@ -445,6 +499,7 @@ def is_complete(card: Sequence[str]) -> bool:
 __all__ = [
     "JOB_FIELDS",
     "LABEL_WIDTH",
+    "LAUNCHER_MODULE",
     "SweepError",
     "SweepJob",
     "assigned",
