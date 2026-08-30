@@ -1,7 +1,8 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "fab1d991f4d6f39e72c3b21ca5757a072c01f277",
+  "git_commit": "9c817bf7a61d97e497582182f44162dc7b9e5137",
+  "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -210,6 +211,10 @@
     {
       "module": "platform_core.determinism_env",
       "attribute": "CUBLASLT_WORKSPACE_ENV_VAR"
+    },
+    {
+      "module": "model_trainer.cli.probe_trace",
+      "attribute": "require_control_arm"
     }
   ],
   "smoke_commands": [
@@ -218,13 +223,14 @@
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
     "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm.json",
     "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
-    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json",
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json --controls none",
     "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.train_cost import TRAIN_SHAPES, run_train_step, train_step_setup; row = [s for s in TRAIN_SHAPES if s['name'] == 'gate-tiny-b1-s64'][0]; run_train_step(train_step_setup(row, 'cpu'))\"",
     "/opt/env/bin/python -c \"from platform_core.determinism_record import UNPINNED_STACK, determinism_record; from model_trainer.core.run_fingerprint import capture_run_fingerprint; f = capture_run_fingerprint('cpu', determinism_record(UNPINNED_STACK, {})); assert f['host']['logical_cores'] >= 1, f['host']; assert [p['name'] for p in f['packages']] == ['numpy', 'torch', 'transformers'], f['packages']\"",
     "/opt/env/bin/python -m model_trainer.cli.legacy_gemm_probe --device cpu --out /tmp/lmhead.json",
     "/opt/env/bin/python -c \"import torch.backends.cuda as c; from model_trainer.core._test_hooks import _default_apply_determinism as pin; s = dict(pin(remove_split_k=True, math_attention=True)['settings']); assert s['cublaslt_split_k'] == 'removed', s; assert s['sdpa_backends'] == 'math', s; assert (c.math_sdp_enabled(), c.flash_sdp_enabled(), c.mem_efficient_sdp_enabled(), c.cudnn_sdp_enabled()) == (True, False, False, False), 'sdp switches did not take'\"",
-    "/opt/env/bin/python -c \"from model_trainer.cli.known_answer_probe import probe_determinism; s = dict(probe_determinism('cpu')['settings']); assert 'cublaslt_split_k' not in s, s; assert 'sdpa_backends' not in s, s\""
+    "/opt/env/bin/python -c \"from model_trainer.cli.known_answer_probe import probe_determinism; s = dict(probe_determinism('cpu', remove_split_k=False, math_attention=False)['settings']); assert 'cublaslt_split_k' not in s, s; assert 'sdpa_backends' not in s, s\"",
+    "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace-both.json --controls both"
   ],
   "labels": {
     "org.corvis.project": "mi",
