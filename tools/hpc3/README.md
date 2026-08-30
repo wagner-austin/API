@@ -248,7 +248,10 @@ hpc3-image --config runs/hpc3.json --spec specs/turkic-lstm-image.json \
 #    Putting them anywhere else fails with "build.sh: No such file or directory".
 scp runs/turkic-lstm-build-v1/* hpc3:/pub/wagnera3/images/turkic-lstm-v1/
 
-# 4. Build on the cluster (~25 min, free partition, requeue-protected).
+# 4. Build on the cluster (~25 min, free partition, NOT preemption-proof --
+#    `free` is PreemptMode=CANCEL, so the rendered `--requeue` is inert there
+#    and a preempted build is simply gone. Re-run this command; it is
+#    idempotent apart from the job id. See BUILD_PARTITION for the measurement.
 #    Preflights, submits, and writes the ledger row — like every other job.
 hpc3-image-build --config runs/hpc3.json \
     --project turkic-lstm --name image-v1 \

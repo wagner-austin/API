@@ -31,7 +31,26 @@ from hpc3.core.image_exec import APPTAINER_MODULE
 from hpc3.core.image_layout import SELFCHECK_NAME, SPEC_DIR
 
 BUILD_PARTITION = "free"
-"""Preemptible and unbilled. A build is restartable, so it is the right pool."""
+"""Preemptible and unbilled, and a build is cheap to start over, so it is the
+right pool.
+
+WHAT IT DOES NOT GIVE YOU, measured 2026-08-30 rather than assumed. This
+docstring used to read "a build is restartable, so it is the right pool",
+which invited the reading that Slurm restarts it. It does not.
+``scontrol show partition free`` reports ``PreemptMode=CANCEL``, so the
+``--requeue`` this package renders is INERT here: preemption cancels the job
+outright and no requeue follows. Build ``55657561`` of image v25 died that
+way twelve minutes in -- ``PREEMPTED``, batch step ``CANCELLED``, no ``.sif``,
+gone from the queue -- and nothing retried it. Restarting is a person
+resubmitting, and the only cost of being wrong about that is the wait.
+
+So ``--requeue`` is kept because it is correct on any partition whose
+``PreemptMode`` is ``REQUEUE``, and because a directive that is merely inert
+costs nothing. What is NOT true is that this build path is protected against
+preemption; anything that says so is describing the directive rather than the
+partition. A build that keeps losing the race belongs on ``standard``, which
+is billed and not preemptible.
+"""
 
 BUILD_CPUS = 8
 BUILD_MEM_GB = 32
