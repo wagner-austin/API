@@ -85,11 +85,19 @@ async def test_http_page_stats_and_restart(
     listed_rooms = await fleet_client.get("/rooms")
     assert listed_rooms.status == 200
     rooms_payload = narrow_json_to_dict(load_json_str(await listed_rooms.text()))
-    assert rooms_payload == {"rooms": ["Practice", "World"]}
+    assert rooms_payload == {"rooms": ["World", "Practice"]}
 
-    # Color too: the account's own tank is the static first option, so
-    # the served list is the four colors and nothing else.
-    assert '<select id="troop">' in body and '"/troops"' in body
+    # Color has no "account default" option: an account holds one tank
+    # PER COLOR with its own rank, so the operator states which tank
+    # plays rather than inheriting whichever was played last.
+    assert '<select id="troop"></select>' in body and '"/troops"' in body
+    # Roles read as proper nouns on the form; the wire values stay lower.
+    assert ">Fighter<" in body and '"fighter"' in body
+    # The colour panel's source: measured rank per account/world/colour.
+    tanks = await fleet_client.get("/tanks")
+    assert tanks.status == 200
+    assert "tanks" in narrow_json_to_dict(load_json_str(await tanks.text()))
+
     listed_troops = await fleet_client.get("/troops")
     assert listed_troops.status == 200
     troops_payload = narrow_json_to_dict(load_json_str(await listed_troops.text()))

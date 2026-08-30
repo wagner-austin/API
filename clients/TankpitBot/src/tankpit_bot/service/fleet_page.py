@@ -136,16 +136,16 @@ __CARD_CSS__
     <div class="hint">from accounts.json</div></div>
   <div class="field"><label for="role">Role</label>
     <select id="role">
-      <option value="fighter">fighter</option>
-      <option value="gatherer">gatherer</option>
+      <option value="fighter">Fighter</option>
+      <option value="gatherer">Gatherer</option>
     </select>
     <div class="hint">gatherer never hunts</div></div>
   <div class="field wide"><label for="room">Room</label>
     <select id="room"><option value="">Practice</option></select>
     <div class="hint">the lobby's two rooms</div></div>
   <div class="field"><label for="troop">Color</label>
-    <select id="troop"><option value="">account default</option></select>
-    <div class="hint">own rank + inventory; 5-min recolor cd</div></div>
+    <select id="troop"></select>
+    <div class="hint" id="troopinfo">own rank + inventory; 5-min recolor cd</div></div>
   <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
@@ -315,15 +315,12 @@ async function poll() {
     " · " + running + " running";
 }
 
-async function fillSelect(id, path, key, keepFirst) {
+async function fillSelect(id, path, key) {
   try {
     const body = await (await fetch(path)).json();
     const select = document.getElementById(id);
     if (!body[key].length) return;
-    // keepFirst holds a static "" option — the account's own default
-    // colour, which no server list can name.
-    const kept = keepFirst ? [select.firstElementChild] : [];
-    select.replaceChildren(...kept);
+    select.replaceChildren();
     for (const name of body[key]) {
       const option = document.createElement("option");
       option.value = name;
@@ -331,6 +328,48 @@ async function fillSelect(id, path, key, keepFirst) {
       select.appendChild(option);
     }
   } catch (e) { /* dropdown falls back to plain default */ }
+}
+
+const RANKS = ["recruit", "private", "corporal", "sergeant", "lieutenant",
+               "captain", "major", "colonel", "general"];
+let tanks = {};
+
+// Rank is measured, never derived: the lobby names only the colour an
+// account played LAST, so the other three are blank until somebody
+// enters them. Blank says "not measured", never "recruit".
+function paintTroopInfo() {
+  const hint = document.getElementById("troopinfo");
+  const account = document.getElementById("account").value;
+  const room = document.getElementById("room").value || "Practice";
+  const colour = document.getElementById("troop").value;
+  const cell = ((tanks[account] || {})[room] || {})[colour];
+  if (cell === undefined) {
+    hint.textContent = "no reading for " + colour + " on " + room;
+    return;
+  }
+  const rank = typeof cell === "number" ? cell : cell.rank;
+  const kills = typeof cell === "number" ? undefined : cell.kills;
+  const deaths = typeof cell === "number" ? undefined : cell.deaths;
+  const inv = typeof cell === "number" ? undefined : cell.inventory;
+  let text = RANKS[rank] + " (" + rank + ") · fuel " + (1000 + 100 * rank) +
+             " · radar " + (2 + Math.floor(rank / 3));
+  if (kills !== undefined || deaths !== undefined) {
+    text += " · K" + (kills === undefined ? "?" : kills) +
+            " D" + (deaths === undefined ? "?" : deaths);
+  }
+  if (inv) { text += " · " + inv.join("·"); }
+  hint.textContent = text;
+}
+
+async function loadTanks() {
+  try {
+    tanks = (await (await fetch("/tanks")).json()).tanks;
+  } catch (e) { tanks = {}; }
+  paintTroopInfo();
+}
+
+for (const id of ["account", "room", "troop"]) {
+  document.getElementById(id).addEventListener("change", paintTroopInfo);
 }
 
 document.getElementById("spawn").addEventListener("submit", async (event) => {
@@ -352,9 +391,9 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
   if (response.ok) poll();
 });
 
-fillSelect("account", "/accounts", "accounts");
+fillSelect("account", "/accounts", "accounts").then(paintTroopInfo);
 fillSelect("room", "/rooms", "rooms");
-fillSelect("troop", "/troops", "troops", true);
+fillSelect("troop", "/troops", "troops", false).then(loadTanks);
 poll();
 setInterval(poll, 1000);
 </script>

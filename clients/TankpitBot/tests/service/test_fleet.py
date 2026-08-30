@@ -170,23 +170,72 @@ def test_spawn_with_a_room_sets_the_selector(spawner: _FakeSpawner) -> None:
     assert row["room"] == "World (Desert)"
 
 
-def test_rooms_offers_the_two_lobby_selectors_default_first(
+def test_rooms_offers_world_first_but_the_env_fallback_stays_practice(
     spawner: _FakeSpawner,
 ) -> None:
-    """The dropdown offers prefixes, not the map-stamped display names.
+    """The page leads with World; a room-less run still gets Practice.
 
-    The lobby lists two rooms and the world's name carries the current
-    map ("World (Desert)"), so ``World`` is what stays true across a
-    rotation. That the selectors actually resolve against a live lobby
-    is the join resolver's contract, tested in ``tests/login``.
+    The dropdown offers prefixes, not the map-stamped display names —
+    the world's name carries the current map ("World (Desert)"), so
+    ``World`` is what stays true across a rotation. Order is
+    presentation: World leads because that is where the fleet plays.
+    The no-config fallback deliberately does NOT follow it, so
+    ``make run`` and the probes cannot wander into the live world
+    where a deactivation costs a rank.
     """
     _ = spawner
     manager = FleetManager()
 
     names = manager.rooms()
 
-    assert names == ["Practice", "World"]
-    assert names[0] == DEFAULT_LOBBY_ROOM
+    assert names == ["World", "Practice"]
+    assert names[0] != DEFAULT_LOBBY_ROOM
+    assert DEFAULT_LOBBY_ROOM == "Practice"
+
+
+def test_tanks_serves_the_measured_registry(spawner: _FakeSpawner) -> None:
+    """The per-colour ranks are READ, never derived.
+
+    Nothing on the wire reports the rank of a colour an account is not
+    currently playing — the lobby names only the last-played one — so
+    the registry is measured state and the page can only show what
+    somebody entered and recorded.
+    """
+    _ = spawner
+
+    def fake_read(path: Path) -> str:
+        _ = path
+        return '{"accounts": {"Artax": {"World": {"orange": 6}}}}'
+
+    original = top_hooks.read_text
+    top_hooks.read_text = fake_read
+    try:
+        registry = FleetManager().tanks()
+    finally:
+        top_hooks.read_text = original
+
+    assert registry == {"accounts": {"Artax": {"World": {"orange": 6}}}}
+
+
+def test_tanks_without_a_registry_is_empty_not_an_error(spawner: _FakeSpawner) -> None:
+    """An operator who never ran the census gets an empty panel.
+
+    A missing registry is the ordinary first-run state, not a fault:
+    the colour dropdown still works, it just has no reading to show.
+    """
+    _ = spawner
+
+    def fake_read(path: Path) -> str:
+        raise OSError(f"no registry at {path}")
+
+    original = top_hooks.read_text
+    top_hooks.read_text = fake_read
+    try:
+        registry = FleetManager().tanks()
+    finally:
+        top_hooks.read_text = original
+
+    assert registry == {}
 
 
 def test_troops_are_team_id_ordered_and_reach_the_child_as_the_wire_id(
@@ -485,6 +534,7 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
         "/accounts",
         "/rooms",
         "/troops",
+        "/tanks",
         "/bots",
         "/bots/{instance}/stats",
         "/bots/{instance}/hud",

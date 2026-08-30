@@ -24,13 +24,23 @@ though the control page only offers the two durable ones.
 from __future__ import annotations
 
 DEFAULT_LOBBY_ROOM = "Practice"
-"""The room a bot joins when ``TANKPIT_ROOM`` is unset or empty."""
+"""The room a bot joins when ``TANKPIT_ROOM`` is unset or empty.
+
+Practice, NOT the head of :data:`LOBBY_ROOMS`. This is the fallback for
+a run that names no room at all -- ``make run``, ``make smoke``, the
+probes -- and those must not wander into the live world by default,
+where a deactivation costs a rank ([[game-rules]]). The fleet always
+states a room explicitly, so the two never disagree in practice."""
 
 LOBBY_ROOMS: tuple[str, ...] = (
-    DEFAULT_LOBBY_ROOM,
     "World",
+    DEFAULT_LOBBY_ROOM,
 )
-"""Durable room selectors, in lobby order; the first is the default."""
+"""Durable room selectors in the order the control page offers them.
+
+World leads because that is where the fleet plays; Practice is the
+deliberate choice, not the accident. Order is presentation only -- the
+no-config fallback is :data:`DEFAULT_LOBBY_ROOM`."""
 
 
 __all__ = [

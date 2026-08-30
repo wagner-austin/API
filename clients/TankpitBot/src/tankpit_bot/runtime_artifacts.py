@@ -16,6 +16,15 @@ from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
 
+TANK_REGISTRY_PATH = Path("data") / "tank_registry.json"
+"""Measured per-colour tank ranks, keyed account -> world -> colour.
+
+Operator state like ``accounts.json``, not a build artifact: it is
+filled by entering each colour once and reading the rank off the wire,
+because nothing reports the rank of a colour the account is not
+currently playing. ``make release`` copies it into the snapshot for
+the same reason it copies ``accounts.json``."""
+
 _RUNS_DIR = Path("runs")
 _BOT_DIR = _RUNS_DIR / "bot"
 _SNIFF_DIR = _RUNS_DIR / "sniff"
@@ -358,6 +367,7 @@ def decode_sniff_run_artifacts(data: JSONObject) -> SniffRunArtifactsDict:
 
 
 __all__ = [
+    "TANK_REGISTRY_PATH",
     "BotRunArtifactsDict",
     "ProbeRunArtifactsDict",
     "SniffRunArtifactsDict",

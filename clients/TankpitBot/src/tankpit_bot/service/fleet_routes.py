@@ -133,10 +133,16 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         names: list[JSONValue] = list(manager.troops())
         return _json_response({"troops": names})
 
+    async def list_tanks(request: web.Request) -> web.Response:
+        """``GET /tanks`` — measured rank per account, world and colour."""
+        _ = request
+        return _json_response({"tanks": manager.tanks()})
+
     app.router.add_get("/", control_page)
     app.router.add_get("/accounts", list_accounts)
     app.router.add_get("/rooms", list_rooms)
     app.router.add_get("/troops", list_troops)
+    app.router.add_get("/tanks", list_tanks)
     app.router.add_get("/bots", list_bots)
 
 

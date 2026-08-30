@@ -152,9 +152,9 @@ def test_every_offered_room_selector_resolves_against_a_live_lobby() -> None:
         },
     ]
 
-    resolved = [_resolve_room_id(lobby, selector) for selector in LOBBY_ROOMS]
+    resolved = {selector: _resolve_room_id(lobby, selector) for selector in LOBBY_ROOMS}
 
-    assert resolved == ["1", "5"]
+    assert resolved == {"World": "5", "Practice": "1"}
 
 
 def test_resolve_room_id_returns_none_when_room_is_missing() -> None:
