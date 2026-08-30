@@ -133,30 +133,59 @@ class TestRankOneIsNotTheVendorCallInDisguise:
 
     If ``rank1`` dispatched back to ``addmm``, two cards would agree exactly
     when cuBLAS happened to agree and we would read that as the fixed order
-    working. These pin that it really is different arithmetic.
+    working. These pin that it really computes its own order.
+
+    WHAT IS NOT ASSERTABLE HERE, and the assertion that used to be. This class
+    opened with ``assert not torch.equal(rank1_addmm(...), cublas_addmm(...))``
+    -- "it must differ from the vendor call". That passed on this laptop and
+    FAILED inside the image on 2026-08-30, at M=384 K=128 N=64, because the
+    container's BLAS summed that shape in ascending k as well. Two different
+    implementations produced identical bits.
+
+    That is the thesis working rather than breaking: a short K has little for
+    a library to reorder, and a plain sequential dot product IS this order. So
+    "differs from the baseline" was never evidence of different arithmetic --
+    it is a machine-dependent coincidence, and asserting it made the suite
+    depend on which BLAS ran it.
+
+    What replaces it is positive and order-specifying: the result must equal
+    an ascending-k accumulation written out longhand. Aliasing to ``addmm``
+    fails that wherever the two orders differ, and where they do not differ
+    the aliasing changes no value and costs nothing.
     """
-
-    def test_it_does_not_reproduce_addmm_bit_for_bit(self) -> None:
-        bias, x, w = _operands()
-
-        assert not torch.equal(rank1_addmm(bias, x, w), cublas_addmm(bias, x, w))
 
     def test_it_reproduces_itself_exactly(self) -> None:
         bias, x, w = _operands()
 
         assert torch.equal(rank1_addmm(bias, x, w), rank1_addmm(bias, x, w))
 
-    def test_it_adds_the_bias_last_not_first(self) -> None:
-        # Both are fixed orders and they give different bits: a bias folded
-        # in first participates in the rounding of all K subsequent adds.
-        # Last matches how addmm is written, so the arms differ in the
-        # reduction under study and not also in where the bias went.
+    def test_it_is_an_ascending_k_accumulation_with_the_bias_added_last(self) -> None:
+        # The anchor that replaced "must differ from addmm", and the one that
+        # actually catches aliasing: an implementation that dispatched to the
+        # vendor fails this wherever the vendor's order differs.
+        #
+        # Bias last, not first: both are fixed orders and they give different
+        # bits, since a bias folded in first participates in the rounding of
+        # all K subsequent adds. Last matches how addmm is written, so the
+        # arms differ in the reduction under study and not also in where the
+        # bias went.
         bias, x, w = _operands()
         accumulator = torch.zeros(COLS, ROWS)
         for k in range(INNER):
             accumulator.addr_(x[:, k], w[k, :])
 
         assert torch.equal(rank1_addmm(bias, x, w), bias + accumulator)
+
+    def test_folding_the_bias_in_first_would_give_different_bits(self) -> None:
+        # Why the previous test names an order rather than just a value. If
+        # bias placement did not matter, "bias added last" would be an empty
+        # claim and the anchor would be weaker than it looks.
+        bias, x, w = _operands()
+        first = bias.expand(COLS, ROWS).clone()
+        for k in range(INNER):
+            first.addr_(x[:, k], w[k, :])
+
+        assert not torch.equal(rank1_addmm(bias, x, w), first)
 
     def test_reversing_the_k_order_changes_the_bits(self) -> None:
         # The load-bearing property. If summation order did NOT change the
