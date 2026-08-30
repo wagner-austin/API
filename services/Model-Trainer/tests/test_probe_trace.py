@@ -400,26 +400,11 @@ class TestTheControlArms:
     condition cannot measure it.
     """
 
-    def test_every_arm_names_a_distinct_posture(self) -> None:
-        # Four arms because the two controls are disjoint: split-K governs
-        # cuBLASLt matmuls, the math pin governs attention. The single-control
-        # arms are what make attribution a run rather than a code change.
-        assert probe_trace.CONTROL_ARMS == {
-            "none": (False, False),
-            "split-k": (True, False),
-            "attention": (False, True),
-            "both": (True, True),
-        }
-
-    def test_it_resolves_each_arm(self) -> None:
-        assert probe_trace.require_control_arm("none") == (False, False)
-        assert probe_trace.require_control_arm("both") == (True, True)
-
-    def test_an_unknown_arm_is_refused_by_name(self) -> None:
-        # Refused rather than defaulted: a trace whose arm was guessed is a
-        # trace whose record names a condition it may not have run.
-        with pytest.raises(ValueError, match="must be one of attention, both, none, split-k"):
-            probe_trace.require_control_arm("splitk")
+    # The table and its refusal moved to `core/services/model/control_arms` on
+    # 2026-08-29, when the isolated GEMM probe needed the same four arms; they
+    # are exercised in `test_control_arms`. What stays here is the part that
+    # is about a TRACE: that asking for an arm on this command line reaches
+    # the determinism record.
 
     def test_the_applied_arm_reaches_the_determinism_record(self, tmp_path: pathlib.Path) -> None:
         # The record is how a reader knows which arm produced a trace, and

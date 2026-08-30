@@ -59,7 +59,7 @@ class GemmShape(TypedDict):
 #: ladder runs one sequence of the gate rung's length.
 GEMM_COLS = 64
 
-#: Seven calls spanning the three cases the trace turned up, chosen so the
+#: Thirteen calls spanning the four cases the traces turned up, chosen so the
 #: result can discriminate rather than merely accumulate:
 #:
 #: * ``128x128`` is the ONE shape of 32 where all three cards chose the same
@@ -70,6 +70,20 @@ GEMM_COLS = 64
 #:   their rungs returned bit-identical losses. These are the cases that
 #:   decide whether a kernel difference can be numerically invisible.
 #: * The ``large`` and ``xl`` calls come from the rungs that DID disagree.
+#: * The five ``-attn-qkv`` calls are the combined query-key-value projection,
+#:   added 2026-08-29 because the whole-model trace names it and this table
+#:   could not answer. Under BOTH controls -- split-K removed, attention
+#:   pinned to math -- the v24 four-card trace agrees on every tensor of the
+#:   ``tiny`` and ``medium`` rungs, and breaks on ``large`` and ``xl`` at
+#:   ``transformer.h.0.attn.c_attn``: layer zero, the first matmul in the
+#:   model, with the V100 the only card out. Every shape above is an OUTPUT
+#:   projection (``c_proj``, M=K) or an MLP projection; the QKV call is M=3K
+#:   and had never been issued alone. So the one shape the traces point at was
+#:   the one shape unprobed, and "the break is reduction order in this matmul"
+#:   stayed an inference. These make it a measurement. ``small`` is included
+#:   though no trace rung runs it: it mirrors ``small-attn-proj`` above, and
+#:   its K=768 is the only point between the largest agreeing rung's K=1024
+#:   and the smallest at K=128.
 #:
 #: Declared as constants rather than derived from a model, for the reason the
 #: probe ladder is: a shape assembled at runtime is one nobody can reproduce
@@ -122,6 +136,36 @@ GEMM_SHAPES: Final[dict[str, GemmShape]] = {
         "inner": 6400,
         "cols": GEMM_COLS,
         "origin": "xl rung, MLP output projection; rung DISAGREED with V100 the outlier",
+    },
+    "tiny-attn-qkv": {
+        "rows": 384,
+        "inner": 128,
+        "cols": GEMM_COLS,
+        "origin": "tiny rung, QKV projection; v24 four-card trace AGREED on every tensor",
+    },
+    "small-attn-qkv": {
+        "rows": 2304,
+        "inner": 768,
+        "cols": GEMM_COLS,
+        "origin": "small rung, QKV projection; no trace rung runs it, brackets K=768",
+    },
+    "medium-attn-qkv": {
+        "rows": 3072,
+        "inner": 1024,
+        "cols": GEMM_COLS,
+        "origin": "medium rung, QKV projection; v24 four-card trace AGREED on every tensor",
+    },
+    "large-attn-qkv": {
+        "rows": 3840,
+        "inner": 1280,
+        "cols": GEMM_COLS,
+        "origin": "large rung, QKV projection; the v24 trace's FIRST divergence, V100 alone",
+    },
+    "xl-attn-qkv": {
+        "rows": 4800,
+        "inner": 1600,
+        "cols": GEMM_COLS,
+        "origin": "xl rung, QKV projection; the v24 trace's FIRST divergence, V100 alone",
     },
 }
 
@@ -183,6 +227,76 @@ def _sweep() -> tuple[GemmShape, ...]:
 
 #: The grid.
 GEMM_SWEEP: Final[tuple[GemmShape, ...]] = _sweep()
+
+#: The two lines that bracket where the QKV projection stops agreeing.
+#:
+#: WHY A SECOND GRID RATHER THAN MORE POINTS IN THE FIRST. :data:`SWEEP_ROWS`
+#: and :data:`SWEEP_INNERS` are powers of two ending at M=2048, and the
+#: comment above them explains that small K is over-represented ON PURPOSE.
+#: The QKV break sits at M=3840 K=1280 -- outside that grid on both axes, and
+#: at a K no power-of-two list contains. Widening the first grid to reach it
+#: would quietly undo a stated design decision and multiply a 35-point sweep
+#: by the cost of every added row.
+#:
+#: WHY TWO LINES AND NOT A RECTANGLE. Across the trace's rungs M and K move
+#: TOGETHER -- QKV is always M=3K -- so the rungs alone cannot say which axis
+#: carries the break, exactly the confound :mod:`probe_shapes` built its
+#: ladder to avoid. One line holds K at :data:`BOUNDARY_INNER` and walks M;
+#: the other holds M at :data:`BOUNDARY_ROW` and walks K. Whichever line moves
+#: the result names the axis. A rectangle would answer the same question for
+#: six times the GPU.
+#:
+#: The K line steps in half-multiples of 256 (1152, 1280, 1408) because the
+#: agreeing rungs are all K multiples of 256 that are ALSO powers of two, and
+#: the first breaking rung is 5x256. Whether that matters is a guess; these
+#: points are what make it a measurable one rather than a story.
+BOUNDARY_INNER = 1280
+
+#: The output width the K line holds, the QKV width of the first rung to break.
+BOUNDARY_ROW = 3840
+
+#: Output widths walked at :data:`BOUNDARY_INNER`.
+BOUNDARY_ROWS: Final[tuple[int, ...]] = (1024, 2048, 3072, 3840, 4800, 6144)
+
+#: Reduction lengths walked at :data:`BOUNDARY_ROW`.
+BOUNDARY_INNERS: Final[tuple[int, ...]] = (768, 1024, 1152, 1280, 1408, 1600)
+
+#: The name every boundary point is labelled under, for the reason
+#: :data:`SWEEP_NAME` is one: the label already carries the dimensions.
+BOUNDARY_NAME = "boundary"
+
+
+def _boundary() -> tuple[GemmShape, ...]:
+    """Build the two bracketing lines.
+
+    Returns:
+        One entry per point, M line first then K line, with the point where
+        they cross emitted once. Deduplicated here rather than left to
+        :func:`require_unique_labels` to reject, because the crossing is
+        intended: the lines are DEFINED to meet at the shape under study, and
+        a table that could not express that would be the wrong table.
+    """
+    points = [(rows, BOUNDARY_INNER) for rows in BOUNDARY_ROWS]
+    points += [(BOUNDARY_ROW, inner) for inner in BOUNDARY_INNERS]
+    seen: set[tuple[int, int]] = set()
+    unique: list[tuple[int, int]] = []
+    for point in points:
+        if point not in seen:
+            seen.add(point)
+            unique.append(point)
+    return tuple(
+        GemmShape(
+            rows=rows,
+            inner=inner,
+            cols=GEMM_COLS,
+            origin=f"QKV boundary bracket, M={rows} K={inner}",
+        )
+        for rows, inner in unique
+    )
+
+
+#: The bracket.
+GEMM_BOUNDARY: Final[tuple[GemmShape, ...]] = _boundary()
 
 #: A realistic training batch: eight sequences of 512 tokens flattened, which
 #: is what the batch-times-sequence dimension is in a real step.
@@ -325,13 +439,15 @@ def probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
     the result depends on the DIMENSIONS and not on which table asked.
 
     Returns:
-        ``(name, shape)`` pairs, ladder first then the grid.
+        ``(name, shape)`` pairs, ladder first, then the grid, then the
+        boundary bracket.
 
     Raises:
         ValueError: Propagated from :func:`require_unique_labels`.
     """
     pairs = [(name, shape) for name, shape in GEMM_SHAPES.items()]
     pairs += [(SWEEP_NAME, shape) for shape in GEMM_SWEEP]
+    pairs += [(BOUNDARY_NAME, shape) for shape in GEMM_BOUNDARY]
     return require_unique_labels(tuple(pairs))
 
 
@@ -390,10 +506,16 @@ def require_unique_labels(
 
 __all__ = [
     "BATCH_COLS",
+    "BOUNDARY_INNER",
+    "BOUNDARY_INNERS",
+    "BOUNDARY_NAME",
+    "BOUNDARY_ROW",
+    "BOUNDARY_ROWS",
     "CROSSOVER_COLS",
     "CROSSOVER_SOURCES",
     "DIGEST_SUFFIX",
     "GEMM_BATCHED",
+    "GEMM_BOUNDARY",
     "GEMM_COLS",
     "GEMM_CROSSOVER",
     "GEMM_EXPERIMENT",

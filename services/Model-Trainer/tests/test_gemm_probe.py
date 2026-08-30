@@ -22,9 +22,14 @@ import pytest
 import torch
 from platform_core.json_utils import load_json_str
 from platform_core.known_answer_registry import gate_record
-from platform_core.run_record import NO_PAYLOAD, decode_run_record
+from platform_core.run_record import NO_PAYLOAD, RunRecord, decode_run_record
 
 from model_trainer.cli import gemm_probe as gemm_cli
+from model_trainer.core.services.model.deterministic_gemm import (
+    CUBLAS_ARM,
+    FP64_ARM,
+    RANK1_ARM,
+)
 from model_trainer.core.services.model.gemm_probe import (
     DIGEST_BYTES,
     gemm_description,
@@ -33,7 +38,13 @@ from model_trainer.core.services.model.gemm_probe import (
     gemm_output,
 )
 from model_trainer.core.services.model.gemm_shapes import (
+    BOUNDARY_INNER,
+    BOUNDARY_INNERS,
+    BOUNDARY_NAME,
+    BOUNDARY_ROW,
+    BOUNDARY_ROWS,
     DIGEST_SUFFIX,
+    GEMM_BOUNDARY,
     GEMM_COLS,
     GEMM_EXPERIMENT,
     GEMM_SHAPES,
@@ -61,7 +72,25 @@ def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
 
 def _argv(tmp_path: pathlib.Path) -> list[str]:
     """Return a complete CPU command line."""
-    return ["--device", "cpu", "--out", str(_out_path(tmp_path))]
+    return [
+        "--device",
+        "cpu",
+        "--out",
+        str(_out_path(tmp_path)),
+        "--controls",
+        "none",
+        "--kernel",
+        CUBLAS_ARM,
+    ]
+
+
+def _record() -> RunRecord:
+    """Return a CPU record under the untreated posture and the vendor kernel.
+
+    The arm pair every assertion below is indifferent to. Tests that care
+    which arm ran spell it out instead.
+    """
+    return gemm_cli.gemm_run_record("cpu", controls="none", kernel=CUBLAS_ARM)
 
 
 class TestTheShapeTable:
@@ -71,6 +100,32 @@ class TestTheShapeTable:
         ]
 
         assert bad == []
+
+    def test_every_qkv_shape_is_three_times_its_hidden_size(self) -> None:
+        # GPT-2's c_attn projects hidden -> 3*hidden, one matmul for Q, K and
+        # V together. A QKV entry with M != 3K would be measuring a shape the
+        # model does not issue, which is the failure the origin strings claim
+        # these exist to end.
+        qkv = {name: s for name, s in GEMM_SHAPES.items() if name.endswith("-attn-qkv")}
+        wrong = {name for name, s in qkv.items() if s["rows"] != 3 * s["inner"]}
+
+        assert wrong == set()
+        assert sorted(qkv) == [
+            "large-attn-qkv",
+            "medium-attn-qkv",
+            "small-attn-qkv",
+            "tiny-attn-qkv",
+            "xl-attn-qkv",
+        ]
+
+    def test_the_qkv_shape_the_trace_broke_on_is_present(self) -> None:
+        # transformer.h.0.attn.c_attn at the large rung: hidden 1280, so
+        # M=3840 K=1280. This is the v24 four-card trace's first divergence
+        # and the one shape no earlier table contained.
+        assert (GEMM_SHAPES["large-attn-qkv"]["rows"], GEMM_SHAPES["large-attn-qkv"]["inner"]) == (
+            3840,
+            1280,
+        )
 
     def test_every_shape_shares_the_ladder_sequence_length(self) -> None:
         # The ladder runs one sequence of the gate rung's length, so a shape
@@ -146,11 +201,64 @@ class TestTheSweepGrid:
         # them anyway. One name for the grid keeps the label honest.
         assert gemm_label(SWEEP_NAME, GEMM_SWEEP[0], DIGEST_SUFFIX).count("-M") == 1
 
-    def test_probed_shapes_carries_both_tables(self) -> None:
-        assert len(probed_shapes()) == len(GEMM_SHAPES) + len(GEMM_SWEEP)
+    def test_probed_shapes_carries_every_table(self) -> None:
+        assert len(probed_shapes()) == len(GEMM_SHAPES) + len(GEMM_SWEEP) + len(GEMM_BOUNDARY)
 
     def test_the_real_tables_pass_the_label_check(self) -> None:
         assert require_unique_labels(probed_shapes()) == probed_shapes()
+
+
+class TestTheBoundaryBracket:
+    """Two lines through the shape the v24 four-card trace broke on.
+
+    The trace's rungs move M and K together -- QKV is always M=3K -- so they
+    cannot say which axis carries the break. These can.
+    """
+
+    def test_it_holds_one_axis_on_each_line(self) -> None:
+        on_k_line = {s["rows"] for s in GEMM_BOUNDARY if s["inner"] != BOUNDARY_INNER}
+        on_m_line = {s["inner"] for s in GEMM_BOUNDARY if s["rows"] != BOUNDARY_ROW}
+
+        assert on_k_line == {BOUNDARY_ROW}
+        assert on_m_line == {BOUNDARY_INNER}
+
+    def test_every_declared_point_is_present(self) -> None:
+        present = {(s["rows"], s["inner"]) for s in GEMM_BOUNDARY}
+        declared = {(rows, BOUNDARY_INNER) for rows in BOUNDARY_ROWS}
+        declared |= {(BOUNDARY_ROW, inner) for inner in BOUNDARY_INNERS}
+
+        assert present == declared
+
+    def test_the_crossing_point_is_emitted_once(self) -> None:
+        # The lines are DEFINED to meet at the shape under study. Emitting it
+        # twice would make `require_unique_labels` refuse the whole table.
+        points = [(s["rows"], s["inner"]) for s in GEMM_BOUNDARY]
+
+        assert points.count((BOUNDARY_ROW, BOUNDARY_INNER)) == 1
+        assert len(points) == len(set(points))
+
+    def test_it_brackets_the_shape_that_broke(self) -> None:
+        # large-attn-qkv is M=3840 K=1280, the v24 trace's first divergence.
+        assert (BOUNDARY_ROW, BOUNDARY_INNER) == (3840, 1280)
+        assert min(BOUNDARY_INNERS) < BOUNDARY_INNER < max(BOUNDARY_INNERS)
+        assert min(BOUNDARY_ROWS) < BOUNDARY_ROW < max(BOUNDARY_ROWS)
+
+    def test_it_spans_the_two_rungs_that_disagree_about_agreeing(self) -> None:
+        # medium (K=1024) agreed on all four cards; large (K=1280) did not.
+        # A bracket that did not contain both endpoints could not locate the
+        # boundary between them, only confirm it exists.
+        assert 1024 in BOUNDARY_INNERS
+        assert 1280 in BOUNDARY_INNERS
+
+    def test_it_reaches_a_k_no_power_of_two_grid_contains(self) -> None:
+        # The sweep is powers of two. 1152 and 1408 are the half-multiples of
+        # 256 either side of 1280, which is where the break first shows.
+        assert 1152 in BOUNDARY_INNERS
+        assert 1408 in BOUNDARY_INNERS
+        assert not set(BOUNDARY_INNERS) <= set(SWEEP_INNERS)
+
+    def test_the_whole_bracket_shares_one_name(self) -> None:
+        assert gemm_label(BOUNDARY_NAME, GEMM_BOUNDARY[0], DIGEST_SUFFIX).count("-M") == 1
 
     def test_two_entries_sharing_a_label_are_refused(self) -> None:
         twin = (("dup", SMALL), ("dup", SMALL))
@@ -194,7 +302,7 @@ class TestTheOperands:
         # verified against a real trace: addmm(b, x[64,4096], w[4096,1024])
         # logs Adesc=[rows=1024 cols=4096] Bdesc=[rows=4096 cols=64], which is
         # the ladder's medium MLP-projection call exactly.
-        out = gemm_output(SMALL, "cpu")
+        out = gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM)
 
         assert list(out.shape) == [SMALL["cols"], SMALL["rows"]]
 
@@ -204,19 +312,19 @@ class TestTheOperands:
         # cublasSgemm path and log nothing under a trace.
         bias, x, w = gemm_operands(SMALL, "cpu")
 
-        assert torch.equal(gemm_output(SMALL, "cpu"), torch.addmm(bias, x, w))
-        assert not torch.equal(gemm_output(SMALL, "cpu"), torch.mm(x, w))
+        assert torch.equal(gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM), torch.addmm(bias, x, w))
+        assert not torch.equal(gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM), torch.mm(x, w))
 
 
 class TestTheDigest:
     def test_it_is_stable_for_one_tensor(self) -> None:
-        out = gemm_output(SMALL, "cpu")
+        out = gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM)
 
         assert describe_tensor(out) == describe_tensor(out)
 
     def test_a_single_last_bit_change_changes_it(self) -> None:
         # The whole reason the digest is recorded rather than only the sum.
-        out = gemm_output(SMALL, "cpu")
+        out = gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM)
         nudged = out.clone()
         nudged[0][0] = torch.nextafter(nudged[0][0], torch.tensor(float("inf")))
 
@@ -225,7 +333,7 @@ class TestTheDigest:
     def test_it_catches_a_change_a_sum_cannot(self) -> None:
         # Two elements moved by +d and -d leave the sum EXACTLY untouched.
         # A hash cannot cancel, which is why the sum alone is not the check.
-        out = gemm_output(SMALL, "cpu").double()
+        out = gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM).double()
         swapped = out.clone()
         swapped[0][0] += 1.0
         swapped[0][1] -= 1.0
@@ -237,7 +345,7 @@ class TestTheDigest:
         # Taking more bytes would start rounding, and two different tensors
         # could then record the same number -- the one failure this
         # observation must not have.
-        digest, _ = describe_tensor(gemm_output(SMALL, "cpu"))
+        digest, _ = describe_tensor(gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM))
 
         assert digest == float(int(digest))
         # 2**48, written out: six bytes of digest.
@@ -268,7 +376,7 @@ class TestTheDigest:
         equals the exact sum of the values, which a device reduction tree is
         not obliged to give.
         """
-        out = gemm_output(SMALL, "cpu")
+        out = gemm_output(SMALL, "cpu", kernel=CUBLAS_ARM)
         _, total = describe_tensor(out)
         values: list[float] = out.flatten().tolist()
 
@@ -280,23 +388,39 @@ class TestTheReproducibilityGuard:
     # uses it; its two directions are exercised there. What stays here is
     # the part specific to a GEMM: that the refusal names the call.
     def test_the_description_names_the_dimensions(self) -> None:
-        assert gemm_description(SMALL) == "a GEMM M8xK16xN4"
+        assert gemm_description(SMALL, CUBLAS_ARM) == "a cublas GEMM M8xK16xN4"
 
     def test_two_shapes_do_not_share_a_description(self) -> None:
-        assert gemm_description(SMALL) != gemm_description({**SMALL, "inner": SMALL["inner"] * 2})
+        widened: GemmShape = {**SMALL, "inner": SMALL["inner"] * 2}
+
+        assert gemm_description(SMALL, CUBLAS_ARM) != gemm_description(widened, CUBLAS_ARM)
+
+    def test_two_arms_do_not_share_a_description(self) -> None:
+        # All three arms produce a tensor of the same shape, so a failure
+        # reading only the dimensions would not say which arithmetic failed
+        # to reproduce itself.
+        assert gemm_description(SMALL, CUBLAS_ARM) != gemm_description(SMALL, RANK1_ARM)
 
     def test_a_real_cpu_call_reproduces_itself(self) -> None:
-        assert gemm_identity(SMALL, "cpu") == gemm_identity(SMALL, "cpu")
+        assert gemm_identity(SMALL, "cpu", kernel=CUBLAS_ARM) == gemm_identity(
+            SMALL, "cpu", kernel=CUBLAS_ARM
+        )
+
+    def test_every_arm_reproduces_itself(self) -> None:
+        for arm in (CUBLAS_ARM, FP64_ARM, RANK1_ARM):
+            assert gemm_identity(SMALL, "cpu", kernel=arm) == gemm_identity(
+                SMALL, "cpu", kernel=arm
+            )
 
 
 class TestTheRecord:
     def test_it_carries_two_observations_per_shape(self) -> None:
-        record = gemm_cli.gemm_run_record("cpu")
+        record = _record()
 
         assert len(record["observations"]) == 2 * len(probed_shapes())
 
     def test_every_observation_is_named_for_its_shape_and_measurement(self) -> None:
-        record = gemm_cli.gemm_run_record("cpu")
+        record = _record()
         expected = sorted(
             gemm_label(n, s, suffix)
             for n, s in probed_shapes()
@@ -306,10 +430,10 @@ class TestTheRecord:
         assert sorted(o["name"] for o in record["observations"]) == expected
 
     def test_the_values_are_what_the_probe_computes(self) -> None:
-        record = gemm_cli.gemm_run_record("cpu")
+        record = _record()
         by_name = {o["name"]: o["value"] for o in record["observations"]}
         name, shape = next(iter(GEMM_SHAPES.items()))
-        digest, total = gemm_identity(shape, "cpu")
+        digest, total = gemm_identity(shape, "cpu", kernel=CUBLAS_ARM)
 
         assert by_name[gemm_label(name, shape, DIGEST_SUFFIX)] == digest
         assert by_name[gemm_label(name, shape, SUM_SUFFIX)] == total
@@ -317,7 +441,7 @@ class TestTheRecord:
     def test_distinct_dimensions_produced_distinct_digests(self) -> None:
         # If they had not, the probe would be measuring one thing repeatedly
         # and every shape would agree across cards for free.
-        record = gemm_cli.gemm_run_record("cpu")
+        record = _record()
         by_name = {o["name"]: o["value"] for o in record["observations"]}
         by_dims = {
             (s["rows"], s["inner"], s["cols"]): by_name[gemm_label(n, s, DIGEST_SUFFIX)]
@@ -332,7 +456,7 @@ class TestTheRecord:
         # twice rather than deduplicated. The two names must agree, which
         # checks the result depends on the DIMENSIONS and not on which table
         # asked for them.
-        by_name = {o["name"]: o["value"] for o in gemm_cli.gemm_run_record("cpu")["observations"]}
+        by_name = {o["name"]: o["value"] for o in _record()["observations"]}
 
         seen: dict[tuple[int, int, int], str] = {}
         overlaps = 0
@@ -351,13 +475,13 @@ class TestTheRecord:
         assert overlaps > 0
 
     def test_it_declares_its_own_experiment(self) -> None:
-        assert gemm_cli.gemm_run_record("cpu")["experiment"] == GEMM_EXPERIMENT
+        assert _record()["experiment"] == GEMM_EXPERIMENT
 
     def test_it_carries_no_payload_digest(self) -> None:
-        assert gemm_cli.gemm_run_record("cpu")["payload_digest"] == NO_PAYLOAD
+        assert _record()["payload_digest"] == NO_PAYLOAD
 
     def test_the_registry_refuses_it_by_observation_count(self) -> None:
-        record = gemm_cli.gemm_run_record("cpu")
+        record = _record()
 
         with pytest.raises(ValueError, match="exactly one observation"):
             gate_record((), record)
@@ -369,7 +493,7 @@ class TestTheCommandLine:
 
         decoded = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
 
-        assert decoded["label"] == gemm_cli.GEMM_LABEL
+        assert decoded["label"] == gemm_cli.gemm_label_for("none", CUBLAS_ARM)
         assert len(decoded["observations"]) == 2 * len(probed_shapes())
 
     def test_main_creates_the_parent_directory(self, tmp_path: pathlib.Path) -> None:
@@ -389,7 +513,47 @@ class TestTheCommandLine:
 
     def test_an_absent_out_is_refused(self) -> None:
         with pytest.raises(ValueError, match="--out"):
-            gemm_cli.main(["--device", "cpu"])
+            gemm_cli.main(["--device", "cpu", "--controls", "none", "--kernel", CUBLAS_ARM])
+
+    def test_an_absent_controls_is_refused(self, tmp_path: pathlib.Path) -> None:
+        # No default posture. A record whose arm was guessed names a
+        # condition it may not have run under.
+        with pytest.raises(ValueError, match="--controls"):
+            gemm_cli.main(
+                ["--device", "cpu", "--out", str(_out_path(tmp_path)), "--kernel", CUBLAS_ARM]
+            )
+
+    def test_an_absent_kernel_is_refused(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="--kernel"):
+            gemm_cli.main(
+                ["--device", "cpu", "--out", str(_out_path(tmp_path)), "--controls", "none"]
+            )
+
+    def test_an_unknown_kernel_is_refused_before_anything_is_written(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        with pytest.raises(ValueError, match="kernel must be one of"):
+            gemm_cli.main([*_argv(tmp_path)[:-1], "triton"])
+
+        assert not _out_path(tmp_path).exists()
+
+    def test_the_destination_is_resolved_before_anything_computes(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # Until 2026-08-29 `--out` was read AFTER the record was built, so a
+        # command line missing it ran all fifty-nine GEMMs and then failed.
+        # The refusal must arrive before the work, not after it.
+        with pytest.raises(ValueError, match="--out"):
+            gemm_cli.main(["--device", "cpu", "--controls", "none", "--kernel", "triton"])
+
+    def test_the_label_names_both_arms(self, tmp_path: pathlib.Path) -> None:
+        argv = ["--device", "cpu", "--out", str(_out_path(tmp_path))]
+
+        assert gemm_cli.main([*argv, "--controls", "both", "--kernel", RANK1_ARM]) == 0
+
+        decoded = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
+
+        assert decoded["label"] == "gemm-attribution-v2-both-rank1"
 
     def test_an_unknown_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--shape"):

@@ -29,7 +29,6 @@ from __future__ import annotations
 import pathlib
 import sys
 from collections.abc import Sequence
-from typing import Final
 
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
@@ -50,6 +49,7 @@ from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
 )
+from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.forward_trace import TracedTensor, traced_forward
 from model_trainer.core.services.model.probe_shapes import require_probe_shape
 from model_trainer.core.services.model.trace_plan import (
@@ -69,52 +69,8 @@ _log = get_logger(__name__)
 
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
-CONTROLS_FLAG = "--controls"
 
 _FLAGS = (DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
-
-#: Which cross-card controls a trace applies, by the name the flag takes.
-#:
-#: WHY FOUR ARMS AND NOT TWO. The two controls address disjoint halves of a
-#: model -- split-K governs cuBLASLt matmuls, the math pin governs attention,
-#: and neither moves the other's tensors. So "both" answers whether agreement
-#: is achievable, and the two single-control arms answer which control bought
-#: which tensor. A two-arm flag would force a later attribution question to be
-#: a code change rather than a run.
-#:
-#: ``none`` is first and is the arm every other measurement command is fixed
-#: at: it applies nothing, so whatever the launcher exported still governs and
-#: :func:`workspace_observation` still reports the real environment.
-CONTROL_ARMS: Final[dict[str, tuple[bool, bool]]] = {
-    "none": (False, False),
-    "split-k": (True, False),
-    "attention": (False, True),
-    "both": (True, True),
-}
-
-
-def require_control_arm(raw: str) -> tuple[bool, bool]:
-    """Resolve the ``--controls`` value to a posture.
-
-    Args:
-        raw: The flag's value.
-
-    Returns:
-        ``(remove_split_k, math_attention)``.
-
-    Raises:
-        ValueError: When the name is not one of :data:`CONTROL_ARMS`. Refused
-            rather than defaulted: a trace whose arm was guessed is a trace
-            whose record names a condition it may not have run, which is the
-            defect this command's ``workspace_observation`` already exists to
-            prevent one control at a time.
-    """
-    arm = CONTROL_ARMS.get(raw)
-    if arm is None:
-        raise ValueError(
-            f"{CONTROLS_FLAG} must be one of {', '.join(sorted(CONTROL_ARMS))}; got {raw!r}"
-        )
-    return arm
 
 
 def tensor_observations(rung: str, traced: tuple[TracedTensor, ...]) -> tuple[Observation, ...]:
@@ -304,10 +260,8 @@ def entrypoint() -> None:
 
 
 __all__ = [
-    "CONTROL_ARMS",
     "entrypoint",
     "main",
-    "require_control_arm",
     "tensor_observations",
     "trace_run_record",
     "workspace_observation",

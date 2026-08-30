@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import torch
 
+from model_trainer.core.services.model.deterministic_gemm import gemm_by_arm
 from model_trainer.core.services.model.gemm_shapes import GEMM_SEED, GemmShape
 from model_trainer.core.services.model.tensor_digest import (
     DIGEST_BYTES,
@@ -56,43 +57,57 @@ def gemm_operands(shape: GemmShape, device: str) -> tuple[torch.Tensor, torch.Te
     return bias.to(device), x.to(device), w.to(device)
 
 
-def gemm_output(shape: GemmShape, device: str) -> torch.Tensor:
-    """Compute one GEMM, on the cuBLASLt path.
+def gemm_output(shape: GemmShape, device: str, *, kernel: str) -> torch.Tensor:
+    """Compute one GEMM under one kernel arm.
 
-    ``addmm`` rather than ``mm``: the fused bias epilogue is what routes this
-    to cuBLASLt, and ``mm`` was measured to reach the legacy ``cublasSgemm``
-    entry point instead, logging nothing under a trace. A probe on the wrong
-    entry point would answer a question nobody asked.
+    The arm is keyword-only and required, with no default, for the reason
+    ``probe_determinism``'s controls are: a caller that did not say which
+    arithmetic it wanted is a caller whose record cannot say either. On
+    :data:`~deterministic_gemm.CUBLAS_ARM` this is ``addmm`` rather than
+    ``mm``, because the fused bias epilogue is what routes it to cuBLASLt and
+    ``mm`` was measured to reach the legacy ``cublasSgemm`` entry point
+    instead, logging nothing under a trace.
 
     Args:
         shape: The call to run.
         device: Device to run it on.
+        kernel: One of :data:`~deterministic_gemm.KERNEL_ARMS`.
 
     Returns:
         The output tensor, still on ``device``.
+
+    Raises:
+        ValueError: Propagated from
+            :func:`~deterministic_gemm.require_kernel_arm` for an unknown arm.
     """
     bias, x, w = gemm_operands(shape, device)
-    return torch.addmm(bias, x, w)
+    return gemm_by_arm(kernel, bias, x, w)
 
 
-def gemm_description(shape: GemmShape) -> str:
+def gemm_description(shape: GemmShape, kernel: str) -> str:
     """Name one call, for a self-reproduction failure message.
+
+    The arm is in the message because all three produce a tensor of the same
+    shape: a failure reading only ``M1024xK4096xN64`` would not say which
+    arithmetic failed to reproduce itself.
 
     Args:
         shape: The call.
+        kernel: The arm it ran under.
 
     Returns:
-        e.g. ``a GEMM M1024xK4096xN64``.
+        e.g. ``a rank1 GEMM M1024xK4096xN64``.
     """
-    return f"a GEMM M{shape['rows']}xK{shape['inner']}xN{shape['cols']}"
+    return f"a {kernel} GEMM M{shape['rows']}xK{shape['inner']}xN{shape['cols']}"
 
 
-def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:
-    """Run one GEMM twice and describe the result.
+def gemm_identity(shape: GemmShape, device: str, *, kernel: str) -> tuple[float, float]:
+    """Run one GEMM twice under one arm and describe the result.
 
     Args:
         shape: The call to measure.
         device: Device to run it on.
+        kernel: One of :data:`~deterministic_gemm.KERNEL_ARMS`.
 
     Returns:
         ``(folded digest, float64 sum)`` of the output.
@@ -101,10 +116,13 @@ def gemm_identity(shape: GemmShape, device: str) -> tuple[float, float]:
         RuntimeError: Propagated from
             :func:`~tensor_digest.require_reproduced` when the same call on
             the same device produced two different tensors.
+        ValueError: Propagated from
+            :func:`~deterministic_gemm.require_kernel_arm` for an unknown arm.
     """
-    first = gemm_output(shape, device).cpu()
-    second = gemm_output(shape, device).cpu()
-    return describe_tensor(require_reproduced(first, second, gemm_description(shape), device))
+    first = gemm_output(shape, device, kernel=kernel).cpu()
+    second = gemm_output(shape, device, kernel=kernel).cpu()
+    described = require_reproduced(first, second, gemm_description(shape, kernel), device)
+    return describe_tensor(described)
 
 
 __all__ = [
