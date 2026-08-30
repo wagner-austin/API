@@ -46,6 +46,7 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
         "account": bot["account"],
         "role": bot["role"],
         "room": bot["room"],
+        "troop": bot["troop"],
         "pid": bot["pid"],
         "alive": bot["alive"],
         "returncode": bot["returncode"],
@@ -55,14 +56,14 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
     }
 
 
-def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str]:
+def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str, str]:
     """Parse the ``POST /bots`` body.
 
     Args:
         body: Raw request body.
 
     Returns:
-        ``(instance, account, kills, seconds, role, room)``.
+        ``(instance, account, kills, seconds, role, room, troop)``.
 
     Raises:
         JSONTypeError: Malformed JSON or wrong field types.
@@ -74,7 +75,8 @@ def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str]:
     seconds = narrow_json_to_int(data.get("seconds", 0))
     role = narrow_json_to_str(data.get("role", ""))
     room = narrow_json_to_str(data.get("room", ""))
-    return instance, account, kills, seconds, role, room
+    troop = narrow_json_to_str(data.get("troop", ""))
+    return instance, account, kills, seconds, role, room, troop
 
 
 def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
@@ -95,7 +97,7 @@ def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
 
 
 def _add_observation_routes(app: web.Application, manager: FleetManager) -> None:
-    """Wire the read-only routes: the page, the list, the stats.
+    """Wire the read-only routes: the page, the lists, the stats.
 
     Args:
         app: Application under construction.
@@ -119,8 +121,22 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         names: list[JSONValue] = list(manager.accounts())
         return _json_response({"accounts": names})
 
+    async def list_rooms(request: web.Request) -> web.Response:
+        """``GET /rooms`` — room selectors, first is the default."""
+        _ = request
+        names: list[JSONValue] = list(manager.rooms())
+        return _json_response({"rooms": names})
+
+    async def list_troops(request: web.Request) -> web.Response:
+        """``GET /troops`` — tank colors, in wire team-id order."""
+        _ = request
+        names: list[JSONValue] = list(manager.troops())
+        return _json_response({"troops": names})
+
     app.router.add_get("/", control_page)
     app.router.add_get("/accounts", list_accounts)
+    app.router.add_get("/rooms", list_rooms)
+    app.router.add_get("/troops", list_troops)
     app.router.add_get("/bots", list_bots)
 
 
@@ -198,7 +214,7 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     async def spawn_bot(request: web.Request) -> web.Response:
         """``POST /bots`` — spawn one instance."""
         try:
-            instance, account, kills, seconds, role, room = parse_spawn_request(
+            instance, account, kills, seconds, role, room, troop = parse_spawn_request(
                 await request.read()
             )
             row = manager.spawn(
@@ -208,6 +224,7 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
                 seconds=seconds,
                 role=role,
                 room=room,
+                troop=troop,
             )
         except (JSONTypeError, ValueError) as error:
             log.warning("Fleet: rejected spawn request (400): %s", error)

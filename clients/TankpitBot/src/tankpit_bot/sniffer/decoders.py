@@ -352,11 +352,23 @@ def decode_plus_message(ws: WorldService, text: str, tag: str) -> str:
 def decode_join_confirm(ws: WorldService, text: str, tag: str) -> str:
     """Decode a '=' prefixed JOIN_CONFIRM message.
 
-    Format: =room|date|name|rank|eq1|eq2|eq3|eq4
+    Format: =room|date|name|rank|f5|f6|f7|f8
     Example: =2|Sep. 25, 2012|Yuppler|4|9|9|9|10
 
     Rank values: 0=recruit, 1=private, 2=corporal, 3=sergeant,
                  4=lieutenant, 5=captain, 6=major, 7=colonel, 8=general
+
+    Fields 5-8 are UNIDENTIFIED and logged verbatim. They were named
+    ``eq1..eq4`` here and ``equipment`` in
+    :class:`~tankpit_bot.types.message.JoinConfirmDict`, but nothing
+    ever verified that. The competing reading comes from the client
+    itself: ``tpclient.js`` builds the lobby stats panel as ``Rank:``
+    followed immediately by ``Active Forces / Orange: / Purple: /
+    Blue: / Red:`` from four variables, which would make these
+    per-color PLAYER COUNTS for the room rather than inventory.
+    Logging them raw is what lets the two readings be told apart
+    against ``tankpit.com/api/active_games``, which reports the same
+    rooms' live populations without a login.
 
     Args:
         text: Text starting with '='.
@@ -372,7 +384,8 @@ def decode_join_confirm(ws: WorldService, text: str, tag: str) -> str:
     tank_name = parts[2] if len(parts) > 2 else "?"
     rank_num = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
     rank_str = RANK_NAMES[rank_num] if 0 <= rank_num < len(RANK_NAMES) else f"rank{rank_num}"
-    return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name} {rank_str}"
+    trailing = ",".join(parts[4:8]) if len(parts) > 4 else "-"
+    return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name} {rank_str} f5-8={trailing}"
 
 
 def decode_command(body: bytes, tag: str, magic: str | None) -> str:

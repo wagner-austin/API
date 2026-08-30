@@ -1,36 +1,36 @@
-"""Tests for join_room, auto_join_room, and ensure_on_play_page."""
+"""Tests for join_room, auto_join_room, and ensure_on_play_page.
+
+The room-list decoding that precedes the handshake lives in
+``test_room_discovery.py``, split out 2026-08-28 when this module
+crossed the 600-line ceiling.
+"""
 
 from __future__ import annotations
 
-import base64
-from collections.abc import Callable
-
 import pytest
-from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
+from platform_core.json_utils import JSONObject, JSONTypeError
 
-from tankpit_bot.browser.cdp_helpers import decode_captured_body, load_tpclient_static_key
+from tankpit_bot.browser.cdp_helpers import load_tpclient_static_key
 from tankpit_bot.browser.login import (
     ensure_on_play_page,
 )
 from tankpit_bot.browser.room_join import (
-    _collect_room_entries,
     _has_enter_response,
     _has_join_confirm,
-    _register_room_entries,
-    _resolve_room_id,
     _wait_for_enter_response,
     _wait_for_join_confirm,
     _wait_for_room_id,
     join_room,
     resolve_room_troop,
 )
-from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.conftest import FakeEnv
 from tests.login.conftest import (
     FakeCDPLogin,
     FakeCDPLoginNonDictResult,
     FakePageLogin,
+    FakeRawMessageCDP,
+    frame_payload,
 )
 
 # =============================================================================
@@ -169,28 +169,6 @@ def test_join_room_non_dict_result() -> None:
         join_room(page, cdp, WorldService())
 
 
-class _RawMessageCDP:
-    """CDP fake that only exposes captured raw websocket messages."""
-
-    def __init__(self, payloads: list[str]) -> None:
-        """Initialize fake raw-message source."""
-        payload_values: list[JSONValue] = []
-        payload_values.extend(payloads)
-        self._payloads = payload_values
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return the synthetic raw-message snapshot."""
-        _ = (method, params)
-        return {"result": {"value": self._payloads}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """Ignore event registration in tests."""
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        """Ignore detach in tests."""
-
-
 class _MissingMagicCDP(FakeCDPLogin):
     """Login fake that withholds tankpit.magic from the runtime."""
 
@@ -221,131 +199,12 @@ class _MissingStaticKeyCDP(FakeCDPLogin):
         return super()._handle_metadata_evaluate(expression)
 
 
-def _frame_payload(body: bytes) -> str:
-    """Encode one framed raw-message payload for login helper tests."""
-    return base64.b64encode(encode_frame(body)).decode("utf-8")
-
-
-def test_decode_captured_body_rejects_trailing_bytes() -> None:
-    """Captured body decode rejects trailing bytes after a framed payload."""
-    payload = base64.b64encode(encode_frame(b"+1|Practice") + b"\x00").decode("utf-8")
-
-    with pytest.raises(ValueError, match="unexpected trailing bytes"):
-        decode_captured_body(payload)
-
-
-def test_collect_room_entries_skips_non_room_messages_and_short_entries() -> None:
-    """Room collection ignores non-ROOM_LIST payloads and malformed entries."""
-    cdp = _RawMessageCDP(
-        [
-            _frame_payload(b"=1|date|Artax|4"),
-            _frame_payload(b"+9"),
-            _frame_payload(b"+1|Practice|1"),
-            _frame_payload(b"+1|2|118|101|not-a-room"),
-            _frame_payload(b"+1|Practice|1|0,0,0,0,0,0,0|1|p|field01.gif|2026"),
-        ]
-    )
-
-    entries = _collect_room_entries(cdp)
-
-    assert len(entries) == 1
-    assert entries[0]["room_id"] == "1"
-    assert entries[0]["name"] == "Practice"
-    assert entries[0]["image"] == "field01.gif"
-
-
-def test_register_room_entries_skips_missing_images() -> None:
-    """Room registration stores the field image from ROOM_LIST data."""
-
-    ws = WorldService()
-    _register_room_entries(
-        ws,
-        [
-            {
-                "room_id": "1",
-                "name": "Practice",
-                "field_id": 1,
-                "game_modes": "0,0,0,0,0,0,0",
-                "default_troop": 2,
-                "mode_code": "p",
-                "image": "field01.gif",
-                "year": "2026",
-            }
-        ],
-    )
-
-    assert ws.room_images["1"] == "field01.gif"
-
-
-def test_resolve_room_id_supports_prefix_match() -> None:
-    """Room resolution accepts stable prefix matches for renamed world rooms."""
-    room_id = _resolve_room_id(
-        [
-            {
-                "room_id": "4",
-                "name": "World (President Trump)",
-                "field_id": 24,
-                "game_modes": "5,1,0,0,0,0,0",
-                "default_troop": 2,
-                "mode_code": "n",
-                "image": "field24.gif",
-                "year": "2026",
-            }
-        ],
-        "World",
-    )
-
-    assert room_id == "4"
-
-
-def test_resolve_room_id_supports_exact_match() -> None:
-    """Room resolution returns the exact room ID on exact name matches."""
-    room_id = _resolve_room_id(
-        [
-            {
-                "room_id": "1",
-                "name": "Practice",
-                "field_id": 1,
-                "game_modes": "0,0,0,0,0,0,0",
-                "default_troop": 2,
-                "mode_code": "p",
-                "image": "field01.gif",
-                "year": "2026",
-            }
-        ],
-        "Practice",
-    )
-
-    assert room_id == "1"
-
-
-def test_resolve_room_id_returns_none_when_room_is_missing() -> None:
-    """Room resolution returns None when no room matches the target name."""
-    room_id = _resolve_room_id(
-        [
-            {
-                "room_id": "4",
-                "name": "World (President Trump)",
-                "field_id": 24,
-                "game_modes": "5,1,0,0,0,0,0",
-                "default_troop": 2,
-                "mode_code": "n",
-                "image": "field24.gif",
-                "year": "2026",
-            }
-        ],
-        "Practice",
-    )
-
-    assert room_id is None
-
-
 def test_has_join_confirm_ignores_other_rooms_before_match() -> None:
     """Join confirm matching skips unrelated room confirmations."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"=4|date|Artax|4"),
-            _frame_payload(b"=1|date|Artax|4"),
+            frame_payload(b"=4|date|Artax|4"),
+            frame_payload(b"=1|date|Artax|4"),
         ]
     )
 
@@ -354,10 +213,10 @@ def test_has_join_confirm_ignores_other_rooms_before_match() -> None:
 
 def test_has_join_confirm_respects_start_index() -> None:
     """Join confirm matching can ignore stale confirms captured earlier."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"=1|date|Artax|4"),
-            _frame_payload(b"=4|date|Artax|4"),
+            frame_payload(b"=1|date|Artax|4"),
+            frame_payload(b"=4|date|Artax|4"),
         ]
     )
 
@@ -366,10 +225,10 @@ def test_has_join_confirm_respects_start_index() -> None:
 
 def test_has_join_confirm_skips_non_join_messages() -> None:
     """Join confirm matching ignores non-'=' messages in the capture slice."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"$1|0"),
-            _frame_payload(b"=1|date|Artax|4"),
+            frame_payload(b"$1|0"),
+            frame_payload(b"=1|date|Artax|4"),
         ]
     )
 
@@ -378,10 +237,10 @@ def test_has_join_confirm_skips_non_join_messages() -> None:
 
 def test_has_enter_response_ignores_other_rooms_before_match() -> None:
     """Enter-response matching skips unrelated room responses."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"$4|0"),
-            _frame_payload(b"$1|0"),
+            frame_payload(b"$4|0"),
+            frame_payload(b"$1|0"),
         ]
     )
 
@@ -390,17 +249,17 @@ def test_has_enter_response_ignores_other_rooms_before_match() -> None:
 
 def test_has_enter_response_matches_target_room() -> None:
     """Enter-response matching returns True on a direct room match."""
-    cdp = _RawMessageCDP([_frame_payload(b"$1|0")])
+    cdp = FakeRawMessageCDP([frame_payload(b"$1|0")])
 
     assert _has_enter_response(cdp, "1") is True
 
 
 def test_has_enter_response_skips_non_status_messages() -> None:
     """Enter-response matching ignores non-'$' payloads before a real response."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"=1|Sep. 25, 2012|Artax|4|9|9|9|9"),
-            _frame_payload(b"$1|0"),
+            frame_payload(b"=1|Sep. 25, 2012|Artax|4|9|9|9|9"),
+            frame_payload(b"$1|0"),
         ]
     )
 
@@ -409,10 +268,10 @@ def test_has_enter_response_skips_non_status_messages() -> None:
 
 def test_has_enter_response_respects_start_index() -> None:
     """Enter-response matching can ignore stale responses captured earlier."""
-    cdp = _RawMessageCDP(
+    cdp = FakeRawMessageCDP(
         [
-            _frame_payload(b"$1|0"),
-            _frame_payload(b"$4|0"),
+            frame_payload(b"$1|0"),
+            frame_payload(b"$4|0"),
         ]
     )
 
@@ -422,7 +281,7 @@ def test_has_enter_response_respects_start_index() -> None:
 def test_wait_for_join_confirm_times_out_without_match() -> None:
     """Join confirm polling returns False when the target room never confirms."""
     page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = _RawMessageCDP([_frame_payload(b"=4|date|Artax|4")])
+    cdp = FakeRawMessageCDP([frame_payload(b"=4|date|Artax|4")])
 
     assert _wait_for_join_confirm(page, cdp, "1") is False
 
@@ -430,7 +289,7 @@ def test_wait_for_join_confirm_times_out_without_match() -> None:
 def test_wait_for_enter_response_times_out_without_match() -> None:
     """Enter-response polling returns False when the target room never responds."""
     page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = _RawMessageCDP([_frame_payload(b"$4|0")])
+    cdp = FakeRawMessageCDP([frame_payload(b"$4|0")])
 
     assert _wait_for_enter_response(page, cdp, "1") is False
 
@@ -438,7 +297,7 @@ def test_wait_for_enter_response_times_out_without_match() -> None:
 def test_wait_for_enter_response_returns_true_when_match_arrives() -> None:
     """Enter-response polling succeeds when the target room responds."""
     page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = _RawMessageCDP([_frame_payload(b"$1|0")])
+    cdp = FakeRawMessageCDP([frame_payload(b"$1|0")])
 
     assert _wait_for_enter_response(page, cdp, "1") is True
 
@@ -455,25 +314,6 @@ def test_wait_for_room_id_returns_none_when_missing() -> None:
     """Room-ID waiting returns None when the target room never appears."""
     page = FakePageLogin(start_url="https://tankpit.com/play")
     cdp = FakeCDPLogin(include_practice_room=False)
-
-    assert _wait_for_room_id(page, cdp, WorldService(), "Practice") is None
-
-
-def test_room_discovery_timeout_diagnostic_tolerates_empty_frames() -> None:
-    """The timeout dump skips undecodable frames and still reports.
-
-    The 2026-08-13 arterial fresh-login lobby exposed one non-target
-    room and the diagnostic dump is the discriminator between a parse
-    rejection and a capture race — it must never crash on an empty
-    captured frame while producing the report.
-    """
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = _RawMessageCDP(
-        [
-            _frame_payload(b""),
-            _frame_payload(b"+5|World (Desert)|2|d|2|n|desert.gif|2026"),
-        ]
-    )
 
     assert _wait_for_room_id(page, cdp, WorldService(), "Practice") is None
 

@@ -30,6 +30,16 @@ TEAM_PURPLE = 1
 TEAM_BLUE = 2
 TEAM_ORANGE = 3
 
+TROOP_COLOR_NAMES: tuple[str, ...] = ("red", "purple", "blue", "orange")
+"""Team colors indexed BY team id -- ``TROOP_COLOR_NAMES[TEAM_BLUE]``
+is ``"blue"``. One home for the color<->team mapping that three
+callers need: the practice-bot roster classification (join-roster
+ground truth: red-1 arrives team 0, purple-2 team 1, blue-7 team 2,
+orange-1 team 3), the ``TANKPIT_TROOP`` selector the join flow sends
+as the room-entry troop byte, and the fleet control page's color
+dropdown. Order is the wire's, not a display preference: the index IS
+the team id, so the tuple must never be re-sorted."""
+
 # Wire damage tier = fuel quartile (corpus-fitted 2026-07-23, 19,658
 # samples, zero exceptions; [[deactivation-format]]): tier 3 is the
 # TOP quartile (healthy, lightest shade), tier 0 the bottom (near
@@ -226,6 +236,7 @@ __all__ = [
     "TERRAIN_FERRY",
     "TERRAIN_FERRY_ROCK",
     "TERRAIN_GROUND",
+    "TROOP_COLOR_NAMES",
     "ContainerRefreshKind",
     "EntitySource",
     "TankLiveness",

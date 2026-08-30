@@ -283,3 +283,37 @@ class FakeCDPNonDictResult:
 
     def detach(self) -> None:
         """Detach CDP session."""
+
+
+class FakeRawMessageCDP:
+    """CDP fake that only exposes captured raw websocket messages."""
+
+    def __init__(self, payloads: list[str]) -> None:
+        """Initialize fake raw-message source."""
+        payload_values: list[JSONValue] = []
+        payload_values.extend(payloads)
+        self._payloads = payload_values
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Return the synthetic raw-message snapshot."""
+        _ = (method, params)
+        return {"result": {"value": self._payloads}}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Ignore event registration in tests."""
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Ignore detach in tests."""
+
+
+def frame_payload(body: bytes) -> str:
+    """Encode one framed raw-message payload for login helper tests.
+
+    Args:
+        body: The unframed message body.
+
+    Returns:
+        The base64 payload a captured raw message would carry.
+    """
+    return base64.b64encode(encode_frame(body)).decode("utf-8")

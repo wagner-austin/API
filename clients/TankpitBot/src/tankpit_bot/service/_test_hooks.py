@@ -27,6 +27,7 @@ from typing import Protocol
 
 from aiohttp import web
 
+from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.service.probe import default_probe_existing_instance
 from tankpit_bot.service.session_runner import BotFactoryProtocol
 
@@ -364,6 +365,24 @@ def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[b
     the per-instance isolation (artifact namespace, stop sentinel,
     account selection) all lands through the environment.
 
+    The child's stdout and stderr go to its OWN
+    ``runs/bot/<instance>/console.log``, never to the manager's
+    terminal. Inheriting the console (the behavior until 2026-08-28)
+    put every tick line and viewport dump of every bot into the
+    ``make fleet`` window — N interleaved streams with no instance
+    prefix — duplicating what the bot already writes to
+    ``latest.log``, and contradicting this service's own rule that
+    the manager owns lifecycle while telemetry stays on disk.
+
+    Redirecting to a FILE rather than discarding matters: the
+    interpreter prints an uncaught exception's traceback to stderr as
+    the process dies, AFTER the bot's file logging is gone. The
+    2026-08-28 bad-password run is the case in point — its
+    ``latest.log`` ends at "Login errors: Invalid username or
+    password." and the ``GameNotJoinedError`` traceback existed only
+    on the console. ``DEVNULL`` would have destroyed the one artifact
+    that explained the exit.
+
     Args:
         env_overrides: Variables set in the child's environment
             (``TANKPIT_BOT_INSTANCE`` and friends), layered over the
@@ -373,7 +392,16 @@ def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[b
         The spawned process handle.
     """
     pairs = [f"{key}={value}" for key, value in env_overrides.items()]
-    return subprocess.Popen([sys.executable, "-c", _CHILD_BOOTSTRAP, *pairs])
+    console = bot_run_dir(env_overrides.get("TANKPIT_BOT_INSTANCE", "")) / "console.log"
+    console.parent.mkdir(parents=True, exist_ok=True)
+    # Append, not truncate: a restart must not erase the traceback
+    # that explains why the previous run of this instance died.
+    with console.open("a", encoding="utf-8") as stream:
+        return subprocess.Popen(
+            [sys.executable, "-c", _CHILD_BOOTSTRAP, *pairs],
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+        )
 
 
 #: Fleet-manager spawn seam. Tests inject a fake that records env and

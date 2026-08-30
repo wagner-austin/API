@@ -194,15 +194,20 @@ def test_decode_plus_message_action_does_not_register_room_image() -> None:
 
 
 def test_decode_join_confirm() -> None:
-    """Test decode_join_confirm decodes JOIN_CONFIRM messages."""
+    """Test decode_join_confirm decodes JOIN_CONFIRM messages.
+
+    Fields 5-8 ride the line verbatim: they are unidentified, and the
+    log is the only place their values can be read against a known
+    room population.
+    """
     result = decode_join_confirm(WorldService(), "=4|Sep. 25, 2012|Yuppler|4|9|10", "RECV")
-    assert result == "[RECV] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant"
+    assert result == "[RECV] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant f5-8=9,10"
 
 
 def test_decode_join_confirm_short() -> None:
     """Test decode_join_confirm handles short messages."""
     result = decode_join_confirm(WorldService(), "=4|date", "RECV")
-    assert result == "[RECV] JOIN_CONFIRM: room=4 tank=? rank-1"
+    assert result == "[RECV] JOIN_CONFIRM: room=4 tank=? rank-1 f5-8=-"
 
 
 def test_decode_join_confirm_empty_room_id_does_not_select_room() -> None:
@@ -211,7 +216,7 @@ def test_decode_join_confirm_empty_room_id_does_not_select_room() -> None:
     ws = WorldService()
     result = decode_join_confirm(ws, "=|date", "RECV")
 
-    assert result == "[RECV] JOIN_CONFIRM: room= tank=? rank-1"
+    assert result == "[RECV] JOIN_CONFIRM: room= tank=? rank-1 f5-8=-"
     assert ws.selected_room is None
 
 
@@ -267,7 +272,7 @@ def test_decode_message_calls_decode_join_confirm() -> None:
     """Test decode_message routes to decode_join_confirm."""
     payload = frame_payload(b"=4|Sep. 25, 2012|Yuppler|4|9|10|10|9")
     result = decode_message(WorldService(), payload, "received", None)
-    assert result == "[RECEIVED] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant"
+    assert result == "[RECEIVED] JOIN_CONFIRM: room=4 tank=Yuppler lieutenant f5-8=9,10,10,9"
 
 
 def test_decode_message_calls_decode_command() -> None:

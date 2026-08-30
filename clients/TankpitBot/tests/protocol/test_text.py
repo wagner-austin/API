@@ -20,21 +20,27 @@ class TestDecodeJoinConfirm:
     """Tests for decode_join_confirm function."""
 
     def test_decodes_valid_join_confirm(self) -> None:
-        """Decodes valid join confirmation message."""
+        """Decodes valid join confirmation message.
+
+        The four trailing counts are the room's ACTIVE FORCES per
+        color (orange, purple, blue, red), confirmed live 2026-08-28:
+        a world empty of humans reads 9,9,9,9 because it always
+        carries 9 bots per color.
+        """
         data = b"=2|2024-01-15|PlayerName|4|1|0|1|0"
         result = decode_join_confirm(data)
         assert result["msg_type"] == 0x3D
         assert result["team"] == 2
-        assert result["join_date"] == "2024-01-15"
+        assert result["game_start"] == "2024-01-15"
         assert result["name"] == "PlayerName"
         assert result["rank"] == 4
-        assert result["equipment"] == [1, 0, 1, 0]
+        assert result["active_forces"] == [1, 0, 1, 0]
 
-    def test_decodes_with_missing_equipment(self) -> None:
-        """Decodes join confirmation with missing equipment fields."""
+    def test_decodes_with_missing_active_forces(self) -> None:
+        """Decodes join confirmation with the trailing counts absent."""
         data = b"=1|2024-01-15|Tank|3"
         result = decode_join_confirm(data)
-        assert result["equipment"] == []
+        assert result["active_forces"] == []
 
     def test_raises_on_wrong_prefix(self) -> None:
         """Raises DecodeError when prefix is wrong."""

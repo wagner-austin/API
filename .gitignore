@@ -82,6 +82,15 @@ Thumbs.db
 
 # Data directories (each service manages its own)
 **/data/
+# Allow the TankpitBot per-colour tank registry to be versioned: it is
+# measured state (each account's rank per colour per world), useless if
+# a clean of ignored files takes it -- which is how its neighbour the
+# equipment atlas disappeared mid-run on 2026-08-28. Re-ignore the
+# directory's contents so only this one file escapes the rule.
+!clients/TankpitBot/data/
+clients/TankpitBot/data/*
+!clients/TankpitBot/data/tank_registry.json
+
 # Allow covenant-radar-api external datasets to be versioned for tests/benchmarks
 !services/covenant-radar-api/data/
 !services/covenant-radar-api/data/external/

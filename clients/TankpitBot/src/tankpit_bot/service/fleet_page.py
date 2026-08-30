@@ -10,8 +10,12 @@ Served at ``GET /`` on the fleet port (default 27300). Two layers:
   renders. Mode band, fuel meter, stocks, do/why/tgt, K/H/M/RJ — all
   identical to what a human sees over the live game.
 * **The fleet table** — lifecycle: status, limits, kills/deaths/rank
-  totals from the digest, stop/restart/remove, and the launch form
-  (accounts from config, never free text).
+  totals from the digest, stop/restart/remove, and the launch form.
+  Every selector on that form is a dropdown, never free text:
+  accounts come from ``GET /accounts`` (accounts.json), rooms from
+  ``GET /rooms`` (:mod:`tankpit_bot.types.rooms`), roles from the
+  fleet-role vocabulary. Nothing on this page asks a human to
+  remember a spelling.
 
 Both poll every second; the server caches digest work.
 """
@@ -118,12 +122,12 @@ __CARD_CSS__
 <div class="panel">
 <table>
   <thead><tr>
-    <th>name</th><th>account</th><th>role</th><th>room</th><th>status</th><th>limits</th>
+    <th>name</th><th>account</th><th>role</th><th>room</th><th>color</th><th>status</th><th>limits</th>
     <th>kills</th><th>deaths</th><th>hit/miss</th><th>dmg +/-</th>
     <th>tp</th><th>0-radar</th><th>inv start&rarr;now</th>
     <th>rank</th><th>time</th><th>actions</th>
   </tr></thead>
-  <tbody id="rows"><tr><td colspan="16" class="empty">loading…</td></tr></tbody>
+  <tbody id="rows"><tr><td colspan="17" class="empty">loading…</td></tr></tbody>
 </table>
 </div>
 <form id="spawn">
@@ -137,8 +141,11 @@ __CARD_CSS__
     </select>
     <div class="hint">gatherer never hunts</div></div>
   <div class="field wide"><label for="room">Room</label>
-    <input id="room" type="text" placeholder="Practice">
-    <div class="hint">lobby room name; empty = Practice</div></div>
+    <select id="room"><option value="">Practice</option></select>
+    <div class="hint">the lobby's two rooms</div></div>
+  <div class="field"><label for="troop">Color</label>
+    <select id="troop"><option value="">account default</option></select>
+    <div class="hint">own rank + inventory; 5-min recolor cd</div></div>
   <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
@@ -241,6 +248,7 @@ function row(bot) {
     "<td>" + bot.instance + "</td><td>" + (bot.account || "default") + "</td>" +
     "<td>" + bot.role + "</td>" +
     "<td>" + (bot.room || "Practice") + "</td>" +
+    "<td>" + (bot.troop || "default") + "</td>" +
     "<td>" + status + "</td><td>" + limits + "</td>" +
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
@@ -297,7 +305,7 @@ async function poll() {
   tbody.replaceChildren();
   if (!names.length) {
     tbody.innerHTML =
-      '<tr><td colspan="16" class="empty">no bots yet — launch one below</td></tr>';
+      '<tr><td colspan="17" class="empty">no bots yet — launch one below</td></tr>';
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;
@@ -307,13 +315,16 @@ async function poll() {
     " · " + running + " running";
 }
 
-async function loadAccounts() {
+async function fillSelect(id, path, key, keepFirst) {
   try {
-    const body = await (await fetch("/accounts")).json();
-    const select = document.getElementById("account");
-    if (!body.accounts.length) return;
-    select.replaceChildren();
-    for (const name of body.accounts) {
+    const body = await (await fetch(path)).json();
+    const select = document.getElementById(id);
+    if (!body[key].length) return;
+    // keepFirst holds a static "" option — the account's own default
+    // colour, which no server list can name.
+    const kept = keepFirst ? [select.firstElementChild] : [];
+    select.replaceChildren(...kept);
+    for (const name of body[key]) {
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
@@ -331,6 +342,7 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
       account: document.getElementById("account").value,
       role: document.getElementById("role").value,
       room: document.getElementById("room").value,
+      troop: document.getElementById("troop").value,
       kills: Number(document.getElementById("kills").value) || 0,
       seconds: Number(document.getElementById("seconds").value) || 0,
     }),
@@ -340,7 +352,9 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
   if (response.ok) poll();
 });
 
-loadAccounts();
+fillSelect("account", "/accounts", "accounts");
+fillSelect("room", "/rooms", "rooms");
+fillSelect("troop", "/troops", "troops", true);
 poll();
 setInterval(poll, 1000);
 </script>

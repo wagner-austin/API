@@ -69,14 +69,17 @@ ENTER_RESPONSE_CODE = 0
 class SimAccountDict(TypedDict):
     """The account fields a join confirm reports back.
 
-    ``equipment`` is the four trailing counts of ``=room|date|name|
-    rank|e1|e2|e3|e4``; the archive's are all 9s and 10s.
+    ``active_forces`` is the four trailing counts of ``=room|date|
+    name|rank|orange|purple|blue|red`` -- tanks playing each color in
+    the room. All 9s is a world with no humans in it: there are always
+    9 bots per color (operator, 2026-08-28), so the archive's 9s and
+    10s are the standing bots plus the odd human.
     """
 
-    join_date: str
+    game_start: str
     name: str
     rank: int
-    equipment: tuple[int, int, int, int]
+    active_forces: tuple[int, int, int, int]
 
 
 SIM_ROOMS: tuple[RoomInfo, ...] = (
@@ -111,17 +114,17 @@ and an empty world."""
 
 
 SIM_ACCOUNT: SimAccountDict = SimAccountDict(
-    join_date="Jan. 08, 2013",
+    game_start="Jan. 08, 2013",
     name="red-9",
     rank=1,
-    equipment=(9, 9, 9, 9),
+    active_forces=(9, 9, 9, 9),
 )
 """The account the sim's join confirms report.
 
 ``name`` matches the client tank's own wire name (``make_sim_tank``'s
 practice shape for id 9) so the lobby and the room agree about who
-just joined; ``rank`` matches the tank's. The join date and equipment
-counts are the archive's own — nothing downstream reads them, and the
+just joined; ``rank`` matches the tank's. The game-start date and
+active force counts are the archive's own — nothing downstream reads them, and the
 only durable effect of a join confirm is that the room was accepted."""
 
 
@@ -159,10 +162,10 @@ def _join_confirm_frame(room_id: str, account: SimAccountDict) -> bytes:
     Returns:
         The plaintext frame body.
     """
-    equipment = "|".join(str(count) for count in account["equipment"])
+    active_forces = "|".join(str(count) for count in account["active_forces"])
     return (
-        f"{JOIN_CONFIRM_PREFIX}{room_id}|{account['join_date']}|"
-        f"{account['name']}|{account['rank']}|{equipment}"
+        f"{JOIN_CONFIRM_PREFIX}{room_id}|{account['game_start']}|"
+        f"{account['name']}|{account['rank']}|{active_forces}"
     ).encode()
 
 

@@ -19,6 +19,8 @@ from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_telemetry import FleetTelemetry
+from tankpit_bot.types.constants import TROOP_COLOR_NAMES
+from tankpit_bot.types.rooms import LOBBY_ROOMS
 
 log = get_logger(__name__)
 
@@ -54,6 +56,8 @@ class FleetBotDict(TypedDict):
             the child was spawned with ([[fleet-coordination]]).
         room: ``TANKPIT_ROOM`` the child was spawned with (empty means
             the default Practice room).
+        troop: Tank color name the child was spawned with (empty means
+            the account's own default for that map).
         pid: Child process id.
         alive: Whether the process is still running at report time.
         returncode: Exit code once dead; ``None`` while alive.
@@ -66,6 +70,7 @@ class FleetBotDict(TypedDict):
     account: str
     role: FleetRole
     room: str
+    troop: str
     pid: int
     alive: bool
     returncode: int | None
@@ -81,14 +86,20 @@ def _child_environment(
     resolved_role: str,
     account: str,
     room: str,
+    troop: str,
 ) -> dict[str, str]:
     """Build one child's spawn environment.
 
     ``TANKPIT_ROLE`` is always explicit: the child inherits the
     manager's whole environment, and a role lingering there must never
-    silently re-role the entire fleet. Empty account and room omit
-    their selectors so the child keeps its defaults (accounts.json
-    default; the Practice room).
+    silently re-role the entire fleet. Empty account, room and troop
+    omit their selectors so the child keeps its defaults (accounts.json
+    default; the Practice room; the account's own tank color for that
+    map).
+
+    ``TANKPIT_TROOP`` goes over the wire as the team id, so the color
+    NAME the operator picked is converted here — the index into
+    :data:`~tankpit_bot.types.constants.TROOP_COLOR_NAMES` IS that id.
 
     Args:
         instance: Validated instance name.
@@ -97,6 +108,7 @@ def _child_environment(
         resolved_role: Resolved fleet role.
         account: Account selector ("" = default).
         room: Room selector ("" = default).
+        troop: Tank color name ("" = the account's default).
 
     Returns:
         Environment overrides for the spawned child.
@@ -111,6 +123,8 @@ def _child_environment(
         env["TANKPIT_ACCOUNT"] = account
     if room:
         env["TANKPIT_ROOM"] = room
+    if troop:
+        env["TANKPIT_TROOP"] = str(TROOP_COLOR_NAMES.index(troop))
     return env
 
 
@@ -124,6 +138,7 @@ class _ManagedBot:
         account: str,
         role: FleetRole,
         room: str,
+        troop: str,
         kills: int,
         seconds: int,
         started_ms: int,
@@ -136,6 +151,7 @@ class _ManagedBot:
             account: Account selector the child received.
             role: Resolved fleet role the child received.
             room: Room selector the child received ("" = default).
+            troop: Tank color name the child received ("" = default).
             kills: Kill bound the child received.
             seconds: Seconds bound the child received.
             started_ms: Wall-clock spawn time.
@@ -145,6 +161,7 @@ class _ManagedBot:
         self.account = account
         self.role = role
         self.room = room
+        self.troop = troop
         self.kills = kills
         self.seconds = seconds
         self.started_ms = started_ms
@@ -162,6 +179,7 @@ class _ManagedBot:
             account=self.account,
             role=self.role,
             room=self.room,
+            troop=self.troop,
             pid=self.process.pid,
             alive=returncode is None,
             returncode=returncode,
@@ -197,6 +215,28 @@ def _resolve_role(role: str) -> FleetRole:
     raise FleetError(f"role {role!r} is not a fleet role (one of: {known_roles})")
 
 
+def _resolve_troop(troop: str) -> str:
+    """Resolve a spawn request's color selector to a tank color name.
+
+    Args:
+        troop: Color name, or ``""`` to keep the account's own default
+            tank color for the map it joins.
+
+    Returns:
+        The validated color name, or ``""``.
+
+    Raises:
+        FleetError: If the selector is not a tank color.
+    """
+    if troop == "":
+        return ""
+    for known in TROOP_COLOR_NAMES:
+        if troop == known:
+            return known
+    known_colors = ", ".join(TROOP_COLOR_NAMES)
+    raise FleetError(f"troop {troop!r} is not a tank color (one of: {known_colors})")
+
+
 class FleetManager:
     """Spawn and track one bot process per instance name."""
 
@@ -220,6 +260,41 @@ class FleetManager:
         if not top_hooks.path_exists(_ACCOUNTS_PATH):
             return []
         return [account["username"] for account in load_accounts(_ACCOUNTS_PATH)]
+
+    def rooms(self) -> list[str]:
+        """Return the room selectors the control page offers.
+
+        The lobby lists two rooms, and the world's display name
+        carries the current map, so the page offers the durable
+        PREFIXES the join resolver matches on
+        ([[game-rules]], :mod:`tankpit_bot.types.rooms`) rather than
+        asking a human to type a name that rotates. Spawn still
+        accepts any selector: this list is what the dropdown shows,
+        not a closed set.
+
+        Returns:
+            Room selectors in lobby order; the first is the default.
+        """
+        return list(LOBBY_ROOMS)
+
+    def troops(self) -> list[str]:
+        """Return the tank colors the control page offers.
+
+        Four colors, in TEAM ID order — the index is the wire's team
+        id, so the list doubles as the name->id table the spawn
+        environment converts through. An account holds FOUR TANKS PER
+        WORLD, one per color, each with its own RANK, inventory, fuel
+        and points (awards alone are shared) — so picking a color
+        picks WHICH TANK plays, not a skin, and a fresh color starts
+        that world from scratch. The worlds are independent: four on
+        the main world plus four on Practice. Switching is throttled
+        per world — 5 minutes between exiting a world and re-entering
+        it on a different color ([[game-rules]]).
+
+        Returns:
+            Color names in team-id order.
+        """
+        return list(TROOP_COLOR_NAMES)
 
     def derive_instance(self, account: str) -> str:
         """Derive the instance name from the account — programmatic, reliable.
@@ -255,6 +330,7 @@ class FleetManager:
         seconds: int,
         role: str = "",
         room: str = "",
+        troop: str = "",
     ) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -273,14 +349,17 @@ class FleetManager:
             role: Fleet role selector; empty means fighter — the full
                 doctrine is the primary configuration, a gatherer is
                 an explicit operator choice ([[fleet-coordination]]).
+            troop: Tank color name; empty keeps the account's own
+                default tank for the map. Accounts hold one tank per
+                color, so this picks which tank plays.
 
         Returns:
             The spawned instance's report row.
 
         Raises:
             FleetError: If the name is invalid, already registered and
-                alive, the bounds are negative, or the role is not a
-                fleet role.
+                alive, the bounds are negative, or the role or troop
+                is not a known one.
         """
         if not instance:
             instance = self.derive_instance(account)
@@ -292,6 +371,7 @@ class FleetManager:
         if kills < 0 or seconds < 0:
             raise FleetError("bounds must be non-negative")
         resolved_role = _resolve_role(role)
+        resolved_troop = _resolve_troop(troop)
         if account:
             configured = self.accounts()
             if account not in configured:
@@ -320,13 +400,16 @@ class FleetManager:
                 f"instance {instance!r} is already running (pid {existing.process.pid})"
             )
         process = service_hooks.spawn_bot_process(
-            _child_environment(instance, kills, seconds, resolved_role, account, room)
+            _child_environment(
+                instance, kills, seconds, resolved_role, account, room, resolved_troop
+            )
         )
         bot = _ManagedBot(
             instance=instance,
             account=account,
             role=resolved_role,
             room=room,
+            troop=resolved_troop,
             kills=kills,
             seconds=seconds,
             started_ms=top_hooks.get_current_time_ms(),
@@ -378,6 +461,12 @@ class FleetManager:
     def restart(self, instance: str) -> FleetBotDict:
         """Respawn a finished instance with the parameters it had.
 
+        ALL of them: account, bounds, role, room, and troop. The room was
+        missing here from the day it was added to spawn (2026-08-26)
+        until 2026-08-28, so a restart silently relocated the bot to
+        the default Practice room — the row said ``World``, the child
+        joined Practice, and only the run log disagreed.
+
         The fleet never silently kills: restarting a LIVE instance is
         refused — stop it first, let the teardown run, then restart.
 
@@ -401,6 +490,8 @@ class FleetManager:
             kills=bot.kills,
             seconds=bot.seconds,
             role=bot.role,
+            room=bot.room,
+            troop=bot.troop,
         )
 
     def stats_gate(self, instance: str) -> None:

@@ -67,7 +67,14 @@ class RoomInfo(TypedDict):
         name: Room display name.
         field_id: Field/map identifier used to resolve the room image.
         game_modes: Comma-separated game mode flags.
-        default_troop: Default troop/team code sent by the client for room entry.
+        default_troop: The color this account played LAST on this room,
+            which the client pre-selects for entry — not a fixed
+            account setting (user ground truth 2026-08-28: "whichever
+            color you were last is the default, but you can click
+            another color and enter"). ``-1`` means the account has
+            never played this room, which is why a never-entered room
+            has no color to name. Choosing a DIFFERENT color than this
+            one is what arms the 5-minute recolor cooldown.
         mode_code: One-letter room mode code from the lobby payload.
         image: Background image filename.
         year: Year value (purpose unknown).

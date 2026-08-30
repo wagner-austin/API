@@ -5059,3 +5059,41 @@ Minutes into the v0.1.0-af9b2fdd fleet validation the operator flagged fuel blee
 ## [2026-08-28] live crash + fix | A locked sibling report killed a session — denied reads now skip, never raise
 
 First two-bot World fleet, arterial tick 316 (21:10:06): `PermissionError` reading artax's `knowledge.json` mid-`os.replace`, three immediate retries all landed inside the same swap window (heavy machine load: two Chromiums + a parallel test gate), and the "persistent denial = real permission fault" raise KILLED the session — over one beat of advisory data that rewrites every ~2 s. The premise behind the raise is falsified and the design inverted: a sibling denied through the whole retry budget is SKIPPED for that exchange (`_read_report_text` returns None; the next tick reads the fresh rewrite), with a `fleet_report_read_denied` diagnostic so a genuinely wedged permission fault stays visible as a repeating beacon instead of a corpse. Teardown-hang watchdog fired again on the crashed session's browser close (second sighting tonight) — still a watch item, artifacts save first by design.
+
+## [2026-08-28] live probe | Troop byte == team id, confirmed — and one account's two World tanks differ by two ranks
+
+Chasing "why can't the dashboard show me each tank's rank", two sniff runs on Artax settled three things and killed one of my own guesses.
+
+**The `=` lobby rows were already decoded.** `sniffer/decoders.py::decode_join_confirm` has carried the format all along — `=room|date|name|rank|f5|f6|f7|f8`, ranks `0=recruit .. 8=general` — while I wrote a `_collect_account_records` collector in `browser/room_join.py` to capture them as "undecoded material". It never produced a line in any run, for a reason worth keeping: it ran right after room DISCOVERY, and the `=` rows are the RESPONSE TO A SELECT, which had not been sent yet. Collector and its tests deleted; the decoder is the one home. Grepping for the format first would have cost one command.
+
+**Troop byte == team id.** `TANKPIT_TROOP=3` -> `Enter game: room=6 troop=3` -> `Self: (128,128) team=3 rank=6`. The colors the operator picks and the team ids every decoder already speaks are ONE space (red 0, purple 1, blue 2, orange 3), which validates the new fleet color dropdown's name->index conversion. The client's lobby picker binds `pick-troop-orange` to 0 and `pick-troop-red` to 3 — the reverse — so those DOM ids are UI slots and reading them as wire values would have entered orange when the operator asked for red. Five independent pins (mine-team `Pg.h`, map-data team bits, practice-bot roster, game-rules, operator ground truth) versus one misleading DOM order.
+
+**Independent rank per color, measured.** Same account, same world: the red tank (last played, so the lobby's `default_troop` 0) is **lieutenant**; entering as orange reported **major**. Two ranks two apart on one account/world, exactly as the operator's four-tanks-per-world rule predicts, and the fuel caps follow (`1400` vs `1600`).
+
+**Cooldown scope, measured.** The first run tried to enter blue (`.env` `TANKPIT_TROOP=2`) over a red last-played tank inside the 5-minute window: every SELECT answered and returned rank, only the ENTER went unanswered (`Enter response timeout: room=6 name=World`). The cooldown gates ENTRY, not the lobby query — so rank is readable even while a recolor is barred.
+
+Still open: fields 5-8 of the JOIN_CONFIRM. The client's lobby panel renders `Rank:` immediately followed by `Active Forces / Orange: / Purple: / Blue: / Red:` from four variables, so they are probably per-color PLAYER COUNTS for that room, not the `eq1..eq4` equipment the decoder's docstring names them. Untested: the decoder prints only room/tank/rank and drops 5-8, and the capture stores ciphered frames. One log line would settle it against `/api/active_games`.
+
+## [2026-08-28] decoded | JOIN_CONFIRM fields 5-8 are ACTIVE FORCES, not equipment — 9 bots per color is the tell
+
+Added the trailing fields to the sniffer's JOIN_CONFIRM log line and read them against the public API. Live: `JOIN_CONFIRM: room=6 tank=Artax major f5-8=9,9,9,9` with `api/active_games` reporting `World (Desert) playing=0` at the same minute. Operator supplied the key: "its cuz there's always 9 bots of each color." So the two sources disagree because they count different things — the API counts HUMANS, the wire counts every tank, and an empty world still carries 36 bots. The archived `9|10|10|9` sample decodes cleanly under this reading as the same 9-per-color baseline plus one human on two colors, and the evening's own viewport census (`Tanks: 38 (allies=10, enemies=27)`) agrees.
+
+The name `equipment` was invented, never verified, and had spread to three places: `eq1..eq4` in `sniffer/decoders.py`, `JoinConfirmDict.equipment` in `protocol/types/text.py`, and `SimAccountDict.equipment` in `sim/lobby.py`. All renamed `active_forces`, with the meaning and its receipt written where the field is declared rather than left in a log entry. The lead came from `tpclient.js` itself: the lobby panel builds `Rank:` followed immediately by `Active Forces / Orange: / Purple: / Blue: / Red:` from four variables — reading the client before running another probe is what turned a guess into a decode.
+
+Not yet pinned: the field ORDER. Orange-first comes from the client's panel builder, and every sample so far is symmetric (all 9s), so an asymmetric one — a world with humans on a known color — is what would confirm it. Cheap: any run while somebody is playing.
+
+## [2026-08-28] census | Every colour's rank on World, for all three accounts — and rank is the lever on the forage loop
+
+Operator directive: "just identify which colors we're missing for each. log into world, get stats, log out ... then wait 5 min then another color". Twelve cells filled by entering each colour once and reading the wire's own `Self: (128,128) team=T rank=R` on entry — the JOIN_CONFIRM reports the PREVIOUS last-played colour, so the entry line is what names the colour just chosen. Committed as `data/tank_registry.json`, the same shape as `data/equipment_atlas.json` (operator ruling: a dict of dicts, not a database — 24 cells does not want a service, migrations and a second source of truth).
+
+| account | red | purple | blue | orange |
+|---|---|---|---|---|
+| Artax | lieutenant 4 | captain 5 | captain 5 | **major 6** |
+| Yuppler | **colonel 7** | captain 5 | lieutenant 4 | lieutenant 4 |
+| Arterial | sergeant 3 | **lieutenant 4** | sergeant 3 | private 1 |
+
+Two checks fell out of it. Arterial's orange read `private` (1), exactly matching the 2026-08-13 lobby capture fifteen days earlier — the method reproduces. And the evening's unexplained fuel caps resolve completely: artax at `1480/1500` was its CAPTAIN purple tank and at `1100/1100` a private one, not the demotion I had offered as an alternative. Different colour, different tank, different cap — [[game-rules]]'s independent-rank rule doing exactly what it says.
+
+**Operationally this outranks cascade tuning.** `fuel_capacity = 1000 + 100*rank` and `radar_radius = 2 + rank//3` ([[game-economy]]), so Yuppler's colonel fields 1700 fuel and a radius-4 scan against a recruit's 1000 and radius-2. The forage oscillation diagnosed earlier the same evening — ~300-fuel frontier teleports draining the tank faster than it refilled, so `hunt-only-when-full` never armed and the bot foraged beside two visible enemies — is a fuel-budget failure first. Fielding the best-ranked colour per account (Artax orange, Yuppler red, Arterial purple) buys more headroom than any rung reordering would, and the colour dropdown shipped earlier tonight is what makes that selectable.
+
+Method note: the census script's final round held ONE job, and PowerShell unwrapped the single-element array so `$job[0]`/`$job[1]` indexed into the string `"Arterial"` — it ran `account=A troop=r`, which failed at account lookup and entered nothing. Caught by reading the output rather than the exit code; the missing cell was re-run by hand. Practice was not surveyed (World only, per the directive).

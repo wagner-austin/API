@@ -56,7 +56,7 @@ def test_select_answers_with_a_join_confirm_the_decoder_accepts() -> None:
     assert len(frames) == 1
     confirm = decode_join_confirm(frames[0])
     assert confirm["name"] == SIM_ACCOUNT["name"]
-    assert confirm["join_date"] == SIM_ACCOUNT["join_date"]
+    assert confirm["game_start"] == SIM_ACCOUNT["game_start"]
 
 
 def test_selecting_a_room_that_is_not_advertised_answers_nothing() -> None:
@@ -170,7 +170,7 @@ def test_the_auth_frame_carries_the_session_magic_last() -> None:
 def test_a_join_confirm_reports_the_accounts_equipment_counts() -> None:
     """All four trailing counts ride the confirm."""
     account = SimAccountDict(
-        join_date="Feb. 02, 2020", name="red-9", rank=3, equipment=(1, 2, 3, 4)
+        game_start="Feb. 02, 2020", name="red-9", rank=3, active_forces=(1, 2, 3, 4)
     )
     frame = SimLobby(account).handle_frame(b"*1")[0]
 

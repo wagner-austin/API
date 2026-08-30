@@ -31,6 +31,7 @@ from tankpit_bot.sim.bot_policy import (
     BOT_RETURN_WINDOW_MS,
 )
 from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
+from tankpit_bot.types.constants import TROOP_COLOR_NAMES
 from tankpit_bot.validate.shadow_timeline import (
     ShadowTimelineDict,
     ShotEventDict,
@@ -44,9 +45,12 @@ boundary (frame timing jitter — the same tolerance the corpse-window
 law uses)."""
 
 
-_TEAM_BY_COLOR = {"red": 0, "purple": 1, "blue": 2, "orange": 3}
-"""Roster color → team id (join-roster ground truth: red-1 arrives
-team 0, purple-2 team 1, blue-7 team 2, orange-1 team 3)."""
+_TEAM_BY_COLOR = {name: team for team, name in enumerate(TROOP_COLOR_NAMES)}
+"""Roster color → team id, derived from the one vocabulary
+(:data:`~tankpit_bot.types.constants.TROOP_COLOR_NAMES`, whose index
+IS the team id) rather than restating it — this module kept its own
+copy of the name regex once already, which is why that lives in
+``protocol/naming.py`` today."""
 
 
 def _bot_teams(timeline: ShadowTimelineDict) -> dict[int, int]:

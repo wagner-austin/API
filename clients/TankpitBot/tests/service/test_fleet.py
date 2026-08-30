@@ -1,4 +1,10 @@
-"""Tests for the AI-operated fleet manager."""
+"""Tests for the AI-operated fleet manager's domain layer.
+
+Spawn, bounds, accounts, rooms, lifecycle, stats, and the port/entry
+wiring. The aiohttp surface over this registry is exercised in
+``test_fleet_http.py``, split out 2026-08-28 when the combined module
+crossed the 600-line ceiling.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +12,11 @@ from pathlib import Path
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestClient
-from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks.fs import PathExistsProtocol
+from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import _real_run_web_app, _real_spawn_bot_process
 from tankpit_bot.service.fleet import main
@@ -21,6 +26,8 @@ from tankpit_bot.service.fleet_manager import (
     FleetManager,
     resolve_fleet_port,
 )
+from tankpit_bot.types.constants import TEAM_BLUE
+from tankpit_bot.types.rooms import DEFAULT_LOBBY_ROOM
 from tests.conftest import FakeEnv
 from tests.service._fleet_fixtures import (
     _FakeSpawner,
@@ -163,6 +170,59 @@ def test_spawn_with_a_room_sets_the_selector(spawner: _FakeSpawner) -> None:
     assert row["room"] == "World (Desert)"
 
 
+def test_rooms_offers_the_two_lobby_selectors_default_first(
+    spawner: _FakeSpawner,
+) -> None:
+    """The dropdown offers prefixes, not the map-stamped display names.
+
+    The lobby lists two rooms and the world's name carries the current
+    map ("World (Desert)"), so ``World`` is what stays true across a
+    rotation. That the selectors actually resolve against a live lobby
+    is the join resolver's contract, tested in ``tests/login``.
+    """
+    _ = spawner
+    manager = FleetManager()
+
+    names = manager.rooms()
+
+    assert names == ["Practice", "World"]
+    assert names[0] == DEFAULT_LOBBY_ROOM
+
+
+def test_troops_are_team_id_ordered_and_reach_the_child_as_the_wire_id(
+    spawner: _FakeSpawner,
+) -> None:
+    """Color is picked by NAME and sent as the team id it indexes.
+
+    An account holds four tanks per world, one per color, each with
+    its own rank and inventory ([[game-rules]]) — so this selector
+    picks WHICH TANK plays. The wire wants the team id, and
+    ``TROOP_COLOR_NAMES`` is ordered so the index IS that id — a
+    re-sort of that tuple would silently send the wrong tank.
+    """
+    manager = FleetManager()
+
+    names = manager.troops()
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0, troop="orange")
+    with pytest.raises(FleetError, match="not a tank color"):
+        manager.spawn(instance="bravo", account="", kills=0, seconds=0, troop="chartreuse")
+
+    assert names == ["red", "purple", "blue", "orange"]
+    assert names[TEAM_BLUE] == "blue"
+    assert row["troop"] == "orange"
+    assert spawner.envs[0]["TANKPIT_TROOP"] == "3"
+
+
+def test_spawn_without_a_troop_omits_the_selector(spawner: _FakeSpawner) -> None:
+    """An empty color keeps the account's own tank for that map."""
+    manager = FleetManager()
+
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+
+    assert "TANKPIT_TROOP" not in spawner.envs[0]
+    assert row["troop"] == ""
+
+
 def test_spawn_without_a_room_omits_the_selector(spawner: _FakeSpawner) -> None:
     """An empty room keeps the child's default (Practice)."""
     manager = FleetManager()
@@ -275,11 +335,25 @@ def test_remove_refuses_a_live_instance_and_drops_a_dead_one(
 def test_restart_respawns_a_dead_instance_with_its_parameters(
     spawner: _FakeSpawner,
 ) -> None:
-    """Restart reuses the stored account and bounds, refusing while alive."""
+    """Restart reuses account, bounds AND room, refusing while alive.
+
+    The room is spawned here rather than left default because that is
+    exactly how the omission hid: with no room on either spawn, the
+    env-equality assertion below held while ``restart`` silently
+    dropped the selector and relocated the bot to Practice (live,
+    2026-08-28 — the row read ``World``, the child joined Practice).
+    """
     originals = _with_configured_accounts()
     try:
         manager = FleetManager()
-        manager.spawn(instance="alpha", account="second", kills=30, seconds=2700)
+        manager.spawn(
+            instance="alpha",
+            account="second",
+            kills=30,
+            seconds=2700,
+            room="World",
+            troop="purple",
+        )
 
         with pytest.raises(FleetError, match="still running"):
             manager.restart("alpha")
@@ -291,6 +365,10 @@ def test_restart_respawns_a_dead_instance_with_its_parameters(
     finally:
         _restore_account_hooks(originals)
     assert row["pid"] == 1002
+    assert row["room"] == "World"
+    assert row["troop"] == "purple"
+    assert spawner.envs[0]["TANKPIT_ROOM"] == "World"
+    assert spawner.envs[0]["TANKPIT_TROOP"] == "1"
     assert spawner.envs[1] == spawner.envs[0]
 
 
@@ -405,6 +483,8 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
     assert canonical == {
         "/",
         "/accounts",
+        "/rooms",
+        "/troops",
         "/bots",
         "/bots/{instance}/stats",
         "/bots/{instance}/hud",
@@ -436,138 +516,22 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
     The child is terminated immediately — interpreter startup takes far
     longer than the kill lands, so it never reaches the bot entry point
     (which would open a browser).
+
+    Its console goes to the instance's own file, never to the
+    manager's terminal: inheriting the console put every bot's tick
+    lines in the ``make fleet`` window (2026-08-28). The file is
+    opened even for a child that dies instantly, because the stream
+    the interpreter prints a fatal traceback to IS this one.
     """
+    console = bot_run_dir("covspawn") / "console.log"
     process = _real_spawn_bot_process({"TANKPIT_BOT_INSTANCE": "covspawn"})
     try:
         assert process.pid > 0
+        assert console.exists()
     finally:
         process.kill()
         process.wait(timeout=30)
+        console.unlink()
+        console.parent.rmdir()
     if process.poll() is None:
         raise AssertionError("child still running after kill + wait")
-
-
-@pytest.mark.asyncio
-async def test_http_spawn_list_stop_remove_cycle(
-    fleet_client: TestClient[web.Request, web.Application],
-    spawner: _FakeSpawner,
-) -> None:
-    """The full AI-driven lifecycle over plain HTTP."""
-    written: list[tuple[Path, str]] = []
-
-    def fake_write(path: Path, content: str) -> None:
-        written.append((Path(path), content))
-
-    original_write = top_hooks.write_text
-    top_hooks.write_text = fake_write
-    try:
-        payload: dict[str, str | int] = {"instance": "alpha", "kills": 30, "role": "gatherer"}
-        created = await fleet_client.post("/bots", json=payload)
-        assert created.status == 201
-        created_row = narrow_json_to_dict(load_json_str(await created.text()))
-        assert created_row["role"] == "gatherer"
-
-        listed = await fleet_client.get("/bots")
-        body = narrow_json_to_dict(load_json_str(await listed.text()))
-        bots = body["bots"]
-        assert isinstance(bots, list) and len(bots) == 1
-        first = narrow_json_to_dict(bots[0])
-        assert first["role"] == "gatherer"
-
-        stopped = await fleet_client.post("/bots/alpha/stop")
-        assert stopped.status == 200
-        assert written == [(Path("runs/bot/alpha/STOP"), "")]
-
-        blocked = await fleet_client.delete("/bots/alpha")
-        assert blocked.status == 409
-
-        spawner.processes[0].returncode = 0
-        removed = await fleet_client.delete("/bots/alpha")
-        assert removed.status == 200
-    finally:
-        top_hooks.write_text = original_write
-
-
-@pytest.mark.asyncio
-async def test_http_page_stats_and_restart(
-    fleet_client: TestClient[web.Request, web.Application],
-    spawner: _FakeSpawner,
-) -> None:
-    """The control page serves, stats answer JSON, restart respawns."""
-    page = await fleet_client.get("/")
-    assert page.status == 200
-    assert (page.headers["Content-Type"]).startswith("text/html")
-    body = await page.text()
-    assert "Tankpit Fleet" in body and "/bots" in body and "/accounts" in body
-    # The spawn form offers every fleet role — a gatherer is a spawn
-    # choice, not an env var the operator has to remember.
-    assert 'id="role"' in body and "gatherer" in body
-
-    originals = _with_configured_accounts()
-    try:
-        listed_accounts = await fleet_client.get("/accounts")
-        assert listed_accounts.status == 200
-        accounts_payload = narrow_json_to_dict(load_json_str(await listed_accounts.text()))
-        assert accounts_payload == {"accounts": ["artax", "second"]}
-    finally:
-        _restore_account_hooks(originals)
-
-    ok: dict[str, str | int] = {"instance": "alpha", "kills": 5}
-    assert (await fleet_client.post("/bots", json=ok)).status == 201
-
-    def fake_read(path: Path) -> str:
-        raise OSError(f"no events at {path}")
-
-    original_read = top_hooks.read_text
-    top_hooks.read_text = fake_read
-    try:
-        stats = await fleet_client.get("/bots/alpha/stats")
-        assert stats.status == 200
-        payload = narrow_json_to_dict(load_json_str(await stats.text()))
-        assert payload == {"available": False}
-        assert (await fleet_client.get("/bots/ghost/stats")).status == 404
-        activity = await fleet_client.get("/bots/alpha/activity")
-        assert activity.status == 200
-        activity_payload = narrow_json_to_dict(load_json_str(await activity.text()))
-        assert activity_payload == {"available": False}
-        assert (await fleet_client.get("/bots/ghost/activity")).status == 404
-        hud = await fleet_client.get("/bots/alpha/hud")
-        assert hud.status == 200
-        hud_payload = narrow_json_to_dict(load_json_str(await hud.text()))
-        assert hud_payload == {"available": False}
-        assert (await fleet_client.get("/bots/ghost/hud")).status == 404
-    finally:
-        top_hooks.read_text = original_read
-
-    assert (await fleet_client.post("/bots/alpha/restart")).status == 409
-    assert (await fleet_client.post("/bots/ghost/restart")).status == 404
-    spawner.processes[0].returncode = 0
-    restarted = await fleet_client.post("/bots/alpha/restart")
-    assert restarted.status == 201
-    row = narrow_json_to_dict(load_json_str(await restarted.text()))
-    assert row["pid"] == 1002
-
-
-@pytest.mark.asyncio
-async def test_http_rejections_are_typed_statuses(
-    fleet_client: TestClient[web.Request, web.Application],
-    spawner: _FakeSpawner,
-) -> None:
-    """400 for malformed spawns, 409 for duplicates, 404 for ghosts."""
-    bad: dict[str, str | int] = {"instance": "../escape"}
-    assert (await fleet_client.post("/bots", json=bad)).status == 409
-
-    bad_role: dict[str, str | int] = {"instance": "bravo", "role": "scout"}
-    refused_role = await fleet_client.post("/bots", json=bad_role)
-    assert refused_role.status == 409
-    assert "not a fleet role" in await refused_role.text()
-
-    malformed: dict[str, str] = {"kills": "many"}
-    assert (await fleet_client.post("/bots", json=malformed)).status == 400
-
-    ok: dict[str, str | int] = {"instance": "alpha"}
-    assert (await fleet_client.post("/bots", json=ok)).status == 201
-    assert (await fleet_client.post("/bots", json=ok)).status == 409
-
-    assert (await fleet_client.post("/bots/ghost/stop")).status == 404
-    assert (await fleet_client.delete("/bots/ghost")).status == 404

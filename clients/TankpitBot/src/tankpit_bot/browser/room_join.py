@@ -31,6 +31,7 @@ from tankpit_bot.protocol.lobby import (
 )
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types.constants import TEAM_BLUE
+from tankpit_bot.types.rooms import DEFAULT_LOBBY_ROOM
 
 log = get_logger(__name__)
 
@@ -44,13 +45,22 @@ def resolve_room_troop() -> int | None:
     """Resolve the explicitly configured tank color, or ``None`` when unset.
 
     ``TANKPIT_TROOP`` names the color this bot must play (0=red,
-    1=purple, 2=blue, 3=orange). Accounts hold one tank PER COLOR per
-    map ([[game-rules]]), so the join flow uses this to pick which of
-    the account's tanks to enter with — overriding the lobby's
+    1=purple, 2=blue, 3=orange). Accounts hold four tanks per world,
+    one PER COLOR, each with its own rank and inventory
+    ([[game-rules]]), so the join flow uses this to pick which of the
+    account's tanks to enter with — overriding the lobby's
     ``default_troop`` when they differ (fleet ruling 2026-08-14:
     same-team allies; arterial's account holds an orange tank but the
-    fleet plays blue). The server enforces the 5-minute recolor
-    cooldown after a logout; the override simply states the color.
+    fleet plays blue).
+
+    Overriding is not free. ``default_troop`` is the color this
+    account played LAST on that room, so naming a different one IS a
+    recolor, and the server refuses the ENTRY for 5 minutes after the
+    previous exit. Measured 2026-08-28 (``runs/sniff/
+    sniff-20260828-213328.log``): Artax had just played World as red
+    (``default_troop`` 0), ``TANKPIT_TROOP=2`` asked for blue, and
+    every SELECT answered normally while the enter response never
+    came. The cooldown gates ENTRY, not the lobby query.
 
     Lives here rather than in ``bot/config.py`` with the other env
     resolvers because its only consumer is the join flow and
@@ -333,10 +343,12 @@ def _resolve_entry_troop(room_id: str, default_troop: int) -> int:
 
     An explicit ``TANKPIT_TROOP`` names the color this bot plays
     (fleet ruling 2026-08-14: same-team allies) -- it overrides the
-    account's lobby default, since accounts hold one tank per color
-    per map and the enter request's troop byte picks which one to
-    play. The server enforces the 5-minute recolor cooldown; the bot
-    just states the color. ``default_troop == -1`` marks a room this
+    lobby's pre-selection, since accounts hold four tanks per world,
+    one per color, and the enter request's troop byte picks which one
+    plays. ``default_troop`` is NOT a fixed account setting: it is
+    whichever color this account played last on this room, so an
+    override that differs from it is a recolor and the server refuses
+    the entry for 5 minutes after the previous exit. ``default_troop == -1`` marks a room this
     account has NO TANK on yet (measured 2026-08-13, the fresh
     Arterial account): the lobby UI answers it with a color picker,
     and the picker's output is this same troop byte -- so the bot
@@ -386,7 +398,7 @@ def join_room(
         True if the room was confirmed and the enter response arrived.
     """
     log.info("Joining game...")
-    room_name = _test_hooks.get_env("TANKPIT_ROOM") or "Practice"
+    room_name = _test_hooks.get_env("TANKPIT_ROOM") or DEFAULT_LOBBY_ROOM
     room_entry = _wait_for_room_entry(page, cdp, ws, room_name)
     if room_entry is None:
         log.info("Room select failed: room list never exposed %s", room_name)

@@ -76,10 +76,10 @@ def decode_join_confirm(data: bytes) -> JoinConfirmDict:
     return JoinConfirmDict(
         msg_type=0x3D,
         team=int(parts[0]),
-        join_date=parts[1],
+        game_start=parts[1],
         name=parts[2],
         rank=int(parts[3]),
-        equipment=[int(p) for p in parts[4:8] if p.isdigit()],
+        active_forces=[int(p) for p in parts[4:8] if p.isdigit()],
     )
 
 
