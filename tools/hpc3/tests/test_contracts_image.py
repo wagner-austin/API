@@ -50,6 +50,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "base_image": "python:3.11.16-slim-bookworm",
         "env_prefix": "/opt/env",
         "git_commit": "d11efacd231ef92426eaf92483c33a8504bd770f",
+        "system_packages": [],
         "extra_index_urls": ["https://download.pytorch.org/whl/cu124"],
         "requirements": ["torch==2.6.0+cu124", "transformers==4.46.3"],
         "wheels": ["model_trainer_server-0.1.0-py3-none-any.whl"],
@@ -81,6 +82,7 @@ class TestRoundTrip:
             "required_symbols",
             "requirements",
             "smoke_commands",
+            "system_packages",
             "wheels",
         ]
 
@@ -122,6 +124,67 @@ class TestPinnedRequirements:
     def test_surrounding_whitespace_is_stripped(self) -> None:
         spec = decode_image_spec(_spec(requirements=["  torch==2.6.0+cu124  "]))
         assert spec["requirements"] == ["torch==2.6.0+cu124"]
+
+
+class TestPinnedSystemPackages:
+    """The same argument as the pip layer, in the distribution's syntax."""
+
+    @pytest.mark.parametrize("entry", ["xvfb", "openjdk-17-jre-headless", "mesa-utils"])
+    def test_an_unpinned_package_is_refused(self, entry: str) -> None:
+        """An unpinned apt install resolves against whatever the distribution
+        serves that day and SUCCEEDS, so two images built a week apart differ
+        with nothing recording that they do."""
+        with pytest.raises(JSONTypeError, match="must pin an exact version"):
+            _ = decode_image_spec(_spec(system_packages=[entry]))
+
+    def test_the_pin_is_the_distributions_and_not_pips(self) -> None:
+        """``apt-get install xvfb==2`` installs nothing and reports success;
+        one equals sign is the syntax."""
+        spec = decode_image_spec(_spec(system_packages=["xvfb=2:21.1.4-2ubuntu1.7"]))
+        assert spec["system_packages"] == ["xvfb=2:21.1.4-2ubuntu1.7"]
+
+    def test_an_empty_layer_is_allowed_because_most_images_have_none(self) -> None:
+        """Requiring a package would force one to be invented."""
+        assert decode_image_spec(_spec(system_packages=[]))["system_packages"] == []
+
+    @pytest.mark.parametrize(
+        "entry",
+        [
+            "xvfb=1 ; rm -rf /",
+            "xvfb=1 && curl x",
+            "xvfb=$(id)",
+            "xvfb=`id`",
+            "xvfb=1|sh",
+            "xvfb>=2",
+        ],
+    )
+    def test_a_shell_metacharacter_is_refused(self, entry: str) -> None:
+        """These are interpolated into the build script, so a stray separator
+        becomes a second command rather than a package that does not exist --
+        and the build reports success having installed nothing."""
+        with pytest.raises(JSONTypeError, match="interpolated into the build script"):
+            _ = decode_image_spec(_spec(system_packages=[entry]))
+
+    def test_a_blank_entry_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must not be blank"):
+            _ = decode_image_spec(_spec(system_packages=["   "]))
+
+    def test_a_non_string_entry_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a string"):
+            _ = decode_image_spec(_spec(system_packages=[7]))
+
+    def test_surrounding_whitespace_is_stripped(self) -> None:
+        spec = decode_image_spec(_spec(system_packages=["  xvfb=1.2  "]))
+        assert spec["system_packages"] == ["xvfb=1.2"]
+
+    def test_the_field_is_required_rather_than_defaulted(self) -> None:
+        """Nothing is defaulted in this document: a field absent is a field
+        the author did not decide, and deciding it here would put a value into
+        an image that no document records."""
+        payload = _spec()
+        del payload["system_packages"]
+        with pytest.raises(JSONTypeError):
+            _ = decode_image_spec(payload)
 
 
 class TestEnvPrefix:
@@ -430,6 +493,31 @@ class TestTheCommittedSpec:
         assertion is worth keeping because the LOOK is worth forcing, but
         anyone tempted to explain the next recurrence should reach for the
         generator instead.
+
+        WHY THE GENERATOR IS NOT REACHABLE FROM HERE, checked on 2026-08-30
+        rather than assumed. The generator that would end this would derive
+        the list from the code -- import each module and resolve each
+        attribute -- and this package cannot: ``hpc3`` is its own poetry
+        project and ``import model_trainer`` fails in its venv. Deriving the
+        list from the spec instead would assert the spec against itself and
+        check nothing. So the transcription is not laziness, it is the only
+        thing available at this layer.
+
+        WHERE THE REAL RESOLVE-CHECK LIVES. ``selfcheck.py``, rendered into
+        the build directory and run INSIDE the image, which is where every
+        module is installed. That is the check with teeth; this list is a
+        local front-run of it, and its value is catching a moved symbol
+        before a build job is spent rather than after. v24 spent one on a
+        stale smoke, which is the same class of failure one layer over.
+
+        Eleventh recurrence, 2026-08-30: ``require_control_arm`` MOVED --
+        from ``cli.probe_trace`` to ``core.services.model.control_arms``,
+        because the isolated GEMM probe needed the same four arms -- and
+        three symbols were added for the kernel arms. A move is the case the
+        confession above never covered: the transcribed list stayed
+        internally consistent and pointed at an attribute that no longer
+        existed, so the spec would have decoded, rendered, and failed in the
+        container.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
@@ -449,8 +537,21 @@ class TestTheCommittedSpec:
             ("model_trainer.cli.train_benchmark", "train_run_record"),
             ("model_trainer.cli.train_benchmark_report", "report_lines"),
             ("model_trainer.cluster.preflight", "check_corpus_certified"),
+            (
+                "model_trainer.core.services.model.control_arms",
+                "require_control_arm",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
+                "gemm_by_arm",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
+                "rank1_addmm",
+            ),
             ("model_trainer.core.services.model.forward_cost", "release_row"),
             ("model_trainer.core.services.model.forward_trace", "traced_forward"),
+            ("model_trainer.core.services.model.gemm_shapes", "GEMM_BOUNDARY"),
             (
                 "model_trainer.core.services.model.known_answer_probe",
                 "probe_forward_loss",

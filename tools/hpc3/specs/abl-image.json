@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "9c817bf7a61d97e497582182f44162dc7b9e5137",
+  "git_commit": "c8ea46878e56eb29b8906e1b25487819882e7e6f",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -213,15 +213,30 @@
       "attribute": "CUBLASLT_WORKSPACE_ENV_VAR"
     },
     {
-      "module": "model_trainer.cli.probe_trace",
+      "module": "model_trainer.core.services.model.control_arms",
       "attribute": "require_control_arm"
+    },
+    {
+      "module": "model_trainer.core.services.model.deterministic_gemm",
+      "attribute": "rank1_addmm"
+    },
+    {
+      "module": "model_trainer.core.services.model.deterministic_gemm",
+      "attribute": "gemm_by_arm"
+    },
+    {
+      "module": "model_trainer.core.services.model.gemm_shapes",
+      "attribute": "GEMM_BOUNDARY"
     }
   ],
   "smoke_commands": [
     "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
     "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
-    "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm.json",
+    "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm.json --controls none --kernel cublas",
+    "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm-rank1.json --controls both --kernel rank1",
+    "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/gemm.json')); b = json.load(open('/tmp/gemm-rank1.json')); assert a['label'] == 'gemm-attribution-v2-none-cublas', a['label']; assert b['label'] == 'gemm-attribution-v2-both-rank1', b['label']; ka = {o['name'] for o in a['observations']}; assert ka == {o['name'] for o in b['observations']}, 'arms must probe the same shapes'; assert any('large-attn-qkv-M3840-K1280' in n for n in ka), 'the shape the v24 trace broke on is missing'\"",
+    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import cublas_addmm, rank1_addmm; torch.manual_seed(42); b = torch.randn(384); x = torch.randn(64, 128); w = torch.randn(128, 384); r = rank1_addmm(b, x, w); assert torch.equal(r, rank1_addmm(b, x, w)), 'rank1 did not reproduce itself'; assert not torch.equal(r, cublas_addmm(b, x, w)), 'rank1 dispatched back to addmm'; assert (r - cublas_addmm(b, x, w)).abs().max().item() < 1e-3, 'rank1 is not the same product'\"",
     "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
     "/opt/env/bin/python -m model_trainer.cli.probe_trace --device cpu --out /tmp/trace.json --controls none",
     "/opt/env/bin/python -m model_trainer.cli.sdpa_probe --device cpu --out /tmp/sdpa.json",
