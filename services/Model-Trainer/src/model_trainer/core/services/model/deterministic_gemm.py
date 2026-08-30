@@ -115,22 +115,27 @@ def fp64_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Te
     return wide.float()
 
 
-def rank1_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
-    """Compute the same product as K rank-one updates in ascending k.
+def rank1_matmul(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute ``x @ w`` as K rank-one updates in ascending k.
 
-    The accumulator starts at zero and the bias is added at the END, not
-    folded in first. Both are fixed orders and they give different bits: a
-    bias added first participates in the rounding of all K subsequent adds.
-    Last matches how ``addmm`` is written -- ``bias + (x @ w)`` -- so the arms
-    differ in the reduction under study and not also in where the bias went.
+    The product without the bias, because two callers need exactly this and
+    one of them has no bias to add. ``lm_head`` is
+    ``nn.Linear(n_embd, vocab, bias=False)``, and handing it a zero bias would
+    not be free: ``0.0 + -0.0`` is ``+0.0``, so a zeroed bias can flip the
+    sign bit of a negative zero and change bytes a digest reads. Consistently,
+    on every card -- but a probe should not introduce a difference it then has
+    to argue is harmless.
 
     ``addr_`` rather than ``add_(torch.outer(...))``: one elementwise kernel
     over the accumulator instead of an allocation and two, which at K up to
     8192 is the difference between seconds and tens of seconds. It computes
     the same thing.
 
+    ``w`` may be a transposed view -- ``Linear`` stores ``[out, in]`` and this
+    wants ``[in, out]`` -- so ``w[k, :]`` is a strided read. Measured to give
+    the same result as the contiguous form to the last bit.
+
     Args:
-        bias: ``[M]``.
         x: ``[N, K]``.
         w: ``[K, M]``.
 
@@ -140,7 +145,58 @@ def rank1_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.T
     accumulator = torch.zeros(x.shape[0], w.shape[1], dtype=x.dtype, device=x.device)
     for k in range(w.shape[0]):
         accumulator.addr_(x[:, k], w[k, :])
-    return bias + accumulator
+    return accumulator
+
+
+def rank1_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute the same product as K rank-one updates, then add the bias.
+
+    The bias is added at the END, not folded into the accumulator first. Both
+    are fixed orders and they give different bits: a bias added first
+    participates in the rounding of all K subsequent adds. Last matches how
+    ``addmm`` is written -- ``bias + (x @ w)`` -- so the arms differ in the
+    reduction under study and not also in where the bias went.
+
+    Args:
+        bias: ``[M]``.
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+
+    Returns:
+        ``[N, M]``.
+    """
+    return bias + rank1_matmul(x, w)
+
+
+def matmul_by_arm(arm: str, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute ``x @ w`` by the named arm, with no bias anywhere.
+
+    The bias-free twin of :func:`gemm_by_arm`, for the one caller that has no
+    bias: ``lm_head`` is ``nn.Linear(n_embd, vocab, bias=False)``. Passing it
+    a zeroed bias instead would not be free -- ``0.0 + -0.0`` is ``+0.0``, so
+    a zero bias can flip the sign bit of a negative zero and change bytes a
+    digest reads -- and it would also route the cuBLAS arm to ``addmm``,
+    whose fused epilogue takes a DIFFERENT library entry point than the
+    ``mm`` an untreated ``lm_head`` actually uses. The whole point of the
+    cuBLAS arm is to be the untreated path.
+
+    Args:
+        arm: One of :data:`KERNEL_ARMS`.
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+
+    Returns:
+        ``[N, M]``, float32.
+
+    Raises:
+        ValueError: Propagated from :func:`require_kernel_arm`.
+    """
+    named = require_kernel_arm(arm)
+    if named == CUBLAS_ARM:
+        return torch.matmul(x, w)
+    if named == FP64_ARM:
+        return torch.matmul(x.double(), w.double()).float()
+    return rank1_matmul(x, w)
 
 
 def require_kernel_arm(raw: str) -> str:
@@ -196,6 +252,8 @@ __all__ = [
     "cublas_addmm",
     "fp64_addmm",
     "gemm_by_arm",
+    "matmul_by_arm",
     "rank1_addmm",
+    "rank1_matmul",
     "require_kernel_arm",
 ]

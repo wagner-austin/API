@@ -76,18 +76,32 @@ class _CountingPin:
 
 
 def _restore_env_hook() -> Generator[None, None, None]:
-    """Put the config package's env reader back after each test.
+    """Put BOTH hooks :func:`_stated` swaps back after each test.
 
-    The hook is module-global. Left swapped it would answer for every later
+    The hooks are module-global. Left swapped they answer for every later
     test in the same worker, which is the failure mode a shared hook has and
     a fixture is the whole of the fix.
+
+    IT ONLY RESTORED ONE OF THE TWO until 2026-08-30, and the paragraph above
+    was already written when it did. ``_stated`` swaps ``get_env`` AND
+    ``apply_determinism_hook``; this put back ``get_env`` alone, so
+    ``apply_determinism_hook`` stayed pointing at :class:`_CountingPin` --
+    which returns a fixed record carrying neither control -- for the rest of
+    the worker. Nothing caught it because ``--dist loadscope`` happened to
+    place no test that reads those settings after this file, until a new test
+    module changed the grouping and ``probe_trace``'s "the applied arm
+    reaches the determinism record" started failing with ``KeyError:
+    'cublaslt_split_k'``: a real assertion, a real bug, and neither of them
+    in the file that failed.
 
     Yields:
         None, for the duration of one test.
     """
-    original = config_hooks.get_env
+    original_env = config_hooks.get_env
+    original_pin = _test_hooks.apply_determinism_hook
     yield
-    config_hooks.get_env = original
+    config_hooks.get_env = original_env
+    _test_hooks.apply_determinism_hook = original_pin
 
 
 restore_env_hook = pytest.fixture(_restore_env_hook)

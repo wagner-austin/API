@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.services.model.forward_trace import (
     ForwardTrace,
     install_hooks,
@@ -106,30 +107,30 @@ class TestWhatOneTinyForwardTraces:
     def test_the_traced_loss_is_the_untraced_loss_to_the_last_bit(self) -> None:
         # The control. If the hooks perturbed the arithmetic, nothing else in
         # a trace record could be read against the ladder that motivated it.
-        _, loss = traced_forward("cpu", TINY)
+        _, loss = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert loss == probe_forward_loss("cpu", TINY)
 
     def test_the_steps_never_go_backwards(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         steps = [t["step"] for t in traced]
 
         assert steps == sorted(steps)
 
     def test_it_starts_at_the_token_embedding_input(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert (traced[0]["path"], traced[0]["kind"]) == ("transformer.wte", INPUT_KIND)
 
     def test_it_ends_at_the_output_projection(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert (traced[-1]["path"], traced[-1]["kind"]) == ("lm_head", OUTPUT_KIND)
 
     def test_the_output_projection_is_a_bias_free_linear(self) -> None:
         # Which is why disabling cuBLASLt's split-K cannot reach it: a Linear
         # with no bias takes the legacy cublasSgemm path, not cuBLASLt.
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         head = [t for t in traced if t["path"] == "lm_head"]
 
         assert [t["module_class"] for t in head] == ["Linear", "Linear"]
@@ -139,7 +140,7 @@ class TestWhatOneTinyForwardTraces:
         # module, not a submodule, so its result is observable ONLY as the
         # input of the projection that consumes it. This is the boundary the
         # whole leaf-input rule exists for.
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         matching = [
             t
             for t in traced
@@ -152,19 +153,19 @@ class TestWhatOneTinyForwardTraces:
         # Recorded rather than assumed: transformers 4.46 chooses the
         # attention class at construction, and which one ran is part of what
         # a difference between two cards would have to be explained by.
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         classes = {t["module_class"] for t in traced if t["path"] == "transformer.h.0.attn"}
 
         assert classes == {"GPT2SdpaAttention"}
 
     def test_both_layers_of_the_tiny_model_are_traced(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         layers = {t["path"].split(".")[2] for t in traced if t["path"].startswith("transformer.h.")}
 
         assert layers == {"0", "1"}
 
     def test_every_leaf_that_ran_contributed_an_input_and_an_output(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         kinds: dict[str, set[str]] = {}
         for tensor in traced:
             kinds.setdefault(tensor["path"], set()).add(tensor["kind"])
@@ -173,7 +174,7 @@ class TestWhatOneTinyForwardTraces:
         assert leaves == {path for path in leaves if kinds[path] == {INPUT_KIND, OUTPUT_KIND}}
 
     def test_a_container_module_contributes_an_output_and_no_input(self) -> None:
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
         block = {t["kind"] for t in traced if t["path"] == "transformer.h.0"}
 
         assert block == {OUTPUT_KIND}
@@ -181,13 +182,13 @@ class TestWhatOneTinyForwardTraces:
     def test_the_root_is_never_traced(self) -> None:
         # Its hook could not fire: the probe calls forward directly, not
         # __call__, and forward hooks fire from __call__.
-        traced, _ = traced_forward("cpu", TINY)
+        traced, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert [t for t in traced if t["path"] == ""] == []
 
     def test_the_trace_reproduces_itself_exactly(self) -> None:
-        first, first_loss = traced_forward("cpu", TINY)
-        second, second_loss = traced_forward("cpu", TINY)
+        first, first_loss = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
+        second, second_loss = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert first == second
         assert first_loss == second_loss
@@ -197,8 +198,8 @@ class TestTheHooksAreRemoved:
     def test_a_second_trace_records_the_same_count_as_the_first(self) -> None:
         # Handles left installed would double the second run's records, and
         # would go on instrumenting whatever the process ran next.
-        first, _ = traced_forward("cpu", TINY)
-        second, _ = traced_forward("cpu", TINY)
+        first, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
+        second, _ = traced_forward("cpu", TINY, kernel=CUBLAS_ARM)
 
         assert len(first) == len(second)
 
@@ -237,4 +238,8 @@ class TestTheHooksAreRemoved:
 class TestRefusals:
     def test_a_shape_longer_than_its_vocabulary_is_refused_before_anything_runs(self) -> None:
         with pytest.raises(ValueError, match="exceeds vocab_size"):
-            traced_forward("cpu", {"model_size": "tiny", "sequence_len": 8, "vocab_size": 4})
+            traced_forward(
+                "cpu",
+                {"model_size": "tiny", "sequence_len": 8, "vocab_size": 4},
+                kernel=CUBLAS_ARM,
+            )

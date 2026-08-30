@@ -236,6 +236,19 @@ class TracedModuleProto(Protocol):
         """Yield this module's immediate children."""
         ...
 
+    def set_submodule(self, target: str, module: torch.nn.Module) -> None:
+        """Replace the submodule at a dotted path.
+
+        Added 2026-08-30 for the kernel arms, which run a rung with its
+        matmul-bearing modules swapped for ones that fix the reduction order.
+        ``torch.nn.Module.set_submodule`` rather than ``setattr`` on a parent:
+        it takes the same dotted path ``named_modules`` already yields, so a
+        swap needs no second walk to find the parent and no attribute name
+        assembled by hand -- and it is a typed method rather than a dynamic
+        attribute write, which is what lets this stay inside a Protocol.
+        """
+        ...
+
     def register_forward_hook(self, hook: ForwardHookProto, /) -> HookHandleProto:
         """Call ``hook`` after this module computes, until the handle is removed."""
         ...

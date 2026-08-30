@@ -50,6 +50,7 @@ from model_trainer.core.run_fingerprint import (
     describe_run_fingerprint,
 )
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
+from model_trainer.core.services.model.deterministic_gemm import require_kernel_arm
 from model_trainer.core.services.model.forward_trace import TracedTensor, traced_forward
 from model_trainer.core.services.model.probe_shapes import require_probe_shape
 from model_trainer.core.services.model.trace_plan import (
@@ -69,8 +70,9 @@ _log = get_logger(__name__)
 
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
+KERNEL_FLAG = "--kernel"
 
-_FLAGS = (DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
+_FLAGS = (DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG, KERNEL_FLAG)
 
 
 def tensor_observations(rung: str, traced: tuple[TracedTensor, ...]) -> tuple[Observation, ...]:
@@ -132,7 +134,12 @@ def workspace_observation() -> Observation:
 
 
 def trace_run_record(
-    device: str, rungs: tuple[str, ...], *, remove_split_k: bool, math_attention: bool
+    device: str,
+    rungs: tuple[str, ...],
+    *,
+    remove_split_k: bool,
+    math_attention: bool,
+    kernel: str,
 ) -> RunRecord:
     """Pin determinism, trace every rung, and record what they ran on.
 
@@ -148,6 +155,11 @@ def trace_run_record(
         device: Device to trace every rung on.
         remove_split_k: Whether to take split-K out of cuBLASLt's options.
         math_attention: Whether to restrict attention to the math kernel.
+        kernel: Which arithmetic the model's matmuls use, by
+            :data:`~deterministic_gemm.KERNEL_ARMS` name. The controls
+            above pick which VENDOR kernel runs; this picks whether a
+            vendor kernel runs at all, so it is in the record's LABEL
+            rather than beside it -- see :func:`trace_label`.
         rungs: The rungs to walk, in order. Taken as an argument rather than
             read from the module so the suite can exercise this on one cheap
             rung: the declared set ends in a 1.5-billion-parameter model,
@@ -163,9 +175,11 @@ def trace_run_record(
             :func:`~model_trainer.core.services.model.probe_shapes.require_probe_shape`
             when a rung is not one the ladder declares. Nothing is traced
             under a name that names no shape.
-        ValueError: Propagated from :func:`trace_label` when a rung repeats.
+        ValueError: Propagated from :func:`trace_label` when a rung repeats,
+            or from :func:`~kernel_arm_modules.use_kernel_arm` for an
+            unknown arm.
     """
-    label = trace_label(rungs)
+    label = trace_label(rungs, kernel)
     shapes = tuple((rung, require_probe_shape(rung)) for rung in rungs)
 
     # Read BEFORE anything computes. A trace that cannot name its own arm is
@@ -179,7 +193,7 @@ def trace_run_record(
 
     observations: list[Observation] = [workspace]
     for rung, shape in shapes:
-        traced, loss = traced_forward(device, shape)
+        traced, loss = traced_forward(device, shape, kernel=kernel)
         # Logged per rung rather than only at the end: the large rungs take
         # long enough that a job killed by a wall clock or preemption would
         # otherwise leave no record of which rungs had already succeeded.
@@ -214,17 +228,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
+    # Every flag resolved BEFORE anything computes, so a command line that
+    # cannot be honoured costs nothing rather than a GPU-hour.
+    device = cli_args.require_flag(parsed, DEVICE_FLAG)
     remove_split_k, math_attention = require_control_arm(
         cli_args.require_flag(parsed, CONTROLS_FLAG)
     )
+    kernel = require_kernel_arm(cli_args.require_flag(parsed, KERNEL_FLAG))
+    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
     record = trace_run_record(
-        cli_args.require_flag(parsed, DEVICE_FLAG),
+        device,
         _test_hooks.trace_rungs(),
         remove_split_k=remove_split_k,
         math_attention=math_attention,
+        kernel=kernel,
     )
 
-    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

@@ -32,6 +32,7 @@ from platform_ml.determinism import (
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import probe_trace
+from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM, RANK1_ARM
 from model_trainer.core.services.model.known_answer_probe import probe_forward_loss
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.services.model.trace_plan import (
@@ -98,13 +99,22 @@ def _out_path(tmp_path: pathlib.Path) -> pathlib.Path:
 
 def _argv(tmp_path: pathlib.Path) -> list[str]:
     """Return a complete CPU command line for the trace."""
-    return ["--device", "cpu", "--out", str(_out_path(tmp_path)), "--controls", "none"]
+    return [
+        "--device",
+        "cpu",
+        "--out",
+        str(_out_path(tmp_path)),
+        "--controls",
+        "none",
+        "--kernel",
+        CUBLAS_ARM,
+    ]
 
 
 class TestWhatOneRecordCarries:
     def test_it_reports_two_observations_for_every_traced_tensor(self) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         parsed = [parse_trace_name(o["name"]) for o in record["observations"]]
         tensors = [p for p in parsed if p is not None]
@@ -115,7 +125,7 @@ class TestWhatOneRecordCarries:
 
     def test_the_loss_it_records_is_what_the_production_forward_pass_returns(self) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         values = {o["name"]: o["value"] for o in record["observations"]}
 
@@ -125,7 +135,7 @@ class TestWhatOneRecordCarries:
         # Everything except the one RECORD-level observation, which describes
         # the process rather than any rung and so carries no rung prefix.
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         names = [o["name"] for o in record["observations"]]
 
@@ -133,7 +143,7 @@ class TestWhatOneRecordCarries:
 
     def test_the_observations_come_back_in_execution_order(self) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         digests = [
             parsed
@@ -146,7 +156,7 @@ class TestWhatOneRecordCarries:
 
     def test_the_first_traced_tensor_is_the_token_embedding_input(self) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         digests = [
             parsed
@@ -158,25 +168,25 @@ class TestWhatOneRecordCarries:
 
     def test_it_declares_its_own_experiment_and_a_derived_label(self) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
 
         assert record["experiment"] == TRACE_EXPERIMENT
-        assert record["label"] == trace_label(CHEAP)
+        assert record["label"] == trace_label(CHEAP, CUBLAS_ARM)
 
     def test_it_carries_no_payload_digest(self) -> None:
         # The digests ARE the output; a payload digest over them would restate
         # the numbers rather than add the independent check a digest is for.
         assert (
-            probe_trace.trace_run_record("cpu", CHEAP, remove_split_k=False, math_attention=False)[
-                "payload_digest"
-            ]
+            probe_trace.trace_run_record(
+                "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
+            )["payload_digest"]
             == NO_PAYLOAD
         )
 
     def test_a_cpu_trace_records_no_card_and_no_driver(self) -> None:
         fingerprint = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )["fingerprint"]
 
         assert (fingerprint["gpu_model"], fingerprint["driver_version"]) == ("", "")
@@ -188,7 +198,7 @@ class TestWhatOneRecordCarries:
         with pytest.raises(ValueError, match="exactly one observation"):
             entry_from_record(
                 probe_trace.trace_run_record(
-                    "cpu", CHEAP, remove_split_k=False, math_attention=False
+                    "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
                 ),
                 0.0,
             )
@@ -255,14 +265,14 @@ class TestRecordingTheSplitKCondition:
         try:
             with pytest.raises(ValueError, match="which is not an integer"):
                 probe_trace.trace_run_record(
-                    "cpu", CHEAP, remove_split_k=False, math_attention=False
+                    "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
                 )
         finally:
             cli_hooks.env_cublaslt_workspace = cli_hooks._default_env_cublaslt_workspace
 
     def test_the_record_carries_the_condition_beside_the_tensors(self, no_workspace: None) -> None:
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         named = {o["name"]: o["value"] for o in record["observations"]}
 
@@ -303,13 +313,21 @@ class TestRefusals:
     def test_an_unknown_rung_is_refused_and_nothing_is_traced(self) -> None:
         with pytest.raises(KeyError, match="unknown probe rung 'enormous'"):
             probe_trace.trace_run_record(
-                "cpu", ("enormous",), remove_split_k=False, math_attention=False
+                "cpu",
+                ("enormous",),
+                remove_split_k=False,
+                math_attention=False,
+                kernel=CUBLAS_ARM,
             )
 
     def test_a_repeated_rung_is_refused_before_any_work(self) -> None:
         with pytest.raises(ValueError, match="cannot walk one rung twice"):
             probe_trace.trace_run_record(
-                "cpu", ("tiny", "tiny"), remove_split_k=False, math_attention=False
+                "cpu",
+                ("tiny", "tiny"),
+                remove_split_k=False,
+                math_attention=False,
+                kernel=CUBLAS_ARM,
             )
 
 
@@ -321,7 +339,7 @@ class TestTheCommandLine:
 
         written = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
         assert written["experiment"] == TRACE_EXPERIMENT
-        assert written["label"] == trace_label(CHEAP)
+        assert written["label"] == trace_label(CHEAP, CUBLAS_ARM)
 
     def test_main_creates_the_parent_directory_it_was_pointed_at(
         self, tmp_path: pathlib.Path, cheap_trace: None
@@ -345,7 +363,22 @@ class TestTheCommandLine:
 
     def test_an_absent_out_is_refused(self) -> None:
         with pytest.raises(ValueError, match="--out"):
-            probe_trace.main(["--device", "cpu", "--controls", "none"])
+            probe_trace.main(["--device", "cpu", "--controls", "none", "--kernel", CUBLAS_ARM])
+
+    def test_an_absent_kernel_is_refused(self, tmp_path: pathlib.Path) -> None:
+        # No default arithmetic, for the reason there is no default posture.
+        with pytest.raises(ValueError, match="--kernel"):
+            probe_trace.main(
+                ["--device", "cpu", "--out", str(_out_path(tmp_path)), "--controls", "none"]
+            )
+
+    def test_an_unknown_kernel_is_refused_before_anything_is_traced(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        with pytest.raises(ValueError, match="kernel must be one of"):
+            probe_trace.main([*_argv(tmp_path)[:-1], "triton"])
+
+        assert not _out_path(tmp_path).exists()
 
     def test_an_unknown_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="--rung"):
@@ -388,7 +421,90 @@ class TestTheCommandLine:
         assert raised.value.code == 0
 
         written = decode_run_record(load_json_str(_out_path(tmp_path).read_text(encoding="utf-8")))
-        assert written["label"] == trace_label(CHEAP)
+        assert written["label"] == trace_label(CHEAP, CUBLAS_ARM)
+
+
+class TestTheKernelArm:
+    """The arm has to reach the model, and the record has to say it did.
+
+    The controls choose which vendor kernel takes a matmul; this chooses
+    whether a vendor kernel takes it at all. That is a bigger difference and
+    it is carried differently -- in the LABEL, so `agree_across_runs` cannot
+    pair a treated record with an untreated one.
+    """
+
+    def test_the_arm_is_in_the_label(self) -> None:
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=RANK1_ARM
+        )
+
+        assert record["label"] == trace_label(CHEAP, RANK1_ARM)
+        assert record["label"] != trace_label(CHEAP, CUBLAS_ARM)
+
+    def test_the_treated_arm_actually_replaces_the_model_s_matmuls(self) -> None:
+        # The record carries its own evidence: a swapped module writes its own
+        # class name into every observation the trace takes of it. An arm that
+        # matched nothing would produce a record labelled `rank1` full of
+        # `Conv1D`, which is the failure this asserts against.
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=RANK1_ARM
+        )
+        classes = {
+            parsed["module_class"]
+            for parsed in (parse_trace_name(o["name"]) for o in record["observations"])
+            if parsed is not None
+        }
+
+        assert "ArmConv1D" in classes
+        assert "Conv1D" not in classes
+
+    def test_the_untreated_arm_leaves_the_model_alone(self) -> None:
+        # cuBLAS must be a no-op, not a rebuild through wrappers: every trace
+        # taken before the arms existed is a `Conv1D` record and has to stay
+        # comparable with this one.
+        record = probe_trace.trace_run_record(
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
+        )
+        classes = {
+            parsed["module_class"]
+            for parsed in (parse_trace_name(o["name"]) for o in record["observations"])
+            if parsed is not None
+        }
+
+        assert "Conv1D" in classes
+        assert "ArmConv1D" not in classes
+
+    def test_the_arms_agree_on_every_tensor_before_the_first_matmul(self) -> None:
+        """The structural property, and the only one a CPU can assert.
+
+        Whether the arms DIFFER anywhere is not assertable here: which
+        reduction order a BLAS picks is a property of the machine, and at a
+        short K it is routinely ascending-k -- the same coincidence that made
+        an earlier `rank1 != addmm` smoke fail inside the image while passing
+        on the authoring laptop. So this asserts the direction that cannot
+        depend on the platform: everything up to GPT-2's first matmul is
+        embeddings, a dropout and a layer norm, none of which either arm
+        touches, so those tensors MUST be bit-identical between the two.
+        """
+
+        def digests(kernel: str) -> dict[tuple[int, str], float]:
+            record = probe_trace.trace_run_record(
+                "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=kernel
+            )
+            out: dict[tuple[int, str], float] = {}
+            for observation in record["observations"]:
+                parsed = parse_trace_name(observation["name"])
+                if parsed is not None and parsed["suffix"] == DIGEST_SUFFIX:
+                    out[(parsed["step"], parsed["path"])] = observation["value"]
+            return out
+
+        plain = digests(CUBLAS_ARM)
+        treated = digests(RANK1_ARM)
+        first_matmul = min(step for step, path in plain if path.endswith("attn.c_attn"))
+        before = sorted(key for key in plain if key[0] < first_matmul)
+
+        assert before == sorted(key for key in treated if key[0] < first_matmul)
+        assert [plain[key] for key in before] == [treated[key] for key in before]
 
 
 class TestTheControlArms:
@@ -411,7 +527,7 @@ class TestTheControlArms:
         # `apply_determinism` writes these keys ONLY when it applied them --
         # so their presence is evidence, not a restatement of the flag.
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=True, math_attention=True
+            "cpu", CHEAP, remove_split_k=True, math_attention=True, kernel=CUBLAS_ARM
         )
         settings = dict(record["fingerprint"]["determinism"]["settings"])
 
@@ -423,7 +539,7 @@ class TestTheControlArms:
         # setting, so a trace taken under it stays comparable with every trace
         # taken before the flag existed.
         record = probe_trace.trace_run_record(
-            "cpu", CHEAP, remove_split_k=False, math_attention=False
+            "cpu", CHEAP, remove_split_k=False, math_attention=False, kernel=CUBLAS_ARM
         )
         settings = dict(record["fingerprint"]["determinism"]["settings"])
 

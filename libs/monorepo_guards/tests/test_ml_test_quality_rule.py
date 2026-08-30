@@ -84,6 +84,46 @@ def test_forward():
         shape_violations = [v for v in violations if v.kind == "ml-forward-shape-only"]
         assert len(shape_violations) == 0
 
+    def test_allows_forward_pass_checked_with_torch_equal(self, tmp_path: Path) -> None:
+        """``torch.equal`` is bitwise equality, the strictest check available.
+
+        It was absent from the value-check list until 2026-08-30, so a test
+        asserting the exact bytes a module produced was reported as "forward
+        pass only checks shapes" -- the opposite of true. Left that way the
+        rule pushes an author toward ``allclose``, trading a strict assertion
+        for a loose one to get a green build.
+        """
+        test_file = tmp_path / "tests" / "test_model.py"
+        code = """
+def test_forward():
+    output = module.forward(x)
+    assert torch.equal(output, expected)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations if v.kind == "ml-forward-shape-only"] == []
+
+    def test_still_flags_a_forward_pass_with_no_value_check_at_all(self, tmp_path: Path) -> None:
+        # The other direction of the pair: widening the list must not have
+        # made the rule unable to fire.
+        test_file = tmp_path / "tests" / "test_model.py"
+        code = """
+def test_forward():
+    output = module.forward(x)
+    assert output.shape == (2, 3)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations if v.kind == "ml-forward-shape-only"] == [
+            "ml-forward-shape-only"
+        ]
+
     def test_detects_optimizer_without_weight_check(self, tmp_path: Path) -> None:
         test_file = tmp_path / "tests" / "test_train.py"
         code = """

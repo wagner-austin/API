@@ -237,8 +237,8 @@ def parse_trace_name(name: str) -> TraceName | None:
     )
 
 
-def trace_label(rungs: tuple[str, ...]) -> str:
-    """Build the label identifying a trace by the rungs it walked.
+def trace_label(rungs: tuple[str, ...], kernel: str) -> str:
+    """Build the label identifying a trace by its rungs and its kernel arm.
 
     Derived rather than a version constant someone must remember to bump, for
     the reason
@@ -246,11 +246,20 @@ def trace_label(rungs: tuple[str, ...]) -> str:
     removed or reordered produces a different label, so two records that
     traced different rungs can never be mistaken for two runs of one trace.
 
+    THE ARM IS IN THE LABEL, unlike the split-K condition, which is an
+    observation. That asymmetry is deliberate and it is the same rule
+    ``gemm_label_for`` follows: the controls choose which vendor kernel takes
+    a matmul, and the arm chooses whether a vendor kernel takes it at all. A
+    treated run computes different numbers on purpose, so ``agree_across_runs``
+    must not be able to pair it with an untreated one and report the
+    experiment working as a card misbehaving.
+
     Args:
         rungs: The rung names, in the order they were walked.
+        kernel: The arm the model's matmuls ran under.
 
     Returns:
-        The label, e.g. ``forward-trace-4x1a2b3c4d5e6f``.
+        The label, e.g. ``forward-trace-4x1a2b3c4d5e6f-cublas``.
 
     Raises:
         ValueError: If a rung appears twice. Every observation is prefixed by
@@ -261,7 +270,7 @@ def trace_label(rungs: tuple[str, ...]) -> str:
     if duplicated:
         raise ValueError(f"a trace cannot walk one rung twice: {duplicated}")
     digest = hashlib.sha256(FIELD_SEPARATOR.join(rungs).encode("utf-8")).hexdigest()
-    return f"forward-trace-{len(rungs)}x{digest[:12]}"
+    return f"forward-trace-{len(rungs)}x{digest[:12]}-{kernel}"
 
 
 def describe_workspace(value: float) -> str:

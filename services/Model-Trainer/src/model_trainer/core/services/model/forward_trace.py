@@ -33,6 +33,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import TypedDict
 
+from model_trainer.core.services.model.kernel_arm_modules import use_kernel_arm
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import ProbeShape
 from model_trainer.core.services.model.tensor_digest import describe_tensor
@@ -216,26 +217,45 @@ def install_hooks(model: TracedModuleProto, trace: ForwardTrace) -> tuple[HookHa
     return tuple(handles)
 
 
-def traced_forward(device: str, shape: ProbeShape) -> tuple[tuple[TracedTensor, ...], float]:
+def traced_forward(
+    device: str, shape: ProbeShape, *, kernel: str
+) -> tuple[tuple[TracedTensor, ...], float]:
     """Run one rung with every module boundary digested.
+
+    The arm is applied AFTER the model is built and before any hook is
+    installed. After, because the builder is shared with the ladder and a
+    second builder that knew about arms would be a second definition of what a
+    rung is. Before, because the hooks record the module class they fire on,
+    and hooking the modules that are about to be discarded would name the
+    wrong ones.
 
     Args:
         device: Device to run on.
         shape: The rung to run.
+        kernel: Which arithmetic the model's matmuls use, by
+            :data:`~deterministic_gemm.KERNEL_ARMS` name. Required and
+            keyword-only, with no default, for the reason the controls are:
+            a trace that did not say which arithmetic it ran is a trace whose
+            record cannot say either.
 
     Returns:
         ``(traced tensors in execution order, the reported loss)``. The loss
         is the control described in the module docstring, not a second
-        measurement.
+        measurement -- and note that it is only a control for the cuBLAS arm.
+        A treated arm computes a DIFFERENT number by design, so it has no
+        untraced twin to be checked against; what carries over is that the
+        hooks still do not perturb, which the cuBLAS arm establishes.
 
     Raises:
         ValueError: Propagated from
             :func:`~known_answer_probe.probe_model_and_input` for a shape
-            whose sequence exceeds its vocabulary, or from
-            :func:`~tensor_digest.describe_tensor` for a tensor it cannot
+            whose sequence exceeds its vocabulary, from
+            :func:`~kernel_arm_modules.use_kernel_arm` for an unknown arm, or
+            from :func:`~tensor_digest.describe_tensor` for a tensor it cannot
             render exactly.
     """
     model, ids = probe_model_and_input(device, shape)
+    use_kernel_arm(model, kernel)
     trace = ForwardTrace()
     handles = install_hooks(model, trace)
     try:

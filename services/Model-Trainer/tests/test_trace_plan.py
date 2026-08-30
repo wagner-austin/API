@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM, RANK1_ARM
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
@@ -91,24 +92,31 @@ class TestParsingRefusals:
 
 
 class TestLabellingATrace:
-    def test_it_counts_the_rungs_and_digests_them(self) -> None:
-        label = trace_label(("tiny", "xl"))
+    def test_it_counts_the_rungs_digests_them_and_names_the_arm(self) -> None:
+        label = trace_label(("tiny", "xl"), CUBLAS_ARM)
 
         assert label.startswith("forward-trace-2x")
-        assert len(label) == len("forward-trace-2x") + 12
+        assert label.endswith(f"-{CUBLAS_ARM}")
+        assert len(label) == len("forward-trace-2x") + 12 + len(f"-{CUBLAS_ARM}")
+
+    def test_the_arm_distinguishes_two_otherwise_identical_labels(self) -> None:
+        # A treated run computes different numbers on purpose, so
+        # `agree_across_runs` must not be able to pair it with an untreated
+        # one and report the experiment working as a card misbehaving.
+        assert trace_label(("tiny",), CUBLAS_ARM) != trace_label(("tiny",), RANK1_ARM)
 
     def test_the_same_rungs_always_produce_the_same_label(self) -> None:
-        assert trace_label(("tiny", "xl")) == trace_label(("tiny", "xl"))
+        assert trace_label(("tiny", "xl"), CUBLAS_ARM) == trace_label(("tiny", "xl"), CUBLAS_ARM)
 
     def test_reordering_the_rungs_relabels_the_trace(self) -> None:
-        assert trace_label(("tiny", "xl")) != trace_label(("xl", "tiny"))
+        assert trace_label(("tiny", "xl"), CUBLAS_ARM) != trace_label(("xl", "tiny"), CUBLAS_ARM)
 
     def test_adding_a_rung_relabels_the_trace(self) -> None:
-        assert trace_label(("tiny",)) != trace_label(("tiny", "xl"))
+        assert trace_label(("tiny",), CUBLAS_ARM) != trace_label(("tiny", "xl"), CUBLAS_ARM)
 
     def test_a_repeated_rung_is_refused_by_name(self) -> None:
         with pytest.raises(ValueError, match=r"cannot walk one rung twice: \['tiny'\]"):
-            trace_label(("tiny", "xl", "tiny"))
+            trace_label(("tiny", "xl", "tiny"), CUBLAS_ARM)
 
 
 class TestTheDeclaredRungs:

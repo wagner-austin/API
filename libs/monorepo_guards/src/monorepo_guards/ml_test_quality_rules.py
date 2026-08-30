@@ -48,6 +48,13 @@ class _MLPatternVisitor(ast.NodeVisitor):
         "item": "has_value_check",
         "mean": "has_value_check",
         "sum": "has_value_check",
+        # `torch.equal` is bitwise equality -- STRICTER than every other entry
+        # here, and it was missing until 2026-08-30. A test asserting
+        # `torch.equal(module.forward(x), expected)` was reported as
+        # "forward pass only checks shapes", which is the opposite of true.
+        # Left out, the rule pushes an author toward `allclose` to get green,
+        # which is a weaker assertion bought to satisfy a guard.
+        "equal": "has_value_check",
     }
 
     def _is_http_client_call(self, node: ast.Attribute) -> bool:

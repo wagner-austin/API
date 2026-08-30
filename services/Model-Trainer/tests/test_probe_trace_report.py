@@ -34,6 +34,7 @@ from platform_core.testing import sample_run_fingerprint
 
 from model_trainer.cli import probe_trace_report as report_cli
 from model_trainer.cli.record_reports import agreement_groups
+from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.services.model.trace_plan import (
     DIGEST_SUFFIX,
     SUM_SUFFIX,
@@ -121,7 +122,7 @@ def trace_record(
 
     return run_record(
         experiment=TRACE_EXPERIMENT,
-        label=trace_label(rungs),
+        label=trace_label(rungs, CUBLAS_ARM),
         fingerprint=sample_run_fingerprint(
             image_digest="sha256:b002cffc",
             gpu_model=gpu,
@@ -232,7 +233,7 @@ class TestNamingTheRungsARecordCovers:
     def test_a_record_with_no_traced_tensors_names_no_rungs(self) -> None:
         empty = run_record(
             experiment=TRACE_EXPERIMENT,
-            label=trace_label(("tiny",)),
+            label=trace_label(("tiny",), CUBLAS_ARM),
             fingerprint=sample_run_fingerprint(
                 image_digest="sha256:b002cffc",
                 gpu_model="A30",
@@ -306,7 +307,7 @@ class TestTheRenderedRungSection:
         full = trace_record("A30")
         without_loss = run_record(
             experiment=TRACE_EXPERIMENT,
-            label=trace_label(("tiny",)),
+            label=trace_label(("tiny",), CUBLAS_ARM),
             fingerprint=full["fingerprint"],
             observations=tuple(
                 o for o in full["observations"] if o["name"] != trace_loss_name("tiny")
