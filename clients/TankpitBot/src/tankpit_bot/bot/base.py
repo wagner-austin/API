@@ -29,6 +29,7 @@ from tankpit_bot.bot.config import env_ai_config
 from tankpit_bot.bot.game_log_witness import GameLogWitnessMixin
 from tankpit_bot.bot.state_access import StateAccessMixin
 from tankpit_bot.bot.states import make_initial_state_data
+from tankpit_bot.bot.tank_registry import record_tank_sample
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.client_structure import ClientStructureSurveyor
@@ -43,6 +44,7 @@ from tankpit_bot.browser.lifecycle import (
     wait_for_game_ready,
 )
 from tankpit_bot.browser.live_view import LiveViewService
+from tankpit_bot.browser.room_join import resolve_room_name
 from tankpit_bot.browser.session_storage import (
     load_storage_state,
     resolve_storage_state_path,
@@ -326,6 +328,13 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             except KeyboardInterrupt:
                 log.info("Bot interrupted by user")
             finally:
+                # Bookkeeping before the socket drops. The panel sample
+                # this files was taken at STARTUP -- it is a login-time
+                # snapshot that does not move mid-session -- but the
+                # tank's name and colour only arrive on the wire after
+                # the first ticks, so the WRITE waits for identity even
+                # though the READING did not. No keypress, no tick.
+                record_tank_sample(self.world, resolve_room_name())
                 self._send_graceful_quit()
                 self._save_capture_session()
                 self._detach_cdp_session()

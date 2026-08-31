@@ -41,6 +41,22 @@ _ROOM_ENTER_TIMEOUT_MS = 10000
 _JOIN_POLL_INTERVAL_MS = 100.0
 
 
+def resolve_room_name() -> str:
+    """Resolve the room this session plays, or the default.
+
+    Lifted out of :func:`join_room` 2026-08-31 so the per-colour tank
+    recorder names the same room the join flow actually entered. Two
+    copies of ``get_env("TANKPIT_ROOM") or DEFAULT_LOBBY_ROOM`` would
+    be one edit away from filing a World reading under Practice.
+
+    Returns:
+        The configured room selector, or :data:`DEFAULT_LOBBY_ROOM`
+        when unset — Practice, deliberately, so a run naming no room
+        cannot wander into the live world ([[game-rules]]).
+    """
+    return _test_hooks.get_env("TANKPIT_ROOM") or DEFAULT_LOBBY_ROOM
+
+
 def resolve_room_troop() -> int | None:
     """Resolve the explicitly configured tank color, or ``None`` when unset.
 
@@ -398,7 +414,7 @@ def join_room(
         True if the room was confirmed and the enter response arrived.
     """
     log.info("Joining game...")
-    room_name = _test_hooks.get_env("TANKPIT_ROOM") or DEFAULT_LOBBY_ROOM
+    room_name = resolve_room_name()
     room_entry = _wait_for_room_entry(page, cdp, ws, room_name)
     if room_entry is None:
         log.info("Room select failed: room list never exposed %s", room_name)
@@ -455,4 +471,5 @@ def join_room(
 
 __all__ = [
     "join_room",
+    "resolve_room_name",
 ]

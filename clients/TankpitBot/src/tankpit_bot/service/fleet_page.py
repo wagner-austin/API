@@ -347,17 +347,18 @@ function paintTroopInfo() {
     hint.textContent = "no reading for " + colour + " on " + room;
     return;
   }
-  const rank = typeof cell === "number" ? cell : cell.rank;
-  const kills = typeof cell === "number" ? undefined : cell.kills;
-  const deaths = typeof cell === "number" ? undefined : cell.deaths;
-  const inv = typeof cell === "number" ? undefined : cell.inventory;
-  let text = RANKS[rank] + " (" + rank + ") · fuel " + (1000 + 100 * rank) +
-             " · radar " + (2 + Math.floor(rank / 3));
-  if (kills !== undefined || deaths !== undefined) {
-    text += " · K" + (kills === undefined ? "?" : kills) +
-            " D" + (deaths === undefined ? "?" : deaths);
+  // The registry stores the game's own rank WORD. The 0-8 index the
+  // fuel and radar formulas take is looked up here; an unrecognised
+  // word still prints, it just carries no derived numbers.
+  const rank = RANKS.indexOf(cell.rank);
+  let text = cell.rank;
+  if (rank >= 0) {
+    text += " · fuel " + (1000 + 100 * rank) +
+            " · radar " + (2 + Math.floor(rank / 3));
   }
-  if (inv) { text += " · " + inv.join("·"); }
+  if (cell.kills !== undefined) { text += " · K" + cell.kills; }
+  if (cell.deaths !== undefined) { text += " D" + cell.deaths; }
+  if (cell.leaderboard !== undefined) { text += " · #" + cell.leaderboard; }
   hint.textContent = text;
 }
 
