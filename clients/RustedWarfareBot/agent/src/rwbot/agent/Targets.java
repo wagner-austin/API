@@ -54,4 +54,53 @@ final class Targets {
 
         return targets;
     }
+
+    /**
+     * The unit class carrying the wall-paced cosmetic spawners.
+     *
+     * <p>Named separately from {@link #byClass()} because these are NOT
+     * render-path no-ops: they run inside the simulation tick, and
+     * neutralising them changes which draws the simulation consumes. That is
+     * the point, and it is also why {@link Premain} skips them when hosting
+     * -- the same containment {@link SyncPathTransformer} gets, for the same
+     * reason (wiki: multiplayer-portability-invariants).
+     */
+    static final String EFFECT_SPAWNER_CLASS = "com/corrodinggames/rts/game/units/y";
+
+    /**
+     * Methods whose only body is a wall-clock-paced cosmetic effect spawn.
+     *
+     * <p><b>Each spends two {@code Math.random()} draws on a schedule the
+     * frame delta sets.</b> Both have the identical shape, verified against
+     * the pinned jar's bytecode:
+     *
+     * <pre>
+     *   U = f.a(U, delta)              // per-unit accumulator, MEASURED delta
+     *   if (U == 0) { U = 5.0f;
+     *       if (s_()) { ...
+     *           x = am.eo + (-8.0 + Math.random() * 16.0)   // y.a:11504
+     *           y = am.ep + (-8.0 + Math.random() * 16.0)   // y.a:11505
+     *           ... spawn effect, set its velocity/life/colour ... }}
+     *   return
+     * </pre>
+     *
+     * <p>Everything after the gate writes only to the effect object the
+     * particle manager returned -- {@code P/Q} velocity, {@code V/W} life,
+     * {@code E/F/G} colour, the {@code r} flag -- and to the unit's own
+     * accumulator. No unit state, no world state. So the simulation loses
+     * nothing and the draw stream stops depending on the wall clock.
+     *
+     * <p><b>Found by measurement, not by reading.</b> The draw tap named
+     * {@code y.a:11504} and {@code :11505} as the first call site whose
+     * per-window count differed between two invocations, at frame 2850, with
+     * every downstream difference following from it. Same pattern as the
+     * ambient spawner already silenced, on the unit class rather than the
+     * effects manager (wiki log 2026-08-30).
+     */
+    static java.util.Set<String> effectSpawners() {
+        return new java.util.LinkedHashSet<String>(
+                java.util.Arrays.asList(
+                        "a(Lcom/corrodinggames/rts/game/units/am;FI)V",
+                        "b(Lcom/corrodinggames/rts/game/units/am;FI)V"));
+    }
 }

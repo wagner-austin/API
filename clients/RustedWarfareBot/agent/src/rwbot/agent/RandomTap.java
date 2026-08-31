@@ -41,6 +41,12 @@ final class RandomTap {
     /** The live tap, or null when never armed. */
     private static Tap tap;
 
+    /** The Math.random tap, or null when never armed. */
+    private static Tap mathTap;
+
+    /** The Collections.shuffle tap, or null when never armed. */
+    private static Tap shuffleTap;
+
     /** Whether {@link #install(long)} should do anything, set at premain. */
     private static boolean requested;
 
@@ -89,6 +95,40 @@ final class RandomTap {
     }
 
     /**
+     * Taps {@link Math#random()}'s and {@link java.util.Collections#shuffle}'s
+     * generators too, so all three streams name their callers.
+     *
+     * <p><b>One tapped stream out of three is a tap that can only answer a
+     * third of the question.</b> With the engine stream tapped and the other
+     * two merely split, a run whose SHUFFLE count diverged -- eleven draws in
+     * two invocations and zero in two others by frame 600, a whole
+     * {@code Collections.shuffle} taken or not taken -- could be seen but not
+     * attributed. The tap's generator already extends the split, so pointing
+     * it at the other two holders costs nothing they were not already doing.
+     *
+     * <p>Called instead of {@link SplitRandom#installMath} and
+     * {@link SplitRandom#installShuffle} when the tap is armed, so the
+     * routing is identical and only the attribution is added.
+     *
+     * @param seed The seed both streams start from, matching what the reseed
+     *     installs anyway.
+     * @throws IllegalStateException When either swap cannot be made or did
+     *     not stick.
+     */
+    static void installOthers(long seed) {
+        if (!requested) {
+            return;
+        }
+        Tap math = new Tap(seed);
+        EngineRandom.swapMathGenerator(math, "the Math.random draw tap");
+        mathTap = math;
+        Tap shuffle = new Tap(seed);
+        EngineRandom.swapShuffleGenerator(shuffle, "the shuffle draw tap");
+        shuffleTap = shuffle;
+        Log.info("draw tap installed on the Math.random and Collections.shuffle generators");
+    }
+
+    /**
      * Logs and clears the per-caller tally for the window just sampled.
      *
      * <p>Runs on the game thread at each sample boundary, beside the ledger
@@ -98,11 +138,27 @@ final class RandomTap {
      * @param frame The boundary frame, for lining two logs up.
      */
     static void flush(int frame) {
-        if (tap == null) {
+        drain("rngtap", frame, tap);
+        // Prefixed per stream, because a call site can draw from more than
+        // one and a merged tally would hide which stream it moved.
+        drain("rngtap-math", frame, mathTap);
+        drain("rngtap-shuffle", frame, shuffleTap);
+    }
+
+    /**
+     * Logs and clears one tap's tally.
+     *
+     * @param label Line prefix naming which stream this is.
+     * @param frame The boundary frame, for lining two logs up.
+     * @param which The tap to drain, or null when it was never armed.
+     */
+    private static void drain(String label, int frame, Tap which) {
+        if (which == null) {
             return;
         }
-        StringBuilder line = new StringBuilder("rngtap frame=").append(frame);
-        for (Map.Entry<String, Integer> site : new TreeMap<String, Integer>(tap.drain()).entrySet()) {
+        StringBuilder line = new StringBuilder(label).append(" frame=").append(frame);
+        for (Map.Entry<String, Integer> site
+                : new TreeMap<String, Integer>(which.drain()).entrySet()) {
             line.append(' ').append(site.getKey()).append('=').append(site.getValue());
         }
         Log.info(line.toString());

@@ -308,11 +308,18 @@ final class MatchSetup {
             // samples, math differing at frame 0 predicted a fork, with no
             // exceptions -- and the engine stream diverged only after the
             // world already had (wiki log 2026-08-30).
-            SplitRandom.installMath(seed);
-            // And the third. Splitting Math alone moved the fork EARLIER --
-            // shuffle had been agreeing only because the Math leak forked
-            // the world before shuffle could matter. All three or none.
-            SplitRandom.installShuffle(seed);
+            if (RandomTap.requested()) {
+                // Same routing, plus attribution. Split-only here would leave
+                // the tap able to answer for one stream out of three.
+                RandomTap.installOthers(seed);
+            } else {
+                SplitRandom.installMath(seed);
+                // And the third. Splitting Math alone moved the fork EARLIER
+                // -- shuffle had been agreeing only because the Math leak
+                // forked the world before shuffle could matter. All three or
+                // none.
+                SplitRandom.installShuffle(seed);
+            }
         }
         // The split routes by phase, and the bracket is what publishes the
         // phase: without it every draw reads as render-side and the

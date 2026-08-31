@@ -25,6 +25,16 @@ public final class SelfTest {
         java.util.Map<String, java.util.Set<String>> targets = Targets.byClass();
         int failures = JarChecks.checkPatcher(args[0], targets);
 
+        // The wall-paced spawners, held to the real jar for the same reason
+        // and one more: their descriptors were derived by hand from javap
+        // output, so a mistyped one would fail at premain on a compute node
+        // rather than here. Checked against the pinned jar, a wrong name
+        // fails the build.
+        failures += JarChecks.checkPatcher(
+                args[0],
+                java.util.Collections.singletonMap(
+                        Targets.EFFECT_SPAWNER_CLASS, Targets.effectSpawners()));
+
         failures += JarChecks.checkSyncPath(args[0]);
         failures += OptionChecks.checkOptions();
         failures += DiscoveryChecks.checkDiscovery();

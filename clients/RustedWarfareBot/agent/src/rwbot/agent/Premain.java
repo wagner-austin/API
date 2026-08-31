@@ -54,6 +54,28 @@ public final class Premain {
             }
         }
 
+        // The wall-paced cosmetic spawners inside the tick. Like the path
+        // solver above and unlike Targets' render-path no-ops, this alters
+        // what the simulation consumes -- two Math.random draws per unit per
+        // drained accumulator, on a schedule the frame delta sets -- so it
+        // gets the same containment: never while hosting a stock-engine peer.
+        if (!options.hostRequested()) {
+            java.util.Map<String, java.util.Set<String>> spawners =
+                    java.util.Collections.singletonMap(
+                            Targets.EFFECT_SPAWNER_CLASS, Targets.effectSpawners());
+            NoOpTransformer spawnerTransformer = new NoOpTransformer(spawners);
+            instrumentation.addTransformer(spawnerTransformer);
+            forceLoad(spawners.keySet());
+            java.util.List<String> unpatched = spawnerTransformer.unseen();
+            if (!unpatched.isEmpty()) {
+                throw new IllegalStateException(
+                        "rw-agent: the wall-paced effect spawners were not patched: "
+                                + unpatched
+                                + " -- the pinned build is 1.15 (code 176, build #28);"
+                                + " re-derive the names against this jar and update Targets.");
+            }
+        }
+
         // Intent only: the swap itself waits for match start, because a
         // premain swap was measured being overwritten by the holder's own
         // <clinit> (see RandomTap).
