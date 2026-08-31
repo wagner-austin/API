@@ -1,5 +1,5 @@
 {
-  "git_commit": "1909eae7ce1c1dd6c0265762fb2097334e25d330",
+  "git_commit": "4492e4dc6297eaeef9ae8be9b9b7bcbbac76f196",
   "carries": [
     "scripts",
     "doctrines",
@@ -621,8 +621,8 @@
     },
     {
       "path": "rw-agent.jar",
-      "sha256": "92fa74606e5fe02a2582a56f8bf94ea7ce5c56ce132a184bebcc5e448483d07b",
-      "size_bytes": 134364
+      "sha256": "935c8130bda95e85457298dd727c50b05879646d0ce95cc66a3431737136621d",
+      "size_bytes": 135385
     },
     {
       "path": "scripts/__init__.py",
@@ -876,8 +876,8 @@
     },
     {
       "path": "src/rw_bot/harness/campaign_match.py",
-      "sha256": "095bac0ad607b4c1e78af2407f57e457fe5d3b368544c6a56bc972ca6b19e522",
-      "size_bytes": 14863
+      "sha256": "7a7dfe9303940ab1bc3a00dac2cc97a0775b1318b7330d99e357b26b645f2e7e",
+      "size_bytes": 15061
     },
     {
       "path": "src/rw_bot/harness/clone.py",
@@ -2060,8 +2060,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "0d607f0ff1802716361f91302f2775f07e5256eeca567db1d5f3b7bb70928c53",
+  "tree_sha256": "f0a335ab5c1928fa74590db8776b8cf9b341a1a159bcc2bd279053a19ccc911f",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "9de691e1a5b51cd5f83c16d0a059f1e6e5decdb136c536b2a33d441a5b39e2ce",
+  "archive_sha256": "462e7050fbf34677460786fa6f91df32f502d3f0c2585980723daf36a8d5e955",
   "archive_size_bytes": 2252800
 }
