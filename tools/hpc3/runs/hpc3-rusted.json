@@ -14,8 +14,8 @@
       "requeue": false,
       "checkpoint_steps": 0,
       "image": {
-        "path": "/pub/wagnera3/rusted/images/v2/rusted.sif",
-        "sha256": "d194314c892645f05c6d50ea03b554960fa4081d6e3fcaffa07eba24e8667541",
+        "path": "/pub/wagnera3/rusted/images/v3/rusted.sif",
+        "sha256": "57484f53a1ec8af32a389830f99fb147e9a9204e9b49f511f752a7d012661aaf",
         "binds": ["/pub/wagnera3"]
       },
       "env_path": "/opt/env",
