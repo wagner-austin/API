@@ -39,6 +39,13 @@ hubs: [determinism-measurement]
 
 [[mjwarp-cannot-compile-under-warp-deterministic-mode]] left open whether `_sensor_tactile` was the only blocker, since compilation stops at the first rejected function. Measured 2026-08-18: **it is the only one** — with the mixing removed, every module in the touching-row pipeline compiles cold and steps under both `RUN_TO_RUN` and `GPU_TO_GPU` — **and the unblocked mode delivers**: the full ten-scene sweep on `cuda:0` reports every scene bit-reproducible, including the coupled-body scenes where the default mode returns twelve distinct results from twelve runs.
 
+**Scope: this block is a 3.11.0 fact, not a HEAD fact.** Measured 2026-08-31 at upstream HEAD
+`3879591` with warp 1.16.0 verified in-process and a live tactile fixture executing (nonzero
+sensordata, max 0.199289): the **unpatched** `_sensor_tactile` — still mixing `atomic_max`
+and `atomic_add` on `sensordata_out` — compiles and runs under `RUN_TO_RUN`. The alias is
+unnecessary upstream, and an alias briefly applied to the HEAD working tree was reverted for
+exactly that reason. Do not port this patch upstream; it solves a problem HEAD does not have.[^head]
+
 ## The patch under test is the withdrawn upstream fix, verbatim
 
 GitHub user NY-WaKeUp filed the same defect upstream (issue #1590) and a fix (PR #1591) on the morning of 2026-08-18, then closed both within sixteen minutes when Google's CLA check failed; the PR was never merged and, as far as the record shows, never compile-tested in CI. The fix is three edits: a second kernel parameter `sensordata_max_out` that **aliases** `sensordata_out`, the `atomic_max` routed through the alias, and `d.sensordata` bound twice at the launch site. No second array is allocated, no arithmetic changes, and the channels write disjoint index ranges (channel `k` at `adr + k*dim + vertid`, `vertid < dim`), so the alias is semantically inert.
@@ -110,3 +117,5 @@ The mode it unlocks is not, on that model. Under `RUN_TO_RUN` the same fixture g
 
 - **`deterministic_max_records = 64` is model-dependent and fails quietly.** It was validated here on the sphere family up to 32 bodies with no sensors. On the tactile fixture it is too small, and Warp's overflow guard is skipped while a CUDA stream is capturing, which MuJoCo-Warp does — so a truncated buffer corrupts results with no exception and exit 0.
 - **"10/10 bit-reproducible" was a verdict with no correctness oracle.** The ten rows below were re-run with contact counts attached and they survive intact — the contacts are there, totals matching the default mode on nine of ten scenes ([[a-determinism-verdict-needs-a-correctness-oracle]]). The table stands. But it stands because it was checked, not because the original sweep could have told the difference.
+
+[^head]: `[observed]` — `uv run --with warp-lang==1.16.0 python repro_tactile_compile.py RUN_TO_RUN` at HEAD `3879591` with pristine `sensor.py` (alias absent, verified by `git show HEAD:` swap): `warp=1.16.0 ... COMPILED OK sensordata_nonzero=2/36 max=0.199289`. The aliased build gives the identical result. An earlier check on a **sensorless** model was vacuous — a sensorless model may never load the sensor module — which is why this one prints the warp version and proves taxel execution via nonzero sensordata. Script: `C:\Users\Test\PROJECTS\upstream\mujoco_warp-repro\repro_tactile_compile.py`.
