@@ -138,14 +138,39 @@ class SplitRandom extends Random {
         return side.draw(bits);
     }
 
+    /** How many draws this generator has served to the simulation. */
+    private long simDraws;
+
     /**
-     * Called for every draw routed to the simulation stream; does nothing.
+     * Called for every draw routed to the simulation stream; counts it.
      *
      * <p>The seam the draw tap counts through: with routing live, the only
      * draws worth diffing between runs are the ones that can still desync
      * the sim (see RandomTap).
+     *
+     * <p><b>Counting is what turns a stream state into a diagnosis.</b> Two
+     * runs whose stream states differ have consumed a different number of
+     * draws, but the state alone cannot say how many, so it cannot say
+     * whether one extra draw slipped in or the whole sequence shifted. The
+     * count can, and it is the number the remaining leak has to be found
+     * through: with all three generators split, seed 31337's engine stream
+     * still parts at frame 300 while the worlds agree to sample 116.
+     *
+     * <p>Not synchronised, and does not need to be: every draw the
+     * simulation makes happens on the ticking thread, which is the same
+     * invariant {@link TickBracket#simPhase()} already relies on.
      */
     void onSimDraw() {
+        simDraws++;
+    }
+
+    /**
+     * How many draws the simulation has taken from this generator.
+     *
+     * @return The running count.
+     */
+    long simDraws() {
+        return simDraws;
     }
 
     @Override

@@ -43,9 +43,38 @@ final class RandomLedger {
      *     reached.
      */
     static String describe() {
-        return "engine=" + Long.toHexString(stateOf(EngineRandom.engineGenerator()))
-                + " math=" + Long.toHexString(stateOf(EngineRandom.mathGenerator()))
-                + " shuffle=" + Long.toHexString(stateOf(EngineRandom.shuffleGenerator()));
+        Random engine = EngineRandom.engineGenerator();
+        Random math = EngineRandom.mathGenerator();
+        Random shuffle = EngineRandom.shuffleGenerator();
+        return "engine=" + Long.toHexString(stateOf(engine))
+                + " math=" + Long.toHexString(stateOf(math))
+                + " shuffle=" + Long.toHexString(stateOf(shuffle))
+                + " draws=" + simDrawsOf(engine)
+                + "/" + simDrawsOf(math)
+                + "/" + simDrawsOf(shuffle);
+    }
+
+    /**
+     * How many draws the simulation has taken from one generator, or -1.
+     *
+     * <p><b>A state says two runs differ; a count says by how much.</b> The
+     * state is a scrambled seed, so two runs that have consumed a different
+     * number of draws are merely unequal -- nothing in the value says
+     * whether one extra draw slipped in or the sequence shifted wholesale.
+     * The count answers that directly, which is what the remaining leak
+     * needs: with all three generators split, seed 31337's engine stream
+     * still parts at frame 300 while the worlds agree to sample 116.
+     *
+     * @param generator The generator to read.
+     * @return Its simulation-draw count, or -1 when it is not a split
+     *     generator -- which is the honest answer for an unsplit stream
+     *     rather than a zero that would read as "took no draws".
+     */
+    private static long simDrawsOf(Random generator) {
+        if (generator instanceof SplitRandom) {
+            return ((SplitRandom) generator).simDraws();
+        }
+        return -1;
     }
 
     /**

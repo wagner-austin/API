@@ -290,14 +290,24 @@ final class MatchSetup {
             RandomTap.install(seed);
         } else if (seed != 0) {
             SplitRandom.install(seed);
-            // **And Math's, which was the seam the engine-side split left
-            // open.** Twelve engine call sites read Math.random(), whose
-            // holder is JVM-global, so the render path and the simulation
-            // shared one stream. Measured across eleven seeds replayed on
-            // HPC3: math agreeing at frame 0 predicted bit-exact replication
-            // over 250 samples, math differing at frame 0 predicted a fork,
-            // with no exceptions -- and the engine stream diverged only
-            // after the world already had (wiki log 2026-08-30).
+        }
+        if (seed != 0) {
+            // **Outside the tap branch, because the tap only wants the ENGINE
+            // slot.** Its Tap IS a SplitRandom -- it extends the split and
+            // adds attribution -- so arming it must not cost the other two
+            // splits. Installing these only in the else-branch silently
+            // reopened both seams under the one option whose whole purpose
+            // is diagnosing them, which would have had the tap measuring a
+            // regime nothing else runs.
+            //
+            // **Math's was the seam the engine-side split left open.** Twelve
+            // engine call sites read Math.random(), whose holder is
+            // JVM-global, so the render path and the simulation shared one
+            // stream. Measured across eleven seeds replayed on HPC3: math
+            // agreeing at frame 0 predicted bit-exact replication over 250
+            // samples, math differing at frame 0 predicted a fork, with no
+            // exceptions -- and the engine stream diverged only after the
+            // world already had (wiki log 2026-08-30).
             SplitRandom.installMath(seed);
             // And the third. Splitting Math alone moved the fork EARLIER --
             // shuffle had been agreeing only because the Math leak forked
@@ -341,7 +351,18 @@ final class MatchSetup {
         // over 600 full-planner samples where every weaker pin still wobbled
         // (wiki: policy-determinism, engine-tick-and-clock).
         if (pinDeltaMs > 0) {
-            EngineAccess.writeFloatField(engine, DELTA_OVERRIDE_FIELD, pinDeltaMs * 0.06f);
+            float steps = pinDeltaMs * 0.06f;
+            EngineAccess.writeFloatField(engine, DELTA_OVERRIDE_FIELD, steps);
+            // **Said out loud, because a silent pin cannot be ruled out.**
+            // Every other pin here logs; this one did not, so a run that
+            // never armed it was indistinguishable from one that did -- and
+            // a NEGATIVE result about the delta pin ("armed it, still
+            // forked") is only worth anything if the arming is visible.
+            // Measured 2026-08-30: four invocations forked with the pin
+            // requested, and nothing in the log could confirm it had taken.
+            Log.info(
+                    "frame delta pinned to " + pinDeltaMs + "ms (" + steps + " steps) via "
+                            + DELTA_OVERRIDE_FIELD + "; ticks no longer carry the measured delta");
         }
         // Fast-forward drives the engine's own tick entry, so it arms on
         // the engine rather than the container (see FastForward for the
