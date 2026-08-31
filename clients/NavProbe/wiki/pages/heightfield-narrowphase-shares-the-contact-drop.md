@@ -49,10 +49,15 @@ One structural note with scope beyond heightfields: the flex-contact pipeline
 (`collision_flex.py`) turns out to already be shaped this way — candidates are staged into
 global arrays by earlier kernels and `_write_filtered_contacts` reserves from them — which is
 why its reservation gate is sound under deterministic mode by the same argument that makes
-the fix correct. That is inspection, not measurement; a rope-fixture digest check is the
-outstanding confirmation.[^4]
+the fix correct.[^4] Confirmed by measurement, not just inspection: an 8×8 flex grid dropped
+on a plane produces 5888 contacts over 200 steps in both modes, one digest per mode from
+three repetitions — the same digest, in fact, in both. The shipped flex fixtures cannot show
+this because they disable collision (`contype="0" conaffinity="0"`) or pin their flexes; a
+rope-fixture check ran first and scored reproducible **vacuously** at zero contacts, exactly
+the false positive [[a-determinism-verdict-needs-a-correctness-oracle]] predicts.[^5]
 
 [^1]: `[observed]` — `repro_hfield_drop.py RUN_TO_RUN 64 60` at HEAD `3879591` before the hfield fix: `final_z=-0.198807 total_contacts=0 zero_contact_steps=60/60`, exit 0; default mode `final_z=0.099233 total_contacts=50`. Script: `C:\Users\Test\PROJECTS\upstream\mujoco_warp-repro\repro_hfield_drop.py`.
 [^2]: `mujoco_warp/_src/collision_convex.py` (branch `deterministic-ccd`), `ccd_hfield_kernel_builder` — staging arrays `hfield_ncon/hfield_cdist/hfield_cpos/hfield_cnormal` of shape `(naconmax, 4)`; `ccd_hfield_write_kernel` recomputes `contact_params` and replays `write_contact` with the original call indices.
 [^3]: `[observed]` — same script, same arguments, after the fix: `final_z=0.099233 total_contacts=50 zero_contact_steps=35/60`, matching the default arm exactly.
 [^4]: `mujoco_warp/_src/collision_flex.py` L2192-2340 — `_write_filtered_contacts` takes `cand_dist`/`cand_pos`/`cand_nrm` as array inputs written by the candidate-generation and filter kernels; its `cand_dist[i] >= margin` gate before the `nacon` atomic reads prior-launch memory.
+[^5]: `[observed]` — `repro_flex_determinism.py <MODE> 64 3 dropgrid 200`: default `contacts=[5888,5888,5888]`, 1 digest `a70bb794c8c0453c`; `RUN_TO_RUN` identical including the digest. Prior vacuous run: `rope` fixture, `contacts=[0,0,0]`, `LIVE: False` both modes. Script: `C:\Users\Test\PROJECTS\upstream\mujoco_warp-repro\repro_flex_determinism.py`.
