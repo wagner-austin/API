@@ -170,6 +170,17 @@ structural fix — routing them off the sim stream per call site, patched at
 class-load — is not done. Full narrative in the log, entries 2026-08-30 and
 2026-08-31, one of which corrects the other.
 
+**Re-certified 2026-08-31, with its scope stated.** The full 24-member panel
+is bit-identical 12/12 over 250 samples per pair in BOTH environments run:
+locally in Docker and on HPC3 under image v3 (log, 2026-08-31 verdict
+entries). The certified property is **same seed, same environment → same
+match**. It is deliberately NOT "same seed → same match anywhere": the same
+members compared ACROSS the two environments show a systematic credits
+offset from frame 300 in all 24, six seeds nonetheless world-identical
+cross-machine for all 250 samples and eighteen parting later — deterministic
+per environment, differing between them. Cross-environment identity is an
+open question, not a certified property.
+
 ## The standing rules
 
 **Score on survival time, or on worth share.** The endpoint figures the scorecard reports are the worst available: final worth has a standard deviation larger than its own mean. Computed from the per-sample trace instead, the mean share of worth held against the strongest rival has a coefficient of variation of **0.066**, and survival time **0.098** — the endpoint figure beside them is **0.67**.
