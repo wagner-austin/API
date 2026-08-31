@@ -164,14 +164,20 @@ class TestTheBlockedArms:
 
             assert gap < 1e-5
 
-    def test_a_width_at_or_above_k_is_one_chunk_and_matches_the_vendor(self) -> None:
-        # With one chunk the arm IS torch.matmul on the whole K, so it must be
-        # bit-identical to it -- the degenerate case that proves the chunking
-        # adds nothing of its own.
+    def test_a_width_at_or_above_k_is_one_chunk_and_adds_nothing(self) -> None:
+        # With one chunk the arm IS a single addmm onto a zero accumulator, so
+        # it must be bit-identical to that -- the degenerate case proving the
+        # chunking machinery adds nothing of its own.
+        #
+        # Against addmm and NOT against torch.matmul, which is the entry point
+        # this arm deliberately does not use: measured 2026-08-30, matmul does
+        # not respond to CUBLASLT_WORKSPACE_SIZE at all while addmm does, so a
+        # matmul-chunked arm silently ran with the split-K control off.
         _, x, w = _operands()
+        zeros = torch.zeros(COLS, ROWS)
 
-        assert torch.equal(blocked_matmul(x, w, INNER), torch.matmul(x, w))
-        assert torch.equal(blocked_matmul(x, w, INNER * 4), torch.matmul(x, w))
+        assert torch.equal(blocked_matmul(x, w, INNER), torch.addmm(zeros, x, w))
+        assert torch.equal(blocked_matmul(x, w, INNER * 4), torch.addmm(zeros, x, w))
 
     def test_a_ragged_k_sums_every_term_exactly_once(self) -> None:
         # K=17 against a width of 5 leaves a tail of 2. Padding with zeros

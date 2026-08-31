@@ -231,23 +231,40 @@ def rank1_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.T
 
 
 def blocked_matmul(x: torch.Tensor, w: torch.Tensor, block: int) -> torch.Tensor:
-    """Compute ``x @ w`` as ceil(K/block) vendor matmuls summed in ascending k.
+    """Compute ``x @ w`` as ceil(K/block) cuBLASLt calls summed in ascending k.
 
     The middle ground between :func:`cublas_addmm` and :func:`rank1_matmul`,
     and the one a real implementation would resemble. The PROGRAM fixes how
     the reduction is cut and the order the pieces are added; the VENDOR still
     chooses how to reduce within a piece. So it is not a proof the way the
-    rank-one arm is -- it is the measurement of how much of the order has to
-    be owned before the cards agree, which is the number someone choosing an
+    rank-one arm is -- it measures how much of the order has to be owned
+    before the cards agree, which is the number someone choosing an
     implementation actually needs.
 
-    It is also what a Triton kernel with a fixed ``BLOCK_K`` would do one
-    level down, minus the part that cannot be pinned from Python: ``tl.dot``
-    lowers to the target architecture's MMA instruction, so a Triton kernel
-    fixes the block schedule and inherits the intra-tile order from the card,
-    exactly as this inherits the intra-block order from cuBLAS. If chunking
-    is enough here it is evidence the Triton version would work; if it is not,
-    that is worth knowing before writing one.
+    IT ACCUMULATES WITH ``addmm``, NOT ``matmul``, AND THAT IS THE WHOLE
+    CORRECTNESS OF THE ARM. The first version chunked with ``torch.matmul``
+    and every card disagreed worse than the unchunked baseline. Measured
+    2026-08-30 on an RTX 3090 Ti, one shape, one set of operands, with and
+    without ``CUBLASLT_WORKSPACE_SIZE=0``::
+
+        addmm    338779f0ee4467ae -> fa28a1f6d2ae3b64   (control reaches it)
+        matmul   c6856afb742b9f0a -> c6856afb742b9f0a   (control does not)
+
+    ``torch.matmul`` takes the legacy ``cublasSgemm`` entry point, which
+    ``CUBLASLT_WORKSPACE_SIZE`` structurally cannot touch -- the same fact
+    that makes GPT-2's bias-free ``lm_head`` the one matmul the split-K
+    control never reached. So a matmul-chunked arm ran with the control that
+    buys sm_80+ agreement silently switched off, and measured the entry point
+    rather than the chunking. Accumulating into the running sum keeps every
+    piece on the path the control governs, which is the only way the
+    comparison against the unchunked arm isolates one variable.
+
+    A consequence worth naming: under a block arm ``lm_head`` moves from the
+    legacy path onto cuBLASLt, because every piece here is an ``addmm``. That
+    is a real difference from the untreated arm and is deliberate -- the arm
+    exists to chunk the path the control governs -- but it means an
+    ``lm_head`` row under a block arm is not comparable with one under
+    ``cublas``.
 
     The tail is whatever is left when K is not a multiple of ``block``, added
     in its own turn rather than padded: padding with zeros would change the
@@ -264,7 +281,7 @@ def blocked_matmul(x: torch.Tensor, w: torch.Tensor, block: int) -> torch.Tensor
     accumulator = torch.zeros(x.shape[0], w.shape[1], dtype=x.dtype, device=x.device)
     for start in range(0, w.shape[0], block):
         stop = min(start + block, w.shape[0])
-        accumulator = accumulator + torch.matmul(x[:, start:stop], w[start:stop, :])
+        accumulator = torch.addmm(accumulator, x[:, start:stop], w[start:stop, :])
     return accumulator
 
 
