@@ -1,5 +1,5 @@
 {
-  "git_commit": "7fc59eda039a06b395935bba00618b775744ec4b",
+  "git_commit": "fba07ed4cf9d0715c17b0bcb69cd6c72b5cddea3",
   "carries": [
     "scripts",
     "doctrines",
@@ -621,8 +621,8 @@
     },
     {
       "path": "rw-agent.jar",
-      "sha256": "4a07dc81f975ca5b18c9d7623f1208bc7b649e1a4e38ce72ee6a6aec2798b706",
-      "size_bytes": 127019
+      "sha256": "92fa74606e5fe02a2582a56f8bf94ea7ce5c56ce132a184bebcc5e448483d07b",
+      "size_bytes": 134364
     },
     {
       "path": "scripts/__init__.py",
@@ -871,13 +871,13 @@
     },
     {
       "path": "src/rw_bot/harness/campaign.py",
-      "sha256": "40eb00689d1b8e5a6233826e59adc0a64bd3dc63de62262eb97e72f2668ce787",
-      "size_bytes": 9056
+      "sha256": "e16a47875131ebe32679b2dc7e52e95a26989b5e3890e3624d8e07947bc98c84",
+      "size_bytes": 9070
     },
     {
       "path": "src/rw_bot/harness/campaign_match.py",
-      "sha256": "60781097b88c0813bbbb818e33c5864bf257f07b9cdd616007f9fc5f3ff630bf",
-      "size_bytes": 12709
+      "sha256": "a005131b5f04f35496eefa7fe6ef1d94093b808a0f9ecb9959a1f206c73d90a1",
+      "size_bytes": 14379
     },
     {
       "path": "src/rw_bot/harness/clone.py",
@@ -946,8 +946,8 @@
     },
     {
       "path": "src/rw_bot/harness/results_layout.py",
-      "sha256": "7f12f3e972f061006a87d0a7603a46b459b9a28c63be3b73adc9d75ad32b9012",
-      "size_bytes": 9653
+      "sha256": "2ef95724df770d7830e20e6c62a24255925170113658bb606193746b8e2aecda",
+      "size_bytes": 9879
     },
     {
       "path": "src/rw_bot/harness/runner.py",
@@ -2060,8 +2060,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "e0f00a566a6695c4ca4aa664cbcf80667908a139de52edc77dbcb7cbf4d45fc6",
+  "tree_sha256": "4c94b50a60e922ddfa104eeb6a2e3c4ef627039bb50b03c2cda7fb425f0f3ffb",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "4bc31668036f3331445b87fc5efbe6e7affc82b34168697f5444eb38d306cc91",
-  "archive_size_bytes": 2242560
+  "archive_sha256": "62b2368151b876f0ad082713145e0525619c322a0f2b8bb2cbcd947f06f9a77a",
+  "archive_size_bytes": 2252800
 }

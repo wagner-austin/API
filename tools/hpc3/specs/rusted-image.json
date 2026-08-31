@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11-slim-bookworm@sha256:0bee7276f83efd4a1ee05bbbf4281d95ed28e079220a9457f25a93e3f1e3c31b",
   "env_prefix": "/opt/env",
-  "git_commit": "7fc59eda039a06b395935bba00618b775744ec4b",
+  "git_commit": "fba07ed4cf9d0715c17b0bcb69cd6c72b5cddea3",
   "system_packages": [
     "xvfb=2:21.1.7-3+deb12u13",
     "xauth=1:1.1.2-1",
