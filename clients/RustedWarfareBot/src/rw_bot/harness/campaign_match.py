@@ -281,12 +281,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             # default of 0 is what the cluster panel forked under.
             "pin_delta": PINNED_DELTA_MS,
             # Required and read from the command line, because it is part of
-            # what the batch measured: a member left to a default would run a
-            # pace the campaign document never stated. Under the pinned delta
-            # the multiple changes how fast wall time passes, not what the
-            # simulation computes -- certified bit-exact at 10 against
-            # realtime (log 2026-08-06), and re-checked under the pin before
-            # the first fast-forwarded campaign ran.
+            # what the batch measured -- and not only of how fast it ran.
+            # The pre-pin certification (log 2026-08-06) said 10x is
+            # bit-exact against realtime; re-checked UNDER the pin, that is
+            # false in general: seed 31337's world was identical at both
+            # paces for all 250 samples while seed 8128's diverged at
+            # sample 97. So a fast-forwarded batch is its own regime, its
+            # numbers comparable only within itself, and a member left to a
+            # default would run a pace -- a regime -- the campaign document
+            # never stated.
             "fast_forward": int(parsed["--fast-forward"]),
         },
         match,
