@@ -39,6 +39,7 @@ class SplitRandom extends Random {
     /** Offsets the side stream's seed so the two streams never correlate. */
     private static final long SIDE_SALT = 0x51DE57E4A5EEDL;
 
+
     /** The stream every non-simulation draw is served from. */
     private final Side side;
 
@@ -63,6 +64,63 @@ class SplitRandom extends Random {
         Log.info(
                 "tick-split generator installed: draws under the simulation tick are pinned;"
                         + " render-path draws use a side stream");
+    }
+
+    /**
+     * Installs the same split on {@link Math#random()}'s global generator.
+     *
+     * <p><b>Seeding that generator was never enough, and the ledger proves
+     * it.</b> Twelve engine call sites read {@link Math#random()}, and the
+     * holder is JVM-global: the render path and the simulation drew from one
+     * stream, with the render path drawing at moments only the scheduler
+     * chooses. Replayed across eleven seeds on HPC3, every seed whose
+     * {@code math=} ledger state agreed at frame 0 replicated bit-exact over
+     * 250 samples and every seed whose state differed at frame 0 forked --
+     * while the engine stream, split here since 2026-08-07, diverged only
+     * AFTER the world had already forked in all three cases. Cause and
+     * consequence, in that order (wiki log 2026-08-30).
+     *
+     * <p>Seeded plainly, and NOT salted apart from the engine split. The
+     * reseed that follows ({@link EngineRandom#seed(long)}) pins every
+     * generator to the match seed and would undo a construction-time salt
+     * anyway, leaving the two halves of one object disagreeing about which
+     * seed they were built from. All three generators have always taken the
+     * same seed; what changes here is the phase routing, not the pinning.
+     *
+     * @param seed The seed the simulation stream starts from.
+     * @throws IllegalStateException When the swap cannot be made or did not
+     *     stick.
+     */
+    static void installMath(long seed) {
+        SplitRandom installed = new SplitRandom(seed);
+        EngineRandom.swapMathGenerator(installed, "the Math.random tick-split generator");
+        Log.info(
+                "Math.random tick-split generator installed: the simulation's draws from it"
+                        + " no longer share a stream with the render path");
+    }
+
+    /**
+     * Installs the same split on {@link java.util.Collections#shuffle}'s
+     * generator, the third and last of the shared streams.
+     *
+     * <p><b>It was invisible until the leak above it closed.</b> With Math
+     * still shared, the shuffle stream agreed across all eleven replayed
+     * seeds -- the world forked on Math first, so nothing downstream got to
+     * matter. Split Math, and shuffle became the first stream to diverge, at
+     * frame 600, ahead of the engine stream at 1050 and the world fork at
+     * 3300 (wiki log 2026-08-30). Three generators, one seam, and the fix
+     * only counts when every one of them routes by phase.
+     *
+     * @param seed The seed the simulation stream starts from.
+     * @throws IllegalStateException When the swap cannot be made or did not
+     *     stick.
+     */
+    static void installShuffle(long seed) {
+        SplitRandom installed = new SplitRandom(seed);
+        EngineRandom.swapShuffleGenerator(installed, "the shuffle tick-split generator");
+        Log.info(
+                "Collections.shuffle tick-split generator installed: unit-mix order no longer"
+                        + " shares a stream with anything outside the tick");
     }
 
     @Override

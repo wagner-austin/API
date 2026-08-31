@@ -180,13 +180,120 @@ final class EngineRandom {
      */
     static void swapEngineGenerator(Random replacement, String what) {
         Class<?> holder = EngineAccess.pinnedClass(EngineNames.RANDOM_HOLDER_CLASS);
+        putStaticObject(holder, EngineNames.RANDOM_FIELD, replacement, what);
+        if (engineGenerator() != replacement) {
+            throw new IllegalStateException(
+                    "rw-agent: " + what + " did not stick on "
+                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD
+                            + "; the holder class re-initialised over it");
+        }
+    }
+
+    /**
+     * Replaces the generator behind {@link Math#random()} and verifies it.
+     *
+     * <p><b>Why this exists at all.</b> Seeding {@link Math}'s generator makes
+     * a run start from a known state; it does not make the simulation's draws
+     * from it a function of the seed. The holder is JVM-GLOBAL and twelve
+     * engine call sites read it (see class doc), so render-path draws and
+     * simulation draws share one stream and the render path draws at moments
+     * only the scheduler chooses. {@link SplitRandom} closed exactly this on
+     * the engine's own generator on 2026-08-07; this generator was left
+     * shared, and the {@link RandomLedger} says so outright: across eleven
+     * seeds replayed on HPC3, every seed whose {@code math=} state agreed at
+     * frame 0 replicated bit-exact over 250 samples, and every seed whose
+     * {@code math=} state differed at frame 0 forked -- with the engine
+     * stream diverging only AFTER the world had already forked, which makes
+     * it the consequence rather than the cause (wiki log 2026-08-30).
+     *
+     * <p>The holder is initialised on first use, so the read-back forces it
+     * exactly as {@link #mathGenerator()} does.
+     *
+     * @param replacement The generator to install.
+     * @param what What is being installed, for the failure message.
+     * @throws IllegalStateException When the field cannot be reached or the
+     *     read-back does not return the replacement.
+     */
+    static void swapMathGenerator(Random replacement, String what) {
+        // Forces the holder's <clinit> BEFORE the write, so the class cannot
+        // initialise over the replacement afterwards -- the failure mode the
+        // engine-side swap's read-back was added for (see RandomTap).
+        Math.random();
+        Class<?> holder;
+        try {
+            holder = Class.forName(MATH_HOLDER);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot reach " + MATH_HOLDER
+                            + "; pass --add-opens java.base/java.lang=ALL-UNNAMED", e);
+        }
+        putStaticObject(holder, MATH_FIELD, replacement, what);
+        if (mathGenerator() != replacement) {
+            throw new IllegalStateException(
+                    "rw-agent: " + what + " did not stick on " + MATH_HOLDER + "." + MATH_FIELD
+                            + "; the holder class re-initialised over it");
+        }
+    }
+
+    /**
+     * Replaces the generator behind {@link java.util.Collections#shuffle} and
+     * verifies it.
+     *
+     * <p>The third of three, and it had to be measured to be believed. With
+     * the engine's generator split and {@link Math}'s still shared, the
+     * shuffle stream agreed across every one of eleven replayed seeds --
+     * because the Math leak forked the world first and nothing downstream
+     * got to matter. Split Math, and shuffle became the FIRST stream to
+     * diverge: frame 600, ahead of the engine stream at 1050 and the world
+     * fork at 3300 (four invocations, wiki log 2026-08-30). A leak is only
+     * invisible until the louder one above it is closed.
+     *
+     * <p>The field is lazily built on the first single-argument shuffle, so
+     * one is forced on an empty list before the write, exactly as
+     * {@link #shuffleGenerator()} does.
+     *
+     * @param replacement The generator to install.
+     * @param what What is being installed, for the failure message.
+     * @throws IllegalStateException When the field cannot be reached or the
+     *     read-back does not return the replacement.
+     */
+    static void swapShuffleGenerator(Random replacement, String what) {
+        java.util.Collections.shuffle(new java.util.ArrayList<Object>());
+        putStaticObject(java.util.Collections.class, SHUFFLE_FIELD, replacement, what);
+        if (shuffleGenerator() != replacement) {
+            throw new IllegalStateException(
+                    "rw-agent: " + what + " did not stick on java.util.Collections."
+                            + SHUFFLE_FIELD + "; the field was re-initialised over it");
+        }
+    }
+
+    /**
+     * Writes one {@code static final} object field.
+     *
+     * <p>Reflection on a static final field refuses the write, so it goes
+     * through {@code sun.misc.Unsafe} -- reached reflectively rather than
+     * imported, because javac treats the name itself as a warning and the
+     * build treats warnings as errors.
+     *
+     * <p>Shared by both generator swaps rather than written twice: they
+     * differ in which holder they target and in how they read back, and not
+     * in how the write is made.
+     *
+     * @param holder The class declaring the field.
+     * @param fieldName The field.
+     * @param value What to write.
+     * @param what What is being installed, for the failure message.
+     * @throws IllegalStateException When Unsafe or the field cannot be
+     *     reached.
+     */
+    private static void putStaticObject(
+            Class<?> holder, String fieldName, Object value, String what) {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             java.lang.reflect.Field theUnsafe = unsafeClass.getDeclaredField("theUnsafe");
             theUnsafe.setAccessible(true);
             Object unsafe = theUnsafe.get(null);
-            java.lang.reflect.Field field =
-                    holder.getDeclaredField(EngineNames.RANDOM_FIELD);
+            java.lang.reflect.Field field = holder.getDeclaredField(fieldName);
             Object base =
                     unsafeClass
                             .getMethod("staticFieldBase", java.lang.reflect.Field.class)
@@ -197,19 +304,13 @@ final class EngineRandom {
                             .invoke(unsafe, field);
             unsafeClass
                     .getMethod("putObject", Object.class, long.class, Object.class)
-                    .invoke(unsafe, base, offset, replacement);
+                    .invoke(unsafe, base, offset, value);
         } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
                 | IllegalAccessException | java.lang.reflect.InvocationTargetException
                 | RuntimeException e) {
             throw new IllegalStateException(
                     "rw-agent: cannot install " + what + " on "
-                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD, e);
-        }
-        if (engineGenerator() != replacement) {
-            throw new IllegalStateException(
-                    "rw-agent: " + what + " did not stick on "
-                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD
-                            + "; the holder class re-initialised over it");
+                            + holder.getName() + "." + fieldName, e);
         }
     }
 

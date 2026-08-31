@@ -290,6 +290,19 @@ final class MatchSetup {
             RandomTap.install(seed);
         } else if (seed != 0) {
             SplitRandom.install(seed);
+            // **And Math's, which was the seam the engine-side split left
+            // open.** Twelve engine call sites read Math.random(), whose
+            // holder is JVM-global, so the render path and the simulation
+            // shared one stream. Measured across eleven seeds replayed on
+            // HPC3: math agreeing at frame 0 predicted bit-exact replication
+            // over 250 samples, math differing at frame 0 predicted a fork,
+            // with no exceptions -- and the engine stream diverged only
+            // after the world already had (wiki log 2026-08-30).
+            SplitRandom.installMath(seed);
+            // And the third. Splitting Math alone moved the fork EARLIER --
+            // shuffle had been agreeing only because the Math leak forked
+            // the world before shuffle could matter. All three or none.
+            SplitRandom.installShuffle(seed);
         }
         // The split routes by phase, and the bracket is what publishes the
         // phase: without it every draw reads as render-side and the

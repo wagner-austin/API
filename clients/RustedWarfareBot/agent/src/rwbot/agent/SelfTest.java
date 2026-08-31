@@ -33,6 +33,7 @@ public final class SelfTest {
         failures += WireChecks.checkCommandParsing();
         failures += WireChecks.checkChannelBackpressure();
         failures += WireChecks.checkLogPrefixing();
+        failures += RandomChecks.checkSplitRouting();
 
         if (failures > 0) {
             System.out.println("FAIL " + failures + " check(s)");
