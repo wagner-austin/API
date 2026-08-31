@@ -35,11 +35,13 @@ from platform_core.run_record import Observation, RunRecord, encode_run_record, 
 from model_trainer.cli import _test_hooks
 from model_trainer.core.contracts.cloze import ClozeItemOutcome, encode_cloze_item_outcome
 from model_trainer.core.run_fingerprint import capture_run_fingerprint, describe_run_fingerprint
+from model_trainer.core.services.model.kernel_arm_modules import apply_kernel_arm_to_model
 from model_trainer.worker.cloze_job import parse_items
 
 _log = get_logger(__name__)
 
 MODEL_FLAG = "--model"
+KERNEL_FLAG = "--kernel"
 ITEMS_FLAG = "--items"
 DEVICE_FLAG = "--device"
 MAX_SEQ_LEN_FLAG = "--max-seq-len"
@@ -50,6 +52,7 @@ OUTCOMES_FLAG = "--outcomes"
 
 _FLAGS = (
     MODEL_FLAG,
+    KERNEL_FLAG,
     ITEMS_FLAG,
     DEVICE_FLAG,
     MAX_SEQ_LEN_FLAG,
@@ -122,6 +125,7 @@ def score_with_outcomes(
     max_seq_len: int,
     experiment: str,
     label: str,
+    kernel: str,
 ) -> tuple[RunRecord, str]:
     """Pin determinism, score the model, and record what it ran on.
 
@@ -137,6 +141,12 @@ def score_with_outcomes(
         max_seq_len: Token budget per item.
         experiment: What this measurement belongs to.
         label: Which measurement within it.
+        kernel: Which arithmetic the model's matmuls use, by
+            :data:`~deterministic_gemm.KERNEL_ARMS` name. Applied AFTER the
+            weights are loaded and before anything is scored. Required and
+            with no default, for the reason the controls are: a record that
+            cannot say which arithmetic produced it is a record nobody can
+            read against another.
 
     Returns:
         The run record -- accuracy, correct, total and chance as
@@ -157,6 +167,11 @@ def score_with_outcomes(
 
     items = parse_items(items_path.read_text(encoding="utf-8"))
     model = _test_hooks.load_hub_model(hub_model_id)
+    # After the weights, before the scoring. The arm replaces modules, so it
+    # needs a built model; and it must be in place before a single item is
+    # scored or the record would describe a posture only some of the run had.
+    swapped = apply_kernel_arm_to_model(model.model, kernel)
+    _log.info("kernel arm %s replaced %d module(s)", kernel, swapped)
     result = _test_hooks.score_cloze(
         items=items, model=model, device=device, max_seq_len=max_seq_len
     )
@@ -207,6 +222,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_seq_len=int(raw_len),
         experiment=cli_args.require_flag(parsed, EXPERIMENT_FLAG),
         label=cli_args.require_flag(parsed, LABEL_FLAG),
+        kernel=cli_args.require_flag(parsed, KERNEL_FLAG),
     )
 
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))

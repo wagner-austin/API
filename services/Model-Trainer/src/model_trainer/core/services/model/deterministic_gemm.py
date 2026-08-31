@@ -1,4 +1,4 @@
-"""Three ways to compute one GEMM, differing only in who chooses the order.
+"""Several ways to compute one GEMM, differing only in who chooses the order.
 
 WHY THIS EXISTS. Every determinism control shipped so far -- ``CUBLAS_WORKSPACE_CONFIG``,
 ``use_deterministic_algorithms``, TF32 off, ``CUBLASLT_WORKSPACE_SIZE=0``, the
@@ -12,7 +12,8 @@ and no further flag can reach it -- the trace that found it already had every
 flag on.
 
 So the next control is not a flag. It is owning the reduction order, which
-means not calling the vendor's GEMM. These are the three arms worth measuring:
+means not calling the vendor's GEMM -- or calling it on pieces small enough
+that its remaining freedom does not matter. These are the arms:
 
 * :data:`CUBLAS_ARM` is ``addmm``, the baseline the ladder and the trace have
   always run. It is here so the other two are read against it in the same
@@ -43,16 +44,36 @@ means not calling the vendor's GEMM. These are the three arms worth measuring:
   holds, is that the ceiling is reachable, which is the thing no amount of
   configuration could tell us.
 
+* The ``block<N>`` arms are the middle ground, and the one a real
+  implementation would resemble. Each cuts K into fixed pieces of N and adds
+  the pieces in ascending k, so the PROGRAM fixes how the reduction is cut
+  while the VENDOR still chooses how to reduce within a piece. That is not a
+  proof, and it is not meant to be: it measures HOW MUCH of the order has to
+  be owned before the cards agree, which is the number someone choosing an
+  implementation actually needs. See :data:`BLOCK_SIZES` for why the widths
+  are a prediction rather than a sweep.
+
 WHY NOT TRITON, WHICH IS THE OBVIOUS ANSWER AND IS ALREADY IN THE IMAGE. A
-Triton kernel with a fixed ``BLOCK_K`` and no split-K would keep tensor cores
-and most of the speed. It is the right SECOND move and the wrong first one:
+kernel with a fixed ``BLOCK_K`` and no split-K would keep tensor cores and
+most of the speed, and it remains the right shape for production. Two things
+stand in the way, and only one of them is about Triton.
+
+The first is that a Triton kernel would not settle the question by itself.
 ``tl.dot`` lowers to the MMA instruction of the target architecture, whose
-shape differs between sm_70 and sm_80, so the intra-tile order may move with
-the card -- which is the very thing under test, reintroduced one level down.
-Establishing that a fixed order suffices has to come first, and it has to
-come from an arm where "the order is fixed" is a claim about the program
-rather than about a compiler's lowering. This module is also imported on
-Windows by the test suite, where Triton does not install at all.
+shape differs between sm_70 and sm_80, so such a kernel fixes the block
+SCHEDULE and inherits the intra-tile order from the card -- exactly as the
+``block<N>`` arms fix the chunking and inherit the intra-chunk order from
+cuBLAS. The block arms therefore test the same property one level up, in code
+that runs everywhere, and a negative result from them would predict a
+negative result from Triton without writing it.
+
+The second is this package's own bar, and it is worth stating plainly rather
+than working around. Coverage is ``fail_under = 100`` with ``omit = []``, and
+Triton does not install on Windows at all -- so a ``@triton.jit`` body cannot
+be executed, and cannot be covered, by the suite that gates every commit
+here. Shipping one would mean adding a coverage exemption, which is the
+thing this workspace bans by name. It needs a GPU-capable test runner, not a
+cleverer import.
 """
 
 from __future__ import annotations
@@ -70,11 +91,52 @@ FP64_ARM = "fp64"
 #: K rank-one updates in ascending k. The program fixes the order.
 RANK1_ARM = "rank1"
 
+#: The K-block widths the ``block<N>`` arms chunk a reduction into.
+#:
+#: WHY THESE THREE, AND WHY THEY ARE A PREDICTION RATHER THAN A SWEEP. The
+#: 2026-08-30 boundary bracket measured where the V100 leaves the sm_80+ cards
+#: on an unchunked matmul: at M >= 3072 AND K >= 1152, with K=1024 the
+#: largest reduction length that still agreed. A ``block<N>`` arm holds M
+#: fixed and cuts K into pieces of N, so if the disagreement really is a
+#: property of the reduction LENGTH the vendor is handed, then chunking to
+#: 1024 should agree and chunking to 1280 should not -- on the same shapes,
+#: in the same run. 256 is the control far below the line.
+#:
+#: That is falsifiable in the direction that matters. If ``block1280`` agrees
+#: the threshold is not about the length handed to one call, and the story
+#: the bracket told needs revising rather than extending.
+BLOCK_SIZES: Final[tuple[int, ...]] = (256, 1024, 1280)
+
+#: The chunked arms, named for their width so the label carries it.
+BLOCK_ARMS: Final[tuple[str, ...]] = tuple(f"block{size}" for size in BLOCK_SIZES)
+
 #: Every arm, in the order a report should read them: baseline, the cheap
-#: attempt, the one with a proof. Declared as a tuple rather than inferred
-#: from the dispatch below, so a report can name the arms without importing
-#: torch -- the reason :mod:`gemm_shapes` is separate from :mod:`gemm_probe`.
-KERNEL_ARMS: Final[tuple[str, ...]] = (CUBLAS_ARM, FP64_ARM, RANK1_ARM)
+#: attempt, the one with a proof, then the chunked middle ground. Declared as
+#: a tuple rather than inferred from the dispatch below, so a report can name
+#: the arms without importing torch -- the reason :mod:`gemm_shapes` is
+#: separate from :mod:`gemm_probe`.
+KERNEL_ARMS: Final[tuple[str, ...]] = (CUBLAS_ARM, FP64_ARM, RANK1_ARM, *BLOCK_ARMS)
+
+
+def require_block_size(arm: str) -> int:
+    """Return the K-block width a ``block<N>`` arm names.
+
+    Args:
+        arm: One of :data:`BLOCK_ARMS`.
+
+    Returns:
+        The width in elements.
+
+    Raises:
+        ValueError: When ``arm`` is not a block arm. Parsed from the declared
+            table rather than from the digits in the string: a name is a block
+            arm because it is IN :data:`BLOCK_ARMS`, and reading an integer
+            out of an arbitrary string would accept ``block7`` -- a width
+            nothing declares and no record could be compared against.
+    """
+    if arm not in BLOCK_ARMS:
+        raise ValueError(f"{arm!r} is not one of {', '.join(BLOCK_ARMS)}")
+    return BLOCK_SIZES[BLOCK_ARMS.index(arm)]
 
 
 def cublas_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
@@ -168,6 +230,62 @@ def rank1_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.T
     return bias + rank1_matmul(x, w)
 
 
+def blocked_matmul(x: torch.Tensor, w: torch.Tensor, block: int) -> torch.Tensor:
+    """Compute ``x @ w`` as ceil(K/block) vendor matmuls summed in ascending k.
+
+    The middle ground between :func:`cublas_addmm` and :func:`rank1_matmul`,
+    and the one a real implementation would resemble. The PROGRAM fixes how
+    the reduction is cut and the order the pieces are added; the VENDOR still
+    chooses how to reduce within a piece. So it is not a proof the way the
+    rank-one arm is -- it is the measurement of how much of the order has to
+    be owned before the cards agree, which is the number someone choosing an
+    implementation actually needs.
+
+    It is also what a Triton kernel with a fixed ``BLOCK_K`` would do one
+    level down, minus the part that cannot be pinned from Python: ``tl.dot``
+    lowers to the target architecture's MMA instruction, so a Triton kernel
+    fixes the block schedule and inherits the intra-tile order from the card,
+    exactly as this inherits the intra-block order from cuBLAS. If chunking
+    is enough here it is evidence the Triton version would work; if it is not,
+    that is worth knowing before writing one.
+
+    The tail is whatever is left when K is not a multiple of ``block``, added
+    in its own turn rather than padded: padding with zeros would change the
+    number of terms and put a rounding difference into the arm under study.
+
+    Args:
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+        block: K-block width, from :func:`require_block_size`.
+
+    Returns:
+        ``[N, M]``.
+    """
+    accumulator = torch.zeros(x.shape[0], w.shape[1], dtype=x.dtype, device=x.device)
+    for start in range(0, w.shape[0], block):
+        stop = min(start + block, w.shape[0])
+        accumulator = accumulator + torch.matmul(x[:, start:stop], w[start:stop, :])
+    return accumulator
+
+
+def blocked_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor, block: int) -> torch.Tensor:
+    """Compute the chunked product, then add the bias.
+
+    Bias last, matching :func:`rank1_addmm`, so the arms differ in the
+    reduction under study and not also in where the bias went.
+
+    Args:
+        bias: ``[M]``.
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+        block: K-block width.
+
+    Returns:
+        ``[N, M]``.
+    """
+    return bias + blocked_matmul(x, w, block)
+
+
 def matmul_by_arm(arm: str, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     """Compute ``x @ w`` by the named arm, with no bias anywhere.
 
@@ -196,6 +314,8 @@ def matmul_by_arm(arm: str, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
         return torch.matmul(x, w)
     if named == FP64_ARM:
         return torch.matmul(x.double(), w.double()).float()
+    if named in BLOCK_ARMS:
+        return blocked_matmul(x, w, require_block_size(named))
     return rank1_matmul(x, w)
 
 
@@ -241,19 +361,26 @@ def gemm_by_arm(arm: str, bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) 
         return cublas_addmm(bias, x, w)
     if named == FP64_ARM:
         return fp64_addmm(bias, x, w)
+    if named in BLOCK_ARMS:
+        return blocked_addmm(bias, x, w, require_block_size(named))
     return rank1_addmm(bias, x, w)
 
 
 __all__ = [
+    "BLOCK_ARMS",
+    "BLOCK_SIZES",
     "CUBLAS_ARM",
     "FP64_ARM",
     "KERNEL_ARMS",
     "RANK1_ARM",
+    "blocked_addmm",
+    "blocked_matmul",
     "cublas_addmm",
     "fp64_addmm",
     "gemm_by_arm",
     "matmul_by_arm",
     "rank1_addmm",
     "rank1_matmul",
+    "require_block_size",
     "require_kernel_arm",
 ]

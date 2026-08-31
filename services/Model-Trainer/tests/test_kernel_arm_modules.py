@@ -20,7 +20,7 @@ import torch
 
 from model_trainer.core.services.model.deterministic_gemm import (
     CUBLAS_ARM,
-    FP64_ARM,
+    KERNEL_ARMS,
     RANK1_ARM,
     matmul_by_arm,
     rank1_addmm,
@@ -31,11 +31,14 @@ from model_trainer.core.services.model.kernel_arm_modules import (
     ArmLinear,
     Conv1DProto,
     SwapTargetProto,
+    apply_kernel_arm_to_model,
+    require_swappable,
     use_kernel_arm,
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import TracedLMModelProto
+from tests.core.services.model.backends.hf_lm.testing import FakeHFModel
 
 
 class _Conv1DCtorProto(Protocol):
@@ -132,7 +135,9 @@ class TestWhatGetsReplaced:
         assert _matmul_classes(model) == {"Conv1D", "Linear"}
 
     def test_every_arm_that_is_not_cublas_replaces(self) -> None:
-        for arm in (FP64_ARM, RANK1_ARM):
+        for arm in KERNEL_ARMS:
+            if arm == CUBLAS_ARM:
+                continue
             model, _ = _tiny()
 
             assert use_kernel_arm(model, arm) == 9
@@ -156,6 +161,47 @@ class TestWhatGetsReplaced:
         # not findable, "0 is a Linear" is.
         with pytest.raises(ValueError, match=r"\A0 is a Linear"):
             use_kernel_arm(_biased_tree(), RANK1_ARM)
+
+
+class TestReachingAModelThatOnlyDeclaresItselfALanguageModel:
+    """The hub loader returns an LMModelProto, which declares no module graph.
+
+    ``FakeHFModel`` is the double: it satisfies ``LMModelProto`` and is NOT a
+    torch module, which is precisely the case the narrowing has to handle. It
+    is lifted from the hf_lm helpers rather than rewritten, so it cannot drift
+    from the protocol the original tracks.
+
+    So the scorer cannot call `use_kernel_arm` directly, and the narrowing has
+    to happen somewhere. Where it happens is the behaviour under test: AFTER
+    the untreated short-circuit, so that a fake language model stays usable
+    for every test that does not exercise an arm.
+    """
+
+    def test_the_untreated_arm_never_narrows(self) -> None:
+        # A double that is not a torch module at all. If the narrowing ran
+        # first this would raise, and every baseline test in the suite would
+        # have to build a real module to score nothing.
+        assert apply_kernel_arm_to_model(FakeHFModel(), CUBLAS_ARM) == 0
+
+    def test_a_treated_arm_refuses_a_model_it_cannot_reach(self) -> None:
+        with pytest.raises(ValueError, match="not a torch module"):
+            apply_kernel_arm_to_model(FakeHFModel(), RANK1_ARM)
+
+    def test_an_unknown_arm_is_refused_before_any_narrowing(self) -> None:
+        # The arm check comes first, so the error names the real problem
+        # rather than complaining about the model.
+        with pytest.raises(ValueError, match="kernel must be one of"):
+            apply_kernel_arm_to_model(FakeHFModel(), "triton")
+
+    def test_a_real_model_is_reached_and_swapped(self) -> None:
+        model, _ = _tiny()
+
+        assert apply_kernel_arm_to_model(model, RANK1_ARM) == 9
+
+    def test_require_swappable_returns_the_same_object(self) -> None:
+        model, _ = _tiny()
+
+        assert require_swappable(model) is model
 
 
 class TestTheSwapPreservesTheModel:
@@ -249,7 +295,7 @@ class TestTheModulesComputeTheRightThing:
         x = torch.randn(2, 3, 4)
         flat = x.view(-1, 4)
 
-        for arm in (CUBLAS_ARM, FP64_ARM, RANK1_ARM):
+        for arm in KERNEL_ARMS:
             expected = matmul_by_arm(arm, flat, original.weight.t()).view(2, 3, 6)
 
             assert torch.equal(ArmLinear(original, arm).forward(x), expected)

@@ -25,6 +25,7 @@ from model_trainer.core import _test_hooks as core_hooks
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem, ClozeItemOutcome
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
+from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.types import LMModelProto
 from model_trainer.worker.cloze_job import parse_items
 from tests.core.services.model.backends.hf_lm.testing import (
@@ -179,6 +180,8 @@ def _cpu_argv(tmp_path: pathlib.Path) -> list[str]:
         str(_record_path(tmp_path)),
         "--outcomes",
         str(_outcomes_path(tmp_path)),
+        "--kernel",
+        CUBLAS_ARM,
     ]
 
 
@@ -198,6 +201,7 @@ def test_determinism_is_pinned_before_the_model_loads(tmp_path: pathlib.Path) ->
         max_seq_len=512,
         experiment="e",
         label="l",
+        kernel=CUBLAS_ARM,
     )
 
     assert recorder.order == ["pin", "load:gpt2", "score"]
@@ -221,6 +225,7 @@ def test_the_record_carries_the_four_numbers_and_the_configuration(
         max_seq_len=512,
         experiment="wiki-corpus-extraction-ablation",
         label="gpt2-baseline",
+        kernel=CUBLAS_ARM,
     )
 
     assert record["experiment"] == "wiki-corpus-extraction-ablation"
@@ -246,6 +251,7 @@ def test_a_cpu_run_records_no_card_rather_than_a_wrong_one(tmp_path: pathlib.Pat
         max_seq_len=512,
         experiment="e",
         label="l",
+        kernel=CUBLAS_ARM,
     )
 
     assert record["fingerprint"]["gpu_model"] == ""

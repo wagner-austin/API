@@ -60,7 +60,7 @@ from model_trainer.core.services.model.deterministic_gemm import (
     matmul_by_arm,
     require_kernel_arm,
 )
-from model_trainer.core.types import TracedModuleProto
+from model_trainer.core.types import LMModelProto, TracedModuleProto
 
 
 class Conv1DProto(Protocol):
@@ -162,6 +162,46 @@ def _linear_class() -> type[LinearProto]:
     module = __import__("torch.nn", fromlist=["Linear"])
     cls: type[LinearProto] = module.Linear
     return cls
+
+
+def _swap_target_class() -> type[SwapTargetProto]:
+    """Return ``torch.nn.Module``, typed as the surface a swap needs.
+
+    Reached the same way ``Conv1D`` and ``Linear`` are. It exists so a model
+    typed only as :class:`~model_trainer.core.types.LMModelProto` -- which is
+    what the hub loader hands back, and which declares nothing about a module
+    graph -- can be NARROWED by an ``isinstance`` rather than asserted by a
+    cast. A language model that is not a torch module cannot be swapped, and
+    :func:`require_swappable` says so instead of failing later on a missing
+    attribute.
+
+    Returns:
+        The class, for :func:`isinstance`.
+    """
+    module = __import__("torch.nn", fromlist=["Module"])
+    cls: type[SwapTargetProto] = module.Module
+    return cls
+
+
+def require_swappable(model: LMModelProto) -> SwapTargetProto:
+    """Narrow a language model to the module surface the arms need.
+
+    Args:
+        model: A loaded language model.
+
+    Returns:
+        The same object, typed as swappable.
+
+    Raises:
+        ValueError: If it is not a torch module. Refused rather than skipped:
+            a scorer asked for a treated arm that silently scored untreated
+            would write a record naming a condition it did not run under.
+    """
+    if not isinstance(model, _swap_target_class()):
+        raise ValueError(
+            "this model is not a torch module, so the kernel arms cannot reach its matmuls"
+        )
+    return model
 
 
 def _conv1d_class() -> type[Conv1DProto]:
@@ -323,11 +363,44 @@ def use_kernel_arm(model: SwapTargetProto, arm: str) -> int:
     return replaced
 
 
+def apply_kernel_arm_to_model(model: LMModelProto, arm: str) -> int:
+    """Apply an arm to a loaded language model, narrowing it only if needed.
+
+    The entry point for callers holding an :class:`LMModelProto` -- the hub
+    loader's return type, which declares nothing about a module graph. It is
+    not a rename of :func:`use_kernel_arm`: the ORDER of the two steps is the
+    behaviour.
+
+    The untreated arm returns before the narrowing. That is what keeps a fake
+    language model usable for every test that does not exercise an arm --
+    narrowing first would oblige every double in the suite to become a torch
+    module to score a baseline, which is the cost this codebase already
+    declined to pay when it kept the module graph out of ``LMModelProto``.
+
+    Args:
+        model: The loaded model.
+        arm: One of :data:`~deterministic_gemm.KERNEL_ARMS`.
+
+    Returns:
+        How many modules were replaced. Zero for the cuBLAS arm.
+
+    Raises:
+        ValueError: For an unknown arm, or -- for a treated arm only -- when
+            the model is not a torch module.
+    """
+    named = require_kernel_arm(arm)
+    if named == CUBLAS_ARM:
+        return 0
+    return use_kernel_arm(require_swappable(model), named)
+
+
 __all__ = [
     "ArmConv1D",
     "ArmLinear",
     "Conv1DProto",
     "LinearProto",
     "SwapTargetProto",
+    "apply_kernel_arm_to_model",
+    "require_swappable",
     "use_kernel_arm",
 ]

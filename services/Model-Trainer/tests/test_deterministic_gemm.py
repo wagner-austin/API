@@ -16,14 +16,18 @@ import pytest
 import torch
 
 from model_trainer.core.services.model.deterministic_gemm import (
+    BLOCK_ARMS,
+    BLOCK_SIZES,
     CUBLAS_ARM,
     FP64_ARM,
     KERNEL_ARMS,
     RANK1_ARM,
+    blocked_matmul,
     cublas_addmm,
     fp64_addmm,
     gemm_by_arm,
     rank1_addmm,
+    require_block_size,
     require_kernel_arm,
 )
 
@@ -49,8 +53,24 @@ def _operands() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
 
 class TestTheArmTable:
-    def test_it_names_three_arms_in_reading_order(self) -> None:
-        assert KERNEL_ARMS == (CUBLAS_ARM, FP64_ARM, RANK1_ARM)
+    def test_it_names_every_arm_in_reading_order(self) -> None:
+        assert (CUBLAS_ARM, FP64_ARM, RANK1_ARM, *BLOCK_ARMS) == KERNEL_ARMS
+
+    def test_the_block_arms_are_named_for_their_width(self) -> None:
+        assert BLOCK_ARMS == ("block256", "block1024", "block1280")
+        assert [require_block_size(a) for a in BLOCK_ARMS] == list(BLOCK_SIZES)
+
+    def test_the_block_widths_bracket_the_measured_threshold(self) -> None:
+        # The 2026-08-30 bracket put the V100's departure between K=1024
+        # (agreed) and K=1152 (differed) at M=3840. The widths are chosen so
+        # one sits on each side of that line, with a control far below.
+        assert 1024 in BLOCK_SIZES
+        assert 1280 in BLOCK_SIZES
+        assert min(BLOCK_SIZES) < 1024
+
+    def test_a_width_is_refused_for_an_arm_that_declares_none(self) -> None:
+        with pytest.raises(ValueError, match="is not one of block256"):
+            require_block_size(RANK1_ARM)
 
     def test_the_baseline_is_first(self) -> None:
         # A report reads baseline, cheap attempt, proof. The order is part of
@@ -61,7 +81,7 @@ class TestTheArmTable:
         bias, x, w = _operands()
         shapes = [list(gemm_by_arm(arm, bias, x, w).shape) for arm in KERNEL_ARMS]
 
-        assert shapes == [[COLS, ROWS], [COLS, ROWS], [COLS, ROWS]]
+        assert shapes == [[COLS, ROWS]] * len(KERNEL_ARMS)
 
     def test_an_unknown_arm_is_refused(self) -> None:
         with pytest.raises(ValueError, match="kernel must be one of"):
@@ -113,7 +133,7 @@ class TestTheProduct:
         bias, x, w = _operands()
         dtypes = [gemm_by_arm(arm, bias, x, w).dtype for arm in KERNEL_ARMS]
 
-        assert dtypes == [torch.float32, torch.float32, torch.float32]
+        assert dtypes == [torch.float32] * len(KERNEL_ARMS)
 
     def test_the_bias_is_actually_added_by_every_arm(self) -> None:
         bias, x, w = _operands()
@@ -121,11 +141,66 @@ class TestTheProduct:
         biased = [gemm_by_arm(arm, bias, x, w) for arm in KERNEL_ARMS]
         plain = [gemm_by_arm(arm, unbiased, x, w) for arm in KERNEL_ARMS]
 
-        assert [torch.equal(b, p) for b, p in zip(biased, plain, strict=True)] == [
-            False,
-            False,
-            False,
-        ]
+        assert [torch.equal(b, p) for b, p in zip(biased, plain, strict=True)] == [False] * len(
+            KERNEL_ARMS
+        )
+
+
+class TestTheBlockedArms:
+    """Chunking is the middle ground: the program cuts, the vendor reduces.
+
+    So unlike ``rank1`` these carry no proof, and the tests say only what is
+    true of them -- that they compute the right product, that the cut is where
+    the width says it is, and that a K which is not a multiple of the width
+    still sums every term exactly once.
+    """
+
+    def test_it_agrees_with_addmm_to_float32_rounding(self) -> None:
+        bias, x, w = _operands()
+        exact = torch.addmm(bias.double(), x.double(), w.double())
+
+        for arm in BLOCK_ARMS:
+            gap = (gemm_by_arm(arm, bias, x, w).double() - exact).abs().max().item()
+
+            assert gap < 1e-5
+
+    def test_a_width_at_or_above_k_is_one_chunk_and_matches_the_vendor(self) -> None:
+        # With one chunk the arm IS torch.matmul on the whole K, so it must be
+        # bit-identical to it -- the degenerate case that proves the chunking
+        # adds nothing of its own.
+        _, x, w = _operands()
+
+        assert torch.equal(blocked_matmul(x, w, INNER), torch.matmul(x, w))
+        assert torch.equal(blocked_matmul(x, w, INNER * 4), torch.matmul(x, w))
+
+    def test_a_ragged_k_sums_every_term_exactly_once(self) -> None:
+        # K=17 against a width of 5 leaves a tail of 2. Padding with zeros
+        # would change the number of terms and put a rounding difference into
+        # the arm under study, so the tail is added in its own turn.
+        torch.manual_seed(11)
+        x = torch.randn(3, 17)
+        w = torch.randn(17, 6)
+        exact = x.double() @ w.double()
+
+        gap = (blocked_matmul(x, w, 5).double() - exact).abs().max().item()
+
+        assert gap < 1e-5
+
+    def test_a_narrower_width_is_a_different_computation(self) -> None:
+        # If every width gave identical bits the arms would be measuring
+        # nothing. At a K this short they may coincide, so this asserts on a
+        # K long enough for the cut to matter.
+        torch.manual_seed(3)
+        x = torch.randn(8, 4096)
+        w = torch.randn(4096, 64)
+
+        assert not torch.equal(blocked_matmul(x, w, 64), blocked_matmul(x, w, 4096))
+
+    def test_it_reproduces_itself_exactly(self) -> None:
+        bias, x, w = _operands()
+
+        for arm in BLOCK_ARMS:
+            assert torch.equal(gemm_by_arm(arm, bias, x, w), gemm_by_arm(arm, bias, x, w))
 
 
 class TestRankOneIsNotTheVendorCallInDisguise:
