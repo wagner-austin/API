@@ -1,6 +1,6 @@
 # NavProbe Wiki
 
-**Read this first.** 5 topic hubs, 33 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 5 topic hubs, 37 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 NavProbe is a reproducibility instrument for simulated navigation. This wiki records two things kept deliberately apart: **what the instrument was built to be** (design decisions and their reasoning) and **what it has measured** (results, with the conditions they were taken under).
 
@@ -25,13 +25,22 @@ wall clocks move by up to 4x with host load.
 **The patch is safe; the mode it unlocks is not safe everywhere.** The patch itself
 changes nothing — measured on the vendor's own tactile fixture with twelve live taxels,
 patched and unpatched agree bit for bit on both devices
-([[tactile-alias-is-inert-with-live-taxels]]). But on that same mesh/multiccd model the
-deterministic mode **drops every contact** and the body falls through the geom it should
-rest on, silently and exit 0
-([[deterministic-mode-drops-contacts-in-convex-narrowphase]]). The sphere family above is
-unaffected and its ten-scene table was re-checked with contact counts and survives —
-which is worth knowing precisely because this instrument scores a zero-contact run as
-`deterministic: true` ([[a-determinism-verdict-needs-a-correctness-oracle]]).
+([[tactile-alias-is-inert-with-live-taxels]]). But the mode it unlocks **drops every
+contact for any geometry pair MuJoCo-Warp routes to its CONVEX narrowphase** — two plain
+boxes suffice — and the body falls through what it should rest on, silently and exit 0
+([[deterministic-mode-drops-contacts-in-convex-narrowphase]]); the separate heightfield
+kernel fails the same way ([[heightfield-narrowphase-shares-the-contact-drop]]). Three
+gates make the contact-slot reservation depend on EPA results Warp's counting pass cannot
+compute; neutralising all three restores every pair, at a measured cost
+([[prototype-fix-restores-convex-contacts-under-deterministic-mode]]), and a kernel split
+built at upstream HEAD now restores both narrowphases **exactly** — after which the
+coupled scenes that never reproduce by default give one digest across processes and at
+nworld 8 ([[kernel-split-fix-restores-convex-contacts-at-upstream-head]]). The sphere
+family above routes to the PRIMITIVE narrowphase and is unaffected, and its ten-scene
+table was re-checked with contact counts and survives — which is worth knowing precisely
+because this instrument scores a zero-contact run as `deterministic: true`
+([[a-determinism-verdict-needs-a-correctness-oracle]]). Measurement discipline for all of
+it: mode flips must precede first compile ([[warp-binds-determinism-mode-at-first-compile]]).
 
 **The headline results so far**, all in the default mode. Three separate reproducibility failures, none of which a simple benchmark would surface. Read the figures as instances rather than constants — every precise number below moved when re-measured on a different scene, while every shape held ([[the-numbers-are-scene-dependent-the-shapes-replicate]]):
 
@@ -41,7 +50,7 @@ which is worth knowing precisely because this instrument scores a zero-contact r
 
 ## Hubs
 
-[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (16 pages)
+[Determinism Measurement](hubs/determinism-measurement.md) -- what reproducible means here, and every physics trial this instrument has run (20 pages)
 [Rendered Observations](hubs/rendered-observations.md) -- the batch renderer, and whether the pixel stream a policy consumes reproduces (3 pages)
 [Instrument Design](hubs/instrument-design.md) -- canonical encoding, digest folding, record formats, and the injectivity obligations behind them (8 pages)
 [Simulator Adapters](hubs/simulator-adapters.md) -- the vendor boundary: typing untyped APIs, keeping the declarations honest, and what each backend requires (3 pages)
