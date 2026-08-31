@@ -438,9 +438,21 @@ def probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
     two labels must carry the same digest, so the overlap is a free check that
     the result depends on the DIMENSIONS and not on which table asked.
 
+    THE BATCHED AND CROSSOVER TABLES ARE DIGESTED TOO, since 2026-08-31.
+    They were declared for the TIMING benchmark and never digested, which
+    left every agreement claim in this experiment resting on ``N=64`` -- one
+    64-token sequence, a batch dimension no real job uses -- while the
+    batched shapes real work does use were timed but never compared across
+    cards. ``N`` is a tiling axis, so whether "sm_80+ agrees under both
+    controls" and the V100's M/K threshold survive a real batch was
+    unmeasured, not established. The crossover table's ``N=64`` twins
+    duplicate ladder dimensions under different names on purpose, for the
+    reason the ``tiny-attn-proj`` grid overlap is kept: same dimensions must
+    digest alike regardless of which table asked.
+
     Returns:
         ``(name, shape)`` pairs, ladder first, then the grid, then the
-        boundary bracket.
+        boundary bracket, then the batched twins, then the batch-size sweep.
 
     Raises:
         ValueError: Propagated from :func:`require_unique_labels`.
@@ -448,6 +460,8 @@ def probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
     pairs = [(name, shape) for name, shape in GEMM_SHAPES.items()]
     pairs += [(SWEEP_NAME, shape) for shape in GEMM_SWEEP]
     pairs += [(BOUNDARY_NAME, shape) for shape in GEMM_BOUNDARY]
+    pairs += list(GEMM_BATCHED)
+    pairs += list(GEMM_CROSSOVER)
     return require_unique_labels(tuple(pairs))
 
 

@@ -33,7 +33,11 @@ from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, Forwa
 # Safe at module scope where the others are not: `probe_shapes` is a table of
 # TypedDicts and a label formatter, and imports no torch. That separation is
 # the reason it is its own module -- see its docstring.
-from model_trainer.core.services.model.gemm_shapes import GemmShape, timed_shapes
+from model_trainer.core.services.model.gemm_shapes import (
+    GemmShape,
+    probed_shapes,
+    timed_shapes,
+)
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
 from model_trainer.core.services.model.sdpa_shapes import SdpaCostShape, cost_shapes
 from model_trainer.core.services.model.trace_plan import TRACE_RUNGS
@@ -233,6 +237,33 @@ def _default_benchmark_shapes() -> tuple[tuple[str, GemmShape], ...]:
     return timed_shapes()
 
 
+class ProbedShapesProto(Protocol):
+    """Protocol for the shape table the digest probe walks.
+
+    Behind a hook since 2026-08-31, when the table grew the batched and
+    crossover shapes: a single batched call is cheap on a GPU and the probe
+    runs each twice, but ninety-three shapes at up to ``N=4096`` on a test
+    runner's CPU -- digested through a per-element ``tolist`` -- is minutes
+    per record, and the record tests build several. Tests install a
+    three-shape table and exercise every line of the walk; the cluster walks
+    the real one.
+    """
+
+    def __call__(self) -> tuple[tuple[str, GemmShape], ...]:
+        """Return the shapes to digest, in order."""
+        ...
+
+
+def _default_probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
+    """Production digest-probe shape table - used as default hook.
+
+    Returns:
+        Every declared table: ladder, sweep grid, boundary bracket, batched
+        twins and the batch-size sweep.
+    """
+    return probed_shapes()
+
+
 class RunBenchmarkChildProto(Protocol):
     """Protocol for spawning the benchmark's second-condition process.
 
@@ -407,6 +438,8 @@ run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
 
+probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
+
 
 __all__ = [
     "ApplyDeterminismProto",
@@ -416,6 +449,7 @@ __all__ = [
     "ForwardShapesProto",
     "LadderShapesProto",
     "LoadHubModelProto",
+    "ProbedShapesProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
     "TraceRungsProto",
@@ -428,6 +462,7 @@ __all__ = [
     "ladder_shapes",
     "load_hub_model",
     "pin_torch_threads",
+    "probed_shapes_hook",
     "run_benchmark_child",
     "score_cloze",
     "trace_rungs",
