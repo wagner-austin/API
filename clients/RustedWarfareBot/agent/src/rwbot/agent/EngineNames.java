@@ -460,6 +460,21 @@ final class EngineNames {
      */
     static final String AI_INIT = "av";
 
+    /** The AI's list of sub-controllers, driven once per AI update. */
+    static final String AI_SUBCONTROLLERS = "bm";
+
+    /**
+     * The two sub-controller classes that carry delta-driven cadence clocks.
+     *
+     * <p>Named by their obfuscated names rather than by a guessed role: what
+     * is verified is that {@code a.java:1383} drives every {@code h} in
+     * {@code bm} with the frame delta and that these two decrement float
+     * fields by it, not what the engine's authors called them.
+     */
+    static final String AI_GROUP_CLASS = "com.corrodinggames.rts.game.a.i";
+
+    static final String AI_TASK_CLASS = "com.corrodinggames.rts.game.a.n";
+
     /**
      * The effects manager on the engine ({@code l.bR}, type
      * {@code gameFramework.d.c}) -- owner of the ambient spawner whose two
