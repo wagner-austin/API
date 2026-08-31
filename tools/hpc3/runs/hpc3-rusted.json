@@ -8,7 +8,7 @@
     "rusted": {
       "partition": "free",
       "gpu": null,
-      "cpus": 1,
+      "cpus": 4,
       "mem_gb": 2,
       "minutes": 45,
       "requeue": false,
