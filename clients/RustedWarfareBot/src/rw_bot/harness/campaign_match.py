@@ -280,16 +280,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             # world and all three draw-count streams alike; the workstation
             # default of 0 is what the cluster panel forked under.
             "pin_delta": PINNED_DELTA_MS,
-            # Required and read from the command line, because it is part of
-            # what the batch measured -- and not only of how fast it ran.
-            # The pre-pin certification (log 2026-08-06) said 10x is
-            # bit-exact against realtime; re-checked UNDER the pin, that is
-            # false in general: seed 31337's world was identical at both
-            # paces for all 250 samples while seed 8128's diverged at
-            # sample 97. So a fast-forwarded batch is its own regime, its
-            # numbers comparable only within itself, and a member left to a
-            # default would run a pace -- a regime -- the campaign document
-            # never stated.
+            # Required and read from the command line, because pace is part
+            # of the batch's declared regime and a member left to a default
+            # would run one the campaign document never stated. Re-checked
+            # under the pin with a controlled comparison (2026-08-31): on
+            # the two seeds measured, 10x against realtime moved NOTHING in
+            # the world -- a divergence first blamed on pace turned out to
+            # be the INVOCATION CONTEXT, seed 8128 forking at sample 97
+            # between a solo boot and an 8-way-contended one at identical
+            # pace while 31337 held, which is the pre-liveness boot-pace
+            # seam and not this flag. The flag stays required anyway: two
+            # seeds is evidence of equivalence, not a certification, and
+            # the document stating the pace is what lets anyone check.
             "fast_forward": int(parsed["--fast-forward"]),
         },
         match,
