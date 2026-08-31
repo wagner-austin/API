@@ -543,6 +543,14 @@ class TestTheCommittedSpec:
             ),
             (
                 "model_trainer.core.services.model.deterministic_gemm",
+                "BLOCK_ARMS",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
+                "blocked_matmul",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
                 "gemm_by_arm",
             ),
             (
@@ -559,6 +567,10 @@ class TestTheCommittedSpec:
             (
                 "model_trainer.core.services.model.kernel_arm_modules",
                 "ArmConv1D",
+            ),
+            (
+                "model_trainer.core.services.model.kernel_arm_modules",
+                "apply_kernel_arm_to_model",
             ),
             (
                 "model_trainer.core.services.model.kernel_arm_modules",
