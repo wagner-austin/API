@@ -63,7 +63,15 @@ DOCUMENT_INDENT = 2
 
 #: Flags naming the workspace to read the root from, the batch to emit, and
 #: where to put the document.
-REQUIRED_FLAGS = ("--config", "--jobs", "--batch", "--map", "--difficulty", "--out")
+REQUIRED_FLAGS = (
+    "--config",
+    "--jobs",
+    "--batch",
+    "--map",
+    "--difficulty",
+    "--fast-forward",
+    "--out",
+)
 
 #: Opponents asked for, matching the sweep entry point's. The engine caps the
 #: count by the map's own team count, so a two-player map is a duel regardless.
@@ -73,7 +81,7 @@ EXIT_OK = 0
 
 
 def experiment_of(
-    batch: str, jobs: Sequence[SweepJob], lockstep: int, match: MatchConfig
+    batch: str, jobs: Sequence[SweepJob], lockstep: int, fast_forward: int, match: MatchConfig
 ) -> dict[str, str]:
     """Describe what this campaign IS, for the ledger.
 
@@ -85,6 +93,10 @@ def experiment_of(
         batch: The sweep's name.
         jobs: Every match the file describes.
         lockstep: Engine frames between samples.
+        fast_forward: Wall-clock multiple every member runs at, zero for
+            realtime. Recorded because pace is part of the regime the batch
+            ran under, and a ledger row that omitted it would let a
+            fast-forwarded batch read as comparable to a realtime one.
         match: Which match every member plays. Recorded because the map
             decides the opponent count and is therefore part of what the
             batch measured, not a runtime detail -- two batches on different
@@ -99,6 +111,7 @@ def experiment_of(
         "matches": str(len(jobs)),
         "arms": ",".join(sorted({job["label"] for job in jobs})),
         "lockstep": str(lockstep),
+        "fast_forward": str(fast_forward),
         "map": match["map_path"],
         "difficulty": str(match["difficulty"]),
     }
@@ -124,6 +137,7 @@ def campaign_document(
     batch: str,
     jobs: Sequence[SweepJob],
     lockstep: int,
+    fast_forward: int,
     match: MatchConfig,
 ) -> dict[str, JSONValue]:
     """Build the document a batch is submitted as.
@@ -135,6 +149,8 @@ def campaign_document(
         batch: The sweep's name, which names the campaign.
         jobs: Every match the file describes.
         lockstep: Engine frames between samples.
+        fast_forward: Wall-clock multiple every member runs at, zero for
+            realtime.
         match: Which match every member plays.
 
     Returns:
@@ -150,13 +166,21 @@ def campaign_document(
             "artifact": member["artifact"],
         }
         for member in campaign_members(
-            interpreter_of(env_path), root, PROJECT, jobs_file, batch, jobs, lockstep, match
+            interpreter_of(env_path),
+            root,
+            PROJECT,
+            jobs_file,
+            batch,
+            jobs,
+            lockstep,
+            fast_forward,
+            match,
         )
     ]
     return {
         "project": PROJECT,
         "name": batch,
-        "experiment": dict(experiment_of(batch, jobs, lockstep, match)),
+        "experiment": dict(experiment_of(batch, jobs, lockstep, fast_forward, match)),
         "members": members,
     }
 
@@ -205,7 +229,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     )
     document = campaign_document(
-        workspace["root"], config["env_path"], jobs_file, batch, jobs, DEFAULT_LOCKSTEP, match
+        workspace["root"],
+        config["env_path"],
+        jobs_file,
+        batch,
+        jobs,
+        DEFAULT_LOCKSTEP,
+        int(parsed["--fast-forward"]),
+        match,
     )
     _test_hooks.write_text_lines(
         Path(parsed["--out"]), dump_json_str(document, indent=DOCUMENT_INDENT).splitlines()

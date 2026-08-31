@@ -58,6 +58,7 @@ REQUIRED_FLAGS = (
     "--label",
     "--seed",
     "--lockstep",
+    "--fast-forward",
     "--game",
     "--tree",
     "--traces",
@@ -75,10 +76,6 @@ DUEL_OPPONENTS = 1
 #: This entry point plays one match, so one worker is not a tuning choice.
 SINGLE_WORKER = 1
 
-#: Left to the batch's own defaults. A member that pinned the frame delta or
-#: the fast-forward would be a different experiment from the one its siblings
-#: ran, and nothing in the campaign document would say so.
-BATCH_DEFAULT = 0
 
 #: Milliseconds of simulation every tick carries, whatever the container
 #: measured.
@@ -283,7 +280,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             # world and all three draw-count streams alike; the workstation
             # default of 0 is what the cluster panel forked under.
             "pin_delta": PINNED_DELTA_MS,
-            "fast_forward": BATCH_DEFAULT,
+            # Required and read from the command line, because it is part of
+            # what the batch measured: a member left to a default would run a
+            # pace the campaign document never stated. Under the pinned delta
+            # the multiple changes how fast wall time passes, not what the
+            # simulation computes -- certified bit-exact at 10 against
+            # realtime (log 2026-08-06), and re-checked under the pin before
+            # the first fast-forwarded campaign ran.
+            "fast_forward": int(parsed["--fast-forward"]),
         },
         match,
     )
@@ -304,7 +308,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "BATCH_DEFAULT",
     "EXIT_INCOMPLETE",
     "EXIT_OK",
     "PINNED_DELTA_MS",

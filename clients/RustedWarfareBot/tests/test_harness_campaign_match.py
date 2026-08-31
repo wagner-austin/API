@@ -108,6 +108,8 @@ def _argv(label: str = "attack", seed: int = 1) -> list[str]:
         str(seed),
         "--lockstep",
         "75",
+        "--fast-forward",
+        "10",
         "--game",
         _GAME,
         "--tree",

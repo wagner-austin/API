@@ -78,6 +78,7 @@ def member_command(
     batch: str,
     job: SweepJob,
     lockstep: int,
+    fast_forward: int,
     match: MatchConfig,
 ) -> str:
     """Return the command one member runs.
@@ -90,6 +91,12 @@ def member_command(
         batch: The sweep this job belongs to.
         job: The job this member plays.
         lockstep: Engine frames between samples.
+        fast_forward: Wall-clock multiple every member runs at, zero for
+            realtime. Carried on every member for the same reason the map
+            is: it is part of what the batch measured, and a member left to
+            a default would run a pace the document never stated. The
+            certification batches ran realtime; long matches need the
+            multiple or they outlive a preemptible job's protection ceiling.
         match: Which match every member of this batch plays. Carried on every
             member rather than left to the engine's default, because the map
             decides the opponent count and therefore IS the experiment -- a
@@ -124,6 +131,7 @@ def member_command(
         f" --label {job['label']}"
         f" --seed {job['seed']}"
         f" --lockstep {lockstep}"
+        f" --fast-forward {fast_forward}"
         f" --game {cluster_path(root, project, GAME_DIR)}"
         f" --tree {payload}"
         f" --traces {cluster_path(root, project, TRACE_ROOT)}"
@@ -161,6 +169,7 @@ def campaign_members(
     batch: str,
     jobs: Sequence[SweepJob],
     lockstep: int,
+    fast_forward: int,
     match: MatchConfig,
 ) -> list[SweepMember]:
     """Turn a batch's jobs into the members of a campaign.
@@ -173,6 +182,8 @@ def campaign_members(
         batch: The sweep's name.
         jobs: Every match the file describes.
         lockstep: Engine frames between samples.
+        fast_forward: Wall-clock multiple every member runs at, zero for
+            realtime.
         match: Which match every member plays.
 
     Returns:
@@ -198,7 +209,7 @@ def campaign_members(
         SweepMember(
             suffix=job_name(job),
             command=member_command(
-                interpreter, root, project, jobs_file, batch, job, lockstep, match
+                interpreter, root, project, jobs_file, batch, job, lockstep, fast_forward, match
             ),
             artifact=member_artifact(root, project, batch, job),
         )

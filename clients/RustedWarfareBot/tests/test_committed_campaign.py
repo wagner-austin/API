@@ -95,6 +95,7 @@ class TestTheCommittedPanel:
             require_str(experiment, "batch"),
             jobs,
             int(require_str(experiment, "lockstep")),
+            int(require_str(experiment, "fast_forward")),
             match,
         )
         assert rebuilt == document

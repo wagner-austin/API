@@ -50,6 +50,7 @@ _ENV_PATH = "/opt/env"
 #: workstation batch does.
 _MAP = "maps/skirmish/[p2]duel_lake.tmx"
 _DIFFICULTY = -2
+_FASTFORWARD = 10
 _MATCH = MatchConfig(map_path=_MAP, opponents=1, difficulty=_DIFFICULTY)
 _LINES = (
     "attack|1|doctrines/a.doctrine|1500",
@@ -142,6 +143,8 @@ def _argv(out: str = _OUT) -> list[str]:
         _MAP,
         "--difficulty",
         str(_DIFFICULTY),
+        "--fast-forward",
+        str(_FASTFORWARD),
         "--out",
         out,
     ]
@@ -157,7 +160,14 @@ def _document(jobs: list[SweepJob] | None = None) -> dict[str, JSONValue]:
         The document.
     """
     return campaign_document(
-        _ROOT, _ENV_PATH, _JOBS, _BATCH, _jobs() if jobs is None else jobs, _LOCKSTEP, _MATCH
+        _ROOT,
+        _ENV_PATH,
+        _JOBS,
+        _BATCH,
+        _jobs() if jobs is None else jobs,
+        _LOCKSTEP,
+        _FASTFORWARD,
+        _MATCH,
     )
 
 
@@ -178,11 +188,12 @@ class TestWhatTheCampaignIs:
     def test_it_records_the_facts_that_distinguish_one_batch(self) -> None:
         """A job id and a name say which row in squeue a member was and
         nothing about which experiment it belonged to."""
-        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _MATCH) == {
+        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH) == {
             "batch": "demo",
             "matches": "3",
             "arms": "attack,defend",
             "lockstep": "75",
+            "fast_forward": "10",
             "map": _MAP,
             "difficulty": "-2",
         }
@@ -190,10 +201,10 @@ class TestWhatTheCampaignIs:
     def test_the_map_is_recorded_because_it_decides_the_opponent_count(self) -> None:
         """Two batches on different maps are not comparable, and the ledger
         is where a reader finds out which was which."""
-        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _MATCH)["map"] == _MAP
+        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH)["map"] == _MAP
 
     def test_every_value_is_a_string_because_that_is_what_the_ledger_stores(self) -> None:
-        values = experiment_of(_BATCH, _jobs(), _LOCKSTEP, _MATCH).values()
+        values = experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH).values()
         assert [type(value) for value in values] == [str] * len(values)
 
 
