@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "e93fd847e8d531b055ffb5eab8df5e06a137ab45",
+  "git_commit": "b531fbb2ca1a1c28393cc52cc65144cdc67bd2ae",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -261,7 +261,7 @@
     "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm-rank1.json --controls both --kernel rank1",
     "/opt/env/bin/python -m model_trainer.cli.gemm_probe --device cpu --out /tmp/gemm-block1024.json --controls both --kernel block1024",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.deterministic_gemm import BLOCK_ARMS, KERNEL_ARMS, require_block_size; assert BLOCK_ARMS == ('block256', 'block1024', 'block1280'), BLOCK_ARMS; assert [require_block_size(a) for a in BLOCK_ARMS] == [256, 1024, 1280]; assert len(KERNEL_ARMS) == 6, KERNEL_ARMS\"",
-    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import blocked_matmul; torch.manual_seed(5); x = torch.randn(8, 4096); w = torch.randn(4096, 64); assert torch.equal(blocked_matmul(x, w, 4096), torch.matmul(x, w)), 'one chunk must be the vendor call'; assert not torch.equal(blocked_matmul(x, w, 64), blocked_matmul(x, w, 4096)), 'chunk width must change the computation'\"",
+    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import blocked_matmul; torch.manual_seed(5); x = torch.randn(8, 4096); w = torch.randn(4096, 64); assert torch.equal(blocked_matmul(x, w, 4096), torch.addmm(torch.zeros(8, 64), x, w)), 'one chunk must be a single addmm onto a zero accumulator'; assert not torch.equal(blocked_matmul(x, w, 64), blocked_matmul(x, w, 4096)), 'chunk width must change the computation'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/gemm.json')); b = json.load(open('/tmp/gemm-rank1.json')); assert a['label'] == 'gemm-attribution-v2-none-cublas', a['label']; assert b['label'] == 'gemm-attribution-v2-both-rank1', b['label']; ka = {o['name'] for o in a['observations']}; assert ka == {o['name'] for o in b['observations']}, 'arms must probe the same shapes'; assert any('large-attn-qkv-M3840-K1280' in n for n in ka), 'the shape the v24 trace broke on is missing'\"",
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import cublas_addmm, rank1_addmm; torch.manual_seed(42); b = torch.randn(384); x = torch.randn(64, 128); w = torch.randn(128, 384); r = rank1_addmm(b, x, w); assert torch.equal(r, rank1_addmm(b, x, w)), 'rank1 did not reproduce itself'; acc = torch.zeros(64, 384); [acc.addr_(x[:, k], w[k, :]) for k in range(128)]; assert torch.equal(r, b + acc), 'rank1 is not an ascending-k accumulation with the bias last'; assert (r - cublas_addmm(b, x, w)).abs().max().item() < 1e-3, 'rank1 is not the same product'\"",
     "/opt/env/bin/python -m model_trainer.cli.gemm_benchmark --device cpu --out /tmp/bench.json --condition default",
