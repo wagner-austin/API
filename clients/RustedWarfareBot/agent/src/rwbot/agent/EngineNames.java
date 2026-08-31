@@ -74,6 +74,21 @@ final class EngineNames {
      */
     static final String AI_DIFFICULTY_FIELD = "aiDifficulty";
 
+    /**
+     * Whether the engine autosaves the running match, every five minutes of
+     * game time.
+     *
+     * <p>Not obfuscated, because {@code SettingsEngine} is not. An autosave
+     * serializes the whole world to {@code saves/autosave.rwsave} -- pure
+     * local I/O that no simulation state reads, but on a contended network
+     * filesystem the write FREEZES the engine past the planner's two-minute
+     * sample-read timeout: the Hard-rung panel lost champion-s12345 and
+     * champion-s4242 eighteen minutes in, each with "Finished writing save"
+     * as the engine's last words before the planner gave up on it. Nothing
+     * ever resumes a harness match, so seeded matches turn it off.
+     */
+    static final String AUTOSAVING_FIELD = "autosaving";
+
     /** The map: terrain grid, tile layers, and the per-tile fog test. */
     static final String MAP_CLASS = "com.corrodinggames.rts.game.b.b";
 

@@ -344,7 +344,8 @@ final class MatchSetup {
             EngineAccess.writeIntField(engine, EngineNames.SYNC_SEED, syncSeed);
             Log.info("synced-draw seed pinned to " + syncSeed + " from the match seed");
         }
-        applyDifficulty(difficulty);
+        MatchSettings.applyDifficulty(difficulty);
+        MatchSettings.disableAutosaving();
         pinLogicInterval(fastForwardFps);
         // **The engine's own delta override, and the end of the wall clock.**
         // Pinning the container's logic interval fixes what each update()
@@ -495,21 +496,6 @@ final class MatchSetup {
                 "logic step pinned to " + FIXED_LOGIC_MS
                         + "ms; the simulation no longer measures the wall clock");
 
-    }
-
-    /** Sets the AI difficulty on the live match. Runs on the game thread. */
-    private static void applyDifficulty(int difficulty) {
-        Object engine = EngineHandle.current();
-        Object settings = EngineAccess.readField(engine, EngineNames.SETTINGS_FIELD);
-        java.lang.reflect.Field field =
-                EngineAccess.pinnedField(settings.getClass(), EngineNames.AI_DIFFICULTY_FIELD);
-        try {
-            field.setInt(settings, difficulty);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(
-                    "rw-agent: cannot set " + EngineNames.AI_DIFFICULTY_FIELD, e);
-        }
-        Log.info("difficulty set to " + difficulty);
     }
 
     /**

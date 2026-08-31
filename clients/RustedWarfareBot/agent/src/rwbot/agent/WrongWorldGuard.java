@@ -35,17 +35,34 @@ package rwbot.agent;
 final class WrongWorldGuard {
 
     /**
-     * Seconds a requested match gets to go live before the run is killed.
+     * Seconds a requested match gets to go live before the run is killed,
+     * while the engine has NOT adopted the requested map.
      *
      * <p>Measured from the moment the start is queued, after the ready wait
      * and the settle. A duel map loads in single-digit seconds on a machine
-     * running a full parallel sweep, so a minute is generous -- and it must
-     * stay under the harness's own 90s port wait, because the port only
-     * opens at liveness and whichever timeout fires first writes the
-     * diagnosis: the agent's names the world that was live, the harness's
-     * only says the port never opened.
+     * running a full parallel sweep, so a minute is generous for the case
+     * this guard exists for: a request that evaporated, leaving some OTHER
+     * world live. The old constraint that this must stay under the
+     * harness's port wait dissolved when that wait became silence-keyed
+     * (wait_for_channel): a loading engine keeps writing and keeps both
+     * alive, and a dead one fails the harness side fast.
      */
     private static final int LIVE_DEADLINE_SECONDS = 60;
+
+    /**
+     * Seconds the load gets once the engine has ADOPTED the requested map.
+     *
+     * <p>A separate, longer deadline, because adoption excludes the disguise
+     * class the sixty seconds exist for -- the map-path field carrying the
+     * requested string means THIS match is loading, just slowly. Cluster
+     * nodes under a 22-way submission burst measured a 56 second single
+     * asset read against 4ms on quiet members, and members died at the flat
+     * minute while demonstrably mid-load (jobs 55671486/55671507, wiki log
+     * 2026-08-31). Five minutes covers that class with the same headroom
+     * the minute gives a quiet load; a load that CRASHED goes silent and is
+     * the launcher's silence budget to catch, not this deadline's.
+     */
+    private static final int ADOPTED_DEADLINE_SECONDS = 300;
 
     /**
      * Exit status when the run dies wrong-world or never-live -- sysexits'
@@ -123,10 +140,24 @@ final class WrongWorldGuard {
      * is already dead.
      */
     static void awaitDeadline(String map) {
-        long deadline = System.nanoTime() + LIVE_DEADLINE_SECONDS * 1_000_000_000L;
-        while (System.nanoTime() < deadline) {
+        long start = System.nanoTime();
+        // The deadline is re-derived every pass rather than fixed up front,
+        // because which one applies is a fact that ARRIVES: the engine
+        // adopts the requested map partway through the wait, and from that
+        // moment the run is a slow load rather than a candidate disguise.
+        int allowed = LIVE_DEADLINE_SECONDS;
+        while (System.nanoTime() - start < allowed * 1_000_000_000L) {
             if (matchLive) {
                 return;
+            }
+            Object polled = EngineHandle.current();
+            if (allowed == LIVE_DEADLINE_SECONDS
+                    && polled != null
+                    && isRequestedWorld(map, polled)) {
+                allowed = ADOPTED_DEADLINE_SECONDS;
+                Log.info(
+                        "the engine adopted " + map + "; the load gets "
+                                + ADOPTED_DEADLINE_SECONDS + "s to go live");
             }
             try {
                 Thread.sleep(500L);
@@ -143,7 +174,7 @@ final class WrongWorldGuard {
                                 + " earlier in this log"
                         : "the live world is " + live;
         Log.error(
-                "requested " + map + " but after " + LIVE_DEADLINE_SECONDS + "s " + state
+                "requested " + map + " but after " + allowed + "s " + state
                         + " -- halting before a scorecard can be farmed from it");
         Runtime.getRuntime().halt(WRONG_WORLD_EXIT);
     }
