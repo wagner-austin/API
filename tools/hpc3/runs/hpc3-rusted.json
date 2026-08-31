@@ -10,7 +10,7 @@
       "gpu": null,
       "cpus": 1,
       "mem_gb": 2,
-      "minutes": 45,
+      "minutes": 150,
       "requeue": false,
       "checkpoint_steps": 0,
       "image": {
