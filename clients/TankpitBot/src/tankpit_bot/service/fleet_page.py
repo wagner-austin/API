@@ -342,7 +342,10 @@ function paintTroopInfo() {
   const account = document.getElementById("account").value;
   const room = document.getElementById("room").value || "Practice";
   const colour = document.getElementById("troop").value;
-  const cell = ((tanks[account] || {})[room] || {})[colour];
+  // The registry nests under "accounts"; its other top-level keys are
+  // provenance and per-room facts, not tanks.
+  const byAccount = tanks.accounts || {};
+  const cell = ((byAccount[account] || {})[room] || {})[colour];
   if (cell === undefined) {
     hint.textContent = "no reading for " + colour + " on " + room;
     return;

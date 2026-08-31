@@ -94,9 +94,13 @@ async def test_http_page_stats_and_restart(
     # Roles read as proper nouns on the form; the wire values stay lower.
     assert ">Fighter<" in body and '"fighter"' in body
     # The colour panel's source: measured rank per account/world/colour.
+    # The page must index the SERVED shape — rows nest under
+    # "accounts", and reading tanks[account] directly silently found
+    # nothing and printed "no reading" for every colour (2026-08-31).
     tanks = await fleet_client.get("/tanks")
     assert tanks.status == 200
     assert "tanks" in narrow_json_to_dict(load_json_str(await tanks.text()))
+    assert "tanks.accounts" in body
 
     listed_troops = await fleet_client.get("/troops")
     assert listed_troops.status == 200
