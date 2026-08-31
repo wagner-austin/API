@@ -162,108 +162,117 @@ final class EngineRandom {
     }
 
     /**
-     * Replaces the engine's generator object and verifies the swap stuck.
+     * The three generator slots the simulation draws from.
      *
-     * <p>The holder field is {@code static final}, which reflection on this
-     * JVM (13) refuses to write, so the write goes through
-     * {@code sun.misc.Unsafe} -- reached reflectively rather than imported,
-     * because javac treats the name itself as a warning and the build treats
-     * warnings as errors. The read-back check is structural: a premain swap
-     * was once silently overwritten by the holder's own {@code <clinit>}
-     * (see RandomTap), and a replacement that did not stick must fail the
-     * run, not report a clean one.
+     * <p><b>One shape, three holders.</b> Each is a {@code static final}
+     * field holding a {@link Random}, each is lazily built, and each has to
+     * be forced into existence before it can be swapped and read back after.
+     * Written out three times, the differences that matter -- which class,
+     * which field, what forces it -- were buried in three copies of the
+     * identical Unsafe-write-and-verify dance.
      *
+     * <p>{@link #read()} does double duty deliberately: called before a
+     * write it forces the lazy initialisation, so the holder cannot run its
+     * own {@code <clinit>} over the replacement afterwards, and called after
+     * it is the read-back. A premain swap was once silently overwritten
+     * exactly that way (see RandomTap), and a replacement that did not stick
+     * must fail the run rather than report a clean one.
+     */
+    enum Slot {
+
+        /** The engine's own generator, read by its five draw helpers. */
+        ENGINE {
+            @Override
+            Class<?> holder() {
+                return EngineAccess.pinnedClass(EngineNames.RANDOM_HOLDER_CLASS);
+            }
+
+            @Override
+            String field() {
+                return EngineNames.RANDOM_FIELD;
+            }
+
+            @Override
+            Random read() {
+                return engineGenerator();
+            }
+        },
+
+        /** {@link Math#random()}'s JVM-global generator, twelve call sites. */
+        MATH {
+            @Override
+            Class<?> holder() {
+                try {
+                    return Class.forName(MATH_HOLDER);
+                } catch (ClassNotFoundException e) {
+                    throw new IllegalStateException(
+                            "rw-agent: cannot reach " + MATH_HOLDER
+                                    + "; pass --add-opens java.base/java.lang=ALL-UNNAMED", e);
+                }
+            }
+
+            @Override
+            String field() {
+                return MATH_FIELD;
+            }
+
+            @Override
+            Random read() {
+                return mathGenerator();
+            }
+        },
+
+        /** {@link java.util.Collections#shuffle}'s generator, unit-mix order. */
+        SHUFFLE {
+            @Override
+            Class<?> holder() {
+                return java.util.Collections.class;
+            }
+
+            @Override
+            String field() {
+                return SHUFFLE_FIELD;
+            }
+
+            @Override
+            Random read() {
+                return shuffleGenerator();
+            }
+        };
+
+        /** The class declaring this slot's field. */
+        abstract Class<?> holder();
+
+        /** The field name inside {@link #holder()}. */
+        abstract String field();
+
+        /** Forces the slot's lazy initialisation and returns what it holds. */
+        abstract Random read();
+    }
+
+    /**
+     * Replaces one generator and verifies the swap stuck.
+     *
+     * <p>The field is {@code static final}, which reflection refuses to
+     * write, so the write goes through {@code sun.misc.Unsafe} -- reached
+     * reflectively rather than imported, because javac treats the name
+     * itself as a warning and the build treats warnings as errors.
+     *
+     * @param slot Which generator to replace.
      * @param replacement The generator to install.
      * @param what What is being installed, for the failure message.
      * @throws IllegalStateException When Unsafe or the field cannot be
      *     reached, or the read-back does not return the replacement.
      */
-    static void swapEngineGenerator(Random replacement, String what) {
-        Class<?> holder = EngineAccess.pinnedClass(EngineNames.RANDOM_HOLDER_CLASS);
-        putStaticObject(holder, EngineNames.RANDOM_FIELD, replacement, what);
-        if (engineGenerator() != replacement) {
+    static void swapGenerator(Slot slot, Random replacement, String what) {
+        // Before the write, so the holder cannot initialise over it after.
+        slot.read();
+        Class<?> holder = slot.holder();
+        putStaticObject(holder, slot.field(), replacement, what);
+        if (slot.read() != replacement) {
             throw new IllegalStateException(
-                    "rw-agent: " + what + " did not stick on "
-                            + EngineNames.RANDOM_HOLDER_CLASS + "." + EngineNames.RANDOM_FIELD
-                            + "; the holder class re-initialised over it");
-        }
-    }
-
-    /**
-     * Replaces the generator behind {@link Math#random()} and verifies it.
-     *
-     * <p><b>Why this exists at all.</b> Seeding {@link Math}'s generator makes
-     * a run start from a known state; it does not make the simulation's draws
-     * from it a function of the seed. The holder is JVM-GLOBAL and twelve
-     * engine call sites read it (see class doc), so render-path draws and
-     * simulation draws share one stream and the render path draws at moments
-     * only the scheduler chooses. {@link SplitRandom} closed exactly this on
-     * the engine's own generator on 2026-08-07; this generator was left
-     * shared, and the {@link RandomLedger} says so outright: across eleven
-     * seeds replayed on HPC3, every seed whose {@code math=} state agreed at
-     * frame 0 replicated bit-exact over 250 samples, and every seed whose
-     * {@code math=} state differed at frame 0 forked -- with the engine
-     * stream diverging only AFTER the world had already forked, which makes
-     * it the consequence rather than the cause (wiki log 2026-08-30).
-     *
-     * <p>The holder is initialised on first use, so the read-back forces it
-     * exactly as {@link #mathGenerator()} does.
-     *
-     * @param replacement The generator to install.
-     * @param what What is being installed, for the failure message.
-     * @throws IllegalStateException When the field cannot be reached or the
-     *     read-back does not return the replacement.
-     */
-    static void swapMathGenerator(Random replacement, String what) {
-        // Forces the holder's <clinit> BEFORE the write, so the class cannot
-        // initialise over the replacement afterwards -- the failure mode the
-        // engine-side swap's read-back was added for (see RandomTap).
-        Math.random();
-        Class<?> holder;
-        try {
-            holder = Class.forName(MATH_HOLDER);
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(
-                    "rw-agent: cannot reach " + MATH_HOLDER
-                            + "; pass --add-opens java.base/java.lang=ALL-UNNAMED", e);
-        }
-        putStaticObject(holder, MATH_FIELD, replacement, what);
-        if (mathGenerator() != replacement) {
-            throw new IllegalStateException(
-                    "rw-agent: " + what + " did not stick on " + MATH_HOLDER + "." + MATH_FIELD
-                            + "; the holder class re-initialised over it");
-        }
-    }
-
-    /**
-     * Replaces the generator behind {@link java.util.Collections#shuffle} and
-     * verifies it.
-     *
-     * <p>The third of three, and it had to be measured to be believed. With
-     * the engine's generator split and {@link Math}'s still shared, the
-     * shuffle stream agreed across every one of eleven replayed seeds --
-     * because the Math leak forked the world first and nothing downstream
-     * got to matter. Split Math, and shuffle became the FIRST stream to
-     * diverge: frame 600, ahead of the engine stream at 1050 and the world
-     * fork at 3300 (four invocations, wiki log 2026-08-30). A leak is only
-     * invisible until the louder one above it is closed.
-     *
-     * <p>The field is lazily built on the first single-argument shuffle, so
-     * one is forced on an empty list before the write, exactly as
-     * {@link #shuffleGenerator()} does.
-     *
-     * @param replacement The generator to install.
-     * @param what What is being installed, for the failure message.
-     * @throws IllegalStateException When the field cannot be reached or the
-     *     read-back does not return the replacement.
-     */
-    static void swapShuffleGenerator(Random replacement, String what) {
-        java.util.Collections.shuffle(new java.util.ArrayList<Object>());
-        putStaticObject(java.util.Collections.class, SHUFFLE_FIELD, replacement, what);
-        if (shuffleGenerator() != replacement) {
-            throw new IllegalStateException(
-                    "rw-agent: " + what + " did not stick on java.util.Collections."
-                            + SHUFFLE_FIELD + "; the field was re-initialised over it");
+                    "rw-agent: " + what + " did not stick on " + holder.getName() + "."
+                            + slot.field() + "; the holder re-initialised over it");
         }
     }
 

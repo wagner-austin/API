@@ -60,7 +60,7 @@ class SplitRandom extends Random {
      */
     static void install(long seed) {
         SplitRandom installed = new SplitRandom(seed);
-        EngineRandom.swapEngineGenerator(installed, "the tick-split generator");
+        EngineRandom.swapGenerator(EngineRandom.Slot.ENGINE, installed, "the tick-split generator");
         Log.info(
                 "tick-split generator installed: draws under the simulation tick are pinned;"
                         + " render-path draws use a side stream");
@@ -93,7 +93,8 @@ class SplitRandom extends Random {
      */
     static void installMath(long seed) {
         SplitRandom installed = new SplitRandom(seed);
-        EngineRandom.swapMathGenerator(installed, "the Math.random tick-split generator");
+        EngineRandom.swapGenerator(
+                EngineRandom.Slot.MATH, installed, "the Math.random tick-split generator");
         Log.info(
                 "Math.random tick-split generator installed: the simulation's draws from it"
                         + " no longer share a stream with the render path");
@@ -117,7 +118,8 @@ class SplitRandom extends Random {
      */
     static void installShuffle(long seed) {
         SplitRandom installed = new SplitRandom(seed);
-        EngineRandom.swapShuffleGenerator(installed, "the shuffle tick-split generator");
+        EngineRandom.swapGenerator(
+                EngineRandom.Slot.SHUFFLE, installed, "the shuffle tick-split generator");
         Log.info(
                 "Collections.shuffle tick-split generator installed: unit-mix order no longer"
                         + " shares a stream with anything outside the tick");

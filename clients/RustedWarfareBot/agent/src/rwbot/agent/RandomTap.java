@@ -89,7 +89,7 @@ final class RandomTap {
             return;
         }
         Tap installed = new Tap(seed);
-        EngineRandom.swapEngineGenerator(installed, "the draw tap");
+        EngineRandom.swapGenerator(EngineRandom.Slot.ENGINE, installed, "the draw tap");
         tap = installed;
         Log.info("draw tap installed on the engine generator");
     }
@@ -120,10 +120,10 @@ final class RandomTap {
             return;
         }
         Tap math = new Tap(seed);
-        EngineRandom.swapMathGenerator(math, "the Math.random draw tap");
+        EngineRandom.swapGenerator(EngineRandom.Slot.MATH, math, "the Math.random draw tap");
         mathTap = math;
         Tap shuffle = new Tap(seed);
-        EngineRandom.swapShuffleGenerator(shuffle, "the shuffle draw tap");
+        EngineRandom.swapGenerator(EngineRandom.Slot.SHUFFLE, shuffle, "the shuffle draw tap");
         shuffleTap = shuffle;
         Log.info("draw tap installed on the Math.random and Collections.shuffle generators");
     }
