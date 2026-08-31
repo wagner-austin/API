@@ -305,30 +305,50 @@ def _spawn_game_impl(
         )
 
 
-def _wait_for_port_impl(port: int, timeout_s: float, poll_s: float) -> str | None:
-    """Production implementation of :class:`WaitForPortProto`.
+def _probe_port_impl(port: int, timeout_s: float) -> str | None:
+    """Production implementation of :class:`ProbePortProto`.
 
     Args:
         port: Port to connect to on the loopback address.
-        timeout_s: How long to keep trying.
-        poll_s: How long to wait between attempts.
+        timeout_s: How long this single attempt may take.
 
     Returns:
-        ``None`` once a connection succeeds, otherwise the last failure.
+        ``None`` when a connection succeeds, otherwise the failure.
     """
-    deadline = time.monotonic() + timeout_s
-    last = f"nothing attempted within {timeout_s}s"
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((_CHANNEL_HOST, port), timeout=poll_s):
-                return None
-        except OSError as error:
-            # Kept, not discarded: which OSError this was is the difference
-            # between "the engine is up and the agent never bound" and "the
-            # engine died during boot", and they are fixed in different files.
-            last = f"{type(error).__name__}: {error}"
-            time.sleep(poll_s)
-    return last
+    try:
+        with socket.create_connection((_CHANNEL_HOST, port), timeout=timeout_s):
+            return None
+    except OSError as error:
+        # Kept, not discarded: which OSError this was is the difference
+        # between "the engine is up and the agent never bound" and "the
+        # engine died during boot", and they are fixed in different files.
+        return f"{type(error).__name__}: {error}"
+
+
+def _file_size_impl(path: Path) -> int:
+    """Production implementation of :class:`FileSizeProto`.
+
+    Args:
+        path: The file to measure.
+
+    Returns:
+        Its size in bytes, or zero before the file exists -- the engine's
+        stream files appear when it first writes, and a wait watching for
+        growth reads "not written yet" and "empty" identically.
+    """
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0
+
+
+def _monotonic_impl() -> float:
+    """Production implementation of :class:`MonotonicProto`.
+
+    Returns:
+        Seconds from an arbitrary origin, comparable only to itself.
+    """
+    return time.monotonic()
 
 
 def _run_inherited_impl(argv: Sequence[str], env: Mapping[str, str]) -> int:
@@ -473,12 +493,15 @@ def _write_line_impl(text: str) -> None:
 __all__ = [
     "_copy_entry_impl",
     "_count_cores_impl",
+    "_file_size_impl",
     "_get_env_impl",
     "_kill_tree_impl",
     "_list_names_impl",
     "_make_dirs_impl",
+    "_monotonic_impl",
     "_new_stamp_impl",
     "_path_exists_impl",
+    "_probe_port_impl",
     "_read_argv_impl",
     "_read_environment_impl",
     "_read_executable_impl",
@@ -492,7 +515,6 @@ __all__ = [
     "_sleep_impl",
     "_spawn_game_impl",
     "_spawn_match_impl",
-    "_wait_for_port_impl",
     "_write_line_impl",
     "_write_text_lines_impl",
 ]

@@ -27,6 +27,8 @@ from rw_bot import RwBotError
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.launch import (
     CATALOGUE,
+    FROZEN_CATALOGUE,
+    FROZEN_TYPE_DUMP,
     TYPE_DUMP,
     LaunchConfig,
     decode_launch_config,
@@ -208,6 +210,18 @@ def _payload(tokens: Sequence[str]) -> dict[str, str | int | float | bool]:
     for flag in REQUIRED_FLAGS:
         require_flag(parsed, flag)
     values = {**OPTIONAL_FLAGS, **parsed}
+    # A frozen tree carries both registry dumps under fixed names, and a tree
+    # given without them re-rooted used to read the repository-relative
+    # defaults -- which a compute node does not have. This is the rule
+    # make_argv composes for sweep members, applied to the direct path; a flag
+    # the caller actually typed still wins, which is why the test is against
+    # parsed and not against the merged values. Job 55663569 is the launch
+    # that died on the difference.
+    if values["--tree"]:
+        if "--catalogue" not in parsed:
+            values["--catalogue"] = f"{values['--tree']}/{FROZEN_CATALOGUE}"
+        if "--type-dump" not in parsed:
+            values["--type-dump"] = f"{values['--tree']}/{FROZEN_TYPE_DUMP}"
     # Converted from the declared list rather than one call per field, so a
     # numeric flag added without being declared fails here as a missing key
     # instead of silently reaching the engine as a string.

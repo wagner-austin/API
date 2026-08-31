@@ -296,31 +296,64 @@ class SpawnGameProto(Protocol):
         ...
 
 
-class WaitForPortProto(Protocol):
-    """Wait until something is listening on a local port."""
+class ProbePortProto(Protocol):
+    """Attempt one connection to a local port."""
 
-    def __call__(self, port: int, timeout_s: float, poll_s: float) -> str | None:
-        """Wait for the agent's channel.
+    def __call__(self, port: int, timeout_s: float) -> str | None:
+        """Try the agent's channel once.
+
+        One attempt rather than a loop with its own clock, because the caller
+        owns the question of how long to keep trying: a wait keyed on engine
+        PROGRESS cannot be built over a primitive that hides ninety seconds
+        inside itself. The panel member that died mid-boot under a 22-way
+        asset-read burst was killed by exactly that hidden clock.
 
         Args:
             port: Port to connect to on the loopback address.
-            timeout_s: How long to keep trying before giving up.
-            poll_s: How long to wait between attempts.
+            timeout_s: How long this single attempt may take.
 
         Returns:
-            ``None`` once a connection succeeds, otherwise the LAST connection
-            failure seen before the timeout.
+            ``None`` when a connection succeeds, otherwise the failure.
 
             The reason is carried rather than discarded because the two ways
             this fails look identical from outside and are diagnosed in
             different places: a refused connection means the engine is alive
             and the agent never bound, and a timeout with no route means the
-            engine died during boot. Ninety seconds of silence followed by
-            "the agent never opened port N" said neither.
+            engine died during boot.
 
             A value rather than an exception, because a boot that never opens
             the channel is a match RESULT -- filed as a failure, job left
             outstanding -- not a fault in the harness.
+        """
+        ...
+
+
+class FileSizeProto(Protocol):
+    """Report how many bytes a file currently holds."""
+
+    def __call__(self, path: Path) -> int:
+        """Measure one file.
+
+        Args:
+            path: The file to measure.
+
+        Returns:
+            Its size in bytes, or zero when it does not exist yet -- during
+            engine boot the stream files appear when the engine first writes,
+            and "not written yet" and "empty" mean the same thing to a wait
+            that is watching for growth.
+        """
+        ...
+
+
+class MonotonicProto(Protocol):
+    """Read a clock that only moves forward."""
+
+    def __call__(self) -> float:
+        """Read the clock.
+
+        Returns:
+            Seconds from an arbitrary origin, comparable only to itself.
         """
         ...
 
@@ -435,12 +468,15 @@ class ReadPlatformProto(Protocol):
 __all__ = [
     "CopyEntryProto",
     "CountCoresProto",
+    "FileSizeProto",
     "GetEnvProto",
     "KillTreeProto",
     "ListNamesProto",
     "MakeDirsProto",
+    "MonotonicProto",
     "NewStampProto",
     "PathExistsProto",
+    "ProbePortProto",
     "ReadArgvProto",
     "ReadEnvironmentProto",
     "ReadExecutableProto",
@@ -455,7 +491,6 @@ __all__ = [
     "SpawnGameProto",
     "SpawnMatchProto",
     "SpawnedMatchProto",
-    "WaitForPortProto",
     "WriteLineProto",
     "WriteTextLinesProto",
 ]

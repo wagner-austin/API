@@ -210,6 +210,38 @@ class TestPlayingAMatch:
             play(_config(tree="t"))
             assert host.felled == [4242]
 
+    def test_a_quiet_engine_spends_the_budget_and_reports_the_silence(self) -> None:
+        """The wait is keyed on PROGRESS: with the streams never growing, the
+        budget spends on silence and the report says so."""
+        with _host() as host:
+            host.channel_opens = False
+            assert play(_config(tree="t")) == EXIT_NO_CHANNEL
+            reported = [line for line in host.printed if "wrote nothing for 90s" in line]
+            assert len(reported) == 1
+            assert sum(host.slept) >= 90.0
+
+    def test_a_dead_engine_fails_at_once_rather_than_spending_the_budget(self) -> None:
+        """A total clock waited its full ninety seconds on a corpse."""
+        with _host() as host:
+            host.channel_opens = False
+            host.engine_exit_status = 1
+            assert play(_config(tree="t")) == EXIT_NO_CHANNEL
+            reported = [line for line in host.printed if "exited with status 1" in line]
+            assert len(reported) == 1
+            assert host.slept == []
+
+    def test_a_slow_boot_that_keeps_writing_keeps_its_wait_alive(self) -> None:
+        """The member this exists for was mid-boot under a 22-way asset-read
+        burst at second ninety: still writing, not hung. The streams grow for
+        longer than the whole quiet budget before the channel opens, and the
+        wait follows the writing instead of the clock."""
+        with _host() as host:
+            host.channel_opens = False
+            host.channel_opens_after = 120
+            host.stream_sizes = list(range(121))
+            assert play(_config(tree="t")) == 0
+            assert sum(host.slept) > 90.0
+
     def test_the_engine_is_felled_after_a_normal_match(self) -> None:
         with _host() as host:
             play(_config(tree="t"))

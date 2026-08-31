@@ -88,9 +88,14 @@ HEADLESS_FLAGS = ("-nodisplay", "-nosound")
 SANDBOX_FLAG = "-sandbox"
 
 
-#: How long to wait for the agent to open its channel port. Ninety seconds is
-#: what a cold engine boot plus map load has been measured to fit inside.
-PORT_WAIT_SECONDS = 90
+#: How long the engine may go WITHOUT DEMONSTRABLE PROGRESS before the wait
+#: for its channel port gives up. A quiet budget rather than a total one: a
+#: boot that keeps writing to its streams keeps its wait alive, however long
+#: the filesystem makes it take. The panel member that died at 90 seconds of
+#: TOTAL budget was mid-boot under a 22-way asset-read burst -- a 56 second
+#: single read against 4ms on the other twenty-three members -- and a total
+#: clock cannot tell that engine from a hung one. Silence can.
+PORT_QUIET_SECONDS = 90
 
 #: How long to wait between connection attempts while it boots.
 PORT_POLL_SECONDS = 1.0
@@ -490,7 +495,7 @@ __all__ = [
     "LIBRARY_SEARCH_VAR",
     "MAIN_CLASS",
     "PORT_POLL_SECONDS",
-    "PORT_WAIT_SECONDS",
+    "PORT_QUIET_SECONDS",
     "SANDBOX_FLAG",
     "TYPE_DUMP",
     "XVFB_COMMAND",

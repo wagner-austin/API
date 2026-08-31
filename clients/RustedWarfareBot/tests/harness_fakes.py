@@ -48,18 +48,21 @@ class FakeGame:
 
     Attributes:
         pid: The process id the launcher will fell.
+        exit_status: What :meth:`poll` reports; ``None`` is a live engine.
     """
 
-    def __init__(self, pid: int) -> None:
+    def __init__(self, pid: int, exit_status: int | None = None) -> None:
         self.pid = pid
+        self.exit_status = exit_status
 
     def poll(self) -> int | None:
-        """Report the engine as still running.
+        """Report the engine's state.
 
         Returns:
-            ``None``, because a match is torn down rather than waited on.
+            The exit status this fake was told to die with, or ``None`` while
+            it plays the living.
         """
-        return None
+        return self.exit_status
 
 
 class FakeHost:
@@ -109,7 +112,20 @@ class FakeHost:
         #: Exit status and output keyed by the program a command names, so a
         #: test can make javac fail without also making jar fail.
         self.command_results: dict[str, tuple[int, tuple[str, ...]]] = {}
-        self.waited: tuple[int, float, float] | None = None
+        self.probed: list[tuple[int, float]] = []
+        #: Probe count at which the channel opens, when :attr:`channel_opens`
+        #: is off -- so a test can script a boot that takes a while.
+        self.channel_opens_after: int | None = None
+        #: Exit status the spawned engine reports from ``poll``; ``None`` is
+        #: a live engine, which is what nearly every test wants.
+        self.engine_exit_status: int | None = None
+        #: Sizes the engine's stream files report, indexed by how many probes
+        #: have run and holding the last when exhausted -- a schedule, so a
+        #: test can script "still writing" against "gone quiet" without a
+        #: filesystem.
+        self.stream_sizes: list[int] = [0]
+        #: The fake monotonic clock, advanced by :meth:`sleep`.
+        self.clock = 0.0
         # Saved one field per hook, each at its own protocol type. A dictionary
         # of originals would have to be typed as the union of nine protocols or
         # widened to `object`, and widening is what the typing guard exists to
@@ -129,7 +145,9 @@ class FakeHost:
         self._run_inherited: _test_hooks.RunInheritedProto = _test_hooks.run_inherited
         self._sleep: _test_hooks.SleepProto = _test_hooks.sleep
         self._spawn_game: _test_hooks.SpawnGameProto = _test_hooks.spawn_game
-        self._wait_for_port: _test_hooks.WaitForPortProto = _test_hooks.wait_for_port
+        self._probe_port: _test_hooks.ProbePortProto = _test_hooks.probe_port
+        self._file_size: _test_hooks.FileSizeProto = _test_hooks.file_size
+        self._monotonic: _test_hooks.MonotonicProto = _test_hooks.monotonic
         self._read_text_lines: _test_hooks.ReadTextLinesProto = _test_hooks.read_text_lines
         self._run_capture: _test_hooks.RunCaptureProto = _test_hooks.run_capture
         self._write_line: _test_hooks.WriteLineProto = _test_hooks.write_line
@@ -317,24 +335,49 @@ class FakeHost:
         """
         self.spawned.append((tuple(argv), str(cwd), stdout_path.as_posix(), stderr_path.as_posix()))
         self.engine_environment = dict(env)
-        return FakeGame(pid=4242)
+        return FakeGame(pid=4242, exit_status=self.engine_exit_status)
 
-    def wait_for_port(self, port: int, timeout_s: float, poll_s: float) -> str | None:
-        """Report whether the agent opened its channel.
+    def probe_port(self, port: int, timeout_s: float) -> str | None:
+        """Report one attempt on the agent's channel.
 
         Args:
-            port: The port waited on.
-            timeout_s: How long the caller was willing to wait.
-            poll_s: How long between attempts.
+            port: The port probed.
+            timeout_s: How long the attempt was allowed.
 
         Returns:
-            None when this host was told the channel opens, otherwise the
-            failure it was told to report.
+            None when this host was told the channel opens -- outright, or
+            after the scripted number of probes -- otherwise the failure it
+            was told to report.
         """
-        self.waited = (port, timeout_s, poll_s)
+        self.probed.append((port, timeout_s))
         if self.channel_opens:
             return None
+        if self.channel_opens_after is not None and len(self.probed) >= self.channel_opens_after:
+            return None
         return self.channel_failure
+
+    def file_size(self, path: Path) -> int:
+        """Report a stream file's scripted size.
+
+        Args:
+            path: The file asked about; every stream reads from one schedule,
+                because the wait sums them anyway.
+
+        Returns:
+            The size the schedule holds for the current probe count, the last
+            entry once the schedule is exhausted.
+        """
+        index = min(len(self.probed), len(self.stream_sizes) - 1)
+        return self.stream_sizes[index]
+
+    def monotonic(self) -> float:
+        """Read the fake clock.
+
+        Returns:
+            The clock, which only :meth:`sleep` advances -- fake time passes
+            only where the code under test chooses to wait.
+        """
+        return self.clock
 
     def run_inherited(self, argv: Sequence[str], env: Mapping[str, str]) -> int:
         """Record a planner run.
@@ -350,12 +393,15 @@ class FakeHost:
         return self.planner_status
 
     def sleep(self, seconds: float) -> None:
-        """Record a wait without taking one.
+        """Record a wait without taking one, and advance the fake clock.
 
         Args:
-            seconds: How long the caller asked to wait.
+            seconds: How long the caller asked to wait, which is exactly how
+                far :meth:`monotonic` moves -- fake time passes only where
+                the code under test chooses to wait.
         """
         self.slept.append(seconds)
+        self.clock += seconds
 
     def remove_path(self, path: Path) -> None:
         """Record a removal and forget the path.
@@ -433,7 +479,9 @@ class FakeHost:
         self._run_inherited = _test_hooks.run_inherited
         self._sleep = _test_hooks.sleep
         self._spawn_game = _test_hooks.spawn_game
-        self._wait_for_port = _test_hooks.wait_for_port
+        self._probe_port = _test_hooks.probe_port
+        self._file_size = _test_hooks.file_size
+        self._monotonic = _test_hooks.monotonic
         self._read_text_lines = _test_hooks.read_text_lines
         self._run_capture = _test_hooks.run_capture
         self._write_line = _test_hooks.write_line
@@ -454,7 +502,9 @@ class FakeHost:
         _test_hooks.run_inherited = self.run_inherited
         _test_hooks.sleep = self.sleep
         _test_hooks.spawn_game = self.spawn_game
-        _test_hooks.wait_for_port = self.wait_for_port
+        _test_hooks.probe_port = self.probe_port
+        _test_hooks.file_size = self.file_size
+        _test_hooks.monotonic = self.monotonic
         _test_hooks.read_text_lines = self.read_text_lines
         _test_hooks.run_capture = self.run_capture
         _test_hooks.write_line = self.write_line
@@ -489,7 +539,9 @@ class FakeHost:
         _test_hooks.run_inherited = self._run_inherited
         _test_hooks.sleep = self._sleep
         _test_hooks.spawn_game = self._spawn_game
-        _test_hooks.wait_for_port = self._wait_for_port
+        _test_hooks.probe_port = self._probe_port
+        _test_hooks.file_size = self._file_size
+        _test_hooks.monotonic = self._monotonic
         _test_hooks.read_text_lines = self._read_text_lines
         _test_hooks.run_capture = self._run_capture
         _test_hooks.write_line = self._write_line

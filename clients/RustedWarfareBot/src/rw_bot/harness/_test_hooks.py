@@ -18,12 +18,15 @@ from __future__ import annotations
 from rw_bot.harness._hook_defaults import (
     _copy_entry_impl,
     _count_cores_impl,
+    _file_size_impl,
     _get_env_impl,
     _kill_tree_impl,
     _list_names_impl,
     _make_dirs_impl,
+    _monotonic_impl,
     _new_stamp_impl,
     _path_exists_impl,
+    _probe_port_impl,
     _read_argv_impl,
     _read_environment_impl,
     _read_executable_impl,
@@ -37,19 +40,21 @@ from rw_bot.harness._hook_defaults import (
     _sleep_impl,
     _spawn_game_impl,
     _spawn_match_impl,
-    _wait_for_port_impl,
     _write_line_impl,
     _write_text_lines_impl,
 )
 from rw_bot.harness._hook_protocols import (
     CopyEntryProto,
     CountCoresProto,
+    FileSizeProto,
     GetEnvProto,
     KillTreeProto,
     ListNamesProto,
     MakeDirsProto,
+    MonotonicProto,
     NewStampProto,
     PathExistsProto,
+    ProbePortProto,
     ReadArgvProto,
     ReadEnvironmentProto,
     ReadExecutableProto,
@@ -64,15 +69,17 @@ from rw_bot.harness._hook_protocols import (
     SpawnedMatchProto,
     SpawnGameProto,
     SpawnMatchProto,
-    WaitForPortProto,
     WriteLineProto,
     WriteTextLinesProto,
 )
 
 copy_entry: CopyEntryProto = _copy_entry_impl
 count_cores: CountCoresProto = _count_cores_impl
+file_size: FileSizeProto = _file_size_impl
 get_env: GetEnvProto = _get_env_impl
 kill_tree: KillTreeProto = _kill_tree_impl
+monotonic: MonotonicProto = _monotonic_impl
+probe_port: ProbePortProto = _probe_port_impl
 list_names: ListNamesProto = _list_names_impl
 new_stamp: NewStampProto = _new_stamp_impl
 spawn_game: SpawnGameProto = _spawn_game_impl
@@ -90,7 +97,6 @@ run_capture: RunCaptureProto = _run_capture_impl
 run_inherited: RunInheritedProto = _run_inherited_impl
 sleep: SleepProto = _sleep_impl
 serve_forever: ServeForeverProto = _serve_forever_impl
-wait_for_port: WaitForPortProto = _wait_for_port_impl
 write_line: WriteLineProto = _write_line_impl
 write_text_lines: WriteTextLinesProto = _write_text_lines_impl
 
@@ -98,12 +104,15 @@ write_text_lines: WriteTextLinesProto = _write_text_lines_impl
 __all__ = [
     "CopyEntryProto",
     "CountCoresProto",
+    "FileSizeProto",
     "GetEnvProto",
     "KillTreeProto",
     "ListNamesProto",
     "MakeDirsProto",
+    "MonotonicProto",
     "NewStampProto",
     "PathExistsProto",
+    "ProbePortProto",
     "ReadArgvProto",
     "ReadEnvironmentProto",
     "ReadExecutableProto",
@@ -118,17 +127,19 @@ __all__ = [
     "SpawnGameProto",
     "SpawnMatchProto",
     "SpawnedMatchProto",
-    "WaitForPortProto",
     "WriteLineProto",
     "WriteTextLinesProto",
     "copy_entry",
     "count_cores",
+    "file_size",
     "get_env",
     "kill_tree",
     "list_names",
     "make_dirs",
+    "monotonic",
     "new_stamp",
     "path_exists",
+    "probe_port",
     "read_argv",
     "read_environment",
     "read_executable",
@@ -142,7 +153,6 @@ __all__ = [
     "sleep",
     "spawn_game",
     "spawn_match",
-    "wait_for_port",
     "write_line",
     "write_text_lines",
 ]

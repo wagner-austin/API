@@ -36,7 +36,7 @@ from rw_bot.harness.agent_build import (
 from rw_bot.harness.jvm import tool_path
 from rw_bot.harness.launch import (
     PORT_POLL_SECONDS,
-    PORT_WAIT_SECONDS,
+    PORT_QUIET_SECONDS,
     LaunchConfig,
     game_command,
     game_environment,
@@ -185,6 +185,53 @@ def _teardown_build(config: LaunchConfig, jar_path: str, classes: str) -> None:
     _test_hooks.remove_path(Path(jar_path))
 
 
+def wait_for_channel(
+    port: int, game: _test_hooks.SpawnedMatchProto, engine_log: Path
+) -> str | None:
+    """Wait for the agent's channel while the engine demonstrably boots.
+
+    Keyed on PROGRESS rather than on a total clock: the engine's stream files
+    grow while it loads -- mods, maps, the asset tree -- and a boot that keeps
+    writing keeps its wait alive, however long a contended filesystem makes it
+    take. The budget spends only on SILENCE. A panel member died on the old
+    total clock while mid-boot under a 22-way asset-read burst (one 56 second
+    read against 4ms on the other twenty-three members), which a total budget
+    cannot tell from a hang -- and a dead engine now fails as soon as it is
+    seen rather than after the full wait.
+
+    Args:
+        port: The channel port the agent leases.
+        game: The engine process whose boot is being waited on.
+        engine_log: The launch's log path; the engine's two stream files are
+            derived from it, and their combined growth is the progress signal.
+
+    Returns:
+        ``None`` once the channel opens. Otherwise why the wait ended: the
+        engine exited, or nothing was written for :data:`PORT_QUIET_SECONDS`.
+        A value rather than an exception -- a boot that never opens the
+        channel is a match RESULT, not a fault in the harness.
+    """
+    stdout_path = Path(f"{engine_log}{ENGINE_STDOUT_SUFFIX}")
+    stderr_path = Path(f"{engine_log}{ENGINE_STDERR_SUFFIX}")
+    quiet_start = _test_hooks.monotonic()
+    written = _test_hooks.file_size(stdout_path) + _test_hooks.file_size(stderr_path)
+    while True:
+        failure = _test_hooks.probe_port(port, PORT_POLL_SECONDS)
+        if failure is None:
+            return None
+        status = game.poll()
+        if status is not None:
+            return f"the engine exited with status {status} (last error: {failure})"
+        now = _test_hooks.monotonic()
+        size = _test_hooks.file_size(stdout_path) + _test_hooks.file_size(stderr_path)
+        if size != written:
+            written = size
+            quiet_start = now
+        if now - quiet_start >= PORT_QUIET_SECONDS:
+            return f"the engine wrote nothing for {PORT_QUIET_SECONDS}s (last error: {failure})"
+        _test_hooks.sleep(PORT_POLL_SECONDS)
+
+
 def play(config: LaunchConfig) -> int:
     """Play one match and return what the planner made of it.
 
@@ -222,17 +269,14 @@ def play(config: LaunchConfig) -> int:
             {**_test_hooks.read_environment(), **game_environment(platform)},
         )
         try:
-            failure = _test_hooks.wait_for_port(
-                config["port"], PORT_WAIT_SECONDS, PORT_POLL_SECONDS
-            )
+            failure = wait_for_channel(config["port"], game, log)
             if failure is not None:
                 # The reason is printed, not swallowed: a refused connection
-                # means the engine is up and the agent never bound, and a
-                # timeout with no route means the engine died during boot.
-                # Ninety seconds of silence used to report neither.
+                # means the engine is up and the agent never bound, an exit
+                # status means it died during boot, and quiet means it hung.
+                # Ninety seconds of silence used to report none of the three.
                 _test_hooks.write_line(
-                    f"[play] the agent never opened port {config['port']} within "
-                    f"{PORT_WAIT_SECONDS}s (last error: {failure})"
+                    f"[play] the agent never opened port {config['port']}: {failure}"
                 )
                 return EXIT_NO_CHANNEL
             if config["map"]:
@@ -263,4 +307,5 @@ __all__ = [
     "clear_orphaned_engine",
     "play",
     "run_planner",
+    "wait_for_channel",
 ]

@@ -11,7 +11,7 @@ import runpy
 
 import pytest
 
-from rw_bot.harness.launch import CATALOGUE, TYPE_DUMP
+from rw_bot.harness.launch import CATALOGUE, FROZEN_CATALOGUE, FROZEN_TYPE_DUMP, TYPE_DUMP
 from rw_bot.harness.play_match_cli import (
     ALLOWED_FLAGS,
     EXIT_HELP,
@@ -49,6 +49,31 @@ class TestReadingALaunch:
         config = decode_launch(MINIMAL)
         assert config["catalogue"] == CATALOGUE
         assert config["type_dump"] == TYPE_DUMP
+
+    def test_a_tree_re_roots_both_registry_dumps(self) -> None:
+        """A frozen tree carries both dumps under fixed names, and a launch
+        against one must read THOSE -- the repository-relative defaults do
+        not exist where a frozen tree is the only code present. This is the
+        rule the sweep composes per member, on the direct path; job 55663569
+        died on the difference."""
+        config = decode_launch((*MINIMAL, "--tree", "/pub/wagnera3/rusted/payload"))
+        assert config["catalogue"] == f"/pub/wagnera3/rusted/payload/{FROZEN_CATALOGUE}"
+        assert config["type_dump"] == f"/pub/wagnera3/rusted/payload/{FROZEN_TYPE_DUMP}"
+
+    def test_an_explicit_dump_beats_the_tree_derived_one(self) -> None:
+        config = decode_launch(
+            (
+                *MINIMAL,
+                "--tree",
+                "/pub/wagnera3/rusted/payload",
+                "--catalogue",
+                "probe/printunits.log",
+                "--type-dump",
+                "probe/type-flags.ndjson",
+            )
+        )
+        assert config["catalogue"] == "probe/printunits.log"
+        assert config["type_dump"] == "probe/type-flags.ndjson"
 
     def test_a_mistyped_flag_is_refused_and_the_valid_ones_named(self) -> None:
         """Ignoring it would play a different match and still file a card."""

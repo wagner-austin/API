@@ -25,8 +25,11 @@ import pytest
 from rw_bot.harness._hook_defaults import (
     COPY_EXCLUDES,
     _copy_entry_impl,
+    _file_size_impl,
     _kill_tree_impl,
+    _monotonic_impl,
     _new_stamp_impl,
+    _probe_port_impl,
     _read_environment_impl,
     _read_executable_impl,
     _read_platform_impl,
@@ -35,10 +38,8 @@ from rw_bot.harness._hook_defaults import (
     _run_inherited_impl,
     _sleep_impl,
     _spawn_game_impl,
-    _wait_for_port_impl,
 )
 from rw_bot.harness._hook_protocols import SpawnedMatchProto
-from rw_bot.harness.launch import PORT_POLL_SECONDS
 from rw_bot.harness.process_tree import spawn_isolation
 from rw_bot.platform_id import WINDOWS, is_windows
 
@@ -143,24 +144,45 @@ class TestRemovingPaths:
         assert not absent.exists()
 
 
-class TestWaitingForTheChannel:
+class TestProbingTheChannel:
     def test_a_listening_socket_is_seen(self) -> None:
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.bind(("127.0.0.1", _LISTEN_PORT))
         listener.listen(1)
         try:
-            assert _wait_for_port_impl(_LISTEN_PORT, _WAIT_SECONDS, PORT_POLL_SECONDS) is None
+            assert _probe_port_impl(_LISTEN_PORT, _WAIT_SECONDS) is None
         finally:
             listener.close()
 
     def test_a_closed_port_reports_the_reason_rather_than_a_bare_failure(self) -> None:
         """A refused connection means the engine is up and the agent never
         bound; a timeout with no route means the engine died during boot.
-        Ninety seconds of silence used to report neither."""
-        failure = _wait_for_port_impl(_UNUSED_PORT, 0.3, 0.05)
+        The reason is what tells them apart."""
+        failure = _probe_port_impl(_UNUSED_PORT, 0.3)
         if failure is None:
             raise AssertionError(f"port {_UNUSED_PORT} unexpectedly had a listener")
         assert "Error" in failure
+
+
+class TestMeasuringAStreamFile:
+    def test_a_written_file_reports_its_bytes(self, tmp_path: Path) -> None:
+        target = tmp_path / "engine.log.agent"
+        target.write_bytes(b"loading mods")
+        assert _file_size_impl(target) == 12
+
+    def test_a_file_the_engine_has_not_created_yet_is_empty(self, tmp_path: Path) -> None:
+        """During boot the stream files appear when the engine first writes;
+        a wait watching for growth reads "not written yet" and "empty"
+        identically rather than dying on the difference."""
+        assert _file_size_impl(tmp_path / "never-written.log") == 0
+
+
+class TestTheMonotonicClock:
+    def test_it_only_moves_forward(self) -> None:
+        first = _monotonic_impl()
+        second = _monotonic_impl()
+        assert second >= first
+        assert first > 0.0
 
 
 #: A child that exits 0 only when the marker reached it, and 9 otherwise, so
