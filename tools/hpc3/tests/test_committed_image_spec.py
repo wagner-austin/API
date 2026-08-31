@@ -120,12 +120,20 @@ class TestTheCommittedSpec:
         internally consistent and pointed at an attribute that no longer
         existed, so the spec would have decoded, rendered, and failed in the
         container.
+
+        Twelfth, 2026-08-31: four symbols for the v29 image -- the train-step
+        probe (its plan table, its identity check, its record builder) and
+        ``probed_shapes_hook``, which the batched-digest smokes install to
+        keep a CPU smoke from walking ninety-three shapes. Each names
+        something v28 did not carry, which is the property that makes a
+        required symbol detect a stale wheel at all.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
             (check["module"], check["attribute"]) for check in spec["required_symbols"]
         )
         assert symbols == [
+            ("model_trainer.cli._test_hooks", "probed_shapes_hook"),
             ("model_trainer.cli.forward_benchmark", "measure_row"),
             ("model_trainer.cli.known_answer_probe", "probe_run_record"),
             ("model_trainer.cli.legacy_gemm_probe", "legacy_run_record"),
@@ -138,6 +146,7 @@ class TestTheCommittedSpec:
             ("model_trainer.cli.sdpa_probe", "selected_backend"),
             ("model_trainer.cli.train_benchmark", "train_run_record"),
             ("model_trainer.cli.train_benchmark_report", "report_lines"),
+            ("model_trainer.cli.train_step_probe", "train_step_run_record"),
             ("model_trainer.cluster.preflight", "check_corpus_certified"),
             (
                 "model_trainer.core.services.model.control_arms",
@@ -188,6 +197,14 @@ class TestTheCommittedSpec:
             ("model_trainer.core.services.model.sdpa_timing", "time_sdpa"),
             ("model_trainer.core.services.model.train_cost", "run_train_step"),
             ("model_trainer.core.services.model.train_cost", "train_step_setup"),
+            (
+                "model_trainer.core.services.model.train_step_plan",
+                "TRAIN_STEP_RUNGS",
+            ),
+            (
+                "model_trainer.core.services.model.train_step_probe",
+                "train_step_identity",
+            ),
             (
                 "model_trainer.core.services.training.base_trainer_checkpoints",
                 "_TrainerCheckpoints",
