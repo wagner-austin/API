@@ -118,6 +118,58 @@ routing, so pre-bracket seeds do not replay under it; batches state their
 regime by frozen tree, and every panel to date stands as the within-batch
 experiment it actually was.
 
+### 2026-08-31: that certification was underpowered, and three more seams were open
+
+**The paragraph above overstates what was measured, and this says so rather
+than deleting it.** Its artifacts are `runs/bracket-{ff1,ff2,rt1,rt2}-trace.ndjson`
+— four traces, so **two invocation pairs**, one at 10x and one at realtime.
+Replayed on HPC3 as 24 scheduled jobs, the fork rate on duel_lake is roughly
+**one pair-observation in three**, at which rate two pairs both passing is
+about a coin flip. "Separate invocations bit-exact" was a true statement
+about the runs that were made and not a property of the build.
+
+HPC3 is where it surfaced because one match per job makes **every**
+comparison cross-invocation; the cluster did not introduce the defect, it
+removed what had been hiding it. Three seams were still open, and each was
+invisible until the one above it closed:
+
+* **Two of the three generators were never split.** `EngineRandom.seed`
+  pins the engine's generator, `Math.random()`'s and `Collections.shuffle`'s
+  alike, and seeding makes a run *start* from a known state while saying
+  nothing about whether the simulation's draws from it are a function of the
+  seed. `Math`'s holder is JVM-global with twelve engine call sites, so the
+  render path and the simulation drew from one stream. The ledger had said
+  so all along: across eleven replayed seeds, every seed whose `math=` state
+  agreed at frame 0 replicated over 250 samples and every seed whose state
+  differed at frame 0 forked — with the engine stream diverging only *after*
+  the world already had, which makes it consequence and not cause.
+* **Cosmetic drawers inside the tick.** `y.a`/`y.b` decrement a per-unit
+  float by the MEASURED delta and, when it drains, spend two `Math.random()`
+  draws scattering a particle. Silenced, and only when not hosting — the
+  containment `SyncPathTransformer` already established.
+* **`aR`, the eleventh AI cadence clock.** `AiTimers` reset ten. The AI
+  spends the delta two ways — `aX += f2` and `aX = f.a(aX, f2)` — and a grep
+  for one form finds only half of them.
+
+**The bracket is not at fault, and a natural-sounding diagnosis of it is
+wrong.** It was tempting to conclude the bracket admits the render pass;
+`e.b.a` is called from `units/d/r.java:147` inside the unit's own per-tick
+update, not from rendering. The engine *interleaves cosmetic work into the
+simulation update*, so no phase classifier can separate them — which is a
+real limitation of routing by phase rather than by call site, and the
+deleted stack walk could tell them apart precisely because it looked at the
+call site.
+
+**Where it stands.** Seed 31337, which forked 3/3 before any of this, is
+bit-identical across six separate invocations under the depot's Java 8 —
+world and all three draw-count streams. Cluster members now pin the frame
+delta (`PINNED_DELTA_MS = 3`), which is a **new regime**: numbers from a
+pinned batch are not comparable to any batch before this date. Pinning makes
+the remaining in-tick cosmetic draws *deterministic*, not *absent*; the
+structural fix — routing them off the sim stream per call site, patched at
+class-load — is not done. Full narrative in the log, entries 2026-08-30 and
+2026-08-31, one of which corrects the other.
+
 ## The standing rules
 
 **Score on survival time, or on worth share.** The endpoint figures the scorecard reports are the worst available: final worth has a standard deviation larger than its own mean. Computed from the per-sample trace instead, the mean share of worth held against the strongest rival has a coefficient of variation of **0.066**, and survival time **0.098** — the endpoint figure beside them is **0.67**.

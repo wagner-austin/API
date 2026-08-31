@@ -80,6 +80,15 @@ SINGLE_WORKER = 1
 #: ran, and nothing in the campaign document would say so.
 BATCH_DEFAULT = 0
 
+#: Milliseconds of simulation every tick carries, whatever the container
+#: measured.
+#:
+#: Three because that is what the measurement says: the container's average
+#: is 3.33ms, so the pace shift is under ten percent, and the agent refuses
+#: anything above :data:`AgentOptionsParser.MAX_PIN_DELTA_MS` (17) as a
+#: value no real frame takes (wiki log, the kill-switch entry).
+PINNED_DELTA_MS = 3
+
 #: The match played, its scorecard filed.
 EXIT_OK = 0
 
@@ -257,7 +266,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             # having copied nothing -- and the agent jar cannot be rebuilt
             # there at all, the Linux depot shipping a JRE with no compiler.
             "tree": parsed["--tree"],
-            "pin_delta": BATCH_DEFAULT,
+            # **Pinned, unlike the workstation default.** The engine gates
+            # decisions on `accumulator -= delta; if (drained) { act }` all
+            # through the tick -- the AI's cadence, a unit's effect spawner,
+            # a sway target's convergence -- so an unpinned delta makes each
+            # of them fire on a schedule the wall clock sets. `pinDeltaMs`
+            # writes the engine's own `bu` override, which makes every tick
+            # the same fixed quantum whatever the container measured.
+            #
+            # It is opt-in for one stated reason -- trees frozen before the
+            # option existed reject the unknown key, and watch and host runs
+            # want the sim glued to wall time (wiki log, the kill-switch
+            # entry). Neither applies to a campaign member: the tree is
+            # frozen at submission and nothing watches it. Six separate
+            # invocations of seed 31337 are bit-identical under this regime,
+            # world and all three draw-count streams alike; the workstation
+            # default of 0 is what the cluster panel forked under.
+            "pin_delta": PINNED_DELTA_MS,
             "fast_forward": BATCH_DEFAULT,
         },
         match,
@@ -282,6 +307,7 @@ __all__ = [
     "BATCH_DEFAULT",
     "EXIT_INCOMPLETE",
     "EXIT_OK",
+    "PINNED_DELTA_MS",
     "REQUIRED_FLAGS",
     "SINGLE_WORKER",
     "MatchCommandError",
