@@ -24,11 +24,13 @@ from tankpit_bot.bot.ai.combat_strategy import engage_target, frame_target_shift
 from tankpit_bot.bot.ai.combat_target import (
     block_combat_target_and_replan,
     get_locked_target,
+    has_clear_shot_line,
     is_already_engaged,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.mode_gates import human_fight_resume_fuel_floor
 from tankpit_bot.bot.ai.threat_primitives import (
+    POSITION_FRESHNESS_TTL_MS,
     pursuit_homing_budget_spent,
     pursuit_trace_is_live,
 )
@@ -45,6 +47,7 @@ from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
 )
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
 def visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
@@ -146,7 +149,12 @@ def resume_locked_target_off_viewport(ctx: DecideCtx, pursuit: EnemyThreatDict) 
 def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
     """Fire at a departed target's cached position, or chase instead.
 
-    Two gates before the shot:
+    A target whose registry position was re-placed by a global source
+    (the map answer) SINCE its last viewport sighting, and whose
+    current tile sits inside the visible window with a clear line, is
+    not departed — it is engaged under the in-view firing law before
+    any pursuit gate (see the inline comment). For the genuinely
+    departed rest, two gates before the shot:
 
     * **Trace wall** — the server's homing reroute dies ~12 s after
       the target left the viewport; past it a shot is a booked miss,
@@ -184,6 +192,36 @@ def pursuit_fire(ctx: DecideCtx, pursuit: EnemyThreatDict) -> TickDecisionDict:
         # budget. The free shift frames the target instead — checked
         # BEFORE the trace wall and the budget stamp.
         return shift
+    tank = ctx.filtered["tanks"][str(pursuit["tank_id"])]
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    if (
+        tank["last_position_update_ms"] > tank["last_viewport_observation_ms"]
+        and ctx.timestamp_ms - tank["last_position_update_ms"] <= POSITION_FRESHNESS_TTL_MS
+        and left <= pursuit["x"] <= right
+        and top <= pursuit["y"] <= bottom
+        and has_clear_shot_line(ctx, pursuit)
+    ):
+        # A position stamped SINCE the last viewport sighting comes
+        # from a global source -- the map answer, which re-places
+        # every alive tank at its CURRENT tile on each open. When that
+        # current tile is inside the visible window with a clear line,
+        # the target has not departed at all: this is the in-view
+        # firing law (user law 2026-07-29), not a reroute gamble, so
+        # neither the trace wall nor the human homing budget applies.
+        # Without this rung a map-acquired never-viewport-confirmed
+        # target flip-flopped shoot / "trace expired" map_open every
+        # other tick (run bot-20260831-152132, 15:22:02-08: red-3 shot
+        # at (141,76), then a wasted map chase to rediscover the same
+        # in-window dot). The freshness bound keeps the shot honest:
+        # once the map placement ages past the kill-shot horizon the
+        # chase below refreshes it.
+        emit_ai(
+            "map places %s in the window at (%d,%d) - engaging the live position",
+            pursuit["name"],
+            pursuit["x"],
+            pursuit["y"],
+        )
+        return engage_target(ctx, pursuit)
     if not pursuit_trace_is_live(ctx.filtered, pursuit["tank_id"], ctx.timestamp_ms):
         emit_ai(
             "homing trace on %s expired - chasing via map instead of a dead shot",

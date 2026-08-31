@@ -58,7 +58,7 @@ that the ride exists — see the pond gate below.
 """
 
 
-def _goal_water_pond(
+def goal_water_pond(
     terrain: TerrainMapProtocol,
     goal_x: int,
     goal_y: int,
@@ -138,7 +138,7 @@ def find_ferry_boarding_tile(
         if dist > FERRY_SEARCH_RADIUS:
             continue
         if pond is None:
-            pond = _goal_water_pond(terrain, goal_x, goal_y)
+            pond = goal_water_pond(terrain, goal_x, goal_y)
         if (tile["x"], tile["y"]) not in pond:
             continue
         if best is None or dist < best_dist:
@@ -150,4 +150,5 @@ def find_ferry_boarding_tile(
 __all__ = [
     "FERRY_SEARCH_RADIUS",
     "find_ferry_boarding_tile",
+    "goal_water_pond",
 ]

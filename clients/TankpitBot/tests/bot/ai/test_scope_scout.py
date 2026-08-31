@@ -12,7 +12,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.scope_scout import (
     SCOPE_SCOUT_COOLDOWN_MS,
     pan_plan_toward,
-    scope_direction_toward,
+    pan_reveals_new_goal_water,
     scope_scout_for_ferry,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -42,7 +42,7 @@ _WATER = "W"
 _REST_WINDOW = (92, 92, 107, 107)
 
 
-def test_direction_covers_the_full_compass() -> None:
+def test_pan_plan_covers_the_full_compass() -> None:
     """Each tank->goal sign pair maps to its clockwise compass byte."""
     cases = (
         ((100, 90), SCOPE_NORTH),
@@ -55,24 +55,10 @@ def test_direction_covers_the_full_compass() -> None:
         ((90, 90), SCOPE_NORTHWEST),
     )
     for (goal_x, goal_y), expected in cases:
-        assert scope_direction_toward(_REST_WINDOW, 100, 100, goal_x, goal_y) == expected
-
-
-def test_direction_declines_goals_beyond_one_pan() -> None:
-    """The anchor law reaches 15 tiles — 16 is out of a single pan."""
-    assert scope_direction_toward(_REST_WINDOW, 100, 100, 115, 100) == SCOPE_EAST
-    assert scope_direction_toward(_REST_WINDOW, 100, 100, 116, 100) is None
-
-
-def test_direction_declines_the_tanks_own_tile() -> None:
-    """No compass sign, no pan."""
-    assert scope_direction_toward(_REST_WINDOW, 100, 100, 100, 100) is None
-
-
-def test_direction_declines_a_pan_that_changes_nothing() -> None:
-    """An east goal after an east pan re-derives the same window."""
-    panned_east = (100, 92, 115, 107)
-    assert scope_direction_toward(panned_east, 100, 100, 110, 100) is None
+        plan = pan_plan_toward(_REST_WINDOW, 100, 100, goal_x, goal_y)
+        if plan is None:
+            raise AssertionError(f"expected a plan toward ({goal_x},{goal_y})")
+        assert plan[0] == expected
 
 
 def test_pan_plan_serves_goals_beyond_one_pan() -> None:
@@ -98,6 +84,28 @@ def test_pan_plan_declines_a_pan_that_changes_nothing() -> None:
     """An east goal after an east pan re-derives the same window."""
     panned_east = (100, 92, 115, 107)
     assert pan_plan_toward(panned_east, 100, 100, 130, 100) is None
+
+
+def test_pan_precheck_sees_new_water_past_the_window_edge() -> None:
+    """Pond water beyond the current edge makes the pan informative."""
+    terrain = InMemoryTerrainMap(terrain_data=_water_blob(110, 100))
+
+    assert pan_reveals_new_goal_water(terrain, _REST_WINDOW, 100, 92, 110, 100)
+
+
+def test_pan_precheck_declines_when_every_reachable_pond_tile_is_seen() -> None:
+    """A pan that can only re-show looked-at water is declined.
+
+    The column pond walks all three skip laws: tiles more than the
+    ferry search radius from the goal cannot host a boarding, tiles
+    outside the anchored window stay unrevealed either way, and tiles
+    inside the current window are DEFINITIVELY ferry-less right now
+    (the live 0x5A stream would have delivered any ferry on them).
+    """
+    column = {(105, y): "W" for y in range(80, 108)}
+    terrain = InMemoryTerrainMap(terrain_data=column)
+
+    assert not pan_reveals_new_goal_water(terrain, _REST_WINDOW, 100, 92, 105, 100)
 
 
 def _water_blob(cx: int, cy: int, radius: int = 2) -> dict[tuple[int, int], str]:
@@ -196,6 +204,42 @@ def test_water_locked_equipment_also_draws_the_pan() -> None:
     if decision is None:
         raise AssertionError("expected the scout to pan")
     assert decision["command"]["cmd_type"] == "scope_shift"
+
+
+def test_scout_declines_goals_beyond_one_pan() -> None:
+    """The anchor law reaches 15 tiles — 16 is out of a single pan."""
+    reachable, terrain_reachable = _water_locked_world(goal_x=115, goal_y=100)
+    beyond, terrain_beyond = _water_locked_world(goal_x=116, goal_y=100)
+
+    served = scope_scout_for_ferry(_ctx(reachable, terrain_reachable), make_scanned_ai_state())
+    declined = scope_scout_for_ferry(_ctx(beyond, terrain_beyond), make_scanned_ai_state())
+
+    if served is None:
+        raise AssertionError("expected the scout to pan at the 15-tile goal")
+    assert served["command"] == {"cmd_type": "scope_shift", "direction": SCOPE_EAST}
+    assert declined is None
+
+
+def test_goal_on_the_tanks_own_tile_offers_no_pan_axis() -> None:
+    """Floating over the goal itself: no compass sign, no pan."""
+    world, terrain = _water_locked_world(goal_x=100, goal_y=100)
+
+    assert scope_scout_for_ferry(_ctx(world, terrain), make_scanned_ai_state()) is None
+
+
+def test_scout_skips_a_pan_at_fully_seen_water() -> None:
+    """Pond entirely inside the current window draws no pan.
+
+    Operator flag 2 (run bot-20260831-152132, 15:22:52): the scout
+    panned at a water-locked goal, revealed nothing, and the frontier
+    teleported away one tick later — a wasted look. Water the window
+    already shows is DEFINITIVELY ferry-less, so a pan that can only
+    re-show it is declined and the tick goes to the next plan
+    directly.
+    """
+    world, terrain = _water_locked_world(goal_x=105, goal_y=100)
+
+    assert scope_scout_for_ferry(_ctx(world, terrain), make_scanned_ai_state()) is None
 
 
 def test_held_combat_lock_bars_the_scout() -> None:

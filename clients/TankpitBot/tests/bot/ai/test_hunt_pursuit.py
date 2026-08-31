@@ -358,6 +358,83 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
+class TestMapReplacedInWindowTarget:
+    """A map-fresh position inside the window is engaged, never re-chased.
+
+    Regression for run bot-20260831-152132 15:22:02-08 (operator flag
+    1, "opening the map then firing then opening the map then
+    firing"): red-3 arrived via a map answer at an in-window tile the
+    wire had not yet confirmed, so the pursuit branch read the zero
+    viewport stamp as an expired trace and spent a map_open
+    rediscovering the very dot it already held. The map re-places
+    every alive tank at its CURRENT tile on each open — a placement
+    newer than the last viewport sighting that lands inside the
+    visible window is the in-view firing law's case, not a reroute
+    gamble.
+    """
+
+    def _ctx(
+        self,
+        target: TankStateDict,
+        *,
+        pursuit_shot_target_id: int = -1,
+        pursuit_shot_ms: int = 0,
+    ) -> DecideCtx:
+        ws = WorldService()
+        world, self_state = make_world(fuel=800, tanks={"50": target})
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "combat_target_id": 50,
+                "combat_target_x": target["x"],
+                "combat_target_y": target["y"],
+                "last_shot_target_id": 50,
+                "pursuit_shot_target_id": pursuit_shot_target_id,
+                "pursuit_shot_ms": pursuit_shot_ms,
+            }
+        )
+        return DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+    def test_never_viewport_confirmed_in_window_dot_is_shot_not_map_chased(self) -> None:
+        target = make_pursuit_target(x=104, y=100)
+        target["last_viewport_observation_ms"] = 0
+
+        decision = decide_hunt_mode(self._ctx(target))
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        # Not a pursuit-budget shot: the target is here, not departed.
+        assert decision["updated_ai_state"]["pursuit_shot_ms"] == 0
+
+    def test_stale_map_placement_falls_back_to_the_map_chase(self) -> None:
+        # The placement aged past the kill-shot horizon (8 s > 7 s) and
+        # the trace wall is long gone (20 s > 12 s): refresh via map.
+        target = make_pursuit_target(x=104, y=100)
+        target["last_viewport_observation_ms"] = 80000
+        target["last_position_update_ms"] = 92000
+
+        decision = decide_hunt_mode(self._ctx(target))
+
+        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["reason_kind"] == "find_target"
+
+    def test_human_cap_spares_the_in_window_live_position(self) -> None:
+        # The one-homing-per-departure cap governs reroute pursuit at
+        # DEPARTED humans; a human the map places inside the window is
+        # the normal in-view fight and keeps taking fire.
+        target = make_pursuit_target(x=104, y=100, name="Yuppler")
+
+        decision = decide_hunt_mode(
+            self._ctx(target, pursuit_shot_target_id=50, pursuit_shot_ms=95000)
+        )
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        # The departure budget stamp is untouched by an in-view shot.
+        assert decision["updated_ai_state"]["pursuit_shot_ms"] == 95000
+
+
 def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None:
     """SCAN_ON_LANDING state pursues via homing fire when target leaves viewport."""
     ws = WorldService()

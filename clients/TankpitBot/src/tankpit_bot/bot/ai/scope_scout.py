@@ -25,13 +25,18 @@ water-locked container would re-trigger the pan every tick.
 
 from __future__ import annotations
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import (
     find_all_tracked_equipment,
     find_teleport_landing_tile,
 )
-from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
+from tankpit_bot.bot.ai.ferry_landing import (
+    FERRY_SEARCH_RADIUS,
+    find_ferry_boarding_tile,
+    goal_water_pond,
+)
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_scope_shift_command
@@ -52,11 +57,11 @@ from tankpit_bot.runtime_logging import (
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 SCOPE_SCOUT_COOLDOWN_MS = 30000
-"""Minimum quiet time between ferry scope scouts. Half the 60 s ferry
-belief TTL (unbracketed, like the TTL itself): often enough that a
-ferry drifting into the water near a stalled larder goal is noticed
-within a belief lifetime, rare enough that a ferry-less lake costs
-one free tick per half-minute instead of one per tick."""
+"""Minimum quiet time between ferry scope scouts. Ferry memory is
+positional, not clocked ([[ferry-mechanics]] no-drift law) — the pan
+gambles only on water the bot has never looked at, or on a human
+having ridden a ferry in since the last look. Both are rare, so the
+scout looks at most once per half-minute instead of once per tick."""
 
 SCOPE_REACH_TILES = 15
 """Farthest tile a single scope pan can bring into view: the anchor
@@ -125,43 +130,54 @@ def pan_plan_toward(
     return direction, shifted_left, shifted_top
 
 
-def scope_direction_toward(
+def pan_reveals_new_goal_water(
+    terrain: TerrainMapProtocol,
     window: tuple[int, int, int, int],
-    sx: int,
-    sy: int,
+    shifted_left: int,
+    shifted_top: int,
     goal_x: int,
     goal_y: int,
-) -> int | None:
-    """Pick the compass byte that pans the window at a goal's water.
+) -> bool:
+    """Return True when the anchored pan uncovers unseen ferry water.
 
-    The direction is the tank→goal compass sign, NOT a window test:
-    the goal container is usually already in view (that is how it got
-    radar-believed), and what the pan must reveal is the ferry search
-    water AROUND and BEYOND it. Anchoring the window to the tank in
-    the goal's direction shows the most of that water a single pan
-    can ([[viewport-shift-protocol]] anchor law).
+    The pan precheck (operator flag 2, run bot-20260831-152132
+    15:22:52: pan direction 3, no ferry, frontier teleport one tick
+    later — "it did a viewport shift then it teleported immediately").
+    Water already inside the current window is DEFINITIVELY ferry-less
+    right now — the live 0x5A stream would have delivered any ferry on
+    it — so a pan is informative only when the anchored window covers
+    at least one tile of the goal's own pond, within the ferry search
+    radius, that the current window does not. Terrain is map-wide
+    static, so this is decidable before spending the tick.
 
     Args:
+        terrain: Static terrain of the current field.
         window: Inclusive current window bounds (left, top, right,
             bottom) — the stored 0x5A window.
-        sx: Self X.
-        sy: Self Y.
-        goal_x: Goal tile X.
-        goal_y: Goal tile Y.
+        shifted_left: Anchored window left from :func:`pan_plan_toward`.
+        shifted_top: Anchored window top from :func:`pan_plan_toward`.
+        goal_x: Water-locked goal X.
+        goal_y: Water-locked goal Y.
 
     Returns:
-        The ``SCOPE_*`` direction byte, or ``None`` when the goal is
-        beyond :data:`SCOPE_REACH_TILES` (no single pan can serve it)
-        or the anchored window IS the current window (the pan would
-        reveal nothing — e.g. right after a previous scout the same
-        way).
+        True when the pan can show boarding-candidate water the bot is
+        not already looking at.
     """
-    if max(abs(goal_x - sx), abs(goal_y - sy)) > SCOPE_REACH_TILES:
-        return None
-    plan = pan_plan_toward(window, sx, sy, goal_x, goal_y)
-    if plan is None:
-        return None
-    return plan[0]
+    left, top, right, bottom = window
+    shifted_right = shifted_left + (right - left)
+    shifted_bottom = shifted_top + (bottom - top)
+    for water_x, water_y in goal_water_pond(terrain, goal_x, goal_y):
+        if max(abs(water_x - goal_x), abs(water_y - goal_y)) > FERRY_SEARCH_RADIUS:
+            continue
+        in_shifted = (
+            shifted_left <= water_x <= shifted_right and shifted_top <= water_y <= shifted_bottom
+        )
+        if not in_shifted:
+            continue
+        if left <= water_x <= right and top <= water_y <= bottom:
+            continue
+        return True
+    return False
 
 
 def _water_locked_goals(ctx: DecideCtx) -> list[tuple[int, int]]:
@@ -227,16 +243,24 @@ def scope_scout_for_ferry(
         return None
     if ctx.timestamp_ms - base_state["last_scope_scout_ms"] < SCOPE_SCOUT_COOLDOWN_MS:
         return None
-    if ctx.terrain is None:
+    terrain = ctx.terrain
+    if terrain is None:
         return None
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     window = viewport_visible_bounds(ctx.world["viewport"])
     best: tuple[int, int, int, int] | None = None
     for candidate_x, candidate_y in _water_locked_goals(ctx):
-        candidate_direction = scope_direction_toward(window, sx, sy, candidate_x, candidate_y)
-        if candidate_direction is None:
-            continue
         dist = max(abs(candidate_x - sx), abs(candidate_y - sy))
+        if dist > SCOPE_REACH_TILES:
+            continue
+        plan = pan_plan_toward(window, sx, sy, candidate_x, candidate_y)
+        if plan is None:
+            continue
+        candidate_direction, shifted_left, shifted_top = plan
+        if not pan_reveals_new_goal_water(
+            terrain, window, shifted_left, shifted_top, candidate_x, candidate_y
+        ):
+            continue
         if best is None or dist < best[0]:
             best = (dist, candidate_direction, candidate_x, candidate_y)
     if best is None:
@@ -271,6 +295,6 @@ __all__ = [
     "SCOPE_REACH_TILES",
     "SCOPE_SCOUT_COOLDOWN_MS",
     "pan_plan_toward",
-    "scope_direction_toward",
+    "pan_reveals_new_goal_water",
     "scope_scout_for_ferry",
 ]
