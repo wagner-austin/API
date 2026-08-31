@@ -10,12 +10,12 @@
       "gpu": null,
       "cpus": 1,
       "mem_gb": 2,
-      "minutes": 150,
+      "minutes": 45,
       "requeue": false,
       "checkpoint_steps": 0,
       "image": {
-        "path": "/pub/wagnera3/rusted/images/v3/rusted.sif",
-        "sha256": "57484f53a1ec8af32a389830f99fb147e9a9204e9b49f511f752a7d012661aaf",
+        "path": "/pub/wagnera3/rusted/images/v4/rusted.sif",
+        "sha256": "b1eaaa2e5a43fd963ddeff20ba06f92c9128135cda918fed1bde458c5de93edb",
         "binds": ["/pub/wagnera3"]
       },
       "env_path": "/opt/env",

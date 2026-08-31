@@ -1,5 +1,5 @@
 {
-  "git_commit": "fba07ed4cf9d0715c17b0bcb69cd6c72b5cddea3",
+  "git_commit": "1909eae7ce1c1dd6c0265762fb2097334e25d330",
   "carries": [
     "scripts",
     "doctrines",
@@ -646,8 +646,8 @@
     },
     {
       "path": "scripts/campaign_doc.py",
-      "sha256": "d6223ce21fee6074a176340ee3aa21bf64638bade1eb24b0ad3c836141be0d64",
-      "size_bytes": 8811
+      "sha256": "9058233c445c0e0781ff632e8f491bf811a30b9be7af90757a6e3712ec1a6d02",
+      "size_bytes": 9541
     },
     {
       "path": "scripts/detprobe.py",
@@ -841,18 +841,18 @@
     },
     {
       "path": "src/rw_bot/harness/_hook_defaults.py",
-      "sha256": "9fca693ed24447576052ebea8c7793ead577f9498578242afd3d891172883575",
-      "size_bytes": 16151
+      "sha256": "cbebcca0e7e4456cc85c040dab00284d6d912bad6faa05e42c855e56dfafbdd1",
+      "size_bytes": 16630
     },
     {
       "path": "src/rw_bot/harness/_hook_protocols.py",
-      "sha256": "3f31c03833f8b482cd689b37a5736311b514a25f5932dc0cb2446e83d5374bfd",
-      "size_bytes": 13492
+      "sha256": "eb6cc1a74c79530c26128204aa77ac851414a7d8cee1be3797deba652d1ac963",
+      "size_bytes": 14493
     },
     {
       "path": "src/rw_bot/harness/_test_hooks.py",
-      "sha256": "8a47264b1beda186f6c801688300ccf24fb4e2541de75b3801b338e0b66ec74a",
-      "size_bytes": 4319
+      "sha256": "d086111e52373edc93117015fa758ae2b574a8de1ab313f14c27e8fa3d583c8a",
+      "size_bytes": 4556
     },
     {
       "path": "src/rw_bot/harness/agent_build.py",
@@ -871,13 +871,13 @@
     },
     {
       "path": "src/rw_bot/harness/campaign.py",
-      "sha256": "e16a47875131ebe32679b2dc7e52e95a26989b5e3890e3624d8e07947bc98c84",
-      "size_bytes": 9070
+      "sha256": "5e8e25e9b21b022c7b7f59a7a41635285e2d1eb65eafeb7b8e794ebc756cace8",
+      "size_bytes": 9707
     },
     {
       "path": "src/rw_bot/harness/campaign_match.py",
-      "sha256": "a005131b5f04f35496eefa7fe6ef1d94093b808a0f9ecb9959a1f206c73d90a1",
-      "size_bytes": 14379
+      "sha256": "095bac0ad607b4c1e78af2407f57e457fe5d3b368544c6a56bc972ca6b19e522",
+      "size_bytes": 14863
     },
     {
       "path": "src/rw_bot/harness/clone.py",
@@ -906,8 +906,8 @@
     },
     {
       "path": "src/rw_bot/harness/launch.py",
-      "sha256": "204bcf63468b79ef36fbf20b46162267395fe26bf0390ee6b54d39eef8a1aebb",
-      "size_bytes": 21100
+      "sha256": "165a82edef362c23582a35f43420bb32cd74323c5a34340225751e417f2a6e45",
+      "size_bytes": 21476
     },
     {
       "path": "src/rw_bot/harness/margin.py",
@@ -921,13 +921,13 @@
     },
     {
       "path": "src/rw_bot/harness/play_match.py",
-      "sha256": "a72ab1a27193cf359cca1d3db63b0147701fa7892af9f8b2645217162ca77c9d",
-      "size_bytes": 10228
+      "sha256": "32aa55631278b0d23a219e8c7a8dce7be97e9c5a1f6613469b294182094dc5e6",
+      "size_bytes": 12476
     },
     {
       "path": "src/rw_bot/harness/play_match_cli.py",
-      "sha256": "a840a1625ea881dc3ecb29a33c3be7bfcf5186d18757edb232c88d08c294a6d7",
-      "size_bytes": 11368
+      "sha256": "b80bb78f2390b0d812b86f3952c199e053172e869de1c5d9d9f3375f2eb3a92e",
+      "size_bytes": 12158
     },
     {
       "path": "src/rw_bot/harness/process_tree.py",
@@ -2060,8 +2060,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "4c94b50a60e922ddfa104eeb6a2e3c4ef627039bb50b03c2cda7fb425f0f3ffb",
+  "tree_sha256": "0d607f0ff1802716361f91302f2775f07e5256eeca567db1d5f3b7bb70928c53",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "62b2368151b876f0ad082713145e0525619c322a0f2b8bb2cbcd947f06f9a77a",
+  "archive_sha256": "9de691e1a5b51cd5f83c16d0a059f1e6e5decdb136c536b2a33d441a5b39e2ce",
   "archive_size_bytes": 2252800
 }
