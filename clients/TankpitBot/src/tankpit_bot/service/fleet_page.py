@@ -242,6 +242,7 @@ function paintHud(name) {
 
 function row(bot) {
   const s = stats[bot.instance] || {};
+  const h = huds[bot.instance];
   const tr = document.createElement("tr");
   if (!bot.alive) tr.className = "dead";
   const status = bot.alive ? '<span class="alive">running</span>'
@@ -265,7 +266,12 @@ function row(bot) {
     // The damage ledger is emitted at TEARDOWN with fuel-confirmed
     // totals, so a LIVE bot has none — printing "0 / 0" claimed it
     // had dealt and taken nothing, which is a different statement.
-    "<td>" + (bot.alive ? "—"
+    // Live rows read the HUD payload, which carries the damage book
+    // as of this tick; finished rows read the digest's teardown
+    // ledger. Same numbers, different channel — the digest simply
+    // does not exist until the bot exits.
+    "<td>" + (bot.alive
+      ? (h ? h.dealt + " / " + h.taken : "—")
       : (s.available ? s.damage_dealt + " / " + s.damage_taken : "")) + "</td>" +
     "<td>" + (s.available ? s.teleports : "") + "</td>" +
     "<td>" + (s.available ? s.zero_yield_radars : "") + "</td>" +

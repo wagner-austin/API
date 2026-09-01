@@ -41,6 +41,7 @@ from tankpit_bot.fleetshare import (
     read_team_reports,
     write_fleet_report,
 )
+from tankpit_bot.ledger.damage_book import total_fuel
 from tankpit_bot.ledger.decision import latest_decision_event_id
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
@@ -229,6 +230,11 @@ def _tick_once(bot: Bot) -> None:
         hits=bot._ai_state["session_hit_count"],
         misses=bot._ai_state["session_miss_count"],
         rejects=bot._ai_state["session_reject_count"],
+        # The damage book is live every tick; only its diagnostic
+        # waited for teardown, which is why the fleet table could not
+        # show a fight in progress.
+        dealt=total_fuel(bot.world.damage_book["dealt"]),
+        taken=total_fuel(bot.world.damage_book["taken"]),
         target_id=bot._ai_state["combat_target_id"],
         target_name=bot._ai_state["last_shot_target_name"],
     )

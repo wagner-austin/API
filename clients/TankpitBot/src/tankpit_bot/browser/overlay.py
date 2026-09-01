@@ -85,6 +85,11 @@ class OverlayStateDict(TypedDict):
         hits: Session hit count.
         misses: Session miss count.
         rejects: Session reject count.
+        dealt: Fuel-confirmed damage this session has landed on
+            enemies. Live every tick: the damage book is maintained
+            continuously and only its DIAGNOSTIC was emitted at
+            teardown, so the fleet page had nothing to show mid-fight.
+        taken: Fuel-confirmed damage taken, same channel.
         target_id: Combat target tank id (``-1`` when none).
         target_name: Last shot target name (``""`` when none).
     """
@@ -113,6 +118,8 @@ class OverlayStateDict(TypedDict):
     hits: int
     misses: int
     rejects: int
+    dealt: int
+    taken: int
     target_id: int
     target_name: str
 
@@ -151,6 +158,8 @@ def encode_overlay_state(overlay: OverlayStateDict) -> JSONObject:
         "hits": overlay["hits"],
         "misses": overlay["misses"],
         "rejects": overlay["rejects"],
+        "dealt": overlay["dealt"],
+        "taken": overlay["taken"],
         "target_id": overlay["target_id"],
         "target_name": overlay["target_name"],
     }
@@ -193,6 +202,8 @@ def decode_overlay_state(data: JSONObject) -> OverlayStateDict:
         hits=require_int(data, "hits"),
         misses=require_int(data, "misses"),
         rejects=require_int(data, "rejects"),
+        dealt=require_int(data, "dealt"),
+        taken=require_int(data, "taken"),
         target_id=require_int(data, "target_id"),
         target_name=require_str(data, "target_name"),
     )
@@ -330,6 +341,8 @@ def render_overlay_payload(overlay: OverlayStateDict) -> JSONObject:
         "hits": overlay["hits"],
         "misses": overlay["misses"],
         "rejects": overlay["rejects"],
+        "dealt": overlay["dealt"],
+        "taken": overlay["taken"],
     }
 
 

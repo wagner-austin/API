@@ -55,6 +55,8 @@ def make_overlay() -> OverlayStateDict:
         hits=12,
         misses=4,
         rejects=1,
+        dealt=270,
+        taken=90,
         target_id=512,
         target_name="purple-4",
     )
@@ -248,3 +250,21 @@ class TestDecisionSlots:
             payload["misses"],
             payload["rejects"],
         ) == (3, 12, 4, 1)
+
+
+def test_damage_rides_the_payload_the_fleet_page_polls() -> None:
+    """Dealt and taken reach the HUD slot map, and survive a round trip.
+
+    The damage book is live every tick; only its diagnostic waited for
+    teardown, so the fleet table showed nothing while a fight was
+    happening. These two slots are what make a live row honest.
+    """
+    overlay = make_overlay()
+
+    payload = render_overlay_payload(overlay)
+    restored = decode_overlay_state(encode_overlay_state(overlay))
+
+    assert payload["dealt"] == 270
+    assert payload["taken"] == 90
+    assert restored["dealt"] == 270
+    assert restored["taken"] == 90
