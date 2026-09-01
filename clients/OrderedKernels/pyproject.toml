@@ -1,0 +1,125 @@
+[build-system]
+requires = ["poetry-core>=1.3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "ordered-kernels"
+version = "0.1.0"
+description = "Fast fixed-order GEMM kernels: cross-GPU bit-identical matmuls at tiled-kernel speed, with the reduction order owned by the program instead of the vendor."
+authors = ["Austin Wagner <austinwagner@msn.com>"]
+packages = [
+  { include = "ordered_kernels", from = "src" },
+]
+readme = "README.md"
+include = ["src/ordered_kernels/py.typed"]
+
+[[tool.poetry.source]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# The exact torch the whole investigation is pinned to; a different build is
+# a different comparison basis, per the abl image's expected_versions.
+torch = {version = "2.6.0", source = "pytorch-cu124"}
+# NVRTC-compiled raw kernels. This is what makes the coverage bar meetable
+# where Triton could not: the CUDA source is a string (data, not Python
+# lines), and every Python line in this package executes for real on a GPU.
+cupy-cuda12x = "^13.3"
+# THE FIRST-PARTY DEPENDENCIES ARE DELIBERATELY ABSENT FROM THIS TABLE.
+# This package is a client of model-trainer-server (shape tables, digest
+# fold, probe builders, run records), but the poetry path-dependency chain
+# is UNSOLVABLE on any fresh machine as of 2026-09-01: platform-ml requires
+# shap ^0.50, shap 0.50.0 pins llvmlite to the beta 0.46.0b1 exactly, and
+# that beta has been DELETED from PyPI -- Model-Trainer itself installs only
+# through its frozen lock. So the Makefile rebuilds and installs the four
+# first-party wheels --no-deps on every lint (the recipe the fleet
+# replication proved), and the third-party closure those wheels need is
+# declared HERE, from their own metadata, where the solver can see it.
+# transformers is exact because it is one of the abl image's two
+# expected_versions; everything else takes the wheels' own bounds.
+transformers = "4.46.3"
+datasets = ">=3.0.1,<4.0.0"
+fastapi = ">=0.124,<0.125"
+httpx = ">=0.28,<0.29"
+hypercorn = ">=0.18,<0.19"
+peft = ">=0.14.0,<0.15.0"
+python-json-logger = ">=3.2.1,<4.0.0"
+redis = ">=7.1,<8.0"
+rq = ">=2.3,<3.0"
+sentencepiece = ">=0.2.1,<0.3.0"
+tokenizers = ">=0.20.0,<0.21"
+rich = ">=14.2,<15.0"
+numpy = ">=2.3.5,<3.0.0"
+shap = ">=0.49"
+typing-extensions = "^4.12.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.0"
+pytest-cov = "^7.0.0"
+pytest-timeout = "^2.3.1"
+mypy = "^1.13.0"
+ruff = "^0.14.4"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+disallow_subclassing_any = true
+disallow_any_unimported = true
+disallow_any_expr = true
+disallow_any_decorated = true
+disallow_any_explicit = true
+disallow_any_generics = true
+no_implicit_optional = true
+check_untyped_defs = true
+no_implicit_reexport = true
+show_error_codes = true
+pretty = true
+files = ["src", "tests", "scripts"]
+mypy_path = ["src"]
+explicit_package_bases = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = [
+  "E","F","I","B","BLE","UP","N","C4","SIM","RET","C90","RUF","ANN"
+]
+ignore = []
+fixable = ["ALL"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
+"typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = false
+mypy-init-return = true
+
+[tool.coverage.run]
+source = ["src", "scripts"]
+omit = []
+branch = true
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+fail_under = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# Serial on purpose, unlike every CPU suite here: these tests share ONE GPU,
+# and xdist workers would each spin a CUDA context and contend for it. The
+# suite REQUIRES a CUDA device -- that is this package's declared bar, the
+# NavProbe precedent -- and refuses early without one rather than skipping.
+addopts = "-v --timeout=900"
