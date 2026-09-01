@@ -24,6 +24,7 @@ def _tank(
     is_bot: bool = True,
     is_self: bool = False,
     liveness: TankLiveness = "alive",
+    rank: int = 1,
 ) -> TankStateDict:
     """Create a TankStateDict with defaults for testing.
 
@@ -38,6 +39,9 @@ def _tank(
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
         liveness: Lifecycle state. Defaults to ``"alive"``.
+        rank: Military rank (0 recruit .. 8). Defaults to 1 — a
+            points-paying tier, so ordering tests that are not about
+            the recruit rule stay on pure distance.
 
     Returns:
         TankStateDict with the provided values.
@@ -52,7 +56,7 @@ def _tank(
         x=x,
         y=y,
         team=team,
-        rank=1,
+        rank=rank,
         damage_state=damage_state,
         direction=direction,
         name=name or f"red-{key}",

@@ -197,7 +197,7 @@ def fleet_assist_ids(ws: WorldService) -> frozenset[int]:
 def _threat_sort_key_for(
     priority_target_name: str,
     fleet_engaged_ids: frozenset[int],
-) -> Callable[[EnemyThreatDict], tuple[int, int, int, int, int]]:
+) -> Callable[[EnemyThreatDict], tuple[int, int, int, int, int, int]]:
     """Build the threat sort key with the priority account and fleet assist.
 
     Args:
@@ -209,14 +209,25 @@ def _threat_sort_key_for(
             converge on one enemy instead of splitting fire.
 
     Returns:
-        Sort-key callable ordering by (tier, fleet assist, distance,
-        finish, age).
+        Sort-key callable ordering by (tier, fleet assist, pays
+        points, distance, finish, age).
     """
 
-    def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int, int]:
+    def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int, int, int]:
         return (
             threat_priority_tier(threat["name"], priority_target_name),
             0 if threat["tank_id"] in fleet_engaged_ids else 1,
+            # The points-floor law, measured 2026-09-01 across 19 kills
+            # with zero contradictions ([[game-rules]]): a rank-0
+            # recruit pays "Enemy's rank was too low" to EVERY killer
+            # rank, and rank 1+ pays extra points to every killer
+            # rank. A paying kill at range outranks a free kill next
+            # door — points are the session's progression lever, and
+            # spoils flow from either. Recruits stay huntable when
+            # they are all the map offers (the component orders, it
+            # never excludes), which also covers the far tank whose
+            # rank the wire has not delivered yet.
+            0 if threat["rank"] >= 1 else 1,
             threat["distance"],
             _finish_priority(threat["damage_state"]),
             -threat["timestamp_ms"],

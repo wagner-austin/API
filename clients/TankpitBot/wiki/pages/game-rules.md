@@ -89,6 +89,30 @@ second tick ([[enemy-bot-behavior]] §Team aggro).[^4]
 
 **Demotion:** if deactivated by an enemy, you lose one rank.[^1]
 
+**Kill-points floor (World, measured 2026-09-01): rank-0 recruits pay
+no points; rank 1+ always pays — the floor is absolute, not relative
+to the killer's rank.** Every kill banner on World carries a verdict
+line: `You earned extra points` or `Enemy's rank was too low. / No
+extra points are given`. Nineteen instrumented kills across four
+fleet tanks (killer ranks 2, 4, 5, 6) split with zero contradictions:
+all 9 rank-0 victims paid nothing to every killer rank, and all 10
+rank-1+ victims (ranks 1-2 in the sample) paid extra points to every
+killer rank — including rank-6 artax killing rank-1 red-4. Kills pay
+inventory spoils ("N dual shots gained") regardless of the verdict,
+so recruit kills are never worthless, just points-less. The threat
+sort's pays-points component (`_threat_sort_key_for`,
+[[bot-behavior-contract]]) prefers rank-1+ targets on this law.[^13]
+
+[^13]: `kill_points_outcome` + `kill_registered` diagnostics, runs
+    bot-20260901-03xxxx (artax/yuppler/arterial/despair, build
+    b3c70bca), 19 verdict rows extracted 2026-09-01: victim ranks
+    read from the wire registry (0x3D carries rank) at banner time,
+    verdicts parsed from the DOM kill banner. Sample ceiling: no
+    victim above rank 2 and no killer above rank 6 yet — a rank-0
+    "unknown-rank default" in the registry is indistinguishable from
+    a true recruit, so the sort component ORDERS rather than
+    excludes.
+
 ## Tanks per account: one per color, per world
 
 An account holds up to FOUR tanks per WORLD — one per color (red=0,

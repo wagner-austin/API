@@ -549,3 +549,44 @@ class TestFleetAssistRanking:
         threats = analyze_threats(ws, world, _self_at(), now_ms=0)
 
         assert [threat["tank_id"] for threat in threats] == [50, 60]
+
+
+class TestPointsFloorRanking:
+    """A paying kill outranks a free one; recruits stay huntable.
+
+    The points-floor law, measured 2026-09-01 across 19 World kills
+    with zero contradictions ([[game-rules]]): rank-0 victims pay
+    "Enemy's rank was too low" to every killer rank, rank 1+ pays
+    extra points to every killer rank. The sort component orders, it
+    never excludes — a map of nothing but recruits still gets hunted
+    for its spoils.
+    """
+
+    def test_paying_target_outranks_a_nearer_recruit(self) -> None:
+        """The rank-1 bot at distance 8 beats the recruit at distance 3."""
+        ws = WorldService()
+        world = _world(
+            {
+                "50": _tank("50", x=103, y=100, team=2, name="red-1", rank=0),
+                "60": _tank("60", x=108, y=100, team=2, name="red-2", rank=1),
+            }
+        )
+
+        threats = analyze_threats(ws, world, _self_at(), now_ms=0)
+
+        assert [threat["tank_id"] for threat in threats] == [60, 50]
+
+    def test_fleet_assist_still_outranks_the_points_preference(self) -> None:
+        """Focus fire is senior: a sibling's locked recruit leads."""
+        ws = WorldService()
+        ws.fleet_engaged_target_ids = {50: 99000}
+        world = _world(
+            {
+                "50": _tank("50", x=103, y=100, team=2, name="red-1", rank=0),
+                "60": _tank("60", x=108, y=100, team=2, name="red-2", rank=1),
+            }
+        )
+
+        threats = analyze_threats(ws, world, _self_at(), now_ms=0)
+
+        assert [threat["tank_id"] for threat in threats] == [50, 60]

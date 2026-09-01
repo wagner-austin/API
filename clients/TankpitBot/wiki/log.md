@@ -5137,3 +5137,11 @@ Live World session against a human (Triumvirate), three fleet bots up. Three beh
 **Fleet Ctrl+C.** The manager's interrupt used to print the interrupt's traceback twice (unwinding loop + orphaned request task); `service/fleet.py` now absorbs it into one log line — bots are separate processes with stop-file teardown, nothing to clean up.
 
 Also this session: Despair added to the account pool. Open orders from the operator, next up: mine-laying doctrine (pin an adjacent enemy with mines + a fleet mine-awareness layer), coordinated engagement timing (bots attack serially because restock cycles desynchronize them), and yuppler's radar-farming-over-consented-human case (hunt readiness bar vs an active human war).
+
+## [2026-09-01] measured+shipped | The points floor is recruits-only, and the threat sort now prices it
+
+The kill-verdict instruments (shipped `bced04f4`) answered the floor question on their first four live runs: 19 verdict rows across artax (rank 6), yuppler (5), arterial (4), despair (2) split with ZERO contradictions — all 9 rank-0 victims drew "Enemy's rank was too low", all 10 rank-1+ victims drew "You earned extra points", independent of killer rank. Operator hypothesis ("it may just be recruits that give no points") confirmed exactly. Law recorded on [[game-rules]] with the sample's ceilings named (no victim above rank 2 yet).
+
+Consumption: a pays-points component in `_threat_sort_key_for`, ranked below fleet focus-fire and above distance — a paying kill at range beats a free kill next door, recruits stay huntable when they are all the map offers (spoils still flow), and the far tank whose rank the wire has not delivered yet (registry rank 0) degrades gracefully into the same deprioritized bucket.
+
+Also answered from the same ledgers: yuppler's flag-3 refusals are three teleport cant_do (the map-receipt race fixed in 67874922, awaiting the fleet restart); the TESLA episode was the consent doctrine working — yuppler teleported six tiles off and HELLO'd, acquisition held at `human_not_consented`, TESLA then consented (engaged) and artax fought; arterial and despair only ever saw TESLA through `stale_map_data`. Fleet targeting is focus-fire by design: a sibling's locked target ranks first within a tier, everything else spreads by distance.
