@@ -3,14 +3,14 @@
   "files": [
     {
       "name": "rw-payload.tar",
-      "sha256": "462e7050fbf34677460786fa6f91df32f502d3f0c2585980723daf36a8d5e955",
-      "size_bytes": 2252800
+      "sha256": "66adcd5724eeb0d05ee28ed1e45ec614e77368c1c28b3141c90340034d9e506d",
+      "size_bytes": 2273280
     }
   ],
   "provenance": {
-    "git_commit": "4492e4dc6297eaeef9ae8be9b9b7bcbbac76f196",
+    "git_commit": "3db2f1557a00e0252b069bb6e65e85a7cf99071b",
     "carries": "scripts, doctrines, sweeps, agent/build/rw-agent.jar, wiki/sources/m0-probe/printunits.log, wiki/sources/m11-pools/type-flags.ndjson",
-    "tree_sha256": "f0a335ab5c1928fa74590db8776b8cf9b341a1a159bcc2bd279053a19ccc911f",
+    "tree_sha256": "76e0f3fda94d9dea5bc05f6a16961d2fd8fa0af2cc007a9c8323d8eeae6d1c4e",
     "entries": "410",
     "agent_bytecode": "java 8 (class 52), the Linux depot JRE ceiling",
     "described_by": "provenance/payload-tree.json"

@@ -1,5 +1,5 @@
 {
-  "git_commit": "4492e4dc6297eaeef9ae8be9b9b7bcbbac76f196",
+  "git_commit": "3db2f1557a00e0252b069bb6e65e85a7cf99071b",
   "carries": [
     "scripts",
     "doctrines",
@@ -621,7 +621,7 @@
     },
     {
       "path": "rw-agent.jar",
-      "sha256": "935c8130bda95e85457298dd727c50b05879646d0ce95cc66a3431737136621d",
+      "sha256": "072c67da5fbb0e143e59f4e48bc1b548f00d0f5c2e64f674db9c78ef713a63f2",
       "size_bytes": 135385
     },
     {
@@ -1036,8 +1036,8 @@
     },
     {
       "path": "src/rw_bot/policy/build_order.py",
-      "sha256": "17dda85716c04dc2bbe63ad0cf9d151446ce29a79abbfab2bcb566d96d54050e",
-      "size_bytes": 22717
+      "sha256": "2f0f406ee5f5993fa311b50ecebcba711080b375e365f8b4b87bfa04887a8355",
+      "size_bytes": 24973
     },
     {
       "path": "src/rw_bot/policy/campaign.py",
@@ -1106,8 +1106,8 @@
     },
     {
       "path": "src/rw_bot/policy/economy.py",
-      "sha256": "b834abea6c7f54298db20842a20be235a76e8928841b8c1737371e6a3a2ab24a",
-      "size_bytes": 22353
+      "sha256": "8b85578c82b2ac3b60aacd50c32d5f6ae0b6007208251f6214efd966cb1a5517",
+      "size_bytes": 23379
     },
     {
       "path": "src/rw_bot/policy/expand.py",
@@ -1116,8 +1116,8 @@
     },
     {
       "path": "src/rw_bot/policy/expander.py",
-      "sha256": "edc8c25453fdb49a09a734f4ee53830f5fd37f1818666e687002f35ea006f4df",
-      "size_bytes": 30702
+      "sha256": "fa889e1ab206c54311df18c25b615d46fe56ab2bd2d4aa412e0b6f2e4f74a30e",
+      "size_bytes": 30836
     },
     {
       "path": "src/rw_bot/policy/field.py",
@@ -1161,8 +1161,8 @@
     },
     {
       "path": "src/rw_bot/policy/nuker.py",
-      "sha256": "e75bfa4a3e2b3077c057646fc74d4eaf53fcba5a17a821a03b0652be1a3e068c",
-      "size_bytes": 14338
+      "sha256": "f6ca869a0f55aee3491662a464597a15638d745946107950d9e6d7119c9a36c4",
+      "size_bytes": 14367
     },
     {
       "path": "src/rw_bot/policy/observation.py",
@@ -1196,8 +1196,8 @@
     },
     {
       "path": "src/rw_bot/policy/runner.py",
-      "sha256": "76c4246b2a6ca5fac4e171fcdfd53c49a61982f06b138275ef464c04cf10af98",
-      "size_bytes": 15441
+      "sha256": "3411eb7be9bb7af94be12992e101b2c95620332c1ce882084c09b0846c78e817",
+      "size_bytes": 19753
     },
     {
       "path": "src/rw_bot/policy/rush.py",
@@ -1221,8 +1221,8 @@
     },
     {
       "path": "src/rw_bot/policy/siting.py",
-      "sha256": "628cce26ccb6742e28ee772939fe94f7f6b858bff8425d3edcb620e7e8e8d8dd",
-      "size_bytes": 21031
+      "sha256": "3ab2d519c9647cc7c21e335f1c1515e5b3aa7dacca9a093d98c04200c11ef02e",
+      "size_bytes": 24555
     },
     {
       "path": "src/rw_bot/policy/situation.py",
@@ -1231,8 +1231,8 @@
     },
     {
       "path": "src/rw_bot/policy/spending.py",
-      "sha256": "5f854586b24306368660c22560114b9da8620a7103c0f5f9695be86a6c747480",
-      "size_bytes": 25156
+      "sha256": "938aa86d0f4a8a630e488c166495ae303cc69288f8e26c53966171738fbe480e",
+      "size_bytes": 25448
     },
     {
       "path": "src/rw_bot/policy/threat.py",
@@ -1251,8 +1251,8 @@
     },
     {
       "path": "src/rw_bot/policy/workforce.py",
-      "sha256": "bc1e809e9e78e16936825e0fccec6e6fb8eeb5b5a7cf3e4a4718bd7d973f5a3c",
-      "size_bytes": 11878
+      "sha256": "0537c971bd31e93cfec42b63e3e8effd33b89ffa2ce86a888c413623a086b3c2",
+      "size_bytes": 13090
     },
     {
       "path": "src/rw_bot/provenance.py",
@@ -2060,8 +2060,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "f0a335ab5c1928fa74590db8776b8cf9b341a1a159bcc2bd279053a19ccc911f",
+  "tree_sha256": "76e0f3fda94d9dea5bc05f6a16961d2fd8fa0af2cc007a9c8323d8eeae6d1c4e",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "462e7050fbf34677460786fa6f91df32f502d3f0c2585980723daf36a8d5e955",
-  "archive_size_bytes": 2252800
+  "archive_sha256": "66adcd5724eeb0d05ee28ed1e45ec614e77368c1c28b3141c90340034d9e506d",
+  "archive_size_bytes": 2273280
 }
