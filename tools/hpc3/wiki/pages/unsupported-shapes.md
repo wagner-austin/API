@@ -9,20 +9,17 @@ confidence: high
 
 # What this package cannot submit, as decisions rather than discoveries
 
-`JobSpec` describes **one single-node job**, with GPUs or without. Everything
-below is not a missing flag but a shape the contract cannot express.
+`JobSpec` describes **one single-node job**, with GPUs or without. The
+current table of inexpressible shapes — multi-node/MPI, job arrays, explicit
+`--qos`, `--constraint`/`--exclusive` — lives in the README's
+"What this cannot submit" section, where a test (`test_examples.py`) holds it
+present and holds lifted limits OUT of it; this page carries the reasoning
+and the history the table cannot.
 
-| shape | status | what it blocks |
-| --- | --- | --- |
-| **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
-| **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
-| **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
-| **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
-
-None of these are hard to add, and the cluster-facts layer already carries
-what the checks would need. They are absent because they were never built, not
-because they were judged wrong — recorded so the gap is a decision rather than
-a discovery.
+None of the absent shapes are hard to add, and the cluster-facts layer
+already carries what the checks would need. They are absent because they were
+never built, not because they were judged wrong — recorded so the gap is a
+decision rather than a discovery.
 
 ## Two things left this list
 

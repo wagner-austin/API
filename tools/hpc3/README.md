@@ -78,6 +78,159 @@ sweep document as a campaign
 
 ---
 
+## Documents by example
+
+Every block below is tested against the real decoders, so what is documented
+is what decodes (`test_examples.py`). The reasoning behind each shape lives in
+the wiki page linked above it.
+
+A full workspace — two projects, one GPU and one CPU:
+
+```json
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "abl": {
+      "partition": "free-gpu",
+      "gpu": { "model": "A100", "count": 1 },
+      "cpus": 8,
+      "mem_gb": 96,
+      "minutes": 720,
+      "requeue": true,
+      "checkpoint_steps": 500,
+      "image": {
+        "path": "/pub/wagnera3/images/v20/abl.sif",
+        "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
+        "binds": ["/pub/wagnera3"]
+      },
+      "env_path": "/opt/env",
+      "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
+      "deterministic": true,
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
+      "repo": "../../.."
+    },
+    "sirius": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 16,
+      "mem_gb": 64,
+      "minutes": 360,
+      "requeue": true,
+      "checkpoint_steps": 1,
+      "env_path": "/pub/wagnera3/envs/sirius",
+      "pinned_packages": {},
+      "deterministic": false,
+      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
+      "repo": "../../../../metabolomics-dashboard"
+    }
+  }
+}
+```
+
+Adding a project is one entry in `projects` — this fragment pastes in whole
+([image build flow](wiki/pages/image-build-flow.md) for why the GPU entry
+carries an image):
+
+```json
+"turkic-lstm": {
+  "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
+  "cpus": 4, "mem_gb": 32, "minutes": 240,
+  "requeue": true, "checkpoint_steps": 200,
+  "image": {
+    "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
+    "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
+    "binds": ["/pub/wagnera3"]
+  },
+  "env_path": "/opt/env",
+  "pinned_packages": { "torch": "2.6.0+cu124", "numpy": "2.3.5" },
+  "deterministic": false,
+  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
+  "repo": "../../../../LSTM"
+}
+```
+
+A run — only what is specific to it, with the required `experiment` block
+([run documents](wiki/pages/run-documents.md)):
+
+```json
+{
+  "project": "abl",
+  "name": "armB-s42",
+  "command": "python -u train.py --arm B --seed 42",
+  "experiment": { "arm": "B", "seed": "42", "base_model": "gpt2", "corpus": "armB.txt" }
+}
+```
+
+A run that overrides project defaults — the merged result goes through the
+same decoder:
+
+```json
+{
+  "project": "abl", "name": "armC-full", "command": "python -u train.py --arm C",
+  "minutes": 900, "checkpoint_steps": 250
+}
+```
+
+A sweep — each member declares its own `artifact`
+([sweeps and artifacts](wiki/pages/sweeps-and-artifacts.md)):
+
+```json
+{
+  "project": "abl", "name": "rung-large",
+  "minutes": 900, "checkpoint_steps": 250,
+  "members": [
+    { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0 --out /pub/wagnera3/abl/s0.json",
+      "artifact": "/pub/wagnera3/abl/s0.json" },
+    { "suffix": "armB-s1", "command": "python -u train.py --arm B --seed 1 --out /pub/wagnera3/abl/s1.json",
+      "artifact": "/pub/wagnera3/abl/s1.json" }
+  ]
+}
+```
+
+A stage manifest with its required provenance block
+([staging identity](wiki/pages/staging-identity.md)):
+
+```json
+{
+  "destination": "/pub/wagnera3/abl/corpora",
+  "files": [{ "name": "armB.txt", "sha256": "…", "size_bytes": 41943040 }],
+  "provenance": {
+    "wiki_commit": "176bb8c",
+    "emitter": "extraction-eval/emit_corpus.py",
+    "emitter_flags": "--seed 0 --dilution oscar_en.txt --dilution-ratio 7.0"
+  }
+}
+```
+
+A chain — stages in order, each waiting on the last
+([chains](wiki/pages/chains.md)):
+
+```json
+{
+  "project": "sirius", "name": "batch7",
+  "experiment": { "sample_set": "batch7" },
+  "stages": [
+    { "suffix": "sirius", "command": "sirius ... formula", "cpus": 16, "minutes": 360 },
+    { "suffix": "zodiac", "command": "sirius ... zodiac", "cpus": 32, "mem_gb": 128 }
+  ]
+}
+```
+
+A run chained onto a job already queued — `depends_on` is run-level, never a
+project default:
+
+```json
+{ "project": "abl", "name": "eval", "command": "...",
+  "experiment": { "of": "55519937" },
+  "depends_on": { "kind": "afterok", "job_ids": ["55519937"] } }
+```
+
+---
+
 ## Partitions
 
 Measured on UCI HPC3 (GPU partitions 2026-08-22, CPU 2026-08-23):
@@ -96,8 +249,22 @@ billing was actually measured, why there is no `accept_billing` flag, and
 which partitions are excluded outright:
 [partitions and billing](wiki/pages/partitions-and-billing.md).
 
-What the contract deliberately cannot express (multi-node, arrays, `--qos`,
-`--constraint`): [unsupported shapes](wiki/pages/unsupported-shapes.md).
+## What this cannot submit
+
+`JobSpec` describes **one single-node job**, with GPUs or without. Everything
+below is not a missing flag but a shape the contract cannot express.
+
+| shape | status | what it blocks |
+| --- | --- | --- |
+| **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
+| **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
+| **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
+| **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
+
+None of these are hard to add; they are absent because they were never built,
+not because they were judged wrong. The two shapes that LEFT this list — job
+dependencies and CPU-only — and the JVM-project caveat are in
+[unsupported shapes](wiki/pages/unsupported-shapes.md).
 
 ---
 
