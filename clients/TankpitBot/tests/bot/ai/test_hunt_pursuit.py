@@ -358,6 +358,58 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
+def test_pursuit_tick_diverts_to_a_visible_bot_finisher_in_a_bot_fight() -> None:
+    """The firefight doctrine survives the human-fight discipline.
+
+    A BOT lock's pursuit tick with a dying bot in view still diverts
+    (the 2026-08-14 doctrine); only a HUMAN lock bars bot diverts.
+    Pins ``pursuit_fire``'s opportunity return, whose old cover the
+    discipline gate re-routed.
+    """
+    ws = WorldService()
+    finisher = make_tank_state(
+        tank_id=60,
+        x=100,
+        y=103,
+        team=2,
+        rank=1,
+        name="red-2",
+        is_self=False,
+        is_bot=True,
+        damage_state=1,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        last_viewport_observation_ms=100000,
+    )
+    tanks: dict[str, TankStateDict] = {
+        "50": make_pursuit_target(x=150, y=150),
+        "60": finisher,
+    }
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ENGAGE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+            "last_shot_target_id": 50,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "", ws=ws)
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["behavior"]["reason_kind"] == "opportunity_shot"
+    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["command"]["target_id"] == 60
+    # The pursuit lock survives the divert.
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
 class TestMapReplacedInWindowTarget:
     """A map-fresh position inside the window is engaged, never re-chased.
 

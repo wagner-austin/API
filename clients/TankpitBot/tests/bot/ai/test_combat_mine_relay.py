@@ -27,6 +27,7 @@ class TestCombatCorridorMineGuard:
     def _corridor_ctx(
         *,
         corked: bool,
+        mined: bool = True,
         ai_state: AIStateDict | None = None,
     ) -> DecideCtx:
         """Enemy 3 east, hostile mine at (101,100), composed terrain.
@@ -54,8 +55,11 @@ class TestCombatCorridorMineGuard:
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
-        # make_world's self is team 1, so a team-2 mine is hostile.
-        world["mines"]["101,100"] = make_mine_state(x=101, y=100, mine_type=0, tank_id=-1, team=2)
+        if mined:
+            # make_world's self is team 1, so a team-2 mine is hostile.
+            world["mines"]["101,100"] = make_mine_state(
+                x=101, y=100, mine_type=0, tank_id=-1, team=2
+            )
         # The rock at (102,100) blocks the dual line to the enemy so
         # the tick reaches the CLOSE branch instead of shooting them.
         rocks: dict[tuple[int, int], str] = {(102, 100): InMemoryTerrainMap.ROCK}
@@ -115,6 +119,22 @@ class TestCombatCorridorMineGuard:
         assert result["updated_ai_state"]["combat_target_id"] == 50
         assert result["updated_ai_state"]["mine_clearance_aim_key"] == "101,100"
         assert result["updated_ai_state"]["mine_clearance_shot_ms"] == 100000
+
+    def test_rock_corked_corridor_with_no_mine_falls_to_the_teleport(self) -> None:
+        """A corridor corked by rock alone has nothing to shoot: teleport.
+
+        The walk is refused, the corridor scan finds no hostile mine
+        to drain, and the close falls through to the teleport landing
+        — the no-clearance return the mine-pin fixtures re-routed the
+        old cover away from.
+        """
+        ctx = self._corridor_ctx(corked=True, mined=False)
+
+        result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
+
+        if result is None:
+            raise AssertionError("expected the teleport close fall-through")
+        assert result["command"]["cmd_type"] == "teleport"
 
     def test_pending_clearance_single_is_never_superseded(self) -> None:
         """While the single serves, the tick must not re-aim the tile.
