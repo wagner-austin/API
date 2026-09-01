@@ -6,6 +6,7 @@ minimums, the human-combat lock, and the resume permission.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.mode_controller import (
     apply_dispatch_counters,
     derive_hunt_mode_state,
@@ -314,3 +315,89 @@ class TestGathererRoleGate:
             ws=ctx.ws,
         )
         assert hunt_entry_permitted(gatherer_ctx) is False
+
+
+class TestWartimeReadinessFloor:
+    """The 80%/50% wartime bar (operator ruling 2026-09-01).
+
+    The yuppler/TESLA case ("he shouldve engaged the person but he
+    kept just farming radars"): while a consented human is alive on
+    the map, HUNT entry needs 80% of the weapon caps and half the
+    radar cap instead of the full peacetime bar. Fuel stays governed
+    by ``should_enter_hunt`` unchanged.
+    """
+
+    def _war_ctx(
+        self,
+        *,
+        dual_count: int,
+        radar_count: int,
+        consented: bool = True,
+        human_alive: bool = True,
+    ) -> DecideCtx:
+        """A rank-2 ctx (caps 30) with one enemy human plus arm-coverage tanks."""
+        from tankpit_bot.sniffer.world_service import WorldService
+        from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
+        from tests.bot.ai._threat_fixtures import _tank
+
+        ws = WorldService()
+        tanks = {
+            # Every skip arm of human_war_is_live gets a resident:
+            "1": _tank("1", x=100, y=100, team=0, is_self=True),
+            "2": _tank("2", x=101, y=101, team=0, name="AllyHuman", is_bot=False),
+            "3": _tank("3", x=102, y=102, team=2, name="Corpse", liveness="deactivated"),
+            "4": _tank("4", x=103, y=103, team=2, name="red-4"),
+            "5": _tank("5", x=104, y=104, team=2, name="Silent"),
+            "60": _tank(
+                "60",
+                x=110,
+                y=100,
+                team=2,
+                name="TESLA",
+                is_bot=False,
+                liveness="alive" if human_alive else "deactivated",
+            ),
+        }
+        world, self_state = make_world(fuel=1200, tanks=tanks)
+        if consented:
+            ws.fleet_consented_tank_ids = {60}
+        inventory = make_inventory(default_count=30, dual_count=dual_count)
+        inventory["homing_shots"]["count"] = dual_count
+        inventory["extra_radars"]["count"] = radar_count
+        return DecideCtx(
+            world, self_state, make_scanned_ai_state(), inventory, 100000, None, "", ws=ws
+        )
+
+    def test_war_floor_admits_the_eighty_fifty_bot(self) -> None:
+        """24/30 weapons and 15/30 radars clear the wartime bar."""
+        from tankpit_bot.bot.ai.mode_gates import human_war_is_live, hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15)
+
+        assert human_war_is_live(ctx) is True
+        assert hunt_entry_permitted(ctx) is True
+
+    def test_war_floor_still_bars_below_eighty_percent(self) -> None:
+        """23/30 weapons is under the 80% floor even at wartime."""
+        from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+
+        assert hunt_entry_permitted(self._war_ctx(dual_count=23, radar_count=15)) is False
+        assert hunt_entry_permitted(self._war_ctx(dual_count=24, radar_count=14)) is False
+
+    def test_unconsented_human_keeps_the_peacetime_bar(self) -> None:
+        """No consent, no war: 24/30 fails the full peacetime bar."""
+        from tankpit_bot.bot.ai.mode_gates import human_war_is_live, hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15, consented=False)
+
+        assert human_war_is_live(ctx) is False
+        assert hunt_entry_permitted(ctx) is False
+
+    def test_dead_consented_human_ends_the_war(self) -> None:
+        """A deactivated human is not a live war: peacetime bar returns."""
+        from tankpit_bot.bot.ai.mode_gates import human_war_is_live, hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15, human_alive=False)
+
+        assert human_war_is_live(ctx) is False
+        assert hunt_entry_permitted(ctx) is False

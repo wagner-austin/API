@@ -138,6 +138,22 @@ class TestDispatchCommand:
         assert result is False
         assert [e for e in bot.world.fuel_book["entries"] if e["kind"] == "mine_press"] == []
 
+    def test_teleport_send_failure_books_nothing(self, fake_env: FakeEnv) -> None:
+        """A wire-refused teleport bills no fuel and records no dispatch.
+
+        The map is certified (overlay + receipt) but the CDP session is
+        gone, so ``teleport_to`` reports False — the arc the map-receipt
+        gate re-routed the old cover away from.
+        """
+        bot, _fake_cdp = _make_bot(fake_env)
+        bot.world.last_wire_command_name = "map_open"
+        bot._cdp = None
+        result = dispatch_command(
+            bot, make_teleport_command(120, 120), _make_snapshot(map_visible=True)
+        )
+        assert result is False
+        assert [e for e in bot.world.fuel_book["entries"] if e["kind"] == "teleport"] == []
+
     def test_dispatch_map_open(self, fake_env: FakeEnv) -> None:
         """Dispatches map_open command via bot.open_map."""
         bot, fake_cdp = _make_bot(fake_env)

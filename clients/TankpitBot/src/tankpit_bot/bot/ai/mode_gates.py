@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.tactics import combat_radar_min
+from tankpit_bot.bot.ai.threat_primitives import human_combat_consented
 from tankpit_bot.bot.config import resolve_weapon_resume_slack
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.naming import is_human_name
@@ -224,6 +225,36 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
 
 
+def human_war_is_live(ctx: DecideCtx) -> bool:
+    """Return True while a consented enemy human is alive on the map.
+
+    The wartime signal (operator ruling 2026-09-01, the yuppler/TESLA
+    case: "he shouldve engaged the person but he kept just farming
+    radars"): consent is fleet-shared and session-persistent, so the
+    war is LIVE only while some consented human still stands in the
+    registry as an alive enemy — a consented human who left the game
+    is 0x58-removed or flips liveness, and peacetime restocking
+    resumes.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when any alive enemy tank is human-classified and has
+        consented (chat, shot us, or a sibling's shared consent).
+    """
+    for tank in ctx.filtered["tanks"].values():
+        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
+            continue
+        if tank["liveness"] != "alive":
+            continue
+        if not is_human_name(tank["name"]):
+            continue
+        if human_combat_consented(ctx.ws, tank["tank_id"]):
+            return True
+    return False
+
+
 def hunt_entry_permitted(ctx: DecideCtx) -> bool:
     """Return True when the bot's inventory permits entering HUNT.
 
@@ -264,6 +295,23 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
         return False
     rank = ctx.self_state["rank"]
     cap = inventory_capacity(rank)
+    if human_war_is_live(ctx):
+        # The wartime floor (operator ruling 2026-09-01, verbatim:
+        # "like 80% equipment and 50% radar?"): while a consented
+        # human fight is live anywhere on the map, a bot at 80% of
+        # its weapon caps and half its radar cap joining NOW is worth
+        # more than a full one joining after the human has killed
+        # someone or left. The full bar below stays the peacetime
+        # law for routine bot-farming, and the fuel bar in
+        # should_enter_hunt is untouched — fuel is health and tops
+        # up in a pickup or two.
+        war_weapon_floor = (cap * 4) // 5
+        war_radar_floor = cap // 2
+        return (
+            ctx.inventory["dual_shots"]["count"] >= war_weapon_floor
+            and ctx.inventory["homing_shots"]["count"] >= war_weapon_floor
+            and ctx.inventory["extra_radars"]["count"] >= war_radar_floor
+        )
     weapon_floor = max(0, cap - resolve_weapon_resume_slack())
     radar_floor = combat_radar_min(rank)
     return (
@@ -296,6 +344,7 @@ __all__ = [
     "held_human_combat_lock",
     "human_fight_resume_fuel_floor",
     "human_fight_resume_permitted",
+    "human_war_is_live",
     "hunt_entry_permitted",
     "hunt_fuel_floor",
     "should_enter_collect",
