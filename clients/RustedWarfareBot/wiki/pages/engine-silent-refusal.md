@@ -54,6 +54,12 @@ The refusal record travels in the world sample ([[wire-contract-ndjson]]) and do
 
 The site chooser reads the same ledger, so the retry goes to the next ring site. End to end: order, silent drop, report, retry elsewhere — three samples.
 
+## Verified live, deterministically
+
+`scripts/refusal_probe.py` fires the chain on demand: it orders a landFactory onto the player's own command centre — the one site the blocked-pair test can never pass, whatever the map or seed — and waits for the report. Against the real engine (duel_lake, seed 12345, lockstep 75, pinned+ff10) the record arrived two samples after the order, with the engine's own log carrying **zero** messages about it: `frame 150: engine refused landFactory at (990.0, 2010.0) for unit 24`.[^6] Run it as the play harness's module: `python -m rw_bot.harness.play_match_cli ... --module scripts.refusal_probe --play-args " "`.
+
+[^6]: `runs/refusal-probe.log` (2026-09-01 run, regenerable by the invocation above) — the agent's dispatch line `channel: build landFactory by 24 at (990.0, 2010.0)` is followed by no validator or engine message; the probe's stdout carried the refusal record the same run.
+
 [^1]: `wiki/sources/m31-refusal/construction-attempt-blocked.txt:1` — `public z a(au au2, as as2, int n2, float f2, float f3) {`. Excerpted from decompiled `runs/decompiled/com/corrodinggames/rts/game/units/y.java:4855` (gitignored; regenerate with `make decompile`).
 [^2]: `wiki/sources/m31-refusal/construction-attempt-blocked.txt:15-30` — the pair `a((am)object, null)` / `a(true, null)` sets `bl2`, then `am3.a();` destroys the ghost and `z2.b = y2;` carries only the blocking unit; no logging call appears in the arm (decompiled y.java:4909-4934).
 [^3]: `wiki/sources/m31-refusal/waypoint-removed-silently.txt:30-32` — `if (!z2.c) { this.ay(); }` after `z2 = this.a(au2, au2.b, au2.d, au2.e, au2.f)` at `:2` (decompiled y.java:1630-1632).
