@@ -407,6 +407,9 @@ final class MatchSetup {
         if (seed != 0) {
             AiTimers.reset();
         }
+        // A previous match's watched orders are not this match's; the sweep
+        // would read them against a world that never dispatched them.
+        BuildWatch.reset();
         // Marked live BEFORE the hold, deliberately: holdNow blocks until
         // the planner connects, and under a full parallel panel that wait
         // can legitimately outlast the wrong-world deadline -- measured on

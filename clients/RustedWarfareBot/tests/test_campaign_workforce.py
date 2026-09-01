@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.policy.campaign import play
-from rw_bot.policy.workforce import EXPAND_RETRY_SAMPLES
+from rw_bot.policy.workforce import EXPAND_RETRY_SAMPLES, Workforce
+from rw_bot.wire.state import Refusal
 from tests.campaign_fixtures import (
     BUILDER,
     CATALOGUE,
@@ -366,10 +367,13 @@ def test_the_plan_gets_the_next_free_worker_ahead_of_the_economy() -> None:
     # worker is busy, the plan waits for it and the economy -- a free pool and
     # 4,000 credits in hand -- buys NOTHING rather than the plan's worker.
     # Once the worker frees, it goes to the plan's factory, not to the
-    # economy's pool.
-    assert len(builds) == 2
+    # economy's pool. The factory never rises in this scripted world, so the
+    # presumed-lost clock ledgers its site, the slot reopens, and the retry
+    # goes to the NEXT ring site -- the recovery this whole chain exists for.
+    assert len(builds) == 3
     assert '"type":"extractorT1"' in builds[0]
     assert '"type":"landFactory"' in builds[1]
+    assert builds[2] == '{"kind":"build","unit_id":214,"x":-200.0,"y":120.0,"type":"landFactory"}'
     stages = [row["stage"] for row in report["reaches"]]
     assert "plan-first-in-line" in stages
 
@@ -512,3 +516,45 @@ def test_an_unrelated_structure_does_not_count_as_a_workers_job() -> None:
     # so the second observation still finds it free -- and the site it was sent
     # to is unchanged, which is what the repeat guard suppresses.
     assert len(verb(peer, "build")) == 1
+
+
+def test_a_reported_refusal_lands_in_the_ledger_once() -> None:
+    """The agent's watch is the ledger's second writer, and the fast one.
+
+    The presumed-lost clock may later write the same site -- both observe the
+    same fact by different means -- so a repeat within the shared tolerance is
+    already recorded, not a second entry. Two entries would make the chooser's
+    exhaustion count lie about how many sites the engine actually refused.
+    """
+    workforce = Workforce(EXPAND_RETRY_SAMPLES)
+    workforce.record_refusal((420.0, 130.0))
+    workforce.record_refusal((420.5, 130.5))
+    workforce.record_refusal((900.0, 130.0))
+    assert workforce.refused() == ((420.0, 130.0), (900.0, 130.0))
+
+
+def test_a_wire_reported_refusal_frees_the_worker_and_moves_the_order() -> None:
+    """The whole fast path, end to end: report, ledger, release, retry.
+
+    The agent's watch says the engine dropped the factory's waypoint one
+    sample after the order left. That single report must do three things on
+    the tick it lands -- enter the ledger, reopen the plan's slot, and free
+    the worker standing on the dead job -- or the retry waits out the
+    45-sample presumed-lost clock the report exists to beat. The next order
+    goes to the next ring site, because the chooser reads the same ledger.
+    """
+    opts = (option(214, "landFactory", placed=True),)
+    calm = sample(CENTRE, BUILDER, credits=4000, options=opts)
+    told = sample(
+        CENTRE,
+        BUILDER,
+        credits=4000,
+        options=opts,
+        refusals=(Refusal(unit_id=214, type_name="landFactory", x=200.0, y=120.0),),
+    )
+    peer = ScriptedPeer(lines(calm, told, calm, calm))
+    play(AgentChannel(peer), ("landFactory",), CATALOGUE, PLACEMENTS, PROFILES, 4)
+    assert verb(peer, "build") == [
+        '{"kind":"build","unit_id":214,"x":200.0,"y":120.0,"type":"landFactory"}',
+        '{"kind":"build","unit_id":214,"x":-200.0,"y":120.0,"type":"landFactory"}',
+    ]

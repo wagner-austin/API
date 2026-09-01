@@ -296,6 +296,12 @@ def play(
         # lockstep the agent holds the simulation until this arrives
         # ([[policy-determinism]]).
         try:
+            # The engine's refusals land in the ledger before anything
+            # decides: a refusal reported in THIS sample must already be
+            # excluded by this sample's site choices, or the tick spends an
+            # order on a site the engine just declined.
+            for refusal in sample["refusals"]:
+                workforce.record_refusal((refusal["x"], refusal["y"]))
             army = find_army(sample, catalogue, profiles)
             if scout or lurk or decoys:
                 # The scout is eyes, the lurker a leash, the decoy a ticket

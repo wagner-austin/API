@@ -32,6 +32,7 @@ def _sample(*, defeated: bool = False, wiped: bool = False, players_left: int = 
         pools=(),
         players=(),
         options=(),
+        refusals=(),
     )
 
 

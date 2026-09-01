@@ -87,7 +87,7 @@ def sample_lines(
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
         f'"visible":{len(entities)},"pools":{len(pools)},'
-        f'"options":{len(options)},"players":0,'
+        f'"options":{len(options)},"players":0,"refused":0,'
         f'"credits":{credits},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name) in enumerate(entities):

@@ -51,6 +51,7 @@ def _sample(*entities: Entity) -> Sample:
         pools=(),
         players=(),
         options=(),
+        refusals=(),
     )
 
 

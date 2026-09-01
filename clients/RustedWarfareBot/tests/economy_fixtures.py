@@ -143,6 +143,7 @@ def sample(
         pools=pools,
         players=(),
         options=options,
+        refusals=(),
     )
 
 

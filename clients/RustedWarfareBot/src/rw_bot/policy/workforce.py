@@ -13,7 +13,7 @@ from collections.abc import Sequence
 
 from rw_bot.policy.build_order import BUILDER_TYPE
 from rw_bot.policy.observation import has_moved
-from rw_bot.policy.siting import RING_SLOT_RADIUS
+from rw_bot.policy.siting import RING_SLOT_RADIUS, is_refused
 from rw_bot.wire.state import Entity, Sample
 
 #: World-unit radius within which a rising structure counts as a worker's job.
@@ -163,6 +163,23 @@ class Workforce:
         """
         return tuple(site for _, site in self._job.values())
 
+    def record_refusal(self, site: tuple[float, float]) -> None:
+        """Record a site the engine refused, reported by the agent's watch.
+
+        The second writer to the ledger, and the fast one: the agent watches
+        every dispatched build order and reports the engine dropping its
+        waypoint the sample after it happens, where the presumed-lost clock
+        in :meth:`free` needs the whole retry window of silence. Both feed
+        the same ledger because both observe the same fact by different
+        means; the slow clock stays as the fallback for whatever the watch
+        cannot see.
+
+        Args:
+            site: The refused placement, as ordered.
+        """
+        if not is_refused(site, self._refused):
+            self._refused.append(site)
+
     def refused(self) -> tuple[tuple[float, float], ...]:
         """Return the sites the engine has silently refused this match.
 
@@ -217,6 +234,15 @@ class Workforce:
             return False
         job = self._job.get(unit_id)
         if job is None:
+            return True
+        # A job whose site the ledger already carries is over: the agent's
+        # watch reported the engine dropping the order, so there is nothing
+        # at the site to rise and no reason to spend the retry window below
+        # confirming silence. The entry is already written -- this only frees
+        # the worker, the same tick the report lands.
+        if is_refused(job[1], self._refused):
+            del self._job[unit_id]
+            self._quiet[unit_id] = 0
             return True
         # **A finished job frees its worker on the tick it finishes.** The
         # freeing used to happen only through the quiet window below, which

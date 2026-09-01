@@ -23,7 +23,7 @@ final class WireChecks {
     static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 6, 4000, false, false, 6);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 6, 1, 4000, false, false, 6);
         // Pinned byte-for-byte on purpose. This is a wire contract, and the
         // consumer parses it strictly, so a field appearing, vanishing or being
         // renamed must fail here rather than at the far end of a socket. That
@@ -33,9 +33,19 @@ final class WireChecks {
                 frame.equals(
                         "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
                                 + "\"visible\":3,\"pools\":2,\"options\":5,\"players\":6,"
-                                + "\"credits\":4000,"
+                                + "\"refused\":1,\"credits\":4000,"
                                 + "\"defeated\":false,\"wiped\":false,\"players_left\":6}"),
                 "frame record is exact");
+
+        String refusedLine =
+                StateStream.refusedRecord(
+                        1918, 0, new BuildWatch.Pending(214L, "landFactory", 4450.0f, 2730.0f, 1900));
+        failures += Check.expect(
+                refusedLine.equals(
+                        "{\"kind\":\"refused\",\"frame\":1918,\"index\":0,"
+                                + "\"unit_id\":214,\"type\":\"landFactory\","
+                                + "\"x\":4450.0,\"y\":2730.0}"),
+                "refused record is exact");
 
         // The scoreboard the engine keeps and the bot used to regress for.
         // Pinned byte-for-byte like every other record the consumer counts.
@@ -168,13 +178,13 @@ final class WireChecks {
                 "a record is exactly one object");
 
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"visible\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"pools\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"pools\":0"),
                 "a map with no pool in sight is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"options\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"options\":0"),
                 "a player who can make nothing is still a record");
         return failures;
     }

@@ -36,7 +36,18 @@ KIND_OPTION: Final = "option"
 KIND_PLAYER: Final = "player"
 """``kind`` value of a per-player scoreboard record inside a sample."""
 
-CHILD_COUNT_FIELDS: Final = ("visible", "pools", "options", "players")
+KIND_REFUSED: Final = "refused"
+"""``kind`` value of a refused-build record inside a sample.
+
+The engine refuses a blocked placement silently -- the waypoint is dropped
+after one in-range attempt and nothing at the shipped log level says so. The
+agent watches every dispatched build order and reports the engine's verdict
+here the sample after it becomes visible, so a refusal costs the planner one
+sample instead of a 45-sample quiet clock (wiki log 2026-08-31,
+verdict-withheld; 2026-09-01, the detection design).
+"""
+
+CHILD_COUNT_FIELDS: Final = ("visible", "pools", "options", "players", "refused")
 """Frame-record fields declaring how many child records follow.
 
 Declared once because two readers need the total and they must not disagree:
@@ -265,6 +276,22 @@ class PlayerStat(TypedDict):
     building_value: int
 
 
+class Refusal(TypedDict):
+    """One build order the engine refused silently, caught by the agent.
+
+    Attributes:
+        unit_id: The builder the refused order was addressed to.
+        type_name: What the order tried to place.
+        x: Placement world x the order asked for.
+        y: Placement world y the order asked for.
+    """
+
+    unit_id: int
+    type_name: str
+    x: float
+    y: float
+
+
 class Sample(TypedDict):
     """One coherent observation of the world.
 
@@ -287,6 +314,9 @@ class Sample(TypedDict):
             fog-filtered: these are the engine's own bookkeeping rather than
             anything observed, so an opponent's army value is known even when
             none of it is in sight.
+        refusals: Build orders the engine refused silently since the previous
+            sample, each reported once. The planner feeds every site straight
+            into the workforce's refusal ledger.
     """
 
     frame: int
@@ -299,3 +329,4 @@ class Sample(TypedDict):
     pools: tuple[ResourcePool, ...]
     options: tuple[BuildOption, ...]
     players: tuple[PlayerStat, ...]
+    refusals: tuple[Refusal, ...]

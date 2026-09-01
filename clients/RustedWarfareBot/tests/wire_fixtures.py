@@ -25,7 +25,7 @@ from rw_bot.control import _test_hooks
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.wire.codec import encode_sample
-from rw_bot.wire.state import BuildOption, Entity, PlayerStat, ResourcePool, Sample
+from rw_bot.wire.state import BuildOption, Entity, PlayerStat, Refusal, ResourcePool, Sample
 
 
 def entity(
@@ -350,6 +350,7 @@ def sample(
     pools: Sequence[ResourcePool] = (),
     options: Sequence[BuildOption] = (),
     players: Sequence[PlayerStat] = (),
+    refusals: Sequence[Refusal] = (),
 ) -> Sample:
     """Build one whole observation.
 
@@ -367,6 +368,7 @@ def sample(
         pools: Visible resource pools.
         options: What the player's units can make.
         players: Per-player scoreboards.
+        refusals: Build orders the engine refused since the previous sample.
 
     Returns:
         The sample.
@@ -382,6 +384,7 @@ def sample(
         pools=tuple(pools),
         options=tuple(options),
         players=tuple(players),
+        refusals=tuple(refusals),
     )
 
 

@@ -31,11 +31,11 @@ from rw_bot.wire.command import (
 from rw_bot.wire.posture import posture_order
 
 _FRAME_3 = (
-    '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,"players":0,'
+    '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,"players":0,"refused":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 _FRAME_1 = (
-    '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"pools":0,"options":0,"players":0,'
+    '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"pools":0,"options":0,"players":0,"refused":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 
@@ -169,7 +169,7 @@ def test_an_immediately_closed_stream_is_reported() -> None:
 
 def test_a_sample_declaring_no_entities_completes_on_its_frame_line() -> None:
     empty = (
-        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,'
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,"refused":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     assert AgentChannel(_ScriptedPeer([empty])).next_sample()["entities"] == ()
@@ -182,7 +182,7 @@ def test_successive_samples_are_read_in_order() -> None:
             '{"kind":"entity","frame":9,"index":0,"id":1,"type":"builder",'
             '"class":"u","x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
             '"hp":1.0,"max_hp":1.0,"complete":true,"queued":0,"damaged_by":""}',
-            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"options":0,"players":0,'
+            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"options":0,"players":0,"refused":0,'
             '"credits":4000,"defeated":false,"wiped":false,"players_left":6}',
         ]
     )

@@ -56,6 +56,7 @@ final class StateStream {
         java.util.List<Scoreboard.PlayerStat> players = Scoreboard.playerStats(engine);
         int frame = EngineAccess.readIntField(engine, FRAME_FIELD);
         int clock = EngineAccess.readIntField(engine, CLOCK_FIELD);
+        java.util.List<BuildWatch.Pending> refused = BuildWatch.sweep(engine, frame);
 
         out.append(
                         frameRecord(
@@ -65,6 +66,7 @@ final class StateStream {
                                 pools.size(),
                                 options.size(),
                                 players.size(),
+                                refused.size(),
                                 Scoreboard.creditsOf(engine),
                                 Scoreboard.isDefeated(engine),
                                 Scoreboard.isWipedOut(engine),
@@ -89,6 +91,37 @@ final class StateStream {
         for (int index = 0; index < players.size(); index++) {
             out.append(playerRecord(frame, index, players.get(index))).append('\n');
         }
+        for (int index = 0; index < refused.size(); index++) {
+            out.append(refusedRecord(frame, index, refused.get(index))).append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
+     * Renders one refused build order.
+     *
+     * <p>The engine's silent verdict, said out loud: this order's waypoint is
+     * gone and its structure never appeared ({@link BuildWatch}). The planner
+     * feeds the site straight into the refusal ledger, so a refusal costs one
+     * sample instead of the stall clock's forty-five.
+     */
+    static String refusedRecord(int frame, int index, BuildWatch.Pending order) {
+        StringBuilder out = new StringBuilder();
+        out.append('{');
+        appendString(out, "kind", "refused");
+        out.append(',');
+        appendInt(out, "frame", frame);
+        out.append(',');
+        appendInt(out, "index", index);
+        out.append(',');
+        appendLong(out, "unit_id", order.builderId);
+        out.append(',');
+        appendString(out, "type", order.typeName);
+        out.append(',');
+        appendFloat(out, "x", order.x);
+        out.append(',');
+        appendFloat(out, "y", order.y);
+        out.append('}');
         return out.toString();
     }
 
@@ -138,6 +171,7 @@ final class StateStream {
             int poolCount,
             int optionCount,
             int playerCount,
+            int refusedCount,
             int credits,
             boolean defeated,
             boolean wiped,
@@ -157,6 +191,8 @@ final class StateStream {
         appendInt(out, "options", optionCount);
         out.append(',');
         appendInt(out, "players", playerCount);
+        out.append(',');
+        appendInt(out, "refused", refusedCount);
         out.append(',');
         appendInt(out, "credits", credits);
         out.append(',');

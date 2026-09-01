@@ -43,9 +43,11 @@ from rw_bot.wire.state import (
     KIND_OPTION,
     KIND_PLAYER,
     KIND_POOL,
+    KIND_REFUSED,
     BuildOption,
     Entity,
     PlayerStat,
+    Refusal,
     ResourcePool,
     Sample,
 )
@@ -57,6 +59,7 @@ _FRAME_MISMATCH = "RW-WIRE-004"
 _POOL_COUNT_MISMATCH = "RW-WIRE-005"
 _OPTION_COUNT_MISMATCH = "RW-WIRE-006"
 _PLAYER_COUNT_MISMATCH = "RW-WIRE-007"
+_REFUSED_COUNT_MISMATCH = "RW-WIRE-008"
 
 
 class WireError(RwBotError):
@@ -152,6 +155,26 @@ def _decode_option(record: Mapping[str, str | int | float | bool]) -> BuildOptio
     )
 
 
+def _decode_refusal(record: Mapping[str, str | int | float | bool]) -> Refusal:
+    """Decode one refused-build record.
+
+    Args:
+        record: The record's fields.
+
+    Returns:
+        The refusal.
+
+    Raises:
+        DecodeError: When a field is absent or carries a wrong type.
+    """
+    return Refusal(
+        unit_id=require_int(record, "unit_id"),
+        type_name=require_non_empty_str(record, "type"),
+        x=require_finite_float(record, "x"),
+        y=require_finite_float(record, "y"),
+    )
+
+
 def _decode_player(record: Mapping[str, str | int | float | bool]) -> PlayerStat:
     """Decode one player-scoreboard record.
 
@@ -222,10 +245,12 @@ class _OpenSample:
         self._declared_pools = require_int(record, "pools")
         self._declared_options = require_int(record, "options")
         self._declared_players = require_int(record, "players")
+        self._declared_refusals = require_int(record, "refused")
         self.entities: list[Entity] = []
         self.pools: list[ResourcePool] = []
         self.options: list[BuildOption] = []
         self.players: list[PlayerStat] = []
+        self.refusals: list[Refusal] = []
 
     def add(self, kind: str, record: Mapping[str, str | int | float | bool]) -> None:
         """Decode one child record into this sample.
@@ -262,6 +287,8 @@ class _OpenSample:
             self.options.append(_decode_option(record))
         elif kind == KIND_PLAYER:
             self.players.append(_decode_player(record))
+        elif kind == KIND_REFUSED:
+            self.refusals.append(_decode_refusal(record))
         else:
             raise WireError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
 
@@ -288,6 +315,9 @@ class _OpenSample:
         self._require_count(
             len(self.players), self._declared_players, "players", _PLAYER_COUNT_MISMATCH
         )
+        self._require_count(
+            len(self.refusals), self._declared_refusals, "refused builds", _REFUSED_COUNT_MISMATCH
+        )
         return Sample(
             frame=self.frame,
             clock_ms=self.clock_ms,
@@ -299,6 +329,7 @@ class _OpenSample:
             pools=tuple(self.pools),
             options=tuple(self.options),
             players=tuple(self.players),
+            refusals=tuple(self.refusals),
         )
 
     def _require_count(self, carried: int, declared: int, what: str, code: str) -> None:
@@ -411,6 +442,7 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
         f'"pools":{len(sample["pools"])},"options":{len(sample["options"])},'
         f'"players":{len(sample["players"])},'
+        f'"refused":{len(sample["refusals"])},'
         f'"credits":{sample["credits"]},'
         f'"defeated":{str(sample["defeated"]).lower()},'
         f'"wiped":{str(sample["wiped"]).lower()},'
@@ -463,6 +495,13 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"income":{player["income"]},"army_value":{player["army_value"]},'
             f'"building_value":{player["building_value"]}}}'
         )
+    for index, refusal in enumerate(sample["refusals"]):
+        type_name = _escape(refusal["type_name"])
+        lines.append(
+            f'{{"kind":"{KIND_REFUSED}","frame":{frame},"index":{index},'
+            f'"unit_id":{refusal["unit_id"]},"type":"{type_name}",'
+            f'"x":{refusal["x"]!r},"y":{refusal["y"]!r}}}'
+        )
     return tuple(lines)
 
 
@@ -499,9 +538,11 @@ __all__ = [
     "KIND_OPTION",
     "KIND_PLAYER",
     "KIND_POOL",
+    "KIND_REFUSED",
     "BuildOption",
     "Entity",
     "PlayerStat",
+    "Refusal",
     "ResourcePool",
     "Sample",
     "WireError",

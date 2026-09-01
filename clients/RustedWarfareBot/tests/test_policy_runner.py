@@ -164,46 +164,44 @@ def test_a_quiet_build_waits_for_the_ledger_rather_than_stalling() -> None:
     assert outcomes == ["building"] * 6
 
 
-def test_a_refused_site_reopens_the_slot_for_the_next_one() -> None:
-    """The armyless-match fix: a refusal is the next ring slot, said loudly."""
+def test_a_refused_site_reopens_the_slot_the_tick_the_ledger_carries_it() -> None:
+    """The armyless-match fix, at its final speed: the agent's build watch
+    reports the engine dropping a waypoint one sample after it happens, so
+    the reopen must not wait out a quiet window on a verdict already in."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
     assert tracker.assess(_world(), _build(), False, ())["act"] is True
-    tracker.assess(_world(), _build(), False, ())
-    tracker.assess(_world(), _build(), False, ())
     step = tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
     assert step["act"] is False
     assert step["outcome"] == "building"
-    assert "refused silently" in step["reason"]
+    assert "refused by the engine" in step["reason"]
     assert "trying the next site" in step["reason"]
     # The slot is open again: the very next order for it is cleared to go.
     assert tracker.assess(_world(), _build(), False, ())["act"] is True
     assert tracker.orders_sent == 2
 
 
-def test_a_refusal_before_the_quiet_window_does_not_retry_early() -> None:
-    """The ledger alone is not enough; the quiet window still has to run out,
-    or a slow walk to a site that HAPPENS to sit near an old refusal would be
-    re-sited mid-journey."""
+def test_a_refusal_of_another_site_does_not_reopen_this_order() -> None:
+    """The gate judges the site THIS slot ordered. A ledger entry from some
+    other structure's refusal says nothing about an order still walking."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
-    step = tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
+    tracker.assess(_world(), _build(), False, ())
+    step = tracker.assess(_world(), _build(), False, ((900.0, 900.0),))
     assert step["outcome"] == "building"
     assert "trying the next site" not in step["reason"]
+    assert tracker.orders_sent == 1
 
 
-def test_the_stall_clock_restarts_on_visible_progress() -> None:
-    """A builder that moves again is an order back in flight, not a slow refusal."""
+def test_a_quiet_build_outlasts_the_window_because_the_verdict_is_explicit() -> None:
+    """The quiet clock no longer rules on builds at all: silence with no
+    ledger entry means no verdict yet -- the builder may be pathfinding
+    around the lake -- and the watch or the presumed-lost clock will write
+    the ledger when there is one. Movement neither helps nor harms."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
-    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
-    tracker.assess(_world(), _build(), True, ((10.0, 20.0),))
-    steps = [tracker.assess(_world(), _build(), False, ((10.0, 20.0),)) for _ in range(3)]
-    assert [step["outcome"] for step in steps] == ["building", "building", "building"]
-    # The movement bought the order a fresh window: the retry lands a full
-    # three quiet observations after it, not one.
-    assert "trying the next site" not in steps[0]["reason"]
-    assert "trying the next site" not in steps[1]["reason"]
-    assert "trying the next site" in steps[2]["reason"]
+    tracker.assess(_world(), _build(), False, ())
+    tracker.assess(_world(), _build(), True, ())
+    outcomes = [tracker.assess(_world(), _build(), False, ())["outcome"] for _ in range(8)]
+    assert outcomes == ["building"] * 8
+    assert tracker.orders_sent == 1
 
 
 def test_a_working_factory_is_not_stalled() -> None:

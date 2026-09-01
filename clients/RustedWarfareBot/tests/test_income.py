@@ -58,7 +58,7 @@ def _world(frame: int, clock_ms: int, credits_held: int, *, extractors: int = 0)
     options = [(214, "extractorT1")]
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{clock_ms},'
-        f'"visible":{len(roster)},"pools":1,"options":{len(options)},"players":0,'
+        f'"visible":{len(roster)},"pools":1,"options":{len(options)},"players":0,"refused":0,'
         f'"credits":{credits_held},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name, x) in enumerate(roster):

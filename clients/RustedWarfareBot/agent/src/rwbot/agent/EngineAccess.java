@@ -132,6 +132,23 @@ final class EngineAccess {
     }
 
     /**
+     * Reads a static object field through the same pinned-name machinery.
+     *
+     * @param owner Class declaring the field.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent.
+     */
+    static Object readStaticField(Class<?> owner, String name) {
+        try {
+            return pinnedField(owner, name).get(null);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read static " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
      * Reads a static {@code int} field through the same pinned-name machinery.
      *
      * @param owner Class declaring the field.

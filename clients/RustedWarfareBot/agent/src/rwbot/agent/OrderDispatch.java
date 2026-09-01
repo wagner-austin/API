@@ -126,6 +126,15 @@ final class OrderDispatch {
             return;
         }
         Orders.buildAt(engine, unit, command.buildType(), command.x(), command.y());
+        // Watched from the moment of dispatch: the engine refuses a blocked
+        // placement by silently dropping the waypoint, and the watch is what
+        // turns that silence into a refused record in the next sample.
+        BuildWatch.record(
+                command.unitId(),
+                command.buildType(),
+                command.x(),
+                command.y(),
+                EngineAccess.readIntField(engine, StateStream.FRAME_FIELD));
         Log.info(
                 "channel: build "
                         + command.buildType()

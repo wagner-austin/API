@@ -7,6 +7,7 @@ actually wrote rather than against a fixture written to match the parser.
 
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
 _FRAME = (
-    '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"players":0,'
+    '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"players":0,"refused":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 _ENTITY = (
@@ -92,11 +93,19 @@ def test_engine_ids_are_distinct_and_stable_across_samples() -> None:
 
 
 def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
-    """~300 frames per second, cross-checking the wire against the clock."""
+    """Exactly 3ms of wire clock per frame -- the pinned delta, not a rate.
+
+    The agent pins the engine's frame delta at 3ms (the determinism regime),
+    so the clock and the counter are locked, not merely correlated. The old
+    assertion here was a ~300fps window from before the pin; a re-take under
+    the pin lands at 1000/3 fps and the window read that as a failure.
+    """
     samples = decode_samples(_capture_lines())
-    frames = samples[2]["frame"] - samples[1]["frame"]
-    millis = samples[2]["clock_ms"] - samples[1]["clock_ms"]
-    assert 290.0 < frames / (millis / 1000.0) < 310.0
+    for earlier, later in itertools.pairwise(samples):
+        frames = later["frame"] - earlier["frame"]
+        millis = later["clock_ms"] - earlier["clock_ms"]
+        assert frames > 0
+        assert millis == frames * 3
 
 
 def test_engine_ids_are_the_dispatch_handles() -> None:
@@ -139,7 +148,7 @@ def test_blank_lines_are_skipped() -> None:
 
 def test_a_sample_with_no_entities_is_valid() -> None:
     empty = (
-        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,'
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,"refused":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     samples = decode_samples([empty])
@@ -184,7 +193,7 @@ def test_a_pool_before_any_frame_is_rejected() -> None:
 
 def test_a_sample_short_of_its_declared_pools_is_rejected() -> None:
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,"players":0,'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,"players":0,"refused":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     with pytest.raises(WireError) as caught:
@@ -201,7 +210,7 @@ def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
     and the planner would answer that by declaring the plan dead.
     """
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,"players":0,'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,"players":0,"refused":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     option = (
@@ -212,6 +221,48 @@ def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
         decode_samples([short, option])
     assert caught.value.code == "RW-WIRE-006"
+    assert "truncated" in caught.value.message
+
+
+def test_a_refused_build_travels_the_wire_and_round_trips() -> None:
+    """The agent's refusal report, decoded and re-encoded byte-for-byte.
+
+    The record is what closes the silent-refusal loop: the engine drops a
+    build order's waypoint without a word, the agent's watch says so in the
+    next sample, and the planner's ledger reads it from here.
+    """
+    frame = (
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":0,"players":0,"refused":1,'
+        '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+    )
+    refused = (
+        '{"kind":"refused","frame":7,"index":0,"unit_id":214,"type":"landFactory",'
+        '"x":420.0,"y":130.0}'
+    )
+    samples = decode_samples([frame, refused])
+    assert samples[0]["refusals"] == (
+        {"unit_id": 214, "type_name": "landFactory", "x": 420.0, "y": 130.0},
+    )
+    assert encode_sample(samples[0]) == (frame, refused)
+
+
+def test_a_sample_short_of_its_declared_refusals_is_rejected() -> None:
+    """The same completeness rule the entity, pool and option counts get.
+
+    A half-read refusal list is a site the planner will order onto again --
+    the exact re-dispatch loop the ledger exists to break.
+    """
+    short = (
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":0,"players":0,"refused":2,'
+        '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+    )
+    refused = (
+        '{"kind":"refused","frame":7,"index":0,"unit_id":214,"type":"landFactory",'
+        '"x":420.0,"y":130.0}'
+    )
+    with pytest.raises(WireError) as caught:
+        decode_samples([short, refused])
+    assert caught.value.code == "RW-WIRE-008"
     assert "truncated" in caught.value.message
 
 
@@ -233,7 +284,7 @@ def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
     with pytest.raises(WireError) as caught:
         short = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,'
-            '"pools":0,"options":0,"players":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+            '"pools":0,"options":0,"players":0,"refused":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([short, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -244,7 +295,7 @@ def test_a_long_sample_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
         long_frame = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,'
-            '"pools":0,"options":0,"players":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+            '"pools":0,"options":0,"players":0,"refused":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([long_frame, _ENTITY, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -268,7 +319,7 @@ def test_an_unknown_record_kind_is_rejected() -> None:
         decode_samples(
             [
                 '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,'
-                '"options":0,"players":0,"credits":0,"defeated":false,'
+                '"options":0,"players":0,"refused":0,"credits":0,"defeated":false,'
                 '"wiped":false,"players_left":6}',
                 '{"kind":"weather","frame":1}',
             ]
@@ -337,6 +388,7 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 price=350,
             ),
         ),
+        refusals=(),
     )
     lines = encode_sample(hostile)
     assert len(lines) == 4

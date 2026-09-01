@@ -205,6 +205,30 @@ final class BindingCheck {
             checkField(engine, EngineNames.SYNC_SEED, problems);
         }
 
+        // The refusal watch. Losing the queue pair crashes the sweep loudly,
+        // but losing the kind member fails in the dangerous direction: the
+        // build-kind reference would stop matching, every dispatched order
+        // would read as "waypoint gone", and every placement on the map would
+        // be ledgered as refused -- a plausible-looking stall, not an error.
+        Class<?> waypoint = checkClass(WaypointNames.WAYPOINT_CLASS, problems);
+        Class<?> waypointKind = checkClass(WaypointNames.WAYPOINT_KIND_CLASS, problems);
+        if (orderable != null) {
+            checkField(orderable, WaypointNames.WAYPOINT_ARRAY, problems);
+            checkField(orderable, WaypointNames.WAYPOINT_COUNT, problems);
+        }
+        if (waypoint != null) {
+            checkField(waypoint, WaypointNames.WAYPOINT_KIND, problems);
+            checkField(waypoint, WaypointNames.WAYPOINT_BUILD_TYPE, problems);
+            checkField(waypoint, WaypointNames.WAYPOINT_X, problems);
+            checkField(waypoint, WaypointNames.WAYPOINT_Y, problems);
+        }
+        if (waypointKind != null) {
+            if (waypointKind.getEnumConstants() == null) {
+                problems.add("not an enum: " + WaypointNames.WAYPOINT_KIND_CLASS);
+            }
+            checkField(waypointKind, WaypointNames.WAYPOINT_KIND_BUILD, problems);
+        }
+
         Class<?> ai = checkClass(EngineNames.AI_CLASS, problems);
         checkClass(EngineNames.ZONE_CLASS, problems);
         if (ai != null) {

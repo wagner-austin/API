@@ -12,7 +12,10 @@ package rwbot.agent;
  * <p>The names describing a unit <i>type</i> -- what it is, what it can be told
  * to make, and what it can shoot -- are {@link TypeNames}, split out of here
  * when this table reached 674 lines. That half grows for its own reason, as the
- * build tree does, and the two are read by different callers.
+ * build tree does, and the two are read by different callers. The names for a
+ * unit's waypoint queue are {@link WaypointNames}, split the same way when the
+ * refusal watch pushed this table past 600: their one reader is
+ * {@link BuildWatch}.
  *
  * <p><b>Pinned to Rusted Warfare 1.15 (code 176, build #28).</b> Every name
  * below moves between releases, silently — the jar is obfuscated, so a rename

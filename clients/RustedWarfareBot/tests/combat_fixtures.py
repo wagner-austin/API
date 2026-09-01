@@ -101,4 +101,5 @@ def sample(*entities: Entity) -> Sample:
         pools=(),
         players=(),
         options=(),
+        refusals=(),
     )

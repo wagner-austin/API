@@ -96,6 +96,7 @@ def _sample(
         pools=(),
         players=(),
         options=options,
+        refusals=(),
     )
 
 

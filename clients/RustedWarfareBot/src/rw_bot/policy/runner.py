@@ -172,17 +172,9 @@ class OrderTracker:
         Returns:
             Whether to act, and how the plan stands.
         """
-        if decision["action"] == "done":
-            return BuildStep(act=False, outcome="done", reason=decision["reason"])
-        if decision["action"] == "blocked":
-            return BuildStep(act=False, outcome="blocked", reason=decision["reason"])
-        if decision["action"] == "stalled":
-            return BuildStep(act=False, outcome="stalled", reason=decision["reason"])
-        if decision["action"] == "wait":
-            if decision["deficit"] > 0:
-                return self._assess_saving(sample, decision)
-            self._reset_saving()
-            return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        told = self._verdict_without_an_order(sample, decision)
+        if told is not None:
+            return told
         # Any actual order means the last save either completed or was
         # abandoned by the plan itself; whatever shortfall follows belongs to
         # the next save, not the finished one.
@@ -197,6 +189,9 @@ class OrderTracker:
         # plan was declared stalled. One duel went from five extractors and an
         # army of 25 to none of either ([[policy-holding-ground]]).
         slot = (completed_count(sample, self.plan), decision["type_name"])
+        reopened = self._reopen_if_refused(slot, decision, refused)
+        if reopened is not None:
+            return reopened
         if slot not in self._ordered:
             self._ordered.add(slot)
             if decision["action"] == "build":
@@ -221,61 +216,100 @@ class OrderTracker:
             self._quiet = 0
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
         self._quiet += 1
-        return self._quiet_verdict(slot, decision, refused)
+        return self._quiet_verdict(decision)
 
-    def _quiet_verdict(
+    def _verdict_without_an_order(self, sample: Sample, decision: Decision) -> BuildStep | None:
+        """Translate the decisions that carry their own verdict.
+
+        Done, blocked, stalled and wait all resolve without an order leaving,
+        so none of them touch the slot tracking below -- except the saving
+        clock, which a credit wait runs and everything else resets.
+
+        Args:
+            sample: One observation of the world.
+            decision: What the build policy wants, for this observation.
+
+        Returns:
+            The decision's own verdict, or ``None`` when it orders something
+            and the slot tracking must judge it.
+        """
+        if decision["action"] == "done":
+            return BuildStep(act=False, outcome="done", reason=decision["reason"])
+        if decision["action"] == "blocked":
+            return BuildStep(act=False, outcome="blocked", reason=decision["reason"])
+        if decision["action"] == "stalled":
+            return BuildStep(act=False, outcome="stalled", reason=decision["reason"])
+        if decision["action"] == "wait":
+            if decision["deficit"] > 0:
+                return self._assess_saving(sample, decision)
+            self._reset_saving()
+            return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        return None
+
+    def _reopen_if_refused(
         self,
         slot: tuple[int, str],
         decision: Decision,
         refused: Sequence[tuple[float, float]],
-    ) -> BuildStep:
+    ) -> BuildStep | None:
+        """Reopen an ordered slot the tick the ledger carries its site.
+
+        The agent's build watch reports the engine dropping an order's
+        waypoint one sample after it happens, so waiting out the quiet window
+        on a verdict that is already in means spending 45 samples confirming
+        what is written down. Judged against the site this tracker ORDERED --
+        the current decision has already moved past a ledgered site (wiki log
+        2026-09-01, the detection design).
+
+        Args:
+            slot: The plan entry under judgement.
+            decision: What the build policy wants, for this observation.
+            refused: The workforce's refusal ledger.
+
+        Returns:
+            The reopened step, or ``None`` when the ledger says nothing about
+            this slot's ordered site.
+        """
+        ordered_site = self._sites.get(slot)
+        if slot not in self._ordered or ordered_site is None:
+            return None
+        if not is_refused(ordered_site, refused):
+            return None
+        self._ordered.discard(slot)
+        del self._sites[slot]
+        self._watching = None
+        self._quiet = 0
+        return BuildStep(
+            act=False,
+            outcome="building",
+            reason=(
+                f"{decision['type_name']} at "
+                f"({ordered_site[0]:.0f}, {ordered_site[1]:.0f}) was refused by the "
+                "engine; trying the next site"
+            ),
+        )
+
+    def _quiet_verdict(self, decision: Decision) -> BuildStep:
         """Rule on an order whose quiet clock just advanced.
 
         Args:
-            slot: The plan slot the quiet order belongs to. Handed in rather
-                than read from the watch state, because by this point the
-                two are provably the same and a None-guard on the watch
-                would be a branch nothing can take.
             decision: What the build policy wants, for this observation.
-            refused: The workforce's refusal ledger, judged against the site
-                this slot's order was aimed at.
 
         Returns:
             Whether to act, and how the plan stands.
         """
         if self._quiet < self.stall_samples:
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
-        # **A refused site is the next site, not a dead plan.** The engine
-        # rejects a placement it dislikes by doing nothing -- no error, no
-        # roster change -- and this used to be terminal on the FIRST site
-        # tried. On duel_lake, where the ring chooser knows structures but
-        # not water, that one silent refusal armylessly ended 20 of 24
-        # Hard-rung members while the same matches raised turrets and
-        # extractors (wiki log 2026-08-31, verdict-withheld). The workforce
-        # owns the refusal ledger -- its presumed-lost clock runs the same
-        # window as this one -- so the slot reopens once the ledger carries
-        # this site, which is what guarantees the chooser's next offer is a
-        # DIFFERENT position rather than the same doomed order. Until the
-        # ledger catches up (the two clocks may disagree by an observation),
-        # the plan keeps waiting; a ring exhausted by refusals arrives from
-        # the chooser as a stalled decision and never reaches here. Produced
-        # units have no site to walk, so for them the quiet clock still
-        # means what it always did.
-        ordered = self._sites.get(slot)
-        if ordered is not None and is_refused(ordered, refused):
-            self._ordered.discard(slot)
-            del self._sites[slot]
-            self._watching = None
-            self._quiet = 0
-            return BuildStep(
-                act=False,
-                outcome="building",
-                reason=(
-                    f"{decision['type_name']} at "
-                    f"({ordered[0]:.0f}, {ordered[1]:.0f}) was refused silently "
-                    f"after {self.stall_samples} quiet samples; trying the next site"
-                ),
-            )
+        # **A quiet BUILD keeps waiting; a quiet PRODUCE stalls.** A build's
+        # refusal now arrives explicitly -- the agent's build watch reports
+        # the engine dropping the waypoint, the ledger carries the site, and
+        # the gate in :meth:`assess` reopens the slot the tick it lands. So
+        # a build that is merely quiet has no verdict yet, and ruling on it
+        # here would be the 45-sample guess the watch replaced; the
+        # presumed-lost clock in the workforce remains the fallback that
+        # writes the ledger when the watch cannot see (wiki log 2026-09-01,
+        # the detection design). Produced units have no site and no watch,
+        # so for them the quiet clock still means what it always did.
         if decision["action"] == "build":
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
         return BuildStep(
