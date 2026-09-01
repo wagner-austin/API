@@ -211,11 +211,61 @@ def materialize_run_artifacts(
         request_id=run_id,
         expected_root=f"model-{run_id}",
     )
-    out_root.rename(normalized)
+    rename_with_scan_retry(out_root, normalized)
     # Evicted AFTER the rename so the run just fetched is the newest entry and
     # is never itself a candidate.
     evict_materialized_runs(settings, redis)
     return normalized
+
+
+#: Rename attempts before a denial is treated as real, and the pause between
+#: them. One second of total patience covers a scanner's pass over a model
+#: directory; a denial that outlives it is an ACL or a genuinely held
+#: directory, which retrying would only hide.
+RENAME_ATTEMPTS = 5
+RENAME_RETRY_SECONDS = 0.2
+
+
+def rename_with_scan_retry(source: Path, target: Path) -> None:
+    """Rename a just-extracted directory, riding out the virus scanner.
+
+    On Windows, real-time scanning opens freshly written files, and renaming
+    a directory holding an open file fails with ``PermissionError``
+    (WinError 5). Measured 2026-08-31: ``test_eval_job_missing_manifest``
+    failed at exactly this rename once under the full 16-worker suite and
+    passed five of five runs in isolation -- the handle was the scanner's,
+    not this process's, since the extraction closes its tar before
+    returning. Production containers are Linux, where an open file does not
+    block a rename; this exists so the SAME code holds where the suite runs.
+
+    Bounded and loud rather than best-effort: the final attempt runs OUTSIDE
+    the catch, so a denial that outlives the retries -- an ACL, a directory
+    something really holds -- propagates unchanged instead of becoming a
+    retry loop's silence.
+
+    Args:
+        source: The directory to rename.
+        target: Its new path.
+
+    Raises:
+        PermissionError: When the last attempt is still denied.
+        OSError: Propagated unretried from any attempt for every other
+            failure -- only the scanner's specific denial is worth waiting
+            out.
+    """
+    for _ in range(RENAME_ATTEMPTS - 1):
+        try:
+            _test_hooks.rename_path(source, target)
+            return
+        except PermissionError as denied:
+            _log.warning(
+                "rename %s -> %s denied (%s); waiting out the scanner",
+                source,
+                target,
+                denied,
+            )
+            _test_hooks.retry_sleep(RENAME_RETRY_SECONDS)
+    _test_hooks.rename_path(source, target)
 
 
 def publish_metrics(r: RedisStrProto, message: str) -> None:

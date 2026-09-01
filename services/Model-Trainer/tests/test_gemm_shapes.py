@@ -31,6 +31,7 @@ from model_trainer.core.services.model.gemm_shapes import (
     gemm_label,
     probed_shapes,
     require_unique_labels,
+    timed_shapes,
 )
 
 #: A shape in the same orientation as the real ones, for label tests.
@@ -159,6 +160,23 @@ class TestTheSweepGrid:
 
     def test_the_real_tables_pass_the_label_check(self) -> None:
         assert require_unique_labels(probed_shapes()) == probed_shapes()
+
+    def test_everything_timed_is_also_digested(self) -> None:
+        # The invariant whose absence cost this experiment its headline. The
+        # batched and crossover tables were declared for the TIMING benchmark
+        # and never digested, so from 2026-08-29 to 2026-08-31 every
+        # agreement claim rested on N=64 while the shapes real work runs --
+        # the ones worth benchmarking -- went uncompared, and a wrong
+        # operational conclusion ("agreement is an architecture-family
+        # property") stood in the wiki. A shape whose COST matters is a shape
+        # whose cross-card IDENTITY matters; a table added to the benchmark
+        # without joining the digest probe recreates the blind spot, and this
+        # is what makes that a failing build instead of a silent audit
+        # finding for the next session.
+        digested = {(s["rows"], s["inner"], s["cols"]) for _, s in probed_shapes()}
+        timed = {(s["rows"], s["inner"], s["cols"]) for _, s in timed_shapes()}
+
+        assert sorted(timed - digested) == []
 
 
 class TestTheBoundaryBracket:

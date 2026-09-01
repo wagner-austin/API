@@ -338,6 +338,18 @@ def _default_os_utime(path: Path | str) -> None:
     os.utime(path, None)
 
 
+def _default_rename_path(source: Path, target: Path) -> None:
+    """Production rename, straight through the OS."""
+    source.rename(target)
+
+
+def _default_retry_sleep(seconds: float) -> None:
+    """Production pause between filesystem retry attempts."""
+    import time
+
+    time.sleep(seconds)
+
+
 def _default_load_wandb_module() -> WandbModuleLike:
     """Production wandb module loader."""
     from platform_ml.wandb_publisher import _load_wandb_module as _load

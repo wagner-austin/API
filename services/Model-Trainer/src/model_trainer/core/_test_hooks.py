@@ -45,6 +45,8 @@ from model_trainer.core._hook_defaults import (
     _default_random_factory,
     _default_random_getstate,
     _default_random_setstate,
+    _default_rename_path,
+    _default_retry_sleep,
     _default_rq_queue,
     _default_rq_retry,
     _default_sample_token,
@@ -91,6 +93,8 @@ from model_trainer.core._hook_protocols import (
     RandomFactoryProto,
     RandomGetstateProto,
     RandomSetstateProto,
+    RenamePathProto,
+    RetrySleepProto,
     RQConnectionFactoryProto,
     RQQueueFactoryProto,
     RQRetryFactoryProto,
@@ -294,6 +298,10 @@ random_factory: RandomFactoryProto = _default_random_factory
 shutil_rmtree: ShutilRmtreeProto = _default_shutil_rmtree
 
 os_utime: OsUtimeProto = _default_os_utime
+
+rename_path: RenamePathProto = _default_rename_path
+
+retry_sleep: RetrySleepProto = _default_retry_sleep
 
 load_wandb_module: LoadWandbModuleProto = _default_load_wandb_module
 

@@ -33,6 +33,7 @@ from model_trainer.core.services.container import ServiceContainer
 from model_trainer.worker.job_utils import (
     load_tokenizer_for_training,
     redis_client,
+    rename_with_scan_retry,
     setup_job_logging,
 )
 from model_trainer.worker.manifest import as_model_family, load_manifest_from_text
@@ -113,7 +114,7 @@ def _ensure_model_downloaded(settings: Settings, r: RedisStrProto, run_id: str) 
             request_id=run_id,
             expected_root=expected_root,
         )
-        out_root.rename(normalized)
+        rename_with_scan_retry(out_root, normalized)
 
     return normalized
 

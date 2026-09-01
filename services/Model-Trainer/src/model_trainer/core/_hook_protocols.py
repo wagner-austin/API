@@ -253,6 +253,28 @@ class OsUtimeProto(Protocol):
     def __call__(self, path: Path | str) -> None: ...
 
 
+class RenamePathProto(Protocol):
+    """Protocol for renaming one filesystem path onto another.
+
+    Behind a hook so the suite can drive the retry in
+    ``rename_with_scan_retry`` both ways -- a denial that clears and one that
+    does not -- without depending on a virus scanner's timing, which is the
+    only thing that produces the real denial.
+    """
+
+    def __call__(self, source: Path, target: Path) -> None: ...
+
+
+class RetrySleepProto(Protocol):
+    """Protocol for the pause between filesystem retry attempts.
+
+    Separate from the rename hook because a test asserting "it waited
+    between attempts" must observe the waits without actually spending them.
+    """
+
+    def __call__(self, seconds: float) -> None: ...
+
+
 class OsScandirProto(Protocol):
     """Protocol for os.scandir hook."""
 
