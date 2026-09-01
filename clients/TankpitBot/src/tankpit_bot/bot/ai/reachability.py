@@ -137,6 +137,18 @@ def is_collection_reachable_within_bounds(
     Returns:
         True if a collection path exists entirely inside the bounds.
     """
+    if not (left <= goal_x <= right and top <= goal_y <= bottom):
+        # The pickup click itself must target a tile inside the bounds:
+        # the server refuses a pickup at an out-of-window container
+        # with 0x52 code 0 even when an in-bounds cardinal neighbour
+        # is walkable. Run bot-20260901-024845 drew all three of its
+        # collect cant_do receipts exactly this way — (79,92) against
+        # window left 80, (138,144) against top 145, (100,136) against
+        # bottom 135 — each dispatched because the adjacent-service
+        # branch below accepted the in-window neighbour. An
+        # out-of-bounds goal is not collectable from these bounds,
+        # full stop; the caller's hold law leaves it to the hop lane.
+        return False
     if terrain.is_passable(goal_x, goal_y) and _viewport_path_exists(
         terrain,
         start_x,

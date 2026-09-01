@@ -279,6 +279,54 @@ class TestViewportReachability:
         assert result is True
 
 
+class TestOutOfWindowGoalIsNotCollectable:
+    """The window-edge pickup hole — run bot-20260901-024845's cant_do class.
+
+    All three collect ``cant_do`` (code 0) receipts of that run were
+    pickups dispatched at containers ONE tile outside the live window
+    — (79,92) against window left 80, (138,144) against top 145,
+    (100,136) against bottom 135 — each accepted because an in-window
+    cardinal neighbour was walkable (the adjacent-service branch).
+    The pickup click itself must target an in-window tile; an
+    out-of-bounds goal is not collectable from these bounds, and the
+    lock-continuation's hold law leaves it to the hop lane.
+    """
+
+    def test_goal_just_past_the_window_edge_is_unreachable(self) -> None:
+        """Clear ground one column outside the window: no pickup dispatch."""
+        world, self_state = make_world(self_x=95, self_y=87)
+        terrain = InMemoryTerrainMap()
+
+        result = is_collection_reachable_in_viewport(
+            world,
+            terrain,
+            self_state["x"],
+            self_state["y"],
+            86,
+            87,
+        )
+
+        assert result is False
+
+    def test_mined_goal_past_the_edge_is_not_served_from_its_neighbour(self) -> None:
+        """The exact (100,136) shape: mined container one row below the
+        window bottom, clean walkable neighbour inside — the service
+        branch must not turn that neighbour into a dispatch."""
+        world, self_state = make_world(self_x=100, self_y=128)
+        terrain = _mined_terrain(InMemoryTerrainMap(), frozenset({"100,136"}))
+
+        result = is_collection_reachable_in_viewport(
+            world,
+            terrain,
+            self_state["x"],
+            self_state["y"],
+            100,
+            136,
+        )
+
+        assert result is False
+
+
 class TestAttainableLanding:
     """Landing attainability -- the bot-20260805-173034 failure class.
 
