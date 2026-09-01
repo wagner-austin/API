@@ -369,7 +369,6 @@ async function loadTanks() {
   try {
     tanks = (await (await fetch("/tanks")).json()).tanks;
   } catch (e) { tanks = {}; }
-  paintTroopInfo();
 }
 
 for (const id of ["account", "room", "troop"]) {
@@ -395,9 +394,16 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
   if (response.ok) poll();
 });
 
-fillSelect("account", "/accounts", "accounts").then(paintTroopInfo);
-fillSelect("room", "/rooms", "rooms");
-fillSelect("troop", "/troops", "troops", false).then(loadTanks);
+// One paint, after ALL of account, room, colour and the registry have
+// landed. Painting per-fill raced: whichever resolved last decided
+// what the readout described, and a late room fill left it reading
+// the Practice fallback while the dropdown displayed World.
+Promise.all([
+  fillSelect("account", "/accounts", "accounts"),
+  fillSelect("room", "/rooms", "rooms"),
+  fillSelect("troop", "/troops", "troops"),
+  loadTanks(),
+]).then(paintTroopInfo);
 poll();
 setInterval(poll, 1000);
 </script>
