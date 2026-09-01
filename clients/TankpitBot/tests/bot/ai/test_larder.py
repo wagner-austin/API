@@ -59,6 +59,31 @@ def test_big_deficit_prefers_the_rich_far_container() -> None:
     assert selection["candidates"] == 2
 
 
+def test_stale_sighting_is_priced_out_of_the_hop() -> None:
+    """A sighting past the hop horizon is tallied stale, never teleported to.
+
+    The 2026-09-01 stale-hop law: the sighting at exactly the horizon
+    (30 s) still hops; one millisecond past it is tallied ``stale``
+    and the lane declines — the belief survives for walk service and
+    in-window pickups.
+    """
+    at_horizon = {
+        "120,100": make_container(120, 100, 600, is_fuel=True, timestamp_ms=70000),
+    }
+    past_horizon = {
+        "120,100": make_container(120, 100, 600, is_fuel=True, timestamp_ms=69999),
+    }
+
+    served = select_fuel_larder_hop(_ctx(fuel=_fuel_at_deficit(600), containers=at_horizon))
+    declined = select_fuel_larder_hop(_ctx(fuel=_fuel_at_deficit(600), containers=past_horizon))
+
+    assert served["container"] == at_horizon["120,100"]
+    assert served["stale"] == 0
+    assert declined["container"] is None
+    assert declined["candidates"] == 1
+    assert declined["stale"] == 1
+
+
 def test_small_deficit_prefers_the_near_container() -> None:
     """The deficit clamp flips the argmax to the closer 250."""
     containers = {

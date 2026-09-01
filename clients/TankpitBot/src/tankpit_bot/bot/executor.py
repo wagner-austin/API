@@ -361,7 +361,16 @@ def _dispatch_teleport_command(
     Returns:
         True if the map open or the teleport was dispatched.
     """
-    if snapshot["map_visible"] is not True:
+    if snapshot["map_visible"] is not True or bot.world.last_wire_command_name != "map_open":
+        # The overlay alone is not proof of an open map: ANY dispatched
+        # wire action closes the map server-side (modal law), and the
+        # client's rendered overlay lags that closure by a tick. Run
+        # bot-20260901-032936 03:34:21-25: a plan flip dispatched a
+        # scope pan between the deferral's open and the teleport, the
+        # snapshot still showed the overlay, the fast path fired, and
+        # the server refused cant_do code 0. The teleport therefore
+        # requires BOTH the overlay AND the last-wire-command receipt
+        # naming the open itself.
         emit_ai(
             "deferring teleport to (%d,%d): opening map first",
             command["target_x"],

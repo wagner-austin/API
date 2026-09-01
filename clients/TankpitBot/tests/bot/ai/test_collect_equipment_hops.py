@@ -69,6 +69,55 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     assert decision["behavior"]["reason_kind"] == "equipment_hop"
 
 
+def test_hop_toward_equipment_prices_out_stale_sightings() -> None:
+    """A sighting past the hop horizon draws no teleport; a fresh one wins.
+
+    The 2026-09-01 stale-hop law (run bot-20260901-033100: eleven
+    code-4 empties in 2.5 minutes against aged own and fleet-merged
+    sightings): the nearer container's sighting is 30.001 s old and is
+    skipped; the farther fresh one takes the hop. The belief itself
+    survives — only the teleport pricing changed.
+    """
+    ws = WorldService()
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=69999,
+            failed_pickups=0,
+        ),
+        "150,100": make_container_state(
+            x=150,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=70000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(default_count=15),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+        ws=ws,
+    )
+
+    decision = hop_toward_equipment(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected the fresh sighting to take the hop")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 150
+    assert decision["command"]["target_y"] == 100
+
+
 def test_hop_toward_equipment_declines_when_every_slot_at_rank_cap() -> None:
     """The physics bar: a tank that can hold nothing never hops at equipment.
 

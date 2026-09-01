@@ -405,6 +405,9 @@ class TestBotAIIntegration:
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
+        # The previous tick's dispatch WAS the open (the deferral
+        # contract): the overlay alone no longer certifies the map.
+        ws.last_wire_command_name = "map_open"
         dispatch_command(bot, make_teleport_command(150, 150), _make_snapshot(map_visible=True))
         assert bot.get_state() == "TELEPORTING"
 

@@ -59,14 +59,18 @@ def test_ringed_hop_is_refused_once_and_never_re_certified() -> None:
         # any of it: its beliefs are mine-blind, the exact marooning state.
         for dx, dy in ((0, 0), (1, 0), (0, -1), (-1, 0), (0, 1)):
             place_mine(server.world, _RING_X + dx, _RING_Y + dy, _ENEMY_TEAM)
-        # The equipment belief from "an earlier scan": the hop's tracked
-        # container, injected through the production state shape.
+        # The equipment belief from a RECENT scan: the hop's tracked
+        # container, injected through the production state shape. The
+        # sighting is stamped at the clock's now — the hop pricing
+        # horizon (HOP_SIGHTING_MAX_AGE_MS, 2026-09-01) rightly
+        # refuses to teleport at minutes-old sightings, and this
+        # scenario pins the RING refusal, which needs the hop to fire.
         ws.world_state["containers"][f"{_RING_X},{_RING_Y}"] = make_container_state(
             x=_RING_X,
             y=_RING_Y,
             is_fuel=False,
             volume=0,
-            timestamp_ms=1,
+            timestamp_ms=100_000,
             failed_pickups=0,
         )
 

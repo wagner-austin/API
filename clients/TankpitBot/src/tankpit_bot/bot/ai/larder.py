@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.collect_common import split_fresh_hop_sightings
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
@@ -79,6 +80,10 @@ class FuelLarderSelectionDict(TypedDict):
         too_close: Candidates inside the walk-dominant range
             (:data:`WALK_DOMINANT_RANGE`) -- travel there is the walk
             step's business, never a teleport's.
+        stale: Candidates whose sighting is older than the hop
+            pricing horizon
+            (:data:`~tankpit_bot.bot.ai.collect_common.HOP_SIGHTING_MAX_AGE_MS`)
+            -- the belief survives, but no teleport is spent on it.
         no_landing: Candidates with no legal landing tile.
         reserve_blocked: Candidates still below the fuel reserve
             AFTER their own pickup (net-of-gain gate, F16).
@@ -101,6 +106,7 @@ class FuelLarderSelectionDict(TypedDict):
     cost: int
     candidates: int
     too_close: int
+    stale: int
     no_landing: int
     reserve_blocked: int
     unprofitable: int
@@ -223,10 +229,14 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     the transit), net profitability (``min(volume, deficit)`` must exceed
     the hop cost), the walk-dominant range
     (:data:`WALK_DOMINANT_RANGE` -- near containers are the walk
-    step's business), and the dreg floor (:data:`_LARDER_MIN_GAIN`,
-    waived for deficit-completing gains and at desperation fuel).
-    Belief freshness is NOT gated: container belief expires only on
-    hard evidence ([[larder-plan]] two-clocks ruling).
+    step's business), the dreg floor (:data:`_LARDER_MIN_GAIN`,
+    waived for deficit-completing gains and at desperation fuel), and
+    the hop pricing horizon
+    (:data:`~tankpit_bot.bot.ai.collect_common.HOP_SIGHTING_MAX_AGE_MS`).
+    Belief EXPIRY stays evidence-only ([[larder-plan]] two-clocks
+    ruling) — the horizon prices the teleport, never the memory: an
+    aged sighting still serves walks, in-window pickups, and the
+    desperation ladder.
 
     Args:
         ctx: Decision context. ``ctx.terrain`` must not be ``None``.
@@ -254,7 +264,12 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     best_landing_y = 0
     best_cost = 0
     best_score = 0.0
-    for container in _live_fuel_beliefs(ctx):
+    # Hop pricing horizon: stale sightings never enter teleport
+    # scoring; the beliefs survive for walk service and in-window
+    # pickups (the ``stale`` tally reports the exclusions).
+    fresh_beliefs, stale = split_fresh_hop_sightings(_live_fuel_beliefs(ctx), ctx.timestamp_ms)
+    candidates += stale
+    for container in fresh_beliefs:
         candidates += 1
         if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1
@@ -332,6 +347,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
         cost=best_cost,
         candidates=candidates,
         too_close=too_close,
+        stale=stale,
         no_landing=no_landing,
         reserve_blocked=reserve_blocked,
         unprofitable=unprofitable,

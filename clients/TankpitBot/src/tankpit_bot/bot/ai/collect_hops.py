@@ -13,6 +13,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import (
     COLLECT_SCORE,
     emit_hop_declined,
+    split_fresh_hop_sightings,
 )
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
@@ -156,12 +157,16 @@ def hop_toward_equipment(
     yield-to-hunt gate (Bug 0.4): if HUNT is permitted, no hop is
     needed.
 
-    Stale-belief caveat: a container tracked from a scan minutes ago
-    may have been picked up by another player and no wire signal
-    confirms distant consumption. The pragmatic Phase 0 hop accepts
-    that risk and pays the wasted-teleport cost if the container is
-    gone. Wasted hops still refresh the viewport and reveal fresher
-    intel on the way to combat-ready.
+    Stale-belief law (2026-09-01, superseding the Phase 0
+    accept-the-risk stance): no wire signal confirms distant
+    consumption, and in a co-farmed room the phantom rate proved the
+    old caveat wrong — run bot-20260901-033100 paid eleven code-4
+    empties in 2.5 minutes hopping to aged sightings while its
+    zero-radar sweep starved. Sightings older than the hop pricing
+    horizon (:data:`~tankpit_bot.bot.ai.collect_common.HOP_SIGHTING_MAX_AGE_MS`)
+    are skipped by this lane; the beliefs survive for walk service
+    and in-window pickups, and the declined tick falls through to
+    sweep/frontier discovery.
 
     Args:
         ctx: Decision context.
@@ -198,11 +203,16 @@ def hop_toward_equipment(
     no_landing = 0
     reserve_blocked = 0
     own_ground = 0
+    # Hop pricing horizon (run bot-20260901-033100: eleven code-4
+    # empties in 2.5 minutes against aged own and fleet-merged
+    # sightings). The beliefs themselves survive — walk service and
+    # in-window pickups still use them.
+    fresh_candidates, stale = split_fresh_hop_sightings(candidates, ctx.timestamp_ms)
     best_cost = -1
     best_landing_x = 0
     best_landing_y = 0
     best_container: ContainerStateDict | None = None
-    for container in candidates:
+    for container in fresh_candidates:
         landing = _equipment_hop_landing(ctx, terrain, container)
         if landing is None:
             no_landing += 1
@@ -234,6 +244,7 @@ def hop_toward_equipment(
         emit_hop_declined(
             "equipment",
             candidates=len(candidates),
+            stale=stale,
             no_landing=no_landing,
             reserve_blocked=reserve_blocked,
             own_ground=own_ground,
@@ -348,6 +359,7 @@ def _hop_toward_fuel_larder(
                 "fuel_larder",
                 candidates=selection["candidates"],
                 too_close=selection["too_close"],
+                stale=selection["stale"],
                 no_landing=selection["no_landing"],
                 reserve_blocked=selection["reserve_blocked"],
                 unprofitable=selection["unprofitable"],

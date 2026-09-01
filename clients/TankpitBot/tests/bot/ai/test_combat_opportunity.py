@@ -21,6 +21,7 @@ from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
+    seed_confirmed_incoming,
 )
 from tests.conftest import FakeEnv
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -95,7 +96,7 @@ class TestFinisherDivert:
     def test_finisher_divert_holds_the_lock(self) -> None:
         """A visible tier-1 enemy draws the shot; the main lock survives."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 100, 103, name="red-1", damage_state=1),
         }
         ctx, main = _main_target(tanks)
@@ -112,7 +113,7 @@ class TestFinisherDivert:
     def test_most_damaged_finisher_wins_over_attacker(self) -> None:
         """Tier 0 beats tier 1; any finisher beats a healthy attacker."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 100, 103, name="red-2", damage_state=1),
             "61": _tank(61, 100, 105, name="red-1", damage_state=0),
             "62": _tank(62, 103, 100, name="red-3"),
@@ -131,7 +132,7 @@ class TestFinisherDivert:
     def test_off_window_finisher_is_not_diverted(self) -> None:
         """A divert never moves or shifts: outside the window, no shot."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 100, 130, name="red-1", damage_state=0),
         }
         ctx, main = _main_target(tanks)
@@ -145,7 +146,7 @@ class TestFinisherDivert:
     def test_out_of_range_finisher_is_not_diverted(self) -> None:
         """In the window but beyond shot range: the main target keeps the tick."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 107, 104, name="red-1", damage_state=0),
         }
         ctx, main = _main_target(tanks)
@@ -158,7 +159,7 @@ class TestFinisherDivert:
         """A rock on the dual line voids the divert (clear-line law)."""
         terrain = InMemoryTerrainMap({(100, 101): InMemoryTerrainMap.ROCK})
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 100, 103, name="red-1", damage_state=0),
         }
         ctx = _locked_ctx(tanks, terrain=terrain)
@@ -173,7 +174,7 @@ class TestFinisherDivert:
     def test_blocked_finisher_is_not_diverted(self) -> None:
         """A blocked id (afterimage/shield cooldown) never draws a divert."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 100, 103, name="red-1", damage_state=0),
         }
         ctx = _locked_ctx(tanks, blocked={"60": _NOW})
@@ -184,13 +185,74 @@ class TestFinisherDivert:
         assert decision["behavior"]["reason_kind"] == "shoot_target"
 
 
+class TestHumanFightDiscipline:
+    """No bot draws a divert while the main lock is a human.
+
+    Operator ruling 2026-09-01: "we should not be engaging a bot
+    during a human chase firefight." Bots respawn and their return
+    fire is noise; every diverted beat is a free beat handed to the
+    human. Human-vs-human diverts stay live.
+    """
+
+    def test_bot_finisher_never_diverts_a_human_fight(self) -> None:
+        """A dying practice bot in view: the shot still goes to the human."""
+        tanks = {
+            "50": _tank(50, 101, 100, name="Beerus"),
+            "60": _tank(60, 100, 103, name="red-1", damage_state=1),
+        }
+        ctx, main = _main_target(tanks)
+
+        decision = close_target(ctx, main)
+
+        assert decision["behavior"]["reason_kind"] != "opportunity_shot"
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_id"] == 50
+
+    def test_bot_attacker_never_diverts_a_human_fight(self) -> None:
+        """A practice bot hitting us mid-human-fight draws nothing back."""
+        tanks = {
+            "50": _tank(50, 101, 100, name="Beerus"),
+            "60": _tank(60, 103, 100, name="red-3"),
+        }
+        ctx, main = _main_target(tanks)
+        ctx.ws.damage_book["confirmed_incoming"].append(
+            ConfirmedIncomingDict(timestamp_ms=_NOW - 1000, cost=45, shooter_id=60)
+        )
+
+        decision = close_target(ctx, main)
+
+        assert decision["behavior"]["reason_kind"] != "opportunity_shot"
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_id"] == 50
+
+    def test_second_human_finisher_still_diverts(self) -> None:
+        """Human-vs-human stays live: a dying consented human draws the shot.
+
+        Whis has hit us (consent-by-aggression, the human-combat
+        gate), so the human-fight discipline does not bar him — only
+        BOTS are barred from diverting a human fight.
+        """
+        tanks = {
+            "50": _tank(50, 101, 100, name="Beerus"),
+            "60": _tank(60, 100, 103, name="Whis", damage_state=1),
+        }
+        ctx, main = _main_target(tanks)
+        seed_confirmed_incoming(ctx.ws, 1)
+
+        decision = close_target(ctx, main)
+
+        assert decision["behavior"]["reason_kind"] == "opportunity_shot"
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_id"] == 60
+
+
 class TestReturnFire:
     """Anyone engaging us gets a shot back while they keep hitting."""
 
     def test_recent_attacker_draws_return_fire(self) -> None:
         """A fuel-confirmed hit inside the window diverts one shot back."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 103, 100, name="red-3"),
         }
         ctx, main = _main_target(tanks)
@@ -208,7 +270,7 @@ class TestReturnFire:
     def test_stale_hit_does_not_divert(self) -> None:
         """An attacker silent past the window stops drawing return fire."""
         tanks = {
-            "50": _tank(50, 101, 100, name="Main"),
+            "50": _tank(50, 101, 100, name="blue-9"),
             "60": _tank(60, 103, 100, name="red-3"),
         }
         ctx, main = _main_target(tanks)

@@ -42,6 +42,27 @@ class DispatchMixin(CompletionsMixin):
     # Command Sending
     # =========================================================================
 
+    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+        """Send wire bytes and stamp the session's last-command receipt.
+
+        The stamp powers the map-modal invalidation law: ANY
+        dispatched action closes the server-side map overlay, and the
+        client's rendered overlay can lag that closure by a tick — so
+        the teleport precondition reads this receipt, never the
+        overlay alone (run bot-20260901-032936 03:34:21-25).
+
+        Args:
+            data: Framed command bytes (with 2-byte length header).
+            cmd_name: Command name for logging and the receipt.
+
+        Returns:
+            True if sent, False if CDP session not available.
+        """
+        sent = super()._send_bytes(data, cmd_name)
+        if sent:
+            self.world.last_wire_command_name = cmd_name
+        return sent
+
     def enter_game(self) -> bool:
         """Send CMD_ENTER_GAME to activate the tank in the game world.
 

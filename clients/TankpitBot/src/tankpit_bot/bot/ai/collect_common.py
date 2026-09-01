@@ -17,9 +17,58 @@ writer first — a reader without one is a decision nobody makes.
 from __future__ import annotations
 
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.state.types import ContainerStateDict
 
 COLLECT_SCORE = 925
 """Behavior score every COLLECT-cascade decision carries."""
+
+HOP_SIGHTING_MAX_AGE_MS = 30_000
+"""Oldest container sighting a TELEPORT hop may spend fuel on.
+
+Pricing, not expiry: the two-clocks ruling ([[larder-plan]]) keeps
+beliefs alive until hard evidence, and this gate does not touch them —
+walk service, in-window pickups, and the desperation ladder still use
+memory of any age. What it prices is the teleport: in a co-farmed
+World (two-plus fleet bots and ~27 practice bots eating containers),
+a sighting older than half a minute is more phantom than prize.
+Receipts: run bot-20260901-033100 (arterial) drew ELEVEN code-4
+empty-container rejections in 2.5 minutes hopping to aged own and
+fleet-merged sightings while its zero-radar sweep starved; the
+2026-08-14 240 s fleet run drew 18 the same way; run
+bot-20260901-024845 (artax) paid three stale-hop teleports. A declined
+lane falls through to sweep/frontier discovery — fresh intel instead
+of a phantom's teleport bill."""
+
+
+def is_hop_sighting_fresh(container: ContainerStateDict, now_ms: int) -> bool:
+    """Return True when a container sighting is young enough to hop to.
+
+    Args:
+        container: Believed container under hop consideration.
+        now_ms: Current tick timestamp.
+
+    Returns:
+        True when the sighting is within :data:`HOP_SIGHTING_MAX_AGE_MS`.
+    """
+    return now_ms - container["timestamp_ms"] <= HOP_SIGHTING_MAX_AGE_MS
+
+
+def split_fresh_hop_sightings(
+    containers: list[ContainerStateDict],
+    now_ms: int,
+) -> tuple[list[ContainerStateDict], int]:
+    """Split hop candidates into fresh sightings and a stale count.
+
+    Args:
+        containers: Believed containers entering a hop lane.
+        now_ms: Current tick timestamp.
+
+    Returns:
+        ``(fresh, stale_count)`` — the hop-priceable sightings and how
+        many the horizon excluded (the ``stale`` decline tally).
+    """
+    fresh = [c for c in containers if is_hop_sighting_fresh(c, now_ms)]
+    return fresh, len(containers) - len(fresh)
 
 
 def emit_hop_declined(hop_kind: str, **tallies: int) -> None:

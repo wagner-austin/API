@@ -31,6 +31,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_shoot_command
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -120,6 +121,16 @@ def select_opportunity_shot(ctx: DecideCtx, main_target_id: int) -> EnemyThreatD
         main target.
     """
     lock_id = main_target_id
+    # Human-fight discipline (operator ruling 2026-09-01: "we should
+    # not be engaging a bot during a human chase firefight"): while
+    # the main lock is a HUMAN, practice bots never draw a divert —
+    # not as finishers, not as attackers. Bots respawn and their
+    # return fire is noise; the human fight is the session's stake,
+    # and every diverted beat is a free beat handed to the human.
+    # Human-vs-human diverts (a human finisher, a second human
+    # attacker) stay live.
+    main_tank = ctx.filtered["tanks"].get(str(lock_id))
+    human_fight = main_tank is not None and is_human_name(main_tank["name"])
     shootable = [
         threat
         for threat in analyze_threats(
@@ -135,6 +146,7 @@ def select_opportunity_shot(ctx: DecideCtx, main_target_id: int) -> EnemyThreatD
         # map (shielded/afterimage cooldowns, incl. a diverted miss's
         # own block) is a separate exclusion.
         and str(threat["tank_id"]) not in ctx.blocked_targets
+        and (not human_fight or is_human_name(threat["name"]))
         and _has_immediate_shot(ctx, threat)
     ]
     if not shootable:

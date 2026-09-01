@@ -345,6 +345,7 @@ class TestDispatchRefusalPrediction:
         """(200,200) from (100,100) costs 848 against 800 fuel: even the
         cheapest ring-1 landing is out of reach, so nothing is sent."""
         bot, fake_cdp = _make_bot(fake_env)
+        bot.world.last_wire_command_name = "map_open"
         result = dispatch_command(
             bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True)
         )
@@ -365,9 +366,33 @@ class TestDispatchRefusalPrediction:
         bot, fake_cdp = _make_bot(fake_env)
         bot.world = WorldService()
         picked = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
+        bot.world.last_wire_command_name = "map_open"
         hopped = dispatch_command(
             bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True)
         )
         assert picked is True
         assert hopped is True
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 2
+
+    def test_overlay_without_the_open_receipt_defers_the_teleport(self, fake_env: FakeEnv) -> None:
+        """A rendered overlay after another action re-opens, never teleports.
+
+        The map-modal invalidation law (run bot-20260901-032936
+        03:34:21-25): a scope pan dispatched between the deferral's
+        open and the teleport closed the map server-side while the
+        client overlay still rendered, and the fast-path teleport drew
+        cant_do code 0. With the last-wire-command receipt naming the
+        pan instead of the open, the executor must spend the tick on a
+        fresh map open.
+        """
+        bot, _fake_cdp = _make_bot(fake_env)
+        bot.world.last_wire_command_name = "scope(5)"
+
+        result = dispatch_command(
+            bot, make_teleport_command(120, 120), _make_snapshot(map_visible=True)
+        )
+
+        assert result is True
+        # The dispatch that went out is the map open: the receipt now
+        # names it, so the NEXT tick's fast path is legitimate.
+        assert bot.world.last_wire_command_name == "map_open"

@@ -145,6 +145,15 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self.pending_ground_shot_aim_x: int = 0
         self.pending_ground_shot_aim_y: int = 0
         self.pending_ground_shot_dispatch_ms: int = 0
+        # Name of the most recent wire command this session dispatched
+        # ("map_open", "teleport", "scope(5)", ...). The map-modal
+        # receipt: ANY dispatched action closes the server-side map,
+        # and the client overlay can lag that closure by a tick — the
+        # teleport precondition must read this, not the overlay alone
+        # (run bot-20260901-032936 03:34:21-25: a scope pan between
+        # the open and the teleport closed the map server-side while
+        # the overlay still rendered, and the teleport drew cant_do).
+        self.last_wire_command_name: str = ""
         # Undrained 0x41 deactivations, victim -> killer. The killer id
         # travels with the victim because the two consumers diverge:
         # the dead-tank registry takes every victim, but the session
