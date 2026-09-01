@@ -1,0 +1,61 @@
+# Forty-eight fresh seeds for the v7-vs-v8 pace question, disjoint from
+# hard24.txt's twenty-four.
+#
+# The 24-pair A/B (ab24, log 2026-09-01) measured 9 verdict flips splitting
+# 7:2 toward v7 -- within chance at that sample size (two-sided binomial
+# p ~= 0.18) -- with the divergence trace-pinned to refusal-recovery timing.
+# These pairs exist to settle whether the asymmetry is real: if the flip
+# rate and split hold, 72 combined pairs puts the answer near p ~= 0.005;
+# if it is butterfly variance, the split flattens. Fresh seeds rather than
+# re-runs, because the per-environment determinism regime makes a re-run of
+# a played seed a copy of its result, not a new observation.
+#
+# label | seed | doctrine | samples
+champion|101|doctrines/aa-counter-guard.doctrine|4000
+champion|211|doctrines/aa-counter-guard.doctrine|4000
+champion|307|doctrines/aa-counter-guard.doctrine|4000
+champion|401|doctrines/aa-counter-guard.doctrine|4000
+champion|503|doctrines/aa-counter-guard.doctrine|4000
+champion|601|doctrines/aa-counter-guard.doctrine|4000
+champion|701|doctrines/aa-counter-guard.doctrine|4000
+champion|809|doctrines/aa-counter-guard.doctrine|4000
+champion|907|doctrines/aa-counter-guard.doctrine|4000
+champion|1009|doctrines/aa-counter-guard.doctrine|4000
+champion|1103|doctrines/aa-counter-guard.doctrine|4000
+champion|1201|doctrines/aa-counter-guard.doctrine|4000
+champion|1301|doctrines/aa-counter-guard.doctrine|4000
+champion|1409|doctrines/aa-counter-guard.doctrine|4000
+champion|1499|doctrines/aa-counter-guard.doctrine|4000
+champion|1601|doctrines/aa-counter-guard.doctrine|4000
+champion|1709|doctrines/aa-counter-guard.doctrine|4000
+champion|1801|doctrines/aa-counter-guard.doctrine|4000
+champion|1901|doctrines/aa-counter-guard.doctrine|4000
+champion|2003|doctrines/aa-counter-guard.doctrine|4000
+champion|2111|doctrines/aa-counter-guard.doctrine|4000
+champion|2203|doctrines/aa-counter-guard.doctrine|4000
+champion|2309|doctrines/aa-counter-guard.doctrine|4000
+champion|2411|doctrines/aa-counter-guard.doctrine|4000
+champion|2503|doctrines/aa-counter-guard.doctrine|4000
+champion|2609|doctrines/aa-counter-guard.doctrine|4000
+champion|2707|doctrines/aa-counter-guard.doctrine|4000
+champion|2801|doctrines/aa-counter-guard.doctrine|4000
+champion|2903|doctrines/aa-counter-guard.doctrine|4000
+champion|3001|doctrines/aa-counter-guard.doctrine|4000
+champion|3109|doctrines/aa-counter-guard.doctrine|4000
+champion|3203|doctrines/aa-counter-guard.doctrine|4000
+champion|3301|doctrines/aa-counter-guard.doctrine|4000
+champion|3407|doctrines/aa-counter-guard.doctrine|4000
+champion|3511|doctrines/aa-counter-guard.doctrine|4000
+champion|3607|doctrines/aa-counter-guard.doctrine|4000
+champion|3701|doctrines/aa-counter-guard.doctrine|4000
+champion|3803|doctrines/aa-counter-guard.doctrine|4000
+champion|3907|doctrines/aa-counter-guard.doctrine|4000
+champion|4001|doctrines/aa-counter-guard.doctrine|4000
+champion|4111|doctrines/aa-counter-guard.doctrine|4000
+champion|4201|doctrines/aa-counter-guard.doctrine|4000
+champion|4297|doctrines/aa-counter-guard.doctrine|4000
+champion|4409|doctrines/aa-counter-guard.doctrine|4000
+champion|4507|doctrines/aa-counter-guard.doctrine|4000
+champion|4603|doctrines/aa-counter-guard.doctrine|4000
+champion|4703|doctrines/aa-counter-guard.doctrine|4000
+champion|4801|doctrines/aa-counter-guard.doctrine|4000
