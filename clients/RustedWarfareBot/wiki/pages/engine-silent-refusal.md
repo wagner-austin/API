@@ -19,7 +19,7 @@ source_git_blobs:
   "wiki/sources/m31-refusal/cant-afford-retry.txt": "d902172470e3163005453f94b1aace347f9aa850"
   "wiki/sources/m31-refusal/waypoint-removed-silently.txt": "17b5f882b8aa7e1fc2b97a5af7ffdca3fc2ca13f"
   "wiki/sources/m31-refusal/waypoint-resume-check.txt": "60393dfcc0ea3bf3eaa0940f33cc3668b7b22273"
-  "agent/src/rwbot/agent/BuildWatch.java": "7c86a396339f1f7b1dd415ec1d41e6089b45e57a"
+  "agent/src/rwbot/agent/BuildWatch.java": "7c234857a53641b306daf022d606bbfc26a43f48"
   "src/rw_bot/policy/workforce.py": "3ced6c8025c33d3d1406d679650d43086c740c7d"
   "src/rw_bot/policy/runner.py": "857d1e24c2cde142054e40c7bcb50b3a1d94b009"
 game_version: "1.15 (code 176, build #28)"
