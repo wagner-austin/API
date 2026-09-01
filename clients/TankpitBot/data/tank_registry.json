@@ -39,9 +39,17 @@
      "leaderboard": 18,
      "kills": 1960,
      "deaths": 5,
-     "promo": 677110,
-     "play_time_s": 365449,
-     "observed_ms": 1788215681181
+     "promo": 677675,
+     "play_time_s": 365494,
+     "fuel": 846,
+     "inventory": [
+      25,
+      22,
+      25,
+      25,
+      19
+     ],
+     "observed_ms": 1788265482566
     }
    }
   },

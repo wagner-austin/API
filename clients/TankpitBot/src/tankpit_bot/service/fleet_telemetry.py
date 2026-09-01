@@ -186,7 +186,7 @@ class FleetTelemetry:
                 "clean_exit": digest["clean_exit"],
                 "exit_reason": digest["exit_reason"],
                 "rank_name": digest["rank_name"],
-                "rank_number": digest["rank_number"],
+                "leaderboard_position": digest["leaderboard_position"],
                 "promotion_points": digest["promotion_points"],
                 "started_at": digest["started_at"],
                 "inventory_first": inventory_first,

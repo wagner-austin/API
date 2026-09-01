@@ -11,7 +11,7 @@ feature could consult.
 
 Two writers fill it: the 0x21 TankInfo dispatch (name, persistent id,
 decoration) and the startup stats-panel scrape (rank_name, the
-countdown ``rank_number`` — [[tank-registry]] § rank number —
+countdown ``leaderboard_position`` — [[tank-registry]] § rank number —
 promotion points, lifetime totals). Anything rank-aware or
 identity-aware plugs in HERE instead of re-fishing event streams.
 """
@@ -34,7 +34,7 @@ class SelfAccountDict(TypedDict):
             until observed.
         rank_name: Stats-panel rank label (e.g. ``private``); empty
             until scraped.
-        rank_number: The countdown rank in parentheses after the rank
+        leaderboard_position: The countdown rank in parentheses after the rank
             name — descends toward 1 as promotion points accumulate
             ([[tank-registry]]); -1 until scraped.
         promotion_points: Lifetime promotion points; -1 until scraped.
@@ -52,7 +52,7 @@ class SelfAccountDict(TypedDict):
     persistent_tank_id: int
     decoration_state_hex: str
     rank_name: str
-    rank_number: int
+    leaderboard_position: int
     promotion_points: int
     destroyed_enemies: int
     deactivated_total: int
@@ -73,7 +73,7 @@ def make_empty_self_account() -> SelfAccountDict:
         persistent_tank_id=-1,
         decoration_state_hex="",
         rank_name="",
-        rank_number=-1,
+        leaderboard_position=-1,
         promotion_points=-1,
         destroyed_enemies=-1,
         deactivated_total=-1,
@@ -97,7 +97,7 @@ def encode_self_account(account: SelfAccountDict) -> JSONObject:
         "persistent_tank_id": account["persistent_tank_id"],
         "decoration_state_hex": account["decoration_state_hex"],
         "rank_name": account["rank_name"],
-        "rank_number": account["rank_number"],
+        "leaderboard_position": account["leaderboard_position"],
         "promotion_points": account["promotion_points"],
         "destroyed_enemies": account["destroyed_enemies"],
         "deactivated_total": account["deactivated_total"],
@@ -121,7 +121,7 @@ def decode_self_account(data: JSONObject) -> SelfAccountDict:
         persistent_tank_id=require_int(data, "persistent_tank_id"),
         decoration_state_hex=require_str(data, "decoration_state_hex"),
         rank_name=require_str(data, "rank_name"),
-        rank_number=require_int(data, "rank_number"),
+        leaderboard_position=require_int(data, "leaderboard_position"),
         promotion_points=require_int(data, "promotion_points"),
         destroyed_enemies=require_int(data, "destroyed_enemies"),
         deactivated_total=require_int(data, "deactivated_total"),

@@ -144,7 +144,7 @@ def test_capture_emits_single_c_press_and_scrapes(
     # runtime features read THIS, not the diagnostic stream.
     account = ws.self_account
     assert account["rank_name"] == "private"
-    assert account["rank_number"] == 160
+    assert account["leaderboard_position"] == 160
     assert account["promotion_points"] == 121314
     assert account["destroyed_enemies"] == 65
     assert account["deactivated_total"] == 0

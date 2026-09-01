@@ -46,7 +46,7 @@ _EXPECTED = AccountStatsDict(
     deactivated=0,
     promotion_points=121314,
     rank_name="private",
-    rank_number=160,
+    leaderboard_position=160,
 )
 
 
@@ -130,7 +130,7 @@ def test_parse_unpadded_play_time_fields() -> None:
     assert stats["play_time_s"] == 42 * 3600 + 3 * 60 + 10
     assert stats["destroyed_enemies"] == 89
     assert stats["promotion_points"] == 157725
-    assert stats["rank_number"] == 139
+    assert stats["leaderboard_position"] == 139
 
 
 def test_parse_returns_none_without_marker() -> None:
@@ -182,7 +182,7 @@ def test_emit_visible_sample(fake_fs: FakeFileSystem) -> None:
         "deactivated": 0,
         "promotion_points": 121314,
         "rank_name": "private",
-        "rank_number": 160,
+        "leaderboard_position": 160,
     }
 
 

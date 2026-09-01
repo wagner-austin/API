@@ -82,7 +82,7 @@ def _full_session_lines() -> list[str]:
             "diagnostic_kind=session_account_stats",
             diagnostic_kind="session_account_stats",
             rank_name="private",
-            rank_number=26,
+            leaderboard_position=26,
             promotion_points=267291,
         ),
         _event(
@@ -221,7 +221,7 @@ def test_full_session_digest(tmp_path: Path) -> None:
     assert digest["displacement_top"] == [{"requested_x": 59, "requested_y": 95, "count": 2}]
     assert digest["releases_by_reason"] == {"unservable": 1}
     assert digest["rank_name"] == "private"
-    assert digest["rank_number"] == 26
+    assert digest["leaderboard_position"] == 26
     assert digest["promotion_points"] == 267291
     assert digest["inventory_first"] == [25, 20, 25, 23, 22]
     assert digest["inventory_last"] == [25, 25, 25, 25, 20]
@@ -270,7 +270,7 @@ def test_crashed_session_has_no_clean_exit(tmp_path: Path) -> None:
 
     assert digest["clean_exit"] is False
     assert digest["exit_reason"] == ""
-    assert digest["rank_number"] == -1
+    assert digest["leaderboard_position"] == -1
     assert digest["inventory_first"] == []
     assert digest["kills"] == 1
 
@@ -278,26 +278,6 @@ def test_crashed_session_has_no_clean_exit(tmp_path: Path) -> None:
     assert "CRASHED (no teardown scorecard)" in rendered
     assert "account" not in rendered
     assert "inventory" not in rendered
-
-
-def test_pre_rename_archives_read_rank_points(tmp_path: Path) -> None:
-    """Artifacts written before the rank_number rename still digest."""
-    source = _write_session(
-        tmp_path / "old.events.jsonl",
-        [
-            _event(
-                "2026-08-05T00:00:00",
-                "DIAGNOSTIC",
-                "diagnostic_kind=session_account_stats",
-                diagnostic_kind="session_account_stats",
-                rank_name="private",
-                rank_points=27,
-                promotion_points=241167,
-            ),
-        ],
-    )
-
-    assert build_run_digest(source)["rank_number"] == 27
 
 
 def test_a_demotion_with_an_unknown_rank_still_lands_in_the_digest(tmp_path: Path) -> None:

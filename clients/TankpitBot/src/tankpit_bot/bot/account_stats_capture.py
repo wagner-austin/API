@@ -78,7 +78,7 @@ def capture_account_stats(
         # diagnostic stream.
         ws.record_account_stats(
             rank_name=stats["rank_name"],
-            rank_number=stats["rank_number"],
+            leaderboard_position=stats["leaderboard_position"],
             promotion_points=stats["promotion_points"],
             destroyed_enemies=stats["destroyed_enemies"],
             deactivated_total=stats["deactivated"],

@@ -5165,3 +5165,19 @@ Same push: the last uncovered arc from the mine batch (executor's teleport send-
 Operator: "double check your work so far please." Three adversarial worries chased. CLEAR: the sim already routes `CMD_MINE` (kind "mine", sim/server.py) so seam scenarios survive pin presses; CLEAR: `read_team_reports` skips the bot's own report, so the bot-spread rank can never deprioritize a tank's own locked target. REAL: `human_war_is_live` keyed the war's end on `liveness != "alive"` — but a human who LOGS OUT emits no deactivation and lingers `alive` in the registry indefinitely (the Yuppler ghost, 2026-07-30: 43 rejected shots at a departed human's kept entry), so one logout would have held the whole fleet at the 80/50 wartime bar for the rest of the session. Fix: a 30 s presence-staleness bound (`_WAR_PRESENCE_TTL_MS`) — a present tank is re-stamped every ~2 s by the global 0x2E sync and every map answer, so staleness IS the departure tell. The war fixture was rebuilt with explicit per-arm stamps and a dedicated logout test.
 
 Standing doctrine recorded on [[bot-behavior-contract]] §3.1 in the same pass: the wartime floor, the focus-humans/spread-bots split, the recruits-pay-nothing ordering, and the mine pin.
+
+## [2026-09-01] corrected | The `s` field is a LEADERBOARD POSITION, not a promotion countdown — and the archive said so all along
+
+[[tank-registry]] had carried "COUNTDOWN RANK NUMBER" since 2026-08-05. It is the tank's PLACE in the room's standings, 1 at the top. The correction came from the operator's reading, but it is not filed on the operator's say-so: the answer was already sitting in `runs/bot/*/*.events.jsonl`, unqueried.
+
+**The identical-state pair settles it.** Two tanks at 0 kills and 0 promotion points read **28946** and **28952**, seventeen seconds apart (artax and arterial, both recruits, 2026-08-28 20:30). A countdown to the next rank is a function of rank and points alone, so identical state MUST produce an identical number. A place in a standings table must not — those two are simply adjacent near the bottom of ~29,000 tanks.
+
+**The other end confirms it.** Arterial went 148 kills → 12055, then 149 kills → **12060**: the number got WORSE while the tank scored. A countdown cannot move that way; four days of other tanks climbing past it explains it exactly.
+
+**It is per TANK, not per account.** One account's colours, same day: artax private 1933 kills → 18, artax captain 691 kills → 4562, artax recruit 0 kills → 28946.
+
+Three observations the page already carried only ever fit the corrected reading, which is the part worth remembering: `100000 = roster default before a tank is ever seen live` is a sentinel for "unplaced" that a countdown has no use for, and "bots decrement ~1 per hit they LAND; bots that only TAKE hits stay frozen" is how a standings table behaves, not a promotion requirement. The evidence was in the page, under the wrong headline.
+
+Renamed through the code the same day, no compatibility shim: `rank_number` → `leaderboard_position` across 15 files (`AccountStatsDict`, `SelfAccountDict`, `RunDigestDict`, the digest reader and renderer, the fleet telemetry payload and page, the C-panel capture, the tank registry writer). The digest's pre-2026-08-05 `rank_points` fallback was DELETED rather than extended to a third spelling, and the test that pinned it deleted with it — an immutable archive is not a reason to keep a reader growing spellings forever. Old archives now read the digest default for that field, which is honest; nothing silently mislabels itself.
+
+Gate: ruff, mypy (1121 files), guard, and 2,355 tests across diagnostics/bot/service/world_state.

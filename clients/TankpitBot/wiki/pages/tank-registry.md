@@ -28,21 +28,41 @@ hubs: [protocol]
 | `i` | drawn viewport row | same motion; i 9→8; self renders at col 9, row 9[^1] |
 | `s` | **rank number** | panel rank number 151 at 00:45:20 matched s=151 at 00:45:18[^2] |
 
-## Rank number behavior
+## Leaderboard position behavior
 
-Corrected 2026-08-05 (user law): `s` is the COUNTDOWN RANK NUMBER shown
-in parentheses after the rank name on the stats panel ("Rank: private
-(26)"), not a points total — the points are the separate
-`promotion_points` line. It descends toward 1 as promotion points
-accumulate ("im currently rank 26. as we get more kills ill move down
-to 25, 24, ..., and eventually 1"); own-tank trace across the archive:
-160 (Jun 10) → 151 (Jun 11) → 27 → 26 (Aug 5, one 20-kill session
-apart). Startup scrape lands in `session_account_stats.rank_number` and, as of 2026-08-06, in the canonical runtime account model `SelfAccountDict` (`state/types/self_account.py`, read via `sniffer.world_state.get_self_account()`) -- the plug-in point for rank-aware features.[^countdown]
+`s` is the tank's PLACE in the room's standings, shown in parentheses
+after the rank name on the stats panel ("Rank: private (18)"). 1 is the
+top. Not a points total — the points are the separate
+`promotion_points` line. It descends as the tank accumulates ("im
+currently rank 26. as we get more kills ill move down to 25, 24, ...,
+and eventually 1"); own-tank trace across the archive: 160 (Jun 10) →
+151 (Jun 11) → 27 → 26 (Aug 5, one 20-kill session apart). Startup
+scrape lands in `session_account_stats.leaderboard_position` and in the
+canonical runtime account model `SelfAccountDict`
+(`state/types/self_account.py`, read via
+`sniffer.world_state.get_self_account()`) -- the plug-in point for
+rank-aware features.
+
+**Read as a promotion COUNTDOWN from 2026-08-05 to 2026-09-01.** The
+archive settled it: two tanks at 0 kills and 0 promotion points read
+**28946** and **28952**, seventeen seconds apart. A countdown to the
+next rank is a function of rank and points alone, so identical state
+MUST yield an identical number; a place in a standings table must not.
+Confirmed from the other end — one tank went 148 kills → 12055 and
+then 149 kills → **12060**, the number worsening as it scored, which
+positional drift explains and a countdown cannot. It is per TANK, not
+per account: one account's four colours read 18, 4562 and 28946 on the
+same day.[^leaderboard]
+
+The three older observations all fit the corrected reading, and two of
+them only fit it:
 
 - Persistent across sessions AND across deaths (purple-3 died at s=559, respawned still 559)[^2]
-- Counts DOWN as the tank earns promotion points[^2]
-- 100000 = roster default before a tank is ever seen live[^2]
-- Bots decrement ~1 per hit they land; bots that only TAKE hits stay frozen[^2]
+- Descends as the tank earns promotion points[^2]
+- 100000 = roster default before a tank is ever seen live[^2] — a
+  sentinel for "unplaced", which a countdown has no need of
+- Bots decrement ~1 per hit they land; bots that only TAKE hits stay
+  frozen[^2] — landing hits moves you UP a table; taking them does not
 
 ## Damage tier for self
 
@@ -65,4 +85,4 @@ Dead or departed tanks keep their last drawn state for minutes. Not distinguisha
 [^1]: run 20260611-004505 — full registry field verification; damage tier matched 5/5 transitions; viewport position matched motion
 [^2]: run 20260611-004505 — panel rank_points exact match; persistence across death verified on purple-3
 [^3]: run 20260611-110445 + 013801 + 003415 — P/U, l, practice-bot theories tested and retracted
-[^countdown]: User law, 2026-08-05, correcting this page's earlier reading of the `s` field. The registry writer that consumes it is `apply_tank_observation` at `src/tankpit_bot/state/tank_mutations.py:28`. Verified present 2026-08-07.
+[^leaderboard]: Measured 2026-09-01 from `runs/bot/*/*.events.jsonl` `session_account_stats` records across seven instances. The identical-state pair is artax recruit 0 kills / 0 promo → 28946 (20:30:33) and arterial recruit 0 kills / 0 promo → 28952 (20:30:50), both 2026-08-28. The worsening-with-kills pair is arterial sergeant 148 kills → 12055 (2026-08-28) and 149 kills → 12060 (2026-09-01). Per-tank spread on one account, same day: artax private 1933 kills → 18, artax captain 691 kills → 4562, artax recruit 0 kills → 28946. Supersedes the 2026-08-05 countdown reading this page carried; the operator named it a leaderboard the same day the measurement was taken. The registry writer that consumes `s` is `apply_tank_observation` at `src/tankpit_bot/state/tank_mutations.py:28`. Field renamed `rank_number` → `leaderboard_position` across the code the same day.

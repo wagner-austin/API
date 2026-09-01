@@ -104,11 +104,9 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
     # number for fuel_capacity or radar_radius look it up.
     colours[TROOP_COLOR_NAMES[team]] = {
         "rank": account["rank_name"],
-        # Descends toward 1 as points accumulate, so it is a POSITION
-        # rather than a countdown to the next promotion (operator,
-        # 2026-08-31). ``AccountStatsDict.rank_number`` still carries
-        # the older reading in its own docstring.
-        "leaderboard": account["rank_number"],
+        # A place in the room's standings, 1 being the top -- settled
+        # by measurement 2026-09-01, see AccountStatsDict.
+        "leaderboard": account["leaderboard_position"],
         "kills": account["destroyed_enemies"],
         "deaths": account["deactivated_total"],
         "promo": account["promotion_points"],

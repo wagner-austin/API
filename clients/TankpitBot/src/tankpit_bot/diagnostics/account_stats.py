@@ -38,15 +38,26 @@ class AccountStatsDict(TypedDict):
         deactivated: Lifetime own-deactivation count.
         promotion_points: Lifetime promotion points.
         rank_name: Current rank label (e.g. ``private``).
-        rank_number: The COUNTDOWN rank number in parentheses after the
-            rank name -- "Rank: private (26)". Descends toward 1 as
-            promotion points accumulate (user, 2026-08-05: "im
-            currently rank 26. as we get more kills ill move down to
-            25, 24, ..., and eventually 1"); measured 151 (June 11) ->
-            27 -> 26 across the archive. NOT a points total -- the
-            points live in ``promotion_points``. The same number is
-            wire-visible per tank as registry field ``s``
-            ([[tank-registry]]).
+        leaderboard_position: The tank's PLACE in the room's standings,
+            printed in parentheses after the rank -- "Rank: private
+            (18)". 1 is the top. Descends as the tank accumulates
+            (user, 2026-08-05: "im currently rank 26. as we get more
+            kills ill move down to 25, 24, ..., and eventually 1").
+
+            Called ``rank_number`` and documented as a promotion
+            COUNTDOWN until 2026-09-01, when the archive settled it:
+            two tanks at 0 kills and 0 promotion points read 28946 and
+            28952, seventeen seconds apart. A countdown to the next
+            rank is a function of rank and points alone, so identical
+            state MUST yield an identical number; a place in a
+            standings table must not. Confirmed from the other end --
+            one tank went 148 kills -> 12055 and then 149 kills ->
+            12060, the number worsening as it scored, which positional
+            drift explains and a countdown cannot.
+
+            Per TANK, not per account: one account's colours read 18,
+            4562 and 28946 on the same day. NOT a points total -- the
+            points live in ``promotion_points``.
     """
 
     play_time_s: int
@@ -54,7 +65,7 @@ class AccountStatsDict(TypedDict):
     deactivated: int
     promotion_points: int
     rank_name: str
-    rank_number: int
+    leaderboard_position: int
 
 
 def encode_account_stats(stats: AccountStatsDict) -> JSONObject:
@@ -72,7 +83,7 @@ def encode_account_stats(stats: AccountStatsDict) -> JSONObject:
         "deactivated": stats["deactivated"],
         "promotion_points": stats["promotion_points"],
         "rank_name": stats["rank_name"],
-        "rank_number": stats["rank_number"],
+        "leaderboard_position": stats["leaderboard_position"],
     }
 
 
@@ -94,7 +105,7 @@ def decode_account_stats(data: JSONObject) -> AccountStatsDict:
         deactivated=require_int(data, "deactivated"),
         promotion_points=require_int(data, "promotion_points"),
         rank_name=require_str(data, "rank_name"),
-        rank_number=require_int(data, "rank_number"),
+        leaderboard_position=require_int(data, "leaderboard_position"),
     )
 
 
@@ -138,7 +149,7 @@ def parse_account_stats(page_text: str) -> AccountStatsDict | None:
         deactivated=int(deactivated.group(1)),
         promotion_points=int(promotion.group(1)),
         rank_name=rank.group(1),
-        rank_number=int(rank.group(2)),
+        leaderboard_position=int(rank.group(2)),
     )
 
 
@@ -195,7 +206,7 @@ def emit_account_stats_sample(
         deactivated=stats["deactivated"],
         promotion_points=stats["promotion_points"],
         rank_name=stats["rank_name"],
-        rank_number=stats["rank_number"],
+        leaderboard_position=stats["leaderboard_position"],
     )
 
 

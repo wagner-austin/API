@@ -40,7 +40,7 @@ def _panelled_world(*, team: int, name: str = "Artax") -> WorldService:
     ws.record_self_identity(name, 62913, "00", 1000)
     ws.record_account_stats(
         rank_name="major",
-        rank_number=18,
+        leaderboard_position=18,
         promotion_points=674270,
         destroyed_enemies=1958,
         deactivated_total=5,

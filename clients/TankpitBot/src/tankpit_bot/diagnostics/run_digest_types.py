@@ -112,7 +112,7 @@ class RunDigestDict(TypedDict):
             timeline buckets smooth over.
         wire_gaps_over_30s: How many inter-dispatch gaps exceeded 30 s.
         rank_name: Account rank label at startup, empty when unscraped.
-        rank_number: Countdown rank number at startup (-1 unscraped).
+        leaderboard_position: Countdown rank number at startup (-1 unscraped).
         promotion_points: Account promotion points (-1 unscraped).
         inventory_first: First sampled (armor,dual,missile,homing,radar).
         inventory_last: Last sampled (armor,dual,missile,homing,radar).
@@ -148,7 +148,7 @@ class RunDigestDict(TypedDict):
     max_wire_gap_s: int
     wire_gaps_over_30s: int
     rank_name: str
-    rank_number: int
+    leaderboard_position: int
     promotion_points: int
     inventory_first: list[int]
     inventory_last: list[int]

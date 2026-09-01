@@ -281,8 +281,8 @@ function row(bot) {
     // The WORD is the rank; the number beside it is the leaderboard
     // position, which is what this column used to show on its own.
     '<td><span class="rank">' + (s.available && s.rank_name ? s.rank_name : "") +
-    "</span>" + (s.available && s.rank_number >= 0
-      ? ' <span class="lb">#' + s.rank_number + "</span>" : "") + "</td>" +
+    "</span>" + (s.available && s.leaderboard_position >= 0
+      ? ' <span class="lb">#' + s.leaderboard_position + "</span>" : "") + "</td>" +
     "<td>" + fmtDuration(up) + "</td>";
   const actions = document.createElement("td");
   for (const [label, method, path, disabled] of [

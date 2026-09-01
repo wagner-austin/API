@@ -406,7 +406,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         self,
         *,
         rank_name: str,
-        rank_number: int,
+        leaderboard_position: int,
         promotion_points: int,
         destroyed_enemies: int,
         deactivated_total: int,
@@ -417,7 +417,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
 
         Args:
             rank_name: Panel rank label.
-            rank_number: The countdown rank number.
+            leaderboard_position: The countdown rank number.
             promotion_points: Lifetime promotion points.
             destroyed_enemies: Lifetime kills.
             deactivated_total: Lifetime own-deactivations.
@@ -425,7 +425,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
             timestamp_ms: When the scrape was taken.
         """
         self.self_account["rank_name"] = rank_name
-        self.self_account["rank_number"] = rank_number
+        self.self_account["leaderboard_position"] = leaderboard_position
         self.self_account["promotion_points"] = promotion_points
         self.self_account["destroyed_enemies"] = destroyed_enemies
         self.self_account["deactivated_total"] = deactivated_total

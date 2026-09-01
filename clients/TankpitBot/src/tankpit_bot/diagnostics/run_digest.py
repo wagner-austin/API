@@ -206,11 +206,7 @@ def _apply_session_diagnostic(
         digest["self_tank_id"] = _field_int(record, "tank_id")
     elif kind == "session_account_stats":
         digest["rank_name"] = str(record["fields"].get("rank_name", ""))
-        # Archives before 2026-08-05 spell the countdown rank
-        # "rank_points" (the mislabel the rename fixed); the artifact
-        # is immutable so the reader takes either.
-        rank_key = "rank_number" if "rank_number" in record["fields"] else "rank_points"
-        digest["rank_number"] = _field_int(record, rank_key)
+        digest["leaderboard_position"] = _field_int(record, "leaderboard_position")
         digest["promotion_points"] = _field_int(record, "promotion_points")
     elif kind == "inventory_sample":
         inventory = _inventory_row(record)
@@ -392,7 +388,7 @@ def build_run_digest(source_path: Path) -> RunDigestDict:
         max_wire_gap_s=0,
         wire_gaps_over_30s=0,
         rank_name="",
-        rank_number=-1,
+        leaderboard_position=-1,
         promotion_points=-1,
         inventory_first=[],
         inventory_last=[],

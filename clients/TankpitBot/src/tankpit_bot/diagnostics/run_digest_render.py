@@ -40,9 +40,9 @@ def render_run_digest(digest: RunDigestDict) -> str:
         f" max_wire_gap={digest['max_wire_gap_s']}s"
         f" gaps_over_30s={digest['wire_gaps_over_30s']}",
     ]
-    if digest["rank_number"] != -1:
+    if digest["leaderboard_position"] != -1:
         lines.append(
-            f"account    rank={digest['rank_name']} ({digest['rank_number']})"
+            f"account    rank={digest['rank_name']} ({digest['leaderboard_position']})"
             f" promo={digest['promotion_points']}"
         )
     if digest["inventory_first"]:

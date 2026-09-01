@@ -18,7 +18,7 @@ def test_empty_model_is_all_sentinels() -> None:
 
     assert account["name"] == ""
     assert account["persistent_tank_id"] == -1
-    assert account["rank_number"] == -1
+    assert account["leaderboard_position"] == -1
     assert account["promotion_points"] == -1
     assert account["identity_observed_ms"] == 0
     assert account["stats_observed_ms"] == 0
@@ -31,7 +31,7 @@ def test_roundtrip_preserves_every_field() -> None:
     account["persistent_tank_id"] = 62913
     account["decoration_state_hex"] = "1e000000"
     account["rank_name"] = "private"
-    account["rank_number"] = 25
+    account["leaderboard_position"] = 25
     account["promotion_points"] = 381015
     account["destroyed_enemies"] = 1179
     account["deactivated_total"] = 3
