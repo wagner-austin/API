@@ -76,29 +76,6 @@ GAME_DIR = "game"
 #: node assembled for itself.
 PAYLOAD_DIR = "payload"
 
-#: Where a batch's per-member game clones live, relative to the root.
-#:
-#: Given to a cluster member rather than left to resolve against its working
-#: directory, and both halves of that were measured on one submission.
-#:
-#: A clone name is relative -- ``.game-w1`` -- and ``sbatch`` sets no working
-#: directory, so a member resolves it against the directory it was SUBMITTED
-#: from. ``hpc3`` submits with ``cd <script_dir> && sbatch``, and that is one
-#: directory on ``/pub`` for the whole project. Two members nine seconds
-#: apart on different nodes therefore aimed at ONE clone: the first made it
-#: and began copying 307 MB in, the second saw it already existed, skipped
-#: the copy it thought was done, and died listing
-#: ``.game-w1/assets/maps/skirmish`` one second in (jobs 55663569/55663571,
-#: 2026-08-30; the 72 MB it got through was still sitting in
-#: ``rusted/scripts/`` afterwards). Named here instead, so a clone lands
-#: where the batch's other data does rather than wherever a submission
-#: happened to be typed.
-#:
-#: Per BATCH, not per project: two batches running at once would otherwise
-#: hand the same ordinal to two different matches, which is the collision
-#: this exists to remove rather than a smaller version of it.
-CLONE_ROOT = "runs/clones"
-
 #: The pinned game directory a workstation's clones are copied from.
 #:
 #: Here rather than beside each caller: the sweep entry point, the fleet
@@ -184,20 +161,6 @@ def cluster_path(root: str, project: str, relative: str) -> str:
     return f"{project_dir(root, project)}/{relative}"
 
 
-def clones_path(root: str, project: str, batch: str) -> str:
-    """Return the directory one batch's game clones are made in.
-
-    Args:
-        root: The cluster root, absolute and POSIX, from the hpc3 workspace.
-        project: The hpc3 project this batch belongs to.
-        batch: The sweep whose members clone here.
-
-    Returns:
-        The absolute cluster path.
-    """
-    return cluster_path(root, project, f"{CLONE_ROOT}/{batch}")
-
-
 def declares_result_for(declared: str, batch: str, job: SweepJob) -> bool:
     """Report whether a declared path is the one a given match writes.
 
@@ -220,7 +183,6 @@ def declares_result_for(declared: str, batch: str, job: SweepJob) -> bool:
 
 
 __all__ = [
-    "CLONE_ROOT",
     "GAME_DIR",
     "LOG_DIR",
     "LOG_SUFFIX",
@@ -230,7 +192,6 @@ __all__ = [
     "SWEEP_ROOT",
     "TRACE_ROOT",
     "TRACE_SUFFIX",
-    "clones_path",
     "cluster_path",
     "declares_result_for",
     "match_log_path",

@@ -29,7 +29,6 @@ from rw_bot.harness.clone import CLONE_PREFIX, DISPLAY_BASE, PLAY_PORT_BASE
 from rw_bot.harness.results_layout import (
     PAYLOAD_DIR,
     TRACE_ROOT,
-    clones_path,
     cluster_path,
 )
 from rw_bot.harness.runner import FROZEN_ENTRIES, TREE_MARKER
@@ -49,10 +48,10 @@ _MAP = "maps/skirmish/[p2]duel_lake.tmx"
 _JOBS = cluster_path(_ROOT, _PROJECT, "sweeps/demo.txt")
 _BATCH = "demo"
 
-#: Where this batch's members make their clones. Given to a member rather
-#: than resolved against its working directory, which on a compute node is a
-#: HOME every node shares.
-_CLONES = clones_path(_ROOT, _PROJECT, _BATCH)
+#: Where this batch's members make their clones. On the real cluster this is
+#: the job's own $TMPDIR, expanded by the batch script; the member itself
+#: just receives a directory, so any absolute path exercises it.
+_CLONES = "/tmp/wagnera3/55555555/rw-clones"
 _LINES = (
     "attack|1|doctrines/a.doctrine|1500",
     "attack|2|doctrines/a.doctrine|1500",

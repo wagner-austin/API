@@ -228,6 +228,26 @@ class TestTheMembers:
             assert decoded == member
 
 
+class TestClonesAreNodeLocal:
+    """Clones lived on BeeGFS until 2026-09-01, and many members booting at
+    once crawled the engine's asset loading past the wrong-world guard's 60s
+    deadline -- ten members across four batches halted with `after 60s the
+    live world is null`, every one completing on an uncontended retry. The
+    job's own $TMPDIR (local disk, measured 1.9 GB/s, removed with the job)
+    is where a disposable per-member copy belongs."""
+
+    def test_the_member_clones_into_the_jobs_own_scratch(self) -> None:
+        """Unexpanded in the document, deliberately: the batch script's bash
+        expands it on the node, after Slurm has provisioned the directory,
+        and the script's `set -u` makes a node without TMPDIR fail loudly."""
+        assert " --clones $TMPDIR/rw-clones " in _command()
+
+    def test_no_clone_path_touches_the_shared_filesystem(self) -> None:
+        command = _command()
+        clones = command.split("--clones ")[1].split(" ")[0]
+        assert not clones.startswith(ROOT)
+
+
 class TestThePayloadIsAParameter:
     """Which staged tree a batch reads IS the experiment once two code
     versions are compared: an A/B is two documents whose members read their

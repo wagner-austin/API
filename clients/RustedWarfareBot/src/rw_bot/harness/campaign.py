@@ -54,7 +54,6 @@ from rw_bot.harness.match import MatchConfig
 from rw_bot.harness.results_layout import (
     GAME_DIR,
     TRACE_ROOT,
-    clones_path,
     cluster_path,
     result_path,
 )
@@ -143,11 +142,20 @@ def member_command(
         f" --traces {cluster_path(root, project, TRACE_ROOT)}"
         f" --map {shlex.quote(match['map_path'])}"
         f" --difficulty {match['difficulty']}"
-        # Where this member's copy of the game is made. Given, because a
-        # clone name is relative and `sbatch` sets no working directory --
-        # which aimed the whole batch at one directory in the project's
-        # script directory and killed the second member to reach it.
-        f" --clones {clones_path(root, project, batch)}"
+        # Where this member's copy of the game is made: the NODE'S OWN
+        # scratch, expanded by the job script's bash at runtime, never the
+        # shared filesystem. Clones lived on BeeGFS until 2026-09-01, and
+        # the engine's asset loading -- thousands of small reads plus a
+        # file-watch attempt per .ini -- crawled whenever many members
+        # booted at once, blowing the wrong-world guard's 60s un-adopted
+        # deadline: ten members across four batches halted with `after 60s
+        # the live world is null` and every one completed on an
+        # uncontended retry. Slurm provisions $TMPDIR per job on local
+        # disk (measured 1.9 GB/s on hpc3-l18-04) and removes it with the
+        # job, which also makes cluster clone cleanup automatic. The job
+        # script runs `set -u`, so a node without TMPDIR fails loudly at
+        # expansion rather than quietly cloning somewhere shared.
+        f" --clones $TMPDIR/rw-clones"
         f" --result {member_artifact(root, project, batch, job)}"
     )
 
