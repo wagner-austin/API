@@ -9,11 +9,14 @@ interesting and is why the two-project cases live here.
 from __future__ import annotations
 
 import pathlib
+import time
+from collections.abc import Callable
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str
 
+from hpc3.cli import _test_hooks
 from hpc3.cli import submit as submit_cli
 from hpc3.cli import watch as watch_cli
 from tests.against_hpc3 import decode_job_status
@@ -301,3 +304,111 @@ class TestMultiJobWatch:
     ) -> None:
         with pytest.raises(ValueError, match="at least one job id"):
             watch_cli.main(_watch_args(tmp_path, ",,"))
+
+    def test_a_non_positive_poll_cadence_is_refused(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        with pytest.raises(ValueError, match="--poll-seconds must be positive"):
+            watch_cli.main([*_watch_args(tmp_path, "101"), "--poll-seconds", "0"])
+
+
+class TestFollowMode:
+    """The follow mode replaces the hand-rolled ssh polling loop per session.
+
+    Six such loops were written in one day of panel-driving, and one of them
+    declared a running panel drained on a shell quoting bug -- the failure
+    class a tested flag exists to remove.
+    """
+
+    def _slept(self) -> tuple[list[float], Callable[[], None]]:
+        """Swap the sleep hook for a recorder.
+
+        Returns:
+            The record of requested waits, and the restorer.
+        """
+        recorded: list[float] = []
+        original = _test_hooks.sleep
+        _test_hooks.sleep = recorded.append
+        return recorded, lambda: setattr(_test_hooks, "sleep", original)
+
+    def test_it_polls_to_terminal_and_emits_only_transitions(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        running = "55519937|abl.verify|free-gpu32|RUNNING|30|billing=11,gres/gpu=1|n1\n"
+        fake_run.add("sacct", stdout=running, once=True)
+        fake_run.add("sacct", stdout=running, once=True)
+        fake_run.add("sacct", stdout=_ROW + "\n")
+        slept, restore = self._slept()
+        try:
+            code = watch_cli.main(
+                [*_watch_args(tmp_path, "55519937"), "--until-done", "1", "--poll-seconds", "5"]
+            )
+        finally:
+            restore()
+        assert code == 0
+        status_lines = [line for line in emitted if line.startswith(("live ", "final "))]
+        # Three reads, two states: the unchanged middle read emits nothing.
+        assert len(status_lines) == 2
+        assert "RUNNING" in status_lines[0]
+        assert "COMPLETED" in status_lines[1]
+        assert slept == [5, 5]
+        assert emitted[-1] == "budget OK abl"
+
+    def test_a_late_appearing_job_is_waited_for_and_said_so(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        fake_run.add("sacct", stdout="", once=True)
+        fake_run.add("sacct", stdout=_ROW + "\n")
+        slept, restore = self._slept()
+        try:
+            code = watch_cli.main([*_watch_args(tmp_path, "55519937"), "--until-done", "1"])
+        finally:
+            restore()
+        assert code == 0
+        assert emitted[0] == "accounting knows none of 1 job(s) yet; waiting"
+        assert slept == [60]
+
+    def test_ids_accounting_never_learns_are_ruled_wrong_not_waited_on_forever(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        fake_run.add("sacct", stdout="")
+        slept, restore = self._slept()
+        try:
+            with pytest.raises(ValueError, match="sacct knows no job"):
+                watch_cli.main([*_watch_args(tmp_path, "999"), "--until-done", "1"])
+        finally:
+            restore()
+        # Four waits, then the fifth empty read raises rather than sleeping.
+        assert slept == [60, 60, 60, 60]
+
+    def test_the_default_sleep_hook_really_waits(self) -> None:
+        """The production binding is a real wait, executed here against the
+        clock -- everywhere else the suite swaps it, so without this the one
+        line production runs would be the one line nothing ever ran. The
+        floor sits under the request because Windows' timer granularity can
+        return a few milliseconds early."""
+        _test_hooks.reset_hooks()
+        started = time.monotonic()
+        _test_hooks.sleep(0.05)
+        assert time.monotonic() - started >= 0.03
+
+    def test_the_wait_holds_while_a_requested_id_is_still_absent(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """All rows terminal is not enough: a member accounting has not seen
+        yet is still in flight, and returning without it would be the false
+        drain this mode exists to prevent."""
+        one_of_two = "101|abl.a|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n1\n"
+        both = one_of_two + "102|abl.b|free-gpu|COMPLETED|60|billing=8,gres/gpu=1|n2\n"
+        fake_run.add("sacct", stdout=one_of_two, once=True)
+        fake_run.add("sacct", stdout=both)
+        slept, restore = self._slept()
+        try:
+            code = watch_cli.main(
+                [*_watch_args(tmp_path, "101,102", gpu_hours=10.0), "--until-done", "1"]
+            )
+        finally:
+            restore()
+        assert code == 0
+        assert slept == [60]
+        assert "states COMPLETED=2" in emitted

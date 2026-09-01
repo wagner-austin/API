@@ -1,16 +1,17 @@
 """Dependency-injection seam for the CLI layer.
 
-The CLI's only impure acts beyond what the core already routes through hooks
-are writing its report to stdout and its refusals to stderr. Both go through
-hooks so a test asserts what a command reported rather than what pytest
-managed to capture, which keeps the assertions about content instead of about
-capture behaviour.
+The CLI's impure acts beyond what the core already routes through hooks are
+writing its report to stdout, its refusals to stderr, reading the wall clock,
+and -- for the follow mode -- sleeping between polls. All go through hooks so
+a test asserts what a command reported rather than what pytest managed to
+capture, and drives a polling loop without waiting through it.
 """
 
 from __future__ import annotations
 
 import datetime
 import sys
+import time
 from collections.abc import Callable
 
 
@@ -48,17 +49,28 @@ def _default_now_iso() -> str:
     return datetime.datetime.now(tz=datetime.UTC).isoformat()
 
 
+def _default_sleep(seconds: float) -> None:
+    """Wait between follow-mode polls.
+
+    Args:
+        seconds: How long to wait.
+    """
+    time.sleep(seconds)
+
+
 emit: Callable[[str], None] = _default_emit
 emit_error: Callable[[str], None] = _default_emit_error
 now_iso: Callable[[], str] = _default_now_iso
+sleep: Callable[[float], None] = _default_sleep
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global emit, emit_error, now_iso
+    global emit, emit_error, now_iso, sleep
     emit = _default_emit
     emit_error = _default_emit_error
     now_iso = _default_now_iso
+    sleep = _default_sleep
 
 
-__all__ = ["emit", "emit_error", "now_iso", "reset_hooks"]
+__all__ = ["emit", "emit_error", "now_iso", "reset_hooks", "sleep"]

@@ -3,6 +3,7 @@
 Usage:
     hpc3-watch --config hpc3.json --job 55519937
     hpc3-watch --config hpc3.json --job 55519937,55520509,55520564
+    hpc3-watch --config hpc3.json --job 55519937,55520509 --until-done 1
 
 The reported cost applies the partition's usage factor, so a job on
 ``free-gpu`` reports 0.0000 SU however long it ran, and a short job on a
@@ -11,6 +12,13 @@ billing partition reports the fraction that ``sbank`` rounds away.
 A comma-separated list becomes one ``sacct`` call, so every row in a sweep
 is read from the same moment. Ids that accounting does not know are reported
 by name at the end rather than silently omitted.
+
+``--until-done 1`` re-reads accounting until every requested job reaches a
+terminal state, emitting a row only when a job's state CHANGES, then the
+ordinary summary. It exists because waiting on a batch used to mean a
+hand-rolled ssh polling loop per session -- six were written in one day, and
+one of them declared a running panel drained on a shell quoting bug the
+loop's author could not see. ``--poll-seconds`` sets the cadence.
 """
 
 from __future__ import annotations
@@ -29,7 +37,20 @@ from hpc3.core.budget import check_consumption
 from hpc3.core.remote import run_remote
 from hpc3.core.status import parse_sacct_output, sacct_command
 
-_FLAGS = (_config.CONFIG_FLAG, "--job")
+_FLAGS = (_config.CONFIG_FLAG, "--job", "--until-done", "--poll-seconds")
+
+#: Seconds between accounting reads in follow mode, unless the caller sets
+#: a cadence. A minute keeps a multi-hour batch legible without hammering
+#: the scheduler the way an eager loop would.
+POLL_SECONDS_DEFAULT = 60
+
+#: Consecutive reads that may come back knowing NONE of the requested jobs
+#: before follow mode rules the ids wrong and raises. Accounting can lag a
+#: fresh submission by a read or two, so one empty answer is patience -- but
+#: a follow loop with no such bound would spin forever on a mistyped id,
+#: reporting nothing, which is the failure the one-shot mode's raise exists
+#: to prevent.
+UNKNOWN_POLL_LIMIT = 5
 
 
 def format_status(status: JobStatus, cluster: ClusterFacts) -> str:
@@ -91,45 +112,95 @@ def _budget_groups(
     return sorted(grouped.items()), unclaimed
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Report the state and cost of one job.
+def _read_rows(host: str, requested: Sequence[str], cluster: ClusterFacts) -> list[JobStatus]:
+    """Read one accounting snapshot for the whole requested set.
+
+    One sacct call for the whole set: six separate calls would observe six
+    different moments, and a sweep's rows are only comparable if they came
+    from the same one.
 
     Args:
-        argv: Command-line arguments excluding the program name. Defaults to
-            the process arguments.
+        host: The cluster's SSH host alias.
+        requested: The job ids asked about.
+        cluster: The cluster whose facts decode the accounting output.
 
     Returns:
-        Exit code 0 when accounting returned at least one row.
+        The accounting rows, in the order ``sacct`` returned them.
 
     Raises:
-        ValueError: If a required flag is missing or an argument is unknown.
-        AppError: If the remote command fails, accounting output is
-            malformed, or the job id is unknown to ``sacct``. An unknown job
-            is a failure, not an empty report: the caller asked about a
-            specific job and silence would read as "not running yet".
+        AppError: If the remote command fails or the output is malformed.
     """
-    tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
-    workspace = _config.load_workspace(parsed)
-    cluster = workspace_cluster(workspace)
-    host = workspace["host"]
-    requested = [part for part in cli_args.require_flag(parsed, "--job").split(",") if part != ""]
-    if requested == []:
-        raise ValueError("--job must name at least one job id")
-
-    # One sacct call for the whole set: six separate calls would observe six
-    # different moments, and a sweep's rows are only comparable if they came
-    # from the same one.
     output = run_remote(host, sacct_command(requested))
-    rows = parse_sacct_output(output, cluster)
-    if rows == []:
-        raise ValueError(f"sacct knows no job in {requested} on {host}")
+    return parse_sacct_output(output, cluster)
 
+
+def _follow(
+    host: str, requested: Sequence[str], cluster: ClusterFacts, poll_seconds: int
+) -> list[JobStatus]:
+    """Re-read accounting until every requested job is terminal.
+
+    Emits a row only when a job's state CHANGES, so a six-hour panel writes
+    a legible transition log rather than a screenful of identical RUNNING
+    lines per minute.
+
+    Args:
+        host: The cluster's SSH host alias.
+        requested: The job ids being waited on.
+        cluster: The cluster whose facts decode the accounting output.
+        poll_seconds: Seconds between reads.
+
+    Returns:
+        The final accounting snapshot, every row terminal.
+
+    Raises:
+        ValueError: When :data:`UNKNOWN_POLL_LIMIT` consecutive reads know
+            none of the requested jobs -- the same wrong-id failure the
+            one-shot mode raises on its single read.
+        AppError: If the remote command fails or the output is malformed.
+    """
+    seen: dict[str, JobState] = {}
+    unknown_reads = 0
+    while True:
+        rows = _read_rows(host, requested, cluster)
+        if rows == []:
+            unknown_reads += 1
+            if unknown_reads >= UNKNOWN_POLL_LIMIT:
+                raise ValueError(f"sacct knows no job in {list(requested)} on {host}")
+            _test_hooks.emit(f"accounting knows none of {len(requested)} job(s) yet; waiting")
+            _test_hooks.sleep(poll_seconds)
+            continue
+        unknown_reads = 0
+        for status in rows:
+            if seen.get(status["job_id"]) != status["state"]:
+                seen[status["job_id"]] = status["state"]
+                _test_hooks.emit(format_status(status, cluster))
+        ids = {status["job_id"] for status in rows}
+        if all(is_terminal(status["state"]) for status in rows) and set(requested) <= ids:
+            return rows
+        _test_hooks.sleep(poll_seconds)
+
+
+def _summarize(
+    rows: Sequence[JobStatus],
+    requested: Sequence[str],
+    workspace: Workspace,
+    cluster: ClusterFacts,
+) -> None:
+    """Emit the totals, the missing ids, and the per-project budget verdicts.
+
+    Args:
+        rows: The accounting rows being summarized.
+        requested: The job ids originally asked about.
+        workspace: The decoded workspace, for the budget caps.
+        cluster: The cluster whose usage factors price the rows.
+
+    Raises:
+        AppError: When a project's consumption exceeds its declared budget.
+    """
     total = 0.0
     total_gpu_hours = 0.0
     counts: dict[JobState, int] = {}
     for status in rows:
-        _test_hooks.emit(format_status(status, cluster))
         total += service_units(status, cluster)
         total_gpu_hours += gpu_hours(status)
         counts[status["state"]] = counts.get(status["state"], 0) + 1
@@ -160,6 +231,47 @@ def main(argv: Sequence[str] | None = None) -> int:
     for project, group in grouped:
         check_consumption(workspace["projects"][project]["budget"], group, cluster)
         _test_hooks.emit(f"budget OK {project}")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Report the state and cost of one job, or follow a set to completion.
+
+    Args:
+        argv: Command-line arguments excluding the program name. Defaults to
+            the process arguments.
+
+    Returns:
+        Exit code 0 when accounting returned at least one row.
+
+    Raises:
+        ValueError: If a required flag is missing, an argument is unknown,
+            or ``--poll-seconds`` is not a positive whole number.
+        AppError: If the remote command fails, accounting output is
+            malformed, or the job id is unknown to ``sacct``. An unknown job
+            is a failure, not an empty report: the caller asked about a
+            specific job and silence would read as "not running yet".
+    """
+    tokens = list(argv) if argv is not None else list(sys.argv[1:])
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    workspace = _config.load_workspace(parsed)
+    cluster = workspace_cluster(workspace)
+    host = workspace["host"]
+    requested = [part for part in cli_args.require_flag(parsed, "--job").split(",") if part != ""]
+    if requested == []:
+        raise ValueError("--job must name at least one job id")
+    poll_seconds = int(parsed.get("--poll-seconds", str(POLL_SECONDS_DEFAULT)))
+    if poll_seconds <= 0:
+        raise ValueError(f"--poll-seconds must be positive, got {poll_seconds}")
+
+    if parsed.get("--until-done", "0") != "0":
+        rows = _follow(host, requested, cluster, poll_seconds)
+    else:
+        rows = _read_rows(host, requested, cluster)
+        if rows == []:
+            raise ValueError(f"sacct knows no job in {requested} on {host}")
+        for status in rows:
+            _test_hooks.emit(format_status(status, cluster))
+    _summarize(rows, requested, workspace, cluster)
     return 0
 
 
