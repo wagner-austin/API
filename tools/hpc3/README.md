@@ -8,6 +8,11 @@ package encodes what it cost to learn them, as rules that run rather than
 documentation that has to be remembered. A job that would break one cannot be
 constructed.
 
+**This file is the command reference.** The design record — every rule's
+incident, every measured fact's measurement — lives in
+[`wiki/`](wiki/index.md): read `wiki/index.md` first, follow the hub for your
+topic. New incident narrative goes into the wiki, not here.
+
 ---
 
 ## Quick start
@@ -32,582 +37,50 @@ hpc3-trace     --config runs/hpc3.json --match 07ab4976…       # which job tra
 hpc3-cancel    --config runs/hpc3.json --job 55519937          # stop it, and say what actually stopped
 ```
 
-Working examples of all three documents are in [`examples/`](examples/).
+Working examples of the documents are in [`examples/`](examples/).
 
 ---
 
 ## The workspace
 
-Every command reads one workspace document. It is the only place the cluster's
-address, the ledger, and each project's resources, caps and account are
-written down.
-
-```json
-{
-  "cluster": "hpc3",
-  "host": "hpc3",
-  "root": "/pub/wagnera3",
-  "ledger": "ledger.jsonl",
-  "quiet_seconds": 1800,
-  "projects": {
-    "abl": {
-      "partition": "free-gpu",
-      "gpu": { "model": "A100", "count": 1 },
-      "cpus": 8,
-      "mem_gb": 96,
-      "minutes": 720,
-      "requeue": true,
-      "checkpoint_steps": 500,
-      "image": {
-        "path": "/pub/wagnera3/images/v20/abl.sif",
-        "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
-        "binds": ["/pub/wagnera3"]
-      },
-      "env_path": "/opt/env",
-      "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
-      "deterministic": true,
-      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
-      "repo": "../../.."
-    },
-    "sirius": {
-      "partition": "free",
-      "gpu": null,
-      "cpus": 16,
-      "mem_gb": 64,
-      "minutes": 360,
-      "requeue": true,
-      "checkpoint_steps": 1,
-      "env_path": "/pub/wagnera3/envs/sirius",
-      "pinned_packages": {},
-      "deterministic": false,
-      "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
-      "repo": "../../../../metabolomics-dashboard"
-    }
-  }
-}
-```
+Every command reads one workspace document. It is the only place the
+cluster's address, the ledger, and each project's resources, caps and account
+are written down.
 
 | field | meaning |
 | --- | --- |
-| `cluster` | which measured machine's limits every rule is checked against (see [Clusters](#clusters)) |
+| `cluster` | which measured machine's limits every rule is checked against ([facts are code](wiki/pages/facts-are-code.md)) |
 | `host` | SSH destination — an alias from your `~/.ssh/config`, not a hostname |
 | `root` | absolute cluster directory; scripts and logs are **derived** from it |
 | `ledger` | local record of every submission; relative paths resolve against this file's directory |
 | `quiet_seconds` | how long a running job may write nothing before triage calls it silent (default 1800) |
 | `projects` | resource defaults, caps and charge account per body of work |
-| `projects.<name>.budget` | that project's self-imposed caps, checked before submission and again while running |
+| `projects.<name>.budget` | that project's self-imposed caps, checked before submission and again while running ([budget model](wiki/pages/budget-model.md)) |
 | `projects.<name>.repo` | where that project's code lives; relative paths resolve against this file's directory |
 
-**There are no `--host` / `--root` / `--budget` / `--ledger` flags.** The
-budget is not a flag either; it is read from the project the run names, so
-`hpc3-submit` and `hpc3-watch` reach the same cap for the same job. That is
-deliberate. When they existed, nothing tied `hpc3-triage --ledger` to the
-ledger `hpc3-submit` had written — and pointing them at different paths gives
-you either a clean board while jobs run unwatched, or every job reported as
-`unaccounted` while nothing is wrong. Both readings are wrong and neither
-looks wrong.
+**There are no `--host` / `--root` / `--budget` / `--ledger` flags** — the
+reasons are measured, not stylistic
+([budget model](wiki/pages/budget-model.md)).
 
-### Adding a project
+**Adding a project** is one entry in `projects` for any single-node job, GPU
+or CPU (see `examples/` for complete workspaces). A project that requests a
+GPU must declare an `image`
+([image build flow](wiki/pages/image-build-flow.md)); `"gpu": null` is the
+one spelling of CPU-only. Project names are lowercase letters, digits and
+hyphens, at most 24 characters.
 
-Add one entry to `projects`. For a **single-node job**, GPU or CPU, that is the
-whole procedure — the LSTM work, covenant-radar, `cleargbm_rs`, SIRIUS, ZODIAC
-and the transformer ablation differ only in their resource line and their
-environment path:
-
-```json
-"turkic-lstm": {
-  "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
-  "cpus": 4, "mem_gb": 32, "minutes": 240,
-  "requeue": true, "checkpoint_steps": 200,
-  "image": {
-    "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
-    "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
-    "binds": ["/pub/wagnera3"]
-  },
-  "env_path": "/opt/env",
-  "pinned_packages": { "torch": "2.6.0+cu124", "numpy": "2.3.5" },
-  "deterministic": false,
-  "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
-  "repo": "../../../../LSTM"
-}
-```
-
-The `budget` is per project and not optional. It lived on the workspace until
-2026-08-28, which sounds tidier and was not: a cap is the one thing that
-genuinely differs between bodies of work, so the only way to say so was to
-fork the whole document — and three forks were committed, declaring 0.5, 12.0
-and 1.0 GPU-hours over the same ledger. `hpc3-watch` then enforced whichever
-one you happened to pass against whatever job you named. `charge_account`
-moved with the caps for a sharper reason: accounts are per-PI, and a job
-charged to the wrong one spends another lab's allocation.
-
-### Preemption on `free-gpu` cancels; it does not requeue
-
-`#SBATCH --requeue` is rendered for every preemptible run over an hour, and it
-is correct — but it does **not** bring a preempted job back on this cluster:
-
-```
-$ scontrol show partition free-gpu
-GraceTime=0  PreemptMode=CANCEL
-```
-
-Slurm requeues on preemption only under `PreemptMode=REQUEUE`. Under `CANCEL`
-the job is cancelled and `--requeue` covers node failure and administrative
-requeue instead. Observed on 2026-08-28: `turkic-lstm.bases-kk` was preempted
-at 64 seconds and did not return to the queue.
-
-**What actually protects the work is the checkpoint, not the flag.** The
-resume state is written to `/pub` after every completed epoch precisely
-because node-local scratch dies with the job — including when it dies by
-preemption. So a preempted member is resubmitted and continues from its last
-completed epoch; it does not restart from zero. That is what
-`checkpoint_steps` and the trainer's `save_resume_state` / `load_resume_state`
-are for, and it is why a long run on this partition is viable at all.
-
-**Use `hpc3-campaign` for this, not a hand-written resume document.** Run the
-sweep document again and it submits exactly the members that are neither
-finished nor already running:
-
-```bash
-hpc3-campaign --config runs/hpc3-turkic-lstm.json --run runs/sweep-turkic-bases.json
-```
-
-```
-done      turkic-lstm.bases-tr
-done      turkic-lstm.bases-az
-in flight turkic-lstm.bases-kk <- turkic-lstm.bases-r1-kk
-in flight turkic-lstm.bases-uz <- turkic-lstm.bases-uz-r3
-2 done, 5 in flight, 0 submitted, 5 remaining
-```
-
-That is the real first run, and it shows what makes this work: **the artifact
-is the identity, not the job name.** `bases-uz-r3` is recognised as covering
-`bases-uz` because they write the same checkpoint, so a resume under any name
-counts. Run it twice in a row and the second run submits nothing — which is
-also why it is safe on a schedule.
-
-Every member must declare an `artifact`, and that is the one thing a campaign
-refuses. "Done" means the artifact exists, so a member that writes no file of
-its own is never done and would be resubmitted forever. `cleargbm`'s sweeps
-all declare `null` — correctly, every member runs `--no-save-model` — and are
-therefore sweeps, not campaigns. The refusal says so and names `hpc3-sweep`.
-
-**Why this exists.** On 2026-08-28 `free-gpu` preempted five of seven members
-inside an hour, and nothing could say which five. What followed was four
-hand-written resume documents describing one experiment, each a transcription
-of a queue state that had already changed — and at one point two of them were
-live, writing the same `uz_best.pt`. That race is now refused at submit time
-by `hpc3.core.inflight`, for every command, and the campaign avoids provoking
-it in the first place.
-
-The older shape — a one-member run document naming the job it resumes, like
-`runs/turkic-lstm-kk-resume.json` — still works and still records the chain in
-the ledger. It is the right tool for resuming *one* member deliberately. It is
-the wrong tool for a preemption wave. Expect waves: `free-gpu` is the free
-partition because other people's allocated work outranks yours.
-
-### Adopting an image
-
-**A project that requests a GPU must declare an `image`.** This is enforced
-when the workspace is decoded, so a GPU project cannot be registered without
-one, and a run may override the image but may not set it to `null`.
-
-The reason is not tidiness. A GPU run's numbers are decided by the whole stack
-above the card — CUDA runtime, cuDNN, the torch build, every library that
-touches a tensor. An image pins all of it and gives the run a **content
-digest**, which is the `image_digest` axis of the run fingerprint. A directory
-environment pins nothing and has no digest, and it can be edited in place
-while `pinned_packages` is edited to match — which is exactly what happened on
-2026-08-28, in under an hour, with every check still passing.
-
-CPU-only projects may omit it. `cleargbm` has no card and no driver stack; its
-arithmetic is pinned by BLAS thread count instead.
-
-Four commands, in order:
-
-```bash
-# 1. Capture the project's live environment as a spec. Do NOT hand-write this:
-#    pip freeze, delete the first-party lines, paste into JSON is unrepeatable
-#    and silently incomplete, which is how the first spec got made.
-hpc3-image-capture --config runs/hpc3.json --project turkic-lstm \
-    --commit <repo sha> --base-image python:3.11.16-slim-bookworm \
-    --env-prefix /opt/env --first-party char_lstm,platform_core \
-    --symbols char_lstm.provenance:scoring_fingerprint \
-    --extra-index-url https://download.pytorch.org/whl/cu124 \
-    --out specs/turkic-lstm-image.json
-
-# 2. Render the build. Pure, runs anywhere, builds nothing.
-#    --project and --name COMPOSE the job name; there is no --job-name, so a
-#    name whose project half no workspace declares cannot be rendered.
-hpc3-image --config runs/hpc3.json --spec specs/turkic-lstm-image.json \
-    --out-dir runs/turkic-lstm-build-v1 --image-name turkic-lstm.sif \
-    --project turkic-lstm --name image-v1 \
-    --image-dir /pub/wagnera3/images/turkic-lstm-v1
-
-# 3. Stage the rendered files AND the first-party wheels into the IMAGE
-#    directory -- build.sbatch does `cd <image-dir>` and runs build.sh there.
-#    Putting them anywhere else fails with "build.sh: No such file or directory".
-scp runs/turkic-lstm-build-v1/* hpc3:/pub/wagnera3/images/turkic-lstm-v1/
-
-# 4. Build on the cluster (~25 min, free partition, NOT preemption-proof --
-#    `free` is PreemptMode=CANCEL, so the rendered `--requeue` is inert there
-#    and a preempted build is simply gone. Re-run this command; it is
-#    idempotent apart from the job id. See BUILD_PARTITION for the measurement.
-#    Preflights, submits, and writes the ledger row — like every other job.
-hpc3-image-build --config runs/hpc3.json \
-    --project turkic-lstm --name image-v1 \
-    --image-dir /pub/wagnera3/images/turkic-lstm-v1 \
-    --image-name turkic-lstm.sif
-```
-
-**Step 4 was a raw `ssh hpc3 'cd … && sbatch build.sbatch'` until 2026-08-28**,
-and that is why twenty-one builds hold no ledger row: `hpc3-trace` cannot say
-which job built an image, `hpc3-watch` was never given the id, and
-`hpc3-triage` reports the build as `unclaimed` for the two hours it runs —
-correctly, because from this machine's records it is a stranger holding eight
-cores. The reverse-direction check found the twenty-second, and this command
-is the answer to it.
-
-**And a twenty-third ran the old way on the same day the command landed.** The
-build of image `ebb61ed0…` was submitted by raw `sbatch` hours after
-`hpc3-image-build` existed, so it holds no ledger row either. The cause was
-step 2, not step 4: it had been rendered with `--job-name img.abl-sif-v22`,
-a name whose project half is `img`, which no workspace declares — and
-`hpc3-image-build` **refuses** exactly that, so the malformed name pushed its
-author onto the path that records nothing. A refusal at submit time is one
-step too late when the thing it refuses is what the previous step invited you
-to write. That is why `--job-name` is gone: the renderer now composes the name
-from a declared `--project`, the submitter derives it by the same rule, and
-the two cannot disagree. A build that would break the ledger cannot be
-rendered.
-
-`--project` and `--name` are not read out of the script, because the ledger's
-name is the qualified `<project>.<name>` and **the project half is the part a
-script cannot tell you**: v22 was rendered `img.abl-sif-v22`, which reads as a
-project called `img` that no workspace declares. The script's own `#SBATCH -J`
-is then required to match what will be recorded — so the ledger row and
-`squeue` cannot disagree — and the refusal prints the `hpc3-image --job-name`
-that would fix it. The partition is read from the script rather than assumed
-from `BUILD_PARTITION`: that constant says what this package renders *today*,
-and the file on the cluster is what actually runs.
-
-The row records `deterministic: false` and an empty `image_digest` — a build
-is not a numerical run, and it *produces* the image rather than running inside
-one — and carries the `.sif` as its `artifact`, which is what lets
-`hpc3-trace --match` answer "which job built this image".
-
-Then put the built image's path and `sha256` in the project's `image`, set
-`env_path` to the in-image prefix (`/opt/env`), and preflight: the pinned
-packages are then checked **inside the image** rather than against a directory
-someone can edit.
-
-`"gpu": null` is how a **CPU-only** job is stated, and it is the only way —
-there is no zero-count request, because two spellings of one state is how they
-drift apart. The partition must agree in both directions: a GPU on a CPU
-partition pends forever, and no GPU on a GPU partition *runs*, holding a card
-it never touches.
-
-**Not every workload is that shape.** See
-[What this cannot submit](#what-this-cannot-submit) before assuming a project
-entry is all that stands between a workload and the cluster.
-
-Project names are lowercase letters, digits and hyphens, at most 24 characters.
+**Run, sweep and chain documents** say only what is specific to that work:
+see [run documents](wiki/pages/run-documents.md),
+[sweeps](wiki/pages/sweeps-and-artifacts.md) and
+[chains](wiki/pages/chains.md). Preempted work is resumed by re-running the
+sweep document as a campaign
+([preemption and campaigns](wiki/pages/preemption-and-campaigns.md)).
 
 ---
 
-## Runs
+## Partitions
 
-A run document says only what is specific to this run:
-
-```json
-{
-  "project": "abl",
-  "name": "armB-s42",
-  "command": "python -u train.py --arm B --seed 42",
-  "experiment": { "arm": "B", "seed": "42", "base_model": "gpt2", "corpus": "armB.txt" }
-}
-```
-
-`experiment` is required and free-form: it is what the run **is**, as opposed
-to which row in the queue it held. It lands in the ledger and in the job's
-`--comment`, and `hpc3-trace` searches it. Without it the only link between a
-job and the result it produced is a name somebody typed — and `arm-b-43`
-mistyped as `arm-b-42` gives two jobs claiming one identity with no error
-anywhere.
-
-Any project default may be restated to override it for this run alone:
-
-```json
-{
-  "project": "abl", "name": "armC-full", "command": "python -u train.py --arm C",
-  "minutes": 900, "checkpoint_steps": 250
-}
-```
-
-Overriding is not a way around validation — the merged result goes through the
-same decoder a fully hand-written spec would, so an override that lengthens a
-preemptible run past an hour must also carry `requeue` and `checkpoint_steps`.
-
-An unrecognised field is **refused, not ignored**. `"minute": 600` is a run its
-author believes is capped at ten hours and that Slurm will kill at the project
-default.
-
-### Sweeps
-
-```json
-{
-  "project": "abl", "name": "rung-large",
-  "minutes": 900, "checkpoint_steps": 250,
-  "members": [
-    { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0 --out /pub/wagnera3/abl/s0.json",
-      "artifact": "/pub/wagnera3/abl/s0.json" },
-    { "suffix": "armB-s1", "command": "python -u train.py --arm B --seed 1 --out /pub/wagnera3/abl/s1.json",
-      "artifact": "/pub/wagnera3/abl/s1.json" }
-  ]
-}
-```
-
-Each member states its own `artifact`, or `null` if it writes no file of its
-own — six arms writing to one path are five results nobody can read. It is
-checked against that member's own command, so a suffix changed in one and not
-the other fails here rather than after the run.
-
-`hpc3-sweep --config … --run …` submits each member and records each one as it
-goes. There is no rollback: a member that fails leaves the earlier ones running
-and findable, because a live job that is fine should not be cancelled for a
-later job's failure.
-
----
-
-## Identity: the bytes are the right ones, not just intact
-
-Three checks in this package verify *transport* — that what arrived is what
-left. Three others verify *identity* — that what left was the right thing in
-the first place. The second kind exists because the first kind cannot catch a
-run that completes, reports plausible numbers, and is comparable to nothing.
-
-### The environment is the pinned one
-
-`env_path` proves a directory exists. `pinned_packages` proves what is in it:
-preflight runs that environment's own interpreter and holds it to the declared
-versions.
-
-This is not hypothetical. `/pub/wagnera3/envs/abl` and
-`/pub/wagnera3/envs/abl-pinned` both exist, both pass an existence check, and
-they differ by transformers 4.46.3 vs 5.15.1 and torch 2.6.0+cu124 vs
-2.11.0+cu128. Seven characters in a path, a major version underneath, and a
-McNemar comparison against published arms that silently means nothing.
-
-Declaring `{}` is allowed and deliberate — a project whose payload is a
-compiled binary has no Python packages to pin — but the field is required, so
-"no pins" is an answer rather than an omission.
-
-### The staged bytes are the published ones
-
-```bash
-hpc3-stage --config hpc3.json --manifest runs/stage.json \
-    --source-dir runs/corpora --expect-from runs/file_ids.txt
-```
-
-A manifest is self-consistent by construction: whoever emitted the files
-computed the digests from those same files, so they always agree. That proves
-the emitter was deterministic and nothing else.
-
-`--expect-from` is required and points at a record written by a *different act*
-— every digest in the manifest must appear in it. That is a real check
-precisely because re-emitting a corpus from the wrong source state produces new
-digests, and new digests are not in the record. Any text works: a `sha256sum`
-listing, a JSON manifest, a run log.
-
-Every manifest also carries a required, non-empty `provenance` block:
-
-```json
-{
-  "destination": "/pub/wagnera3/abl/corpora",
-  "files": [{ "name": "armB.txt", "sha256": "…", "size_bytes": 41943040 }],
-  "provenance": {
-    "wiki_commit": "176bb8c",
-    "emitter": "extraction-eval/emit_corpus.py",
-    "emitter_flags": "--seed 0 --dilution oscar_en.txt --dilution-ratio 7.0"
-  }
-}
-```
-
-Free-form because what identifies a source differs per project, and a fixed
-schema would mean writing `"none"` into fields that do not apply. It is the
-record; `--expect-from` is the enforcement.
-
-### The run's numerical determinism is declared and recorded
-
-`deterministic` is required on every project, and it is not a quality setting —
-it **partitions results**. Measured on this exact stack (RTX 3090 Ti, torch
-2.6.0+cu124, transformers 4.46.3): two same-seed runs of a 6-layer model
-diverge at the sixth significant figure of the loss without the controls, and
-the deterministic loss is a *different number* from the nondeterministic one.
-Runs on either side form separate records, and comparing across them measures
-the setting rather than the thing under test.
-
-So the posture travels with the run — into `--comment` as `det=on|off` and into
-the ledger — and two arms that differ only in it can never be silently mixed.
-
-The work itself is split, because only one half is a submitter's to do:
-
-| half | who | why |
-| --- | --- | --- |
-| `CUBLAS_WORKSPACE_CONFIG` | **this tool**, in the batch script | cuBLAS reads it once when its handle is created; setting it after CUDA has started is accepted in silence and does nothing. Exported from the script it cannot be too late, and cannot be forgotten. |
-| `torch.use_deterministic_algorithms(True)`, cuDNN and TF32 flags | **the payload** | they are torch calls in the payload's own process. This tool has no torch and does not pretend to make them. |
-
-The payload reads `TRAIN_DETERMINISTIC` (`0` or `1`, always exported) and
-applies its half. **Model-Trainer's `setup_env` now honours it**: absent means
-on, since determinism is the platform default and the local worker predates any
-launcher; `0` declines it and logs `determinism declined`; anything else raises
-rather than resolving to either posture. The name carries no cluster prefix
-because a worker running locally should not be reading `HPC3_*`.
-
-The record of what happened comes from the payload, not from here. This tool
-*declares* a posture; only the process making the torch calls knows whether
-they happened, and it logs the applied report either way — so "deterministic"
-and "not" are never distinguished by a missing log line.
-
-The two halves are safe to split because
-PyTorch *enforces* the pairing: deterministic mode raises a `RuntimeError`
-naming the missing variable, so a payload that does its half without the
-launcher's half fails loudly rather than training quietly non-reproducible
-numbers.
-
-The variable's name and value are defined once, in
-`platform_core.determinism_env`, and imported by both the trainer and this
-submitter. A duplicated literal would be the worst kind: the copies drift,
-nothing fails, and the runs stop being comparable.
-
-### The result can be traced back to the run
-
-```bash
-$ hpc3-trace --config hpc3.json --match 07ab4976…
-101 abl.armB-s42 submitted 2026-08-22T16:00:00+00:00
-  arm=B corpus=07ab4976… seed=42
-  logs /pub/wagnera3/abl/logs
-1 of 6 recorded run(s) match
-```
-
-Exits 1 when nothing matches — a question with no answer is not an error, but
-it must not read as "nothing was ever run".
-
-### The image still computes what it used to
-
-An image that still *builds* is not an image that still *computes* the same
-thing. Nothing in the reproducibility standards checks the second: CWL
-validates the description, MLflow describes entry points, and neither runs the
-tool and compares the answer. On this project a rebuilt image silently changed
-its torch major version, and it was found only after a training run whose
-result could not be interpreted.
-
-The registry lives at **`wiki/tools/extraction-eval/runs/known-answers.json`,
-in git** — in the wiki repo, not this one, beside the ablation audit chain
-(`PROVENANCE.md`, `baselines.txt`, `runs*.txt`) whose floors it also carries.
-Version control is the point: it is the record of what this environment
-computed and when, so a copy on cluster scratch is one cleanup away from
-losing every baseline that makes a future run interpretable. `write_registry`
-deliberately overrides the compact JSON default and writes indented, for the
-sole reason that a new entry should be a readable one-line diff, which only
-pays off under version control.
-
-**It briefly lived here too, and that was a mistake worth recording.** On
-2026-08-29 a session searched this repo, `/pub/wagnera3`, the cluster home
-directory and `artifacts/`, found no registry, and built a second one in this
-directory — having written the first into the wiki repo hours earlier in the
-same session. The duplicate reconstructed the original's six entries
-byte-for-byte from the same artifacts through the same command, which is
-exactly the signal that should have prompted a wider search. Four exhaustive
-searches of the wrong namespace are not an absence proof, and this workspace
-spans three repositories plus a cluster filesystem.
-
-```bash
-# Before trusting an environment: does it still give the known answer?
-python -m model_trainer.cli.known_answer_registry \
-    --registry ../../../wiki/tools/extraction-eval/runs/known-answers.json \
-    --record artifacts/ka-probe-v20/v20-a100.json --mode gate
-
-# Establish a new answer, e.g. on a new image or a new card.
-python -m model_trainer.cli.known_answer_registry \
-    --registry ../../../wiki/tools/extraction-eval/runs/known-answers.json \
-    --record <record.json> --mode register --tolerance 0.0
-
-# A scoring run emits four numbers; --observation says which one IS the answer.
-    ... --mode register --tolerance 0.0 --observation cloze_correct
-```
-
-**Three outcomes, not two.** A value can match, deviate, or *not apply*. An
-expected loss is not a property of an experiment; it is a property of an
-experiment on a particular image, on a particular card, under particular
-determinism settings. Without the third outcome, moving to a new GPU reports a
-working image as broken — and everyone learns to ignore the check.
-
-**Two invariants refuse an entry, and both have fired for real:**
-
-- *No empty fingerprint axis.* An unknown axis differs from every real value,
-  so such an entry could never match anything again. This is why the two
-  RTX 3090 Ti cloze floors are **not** registered: measured on the
-  workstation outside any image, their `image_digest` is `""`.
-- *The entry must discriminate.* Registration also checks that a drifted value
-  deviates and that the same value on another card does not apply. Verifying
-  an answer against the measurement it was built from proves only that the
-  checker can subtract. An entry that cannot fail is not a gate, and it fails
-  silently — everything passes forever.
-
-Tolerance is `0.0`: bit-exact is the right band *within* one configuration
-once determinism is pinned, which is exactly why moving configuration is a
-separate outcome rather than a wider band.
-
----
-
-## What the cluster sees
-
-Jobs are not loose. Every one carries its project:
-
-```
-$ squeue -u wagnera3
-   JOBID PARTITION       NAME     USER ST  TIME  NODES NODELIST
-55519937  free-gpu abl.armB-s42 wagnera3  R  4:21      1 hpc3-gpu-16-02
-
-$ scontrol show job 55519937 | grep Comment
-   Comment=project=abl;gpu=A100x1;cpus=8;env=/pub/wagnera3/envs/abl-pinned
-```
-
-| | |
-| --- | --- |
-| job name | `<project>.<name>` — self-describing among 102 users' rows |
-| `--comment` | project, hardware and environment, readable via `scontrol show job <id>` or `squeue -o %k` **while the job is live** — see below |
-| scripts | `<root>/<project>/scripts/<project>.<name>.sbatch` |
-| logs | `<root>/<project>/logs/<project>.<name>-<jobid>.{out,err}` |
-
-The payload can read `HPC3_PROJECT`, `HPC3_JOB_NAME`, `HPC3_CHECKPOINT_STEPS`
-and `HPC3_RESTART_COUNT` from its environment — enough to name its own
-checkpoints and to know whether it is a first run or a requeue.
-
-Directories are **derived from `root` + project, never passed in**. A caller
-who can choose a log directory will eventually choose the wrong one, and that
-job's output is then findable only by whoever remembers what was typed.
-
----
-
-## Clusters
-
-`cluster` selects a module under `src/hpc3/clusters/`. Each one holds facts
-read off a real machine: partition names, GPU inventory, per-user QOS
-ceilings, walltime caps, and each partition's `UsageFactor`. Every rule below
-is asked of that module rather than of a constant, so pointing the workspace
-at a different cluster changes what is enforced without changing any code that
-enforces it.
-
-**Facts are code, never configuration.** A workspace selects a cluster; it
-cannot describe one. If `max_gpus_per_user` were a field you could write, then
-writing `999` would not raise the ceiling — it would only disable the check
-that predicts the pending job. Committing a cluster module is the act of
-saying "these numbers were read off the real thing."
-
-Currently measured: **`hpc3`** (UCI HPC3 — GPU partitions 2026-08-22, CPU
-partitions 2026-08-23).
+Measured on UCI HPC3 (GPU partitions 2026-08-22, CPU 2026-08-23):
 
 | partition | GPUs | bills | preemptible | max hours | per-user ceiling |
 | --- | --- | --- | --- | --- | --- |
@@ -618,322 +91,13 @@ partitions 2026-08-23).
 | `gpu32` | L40S, RTX6000 | **yes** | no | 336 | 12 GPUs |
 | `standard` | — | **yes** | no | 336 | 2500 cores |
 
-**This package submits to the free three and refuses the other three**, so the
-last two columns are what you get: 72 hours per attempt, and preemption.
-
-### Billing follows the *job's* QOS, not the partition's
-
-This table said `free-gpu32` billed at `UsageFactor 1.0` for a day, and it was
-wrong. The 1.0 belongs to `free-gpu32-part`, which is the **partition** QOS and
-governs limits. Jobs there run under `low`, at `0.000000`, because every free
-partition declares `AllowQos=low,guest`. Reading a factor off the partition QOS
-is how that error was made.
-
-Measured, not reasoned — an 8-core, 1-GPU, 2-minute RTX6000 job on `free-gpu32`
-moved `sshare` `RawUsage` by **exactly zero**, on a meter that read 33,654,891
-for another user in the same account at the same moment:
-
-```
-cjmayer_lab|akondur|33654891
-cjmayer_lab|wagnera3|0
-```
-
-So the rule is `AllowQos`: `low,guest` (both `0.0`) is free, `normal,high`
-(`1.0` and `2.0`) bills. **L40S and RTX6000 are free**, which the old wrong
-fact had been hiding. The billing three are marked from the `AllowQos` rule
-rather than from a measurement, deliberately: the safe direction to be wrong is
-to refuse something that would have been free, never to spend on something
-recorded as free.
-
-There is also a QOS literally *named* `free-gpu` carrying `UsageFactor
-1.000000`, which is not what the `free-gpu` partition uses. Same lesson twice:
-a name containing "free" and a QOS containing a factor are two different
-questions, and only a job's own accounting answers either.
-
-`free` is the CPU twin of `free-gpu` — same `0.0`, same `PreemptMode=CANCEL`,
-same 72-hour cap — so the preemption-protection rule applies to it unchanged,
-with no new logic.
-
-### Free only, and not as a setting
-
-There is no `accept_billing`. A billing partition is refused outright with
-`PARTITION_BILLS`, which names the free ones. A consent flag would be a limit a
-run could switch off — the same shape as declaring `max_gpus_per_user: 999` to
-raise a ceiling. Both disable the check instead of changing the fact.
-
-Not carried, each for a measured reason: `standard-hbm` needs an explicit
-`--qos` this package does not emit; `gpu-hugemem` returns `Invalid account or
-account/partition combination`; `highmem`, `hugemem`, `maxmem` and `admin`
-appear in `sinfo -a` but not in `scontrol show partition`.
-
-### Adding a cluster
-
-1. Measure it: `sinfo`, `scontrol show partition`, `sacctmgr show qos`.
-2. Write a module beside `clusters/hpc3.py` naming the source and the date.
-3. Register it in `clusters/__init__.py`.
-
-Nothing else changes. `test_cluster.py` drives the production decoders against
-a synthetic cluster with different partition names, different GPUs, a
-half-rate usage factor and much lower ceilings — that test is what keeps the
-rules from quietly re-acquiring HPC3's values. A `CLUSTER_UNKNOWN` error lists
-what has been measured; the tool never guesses a default, because submitting
-to one machine under another machine's ceilings is worse than refusing.
-
-This is a Slurm tool. `sbatch`, `sbatch --test-only`, `sacct`, `squeue` and
-`scancel` are wired into `core/`, so PBS/Torque, LSF and Kubernetes are out of
-scope rather than one module away.
-
----
-
-## What this cannot submit
-
-`JobSpec` describes **one single-node job**, with GPUs or without. Everything
-below is not a missing flag but a shape the contract cannot express.
-
-| shape | status | what it blocks |
-| --- | --- | --- |
-| **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
-| **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
-| **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
-| **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
-
-None of these are hard to add, and the cluster-facts layer already carries what
-the checks would need. They are absent because they were never built, not
-because they were judged wrong — recorded here so the gap is a decision rather
-than a discovery.
-
-**Job dependencies were on this list and are not any more** — see
-[Chains](#chains-a-pipeline-that-stops-when-a-stage-fails).
-
-**CPU-only was on this list and is not any more.** `"gpu": null` on a CPU
-partition submits, so `cleargbm_rs`, SIRIUS and ZODIAC are reachable. One
-caveat worth stating: `pinned_packages` verification runs the environment's
-own `bin/python`, and an empty pin map makes **no round trip at all**. A JVM
-project is therefore submittable while getting only `test -d` on its
-environment — the weakest guarantee here, and exactly the "both paths exist,
-both pass, the results aren't comparable" failure the pin check was built for.
-
----
-
-## The rules that run
-
-### Submission — checked when a run resolves
-
-| rule | why |
-| --- | --- |
-| `PARTITION_UNKNOWN` — the partition exists on this cluster | a workspace written for another machine, or a typo; either way the job would be refused at submission or land somewhere unintended |
-| `GPU_TYPE_UNPINNED` — a GPU request names its model and the cluster carries it | a bare `--gres=gpu:1` on `free-gpu` is roughly a two-in-five chance of a V100, whose `sm_70` the pinned torch does not target; the failure reads as a bug in the training code |
-| `PARTITION_GPU_MISMATCH` — the partition and the request agree, **both ways** | a GPU on a CPU partition pends forever; no GPU on a GPU partition *runs*, holding a card it never touches, so only this catches it |
-| `PARTITION_BILLS` — the partition's `UsageFactor` is zero | this package submits free work only; `standard` is the default partition and charges, so the partition is required and never defaulted |
-| `DEPENDENCY` fields — a wait names real, distinct, numeric job ids | a typo'd id is not a slow job, it is a job that never existed, and under `--kill-on-invalid-dep` that cancels the dependent stage at once |
-| `ENV_PACKAGE_MISMATCH` — the environment contains what the project pinned | `envs/abl` and `envs/abl-pinned` both exist and differ by a transformers major version |
-| `PREEMPTIBLE_RUN_UNPROTECTED` — long preemptible runs carry requeue **and** checkpointing | `PreemptMode=CANCEL` gives 60 seconds of grace; requeue without checkpoints restarts from step zero, which is not protection |
-| `TIME_LIMIT_EXCEEDS_PARTITION` — the wall clock fits | rejected at submission otherwise |
-
-### Sweeps — checked before anything is sent
-
-`SWEEP_EXCEEDS_GPU_CEILING` / `SWEEP_EXCEEDS_CPU_CEILING` /
-`SWEEP_EXCEEDS_JOB_CEILING`. Slurm does not reject an oversized set; it queues
-the excess against `MaxTRESPU`, which reads as a busy cluster and is not.
-
-Which ceiling binds follows from the partition: GPU work pends against
-`gres/gpu`, CPU work against `cpu`. A ceiling the QOS **does not declare** is
-not checked — `free-gpu-part` caps GPUs and says nothing about cores, and
-inventing a core limit for it would refuse sweeps the cluster would have run.
-
-### Budget — ours, because nothing else says stop
-
-The QOS bounds what runs *at once*. Nothing bounds the total, and on the free
-partitions nothing bills — a 24-GPU three-day sweep is 1,728 GPU-hours, inside
-every limit the cluster enforces, and not a reasonable share of a shared
-machine. `BUDGET_PROJECTION_EXCEEDED` before submission,
-`BUDGET_CONSUMPTION_EXCEEDED` from `hpc3-watch` while running.
-
-### Preflight — non-skippable
-
-`hpc3-submit` preflights unconditionally: it probes the environment, uploads
-the real rendered script and runs `sbatch --test-only` on it by path. There is
-no flag to skip it and no code path that reaches the cluster without it. The
-same rendered file is then submitted, so preflight and submission cannot drift.
-
----
-
-## Triage: the five conditions that look like health
-
-`hpc3-triage` reconciles the ledger against the cluster **in both directions**
-and exits non-zero if anything is found.
-
-- **blocked** — pending on a reason that will never resolve. On HPC3, 261 of
-  621 pending GPU jobs were sitting on `DependencyNeverSatisfied`; in `squeue`'s
-  state column that is indistinguishable from waiting on `Resources`. A reason
-  the allowlist has never seen is treated as blocked, because that is where
-  patience costs a week.
-- **unaccounted** — we recorded submitting it and accounting has never heard of
-  it. No cluster-side query can find these: the evidence is the *absence* of a
-  cluster-side record, which is what the local ledger exists to supply.
-- **unclaimed** — the cluster is holding it and the ledger has never heard of
-  *it*. No ledger-side query can find these either, for the mirror reason: the
-  evidence is the absence of a **local** record, so the check has to ask the
-  account to enumerate itself (`squeue --me`) rather than ask about ids it
-  already has.
-- **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
-  age is measured against the cluster's own clock; a few minutes of skew would
-  either invent staleness or hide it.
-- **oversized** — the project asks Slurm for far more wall clock than its work
-  has ever taken. Slurm backfills a job into a hole its own size, so an
-  oversized request waits for a hole it never needed. The only finding drawn
-  from history rather than the queue, and the only one needing no cluster
-  query — the runtimes live in the closure records.
-
-**What `oversized` caught the day it was written.** `turkic-lstm` declared
-`minutes: 720`; its members finished in 27 minutes, and five more sat
-unschedulable for hours. That got past everything because it was never
-measured — the project was created before LSTM had ever run on the cluster —
-then inherited from the `abl` example above, and finally *ratified* by a
-budget derived from it: the cap was 84.0 GPU-hours and 7 members × 12 hours is
-84.0 exactly, so the one number positioned to contradict the request had been
-computed from it. `floor` was over-requested too, by 10×, and nobody had
-noticed either.
-
-Only `COMPLETED` runs on the project's **own partition** count as evidence.
-Both exclusions were learned from this check's first live run, which reported
-a true finding for two wrong reasons: it counted a cancelled job's zero
-seconds, and it took its evidence from an image build that ran on `free` under
-`build.sbatch`'s own limit and had never used `minutes` at all.
-
-**Only three of these existed until 2026-08-28**, and the missing one was the
-mirror of the one everybody thought was the clever check. `unaccounted` proves
-every ledger row is a real job; nothing proved every real job has a ledger row.
-That is not a hypothetical gap — the image-build recipe below *told you* to run
-`ssh hpc3 'cd … && sbatch build.sbatch'`, and twenty-one builds ran that way
-without leaving a record. The check found the twenty-second on its first run,
-and `hpc3-image-build` is why there will not be a twenty-third: the finding was
-answered by closing the path that produced it, not by excusing it.
-
-Two consequences worth knowing before the first red board:
-
-- **An interactive session is a true positive.** It is a job on the account
-  that this machine did not submit and cannot trace. If those become common
-  enough to be noise, the fix is to record them, not to teach the check to
-  look away — a name filter that skipped them would skip the bypasses too,
-  since a job submitted around this tool is under no obligation to be named
-  the way this tool names things.
-- **It cannot see a bypassed job that already finished.** `squeue` forgets a
-  job minutes after it ends, so this catches an unrecorded job while it is
-  running — when it is costing something and cancelling is still possible —
-  and never afterwards. Catching the finished ones would mean an `sacct` sweep
-  over a window, which reports every interactive shell the account has ever
-  opened and drowns the signal.
-
-## Chains: a pipeline that stops when a stage fails
-
-```bash
-hpc3-chain --config runs/hpc3.json --run examples/chain-sirius-zodiac.json
-```
-
-Stages run in order, each waiting on the one before it with `afterok`. They may
-differ in resources — a training stage holds a GPU, the evaluation reading its
-checkpoints often does not — so a stage overrides the same fields a run can, on
-top of anything the chain sets once:
-
-```json
-{
-  "project": "sirius", "name": "batch7",
-  "experiment": { "sample_set": "batch7" },
-  "stages": [
-    { "suffix": "sirius", "command": "sirius ... formula", "cpus": 16, "minutes": 360 },
-    { "suffix": "zodiac", "command": "sirius ... zodiac", "cpus": 32, "mem_gb": 128 }
-  ]
-}
-```
-
-**`--kill-on-invalid-dep=yes` is emitted with every dependency, never without
-it.** This is the whole reason chains are safe to use here. When a dependency
-cannot be satisfied Slurm does *not* reject the dependent job — it queues it
-forever on `DependencyNeverSatisfied`, holding a QOS slot, looking in `squeue`
-exactly like a job waiting its turn. That was **261 of 621** pending GPU jobs
-on HPC3 in one sample. With the flag, a stage whose predecessor failed is
-cancelled instead: the slot is freed, and the ledger gets a terminal state it
-can close rather than an entry that never resolves.
-
-Three things follow from the ids not existing until submission:
-
-- **Every stage is validated before the first is sent.** Otherwise a misspelled
-  partition in stage three surfaces an hour after stage one started running.
-- **A chain document may not write `depends_on`.** The chain wires its own, so
-  a hand-written one would be silently replaced. It is refused instead.
-- **The budget is checked against the whole pipeline, not stage by stage.**
-  Stages are sequential in *time* and simultaneous in *commitment*: submitting
-  the chain commits every hour of it.
-
-A chain is not a sweep. A sweep is one template run several ways at once, and
-is bounded by how many of your jobs may RUN concurrently. A chain runs one
-stage at a time, so that ceiling cannot bind it — what could is the submit
-ceiling, which on `free` is 3500. No ceiling check is applied to chains for
-that reason: a check that cannot fire still reads as protection.
-
-`depends_on` is also available on an ordinary run, for chaining onto a job that
-is already queued:
-
-```json
-{ "project": "abl", "name": "eval", "command": "...",
-  "experiment": { "of": "55519937" },
-  "depends_on": { "kind": "afterok", "job_ids": ["55519937"] } }
-```
-
-It is a run-level field and never a project default — a default would name ids
-from a previous session, and a stale `afterok` on a job that finished last week
-is satisfied instantly and silently.
-
----
-
-### The comment is live-only, and that is why the ledger exists
-
-`--comment` is readable via `scontrol show job <id>` and `squeue -o %k` **while
-the job is live**. It does not reach accounting on HPC3:
-
-```
-AccountingStoreFlags    = (null)
-```
-
-Without `job_comment` in that list Slurm never stores it, so `sacct -o Comment`
-returns empty for every job — measured 2026-08-23 against both a finished CPU
-job and a GPU job from the day before. This README claimed `sacct -o Comment`
-worked until that measurement; it never did on this cluster.
-
-Nothing in the package reads provenance back from the cluster, so no behaviour
-depended on the wrong claim. That is the actual point: **the ledger is the
-durable record precisely because the comment is not.** The comment is a
-convenience for a human looking at a live queue.
-
-### Closures: why `unaccounted` doesn't rot
-
-Two Slurm components forget finished jobs, on very different schedules.
-
-`squeue` drops a job `MinJobAge` after it ends — **300 seconds on HPC3, read
-from `scontrol show config`**. Past that, `squeue -j <id>` does not return
-empty, it exits non-zero with `Invalid job id specified`. Triage therefore asks
-the queue only about ids accounting reports as `PENDING`; nothing else can be
-in it.
-
-`sacct` retention depends on `slurmdbd`'s purge settings, which a login node
-cannot read — and Slurm's default is to purge nothing, so on this cluster the
-expiry is **unverified**. The closure record is built for it anyway: if a site
-does enable `PurgeJobAfter`, every job past that window becomes a ledger entry
-with no accounting row — the same observation as a job that never existed —
-and triage would exit non-zero forever. A board that is always red is the same
-as no board, and a closure costs one line per job.
-
-So the moment accounting reports a terminal state, triage writes it to
-`<ledger>.closed` and never asks about that job again. The closure is written
-*after* the findings are built, so the run that closes a job still reports on
-it. Failures close exactly as successes do — accounting forgets both on the
-same schedule.
-
-A job that vanished before triage ever saw it end has no closure and stays
-reportable forever, which is correct: that is the case the finding exists for.
-The corollary is that triage has to run at least once inside the retention
-window for a job to close cleanly.
+**This package submits to the free three and refuses the other three.** How
+billing was actually measured, why there is no `accept_billing` flag, and
+which partitions are excluded outright:
+[partitions and billing](wiki/pages/partitions-and-billing.md).
+
+What the contract deliberately cannot express (multi-node, arrays, `--qos`,
+`--constraint`): [unsupported shapes](wiki/pages/unsupported-shapes.md).
 
 ---
 
@@ -946,37 +110,20 @@ window for a job to close cleanly.
 | `hpc3-sweep --config C --run S` | the same, per member, recording each as it goes |
 | `hpc3-campaign --config C --run S` | the same sweep document, run repeatedly: submits only the members that are neither finished nor already running |
 | `hpc3-watch --config C --job ID[,ID…]` | state, elapsed, real cost, GPU-hours, state tally; one `sacct` call so a sweep's rows share one moment |
-| `hpc3-watch … --until-done 1 [--poll-seconds N]` | re-reads accounting until EVERY requested job is terminal, emitting only state transitions, then the ordinary summary. Waits for ids accounting has not learned yet (a member absent from `sacct` is in flight, not done) and rules the ids wrong after five straight empty reads rather than spinning on a typo. Replaces the per-session hand-rolled ssh polling loop, one of which false-drained a running panel on a shell quoting bug (2026-08-31) |
-| `hpc3-triage --config C` | the three conditions above; exit 1 if any |
+| `hpc3-watch … --until-done 1 [--poll-seconds N]` | re-reads accounting until EVERY requested job is terminal, emitting only state transitions, then the ordinary summary. Waits for ids accounting has not learned yet (a member absent from `sacct` is in flight, not done) and rules the ids wrong after five straight empty reads rather than spinning on a typo |
+| `hpc3-triage --config C` | the [five conditions that look like health](wiki/pages/triage-conditions.md); exit 1 if any |
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
-| `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record |
+| `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record ([staging identity](wiki/pages/staging-identity.md)) |
 | `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
 | `hpc3-image --spec S --out-dir D --image-name N` | renders the spec into definition, requirements, self-check and build script. Pure; builds nothing |
-| `hpc3-image-build --config C --project P --name N --image-dir D --image-name I` | preflight → submit the rendered build → record it in the ledger |
+| `hpc3-image-build --config C --project P --name N --image-dir D --image-name I` | preflight → submit the rendered build → record it in the ledger ([why this command exists](wiki/pages/image-ledger-lessons.md)) |
 
-**Three of these were missing from this table until 2026-08-28**, and the
-omission cost real work: `hpc3-image-capture` appeared exactly once in this
-file, inside a code comment eight hundred lines down, and a session that
-needed it did not find it and hand-wrote the spec instead — the precise
-failure its own docstring warns about. A command that is not in the command
-table does not exist to anyone who has not already read the whole document.
-
-Start estimates are a snapshot of the queue, not a reservation. A measured
-3.4-hour estimate on this cluster started in 5 seconds.
-
-**`TIME_LIMIT_EXCEEDS_PARTITION` bounds a single attempt, not a total.**
-free-gpu's 72 hours is per attempt and a requeue restarts that clock, so
-nothing here caps cumulative wall time across requeues. The GPU-hour budget is
-the only thing that does, and it projects from *requested* minutes — so a
-requeued job can exceed its own projection. Watch it with `hpc3-watch`.
-
-**`checkpoint_steps` is a declaration, not a verification.** The contract
-requires a long preemptible run to carry it; nothing here can confirm the
-training script honours it or that resume works, because a submitter cannot
-know the trainer. Prove it with one real preempted arm — a synthetic test
-cannot schedule its own preemption.
+Every command that could break something has a rule that refuses first:
+[submission rules](wiki/pages/submission-rules.md). Identity checks —
+environment pins, staged bytes, declared determinism, known answers — are
+indexed from the [images-and-staging hub](wiki/hubs/images-and-staging.md).
 
 ---
 
@@ -988,23 +135,12 @@ cannot schedule its own preemption.
 | `1` | it ran and the answer is negative — triage found something, `hpc3-trace` matched nothing |
 | `2` | it **refused**; nothing was submitted, staged or run |
 
-A refusal prints one line to stderr carrying its error code:
-
-```
-$ hpc3-preflight --config hpc3.json --run runs/arm-b.json
-ENV_PACKAGE_MISMATCH: /pub/wagnera3/envs/abl has torch==2.11.0+cu128, but this
-project pins torch==2.6.0+cu124. A version difference under a published
-comparison is a confound, not a detail.
-$ echo $?
-2
-```
-
-Exactly one place translates — `cli/_fatal.py`, at the process boundary — and
-it is **typed**, not an `except Exception`. Three exception types become
-messages, because each names something the operator did that the tool declined
-to do. Anything else propagates with its traceback intact, because anything
-else is a defect in this package rather than a refusal by it, and a defect that
-prints one tidy line is a defect nobody debugs.
+A refusal prints one line to stderr carrying its error code. Exactly one
+place translates — `cli/_fatal.py`, at the process boundary — and it is
+**typed**, not an `except Exception`. Anything else propagates with its
+traceback intact, because anything else is a defect in this package rather
+than a refusal by it, and a defect that prints one tidy line is a defect
+nobody debugs.
 
 ---
 
@@ -1027,7 +163,8 @@ contracts/     types + decode/encode + every validation rule
 core/          behaviour: rendering, ssh, parsing, submission, triage
   env_probe.py   asking an environment what is installed in it
   expected.py    holding a manifest against a record written before it
-cli/           eight entry points; argument reading and reporting only
+cli/           entry points; argument reading and reporting only
+wiki/          the design record: incidents, measurements, decisions
 ```
 
 ---
@@ -1039,7 +176,7 @@ make check      # guards → ruff → mypy → pytest, 100% statements and branc
 ```
 
 Held to the workspace standard: no `Any`, no casts, no `type: ignore`, no
-`.pyi`, no mocks, no weak assertions, no fallbacks, no back-compat shims. Every
-`TypedDict` has `encode`/`decode` with `require_*` validation; test seams are
-`_test_hooks.py` DI, and the production hooks are exercised for real rather
-than excluded from coverage.
+`.pyi`, no mocks, no weak assertions, no fallbacks, no back-compat shims.
+Every `TypedDict` has `encode`/`decode` with `require_*` validation; test
+seams are `_test_hooks.py` DI, and the production hooks are exercised for
+real rather than excluded from coverage.
