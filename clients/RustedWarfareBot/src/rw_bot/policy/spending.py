@@ -29,7 +29,6 @@ from rw_bot.policy.build_order import BUILDER_TYPE, decide
 from rw_bot.policy.economy import upgradeable
 from rw_bot.policy.production import sustain
 from rw_bot.policy.runner import OrderTracker
-from rw_bot.policy.siting import is_refused
 from rw_bot.policy.workforce import Workforce
 from rw_bot.wire.command import (
     AbilityOrder,
@@ -461,13 +460,13 @@ def build_plan(
     )
     # Movement is judged per worker now, so the plan's own stall clock asks the
     # workforce whether the unit it ordered is the one that is walking -- and
-    # whether the site it ordered has since been ruled refused, which is what
-    # licenses the tracker to reopen the slot for a different one.
+    # is handed the refusal ledger, which it judges against the site it
+    # ORDERED so a refusal licenses reopening the slot for a different one.
     step = tracker.assess(
         sample,
         decision,
         workforce.working(decision["unit_id"]),
-        is_refused((decision["x"], decision["y"]), workforce.refused()),
+        workforce.refused(),
     )
     # The plan holds the builder for as long as it wants something placed,
     # including while it is merely waiting to afford it. Acting on that is what

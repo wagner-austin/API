@@ -25,6 +25,7 @@ from typing import Literal, TypedDict
 
 from rw_bot.policy.build_order import Decision, completed_count
 from rw_bot.policy.observation import is_rising
+from rw_bot.policy.siting import is_refused
 from rw_bot.wire.state import Sample
 
 #: Observations a *stationary* builder may persist without progress before the
@@ -130,6 +131,14 @@ class OrderTracker:
         self.afford_samples = afford_samples
         self.orders_sent = 0
         self._ordered: set[tuple[int, str]] = set()
+        #: Where each cleared BUILD order was aimed, by plan slot. Kept
+        #: because the refusal question is about the site that was ORDERED:
+        #: once the ledger carries it, every fresh decision already offers
+        #: the next position, so testing the current decision's site against
+        #: the ledger is a gate nothing can ever pass -- measured as a match
+        #: that held its only worker for 1314 samples "building" an order
+        #: the workforce had long written off.
+        self._sites: dict[tuple[int, str], tuple[float, float]] = {}
         self._watching: tuple[int, str] | None = None
         self._quiet = 0
         self._deficit_floor: int | None = None
@@ -137,7 +146,11 @@ class OrderTracker:
         self._saving_at: int | None = None
 
     def assess(
-        self, sample: Sample, decision: Decision, builder_moved: bool, site_refused: bool
+        self,
+        sample: Sample,
+        decision: Decision,
+        builder_moved: bool,
+        refused: Sequence[tuple[float, float]],
     ) -> BuildStep:
         """Judge one observation against the order already outstanding.
 
@@ -146,11 +159,15 @@ class OrderTracker:
             decision: What the build policy wants, for this observation.
             builder_moved: Whether the builder moved since the previous
                 observation, which is what walking to a site looks like.
-            site_refused: Whether the decision's site is on the workforce's
-                refused ledger. The gate for reopening a stalled build's
-                slot: reopening BEFORE the ledger carries the site would let
-                the chooser offer the same doomed position again, and the
-                two quiet clocks may disagree by an observation.
+            refused: The workforce's refusal ledger. Judged against the site
+                this tracker ORDERED, not the decision's current one: once
+                the ledger carries the ordered site, every fresh decision
+                already offers the next position, so a gate on the current
+                site is one nothing can ever pass -- measured as a match
+                holding its only worker for 1314 samples on an order the
+                workforce had long written off. Reopening BEFORE the ledger
+                carries the ordered site would be the opposite failure: the
+                chooser would offer the same doomed position again.
 
         Returns:
             Whether to act, and how the plan stands.
@@ -182,6 +199,8 @@ class OrderTracker:
         slot = (completed_count(sample, self.plan), decision["type_name"])
         if slot not in self._ordered:
             self._ordered.add(slot)
+            if decision["action"] == "build":
+                self._sites[slot] = (decision["x"], decision["y"])
             self._watching = slot
             self._quiet = 0
             self.orders_sent += 1
@@ -202,10 +221,13 @@ class OrderTracker:
             self._quiet = 0
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
         self._quiet += 1
-        return self._quiet_verdict(slot, decision, site_refused)
+        return self._quiet_verdict(slot, decision, refused)
 
     def _quiet_verdict(
-        self, slot: tuple[int, str], decision: Decision, site_refused: bool
+        self,
+        slot: tuple[int, str],
+        decision: Decision,
+        refused: Sequence[tuple[float, float]],
     ) -> BuildStep:
         """Rule on an order whose quiet clock just advanced.
 
@@ -215,8 +237,8 @@ class OrderTracker:
                 two are provably the same and a None-guard on the watch
                 would be a branch nothing can take.
             decision: What the build policy wants, for this observation.
-            site_refused: Whether the decision's site is on the workforce's
-                refused ledger.
+            refused: The workforce's refusal ledger, judged against the site
+                this slot's order was aimed at.
 
         Returns:
             Whether to act, and how the plan stands.
@@ -239,8 +261,10 @@ class OrderTracker:
         # the chooser as a stalled decision and never reaches here. Produced
         # units have no site to walk, so for them the quiet clock still
         # means what it always did.
-        if decision["action"] == "build" and site_refused:
+        ordered = self._sites.get(slot)
+        if ordered is not None and is_refused(ordered, refused):
             self._ordered.discard(slot)
+            del self._sites[slot]
             self._watching = None
             self._quiet = 0
             return BuildStep(
@@ -248,7 +272,7 @@ class OrderTracker:
                 outcome="building",
                 reason=(
                     f"{decision['type_name']} at "
-                    f"({decision['x']:.0f}, {decision['y']:.0f}) was refused silently "
+                    f"({ordered[0]:.0f}, {ordered[1]:.0f}) was refused silently "
                     f"after {self.stall_samples} quiet samples; trying the next site"
                 ),
             )

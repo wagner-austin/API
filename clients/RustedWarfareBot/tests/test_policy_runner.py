@@ -77,8 +77,8 @@ def test_two_entries_pending_at_one_count_do_not_share_a_slot() -> None:
     """
     tracker = OrderTracker(("extractorT1", "landFactory"))
     world = _world()
-    first = tracker.assess(world, _build("extractorT1"), builder_moved=False, site_refused=False)
-    second = tracker.assess(world, _build("landFactory"), builder_moved=False, site_refused=False)
+    first = tracker.assess(world, _build("extractorT1"), builder_moved=False, refused=())
+    second = tracker.assess(world, _build("landFactory"), builder_moved=False, refused=())
     assert first["act"] is True
     assert second["act"] is True
     assert tracker.orders_sent == 2
@@ -92,22 +92,19 @@ def test_turning_to_another_entry_restarts_the_stall_clock() -> None:
     """
     tracker = OrderTracker(("extractorT1", "landFactory"))
     world = _world()
-    tracker.assess(world, _build("extractorT1"), builder_moved=False, site_refused=False)
+    tracker.assess(world, _build("extractorT1"), builder_moved=False, refused=())
     for _ in range(DEFAULT_STALL_SAMPLES - 1):
-        tracker.assess(world, _build("extractorT1"), builder_moved=False, site_refused=False)
+        tracker.assess(world, _build("extractorT1"), builder_moved=False, refused=())
 
     # A different entry: freshly ordered, so it acts rather than inheriting the
     # near-exhausted clock.
     assert (
-        tracker.assess(world, _build("landFactory"), builder_moved=False, site_refused=False)["act"]
-        is True
+        tracker.assess(world, _build("landFactory"), builder_moved=False, refused=())["act"] is True
     )
     # And back again, with the clock restarted rather than one sample from
     # declaring a stall.
     assert (
-        tracker.assess(world, _build("extractorT1"), builder_moved=False, site_refused=False)[
-            "outcome"
-        ]
+        tracker.assess(world, _build("extractorT1"), builder_moved=False, refused=())["outcome"]
         == "building"
     )
 
@@ -123,9 +120,9 @@ def _world(*, queued: int = 0, rising: bool = False) -> Sample:
 def test_a_fresh_slot_is_ordered_once() -> None:
     """Re-deciding every observation would re-order what is already going up."""
     tracker = OrderTracker(_PLAN)
-    assert tracker.assess(_world(), _build(), False, False)["act"] is True
+    assert tracker.assess(_world(), _build(), False, ())["act"] is True
     assert tracker.orders_sent == 1
-    assert tracker.assess(_world(), _build(), False, False)["act"] is False
+    assert tracker.assess(_world(), _build(), False, ())["act"] is False
     assert tracker.orders_sent == 1
 
 
@@ -137,9 +134,9 @@ def test_a_walking_builder_holds_the_clock_open() -> None:
     declared refused while the builder was still walking to it.
     """
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, False)
+    tracker.assess(_world(), _build(), False, ())
     for _ in range(20):
-        assert tracker.assess(_world(), _build(), True, False)["outcome"] == "building"
+        assert tracker.assess(_world(), _build(), True, ())["outcome"] == "building"
 
 
 def test_a_structure_going_up_holds_the_clock_open() -> None:
@@ -149,9 +146,9 @@ def test_a_structure_going_up_holds_the_clock_open() -> None:
     what carries the evidence across the handover.
     """
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, False)
+    tracker.assess(_world(), _build(), False, ())
     for _ in range(20):
-        assert tracker.assess(_world(rising=True), _build(), False, False)["outcome"] == "building"
+        assert tracker.assess(_world(rising=True), _build(), False, ())["outcome"] == "building"
 
 
 def test_a_quiet_build_waits_for_the_ledger_rather_than_stalling() -> None:
@@ -162,24 +159,24 @@ def test_a_quiet_build_waits_for_the_ledger_rather_than_stalling() -> None:
     the site, the tracker keeps the plan alive rather than ruling on evidence
     it does not have."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, False)
-    outcomes = [tracker.assess(_world(), _build(), False, False)["outcome"] for _ in range(6)]
+    tracker.assess(_world(), _build(), False, ())
+    outcomes = [tracker.assess(_world(), _build(), False, ())["outcome"] for _ in range(6)]
     assert outcomes == ["building"] * 6
 
 
 def test_a_refused_site_reopens_the_slot_for_the_next_one() -> None:
     """The armyless-match fix: a refusal is the next ring slot, said loudly."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    assert tracker.assess(_world(), _build(), False, False)["act"] is True
-    tracker.assess(_world(), _build(), False, False)
-    tracker.assess(_world(), _build(), False, False)
-    step = tracker.assess(_world(), _build(), False, True)
+    assert tracker.assess(_world(), _build(), False, ())["act"] is True
+    tracker.assess(_world(), _build(), False, ())
+    tracker.assess(_world(), _build(), False, ())
+    step = tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
     assert step["act"] is False
     assert step["outcome"] == "building"
     assert "refused silently" in step["reason"]
     assert "trying the next site" in step["reason"]
     # The slot is open again: the very next order for it is cleared to go.
-    assert tracker.assess(_world(), _build(), False, False)["act"] is True
+    assert tracker.assess(_world(), _build(), False, ())["act"] is True
     assert tracker.orders_sent == 2
 
 
@@ -188,8 +185,8 @@ def test_a_refusal_before_the_quiet_window_does_not_retry_early() -> None:
     or a slow walk to a site that HAPPENS to sit near an old refusal would be
     re-sited mid-journey."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, True)
-    step = tracker.assess(_world(), _build(), False, True)
+    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
+    step = tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
     assert step["outcome"] == "building"
     assert "trying the next site" not in step["reason"]
 
@@ -197,10 +194,10 @@ def test_a_refusal_before_the_quiet_window_does_not_retry_early() -> None:
 def test_the_stall_clock_restarts_on_visible_progress() -> None:
     """A builder that moves again is an order back in flight, not a slow refusal."""
     tracker = OrderTracker(_PLAN, stall_samples=3)
-    tracker.assess(_world(), _build(), False, True)
-    tracker.assess(_world(), _build(), False, True)
-    tracker.assess(_world(), _build(), True, True)
-    steps = [tracker.assess(_world(), _build(), False, True) for _ in range(3)]
+    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
+    tracker.assess(_world(), _build(), False, ((10.0, 20.0),))
+    tracker.assess(_world(), _build(), True, ((10.0, 20.0),))
+    steps = [tracker.assess(_world(), _build(), False, ((10.0, 20.0),)) for _ in range(3)]
     assert [step["outcome"] for step in steps] == ["building", "building", "building"]
     # The movement bought the order a fresh window: the retry lands a full
     # three quiet observations after it, not one.
@@ -212,30 +209,30 @@ def test_the_stall_clock_restarts_on_visible_progress() -> None:
 def test_a_working_factory_is_not_stalled() -> None:
     """A factory never moves, so the movement test alone would condemn a busy one."""
     tracker = OrderTracker(_PLAN, stall_samples=2)
-    tracker.assess(_world(), _produce(), False, False)
+    tracker.assess(_world(), _produce(), False, ())
     for _ in range(10):
-        assert tracker.assess(_world(queued=1), _produce(), False, False)["outcome"] == "building"
+        assert tracker.assess(_world(queued=1), _produce(), False, ())["outcome"] == "building"
 
 
 def test_an_idle_factory_with_nothing_queued_stalls() -> None:
     tracker = OrderTracker(_PLAN, stall_samples=2)
-    tracker.assess(_world(), _produce(), False, False)
-    outcomes = [tracker.assess(_world(), _produce(), False, False)["outcome"] for _ in range(2)]
+    tracker.assess(_world(), _produce(), False, ())
+    outcomes = [tracker.assess(_world(), _produce(), False, ())["outcome"] for _ in range(2)]
     assert outcomes == ["building", "stalled"]
 
 
 def test_a_producer_that_has_died_is_not_waited_on() -> None:
     """Nothing is being made, so the clock runs rather than waiting on a ghost."""
     tracker = OrderTracker(_PLAN, stall_samples=1)
-    tracker.assess(_world(), _produce(unit_id=999), False, False)
-    assert tracker.assess(_world(), _produce(unit_id=999), False, False)["outcome"] == "stalled"
+    tracker.assess(_world(), _produce(unit_id=999), False, ())
+    assert tracker.assess(_world(), _produce(unit_id=999), False, ())["outcome"] == "stalled"
 
 
 def test_the_stall_message_names_what_was_waited_on() -> None:
     """The producer path still stalls, and its message still says why."""
     tracker = OrderTracker(_PLAN, stall_samples=1)
-    tracker.assess(_world(), _produce(), False, False)
-    reason = tracker.assess(_world(), _produce(), False, False)["reason"]
+    tracker.assess(_world(), _produce(), False, ())
+    reason = tracker.assess(_world(), _produce(), False, ())["reason"]
     assert "c_tank" in reason
     assert "refused it silently" in reason
 
@@ -244,8 +241,8 @@ def test_the_retry_message_names_the_refused_site() -> None:
     """The run log has to say WHERE the engine said no, or the refusals read
     as one repeated failure rather than a walk around the ring."""
     tracker = OrderTracker(_PLAN, stall_samples=1)
-    tracker.assess(_world(), _build(), False, False)
-    reason = tracker.assess(_world(), _build(), False, True)["reason"]
+    tracker.assess(_world(), _build(), False, ())
+    reason = tracker.assess(_world(), _build(), False, ((10.0, 20.0),))["reason"]
     assert "landFactory" in reason
     assert "(10, 20)" in reason
 
@@ -253,7 +250,7 @@ def test_the_retry_message_names_the_refused_site() -> None:
 def test_a_waiting_decision_neither_acts_nor_stalls() -> None:
     """Waiting is the plan's own answer, and the match keeps being played."""
     tracker = OrderTracker(_PLAN)
-    step = tracker.assess(_world(), _plain("wait", "cannot afford it yet"), False, False)
+    step = tracker.assess(_world(), _plain("wait", "cannot afford it yet"), False, ())
     assert step["act"] is False
     assert step["outcome"] == "building"
     assert step["reason"] == "cannot afford it yet"
@@ -261,20 +258,20 @@ def test_a_waiting_decision_neither_acts_nor_stalls() -> None:
 
 
 def test_a_finished_plan_reports_done() -> None:
-    step = OrderTracker(_PLAN).assess(_world(), _plain("done", "all satisfied"), False, False)
+    step = OrderTracker(_PLAN).assess(_world(), _plain("done", "all satisfied"), False, ())
     assert step["act"] is False
     assert step["outcome"] == "done"
 
 
 def test_an_unreachable_plan_reports_blocked() -> None:
-    step = OrderTracker(_PLAN).assess(_world(), _plain("blocked", "nothing makes it"), False, False)
+    step = OrderTracker(_PLAN).assess(_world(), _plain("blocked", "nothing makes it"), False, ())
     assert step["act"] is False
     assert step["outcome"] == "blocked"
 
 
 def test_a_stalled_decision_carries_through() -> None:
     """The build policy can reach this itself; the tracker does not second-guess it."""
-    step = OrderTracker(_PLAN).assess(_world(), _plain("stalled", "already stalled"), False, False)
+    step = OrderTracker(_PLAN).assess(_world(), _plain("stalled", "already stalled"), False, ())
     assert step["outcome"] == "stalled"
     assert step["reason"] == "already stalled"
 
@@ -299,7 +296,7 @@ def test_a_shrinking_shortfall_is_a_save_in_progress() -> None:
     tracker = OrderTracker(_PLAN, afford_samples=3)
     world = _world()
     for deficit in (500, 400, 300, 200, 100):
-        assert tracker.assess(world, _saving(deficit), False, False)["outcome"] == "building"
+        assert tracker.assess(world, _saving(deficit), False, ())["outcome"] == "building"
 
 
 def test_a_shortfall_that_never_shrinks_blocks_the_plan() -> None:
@@ -312,8 +309,8 @@ def test_a_shortfall_that_never_shrinks_blocks_the_plan() -> None:
     ([[policy-economy]])."""
     tracker = OrderTracker(_PLAN, afford_samples=3)
     world = _world()
-    assert tracker.assess(world, _saving(500), False, False)["outcome"] == "building"
-    outcomes = [tracker.assess(world, _saving(500), False, False)["outcome"] for _ in range(3)]
+    assert tracker.assess(world, _saving(500), False, ())["outcome"] == "building"
+    outcomes = [tracker.assess(world, _saving(500), False, ())["outcome"] for _ in range(3)]
     assert outcomes == ["building", "building", "blocked"]
 
 
@@ -323,10 +320,10 @@ def test_the_blocked_ruling_lifts_when_saving_resumes() -> None:
     back."""
     tracker = OrderTracker(_PLAN, afford_samples=2)
     world = _world()
-    tracker.assess(world, _saving(500), False, False)
-    tracker.assess(world, _saving(500), False, False)
-    assert tracker.assess(world, _saving(500), False, False)["outcome"] == "blocked"
-    assert tracker.assess(world, _saving(499), False, False)["outcome"] == "building"
+    tracker.assess(world, _saving(500), False, ())
+    tracker.assess(world, _saving(500), False, ())
+    assert tracker.assess(world, _saving(500), False, ())["outcome"] == "blocked"
+    assert tracker.assess(world, _saving(499), False, ())["outcome"] == "building"
 
 
 def test_plan_progress_restarts_the_savings_clock() -> None:
@@ -334,10 +331,10 @@ def test_plan_progress_restarts_the_savings_clock() -> None:
     the same rule the stall clock already follows across slots."""
     tracker = OrderTracker(("extractorT1", "landFactory"), afford_samples=2)
     bare = sample(entity(214, "builder"))
-    tracker.assess(bare, _saving(500), False, False)
-    tracker.assess(bare, _saving(500), False, False)
+    tracker.assess(bare, _saving(500), False, ())
+    tracker.assess(bare, _saving(500), False, ())
     # The extractor finishes; the plan turns to the factory with a fresh window.
-    assert tracker.assess(_world(), _saving(500), False, False)["outcome"] == "building"
+    assert tracker.assess(_world(), _saving(500), False, ())["outcome"] == "building"
 
 
 def test_a_wait_with_no_shortfall_never_trips_the_savings_clock() -> None:
@@ -346,7 +343,7 @@ def test_a_wait_with_no_shortfall_never_trips_the_savings_clock() -> None:
     tracker = OrderTracker(_PLAN, afford_samples=1)
     world = _world()
     for _ in range(5):
-        step = tracker.assess(world, _plain("wait", "all ring positions taken"), False, False)
+        step = tracker.assess(world, _plain("wait", "all ring positions taken"), False, ())
         assert step["outcome"] == "building"
 
 
@@ -355,17 +352,17 @@ def test_an_order_between_waits_resets_the_savings_clock() -> None:
     belongs to the next save, not the finished one."""
     tracker = OrderTracker(_PLAN, afford_samples=2)
     world = _world()
-    tracker.assess(world, _saving(500), False, False)
-    tracker.assess(world, _saving(500), False, False)
-    tracker.assess(world, _build(), False, False)
-    outcomes = [tracker.assess(world, _saving(500), False, False)["outcome"] for _ in range(2)]
+    tracker.assess(world, _saving(500), False, ())
+    tracker.assess(world, _saving(500), False, ())
+    tracker.assess(world, _build(), False, ())
+    outcomes = [tracker.assess(world, _saving(500), False, ())["outcome"] for _ in range(2)]
     assert outcomes == ["building", "building"]
 
 
 def test_the_blocked_reason_names_the_shortfall_and_the_release() -> None:
     tracker = OrderTracker(_PLAN, afford_samples=1)
-    tracker.assess(_world(), _saving(500), False, False)
-    reason = tracker.assess(_world(), _saving(500), False, False)["reason"]
+    tracker.assess(_world(), _saving(500), False, ())
+    reason = tracker.assess(_world(), _saving(500), False, ())["reason"]
     assert "500" in reason
     assert "worker is released" in reason
 
