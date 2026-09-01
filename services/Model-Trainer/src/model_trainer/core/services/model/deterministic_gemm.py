@@ -44,6 +44,13 @@ that its remaining freedom does not matter. These are the arms:
   holds, is that the ceiling is reachable, which is the thing no amount of
   configuration could tell us.
 
+* :data:`OWNED_ARM` extends the rank-one argument through the BACKWARD pass:
+  same forward, and the two gradient products plus the bias gradient's
+  row-sum are program-ordered too, via the autograd Function in
+  :mod:`owned_backward`. It exists because the v29 train-step measurement
+  showed the forward proof buys zero agreeing gradients -- see the constant's
+  own docstring for what it owns and what it deliberately leaves.
+
 * The ``block<N>`` arms are the middle ground, and the one a real
   implementation would resemble. Each cuts K into fixed pieces of N and adds
   the pieces in ascending k, so the PROGRAM fixes how the reduction is cut
@@ -78,7 +85,7 @@ cleverer import.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Protocol
 
 import torch
 
@@ -90,6 +97,21 @@ FP64_ARM = "fp64"
 
 #: K rank-one updates in ascending k. The program fixes the order.
 RANK1_ARM = "rank1"
+
+#: The rank-one arm with its BACKWARD owned too. The 2026-08-31 train-step
+#: measurement showed why this exists: under every arm above, zero gradients
+#: agree across four cards at any rung, because a matmul's backward is two
+#: MORE matmuls -- the input gradient reduces over the output width, the
+#: weight gradient over the batch -- and autograd hands both to the vendor
+#: regardless of how the forward was computed. This arm routes the forward
+#: AND both gradient products AND the bias gradient's row-sum through the
+#: same ascending-order accumulation, so a training step's every reduction
+#: through a projection is program-ordered. What it deliberately does NOT
+#: touch: the backward of everything that is not a projection -- layer norm,
+#: softmax, GELU, cross-entropy -- which stays autograd's, so a residual
+#: under this arm NAMES those, the way the whole-model trace named the
+#: projections.
+OWNED_ARM = "owned"
 
 #: The K-block widths the ``block<N>`` arms chunk a reduction into.
 #:
@@ -111,11 +133,12 @@ BLOCK_SIZES: Final[tuple[int, ...]] = (256, 1024, 1280)
 BLOCK_ARMS: Final[tuple[str, ...]] = tuple(f"block{size}" for size in BLOCK_SIZES)
 
 #: Every arm, in the order a report should read them: baseline, the cheap
-#: attempt, the one with a proof, then the chunked middle ground. Declared as
-#: a tuple rather than inferred from the dispatch below, so a report can name
-#: the arms without importing torch -- the reason :mod:`gemm_shapes` is
-#: separate from :mod:`gemm_probe`.
-KERNEL_ARMS: Final[tuple[str, ...]] = (CUBLAS_ARM, FP64_ARM, RANK1_ARM, *BLOCK_ARMS)
+#: attempt, the one with a forward proof, the one that extends it through
+#: the backward, then the chunked middle ground. Declared as a tuple rather
+#: than inferred from the dispatch below, so a report can name the arms
+#: without importing torch -- the reason :mod:`gemm_shapes` is separate from
+#: :mod:`gemm_probe`.
+KERNEL_ARMS: Final[tuple[str, ...]] = (CUBLAS_ARM, FP64_ARM, RANK1_ARM, OWNED_ARM, *BLOCK_ARMS)
 
 
 def require_block_size(arm: str) -> int:
@@ -303,6 +326,117 @@ def blocked_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor, block: i
     return bias + blocked_matmul(x, w, block)
 
 
+def accumulate_rows(grad_out: torch.Tensor) -> torch.Tensor:
+    """Sum the rows of a matrix in ascending order.
+
+    The owned form of ``grad_out.sum(dim=0)``, which is what autograd
+    computes for a broadcast bias's gradient -- a reduction over the batch
+    dimension whose order the vendor's kernel chooses. Row-at-a-time
+    ``add_`` makes each output element a sequence of elementwise adds in an
+    order the program fixes, the same argument :func:`rank1_matmul` makes
+    for the product.
+
+    Args:
+        grad_out: ``[N, M]``.
+
+    Returns:
+        ``[M]``.
+    """
+    total = torch.zeros(grad_out.shape[1], dtype=grad_out.dtype, device=grad_out.device)
+    for row in range(grad_out.shape[0]):
+        total.add_(grad_out[row])
+    return total
+
+
+class _ApplyMatmulProto(Protocol):
+    """``OwnedMatmul.apply``, with the type its stub loses."""
+
+    def __call__(self, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor: ...
+
+
+class _ApplyAddmmProto(Protocol):
+    """``OwnedAddmm.apply``, with the type its stub loses."""
+
+    def __call__(self, bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor: ...
+
+
+class _MatmulFunctionProto(Protocol):
+    """The class object carrying the owned matmul's ``apply``."""
+
+    apply: _ApplyMatmulProto
+
+
+class _AddmmFunctionProto(Protocol):
+    """The class object carrying the owned addmm's ``apply``."""
+
+    apply: _ApplyAddmmProto
+
+
+def _owned_matmul_apply() -> _ApplyMatmulProto:
+    """Reach ``OwnedMatmul.apply`` without naming the class in an expression.
+
+    The Functions live in :mod:`owned_backward` and are reached through
+    ``__import__`` -- the ``module.Conv1D`` pattern from
+    :mod:`kernel_arm_modules` -- because ``torch.autograd.Function`` carries
+    ``Any`` in its stub, and naming a subclass in an expression trips this
+    package's contains-Any check while a class DEFINITION does not. The
+    import is inside the function, so importing this module still costs no
+    torch-graph machinery, and the lookup is a ``sys.modules`` hit after the
+    first call.
+
+    Returns:
+        The apply callable, typed.
+    """
+    module = __import__(
+        "model_trainer.core.services.model.owned_backward", fromlist=["OwnedMatmul"]
+    )
+    function: _MatmulFunctionProto = module.OwnedMatmul
+    return function.apply
+
+
+def _owned_addmm_apply() -> _ApplyAddmmProto:
+    """Reach ``OwnedAddmm.apply``, typed. See :func:`_owned_matmul_apply`.
+
+    Returns:
+        The apply callable, typed.
+    """
+    module = __import__("model_trainer.core.services.model.owned_backward", fromlist=["OwnedAddmm"])
+    function: _AddmmFunctionProto = module.OwnedAddmm
+    return function.apply
+
+
+def owned_matmul(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute ``x @ w`` with forward and backward orders both owned.
+
+    Bit-identical to :func:`rank1_matmul` in the FORWARD -- it is the same
+    accumulation -- so every forward-only record under this arm must equal
+    the rank-one arm's, which is a free cross-check the tests assert. What
+    differs is what autograd does afterwards.
+
+    Args:
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+
+    Returns:
+        ``[N, M]``.
+    """
+    return _owned_matmul_apply()(x, w)
+
+
+def owned_addmm(bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute ``bias + x @ w`` with every reduction owned.
+
+    Args:
+        bias: ``[M]``.
+        x: ``[N, K]``.
+        w: ``[K, M]``.
+
+    Returns:
+        ``[N, M]``.
+    """
+    return _owned_addmm_apply()(bias, x, w)
+
+
 def matmul_by_arm(arm: str, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     """Compute ``x @ w`` by the named arm, with no bias anywhere.
 
@@ -331,6 +465,8 @@ def matmul_by_arm(arm: str, x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
         return torch.matmul(x, w)
     if named == FP64_ARM:
         return torch.matmul(x.double(), w.double()).float()
+    if named == OWNED_ARM:
+        return owned_matmul(x, w)
     if named in BLOCK_ARMS:
         return blocked_matmul(x, w, require_block_size(named))
     return rank1_matmul(x, w)
@@ -378,6 +514,8 @@ def gemm_by_arm(arm: str, bias: torch.Tensor, x: torch.Tensor, w: torch.Tensor) 
         return cublas_addmm(bias, x, w)
     if named == FP64_ARM:
         return fp64_addmm(bias, x, w)
+    if named == OWNED_ARM:
+        return owned_addmm(bias, x, w)
     if named in BLOCK_ARMS:
         return blocked_addmm(bias, x, w, require_block_size(named))
     return rank1_addmm(bias, x, w)
@@ -389,13 +527,17 @@ __all__ = [
     "CUBLAS_ARM",
     "FP64_ARM",
     "KERNEL_ARMS",
+    "OWNED_ARM",
     "RANK1_ARM",
+    "accumulate_rows",
     "blocked_addmm",
     "blocked_matmul",
     "cublas_addmm",
     "fp64_addmm",
     "gemm_by_arm",
     "matmul_by_arm",
+    "owned_addmm",
+    "owned_matmul",
     "rank1_addmm",
     "rank1_matmul",
     "require_block_size",

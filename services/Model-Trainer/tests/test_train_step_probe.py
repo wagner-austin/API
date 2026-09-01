@@ -22,7 +22,11 @@ from platform_core.run_record import NO_PAYLOAD, decode_run_record
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import train_step_probe as step_cli
-from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM, RANK1_ARM
+from model_trainer.core.services.model.deterministic_gemm import (
+    CUBLAS_ARM,
+    OWNED_ARM,
+    RANK1_ARM,
+)
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, require_probe_shape
 from model_trainer.core.services.model.tensor_digest import describe_tensor
@@ -200,16 +204,31 @@ class TestTheStep:
         )
 
     def test_a_treated_arm_steps_the_same_parameters(self) -> None:
-        # The rank-one arm swaps every Conv1D and the lm_head, holding the
+        # A treated arm swaps every Conv1D and the lm_head, holding the
         # ORIGINAL parameters by reference -- so the walk must see the same
-        # paths and the backward must reach every one of them.
-        treated, _ = train_step_once("cpu", TINY, kernel=RANK1_ARM)
+        # paths and the backward must reach every one of them. The owned arm
+        # is the one whose whole point is the backward: its gradients route
+        # through the fixed-order autograd Function, and a Function that
+        # dropped a parameter from the graph would fail the no-gradient
+        # refusal inside the walk rather than pass silently.
         untreated, untreated_loss = train_step_once("cpu", TINY, kernel=CUBLAS_ARM)
+        for arm in (RANK1_ARM, OWNED_ARM):
+            treated, _ = train_step_once("cpu", TINY, kernel=arm)
 
-        assert [(t["kind"], t["path"]) for t in treated] == [
-            (t["kind"], t["path"]) for t in untreated
-        ]
+            assert [(t["kind"], t["path"]) for t in treated] == [
+                (t["kind"], t["path"]) for t in untreated
+            ]
         assert untreated_loss > 0.0
+
+    def test_the_owned_forward_is_the_rank_one_forward_bit_for_bit(self) -> None:
+        # The arms share one forward accumulation and differ only in what
+        # autograd does afterwards -- so the LOSS must match exactly, while
+        # the gradients are two different computations and need not.
+        owned, owned_loss = train_step_once("cpu", TINY, kernel=OWNED_ARM)
+        rank1, rank1_loss = train_step_once("cpu", TINY, kernel=RANK1_ARM)
+
+        assert owned_loss == rank1_loss
+        assert len(owned) == len(rank1)
 
     def test_an_unknown_arm_is_refused(self) -> None:
         with pytest.raises(ValueError, match="kernel must be one of"):

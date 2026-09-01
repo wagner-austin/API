@@ -21,12 +21,18 @@ from model_trainer.core.services.model.deterministic_gemm import (
     CUBLAS_ARM,
     FP64_ARM,
     KERNEL_ARMS,
+    OWNED_ARM,
     RANK1_ARM,
+    accumulate_rows,
     blocked_matmul,
     cublas_addmm,
     fp64_addmm,
     gemm_by_arm,
+    matmul_by_arm,
+    owned_addmm,
+    owned_matmul,
     rank1_addmm,
+    rank1_matmul,
     require_block_size,
     require_kernel_arm,
 )
@@ -54,7 +60,7 @@ def _operands() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
 class TestTheArmTable:
     def test_it_names_every_arm_in_reading_order(self) -> None:
-        assert (CUBLAS_ARM, FP64_ARM, RANK1_ARM, *BLOCK_ARMS) == KERNEL_ARMS
+        assert (CUBLAS_ARM, FP64_ARM, RANK1_ARM, OWNED_ARM, *BLOCK_ARMS) == KERNEL_ARMS
 
     def test_the_block_arms_are_named_for_their_width(self) -> None:
         assert BLOCK_ARMS == ("block256", "block1024", "block1280")
@@ -288,3 +294,87 @@ class TestRankOneIsNotTheVendorCallInDisguise:
         dropped[INNER - 1, :] = 0.0
 
         assert not torch.equal(rank1_addmm(bias, x, w), rank1_addmm(bias, x, dropped))
+
+
+def _grad_operands() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Build seeded operands with gradients enabled, plus an upstream grad."""
+    torch.manual_seed(42)
+    bias = torch.randn(ROWS, requires_grad=True)
+    x = torch.randn(COLS, INNER, requires_grad=True)
+    w = torch.randn(INNER, ROWS, requires_grad=True)
+    grad_out = torch.randn(COLS, ROWS)
+    return bias, x, w, grad_out
+
+
+class TestTheOwnedArm:
+    """Forward and backward both program-ordered, per the v29 train result.
+
+    The claim is structural: every gradient must EQUAL the longhand
+    fixed-order computation, bit for bit, because the whole point of the arm
+    is that the program and not the vendor decides those sums.
+    """
+
+    def test_its_forward_is_the_rank_one_forward_bit_for_bit(self) -> None:
+        # The free cross-check every forward-only record inherits: an owned
+        # record must equal a rank-one record on the same card.
+        bias, x, w = _operands()
+
+        assert torch.equal(owned_addmm(bias, x, w), rank1_addmm(bias, x, w))
+        assert torch.equal(owned_matmul(x, w), rank1_matmul(x, w))
+
+    def test_its_gradients_are_the_longhand_fixed_order_computations(self) -> None:
+        bias, x, w, grad_out = _grad_operands()
+
+        out = owned_addmm(bias, x, w)
+        grad_bias, grad_x, grad_w = torch.autograd.grad(out, (bias, x, w), grad_out)
+
+        assert torch.equal(grad_bias, accumulate_rows(grad_out))
+        assert torch.equal(grad_x, rank1_matmul(grad_out, w.detach().t()))
+        assert torch.equal(grad_w, rank1_matmul(x.detach().t(), grad_out))
+
+    def test_the_bias_free_path_owns_both_gradients_too(self) -> None:
+        # lm_head's shape of the call, reached through the dispatcher so the
+        # arm the modules name is the arm that runs.
+        _, x, w, grad_out = _grad_operands()
+
+        out = matmul_by_arm(OWNED_ARM, x, w)
+        grad_x, grad_w = torch.autograd.grad(out, (x, w), grad_out)
+
+        assert torch.equal(grad_x, rank1_matmul(grad_out, w.detach().t()))
+        assert torch.equal(grad_w, rank1_matmul(x.detach().t(), grad_out))
+
+    def test_its_gradients_agree_with_the_vendor_backward_numerically(self) -> None:
+        # The correctness anchor: a different ORDER of the same sums, not a
+        # different derivative.
+        bias, x, w, grad_out = _grad_operands()
+        out = owned_addmm(bias, x, w)
+        owned = torch.autograd.grad(out, (bias, x, w), grad_out)
+
+        bias_v = bias.detach().clone().requires_grad_()
+        x_v = x.detach().clone().requires_grad_()
+        w_v = w.detach().clone().requires_grad_()
+        vendor = torch.autograd.grad(torch.addmm(bias_v, x_v, w_v), (bias_v, x_v, w_v), grad_out)
+
+        gaps = [float((a - b).abs().max().item()) for a, b in zip(owned, vendor, strict=True)]
+        assert max(gaps) < 1e-5
+
+    def test_the_row_accumulation_is_the_ascending_order_longhand(self) -> None:
+        _, _, _, grad_out = _grad_operands()
+        longhand = torch.zeros(ROWS)
+        for row in range(COLS):
+            longhand = longhand + grad_out[row]
+
+        assert torch.equal(accumulate_rows(grad_out), longhand)
+
+    def test_a_backward_reproduces_itself_exactly(self) -> None:
+        first = self._one_backward()
+        second = self._one_backward()
+
+        for a, b in zip(first, second, strict=True):
+            assert torch.equal(a, b)
+
+    def _one_backward(self) -> tuple[torch.Tensor, ...]:
+        """Run one owned forward+backward from fresh seeded operands."""
+        bias, x, w, grad_out = _grad_operands()
+        out = gemm_by_arm(OWNED_ARM, bias, x, w)
+        return torch.autograd.grad(out, (bias, x, w), grad_out)
