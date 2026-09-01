@@ -1,5 +1,5 @@
 {
-  "git_commit": "3db2f1557a00e0252b069bb6e65e85a7cf99071b",
+  "git_commit": "ad19cdbb11bb0ad5d8abc0f621e82afd83ad82ae",
   "carries": [
     "scripts",
     "doctrines",
@@ -621,8 +621,8 @@
     },
     {
       "path": "rw-agent.jar",
-      "sha256": "072c67da5fbb0e143e59f4e48bc1b548f00d0f5c2e64f674db9c78ef713a63f2",
-      "size_bytes": 135385
+      "sha256": "a46e91c1aa7254986486130440c999eeb096cc4748f42bffb7727117d2a32ba7",
+      "size_bytes": 139459
     },
     {
       "path": "scripts/__init__.py",
@@ -1041,8 +1041,8 @@
     },
     {
       "path": "src/rw_bot/policy/campaign.py",
-      "sha256": "74fc9a012083410f371b4baa6946b738d71fe0b6895f41b560802684adb554d0",
-      "size_bytes": 27263
+      "sha256": "ab6e55881fdb336b09445f5abd594eeb1e34b503e5b45afefef8e92ff85ce2cd",
+      "size_bytes": 27657
     },
     {
       "path": "src/rw_bot/policy/combat.py",
@@ -1196,8 +1196,8 @@
     },
     {
       "path": "src/rw_bot/policy/runner.py",
-      "sha256": "3411eb7be9bb7af94be12992e101b2c95620332c1ce882084c09b0846c78e817",
-      "size_bytes": 19753
+      "sha256": "d40893a029774eeab7fa56468777018fa04ecf8e6ff27a49aea28ae6f50c157f",
+      "size_bytes": 20837
     },
     {
       "path": "src/rw_bot/policy/rush.py",
@@ -1251,8 +1251,8 @@
     },
     {
       "path": "src/rw_bot/policy/workforce.py",
-      "sha256": "0537c971bd31e93cfec42b63e3e8effd33b89ffa2ce86a888c413623a086b3c2",
-      "size_bytes": 13090
+      "sha256": "573f8c3125292ed0db0ac996caf0291f0ffd6fa15cd885bb65c71a3d320d182c",
+      "size_bytes": 14381
     },
     {
       "path": "src/rw_bot/provenance.py",
@@ -1336,8 +1336,8 @@
     },
     {
       "path": "src/rw_bot/wire/codec.py",
-      "sha256": "5c4adf8ab7292d08b3bb63b42ae42af545eedb10a62175d37516e003167b287d",
-      "size_bytes": 19694
+      "sha256": "bb29360ebb5bd3afdedc583fe59f5341a801b70a897038379b75a716b12af994",
+      "size_bytes": 21126
     },
     {
       "path": "src/rw_bot/wire/command.py",
@@ -1356,8 +1356,8 @@
     },
     {
       "path": "src/rw_bot/wire/state.py",
-      "sha256": "60329afdfc40c87f659ba257062183e15fa7265aa93a5526d0b3986082d2ea27",
-      "size_bytes": 14273
+      "sha256": "46cb4af704d038e730e959ff3cc74144324f88d306fef2a575ed1053cf070ca2",
+      "size_bytes": 15479
     },
     {
       "path": "sweeps/aa-cover.txt",
@@ -2060,8 +2060,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "76e0f3fda94d9dea5bc05f6a16961d2fd8fa0af2cc007a9c8323d8eeae6d1c4e",
+  "tree_sha256": "bc951587c6f6b23299606217e0c63608b1780e4530be4aeec30d13f539148283",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "66adcd5724eeb0d05ee28ed1e45ec614e77368c1c28b3141c90340034d9e506d",
-  "archive_size_bytes": 2273280
+  "archive_sha256": "4d6ee4c08d5592257710be6beb5478135ffb8d1be28cf89d7ca3fa943ce7ad3f",
+  "archive_size_bytes": 2283520
 }
