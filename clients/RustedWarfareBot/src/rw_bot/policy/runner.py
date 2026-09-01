@@ -136,7 +136,9 @@ class OrderTracker:
         self._deficit_quiet = 0
         self._saving_at: int | None = None
 
-    def assess(self, sample: Sample, decision: Decision, builder_moved: bool) -> BuildStep:
+    def assess(
+        self, sample: Sample, decision: Decision, builder_moved: bool, site_refused: bool
+    ) -> BuildStep:
         """Judge one observation against the order already outstanding.
 
         Args:
@@ -144,6 +146,11 @@ class OrderTracker:
             decision: What the build policy wants, for this observation.
             builder_moved: Whether the builder moved since the previous
                 observation, which is what walking to a site looks like.
+            site_refused: Whether the decision's site is on the workforce's
+                refused ledger. The gate for reopening a stalled build's
+                slot: reopening BEFORE the ledger carries the site would let
+                the chooser offer the same doomed position again, and the
+                two quiet clocks may disagree by an observation.
 
         Returns:
             Whether to act, and how the plan stands.
@@ -195,7 +202,57 @@ class OrderTracker:
             self._quiet = 0
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
         self._quiet += 1
+        return self._quiet_verdict(slot, decision, site_refused)
+
+    def _quiet_verdict(
+        self, slot: tuple[int, str], decision: Decision, site_refused: bool
+    ) -> BuildStep:
+        """Rule on an order whose quiet clock just advanced.
+
+        Args:
+            slot: The plan slot the quiet order belongs to. Handed in rather
+                than read from the watch state, because by this point the
+                two are provably the same and a None-guard on the watch
+                would be a branch nothing can take.
+            decision: What the build policy wants, for this observation.
+            site_refused: Whether the decision's site is on the workforce's
+                refused ledger.
+
+        Returns:
+            Whether to act, and how the plan stands.
+        """
         if self._quiet < self.stall_samples:
+            return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        # **A refused site is the next site, not a dead plan.** The engine
+        # rejects a placement it dislikes by doing nothing -- no error, no
+        # roster change -- and this used to be terminal on the FIRST site
+        # tried. On duel_lake, where the ring chooser knows structures but
+        # not water, that one silent refusal armylessly ended 20 of 24
+        # Hard-rung members while the same matches raised turrets and
+        # extractors (wiki log 2026-08-31, verdict-withheld). The workforce
+        # owns the refusal ledger -- its presumed-lost clock runs the same
+        # window as this one -- so the slot reopens once the ledger carries
+        # this site, which is what guarantees the chooser's next offer is a
+        # DIFFERENT position rather than the same doomed order. Until the
+        # ledger catches up (the two clocks may disagree by an observation),
+        # the plan keeps waiting; a ring exhausted by refusals arrives from
+        # the chooser as a stalled decision and never reaches here. Produced
+        # units have no site to walk, so for them the quiet clock still
+        # means what it always did.
+        if decision["action"] == "build" and site_refused:
+            self._ordered.discard(slot)
+            self._watching = None
+            self._quiet = 0
+            return BuildStep(
+                act=False,
+                outcome="building",
+                reason=(
+                    f"{decision['type_name']} at "
+                    f"({decision['x']:.0f}, {decision['y']:.0f}) was refused silently "
+                    f"after {self.stall_samples} quiet samples; trying the next site"
+                ),
+            )
+        if decision["action"] == "build":
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
         return BuildStep(
             act=False,

@@ -408,7 +408,10 @@ def test_a_worker_sitting_on_an_unstarted_job_is_freed_to_retry() -> None:
         options=(option(214, "extractorT1", placed=True),),
     )
     # Nothing ever goes up and the worker never moves, so after the retry
-    # window the order is reissued.
+    # window the order is presumed lost. The SAME site is never reissued any
+    # more -- that reissue was the 64-doomed-orders disease the Hard panel
+    # measured -- so with a single pool, refusing it leaves exactly one build
+    # ever sent, and the refusal shows up in the run's reason instead.
     peer = ScriptedPeer(lines(*(world for _ in range(EXPAND_RETRY_SAMPLES + 2))))
     play(
         AgentChannel(peer),
@@ -418,7 +421,36 @@ def test_a_worker_sitting_on_an_unstarted_job_is_freed_to_retry() -> None:
         PROFILES,
         EXPAND_RETRY_SAMPLES + 2,
     )
-    assert len(verb(peer, "build")) == 2
+    assert len(verb(peer, "build")) == 1
+
+
+def test_a_presumed_lost_job_retries_on_the_next_pool_not_the_same_one() -> None:
+    """Freed-to-retry now means retry SOMEWHERE ELSE.
+
+    Two pools, one worker, and an engine that never builds anything: the first
+    order goes to the near pool, the retry window rules it refused, and the
+    second order goes to the far pool rather than back to the spot the engine
+    already declined."""
+    world = sample(
+        CENTRE,
+        BUILDER,
+        credits=100_000,
+        pools=(pool(x=300.0), pool(x=900.0)),
+        options=(option(214, "extractorT1", placed=True),),
+    )
+    peer = ScriptedPeer(lines(*(world for _ in range(EXPAND_RETRY_SAMPLES + 2))))
+    play(
+        AgentChannel(peer),
+        (),
+        CATALOGUE,
+        PLACEMENTS,
+        PROFILES,
+        EXPAND_RETRY_SAMPLES + 2,
+    )
+    builds = verb(peer, "build")
+    assert len(builds) == 2
+    assert '"x":300.0' in builds[0]
+    assert '"x":900.0' in builds[1]
 
 
 def test_a_worker_that_dies_is_forgotten() -> None:

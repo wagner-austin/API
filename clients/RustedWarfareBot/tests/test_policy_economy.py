@@ -165,7 +165,9 @@ def test_a_free_pool_is_claimed() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is True
     assert plan["unit_id"] == 214
     assert plan["type_name"] == EXTRACTOR_TYPE
@@ -182,7 +184,9 @@ def test_the_reason_counts_the_extractors_already_standing() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["reason"] == f"{EXTRACTOR_TYPE} #3 at (300, 0)"
     assert plan["owned"] == 2
 
@@ -195,7 +199,7 @@ def test_a_worker_the_loop_has_not_offered_is_not_used() -> None:
     re-tasking the same worker off each other ([[policy-loop]]).
     """
     world = sample(BUILDER, pools=(pool_at(300.0, 0.0),), options=(CAN_PLACE,))
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=())
+    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=(), claimed=(), refused=())
     assert plan["build"] is False
     assert plan["reason"] == f"no free worker can place {EXTRACTOR_TYPE}"
 
@@ -215,7 +219,9 @@ def test_a_second_worker_can_claim_a_pool_while_the_first_builds() -> None:
         pools=(pool_at(900.0, 0.0),),
         options=(CAN_PLACE, option(215)),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=(second,))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=(second,), claimed=(), refused=()
+    )
     assert plan["build"] is True
     assert plan["unit_id"] == 215
 
@@ -228,13 +234,17 @@ def test_an_enemy_extractor_going_up_does_not_block_ours() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(CAN_PLACE,),
     )
-    assert expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))["build"]
+    assert expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )["build"]
 
 
 def test_no_builder_alive_stops_the_economy_and_says_so() -> None:
     """The caller reads this reason to know it should make another builder."""
     world = sample(unit(213, "commandCenter"), pools=(pool_at(300.0, 0.0),))
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["reason"] == f"no free worker can place {EXTRACTOR_TYPE}"
 
@@ -246,13 +256,20 @@ def test_an_unavailable_action_is_not_a_placer() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(option(214, available=False),),
     )
-    assert expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))["build"] is False
+    assert (
+        expand_economy(
+            world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+        )["build"]
+        is False
+    )
 
 
 def test_an_option_from_a_unit_not_in_the_roster_is_not_a_placer() -> None:
     """A dead producer's option can outlive it in a partial observation."""
     world = sample(BUILDER, pools=(pool_at(300.0, 0.0),), options=(option(999),))
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
 
 
@@ -267,7 +284,9 @@ def test_the_map_editor_placeholder_never_places_anything() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(option(217),),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["reason"] == f"no free worker can place {EXTRACTOR_TYPE}"
 
@@ -281,6 +300,8 @@ def test_a_type_the_catalogue_cannot_price_is_refused_by_name() -> None:
         PROFILES,
         reserve=0,
         free=free(world),
+        claimed=(),
+        refused=(),
         type_name="someModRig",
     )
     assert plan["build"] is False
@@ -295,7 +316,9 @@ def test_the_reserve_is_held_back_for_the_army() -> None:
         options=(CAN_PLACE,),
         credits_held=1000,
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=350, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=350, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["reason"] == "1000 credits, need 1050 to expand past a 350 reserve"
 
@@ -308,7 +331,9 @@ def test_the_reserve_boundary_is_inclusive() -> None:
         options=(CAN_PLACE,),
         credits_held=1050,
     )
-    assert expand_economy(world, CATALOGUE, PROFILES, reserve=350, free=free(world))["build"]
+    assert expand_economy(
+        world, CATALOGUE, PROFILES, reserve=350, free=free(world), claimed=(), refused=()
+    )["build"]
 
 
 def test_every_pool_taken_is_reported_with_its_counts() -> None:
@@ -319,7 +344,9 @@ def test_every_pool_taken_is_reported_with_its_counts() -> None:
         pools=(pool_at(300.0, 0.0), pool_at(900.0, 0.0, group_land=7)),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["reason"] == "no pool free of 2: 1 occupied, 1 unreachable, 0 exposed"
     assert plan["occupied"] == 1
@@ -333,7 +360,9 @@ def test_a_pool_under_hostile_guns_is_refused() -> None:
         pools=(pool_at(300.0, 0.0),),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["exposed"] == 1
 
@@ -352,7 +381,9 @@ def test_the_economy_grows_outward_from_the_base_not_from_the_builder() -> None:
         pools=(pool_at(200.0, 0.0), pool_at(1000.0, 0.0)),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert (plan["x"], plan["y"]) == (200.0, 0.0)
 
 
@@ -363,12 +394,16 @@ def test_a_player_holding_no_structure_measures_from_the_builder() -> None:
         pools=(pool_at(200.0, 0.0), pool_at(1000.0, 0.0)),
         options=(CAN_PLACE,),
     )
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert (plan["x"], plan["y"]) == (1000.0, 0.0)
 
 
 def test_no_pool_in_sight_is_not_an_error() -> None:
     world = sample(BUILDER, options=(CAN_PLACE,))
-    plan = expand_economy(world, CATALOGUE, PROFILES, reserve=0, free=free(world))
+    plan = expand_economy(
+        world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
+    )
     assert plan["build"] is False
     assert plan["reason"] == "no pool free of 0: 0 occupied, 0 unreachable, 0 exposed"

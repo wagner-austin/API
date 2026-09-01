@@ -35,7 +35,12 @@ def bound_world(credits_held: int = 4000) -> Sample:
 
 def test_a_busy_queue_and_a_full_bank_buys_another_factory() -> None:
     growth = expand_production(
-        bound_world(), CATALOGUE, available=4000, wanted=("c_tank",), free=free(bound_world())
+        bound_world(),
+        CATALOGUE,
+        available=4000,
+        wanted=("c_tank",),
+        free=free(bound_world()),
+        refused=(),
     )
     assert growth["build"] is True
     assert growth["type_name"] == FACTORY_TYPE
@@ -51,7 +56,9 @@ def test_no_surplus_means_throughput_is_not_the_constraint() -> None:
         options=(option(214, FACTORY_TYPE), option(300, "c_tank", placed=False)),
         credits_held=100_000,
     )
-    growth = expand_production(world, CATALOGUE, available=0, wanted=("c_tank",), free=free(world))
+    growth = expand_production(
+        world, CATALOGUE, available=0, wanted=("c_tank",), free=free(world), refused=()
+    )
     assert growth["build"] is False
     assert growth["reason"] == "production is not the constraint"
 
@@ -67,6 +74,7 @@ def test_a_surplus_short_of_the_price_buys_nothing() -> None:
         available=300,
         wanted=("c_tank",),
         free=free(bound_world(800)),
+        refused=(),
     )
     assert growth["build"] is False
     assert growth["reason"] == "production is not the constraint"
@@ -81,7 +89,7 @@ def test_a_factory_nothing_can_place_is_not_proposed() -> None:
         credits_held=100_000,
     )
     growth = expand_production(
-        world, CATALOGUE, available=4000, wanted=("c_tank",), free=free(world)
+        world, CATALOGUE, available=4000, wanted=("c_tank",), free=free(world), refused=()
     )
     assert growth["build"] is False
     assert growth["reason"] == f"no free worker can place {FACTORY_TYPE}"
@@ -96,7 +104,12 @@ def test_successive_factories_take_successive_ring_slots() -> None:
     factory's site by one position ([[policy-loop]]).
     """
     first = expand_production(
-        bound_world(), CATALOGUE, available=4000, wanted=("c_tank",), free=free(bound_world())
+        bound_world(),
+        CATALOGUE,
+        available=4000,
+        wanted=("c_tank",),
+        free=free(bound_world()),
+        refused=(),
     )
     taken = unit(302, FACTORY_TYPE, first["x"], first["y"])
     crowded = sample(
@@ -108,7 +121,7 @@ def test_successive_factories_take_successive_ring_slots() -> None:
         credits_held=4000,
     )
     second = expand_production(
-        crowded, CATALOGUE, available=4000, wanted=("c_tank",), free=free(crowded)
+        crowded, CATALOGUE, available=4000, wanted=("c_tank",), free=free(crowded), refused=()
     )
     assert (second["x"], second["y"]) != (first["x"], first["y"])
 
@@ -121,7 +134,12 @@ def test_an_extractor_on_a_distant_pool_does_not_move_the_factory() -> None:
     moved it four positions.
     """
     plain = expand_production(
-        bound_world(), CATALOGUE, available=4000, wanted=("c_tank",), free=free(bound_world())
+        bound_world(),
+        CATALOGUE,
+        available=4000,
+        wanted=("c_tank",),
+        free=free(bound_world()),
+        refused=(),
     )
     with_economy = sample(
         unit(213, "commandCenter"),
@@ -133,7 +151,12 @@ def test_an_extractor_on_a_distant_pool_does_not_move_the_factory() -> None:
         credits_held=4000,
     )
     grown = expand_production(
-        with_economy, CATALOGUE, available=4000, wanted=("c_tank",), free=free(with_economy)
+        with_economy,
+        CATALOGUE,
+        available=4000,
+        wanted=("c_tank",),
+        free=free(with_economy),
+        refused=(),
     )
     assert (grown["x"], grown["y"]) == (plain["x"], plain["y"])
 
@@ -141,7 +164,12 @@ def test_an_extractor_on_a_distant_pool_does_not_move_the_factory() -> None:
 def test_a_mobile_unit_does_not_fill_a_ring_position() -> None:
     """It moves; a building does not. Counting it would hide a usable slot."""
     plain = expand_production(
-        bound_world(), CATALOGUE, available=4000, wanted=("c_tank",), free=free(bound_world())
+        bound_world(),
+        CATALOGUE,
+        available=4000,
+        wanted=("c_tank",),
+        free=free(bound_world()),
+        refused=(),
     )
     with_army = sample(
         unit(213, "commandCenter"),
@@ -152,7 +180,7 @@ def test_a_mobile_unit_does_not_fill_a_ring_position() -> None:
         credits_held=4000,
     )
     parked = expand_production(
-        with_army, CATALOGUE, available=4000, wanted=("c_tank",), free=free(with_army)
+        with_army, CATALOGUE, available=4000, wanted=("c_tank",), free=free(with_army), refused=()
     )
     assert (parked["x"], parked["y"]) == (plain["x"], plain["y"])
 
@@ -172,7 +200,7 @@ def test_an_opponents_factory_is_not_our_production_capacity() -> None:
         credits_held=100_000,
     )
     growth = expand_production(
-        theirs, CATALOGUE, available=100_000, wanted=("c_tank",), free=free(theirs)
+        theirs, CATALOGUE, available=100_000, wanted=("c_tank",), free=free(theirs), refused=()
     )
     assert growth["build"] is False
     assert growth["reason"] == "production is not the constraint"
@@ -190,10 +218,29 @@ def test_a_full_ring_stops_the_factory_rather_than_stacking_one() -> None:
         credits_held=4000,
     )
     growth = expand_production(
-        world, CATALOGUE, available=4000, wanted=("c_tank",), free=free(world)
+        world, CATALOGUE, available=4000, wanted=("c_tank",), free=free(world), refused=()
     )
     assert growth["build"] is False
     assert growth["reason"] == "every ring position is taken"
+
+
+def test_a_ring_exhausted_by_refusals_says_so_rather_than_pleading_taken() -> None:
+    """A taken slot frees itself when its structure falls; a refused one was
+    empty all along and stays refused. Reading both as "taken" is what hid 64
+    doomed re-orders behind a plausible wait (wiki log 2026-08-31)."""
+    world = sample(
+        unit(213, "commandCenter"),
+        unit(214, "builder"),
+        unit(300, FACTORY_TYPE, queued=1),
+        options=(option(214, FACTORY_TYPE), option(300, "c_tank", placed=False)),
+        credits_held=4000,
+    )
+    ring = tuple((dx, dy) for dx, dy in PLACEMENT_RING)
+    growth = expand_production(
+        world, CATALOGUE, available=4000, wanted=("c_tank",), free=free(world), refused=ring
+    )
+    assert growth["build"] is False
+    assert growth["reason"] == "every ring position is taken or refused (8 refused silently)"
 
 
 def test_a_factory_already_going_up_blocks_another() -> None:
@@ -214,7 +261,9 @@ def test_a_factory_already_going_up_blocks_another() -> None:
         options=(option(214, FACTORY_TYPE), option(300, "c_tank", placed=False)),
         credits_held=100_000,
     )
-    growth = expand_production(world, CATALOGUE, available=100_000, wanted=("c_tank",), free=())
+    growth = expand_production(
+        world, CATALOGUE, available=100_000, wanted=("c_tank",), free=(), refused=()
+    )
     assert growth["build"] is False
     assert growth["reason"] == f"no free worker can place {FACTORY_TYPE}"
 
@@ -222,7 +271,7 @@ def test_a_factory_already_going_up_blocks_another() -> None:
 def test_a_walking_builder_is_left_alone_by_the_factory_rule_too() -> None:
     """One builder, and an order given to it replaces whatever it was doing."""
     growth = expand_production(
-        bound_world(), CATALOGUE, available=100_000, wanted=("c_tank",), free=()
+        bound_world(), CATALOGUE, available=100_000, wanted=("c_tank",), free=(), refused=()
     )
     assert growth["build"] is False
     assert growth["reason"] == f"no free worker can place {FACTORY_TYPE}"

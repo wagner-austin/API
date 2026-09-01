@@ -120,9 +120,50 @@ RING_SLOT_RADIUS = 60.0
 RING_CLEARANCE = 130.0
 
 
+class RingChoice(TypedDict):
+    """What the ring chooser found, and what it had to pass over.
+
+    Attributes:
+        site: The first usable position, or None when every slot is taken or
+            refused.
+        refused_blocked: How many otherwise-free slots were skipped because
+            the engine already refused them. Carried because the callers'
+            verdicts hinge on it: a ring FULL of structures is a wait -- a
+            destroyed building frees its slot -- while a ring exhausted by
+            refusals is the map saying no, and waiting on it is the armyless
+            match the Hard panel measured (wiki log 2026-08-31,
+            verdict-withheld). Only the chooser can tell the two apart,
+            because only it walks the slots; a caller recomputing this would
+            be a second copy of the ring rule.
+    """
+
+    site: tuple[float, float] | None
+    refused_blocked: int
+
+
+def is_refused(site: tuple[float, float], refused: Sequence[tuple[float, float]]) -> bool:
+    """Judge whether a site is one the engine already refused.
+
+    One tolerance, shared by the chooser that skips refused sites and the
+    order tracker's gate that waits for a refusal to be recorded -- two
+    copies of the comparison would drift on exactly the question they settle.
+
+    Args:
+        site: The candidate position.
+        refused: Sites the engine refused silently.
+
+    Returns:
+        True when the candidate is within a world unit of a refused site.
+    """
+    return any((site[0] - x) ** 2 + (site[1] - y) ** 2 <= 1.0 for x, y in refused)
+
+
 def next_ring_site(
-    sample: Sample, anchor: Entity, catalogue: Mapping[str, UnitStats]
-) -> tuple[float, float] | None:
+    sample: Sample,
+    anchor: Entity,
+    catalogue: Mapping[str, UnitStats],
+    refused: Sequence[tuple[float, float]],
+) -> RingChoice:
     """Return the first ring position with nothing standing on it.
 
     **Read from the world rather than counted, and there is one counter here
@@ -143,20 +184,35 @@ def next_ring_site(
         anchor: The structure the ring is measured around.
         catalogue: Unit stats by type name, for the speed that tells a structure
             from a unit.
+        refused: Sites the engine already refused silently, which this chooser
+            must not offer again. The chooser can see structures but not
+            terrain, so on a water map its geometry happily nominates a spot
+            in the lake -- the engine says nothing, the spot stays
+            structure-free, and without this exclusion the same site is
+            offered forever. The refusals arrive from the workforce's
+            presumed-lost clock, the only place a silent refusal is
+            observable at all (wiki log 2026-08-31, verdict-withheld).
 
     Returns:
-        The first free position, or None when every ring slot is taken.
+        The choice: the first free position not already refused, and how many
+        free slots the refusals cost.
     """
     limit = RING_CLEARANCE**2
+    refused_blocked = 0
     for offset in PLACEMENT_RING:
         site = (anchor["x"] + offset[0], anchor["y"] + offset[1])
-        if not any(
+        standing = any(
             _is_structure(entity, catalogue)
             and (entity["x"] - site[0]) ** 2 + (entity["y"] - site[1]) ** 2 <= limit
             for entity in sample["entities"]
-        ):
-            return site
-    return None
+        )
+        if standing:
+            continue
+        if is_refused(site, refused):
+            refused_blocked += 1
+            continue
+        return RingChoice(site=site, refused_blocked=refused_blocked)
+    return RingChoice(site=None, refused_blocked=refused_blocked)
 
 
 #: Offsets tried around a structure needing cover, nearest shell first.
@@ -284,6 +340,8 @@ class PoolSurvey(TypedDict):
         occupied: How many already have a structure standing on them.
         unreachable: How many the builder cannot walk to at all.
         exposed: How many were reachable only through hostile fire.
+        refused_blocked: How many the engine already refused silently, per the
+            workforce's ledger, and were therefore never offered.
     """
 
     pool: ResourcePool | None
@@ -291,6 +349,7 @@ class PoolSurvey(TypedDict):
     occupied: int
     unreachable: int
     exposed: int
+    refused_blocked: int
 
 
 def survey_pools(
@@ -299,7 +358,8 @@ def survey_pools(
     builder: Entity,
     catalogue: Mapping[str, UnitStats],
     profiles: Mapping[str, CombatProfile],
-    claimed: Sequence[tuple[float, float]] = (),
+    claimed: Sequence[tuple[float, float]],
+    refused: Sequence[tuple[float, float]],
 ) -> PoolSurvey:
     """Choose a resource pool to build on, and account for the rejects.
 
@@ -344,11 +404,17 @@ def survey_pools(
         profiles: Combat profiles by type name, for the threat filter.
         claimed: Sites workers are already under orders to build on. Counted as
             occupied, because they will be.
+        refused: Sites the engine already refused silently, from the
+            workforce's ledger. A refused pool is not offered again -- the
+            spot stays structure-free, so without the exclusion the same
+            doomed order would be re-sent for the rest of the match, exactly
+            the ring chooser's disease on a different placement rule
+            (wiki log 2026-08-31, verdict-withheld).
 
     Returns:
         The chosen pool with the counts behind the choice. ``pool`` is None when
-        every visible pool is occupied or exposed, and when none is visible at
-        all.
+        every visible pool is occupied, exposed or refused, and when none is
+        visible at all.
 
     Raises:
         CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe a
@@ -359,9 +425,13 @@ def survey_pools(
     occupied = 0
     unreachable = 0
     exposed = 0
+    refused_blocked = 0
     origin = (builder["x"], builder["y"])
     limit = POOL_OCCUPIED_RADIUS**2
     for pool in sample["pools"]:
+        if is_refused((pool["x"], pool["y"]), refused):
+            refused_blocked += 1
+            continue
         if _is_occupied(sample, pool, catalogue):
             occupied += 1
             continue
@@ -389,6 +459,7 @@ def survey_pools(
         occupied=occupied,
         unreachable=unreachable,
         exposed=exposed,
+        refused_blocked=refused_blocked,
     )
 
 
@@ -478,10 +549,16 @@ def no_pool_reason(target: str, survey: PoolSurvey) -> str:
     """
     if survey["visible"] == 0:
         return f"{target} needs a resource pool and none is visible yet"
+    refused_note = (
+        f", and {survey['refused_blocked']} the engine refused silently"
+        if survey["refused_blocked"] > 0
+        else ""
+    )
     return (
         f"{target} needs a resource pool: of the {survey['visible']} in sight, "
         f"{survey['occupied']} are built on, {survey['unreachable']} cannot be "
         f"walked to and {survey['exposed']} can only be reached through enemy fire"
+        f"{refused_note}"
     )
 
 
@@ -492,9 +569,11 @@ __all__ = [
     "RING_CLEARANCE",
     "RING_SLOT_RADIUS",
     "PoolSurvey",
+    "RingChoice",
     "clear_point_near",
     "clear_site_near",
     "find_anchor",
+    "is_refused",
     "next_ring_site",
     "no_pool_reason",
     "survey_pools",

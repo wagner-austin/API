@@ -223,6 +223,7 @@ def decide(
     profiles: Mapping[str, CombatProfile],
     free: Sequence[Entity] = (),
     claimed: Sequence[tuple[float, float]] = (),
+    refused: Sequence[tuple[float, float]] = (),
 ) -> Decision:
     """Choose the next action from one observation.
 
@@ -237,6 +238,13 @@ def decide(
             ordered from one of these; which of them is free is decided by the
             loop, because it is the only thing that can see what each was last
             sent to do ([[policy-loop]]).
+        claimed: Sites already claimed by orders in flight, which the pool
+            survey must not offer twice.
+        refused: Sites the engine already refused silently, which the ring
+            chooser must not offer again -- the order tracker's quiet clock is
+            the only place a silent refusal is observable, and it feeds this
+            back so a refusal becomes the next slot rather than the plan's end
+            ([[policy-loop]]).
 
     Returns:
         The decision.
@@ -263,7 +271,7 @@ def decide(
     deferred: Decision | None = None
     for index in pending:
         attempt, deferrable = _attempt(
-            sample, plan, index, built, catalogue, placements, profiles, free, claimed
+            sample, plan, index, built, catalogue, placements, profiles, free, claimed, refused
         )
         if not deferrable:
             return attempt
@@ -285,6 +293,7 @@ def _attempt(
     profiles: Mapping[str, CombatProfile],
     free: Sequence[Entity],
     claimed: Sequence[tuple[float, float]],
+    refused: Sequence[tuple[float, float]],
 ) -> tuple[Decision, bool]:
     """Decide one plan entry, and say whether the next entry may be tried.
 
@@ -366,12 +375,17 @@ def _attempt(
         # returned for a worker the caller listed as free, so a miss here would
         # mean those two reads disagreed about the same list.
         worker = {entity["unit_id"]: entity for entity in free}[producer["unit_id"]]
-        placed = _placed_site(sample, worker, target, placement, catalogue, profiles, claimed)
+        placed = _placed_site(
+            sample, worker, target, placement, catalogue, profiles, claimed, refused
+        )
         if isinstance(placed, dict):
-            # Nowhere legal to stand. Handed back as deferrable, carrying its
-            # own reason -- a full ring and an occupied pool are different
-            # problems and the run log has to say which.
-            return placed, True
+            # Nowhere legal to stand. A WAIT is handed back as deferrable,
+            # carrying its own reason -- a full ring and an occupied pool are
+            # different problems and the run log has to say which. A STALLED
+            # ruling is not deferrable: the ring is out of sites the engine
+            # will take, no world event restores one, and deferring it would
+            # bury the plan's honest end under whatever entry comes next.
+            return placed, placed["action"] != "stalled"
         site = placed
 
     if sample["credits"] < stats["price"]:
@@ -426,6 +440,7 @@ def _placed_site(
     catalogue: Mapping[str, UnitStats],
     profiles: Mapping[str, CombatProfile],
     claimed: Sequence[tuple[float, float]],
+    refused: Sequence[tuple[float, float]],
 ) -> tuple[float, float] | Decision:
     """Choose where a placed structure goes, or explain why nowhere will do.
 
@@ -456,19 +471,40 @@ def _placed_site(
     anchor = find_anchor(sample, catalogue) or builder
 
     if not placement["needs_pool"]:
-        site = next_ring_site(sample, anchor, catalogue)
-        if site is None:
+        choice = next_ring_site(sample, anchor, catalogue, refused)
+        if choice["site"] is None:
+            if choice["refused_blocked"] > 0:
+                # The ring is out of sites the engine will take, and no event
+                # in the world un-refuses one -- a destroyed structure frees
+                # a TAKEN slot, but a refused slot was empty all along.
+                # Waiting here is the armyless match the Hard panel measured,
+                # so this is the plan's honest end, named in full.
+                return _decision(
+                    "stalled",
+                    f"{target} has nowhere the engine will take: "
+                    f"{choice['refused_blocked']} free ring position(s) were "
+                    "refused silently and the rest are occupied",
+                )
             # Every ring position is taken. A wait rather than a block: a
             # structure destroyed frees its slot, so the world can leave this
             # state on its own. Unbounded today -- see the producer wait above.
             return _waiting_on(
                 f"{target} needs a ring position and all are taken", builder["unit_id"]
             )
-        return site
+        return choice["site"]
 
-    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed)
+    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed, refused)
     chosen = survey["pool"]
     if chosen is None:
+        if survey["refused_blocked"] > 0:
+            # No pool is usable and at least one was refused. Unlike an
+            # occupied or exposed pool, nothing in the world un-refuses one --
+            # it was empty when the engine said no -- so once refusals stand
+            # between the plan and every site it can see, the plan ends
+            # loudly. Still strictly more patient than what this replaced,
+            # which stalled the whole plan on the FIRST refusal with the
+            # other pools untried.
+            return _decision("stalled", no_pool_reason(target, survey))
         # Not "blocked". No pool being usable is a state the world can leave on
         # its own -- fog lifts as units move, a destroyed extractor frees its
         # pool, and a killed enemy stops covering the route to one -- so this is

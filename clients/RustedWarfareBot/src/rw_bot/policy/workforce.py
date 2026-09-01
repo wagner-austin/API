@@ -83,6 +83,7 @@ class Workforce:
         self._moved: dict[int, bool] = {}
         self._job: dict[int, tuple[str, tuple[float, float]]] = {}
         self._quiet: dict[int, int] = {}
+        self._refused: list[tuple[float, float]] = []
 
     def free(self, sample: Sample) -> tuple[Entity, ...]:
         """Return the workers not visibly carrying out an order.
@@ -162,6 +163,21 @@ class Workforce:
         """
         return tuple(site for _, site in self._job.values())
 
+    def refused(self) -> tuple[tuple[float, float], ...]:
+        """Return the sites the engine has silently refused this match.
+
+        Written by the presumed-lost judgement in :meth:`free` -- a worker
+        stationary on an unstarted job for the whole retry window -- which is
+        the only observable trace a silent refusal leaves. Read by every ring
+        chooser, so a refused spot is the NEXT slot rather than the same
+        doomed order re-sent for the rest of the match
+        ([[policy-loop]]; wiki log 2026-08-31, verdict-withheld).
+
+        Returns:
+            The refused sites, in refusal order.
+        """
+        return tuple(self._refused)
+
     def underway(self, type_name: str) -> int:
         """Count workers currently under orders to build one type.
 
@@ -226,7 +242,14 @@ class Workforce:
             return False
         # Stationary, nothing going up, and long enough that the order is not
         # merely slow. The engine refuses some placements silently, so the
-        # worker is freed to be given a different one.
+        # worker is freed to be given a different one -- and the SITE is
+        # recorded as refused, because freeing the worker alone re-ran the
+        # same doomed order forever: the refused spot stays structure-free,
+        # every chooser offered it again, and the Hard panel's scorecards
+        # read `expansions 64 (0 factories)` (wiki log 2026-08-31,
+        # verdict-withheld). This is the one place a silent refusal is
+        # observable, so it is the one place the ledger is written.
+        self._refused.append(job[1])
         del self._job[unit_id]
         self._quiet[unit_id] = 0
         return True

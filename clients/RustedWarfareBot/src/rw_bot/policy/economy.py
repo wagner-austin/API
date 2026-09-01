@@ -225,7 +225,8 @@ def expand_economy(
     *,
     reserve: int,
     free: Sequence[Entity],
-    claimed: Sequence[tuple[float, float]] = (),
+    claimed: Sequence[tuple[float, float]],
+    refused: Sequence[tuple[float, float]],
     type_name: str = EXTRACTOR_TYPE,
 ) -> Expansion:
     """Decide whether to claim another resource pool, and which one.
@@ -274,6 +275,8 @@ def expand_economy(
             occupied by what *stands* on it, so one being walked toward reads as
             free -- which cost nineteen orders in twenty the moment more than one
             worker was available at a time ([[policy-holding-ground]]).
+        refused: Sites the engine already refused silently, from the
+            workforce's ledger, which the pool survey must not offer again.
         type_name: The extractor type to place.
 
     Returns:
@@ -302,7 +305,7 @@ def expand_economy(
     # the base. A player holding no immobile structure measures from the builder
     # instead, which is the build plan's own fallback.
     anchor = find_anchor(sample, catalogue) or builder
-    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed)
+    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed, refused)
     owned = count_extractors(sample, type_name)
     if survey["pool"] is None:
         return Expansion(
@@ -348,6 +351,7 @@ def expand_production(
     available: int,
     wanted: Sequence[str],
     free: Sequence[Entity],
+    refused: Sequence[tuple[float, float]],
     factory_type: str = FACTORY_TYPE,
 ) -> Expansion:
     """Decide whether to add another producer.
@@ -381,6 +385,8 @@ def expand_production(
             any of them makes this the build plan's problem rather than the
             economy's.
         free: Workers not already carrying out an order.
+        refused: Sites the engine already refused silently, from the
+            workforce's ledger, which the ring chooser must not offer again.
         factory_type: The producer to add.
 
     Returns:
@@ -394,8 +400,21 @@ def expand_production(
         return waiting(f"no free worker can place {factory_type}", sample, factory_type)
     anchor = find_anchor(sample, catalogue) or builder
 
-    site = next_ring_site(sample, anchor, catalogue)
+    choice = next_ring_site(sample, anchor, catalogue, refused)
+    site = choice["site"]
     if site is None:
+        # The distinction rides in the reason: a taken slot frees itself when
+        # its structure falls, a refused one was empty all along and stays
+        # refused, and a run log that said "taken" for both hid 64 doomed
+        # re-orders behind a plausible wait (wiki log 2026-08-31,
+        # verdict-withheld).
+        if choice["refused_blocked"] > 0:
+            return waiting(
+                f"every ring position is taken or refused "
+                f"({choice['refused_blocked']} refused silently)",
+                sample,
+                factory_type,
+            )
         return waiting("every ring position is taken", sample, factory_type)
     return Expansion(
         build=True,

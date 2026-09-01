@@ -320,6 +320,7 @@ class Expander:
                 available=budget.spendable(),
                 wanted=wanted,
                 free=free[-1:],
+                refused=workforce.refused(),
             )
             capacity = self._commit(throughput, budget, workforce)
             self.reaches.reached("spare-throughput", bool(capacity), throughput["reason"])
@@ -338,6 +339,7 @@ class Expander:
             # every worker freed by the gate above was offered the same nearest
             # one ([[policy-holding-ground]]).
             claimed=workforce.claims(),
+            refused=workforce.refused(),
         )
         # Kept because it is the informative one when nothing is bought at all.
         # "No pool was taken" has five distinct causes and :class:`Expansion`
@@ -420,6 +422,7 @@ class Expander:
                 available=budget.spendable(),
                 wanted=wanted,
                 free=free,
+                refused=workforce.refused(),
             )
             self.reaches.reached("throughput", growth["build"], growth["reason"])
         self.reason = growth["reason"] if growth["build"] else income_reason

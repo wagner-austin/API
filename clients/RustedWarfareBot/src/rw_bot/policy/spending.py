@@ -29,6 +29,7 @@ from rw_bot.policy.build_order import BUILDER_TYPE, decide
 from rw_bot.policy.economy import upgradeable
 from rw_bot.policy.production import sustain
 from rw_bot.policy.runner import OrderTracker
+from rw_bot.policy.siting import is_refused
 from rw_bot.policy.workforce import Workforce
 from rw_bot.wire.command import (
     AbilityOrder,
@@ -449,11 +450,25 @@ def build_plan(
         How the plan stands, and at most one order to send for it.
     """
     decision = decide(
-        sample, tracker.plan, catalogue, placements, profiles, free, workforce.claims()
+        sample,
+        tracker.plan,
+        catalogue,
+        placements,
+        profiles,
+        free,
+        workforce.claims(),
+        workforce.refused(),
     )
     # Movement is judged per worker now, so the plan's own stall clock asks the
-    # workforce whether the unit it ordered is the one that is walking.
-    step = tracker.assess(sample, decision, workforce.working(decision["unit_id"]))
+    # workforce whether the unit it ordered is the one that is walking -- and
+    # whether the site it ordered has since been ruled refused, which is what
+    # licenses the tracker to reopen the slot for a different one.
+    step = tracker.assess(
+        sample,
+        decision,
+        workforce.working(decision["unit_id"]),
+        is_refused((decision["x"], decision["y"]), workforce.refused()),
+    )
     # The plan holds the builder for as long as it wants something placed,
     # including while it is merely waiting to afford it. Acting on that is what
     # keeps the two off each other: a live run had the economy re-tasking the

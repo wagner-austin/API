@@ -108,6 +108,23 @@ def test_a_full_ring_waits_rather_than_ordering_onto_a_building() -> None:
     assert "all are taken" in decision["reason"]
 
 
+def test_a_ring_exhausted_by_refusals_stalls_the_plan_loudly() -> None:
+    """No event in the world un-refuses a slot: a destroyed structure frees a
+    TAKEN one, but a refused one was empty all along. Waiting here is the
+    armyless match the Hard panel measured (wiki log 2026-08-31), so the plan
+    ends and says exactly what stood in its way."""
+    world = sample(ANCHOR, BUILDER)
+    refused = tuple((ANCHOR["x"] + dx, ANCHOR["y"] + dy) for dx, dy in PLACEMENT_RING)
+    decision = decide(
+        world, ("landFactory",), CATALOGUE, PLACEMENTS, PROFILES, free(world), (), refused
+    )
+    assert decision["action"] == "stalled"
+    assert decision["reason"] == (
+        "landFactory has nowhere the engine will take: "
+        "8 free ring position(s) were refused silently and the rest are occupied"
+    )
+
+
 def test_the_free_slot_is_found_through_a_partly_filled_ring() -> None:
     """Not merely the first or the last: the first one actually free."""
     filled = [
@@ -226,12 +243,13 @@ def test_an_enemy_extractor_holds_a_pool_just_as_firmly() -> None:
     taken = pool_at(0, 220, 130)
     enemy = unit(900, "extractorT1", taken["x"], taken["y"], mine=False)
     world = sample(ANCHOR, BUILDER, enemy, pools=(taken,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES) == {
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ()) == {
         "pool": None,
         "visible": 1,
         "occupied": 1,
         "unreachable": 0,
         "exposed": 0,
+        "refused_blocked": 0,
     }
 
 
@@ -249,11 +267,11 @@ def test_a_pool_another_worker_is_walking_to_is_not_free() -> None:
     taken = pool_at(0, 220, 130)
     spare = pool_at(1, 600, 130)
     world = sample(ANCHOR, BUILDER, pools=(taken, spare), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)["pool"] == taken
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())["pool"] == taken
     # Somebody is already on their way to the near one, so the next worker is
     # offered the far one rather than the same site again.
     claimed = ((taken["x"], taken["y"]),)
-    survey = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, claimed)
+    survey = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, claimed, ())
     assert survey["pool"] == spare
     # Counted as occupied rather than given a category of its own: from here,
     # "somebody already has this pool" is one fact.
@@ -264,7 +282,9 @@ def test_every_pool_claimed_leaves_nothing_to_take() -> None:
     """The complement, and what stops the fix hiding the map from itself."""
     only = pool_at(0, 220, 130)
     world = sample(ANCHOR, BUILDER, pools=(only,), credits=10_000)
-    survey = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, ((only["x"], only["y"]),))
+    survey = survey_pools(
+        world, ANCHOR, BUILDER, CATALOGUE, PROFILES, ((only["x"], only["y"]),), ()
+    )
     assert survey["pool"] is None
     assert survey["occupied"] == 1
 
@@ -274,7 +294,7 @@ def test_a_claim_far_from_a_pool_leaves_it_free() -> None:
     pool = pool_at(0, 220, 130)
     world = sample(ANCHOR, BUILDER, pools=(pool,), credits=10_000)
     elsewhere = ((pool["x"] + POOL_OCCUPIED_RADIUS + 0.5, pool["y"]),)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, elsewhere)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, elsewhere, ())["pool"] == pool
 
 
 def test_a_builder_parked_on_a_pool_does_not_occupy_it() -> None:
@@ -282,14 +302,14 @@ def test_a_builder_parked_on_a_pool_does_not_occupy_it() -> None:
     pool = pool_at(0, 220, 130)
     parked = unit(214, "builder", pool["x"], pool["y"])
     world = sample(ANCHOR, parked, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, parked, CATALOGUE, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, parked, CATALOGUE, PROFILES, (), ())["pool"] == pool
 
 
 def test_a_structure_outside_the_occupancy_radius_leaves_a_pool_free() -> None:
     pool = pool_at(0, 220, 130)
     beyond = unit(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS + 0.5, pool["y"])
     world = sample(ANCHOR, BUILDER, beyond, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())["pool"] == pool
 
 
 def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
@@ -297,7 +317,7 @@ def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
     pool = pool_at(0, 220, 130)
     astride = unit(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS, pool["y"])
     world = sample(ANCHOR, BUILDER, astride, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)["pool"] is None
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())["pool"] is None
 
 
 def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
@@ -305,7 +325,7 @@ def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
     pool = pool_at(0, 220, 130)
     unknown = unit(400, "someModStructure", pool["x"], pool["y"])
     world = sample(ANCHOR, BUILDER, unknown, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())["pool"] == pool
 
 
 def test_a_pool_across_water_is_not_offered_to_a_land_builder() -> None:
@@ -319,7 +339,7 @@ def test_a_pool_across_water_is_not_offered_to_a_land_builder() -> None:
     across = pool_at(1, 12, 52)
     across["group_land"] = ISLAND
     world = sample(ANCHOR, BUILDER, pools=(across, here), credits=10_000)
-    survey = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)
+    survey = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())
     assert survey["pool"] == here
     assert survey["unreachable"] == 1
 
@@ -334,14 +354,14 @@ def test_a_pool_with_no_land_component_at_all_is_not_offered() -> None:
     nowhere = pool_at(0, 220, 130)
     nowhere["group_land"] = -1
     world = sample(ANCHOR, BUILDER, pools=(nowhere,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES)["unreachable"] == 1
+    assert survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), ())["unreachable"] == 1
 
 
 def test_a_builder_off_the_land_grid_is_not_offered_a_pool_it_cannot_be_judged_for() -> None:
     """Its own component id belongs to a different grid, so it has none here."""
     stranded = unit(214, "builder", 4250.0, 2610.0, group=-1)
     world = sample(ANCHOR, stranded, pools=(pool_at(0, 220, 130),), credits=10_000)
-    assert survey_pools(world, ANCHOR, stranded, CATALOGUE, PROFILES)["unreachable"] == 1
+    assert survey_pools(world, ANCHOR, stranded, CATALOGUE, PROFILES, (), ())["unreachable"] == 1
 
 
 def test_a_builder_on_another_layer_refuses_the_pool_rather_than_guessing() -> None:
@@ -353,7 +373,7 @@ def test_a_builder_on_another_layer_refuses_the_pool_rather_than_guessing() -> N
     """
     hover = unit(214, "builder", 4250.0, 2610.0, movement="HOVER", group=99)
     world = sample(ANCHOR, hover, pools=(pool_at(0, 220, 130),), credits=10_000)
-    survey = survey_pools(world, ANCHOR, hover, CATALOGUE, PROFILES)
+    survey = survey_pools(world, ANCHOR, hover, CATALOGUE, PROFILES, (), ())
     assert survey["pool"] is None
     assert survey["unreachable"] == 1
 
@@ -362,12 +382,13 @@ def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
     pool = pool_at(0, 220, 130)
     turret = unit(900, "turret", pool["x"] + 50.0, pool["y"], mine=False)
     world = sample(ANCHOR, BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES) == {
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ()) == {
         "pool": None,
         "visible": 1,
         "occupied": 0,
         "unreachable": 0,
         "exposed": 1,
+        "refused_blocked": 0,
     }
 
 
@@ -383,12 +404,12 @@ def test_a_pool_is_rejected_for_the_walk_even_when_the_pool_itself_is_safe() -> 
     ambush = unit(900, "turret", midpoint[0], midpoint[1] + 50.0, mine=False)
     world = sample(ANCHOR, BUILDER, ambush, pools=(pool,), credits=10_000)
 
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] is None
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] is None
     # ... and the same turret standing at the same distance from the pool, but
     # behind the builder rather than between the two, rules out nothing.
     behind = unit(900, "turret", BUILDER["x"], BUILDER["y"] - 400.0, mine=False)
     clear = sample(ANCHOR, BUILDER, behind, pools=(pool,), credits=10_000)
-    assert survey_pools(clear, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] == pool
+    assert survey_pools(clear, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] == pool
 
 
 def test_a_pool_exactly_at_the_edge_of_a_gun_is_rejected() -> None:
@@ -396,14 +417,14 @@ def test_a_pool_exactly_at_the_edge_of_a_gun_is_rejected() -> None:
     pool = pool_at(0, 220, 130)
     turret = unit(900, "turret", pool["x"] + TURRET_RANGE, pool["y"], mine=False)
     world = sample(ANCHOR, BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] is None
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] is None
 
 
 def test_a_pool_beyond_every_gun_is_offered() -> None:
     pool = pool_at(0, 220, 130)
     turret = unit(900, "turret", pool["x"] + TURRET_RANGE + 0.5, pool["y"], mine=False)
     world = sample(ANCHOR, BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] == pool
 
 
 def test_an_unarmed_enemy_standing_on_the_route_is_not_a_threat() -> None:
@@ -412,7 +433,7 @@ def test_an_unarmed_enemy_standing_on_the_route_is_not_a_threat() -> None:
     pool = pool_at(0, 220, 130)
     harmless = unit(900, "builder", pool["x"] + 10.0, pool["y"], mine=False)
     world = sample(ANCHOR, BUILDER, harmless, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] == pool
 
 
 def test_an_ally_is_not_a_threat_even_though_it_is_not_mine() -> None:
@@ -420,7 +441,7 @@ def test_an_ally_is_not_a_threat_even_though_it_is_not_mine() -> None:
     pool = pool_at(0, 220, 130)
     ally = unit(900, "turret", pool["x"] + 50.0, pool["y"], mine=False, hostile=False)
     world = sample(ANCHOR, BUILDER, ally, pools=(pool,), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] == pool
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] == pool
 
 
 def test_the_nearest_safe_pool_beats_a_nearer_exposed_one() -> None:
@@ -435,7 +456,7 @@ def test_the_nearest_safe_pool_beats_a_nearer_exposed_one() -> None:
     far = pool_at(1, 220, 90)
     turret = unit(900, "turret", near["x"], near["y"] + 50.0, mine=False)
     world = sample(ANCHOR, BUILDER, turret, pools=(near, far), credits=10_000)
-    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES)["pool"] == far
+    assert survey_pools(world, ANCHOR, BUILDER, ARMED, PROFILES, (), ())["pool"] == far
 
 
 def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None:

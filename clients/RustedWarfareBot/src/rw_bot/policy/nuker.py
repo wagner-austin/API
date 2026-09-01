@@ -252,7 +252,7 @@ class Nuker:
         if builder is None:
             return None
         anchor = find_anchor(sample, catalogue) or builder
-        site = next_ring_site(sample, anchor, catalogue)
+        site = next_ring_site(sample, anchor, catalogue, workforce.refused())["site"]
         if site is None:
             return None
         price = catalogue[LAUNCHER_TYPE]["price"]
