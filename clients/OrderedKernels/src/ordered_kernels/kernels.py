@@ -41,11 +41,26 @@ from typing import Final, Protocol
 
 import torch
 
-#: One thread block computes a BLOCK x BLOCK output tile from BLOCK-wide
-#: K slices staged in shared memory. 16 keeps the kernel simple and correct;
-#: widening it (or register-tiling several outputs per thread, which keeps
-#: the order contract) is pure speed work and changes no bits.
-BLOCK: Final = 16
+#: One thread block computes a TILE x TILE output tile: 16x16 threads, each
+#: owning a MICRO x MICRO register patch, over K slices of K_SLICE staged in
+#: shared memory. Register tiling is the speed lever the naive version left
+#: on the table -- each staged value feeds MICRO outputs instead of one, so
+#: shared traffic per multiply drops fourfold -- and it is bit-neutral BY
+#: CONSTRUCTION: every output element still belongs to exactly one thread,
+#: whose k-chain is the same strictly ascending sequence of separate
+#: multiply-and-add the naive kernel ran. Measured before the change: the
+#: naive tile priced at 1.8x the vendor at small shapes and 12-128x at
+#: large ones; the register tile exists for the large end.
+TILE: Final = 64
+
+#: Threads per block edge; TILE / THREADS outputs per thread per edge.
+THREADS: Final = 16
+
+#: Outputs per thread per edge.
+MICRO: Final = 4
+
+#: K-slice width staged per iteration.
+K_SLICE: Final = 16
 
 #: Threads per block for the row-sum kernel: one thread per output column.
 ROWSUM_BLOCK: Final = 128
@@ -59,31 +74,61 @@ extern "C" __global__ void ordered_gemm_nn(
     float* __restrict__ out,         // N x M, row-major, contiguous
     const int n_rows, const int k_dim, const int m_cols, const int use_bias)
 {
-    __shared__ float xs[16][16];
-    __shared__ float ws[16][16];
-    const int row = blockIdx.y * 16 + threadIdx.y;
-    const int col = blockIdx.x * 16 + threadIdx.x;
-    float acc = 0.0f;
+    // 64x64 output tile per block; 16x16 threads; a 4x4 register patch per
+    // thread. Each output element belongs to ONE thread and its k-chain is
+    // strictly ascending with separate multiply and add -- the register
+    // tiling changes how many elements a thread owns, never the order any
+    // one element is summed in.
+    __shared__ float xs[64][16];
+    __shared__ float ws[16][64];
+    const int row0 = blockIdx.y * 64;
+    const int col0 = blockIdx.x * 64;
+    const int tid = threadIdx.y * 16 + threadIdx.x;
+    float acc[4][4];
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            acc[i][j] = 0.0f;
     for (int k0 = 0; k0 < k_dim; k0 += 16) {
-        const int kx = k0 + threadIdx.x;
-        xs[threadIdx.y][threadIdx.x] =
-            (row < n_rows && kx < k_dim) ? x[row * k_dim + kx] : 0.0f;
-        const int kw = k0 + threadIdx.y;
-        ws[threadIdx.y][threadIdx.x] =
-            (kw < k_dim && col < m_cols) ? w[kw * m_cols + col] : 0.0f;
+        // 256 threads cooperatively stage 64x16 of x and 16x64 of w.
+        // Out-of-range positions stage 0.0f, which is harmless here: the
+        // K tail is bounds-guarded below (a padded 0.0f term would flip a
+        // -0.0f accumulator), and out-of-range rows/cols are masked at the
+        // store, so their padded products are never written anywhere.
+        for (int s = tid; s < 64 * 16; s += 256) {
+            const int r = s / 16;
+            const int k = s % 16;
+            xs[r][k] = (row0 + r < n_rows && k0 + k < k_dim)
+                ? x[(row0 + r) * k_dim + (k0 + k)] : 0.0f;
+            ws[k][r] = (k0 + k < k_dim && col0 + r < m_cols)
+                ? w[(k0 + k) * m_cols + (col0 + r)] : 0.0f;
+        }
         __syncthreads();
-        // Bounds-guarded tail, never zero-padded: acc + 0.0f is not a no-op
-        // when acc is -0.0f, and the oracle adds no such terms.
         const int k_stop = (k_dim - k0 < 16) ? (k_dim - k0) : 16;
         for (int kk = 0; kk < k_stop; ++kk) {
-            // Separate multiply and add, two roundings, matching addr_'s
-            // arithmetic exactly; --fmad=false forbids contraction.
-            acc = acc + xs[threadIdx.y][kk] * ws[kk][threadIdx.x];
+            float xr[4];
+            float wc[4];
+            for (int i = 0; i < 4; ++i)
+                xr[i] = xs[threadIdx.y * 4 + i][kk];
+            for (int j = 0; j < 4; ++j)
+                wc[j] = ws[kk][threadIdx.x * 4 + j];
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
+                    // Separate multiply and add, two roundings, matching
+                    // addr_'s arithmetic; --fmad=false forbids contraction.
+                    acc[i][j] = acc[i][j] + xr[i] * wc[j];
         }
         __syncthreads();
     }
-    if (row < n_rows && col < m_cols) {
-        out[row * m_cols + col] = use_bias ? (bias[col] + acc) : acc;
+    for (int i = 0; i < 4; ++i) {
+        const int row = row0 + threadIdx.y * 4 + i;
+        if (row < n_rows) {
+            for (int j = 0; j < 4; ++j) {
+                const int col = col0 + threadIdx.x * 4 + j;
+                if (col < m_cols) {
+                    out[row * m_cols + col] = use_bias ? (bias[col] + acc[i][j]) : acc[i][j];
+                }
+            }
+        }
     }
 }
 
@@ -314,11 +359,11 @@ def gemm(x: torch.Tensor, w: torch.Tensor, bias: torch.Tensor | None) -> torch.T
         use_bias = 1
     out = torch.empty(n_rows, m_cols, dtype=torch.float32, device=x2.device)
     surface = _surface()
-    grid = ((m_cols + BLOCK - 1) // BLOCK, (n_rows + BLOCK - 1) // BLOCK, 1)
+    grid = ((m_cols + TILE - 1) // TILE, (n_rows + TILE - 1) // TILE, 1)
     _launch(
         "ordered_gemm_nn",
         grid,
-        (BLOCK, BLOCK, 1),
+        (THREADS, THREADS, 1),
         (
             surface.from_dlpack(x2),
             surface.from_dlpack(w2),
@@ -364,10 +409,13 @@ def rowsum(grad: torch.Tensor) -> torch.Tensor:
 
 
 __all__ = [
-    "BLOCK",
     "CUDA_SOURCE",
+    "K_SLICE",
+    "MICRO",
     "NVRTC_OPTIONS",
     "ROWSUM_BLOCK",
+    "THREADS",
+    "TILE",
     "CupyArrayProto",
     "ExternalStreamProto",
     "RawKernelProto",

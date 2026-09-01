@@ -16,16 +16,19 @@ from model_trainer.core.services.model.deterministic_gemm import (
     rank1_matmul,
 )
 
-from ordered_kernels.kernels import BLOCK, gemm, rowsum
+from ordered_kernels.kernels import K_SLICE, TILE, gemm, rowsum
 
 #: Shapes chosen to exercise every tiling regime: smaller than one tile,
-#: exact multiples, ragged in each dimension, and a K straddling a tile
-#: boundary by one -- the bounds-guarded tail the -0.0 argument is about.
+#: exact tile and K-slice multiples, ragged in each dimension, a K
+#: straddling a slice boundary by one (the bounds-guarded tail the -0.0
+#: argument is about), and rows/cols straddling the 64-wide output tile so
+#: the store masks and padded stage rows are all driven.
 SHAPES = (
     (4, 7, 5),
-    (BLOCK, BLOCK, BLOCK),
-    (BLOCK * 4, BLOCK * 8, BLOCK * 3),
-    (7, BLOCK + 1, 19),
+    (K_SLICE, K_SLICE, K_SLICE),
+    (TILE, K_SLICE * 8, TILE),
+    (7, K_SLICE + 1, 19),
+    (TILE + 3, K_SLICE * 5 + 1, TILE + 17),
     (64, 1152, 384),
 )
 

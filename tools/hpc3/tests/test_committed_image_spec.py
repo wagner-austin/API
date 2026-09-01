@@ -131,6 +131,11 @@ class TestTheCommittedSpec:
         Thirteenth, 2026-09-01: two symbols for v30's owned-backward arm --
         ``OWNED_ARM`` on the arm table and ``OwnedAddmm``, the autograd
         Function whose backward is the entire point. v29 carries neither.
+
+        Fourteenth, 2026-09-01: two symbols for v31's ordered_kernels wheel
+        -- the fast fixed-order GEMM (``kernels.gemm``) and its probe's
+        record builder. A fifth first-party wheel joins the image, plus
+        cupy for NVRTC; no earlier image carries any of it.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
@@ -218,6 +223,8 @@ class TestTheCommittedSpec:
                 "model_trainer.core.services.training.base_trainer_checkpoints",
                 "_TrainerCheckpoints",
             ),
+            ("ordered_kernels.cli.gemm_probe", "ordered_run_record"),
+            ("ordered_kernels.kernels", "gemm"),
             ("platform_core.determinism_env", "CUBLASLT_WORKSPACE_ENV_VAR"),
             ("platform_core.environment_record", "capture_host_record"),
             ("platform_core.environment_record", "capture_package_versions"),
