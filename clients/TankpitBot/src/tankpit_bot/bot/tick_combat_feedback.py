@@ -103,7 +103,27 @@ def _merge_protocol_kills(ws: WorldService, ai_state: AIStateDict) -> AIStateDic
         merged[str(tank_id)] = now
         if killer_id == own_tank_id:
             own_kill_count += 1
-            emit_ai("kill registered (tank_id=%d)", tank_id)
+            # Rank rides along for the points-floor survey (operator
+            # flags 5/6/8/12/13, 2026-09-01): the wire delivers victim
+            # rank via 0x3D but nothing ever wrote it to the ledger, so
+            # "Enemy's rank was too low" could not be correlated with
+            # the rank it judged. A victim already 0x58-removed from
+            # the registry reports rank -1, never a guess.
+            victim = ws.world_state["tanks"].get(str(tank_id))
+            victim_name = "" if victim is None else victim["name"]
+            victim_rank = -1 if victim is None else victim["rank"]
+            emit_ai(
+                "kill registered (tank_id=%d name=%s rank=%d)",
+                tank_id,
+                victim_name,
+                victim_rank,
+            )
+            emit_diagnostic(
+                diagnostic_kind="kill_registered",
+                victim_id=tank_id,
+                victim_name=victim_name,
+                victim_rank=victim_rank,
+            )
     # The shot-target fields are NOT cleared here: when the killed tank
     # is the pending shot's target, ``_get_combat_feedback`` must still
     # see the target id to resolve the shot as ``kill_confirmed`` (a

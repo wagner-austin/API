@@ -29,6 +29,7 @@ from tankpit_bot.browser.game_log import (
     poll_game_log,
     timestamp_game_log_entries,
 )
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import GameLogEntryWithTimestamp
 
@@ -36,6 +37,32 @@ from tankpit_bot.types import GameLogEntryWithTimestamp
 # 20260611-013801: panel never opened across a full poll budget), so
 # the startup capture retries on later ticks.
 _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS = 3
+
+# The kill banner renders as five DOM lines (archived capture, run
+# bot-20260828-212653): a star rule, the victim's name alone, this
+# exact line, a closing star rule, then — on World only — the points
+# verdict. The name is NEVER on the deactivation line itself.
+_KILL_BANNER_LINE = "has been deactivated by you"
+_BANNER_RULE_PREFIX = "****"
+_POINTS_EXTRA_LINE = "You earned extra points"
+_POINTS_TOO_LOW_PREFIX = "Enemy's rank was too low"
+
+
+def _rank_of_named_tank(world: WorldService, name: str) -> int:
+    """Look a tank's rank up by name in the live registry.
+
+    Args:
+        world: The session's world service.
+        name: Exact tank name as the banner rendered it.
+
+    Returns:
+        The registry rank, or -1 when no tank carries the name (the
+        0x58 cleanup can outrun the banner poll).
+    """
+    for tank in world.world_state["tanks"].values():
+        if tank["name"] == name:
+            return tank["rank"]
+    return -1
 
 
 class GameLogWitnessMixin:
@@ -48,6 +75,8 @@ class GameLogWitnessMixin:
     world: WorldService
     _account_stats_captured: bool
     _account_stats_attempts: int
+    _kill_banner_victim: str
+    _last_game_log_line: str
 
     def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
         """Create the game log scraper for server feedback visibility.
@@ -72,6 +101,47 @@ class GameLogWitnessMixin:
             entries: New log entries from this tick's poll, in order.
         """
         self._game_log_witness.extend(timestamp_game_log_entries(entries))
+        for entry in entries:
+            self._witness_points_outcome(entry["text"].strip())
+
+    def _witness_points_outcome(self, text: str) -> None:
+        """Surface the World points verdict as a diagnostic, still a witness.
+
+        The points-floor survey (operator flags 5/6/8/12/13,
+        2026-09-01): World kills carry a verdict line — "You earned
+        extra points" or "Enemy's rank was too low" — that only ever
+        reached the capture artifact, so no ledger row paired a
+        verdict with the victim rank it judged. This pairs them live:
+        the banner names the victim on its own line one before the
+        deactivation line, and the verdict follows the closing star
+        rule. Nothing acts on the diagnostic — the witness law of this
+        module holds.
+
+        Args:
+            text: One stripped game-log line, in arrival order.
+        """
+        if text.startswith(_BANNER_RULE_PREFIX):
+            return
+        if text == _KILL_BANNER_LINE:
+            self._kill_banner_victim = self._last_game_log_line
+            self._last_game_log_line = text
+            return
+        outcome = ""
+        if text == _POINTS_EXTRA_LINE:
+            outcome = "extra_points"
+        elif text.startswith(_POINTS_TOO_LOW_PREFIX):
+            outcome = "rank_too_low"
+        if outcome and self._kill_banner_victim:
+            self_state = self.world.world_state["self_state"]
+            emit_diagnostic(
+                diagnostic_kind="kill_points_outcome",
+                victim_name=self._kill_banner_victim,
+                victim_rank=_rank_of_named_tank(self.world, self._kill_banner_victim),
+                self_rank=-1 if self_state is None else self_state["rank"],
+                outcome=outcome,
+            )
+            self._kill_banner_victim = ""
+        self._last_game_log_line = text
 
     def maybe_capture_account_stats_once(self) -> None:
         """Capture account stats on the first healthy tick, with bounded retries.

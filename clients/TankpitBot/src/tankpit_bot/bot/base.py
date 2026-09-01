@@ -159,6 +159,11 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._respawn_deadline_ms: int = 0
         self._game_log_scraper: GameLogScraper | None = None
         self._game_log_witness: list[GameLogEntryWithTimestamp] = []
+        # Kill-banner points-verdict witness state (GameLogWitnessMixin):
+        # the victim's name renders one line before the deactivation
+        # line, so the pairing needs the trailing line remembered.
+        self._kill_banner_victim: str = ""
+        self._last_game_log_line: str = ""
         self._shot_screenshot_seq: int = 0
         self._ai_state: AIStateDict = make_initial_ai_state(env_ai_config())
         default_mode_bridge: ModeBridgeProtocol = ModeBridge()
