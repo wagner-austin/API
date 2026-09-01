@@ -81,6 +81,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   .alive { color:#5ecb71; font-weight:600; }
   .done { color:#8a93a3; } .crash { color:#e0656a; }
   .rank { color:#d9b45b; font-weight:600; }
+  .lb { color:#8a93a3; font-size:.8em; }
   button { background:#1d232d; color:#d6dae2; border:1px solid #39424f;
            padding:.3rem .8rem; border-radius:6px; margin-right:.35rem;
            cursor:pointer; font-size:.82rem; }
@@ -261,14 +262,21 @@ function row(bot) {
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
     "<td>" + (s.available ? s.hits + "/" + s.misses : "") + "</td>" +
-    "<td>" + (s.available ? s.damage_dealt + " / " + s.damage_taken : "") + "</td>" +
+    // The damage ledger is emitted at TEARDOWN with fuel-confirmed
+    // totals, so a LIVE bot has none — printing "0 / 0" claimed it
+    // had dealt and taken nothing, which is a different statement.
+    "<td>" + (bot.alive ? "—"
+      : (s.available ? s.damage_dealt + " / " + s.damage_taken : "")) + "</td>" +
     "<td>" + (s.available ? s.teleports : "") + "</td>" +
     "<td>" + (s.available ? s.zero_yield_radars : "") + "</td>" +
     "<td>" + (s.available && s.inventory_first.length === 5
       ? s.inventory_first.join("·") + " → " + s.inventory_last.join("·")
       : "") + "</td>" +
-    '<td><span class="rank">' +
-    (s.available && s.rank_number >= 0 ? s.rank_number : "") + "</span></td>" +
+    // The WORD is the rank; the number beside it is the leaderboard
+    // position, which is what this column used to show on its own.
+    '<td><span class="rank">' + (s.available && s.rank_name ? s.rank_name : "") +
+    "</span>" + (s.available && s.rank_number >= 0
+      ? ' <span class="lb">#' + s.rank_number + "</span>" : "") + "</td>" +
     "<td>" + fmtDuration(up) + "</td>";
   const actions = document.createElement("td");
   for (const [label, method, path, disabled] of [
