@@ -31,7 +31,16 @@ def main() -> None:
     manager = FleetManager()
     app = make_fleet_app(manager)
     log.info("tankpit-fleet listening on 127.0.0.1:%d", port)
-    service_hooks.run_web_app(app, host="127.0.0.1", port=port)
+    try:
+        service_hooks.run_web_app(app, host="127.0.0.1", port=port)
+    except KeyboardInterrupt:
+        # Ctrl+C lands wherever the loop happens to be -- usually mid
+        # stats poll, which used to print the interrupt's traceback
+        # twice (once from the unwinding loop, once from the orphaned
+        # request task's "exception was never retrieved" warning).
+        # The bots are separate processes with their own stop-file
+        # teardown, so a manager interrupt has nothing to clean up.
+        log.info("fleet manager stopped (Ctrl+C)")
 
 
 __all__ = [
