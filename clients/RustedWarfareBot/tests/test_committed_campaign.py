@@ -91,6 +91,10 @@ class TestTheCommittedPanel:
         rebuilt = campaign_document(
             workspace["root"],
             config["env_path"],
+            # Read from the document, like the map: which staged tree the
+            # panel ran is part of the experiment it declares, and a tree
+            # name retyped here would be one more copy to go stale.
+            require_str(experiment, "payload"),
             _JOBS_FILE,
             require_str(experiment, "batch"),
             jobs,

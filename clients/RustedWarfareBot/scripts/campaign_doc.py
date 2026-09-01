@@ -70,6 +70,12 @@ REQUIRED_FLAGS = (
     "--map",
     "--difficulty",
     "--fast-forward",
+    # Which staged payload directory the members read, relative to the
+    # project's cluster directory. Required, not defaulted: the moment two
+    # code versions are compared, the tree a batch ran IS the experiment,
+    # and a document that named it implicitly would read as comparable to
+    # one that ran a different tree.
+    "--payload",
     "--out",
 )
 
@@ -133,6 +139,7 @@ def interpreter_of(env_path: str) -> str:
 def campaign_document(
     root: str,
     env_path: str,
+    payload_dir: str,
     jobs_file: str,
     batch: str,
     jobs: Sequence[SweepJob],
@@ -145,6 +152,10 @@ def campaign_document(
     Args:
         root: The cluster root, read from the workspace.
         env_path: The project's environment, read from the workspace.
+        payload_dir: The staged payload directory the members read, relative
+            to the project's cluster directory. Carried into the experiment
+            block as well as the commands, so the document says which tree
+            it measured.
         jobs_file: The batch's job file, relative to the repository root.
         batch: The sweep's name, which names the campaign.
         jobs: Every match the file describes.
@@ -169,6 +180,7 @@ def campaign_document(
             interpreter_of(env_path),
             root,
             PROJECT,
+            payload_dir,
             jobs_file,
             batch,
             jobs,
@@ -177,10 +189,17 @@ def campaign_document(
             match,
         )
     ]
+    experiment: dict[str, JSONValue] = dict(
+        experiment_of(batch, jobs, lockstep, fast_forward, match)
+    )
+    # The tree a batch ran is as much the experiment as the map or the pace:
+    # two documents differing only here are an A/B, and one that omitted it
+    # would read as the same experiment run twice.
+    experiment["payload"] = payload_dir
     return {
         "project": PROJECT,
         "name": batch,
-        "experiment": dict(experiment_of(batch, jobs, lockstep, fast_forward, match)),
+        "experiment": experiment,
         "members": members,
     }
 
@@ -231,6 +250,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     document = campaign_document(
         workspace["root"],
         config["env_path"],
+        parsed["--payload"],
         jobs_file,
         batch,
         jobs,

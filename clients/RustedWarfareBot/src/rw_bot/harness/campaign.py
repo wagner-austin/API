@@ -53,7 +53,6 @@ from rw_bot.harness import campaign_match
 from rw_bot.harness.match import MatchConfig
 from rw_bot.harness.results_layout import (
     GAME_DIR,
-    PAYLOAD_DIR,
     TRACE_ROOT,
     clones_path,
     cluster_path,
@@ -74,6 +73,7 @@ def member_command(
     interpreter: str,
     root: str,
     project: str,
+    payload_dir: str,
     jobs_file: str,
     batch: str,
     job: SweepJob,
@@ -87,6 +87,12 @@ def member_command(
         interpreter: The Python the match runs under, inside the image.
         root: The cluster root, from the hpc3 workspace.
         project: The hpc3 project this batch belongs to.
+        payload_dir: The staged payload directory this batch reads, relative
+            to the project's cluster directory. A parameter rather than the
+            standing :data:`~rw_bot.harness.results_layout.PAYLOAD_DIR`
+            constant, because which frozen tree a batch runs IS the
+            experiment the moment two versions are compared: an A/B needs
+            each arm's members reading their own tree, side by side.
         jobs_file: The batch's job file, relative to the repository root.
         batch: The sweep this job belongs to.
         job: The job this member plays.
@@ -120,7 +126,7 @@ def member_command(
         cluster directory and the result path named so the artifact this
         member declares is one its own command mentions.
     """
-    payload = cluster_path(root, project, PAYLOAD_DIR)
+    payload = cluster_path(root, project, payload_dir)
     return (
         f"{interpreter} -m {MATCH_MODULE}"
         # Read out of the staged payload, not out of a repository. The job
@@ -165,6 +171,7 @@ def campaign_members(
     interpreter: str,
     root: str,
     project: str,
+    payload_dir: str,
     jobs_file: str,
     batch: str,
     jobs: Sequence[SweepJob],
@@ -178,6 +185,8 @@ def campaign_members(
         interpreter: The Python each match runs under.
         root: The cluster root, from the hpc3 workspace.
         project: The hpc3 project this batch belongs to.
+        payload_dir: The staged payload directory this batch reads, relative
+            to the project's cluster directory (see :func:`member_command`).
         jobs_file: The batch's job file, relative to the repository root.
         batch: The sweep's name.
         jobs: Every match the file describes.
@@ -209,7 +218,16 @@ def campaign_members(
         SweepMember(
             suffix=job_name(job),
             command=member_command(
-                interpreter, root, project, jobs_file, batch, job, lockstep, fast_forward, match
+                interpreter,
+                root,
+                project,
+                payload_dir,
+                jobs_file,
+                batch,
+                job,
+                lockstep,
+                fast_forward,
+                match,
             ),
             artifact=member_artifact(root, project, batch, job),
         )

@@ -44,6 +44,9 @@ _BATCH = "demo"
 _LOCKSTEP = 75
 _ROOT = "/pub/wagnera3"
 _ENV_PATH = "/opt/env"
+#: The staged tree the members read. Stated on every invocation because the
+#: tree a batch ran IS the experiment the moment two versions are compared.
+_PAYLOAD = "payload"
 
 #: The match every member of this batch plays. The map every sweep in this
 #: project has ever used, so a cluster batch measures the same simulation a
@@ -145,16 +148,19 @@ def _argv(out: str = _OUT) -> list[str]:
         str(_DIFFICULTY),
         "--fast-forward",
         str(_FASTFORWARD),
+        "--payload",
+        _PAYLOAD,
         "--out",
         out,
     ]
 
 
-def _document(jobs: list[SweepJob] | None = None) -> dict[str, JSONValue]:
+def _document(jobs: list[SweepJob] | None = None, payload: str = _PAYLOAD) -> dict[str, JSONValue]:
     """Build the document for the sample batch.
 
     Args:
         jobs: The matches it describes. ``None`` uses the sample batch.
+        payload: The staged tree the members read.
 
     Returns:
         The document.
@@ -162,6 +168,7 @@ def _document(jobs: list[SweepJob] | None = None) -> dict[str, JSONValue]:
     return campaign_document(
         _ROOT,
         _ENV_PATH,
+        payload,
         _JOBS,
         _BATCH,
         _jobs() if jobs is None else jobs,
@@ -243,6 +250,24 @@ class TestTheDocument:
     def test_an_empty_batch_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least one member"):
             _document(jobs=[])
+
+    def test_the_experiment_records_which_tree_it_measured(self) -> None:
+        """Two batches on different trees are different experiments, and the
+        ledger is where a reader finds out which was which."""
+        experiment = narrow_json_to_dict(_document(payload="payload-v7")["experiment"])
+        assert require_str(experiment, "payload") == "payload-v7"
+
+    def test_two_documents_differing_in_payload_are_a_readable_ab(self) -> None:
+        """The A/B this parameter exists for: each arm's members read their
+        own staged tree, and the tree is the ONLY difference between them."""
+        v7_members = require_list(_document(payload="payload-v7"), "members")
+        v8_members = require_list(_document(payload="payload-v8"), "members")
+        for one, other in zip(v7_members, v8_members, strict=True):
+            command = require_str(narrow_json_to_dict(one), "command")
+            assert f"--tree {_ROOT}/{PROJECT}/payload-v7" in command
+            assert command.replace("payload-v7", "payload-v8") == (
+                require_str(narrow_json_to_dict(other), "command")
+            )
 
 
 class TestWritingIt:

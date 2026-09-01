@@ -8,7 +8,8 @@
     "lockstep": "75",
     "fast_forward": "0",
     "map": "maps/skirmish/[p2]duel_lake.tmx",
-    "difficulty": "-2"
+    "difficulty": "-2",
+    "payload": "payload"
   },
   "members": [
     {

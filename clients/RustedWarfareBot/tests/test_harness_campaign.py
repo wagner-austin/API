@@ -29,6 +29,9 @@ from rw_bot.harness.sweep import SweepJob
 PY = "/opt/env/bin/python"
 ROOT = "/pub/wagnera3"
 PROJECT = "rusted"
+#: The staged tree this batch reads. A parameter of the document, not a
+#: constant of the layout: an A/B is two documents differing exactly here.
+PAYLOAD = "payload"
 JOBS_FILE = "sweeps/demo.txt"
 BATCH = "demo"
 LOCKSTEP = 75
@@ -65,7 +68,7 @@ def _command(job: SweepJob | None = None, batch: str = BATCH) -> str:
         The command.
     """
     return member_command(
-        PY, ROOT, PROJECT, JOBS_FILE, batch, job or _job(), LOCKSTEP, FASTFORWARD, MATCH
+        PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, batch, job or _job(), LOCKSTEP, FASTFORWARD, MATCH
     )
 
 
@@ -122,6 +125,7 @@ class TestEveryPathIsAbsolute:
             PY,
             "/dfs6b/pub/other",
             "rw-second",
+            PAYLOAD,
             JOBS_FILE,
             BATCH,
             _job(),
@@ -182,7 +186,7 @@ class TestTheMembers:
     def test_one_member_per_match_in_file_order(self) -> None:
         jobs = [_job("attack", 1), _job("attack", 2), _job("defend", 1)]
         members = campaign_members(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
         )
         assert [member["suffix"] for member in members] == [
             "attack-s1",
@@ -193,7 +197,7 @@ class TestTheMembers:
     def test_every_member_declares_its_own_artifact(self) -> None:
         jobs = [_job("attack", 1), _job("attack", 2)]
         members = campaign_members(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
         )
         artifacts = [member["artifact"] for member in members]
         assert len(set(artifacts)) == len(artifacts)
@@ -202,7 +206,9 @@ class TestTheMembers:
         """An empty campaign converges immediately and reports an experiment
         complete having played nothing."""
         with pytest.raises(ValueError, match="at least one member"):
-            campaign_members(PY, ROOT, PROJECT, JOBS_FILE, BATCH, [], LOCKSTEP, FASTFORWARD, MATCH)
+            campaign_members(
+                PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, [], LOCKSTEP, FASTFORWARD, MATCH
+            )
 
     def test_every_member_survives_hpc3s_own_decoder(self) -> None:
         """The reason this package depends on hpc3 rather than describing its
@@ -210,7 +216,7 @@ class TestTheMembers:
         checked would be refused at submission, after staging."""
         jobs = [_job("attack", 1), _job("defend", 2)]
         for member in campaign_members(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
         ):
             decoded = decode_sweep_member(
                 {
@@ -220,6 +226,28 @@ class TestTheMembers:
                 }
             )
             assert decoded == member
+
+
+class TestThePayloadIsAParameter:
+    """Which staged tree a batch reads IS the experiment once two code
+    versions are compared: an A/B is two documents whose members read their
+    own trees side by side, and a hardwired payload directory made that
+    impossible to state."""
+
+    def test_the_jobs_and_the_tree_both_read_from_the_named_payload(self) -> None:
+        command = _command()
+        assert f"--jobs {ROOT}/{PROJECT}/payload/sweeps/demo.txt" in command
+        assert f"--tree {ROOT}/{PROJECT}/payload" in command
+
+    def test_a_different_payload_moves_both_reads_and_nothing_else(self) -> None:
+        other = member_command(
+            PY, ROOT, PROJECT, "payload-v7", JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, MATCH
+        )
+        assert f"--jobs {ROOT}/{PROJECT}/payload-v7/sweeps/demo.txt" in other
+        assert f"--tree {ROOT}/{PROJECT}/payload-v7" in other
+        # The tree is the ONLY difference between the arms of an A/B; a
+        # payload that leaked into any other path would confound it.
+        assert other.replace("payload-v7", "payload") == _command()
 
 
 class TestTheMatchIsCarried:
@@ -246,7 +274,7 @@ class TestTheMatchIsCarried:
             map_path="maps/skirmish/[p2]big_island.tmx", opponents=1, difficulty=1
         )
         moved = member_command(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, elsewhere
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, elsewhere
         )
         argv = shlex.split(moved)
         assert argv[argv.index("--map") + 1] == "maps/skirmish/[p2]big_island.tmx"
@@ -268,7 +296,7 @@ class TestTheMapIsSafeInAShellCommand:
         and unquoted it is a bash SYNTAX ERROR rather than a wrong path."""
         steam = MatchConfig(map_path="maps/skirmish/[p2]Lake (2p).tmx", opponents=1, difficulty=-2)
         command = member_command(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
         )
         assert "--map 'maps/skirmish/[p2]Lake (2p).tmx'" in command
 
@@ -277,7 +305,7 @@ class TestTheMapIsSafeInAShellCommand:
         expression: what matters is what bash makes of the line."""
         steam = MatchConfig(map_path="maps/skirmish/[p2]Lake (2p).tmx", opponents=1, difficulty=-2)
         command = member_command(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
         )
         argv = shlex.split(command)
         assert argv[argv.index("--map") + 1] == "maps/skirmish/[p2]Lake (2p).tmx"
@@ -285,7 +313,7 @@ class TestTheMapIsSafeInAShellCommand:
     def test_every_member_of_a_batch_is_split_the_same_way(self) -> None:
         jobs = [_job("attack", 1), _job("defend", 2)]
         for member in campaign_members(
-            PY, ROOT, PROJECT, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
         ):
             argv = shlex.split(member["command"])
             assert argv[argv.index("--map") + 1] == MAP
