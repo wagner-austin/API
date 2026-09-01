@@ -334,28 +334,52 @@ class TestWartimeReadinessFloor:
         radar_count: int,
         consented: bool = True,
         human_alive: bool = True,
+        human_fresh: bool = True,
     ) -> DecideCtx:
         """A rank-2 ctx (caps 30) with one enemy human plus arm-coverage tanks."""
         from tankpit_bot.sniffer.world_service import WorldService
+        from tankpit_bot.state.types import TankStateDict, make_tank_state
+        from tankpit_bot.types.constants import TankLiveness
         from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
-        from tests.bot.ai._threat_fixtures import _tank
+
+        def _resident(
+            tank_id: int,
+            team: int,
+            name: str,
+            *,
+            is_self: bool = False,
+            liveness: TankLiveness = "alive",
+            stamp: int = 100000,
+        ) -> TankStateDict:
+            return make_tank_state(
+                tank_id=tank_id,
+                x=100 + tank_id,
+                y=100,
+                team=team,
+                rank=1,
+                name=name,
+                is_self=is_self,
+                is_bot=False,
+                damage_state=3,
+                liveness=liveness,
+                timestamp_ms=stamp,
+            )
 
         ws = WorldService()
         tanks = {
             # Every skip arm of human_war_is_live gets a resident:
-            "1": _tank("1", x=100, y=100, team=0, is_self=True),
-            "2": _tank("2", x=101, y=101, team=0, name="AllyHuman", is_bot=False),
-            "3": _tank("3", x=102, y=102, team=2, name="Corpse", liveness="deactivated"),
-            "4": _tank("4", x=103, y=103, team=2, name="red-4"),
-            "5": _tank("5", x=104, y=104, team=2, name="Silent"),
-            "60": _tank(
-                "60",
-                x=110,
-                y=100,
-                team=2,
-                name="TESLA",
-                is_bot=False,
+            "1": _resident(1, 0, "SelfTank", is_self=True),
+            "2": _resident(2, 0, "AllyHuman"),
+            "3": _resident(3, 2, "Corpse", liveness="deactivated"),
+            "4": _resident(4, 2, "red-4"),
+            "5": _resident(5, 2, "Silent"),
+            "7": _resident(7, 2, "Departed", stamp=0),
+            "60": _resident(
+                60,
+                2,
+                "TESLA",
                 liveness="alive" if human_alive else "deactivated",
+                stamp=100000 if human_fresh else 0,
             ),
         }
         world, self_state = make_world(fuel=1200, tanks=tanks)
@@ -398,6 +422,20 @@ class TestWartimeReadinessFloor:
         from tankpit_bot.bot.ai.mode_gates import human_war_is_live, hunt_entry_permitted
 
         ctx = self._war_ctx(dual_count=24, radar_count=15, human_alive=False)
+
+        assert human_war_is_live(ctx) is False
+        assert hunt_entry_permitted(ctx) is False
+
+    def test_logged_out_consented_human_ends_the_war(self) -> None:
+        """A stale registry ghost (the logout case) is not a live war.
+
+        A logout emits no deactivation — the entry lingers ``alive``
+        (the Yuppler ghost precedent) — so presence staleness is what
+        releases the fleet back to the peacetime bar.
+        """
+        from tankpit_bot.bot.ai.mode_gates import human_war_is_live, hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15, human_fresh=False)
 
         assert human_war_is_live(ctx) is False
         assert hunt_entry_permitted(ctx) is False

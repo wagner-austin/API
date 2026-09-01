@@ -225,28 +225,41 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
 
 
+_WAR_PRESENCE_TTL_MS = 30_000
+"""How stale a consented human's registry stamp may be while still
+counting as a live war. A PRESENT tank is re-stamped every ~2 s by the
+global 0x2E sync and by every map answer; a human who LOGS OUT emits
+no deactivation and can linger ``alive`` in the registry indefinitely
+(the Yuppler ghost, 2026-07-30: 43 rejected shots at a departed
+human's kept entry), so liveness alone would hold the fleet at the
+wartime floor forever. Staleness is the departure tell."""
+
+
 def human_war_is_live(ctx: DecideCtx) -> bool:
-    """Return True while a consented enemy human is alive on the map.
+    """Return True while a consented enemy human is present on the map.
 
     The wartime signal (operator ruling 2026-09-01, the yuppler/TESLA
     case: "he shouldve engaged the person but he kept just farming
     radars"): consent is fleet-shared and session-persistent, so the
     war is LIVE only while some consented human still stands in the
-    registry as an alive enemy — a consented human who left the game
-    is 0x58-removed or flips liveness, and peacetime restocking
-    resumes.
+    registry as an alive, freshly-stamped enemy. Death flips liveness;
+    a logout emits nothing, so :data:`_WAR_PRESENCE_TTL_MS` staleness
+    is what ends that war and returns the fleet to peacetime bars.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when any alive enemy tank is human-classified and has
-        consented (chat, shot us, or a sibling's shared consent).
+        True when any alive, presence-fresh enemy tank is
+        human-classified and has consented (chat, shot us, or a
+        sibling's shared consent).
     """
     for tank in ctx.filtered["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
         if tank["liveness"] != "alive":
+            continue
+        if ctx.timestamp_ms - tank["timestamp_ms"] > _WAR_PRESENCE_TTL_MS:
             continue
         if not is_human_name(tank["name"]):
             continue
