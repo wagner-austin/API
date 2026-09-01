@@ -1,81 +1,109 @@
 {
-  "_note": "Per-colour tank state. Rank is the game's own WORD, not an index -- the index is derivable through RANK_NAMES, the reverse is not. Rows appear two ways: the 2026-08-28 census entered each colour once and read rank off the wire; every session since records its own colour automatically at teardown, adding kills, deaths, promo and leaderboard position. A SNAPSHOT, not a live truth: rank moves with play (a kill promotes, a deactivation demotes one rank), so re-measure rather than trust an old row. Rank drives both `fuel_capacity` (1000 + 100*rank) and `radar_radius` (2 + rank//3), so the highest-ranked colour is the strongest tank an account can field.",
-  "_measured": "2026-08-28",
-  "_colour_index_is_team_id": [
-    "red",
-    "purple",
-    "blue",
-    "orange"
-  ],
-  "rooms": {
-    "World": {
-      "game_start": "Sep. 25, 2012",
-      "surveyed": true
-    },
-    "Practice": {
-      "game_start": "Jan. 08, 2013",
-      "surveyed": false
-    }
+ "_note": "Per-colour tank state. Rank is the game's own WORD, not an index -- the index is derivable through RANK_NAMES, the reverse is not. Rows appear two ways: the 2026-08-28 census entered each colour once and read rank off the wire; every session since records its own colour automatically at teardown, adding kills, deaths, promo and leaderboard position. A SNAPSHOT, not a live truth: rank moves with play (a kill promotes, a deactivation demotes one rank), so re-measure rather than trust an old row. Rank drives both `fuel_capacity` (1000 + 100*rank) and `radar_radius` (2 + rank//3), so the highest-ranked colour is the strongest tank an account can field.",
+ "_measured": "2026-08-28",
+ "_colour_index_is_team_id": [
+  "red",
+  "purple",
+  "blue",
+  "orange"
+ ],
+ "rooms": {
+  "World": {
+   "game_start": "Sep. 25, 2012",
+   "surveyed": true
   },
-  "accounts": {
-    "Artax": {
-      "World": {
-        "red": {
-          "rank": "lieutenant"
-        },
-        "purple": {
-          "rank": "captain"
-        },
-        "blue": {
-          "rank": "captain"
-        },
-        "orange": {
-          "rank": "major"
-        }
-      },
-      "Practice": {
-        "blue": {
-          "rank": "private",
-          "leaderboard": 18,
-          "kills": 1960,
-          "deaths": 5,
-          "promo": 677110,
-          "play_time_s": 365449,
-          "observed_ms": 1788215681181
-        }
-      }
-    },
-    "Yuppler": {
-      "World": {
-        "red": {
-          "rank": "colonel"
-        },
-        "purple": {
-          "rank": "captain"
-        },
-        "blue": {
-          "rank": "lieutenant"
-        },
-        "orange": {
-          "rank": "lieutenant"
-        }
-      }
-    },
-    "Arterial": {
-      "World": {
-        "red": {
-          "rank": "sergeant"
-        },
-        "purple": {
-          "rank": "lieutenant"
-        },
-        "blue": {
-          "rank": "sergeant"
-        },
-        "orange": {
-          "rank": "private"
-        }
-      }
-    }
+  "Practice": {
+   "game_start": "Jan. 08, 2013",
+   "surveyed": false
   }
+ },
+ "accounts": {
+  "Artax": {
+   "World": {
+    "red": {
+     "rank": "lieutenant"
+    },
+    "purple": {
+     "rank": "captain"
+    },
+    "blue": {
+     "rank": "captain"
+    },
+    "orange": {
+     "rank": "major"
+    }
+   },
+   "Practice": {
+    "blue": {
+     "rank": "private",
+     "leaderboard": 18,
+     "kills": 1960,
+     "deaths": 5,
+     "promo": 677110,
+     "play_time_s": 365449,
+     "observed_ms": 1788215681181
+    }
+   }
+  },
+  "Yuppler": {
+   "World": {
+    "red": {
+     "rank": "colonel"
+    },
+    "purple": {
+     "rank": "captain"
+    },
+    "blue": {
+     "rank": "lieutenant",
+     "leaderboard": 9693,
+     "kills": 9,
+     "deaths": 1,
+     "promo": 994,
+     "play_time_s": 4985,
+     "fuel": 1400,
+     "inventory": [
+      40,
+      12,
+      40,
+      26,
+      20
+     ],
+     "observed_ms": 1788256911654
+    },
+    "orange": {
+     "rank": "lieutenant"
+    }
+   }
+  },
+  "Arterial": {
+   "World": {
+    "red": {
+     "rank": "sergeant"
+    },
+    "purple": {
+     "rank": "lieutenant"
+    },
+    "blue": {
+     "rank": "sergeant",
+     "leaderboard": 12060,
+     "kills": 149,
+     "deaths": 3,
+     "promo": 1609,
+     "play_time_s": 25349,
+     "fuel": 1300,
+     "inventory": [
+      35,
+      27,
+      35,
+      31,
+      30
+     ],
+     "observed_ms": 1788256986592
+    },
+    "orange": {
+     "rank": "private"
+    }
+   }
+  }
+ }
 }

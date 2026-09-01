@@ -350,19 +350,24 @@ function paintTroopInfo() {
     hint.textContent = "no reading for " + colour + " on " + room;
     return;
   }
-  // The registry stores the game's own rank WORD. The 0-8 index the
-  // fuel and radar formulas take is looked up here; an unrecognised
-  // word still prints, it just carries no derived numbers.
+  // Line 1 is what the tank IS: rank, and the fuel it actually has —
+  // the value the last session left, not the rank-derived cap, since
+  // a parked tank keeps what it had. The cap only appears beside it,
+  // as the ceiling that fuel is measured against.
   const rank = RANKS.indexOf(cell.rank);
-  let text = cell.rank;
-  if (rank >= 0) {
-    text += " · fuel " + (1000 + 100 * rank) +
-            " · radar " + (2 + Math.floor(rank / 3));
+  let head = cell.rank;
+  if (cell.fuel !== undefined) {
+    head += " · fuel " + cell.fuel + (rank >= 0 ? "/" + (1000 + 100 * rank) : "");
+  } else if (rank >= 0) {
+    head += " · cap " + (1000 + 100 * rank);
   }
-  if (cell.kills !== undefined) { text += " · K" + cell.kills; }
-  if (cell.deaths !== undefined) { text += " D" + cell.deaths; }
-  if (cell.leaderboard !== undefined) { text += " · #" + cell.leaderboard; }
-  hint.textContent = text;
+  if (cell.kills !== undefined) { head += " · K" + cell.kills + " D" + cell.deaths; }
+  // Line 2 is what it CARRIES, in the HUD's slot order.
+  const slots = ["AR", "DU", "MI", "HO", "RA"];
+  const inv = cell.inventory
+    ? slots.map((label, i) => label + cell.inventory[i]).join(" ")
+    : "no inventory reading yet — play this colour once";
+  hint.replaceChildren(head, document.createElement("br"), inv);
 }
 
 async function loadTanks() {

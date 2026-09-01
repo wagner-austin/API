@@ -92,6 +92,7 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
         log.info("Tank registry: skipped (team %d is not a colour)", team)
         return
 
+    inventory = ws.inventory_state
     registry = _load_registry()
     accounts = narrow_json_to_dict(registry.get("accounts", {}))
     rooms = narrow_json_to_dict(accounts.get(name, {}))
@@ -112,6 +113,18 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
         "deaths": account["deactivated_total"],
         "promo": account["promotion_points"],
         "play_time_s": account["play_time_s"],
+        # Live state as the session left it, NOT the rank-derived cap.
+        # A parked tank keeps its fuel and stock -- it is out of the
+        # world entirely -- so the last thing we saw is what the
+        # operator will find on next entry.
+        "fuel": self_state["fuel"],
+        "inventory": [
+            inventory["armor_shields"]["count"],
+            inventory["dual_shots"]["count"],
+            inventory["missile_shots"]["count"],
+            inventory["homing_shots"]["count"],
+            inventory["extra_radars"]["count"],
+        ],
         "observed_ms": account["stats_observed_ms"],
     }
     rooms[room] = colours
@@ -119,11 +132,12 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
     registry["accounts"] = accounts
     _test_hooks.write_text(TANK_REGISTRY_PATH, dump_json_str(registry, indent=1))
     log.info(
-        "Tank registry: %s %s %s -> %s (%d kills, %d deaths)",
+        "Tank registry: %s %s %s -> %s, fuel %d (%d kills, %d deaths)",
         name,
         room,
         TROOP_COLOR_NAMES[team],
         account["rank_name"],
+        self_state["fuel"],
         account["destroyed_enemies"],
         account["deactivated_total"],
     )

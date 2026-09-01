@@ -35,7 +35,7 @@ def _panelled_world(*, team: int, name: str = "Artax") -> WorldService:
     """
     ws = WorldService()
     ws.world_state["self_state"] = make_self_state(
-        tank_id=1, x=10, y=10, team=team, rank=6, fuel=1600, leaderboard_position=1
+        tank_id=1, x=10, y=10, team=team, rank=6, fuel=1234, leaderboard_position=1
     )
     ws.record_self_identity(name, 62913, "00", 1000)
     ws.record_account_stats(
@@ -134,6 +134,10 @@ def test_records_the_played_colour_under_its_account_and_room() -> None:
     assert orange["kills"] == 1958
     assert orange["deaths"] == 5
     assert orange["leaderboard"] == 18
+    # Live state as the session left it: the cap for a major is 1600,
+    # so a recorded 1600 would mean the cap leaked in place of fuel.
+    assert orange["fuel"] == 1234
+    assert orange["inventory"] == [0, 0, 0, 0, 0]
 
 
 def test_merges_beside_an_existing_colour_without_erasing_it() -> None:
