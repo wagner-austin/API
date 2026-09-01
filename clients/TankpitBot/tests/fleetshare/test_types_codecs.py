@@ -16,6 +16,7 @@ from tankpit_bot.fleetshare.types import (
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
+    FleetMineSightingDict,
     FleetReportDict,
     FleetScannedTileDict,
 )
@@ -55,6 +56,9 @@ def _report() -> FleetReportDict:
             FleetContainerSightingDict(x=51, y=61, is_fuel=False, volume=0, observed_ms=97000),
         ],
         removed=[FleetContainerRemovalDict(x=44, y=45, removed_ms=95000)],
+        mines=[
+            FleetMineSightingDict(x=101, y=100, mine_type=1, tank_id=709, team=1, observed_ms=96000)
+        ],
         scanned=[FleetScannedTileDict(x=10, y=10, observed_ms=96000)],
     )
 
@@ -81,6 +85,14 @@ def test_decode_container_sighting_rejects_non_object() -> None:
     """A non-object container row names the shape in the error."""
     with pytest.raises(JSONTypeError, match="container sighting must be an object"):
         decode_fleet_container_sighting(7)
+
+
+def test_decode_mine_sighting_rejects_non_object() -> None:
+    """A non-object mine row names the shape in the error."""
+    from tankpit_bot.fleetshare.codecs import decode_fleet_mine_sighting
+
+    with pytest.raises(JSONTypeError, match="mine sighting must be an object"):
+        decode_fleet_mine_sighting([1, 2])
 
 
 def test_decode_report_rejects_missing_field() -> None:

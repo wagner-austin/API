@@ -92,6 +92,7 @@ def test_exchange_publishes_and_merges_a_sibling(
             FleetContainerSightingDict(x=80, y=90, is_fuel=True, volume=650, observed_ms=sibling_ms)
         ],
         removed=[],
+        mines=[],
         scanned=[FleetScannedTileDict(x=91, y=90, observed_ms=sibling_ms)],
     )
     fake_fs.write_text(
@@ -130,6 +131,7 @@ def test_exchange_publishes_and_merges_a_sibling(
             "enemies": 1,
             "containers": 1,
             "removed": 0,
+            "mines": 0,
             "scanned": 1,
         }
     ]

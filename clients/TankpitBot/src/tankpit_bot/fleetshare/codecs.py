@@ -23,6 +23,7 @@ from tankpit_bot.fleetshare.types import (
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
+    FleetMineSightingDict,
     FleetReportDict,
     FleetRole,
     FleetScannedTileDict,
@@ -177,6 +178,50 @@ def decode_fleet_container_removal(data: JSONValue) -> FleetContainerRemovalDict
     )
 
 
+def encode_fleet_mine_sighting(sighting: FleetMineSightingDict) -> JSONObject:
+    """Encode one hostile-mine sighting for the report payload.
+
+    Args:
+        sighting: Mine sighting to encode.
+
+    Returns:
+        JSON object mirroring the sighting's fields.
+    """
+    return {
+        "x": sighting["x"],
+        "y": sighting["y"],
+        "mine_type": sighting["mine_type"],
+        "tank_id": sighting["tank_id"],
+        "team": sighting["team"],
+        "observed_ms": sighting["observed_ms"],
+    }
+
+
+def decode_fleet_mine_sighting(data: JSONValue) -> FleetMineSightingDict:
+    """Decode and validate one hostile-mine sighting.
+
+    Args:
+        data: JSON value holding one encoded sighting.
+
+    Returns:
+        The validated sighting.
+
+    Raises:
+        JSONTypeError: If the value is not an object or a field fails
+            validation.
+    """
+    if not isinstance(data, dict):
+        raise JSONTypeError(f"mine sighting must be an object, got {type(data).__name__}")
+    return FleetMineSightingDict(
+        x=require_int(data, "x"),
+        y=require_int(data, "y"),
+        mine_type=require_int(data, "mine_type"),
+        tank_id=require_int(data, "tank_id"),
+        team=require_int(data, "team"),
+        observed_ms=require_int(data, "observed_ms"),
+    )
+
+
 def encode_fleet_scanned_tile(tile: FleetScannedTileDict) -> JSONObject:
     """Encode one covered tile for the report payload.
 
@@ -244,6 +289,7 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
             encode_fleet_container_sighting(sighting) for sighting in report["containers"]
         ],
         "removed": [encode_fleet_container_removal(removal) for removal in report["removed"]],
+        "mines": [encode_fleet_mine_sighting(sighting) for sighting in report["mines"]],
         "scanned": [encode_fleet_scanned_tile(tile) for tile in report["scanned"]],
     }
 
@@ -306,6 +352,7 @@ def decode_fleet_report(data: JSONValue) -> FleetReportDict:
             decode_fleet_container_sighting(entry) for entry in require_list(data, "containers")
         ],
         removed=[decode_fleet_container_removal(entry) for entry in require_list(data, "removed")],
+        mines=[decode_fleet_mine_sighting(entry) for entry in require_list(data, "mines")],
         scanned=[decode_fleet_scanned_tile(entry) for entry in require_list(data, "scanned")],
     )
 
@@ -314,11 +361,13 @@ __all__ = [
     "decode_fleet_container_removal",
     "decode_fleet_container_sighting",
     "decode_fleet_enemy_sighting",
+    "decode_fleet_mine_sighting",
     "decode_fleet_report",
     "decode_fleet_scanned_tile",
     "encode_fleet_container_removal",
     "encode_fleet_container_sighting",
     "encode_fleet_enemy_sighting",
+    "encode_fleet_mine_sighting",
     "encode_fleet_report",
     "encode_fleet_scanned_tile",
     "require_fleet_role",

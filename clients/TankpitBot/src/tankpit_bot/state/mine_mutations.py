@@ -153,6 +153,69 @@ def add_mine_from_radar(
     )
 
 
+def merge_mine_sighting(
+    state: WorldStateDict,
+    x: int,
+    y: int,
+    mine_type: int,
+    tank_id: int,
+    team: int,
+    observed_ms: int,
+) -> WorldStateDict:
+    """Merge one teammate-reported hostile mine into local belief.
+
+    The fleet knowledge law ([[fleet-coordination]]), applied to the
+    mine layer (operator order 2026-09-01: "have a mine aware layer
+    between the bots"): remote knowledge only ADDS or REFRESHES — it
+    never removes a local belief and never outranks one of equal or
+    fresher age (own wire is the higher trust tier). The merged
+    belief carries ``source="world_state"`` (the non-own-sensing tier,
+    the same stamp fleet-merged containers use so own-viewport miners
+    exclude imports) with ``fleet_report`` provenance, and contact
+    disproofs (0x45 in view, the exact-landing receipt) treat it
+    exactly like any other remembered mine.
+
+    Args:
+        state: Current world state.
+        x: Mine X.
+        y: Mine Y.
+        mine_type: Wire mine-type byte from the reporter.
+        tank_id: Layer's tank id as the reporter recorded it.
+        team: The mine's team.
+        observed_ms: The reporter's belief timestamp for the mine.
+
+    Returns:
+        New ``WorldStateDict`` with the sighting merged, or the input
+        state unchanged when local belief is at least as fresh.
+    """
+    key = coord_key(x, y)
+    existing = state["mines"].get(key)
+    if existing is not None and existing["timestamp_ms"] >= observed_ms:
+        return state
+    new_mine = make_mine_state(
+        x=x,
+        y=y,
+        mine_type=mine_type,
+        tank_id=tank_id,
+        team=team,
+        source="world_state",
+        timestamp_ms=observed_ms,
+        provenance=make_provenance("fleet_report", []),
+    )
+    new_mines = dict(state["mines"])
+    new_mines[key] = new_mine
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=new_mines,
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_tiles=state["scanned_tiles"],
+        timestamp_ms=state["timestamp_ms"],
+    )
+
+
 def remove_mine(
     state: WorldStateDict,
     x: int,
@@ -263,5 +326,6 @@ __all__ = [
     "add_mine",
     "add_mine_from_radar",
     "apply_tile_overlay_update",
+    "merge_mine_sighting",
     "remove_mine",
 ]

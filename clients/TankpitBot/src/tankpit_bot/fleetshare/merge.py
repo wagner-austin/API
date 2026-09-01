@@ -27,6 +27,7 @@ from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import merge_container_sighting, remove_container
+from tankpit_bot.state.mine_mutations import merge_mine_sighting
 from tankpit_bot.state.scan_coverage import merge_scanned_coverage
 from tankpit_bot.state.tank_mutations import apply_tank_observation
 from tankpit_bot.state.types import make_tank_observation
@@ -47,6 +48,7 @@ class FleetMergeSummaryDict(TypedDict):
         enemies: Enemy sightings applied to the registry.
         containers: Container sightings merged into the atlas.
         removed: Local beliefs dropped by teammates' removals.
+        mines: Hostile-mine sightings merged into the mine registry.
         scanned: Coverage tiles advanced in the shared scan map.
     """
 
@@ -54,6 +56,7 @@ class FleetMergeSummaryDict(TypedDict):
     enemies: int
     containers: int
     removed: int
+    mines: int
     scanned: int
 
 
@@ -271,6 +274,41 @@ def _merge_container_knowledge(ws: WorldService, report: FleetReportDict) -> tup
     return (sightings_merged, beliefs_removed)
 
 
+def _merge_mine_knowledge(ws: WorldService, report: FleetReportDict) -> int:
+    """Apply one report's hostile-mine sightings.
+
+    The mine-aware layer (operator order 2026-09-01): each sighting
+    lands through :func:`~tankpit_bot.state.mine_mutations.merge_mine_sighting`,
+    which adds or refreshes but never outranks an equal-or-fresher
+    local belief. No removal half: mines never drift, contact
+    disproofs prune on touch, and a cleared mine's phantom re-import
+    self-limits to the reporter-side share horizon
+    ([[fleet-coordination]]).
+
+    Args:
+        ws: The session's world service.
+        report: One fresh same-team report.
+
+    Returns:
+        Number of sightings that changed local belief.
+    """
+    merged = 0
+    for mine in report["mines"]:
+        updated = merge_mine_sighting(
+            ws.world_state,
+            mine["x"],
+            mine["y"],
+            mine["mine_type"],
+            mine["tank_id"],
+            mine["team"],
+            mine["observed_ms"],
+        )
+        if updated is not ws.world_state:
+            merged += 1
+            ws.world_state = updated
+    return merged
+
+
 def merge_fleet_reports(
     ws: WorldService,
     reports: list[FleetReportDict],
@@ -298,6 +336,7 @@ def merge_fleet_reports(
     enemies_merged = 0
     containers_merged = 0
     removed_merged = 0
+    mines_merged = 0
     scanned_merged = 0
     engaged: dict[int, int] = {}
     consented: set[int] = set()
@@ -321,6 +360,7 @@ def merge_fleet_reports(
         sightings, removals = _merge_container_knowledge(ws, report)
         containers_merged += sightings
         removed_merged += removals
+        mines_merged += _merge_mine_knowledge(ws, report)
         ws.world_state, advanced = merge_scanned_coverage(
             ws.world_state,
             [(tile["x"], tile["y"], tile["observed_ms"]) for tile in report["scanned"]],
@@ -343,6 +383,7 @@ def merge_fleet_reports(
         enemies=enemies_merged,
         containers=containers_merged,
         removed=removed_merged,
+        mines=mines_merged,
         scanned=scanned_merged,
     )
 

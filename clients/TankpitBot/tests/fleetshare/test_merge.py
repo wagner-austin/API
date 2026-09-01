@@ -19,6 +19,7 @@ from tankpit_bot.fleetshare.types import (
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
+    FleetMineSightingDict,
     FleetReportDict,
     FleetScannedTileDict,
 )
@@ -50,6 +51,7 @@ def _report(
     enemies: list[FleetEnemySightingDict] | None = None,
     containers: list[FleetContainerSightingDict] | None = None,
     removed: list[FleetContainerRemovalDict] | None = None,
+    mines: list[FleetMineSightingDict] | None = None,
     scanned: list[FleetScannedTileDict] | None = None,
 ) -> FleetReportDict:
     """Build a sibling report."""
@@ -71,6 +73,7 @@ def _report(
         enemies=list(enemies) if enemies else [],
         containers=list(containers) if containers else [],
         removed=list(removed) if removed else [],
+        mines=list(mines) if mines else [],
         scanned=list(scanned) if scanned else [],
     )
 
@@ -206,7 +209,14 @@ class TestMergeFleetReports:
 
         summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
 
-        assert summary == {"reports": 1, "enemies": 1, "containers": 0, "removed": 0, "scanned": 0}
+        assert summary == {
+            "reports": 1,
+            "enemies": 1,
+            "containers": 0,
+            "removed": 0,
+            "mines": 0,
+            "scanned": 0,
+        }
         merged = ws.world_state["tanks"]["506"]
         assert (merged["x"], merged["y"]) == (170, 40)
         assert merged["timestamp_ms"] == _NOW - 500
@@ -506,3 +516,61 @@ class TestSharedRemovals:
 
         assert ws.fleet_forage_goals == {}
         assert ws.fleet_claimed_containers == set()
+
+
+class TestMergeMineKnowledge:
+    """The fleet mine map's receiving half (operator order 2026-09-01)."""
+
+    def _world_service(self) -> WorldService:
+        ws = WorldService()
+        ws.update_world_state_from_position(90, 90)
+        return ws
+
+    def _mine(self, *, observed_ms: int = _NOW - 500) -> FleetMineSightingDict:
+        return FleetMineSightingDict(
+            x=101, y=100, mine_type=1, tank_id=709, team=1, observed_ms=observed_ms
+        )
+
+    def test_sibling_mine_lands_in_the_registry_as_an_import(self) -> None:
+        """A shared hostile mine arrives with the fleet import stamp."""
+        ws = self._world_service()
+        report = _report("artax", mines=[self._mine()])
+
+        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
+
+        assert summary["mines"] == 1
+        landed = ws.world_state["mines"]["101,100"]
+        assert landed["team"] == 1
+        assert landed["mine_type"] == 1
+        assert landed["source"] == "world_state"
+        assert landed["timestamp_ms"] == _NOW - 500
+
+    def test_fresher_local_belief_is_never_outranked(self) -> None:
+        """Own wire is the higher trust tier: an older sighting is a no-op."""
+        from tankpit_bot.state.mine_mutations import add_mine
+
+        ws = self._world_service()
+        ws.world_state = add_mine(
+            ws.world_state, 101, 100, mine_type=0, tank_id=-1, team=1, timestamp_ms=_NOW - 100
+        )
+        report = _report("artax", mines=[self._mine(observed_ms=_NOW - 500)])
+
+        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
+
+        assert summary["mines"] == 0
+        assert ws.world_state["mines"]["101,100"]["source"] == "viewport"
+
+    def test_fresher_sighting_refreshes_an_older_local_belief(self) -> None:
+        """Newer remote knowledge advances the tile's stamp."""
+        from tankpit_bot.state.mine_mutations import add_mine
+
+        ws = self._world_service()
+        ws.world_state = add_mine(
+            ws.world_state, 101, 100, mine_type=1, tank_id=709, team=1, timestamp_ms=_NOW - 900
+        )
+        report = _report("artax", mines=[self._mine(observed_ms=_NOW - 500)])
+
+        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
+
+        assert summary["mines"] == 1
+        assert ws.world_state["mines"]["101,100"]["timestamp_ms"] == _NOW - 500

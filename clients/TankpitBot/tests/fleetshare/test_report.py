@@ -15,9 +15,11 @@ from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     ContainerStateDict,
+    MineStateDict,
     TankStateDict,
     WorldStateDict,
     make_container_state,
+    make_mine_state,
     make_self_state,
     make_tank_state,
 )
@@ -29,6 +31,7 @@ _NOW = 100000
 def _world_service(
     tanks: dict[str, TankStateDict] | None = None,
     containers: dict[str, ContainerStateDict] | None = None,
+    mines: dict[str, MineStateDict] | None = None,
 ) -> WorldService:
     """Build a session with an established self at (100,100), team 2."""
     ws = WorldService()
@@ -48,6 +51,7 @@ def _world_service(
             ),
             "tanks": dict(tanks) if tanks else {},
             "containers": dict(containers) if containers else {},
+            "mines": dict(mines) if mines else {},
         }
     )
     return ws
@@ -349,3 +353,54 @@ def test_no_selected_room_offers_nothing() -> None:
     )
 
     assert report is None
+
+
+class TestMineRows:
+    """The fleet mine map's publication half (operator order 2026-09-01)."""
+
+    def test_hostile_fresh_mines_ride_and_own_or_stale_stay_home(self) -> None:
+        """Only enemy-team mines inside the share horizon are offered."""
+        from tankpit_bot.fleetshare.report import MINE_SIGHTING_TTL_MS
+
+        mines = {
+            "101,100": make_mine_state(
+                x=101, y=100, mine_type=1, tank_id=709, team=1, timestamp_ms=_NOW - 500
+            ),
+            "102,100": make_mine_state(
+                x=102, y=100, mine_type=0, tank_id=2731, team=2, timestamp_ms=_NOW - 500
+            ),
+            "103,100": make_mine_state(
+                x=103,
+                y=100,
+                mine_type=1,
+                tank_id=709,
+                team=1,
+                timestamp_ms=_NOW - MINE_SIGHTING_TTL_MS - 1,
+            ),
+        }
+        ws = _world_service(mines=mines)
+
+        report = build_fleet_report(
+            ws,
+            instance="arterial",
+            role="fighter",
+            engaged_target_id=-1,
+            forage_goal_x=-1,
+            forage_goal_y=-1,
+            collect_claim_x=-1,
+            collect_claim_y=-1,
+            now_ms=_NOW,
+        )
+
+        if report is None:
+            raise AssertionError("expected a report")
+        assert report["mines"] == [
+            {
+                "x": 101,
+                "y": 100,
+                "mine_type": 1,
+                "tank_id": 709,
+                "team": 1,
+                "observed_ms": _NOW - 500,
+            }
+        ]

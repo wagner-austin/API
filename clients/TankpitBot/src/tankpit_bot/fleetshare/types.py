@@ -100,6 +100,42 @@ class FleetContainerRemovalDict(TypedDict):
     removed_ms: int
 
 
+class FleetMineSightingDict(TypedDict):
+    """One hostile mine a reporting bot believes is laid.
+
+    The mine-aware layer between the bots (operator order 2026-09-01:
+    "have a mine aware layer between the bots"): a sibling's hostile
+    mine lands in the receiver's mine registry, so its composed
+    decision terrain avoids the walk-over (45 fuel, movement
+    arrested) and its teleports expect the displacement — BEFORE the
+    receiver ever windows the tile. Only mines hostile to the
+    reporting TEAM are published (reports merge same-team only, and
+    own-color mines are passable to every sibling by game physics,
+    [[mine-mechanics]]). No removal rows: mines never drift, and a
+    cleared mine's phantom re-import self-limits to the share
+    horizon — the clearer stops believing it, the sighted copy ages
+    out of the reporter's publication within
+    :data:`~tankpit_bot.fleetshare.report.MINE_SIGHTING_TTL_MS`, and
+    contact disproofs (0x45 in view, the exact-landing receipt) prune
+    on touch as they always have.
+
+    Attributes:
+        x: Mine X.
+        y: Mine Y.
+        mine_type: Wire mine-type byte from the reporter's registry.
+        tank_id: Layer's tank id as the reporter recorded it.
+        team: The mine's team (hostile to the reporting team).
+        observed_ms: The reporter's belief timestamp for the mine.
+    """
+
+    x: int
+    y: int
+    mine_type: int
+    tank_id: int
+    team: int
+    observed_ms: int
+
+
 class FleetScannedTileDict(TypedDict):
     """One tile the reporting bot holds live radar coverage for.
 
@@ -170,6 +206,7 @@ class FleetReportDict(TypedDict):
         removed: Container tiles recently disproved or consumed --
             the negative knowledge that stops teammates chasing
             ghosts.
+        mines: Fresh hostile-mine sightings -- the fleet mine map.
         scanned: Tiles under live radar coverage (within the forage
             coverage TTL) -- the shared scan map.
     """
@@ -191,6 +228,7 @@ class FleetReportDict(TypedDict):
     enemies: list[FleetEnemySightingDict]
     containers: list[FleetContainerSightingDict]
     removed: list[FleetContainerRemovalDict]
+    mines: list[FleetMineSightingDict]
     scanned: list[FleetScannedTileDict]
 
 
@@ -199,6 +237,7 @@ __all__ = [
     "FleetContainerRemovalDict",
     "FleetContainerSightingDict",
     "FleetEnemySightingDict",
+    "FleetMineSightingDict",
     "FleetReportDict",
     "FleetRole",
     "FleetScannedTileDict",

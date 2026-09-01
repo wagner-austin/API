@@ -298,6 +298,7 @@ def _exchange_fleet_knowledge(bot: Bot) -> None:
             enemies=summary["enemies"],
             containers=summary["containers"],
             removed=summary["removed"],
+            mines=summary["mines"],
             scanned=summary["scanned"],
         )
 

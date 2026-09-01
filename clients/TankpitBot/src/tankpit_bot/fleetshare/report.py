@@ -17,6 +17,7 @@ from tankpit_bot.fleetshare.types import (
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
+    FleetMineSightingDict,
     FleetReportDict,
     FleetRole,
     FleetScannedTileDict,
@@ -41,6 +42,17 @@ older than a minute is more likely a phantom than a prize. The
 2026-08-14 240 s run measured the cost of the unbounded share: 18
 code-4 empty-container disproofs on arterial, most against aged
 imports."""
+
+MINE_SIGHTING_TTL_MS = 60_000
+"""Maximum age of a hostile-mine belief worth publishing.
+
+Mines never drift ([[mine-mechanics]]) but they DO get cleared —
+shots, cascades, walk-overs — and clearings are visible only
+in-window, so an aged sighting is increasingly a phantom that would
+wall a sibling's walk routes for nothing. The horizon also bounds the
+phantom-re-import window after a sibling clears a shared mine: the
+clearer stops believing immediately, and the sighted copy falls out
+of every reporter's publication within one horizon."""
 
 ENEMY_SIGHTING_TTL_MS = 30_000
 """Maximum age of an enemy positional belief worth publishing.
@@ -112,6 +124,38 @@ def _container_rows(ws: WorldService, now_ms: int) -> list[FleetContainerSightin
                 is_fuel=container["is_fuel"],
                 volume=container["volume"],
                 observed_ms=container["timestamp_ms"],
+            )
+        )
+    return rows
+
+
+def _mine_rows(ws: WorldService, own_team: int, now_ms: int) -> list[FleetMineSightingDict]:
+    """Collect the hostile-mine beliefs worth publishing.
+
+    Args:
+        ws: The session's world service.
+        own_team: The reporter's team — own-color mines are passable
+            to every same-team sibling by game physics and are not
+            knowledge worth the bytes.
+        now_ms: Freshness bound reference.
+
+    Returns:
+        Hostile mines within :data:`MINE_SIGHTING_TTL_MS`.
+    """
+    rows: list[FleetMineSightingDict] = []
+    for mine in ws.world_state["mines"].values():
+        if mine["team"] == own_team:
+            continue
+        if now_ms - mine["timestamp_ms"] > MINE_SIGHTING_TTL_MS:
+            continue
+        rows.append(
+            FleetMineSightingDict(
+                x=mine["x"],
+                y=mine["y"],
+                mine_type=mine["mine_type"],
+                tank_id=mine["tank_id"],
+                team=mine["team"],
+                observed_ms=mine["timestamp_ms"],
             )
         )
     return rows
@@ -243,6 +287,7 @@ def build_fleet_report(
         enemies=_enemy_rows(ws, own_team, now_ms),
         containers=_container_rows(ws, now_ms),
         removed=_removal_rows(ws, now_ms),
+        mines=_mine_rows(ws, own_team, now_ms),
         scanned=_scanned_rows(ws, now_ms),
     )
 
