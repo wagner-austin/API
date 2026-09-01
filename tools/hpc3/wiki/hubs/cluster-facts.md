@@ -8,3 +8,4 @@ from the cluster's side.
 [Cluster facts are code, never configuration](../pages/facts-are-code.md) -- why a workspace selects but cannot describe a cluster, and how to add one
 [What the cluster sees, and why the comment is live-only](../pages/job-identity-on-cluster.md) -- job names, derived directories, HPC3_* env, the comment-vs-ledger split
 [Preemption cancels, checkpoints protect, campaigns converge](../pages/preemption-and-campaigns.md) -- PreemptMode=CANCEL, measured on free-gpu
+[Small-file boots belong on the node's own scratch, never on BeeGFS](../pages/node-local-scratch.md) -- per-job $TMPDIR measured at 1.9 GB/s; the boot-contention class ten members died to, closed at the command chokepoint

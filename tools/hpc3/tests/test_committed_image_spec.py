@@ -32,7 +32,15 @@ class TestTheCommittedSpec:
     def test_it_decodes(self) -> None:
         raw = load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8"))
         spec = decode_image_spec(raw)
-        assert spec["expected_versions"] == {"torch": "2.6.0+cu124", "transformers": "4.46.3"}
+        assert spec["expected_versions"] == {
+            "torch": "2.6.0+cu124",
+            "transformers": "4.46.3",
+            # Pinned when QLoRA gained real quantization (board note
+            # 2026-09-01, opus-corpus-docmode-0901): the spec's runtime
+            # probe must hold the image to the bitsandbytes it was built
+            # with, or a rebuilt image could silently load un-quantized.
+            "bitsandbytes": "0.45.5",
+        }
 
     def test_it_round_trips_byte_for_byte_through_the_contract(self) -> None:
         raw = load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8"))
