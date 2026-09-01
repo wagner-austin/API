@@ -15,6 +15,7 @@ from tankpit_bot.bot.tick_loop_types import (
 from tankpit_bot.bot.types import (
     make_hold_command,
     make_map_open_command,
+    make_mine_drop_command,
     make_move_command,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
@@ -84,6 +85,16 @@ class TestEncodeDecodeRoundTrip:
         """Encode then decode produces identical TickDecisionDict with radar."""
         cmd = make_radar_command()
         behavior = make_behavior_score("HUNT", 0, 0, 0, "forage_radar")
+        ai_state = make_initial_ai_state()
+        original = make_tick_decision(cmd, behavior, ai_state, [5])
+        encoded = encode_tick_decision(original)
+        decoded = decode_tick_decision(encoded)
+        assert decoded == original
+
+    def test_roundtrip_mine_drop(self) -> None:
+        """Encode then decode produces identical TickDecisionDict with mine_drop."""
+        cmd = make_mine_drop_command()
+        behavior = make_behavior_score("HUNT", 800, 101, 100, "mine_pin")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [5])
         encoded = encode_tick_decision(original)

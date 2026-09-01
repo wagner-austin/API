@@ -56,14 +56,23 @@ def _engaged_fight() -> BotScenario:
     """A consented adjacent Yuppler fight advanced to the first shot.
 
     With the target consented, cardinally adjacent, and inside the
-    established viewport, the locking tick fires immediately — the
-    in-view shot short-circuit (F8: in-view alone is the firing
-    criterion), no teleport and therefore no landing scan.
+    established viewport, the locking tick is the MINE PIN (operator
+    order 2026-09-01: the first close engage tick salts the ring) and
+    the very next tick fires — the in-view shot short-circuit (F8:
+    in-view alone is the firing criterion), no teleport and therefore
+    no landing scan.
     """
     scenario = BotScenario()
     scenario.place_self(x=100, y=100, fuel=1100)
     scenario.place_enemy(tank_id=YUPPLER_ID, x=101, y=100, name="Yuppler")
     scenario.ingest(chat_message(YUPPLER_ID))
+
+    pin_tick = scenario.decide()
+    assert pin_tick["command"]["cmd_type"] == "mine_drop"
+    assert pin_tick["behavior"]["reason_kind"] == "mine_pin"
+    assert pin_tick["updated_ai_state"]["combat_target_id"] == YUPPLER_ID
+    assert pin_tick["updated_ai_state"]["mine_pin_target_id"] == YUPPLER_ID
+    scenario.advance_clock()
 
     lock_tick = scenario.decide()
     assert lock_tick["command"]["cmd_type"] == "shoot"

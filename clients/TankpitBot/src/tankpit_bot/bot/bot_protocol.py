@@ -112,6 +112,14 @@ class BotProtocol(BufferedMessageSourceProtocol, Protocol):
         """
         ...
 
+    def drop_mine(self) -> bool:
+        """Send the 3x3 self-centered mine placement command.
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
     def send_chat(self, message_id: int, x: int, y: int) -> bool:
         """Send a preset chat message.
 

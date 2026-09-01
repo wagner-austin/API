@@ -74,10 +74,14 @@ class TestKillShotWireGate:
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
+        # Mid-engagement tick: the first in-reach tick already spent
+        # the mine-pin press, so the wire gate under test gets the shot.
+        engaged = make_scanned_ai_state()
+        engaged["mine_pin_target_id"] = 50
         ctx = DecideCtx(
             world,
             self_state,
-            make_scanned_ai_state(),
+            engaged,
             make_inventory(),
             100000,
             None,
@@ -165,6 +169,7 @@ class TestMissOnMovedTarget:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
+        ai_state["mine_pin_target_id"] = 50
         ai_state["combat_target_x"] = 101
         ai_state["combat_target_y"] = 100
         ctx = DecideCtx(

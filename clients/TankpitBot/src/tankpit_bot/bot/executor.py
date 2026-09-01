@@ -30,7 +30,7 @@ from tankpit_bot.ledger.outcome._emit import (
 from tankpit_bot.ledger.outcome.teleport import (
     record_teleport_dispatch,
 )
-from tankpit_bot.physics.costs import RADAR_COST, teleport_cost
+from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
 from tankpit_bot.physics.supervisor import (
     TELEPORT_RING1_COST_SLACK,
     equipment_pickup_refusal,
@@ -255,6 +255,33 @@ def _dispatch_shoot_command(bot: BotProtocol, command: ShootCommandDict) -> bool
     return dispatched_shot
 
 
+def _dispatch_mine_drop(bot: BotProtocol) -> bool:
+    """Send the 3x3 mine press and book its flat fuel bill.
+
+    Like chat, no decision-ledger entry: the press is self-answering
+    (the 0x4B MinePlacement lands in world state on its own) and
+    consumes no id-keyed feedback a classifier could wait on. The
+    flat 10-fuel bill IS booked — the fuel forensics layer's
+    ``mine_press`` kind exists for exactly this ([[mine-mechanics]],
+    [[game-economy]]).
+
+    Args:
+        bot: Bot instance for sending commands.
+
+    Returns:
+        True if the press reached the wire.
+    """
+    dispatched = bot.drop_mine()
+    if dispatched:
+        record_fuel_entry(
+            book=bot.world.fuel_book,
+            kind="mine_press",
+            lo=-MINE_PRESS_COST,
+            hi=-MINE_PRESS_COST,
+        )
+    return dispatched
+
+
 def dispatch_command(
     bot: BotProtocol,
     command: BotCommand,
@@ -314,6 +341,8 @@ def dispatch_command(
             )
             record_ammo_scan(book=bot.world.ammo_book)
         return dispatched_radar
+    if command["cmd_type"] == "mine_drop":
+        return _dispatch_mine_drop(bot)
     if command["cmd_type"] == "map_open":
         # CMD_MAP_OPEN is idempotent on the server: every dispatch
         # produces a fresh MAP_DATA payload regardless of whether the

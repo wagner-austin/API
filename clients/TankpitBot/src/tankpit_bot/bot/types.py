@@ -54,6 +54,22 @@ class RadarCommandDict(TypedDict):
     cmd_type: Literal["radar"]
 
 
+class MineDropCommandDict(TypedDict):
+    """Mine drop command parameters.
+
+    The wire ``CMD_MINE`` takes no coordinates: the server lays a 3x3
+    pattern centered on the placer's own tile, clipped to the visible
+    viewport, for a flat 10 fuel ([[mine-mechanics]]). Positioning is
+    therefore the DECISION layer's job — the command itself only says
+    "drop here, now".
+
+    Attributes:
+        cmd_type: Command type identifier.
+    """
+
+    cmd_type: Literal["mine_drop"]
+
+
 class PickupFuelCommandDict(TypedDict):
     """Fuel pickup command parameters.
 
@@ -121,6 +137,15 @@ def make_shoot_command(
         target_y=target_y,
         target_id=target_id,
     )
+
+
+def make_mine_drop_command() -> MineDropCommandDict:
+    """Create a mine drop command.
+
+    Returns:
+        MineDropCommandDict for a 3x3 self-centered placement.
+    """
+    return MineDropCommandDict(cmd_type="mine_drop")
 
 
 def make_radar_command() -> RadarCommandDict:
@@ -312,6 +337,7 @@ BotCommand = (
     MoveCommandDict
     | ShootCommandDict
     | RadarCommandDict
+    | MineDropCommandDict
     | PickupFuelCommandDict
     | PickupEquipmentCommandDict
     | MapOpenCommandDict
@@ -327,6 +353,7 @@ __all__ = [
     "ChatCommandDict",
     "HoldCommandDict",
     "MapOpenCommandDict",
+    "MineDropCommandDict",
     "MoveCommandDict",
     "PickupEquipmentCommandDict",
     "PickupFuelCommandDict",
@@ -337,6 +364,7 @@ __all__ = [
     "make_chat_command",
     "make_hold_command",
     "make_map_open_command",
+    "make_mine_drop_command",
     "make_move_command",
     "make_pickup_equipment_command",
     "make_pickup_fuel_command",

@@ -150,6 +150,10 @@ class _WorldOnlyBot:
         """Unused BotProtocol stub."""
         return False
 
+    def drop_mine(self) -> bool:
+        """Unused BotProtocol stub."""
+        return False
+
     def send_chat(self, message_id: int, x: int, y: int) -> bool:
         """Unused BotProtocol stub."""
         _ = (message_id, x, y)

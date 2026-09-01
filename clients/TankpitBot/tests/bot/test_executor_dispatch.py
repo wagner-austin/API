@@ -9,6 +9,7 @@ from tankpit_bot.bot.executor import (
 from tankpit_bot.bot.types import (
     make_hold_command,
     make_map_open_command,
+    make_mine_drop_command,
     make_move_command,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
@@ -113,6 +114,29 @@ class TestDispatchCommand:
         result = dispatch_command(bot, make_radar_command(), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_mine_drop_books_the_flat_press(self, fake_env: FakeEnv) -> None:
+        """The mine press reaches the wire and bills exactly -10 fuel.
+
+        No decision-ledger entry exists for the press (the 0x4B answer
+        is self-serving), but the fuel forensics layer's ``mine_press``
+        entry must land ([[mine-mechanics]], [[game-economy]]).
+        """
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(bot, make_mine_drop_command(), _make_snapshot())
+        assert result is True
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+        entries = [e for e in bot.world.fuel_book["entries"] if e["kind"] == "mine_press"]
+        assert [(e["lo"], e["hi"]) for e in entries] == [(-10, -10)]
+        assert bot.world.last_wire_command_name == "mine_drop"
+
+    def test_dispatch_mine_drop_without_cdp_books_nothing(self, fake_env: FakeEnv) -> None:
+        """A failed send bills no fuel and reports False."""
+        bot, _fake_cdp = _make_bot(fake_env)
+        bot._cdp = None
+        result = dispatch_command(bot, make_mine_drop_command(), _make_snapshot())
+        assert result is False
+        assert [e for e in bot.world.fuel_book["entries"] if e["kind"] == "mine_press"] == []
 
     def test_dispatch_map_open(self, fake_env: FakeEnv) -> None:
         """Dispatches map_open command via bot.open_map."""

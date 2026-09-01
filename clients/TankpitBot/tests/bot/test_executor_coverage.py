@@ -59,6 +59,10 @@ class _DispatchFailBot:
         """Unused stub."""
         return False
 
+    def drop_mine(self) -> bool:
+        """Unused stub."""
+        return False
+
     def send_chat(self, message_id: int, x: int, y: int) -> bool:
         """Unused stub."""
         _ = (message_id, x, y)

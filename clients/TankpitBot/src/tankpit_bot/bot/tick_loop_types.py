@@ -72,6 +72,10 @@ def _decode_untargeted_command(data: JSONObject, cmd_type: str) -> BotCommand | 
         from tankpit_bot.bot.types import HoldCommandDict
 
         return HoldCommandDict(cmd_type="hold")
+    if cmd_type == "mine_drop":
+        from tankpit_bot.bot.types import MineDropCommandDict
+
+        return MineDropCommandDict(cmd_type="mine_drop")
     if cmd_type == "scope_shift":
         from tankpit_bot.bot.types import ScopeShiftCommandDict
 
@@ -157,6 +161,8 @@ def _encode_bot_command(command: BotCommand) -> JSONObject:
         return {"cmd_type": "map_open"}
     if command["cmd_type"] == "hold":
         return {"cmd_type": "hold"}
+    if command["cmd_type"] == "mine_drop":
+        return {"cmd_type": "mine_drop"}
     if command["cmd_type"] == "scope_shift":
         return {"cmd_type": "scope_shift", "direction": command["direction"]}
     result: JSONObject = {

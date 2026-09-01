@@ -29,6 +29,7 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
 )
+from tankpit_bot.bot.ai.mine_pin import mine_pin_decision
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -385,6 +386,13 @@ def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         # target is framed by ONE free shift and shot for real next
         # tick instead of clamped into weapon=0 ground fire.
         return shift
+    pin = mine_pin_decision(ctx, target)
+    if pin is not None:
+        # The mine pin at the chokepoint (operator order 2026-09-01):
+        # the FIRST engage tick within pressing reach salts the
+        # target's ring with the 3x3 pattern; the latch makes every
+        # later tick of the same engagement a shot.
+        return pin
     aim_x, aim_y = _clamp_aim_into_viewport(ctx, target["x"], target["y"])
     if (aim_x, aim_y) != (target["x"], target["y"]):
         emit_ai(

@@ -218,6 +218,24 @@ class DispatchMixin(CompletionsMixin):
         label = f"shot_{self._shot_screenshot_seq:04d}_x{x}_y{y}_id{target_id}"
         save_screenshot(self._cdp, Path(directory), label)
 
+    def drop_mine(self) -> bool:
+        """Send the wire ``CMD_MINE`` — a 3x3 self-centered placement.
+
+        Fire-and-forget like chat: the server answers with its own
+        ``0x4B`` MinePlacement (and any same-tick ``0x45`` detonations
+        of enemy mines the pattern hit), which land in world state
+        through the ordinary wire dispatch — no in-flight action is
+        held and no state transition happens, so the next tick's
+        decision runs on time ([[mine-mechanics]]).
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_MINE, build_query_command
+
+        emit_diagnostic(diagnostic_kind="mine_drop_dispatch")
+        return self._send_bytes(build_query_command(CMD_MINE), "mine_drop")
+
     def use_radar(self) -> bool:
         """Send radar scan command and transition to SCANNING state.
 

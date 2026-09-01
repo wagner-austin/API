@@ -48,6 +48,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "mode": "HUNT",
@@ -185,6 +186,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 130,
                 "combat_target_y": 100,
             }
@@ -229,6 +231,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "mode": "HUNT",
@@ -271,6 +274,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 197,
                 "combat_target_y": 86,
             }
@@ -315,6 +319,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 197,
                 "combat_target_y": 86,
             }
@@ -395,6 +400,7 @@ class TestDecideTeleportToFarTarget:
                 "mode_started_ms": 90000,
                 "last_map_open_ms": 94000,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 110,
                 "combat_target_y": 100,
             }
@@ -492,6 +498,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 105,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
@@ -544,6 +551,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
+                "mine_pin_target_id": 50,
                 "combat_target_x": 105,
                 "combat_target_y": 100,
                 "last_shot_target_id": -1,

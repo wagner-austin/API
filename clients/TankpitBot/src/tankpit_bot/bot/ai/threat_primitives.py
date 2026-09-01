@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.world_types import (
     EnemyThreatDict,
     make_enemy_threat,
 )
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
     TankStateDict,
@@ -204,19 +205,29 @@ def _threat_sort_key_for(
         priority_target_name: Account name that outranks even other
             humans (case-insensitive), or ``""`` for none.
         fleet_engaged_ids: Tank ids teammates currently hold combat
-            locks on ([[fleet-coordination]] focus fire) — inside a
-            priority tier these rank first, so same-team fighters
-            converge on one enemy instead of splitting fire.
+            locks on ([[fleet-coordination]]). The assist cuts BOTH
+            ways by target class (operator observation 2026-09-01:
+            "all four bots are locked on the same target ... stacked
+            on a practice bot rather than spreading"): a
+            sibling-engaged HUMAN ranks first — focus fire, the
+            session's stake — while a sibling-engaged PRACTICE BOT
+            ranks last, so routine farming spreads across the map
+            instead of four tanks queuing on one respawner.
 
     Returns:
-        Sort-key callable ordering by (tier, fleet assist, pays
-        points, distance, finish, age).
+        Sort-key callable ordering by (tier, fleet assist/spread,
+        pays points, distance, finish, age).
     """
+
+    def _assist_rank(threat: EnemyThreatDict) -> int:
+        if threat["tank_id"] not in fleet_engaged_ids:
+            return 1
+        return 0 if is_human_name(threat["name"]) else 2
 
     def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int, int, int]:
         return (
             threat_priority_tier(threat["name"], priority_target_name),
-            0 if threat["tank_id"] in fleet_engaged_ids else 1,
+            _assist_rank(threat),
             # The points-floor law, measured 2026-09-01 across 19 kills
             # with zero contradictions ([[game-rules]]): a rank-0
             # recruit pays "Enemy's rank was too low" to EVERY killer
