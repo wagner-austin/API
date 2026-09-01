@@ -304,7 +304,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # partitioning `run_worker` does is what a many-worker sweep needs and
     # this is not one: a member plays the single job it was named, and the
     # only thing it needs from an index is an ordinal nothing else holds.
-    played = play_job(job, prepare_clone(lease, config), config)
+    clone = prepare_clone(lease, config)
+    played = play_job(job, clone, config)
+    if played:
+        # Success releases, failure retains. The scorecard is the artifact;
+        # the clone is a per-member copy of the game with nothing in it a
+        # verdict needs, and a member that FAILED keeps its copy because the
+        # copy is where the wreckage is. Left behind, a finished batch's
+        # clones were 1.7 GB each and four batches deep before anyone
+        # deleted them by hand (2026-09-01) -- the leak class this closes.
+        _test_hooks.remove_path(Path(clone))
     return EXIT_OK if played else EXIT_INCOMPLETE
 
 

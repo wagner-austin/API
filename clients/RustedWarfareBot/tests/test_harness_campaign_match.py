@@ -319,6 +319,22 @@ class TestPlayingIt:
             assert main(_argv()) == EXIT_INCOMPLETE
             assert _result() not in host.files
 
+    def test_a_finished_member_releases_its_clone(self) -> None:
+        """Success releases, failure retains. A clone is a per-member copy of
+        the game with nothing in it a verdict needs; left behind, a finished
+        batch's clones were 1.7 GB each and four batches deep before anyone
+        deleted them by hand (2026-09-01)."""
+        with _planted() as host:
+            assert main(_argv()) == EXIT_OK
+        assert _clone(0) in host.removed
+
+    def test_a_failed_member_keeps_its_clone_because_the_wreckage_is_there(self) -> None:
+        host = _planted()
+        host.transcripts[_clone(0)] = ("[play] the agent never opened port 27511",)
+        with host:
+            assert main(_argv()) == EXIT_INCOMPLETE
+        assert host.removed == []
+
     def test_each_member_clones_ports_and_displays_under_its_own_lease(self) -> None:
         """Every member used to lease ordinal 1. All of them aimed at one
         ``.game-w1``, resolved against the directory they were submitted from
