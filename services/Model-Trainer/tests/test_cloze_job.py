@@ -120,6 +120,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         "learning_rate": 5e-4,
         "tokenizer_id": tok_id,
         "corpus_path": str(corpus),
+        "corpus_format": "lines",
         "holdout_fraction": 0.01,
         "seed": 42,
         "pretrained_run_id": None,

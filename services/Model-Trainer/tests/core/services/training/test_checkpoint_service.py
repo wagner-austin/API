@@ -50,6 +50,7 @@ def _make_cfg() -> ModelTrainConfig:
         "learning_rate": 0.001,
         "tokenizer_id": "tok",
         "corpus_path": "/data/corpus_cache/fid.txt",
+        "corpus_format": "lines",
         "holdout_fraction": 0.0,
         "seed": 7,
         "pretrained_run_id": None,

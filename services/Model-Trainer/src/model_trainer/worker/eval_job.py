@@ -9,6 +9,7 @@ from platform_core.trainer_keys import eval_key
 from typing_extensions import TypedDict
 
 from model_trainer.core import _test_hooks
+from model_trainer.core.contracts.dataset import as_corpus_format
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
 from model_trainer.core.infra.paths import model_eval_dir
@@ -74,6 +75,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "learning_rate": manifest["learning_rate"],
             "tokenizer_id": manifest["tokenizer_id"],
             "corpus_path": manifest["corpus_path"],
+            "corpus_format": as_corpus_format(manifest["corpus_format"], "corpus_format"),
             "holdout_fraction": manifest["holdout_fraction"],
             "seed": manifest["seed"],
             "pretrained_run_id": manifest["pretrained_run_id"],

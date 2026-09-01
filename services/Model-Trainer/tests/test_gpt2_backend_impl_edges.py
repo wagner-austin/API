@@ -66,6 +66,7 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "learning_rate": 1e-3,
         "tokenizer_id": tok_id,
         "corpus_path": str(corpus),
+        "corpus_format": "lines",
         "holdout_fraction": 0.01,
         "seed": 42,
         "pretrained_run_id": None,

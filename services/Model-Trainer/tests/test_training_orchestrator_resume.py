@@ -36,6 +36,7 @@ def _make_request() -> TrainRequest:
         "batch_size": 2,
         "learning_rate": 5e-4,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "tokenizer_id": "tok1",
         "user_id": 42,
         "holdout_fraction": 0.01,

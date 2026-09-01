@@ -129,6 +129,7 @@ def test_unavailable_backend_all_methods_raise() -> None:
         "learning_rate": 1e-3,
         "tokenizer_id": "tok",
         "corpus_path": "/c",
+        "corpus_format": "lines",
         "holdout_fraction": 0.01,
         "seed": 42,
         "pretrained_run_id": None,

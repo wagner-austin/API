@@ -20,6 +20,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from model_trainer.core.contracts.dataset import as_corpus_format
 from model_trainer.infra.persistence.models import (
     GgufExportManifest,
     TrainingManifest,
@@ -245,6 +246,7 @@ class _ManifestFields:
     holdout_fraction: float
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
+    corpus_format: str
     optimizer: str
     freeze_embed: bool
     gradient_clipping: float
@@ -284,6 +286,7 @@ class _ManifestFields:
         holdout_fraction: float,
         tokenizer_id: str | None,
         corpus_path: str,
+        corpus_format: str,
         optimizer: str,
         freeze_embed: bool,
         gradient_clipping: float,
@@ -315,6 +318,7 @@ class _ManifestFields:
         self.holdout_fraction = holdout_fraction
         self.tokenizer_id = tokenizer_id
         self.corpus_path = corpus_path
+        self.corpus_format = corpus_format
         self.optimizer = optimizer
         self.freeze_embed = freeze_embed
         self.gradient_clipping = gradient_clipping
@@ -342,6 +346,7 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         model_size=require_str(obj, "model_size"),
         tokenizer_id=_optional_str(obj, "tokenizer_id"),
         corpus_path=require_str(obj, "corpus_path"),
+        corpus_format=as_corpus_format(require_str(obj, "corpus_format"), "corpus_format"),
         optimizer=require_str(obj, "optimizer"),
         device=require_str(obj, "device"),
         precision=require_str(obj, "precision"),
@@ -434,6 +439,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "learning_rate": fields.learning_rate,
         "tokenizer_id": fields.tokenizer_id,
         "corpus_path": fields.corpus_path,
+        "corpus_format": fields.corpus_format,
         "holdout_fraction": fields.holdout_fraction,
         "optimizer": fields.optimizer,
         "freeze_embed": fields.freeze_embed,

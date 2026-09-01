@@ -154,6 +154,7 @@ def test_make_loader_returns_none_for_empty_files(tmp_path: Path) -> None:
     cfg: ModelTrainConfig = {
         **_make_cfg(),
         "corpus_path": str(corpus),
+        "corpus_format": "lines",
         "holdout_fraction": 0.0,
         "test_split_ratio": 0.0,
     }
@@ -192,6 +193,7 @@ def test_build_all_loaders_raises_when_no_train_data(tmp_path: Path) -> None:
     cfg: ModelTrainConfig = {
         **_make_cfg(),
         "corpus_path": str(tmp_path),
+        "corpus_format": "lines",
     }
 
     trainer = bt.BaseTrainer(

@@ -102,6 +102,7 @@ def encode_quantization_config(config: QuantizationConfig) -> JSONObject:
         "load_in_8bit": config["load_in_8bit"],
         "bnb_4bit_compute_dtype": config["bnb_4bit_compute_dtype"],
         "bnb_4bit_quant_type": config["bnb_4bit_quant_type"],
+        "bnb_4bit_use_double_quant": config["bnb_4bit_use_double_quant"],
     }
 
 
@@ -141,11 +142,14 @@ def decode_quantization_config(obj: JSONObject) -> QuantizationConfig:
         )
     quant_type: Literal["nf4", "fp4"] = "fp4" if quant_type_raw == "fp4" else "nf4"
 
+    use_double_quant = require_bool(obj, "bnb_4bit_use_double_quant")
+
     return {
         "load_in_4bit": load_in_4bit,
         "load_in_8bit": load_in_8bit,
         "bnb_4bit_compute_dtype": compute_dtype,
         "bnb_4bit_quant_type": quant_type,
+        "bnb_4bit_use_double_quant": use_double_quant,
     }
 
 

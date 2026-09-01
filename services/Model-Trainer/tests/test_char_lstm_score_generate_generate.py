@@ -85,6 +85,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "learning_rate": 1e-3,
         "tokenizer_id": tok_id,
         "corpus_path": corpus_path,
+        "corpus_format": "lines",
         "holdout_fraction": 0.01,
         "seed": 42,
         "pretrained_run_id": None,

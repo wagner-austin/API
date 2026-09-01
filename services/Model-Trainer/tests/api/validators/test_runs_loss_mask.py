@@ -24,6 +24,7 @@ def _base_gpt2_payload() -> dict[str, JSONValue]:
         "batch_size": 1,
         "learning_rate": 1e-3,
         "corpus_file_id": "cid",
+        "corpus_format": "lines",
         "tokenizer_id": "tok",
         "user_id": 0,
     }

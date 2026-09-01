@@ -88,6 +88,7 @@ def test_orchestrator_unsupported_model_raises() -> None:
         "batch_size": 1,
         "learning_rate": 1e-3,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "tokenizer_id": "tok",
         "user_id": 0,
         "holdout_fraction": 0.01,

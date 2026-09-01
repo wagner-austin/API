@@ -77,6 +77,7 @@ def test_runs_train_extra_field_corpus_path_forbidden_returns_422(
         "batch_size": 1,
         "learning_rate": 5e-4,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "corpus_path": str(tmp_path / "corpus.txt"),
         "tokenizer_id": "tok-1",
         "user_id": 1,

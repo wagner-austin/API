@@ -20,7 +20,11 @@ from platform_core.json_utils import (
 )
 
 from model_trainer.core.contracts.finetuning import StrategyName
-from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
+from model_trainer.core.contracts.queue_encoding_configs import (
+    _decode_optional_quantization,
+    encode_quantization_config,
+)
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.finetuning import default_registry
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
@@ -44,6 +48,10 @@ class HFLMMetadata(TypedDict):
     hub_model_id: str
     tokenizer_id: str | None  # None for HF LM (uses HF tokenizer from hub_model_id)
     is_peft: bool
+    # What the base model was quantized to when this run trained, or None.
+    # The adapter on disk is a delta against those weights, so reloading it
+    # onto a differently-quantized base reconstructs a different model.
+    quantization: QuantizationConfig | None
 
 
 # Valid strategy names as a set for validation
@@ -86,6 +94,11 @@ def _encode_metadata(metadata: HFLMMetadata) -> JSONObject:
         "hub_model_id": metadata["hub_model_id"],
         "tokenizer_id": metadata["tokenizer_id"],
         "is_peft": metadata["is_peft"],
+        "quantization": (
+            None
+            if metadata["quantization"] is None
+            else encode_quantization_config(metadata["quantization"])
+        ),
     }
     return result
 
@@ -134,12 +147,14 @@ def _decode_metadata(data: JSONObject) -> HFLMMetadata:
     # tokenizer_id is optional for HF LM (uses HF tokenizer from hub_model_id)
     tokenizer_id = optional_str(data, "tokenizer_id")
     is_peft = require_bool(data, "is_peft")
+    quantization = _decode_optional_quantization(data)
 
     return HFLMMetadata(
         strategy_name=strategy_name,
         hub_model_id=hub_model_id,
         tokenizer_id=tokenizer_id,
         is_peft=is_peft,
+        quantization=quantization,
     )
 
 
@@ -200,6 +215,7 @@ def save_prepared_hf_lm(
         hub_model_id=hub_model_id,
         tokenizer_id=prepared.tokenizer_id,
         is_peft=is_peft,
+        quantization=prepared.quantization,
     )
     metadata_path = out_path / "hf_lm_metadata.json"
     metadata_path.write_text(
@@ -247,7 +263,9 @@ def load_prepared_hf_lm_from_handle(
     load_model = HFHooks.load_hf_model
     load_hf_tokenizer = HFHooks.load_hf_tokenizer
 
-    base_model = load_model(metadata["hub_model_id"])
+    # Reloading a saved run: the adapter is re-attached to a base model loaded
+    # the same way the run loaded it, so a quantized run reloads quantized.
+    base_model = load_model(metadata["hub_model_id"], metadata["quantization"])
     hf_tokenizer = load_hf_tokenizer(metadata["hub_model_id"])
 
     # Get strategy and load adapted weights
@@ -268,6 +286,7 @@ def load_prepared_hf_lm_from_handle(
         strategy_name=metadata["strategy_name"],
         hub_model_id=metadata["hub_model_id"],
         is_peft=metadata["is_peft"],
+        quantization=metadata["quantization"],
     )
 
 
@@ -287,7 +306,9 @@ def load_prepared_hf_lm_from_hub(hub_model_id: str) -> PreparedLMModel:
     Returns:
         PreparedLMModel holding the untouched pretrained weights.
     """
-    base_model = HFHooks.load_hf_model(hub_model_id)
+    # Baseline scoring of an untrained model: never quantized, because the
+    # baseline exists to be compared against and must not carry an arm.
+    base_model = HFHooks.load_hf_model(hub_model_id, None)
     hf_tokenizer = HFHooks.load_hf_tokenizer(hub_model_id)
     eos_id, pad_id, _ = _token_ids_from_hf_tokenizer(hf_tokenizer)
 
@@ -305,6 +326,9 @@ def load_prepared_hf_lm_from_hub(hub_model_id: str) -> PreparedLMModel:
         strategy_name=None,
         hub_model_id=hub_model_id,
         is_peft=False,
+        # Loaded above with quantization=None, and recorded as such so the
+        # baseline cannot be mistaken for a quantized comparison arm.
+        quantization=None,
     )
 
 

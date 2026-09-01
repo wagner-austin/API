@@ -99,6 +99,7 @@ class TrainingOrchestrator:
             "batch_size": req["batch_size"],
             "learning_rate": req["learning_rate"],
             "corpus_file_id": fid,
+            "corpus_format": req["corpus_format"],
             "tokenizer_id": req["tokenizer_id"],
             "holdout_fraction": req["holdout_fraction"],
             "seed": req["seed"],

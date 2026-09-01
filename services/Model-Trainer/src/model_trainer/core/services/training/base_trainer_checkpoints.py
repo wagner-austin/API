@@ -70,14 +70,22 @@ class _TrainerCheckpoints(_TrainerObservability):
         partial or corrupt save surfaces here rather than in whatever
         consumes the artifact later.
 
+        The read goes through a hook rather than through the model's own
+        ``from_pretrained`` because three backends write three artifact
+        formats and only two of them are a model. A PEFT directory holds an
+        adapter, and ``PeftModel.from_pretrained`` takes a base model as
+        well as a path; calling it with the path alone raised at exactly
+        this line, after the whole run's compute had been spent. A char-LSTM
+        checkpoint is not HuggingFace-shaped and the Auto class refuses it
+        outright. See ``services/training/reload.py``.
+
         A run without a holdout saved no best checkpoint, so the live model
         already IS the artifact and this is a no-op.
         """
         path = self._best_checkpoint_path
         if path is None:
             return
-        reloaded = self._prepared.model.from_pretrained(str(path))
-        _ = self._prepared.model.load_state_dict(reloaded.state_dict())
+        _test_hooks.reload_shipped_weights(self._prepared, self._cfg["model_family"], str(path))
         _ = self._prepared.model.to(str(self._device))
         _logger.info(
             "Restored best checkpoint for evaluation",

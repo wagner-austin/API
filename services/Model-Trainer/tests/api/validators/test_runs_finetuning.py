@@ -19,6 +19,7 @@ def _base_hf_lm_payload() -> dict[str, JSONValue]:
         "batch_size": 4,
         "learning_rate": 1e-4,
         "corpus_file_id": "cid",
+        "corpus_format": "lines",
         "hub_model_id": "bert-base",
         "user_id": 0,
     }
@@ -85,7 +86,16 @@ class TestFinetuningStrategy:
         payload = _base_hf_lm_payload()
         payload["finetuning_strategy"] = "qlora"
         payload["lora"] = {"r": 16}
-        payload["quantization"] = {"load_in_4bit": True}
+        # Every quantization field is stated: the decoder no longer defaults
+        # the storage or compute data type, because those decide what the run
+        # measures. See tests/api/validators/test_runs_quantization.py.
+        payload["quantization"] = {
+            "load_in_4bit": True,
+            "load_in_8bit": False,
+            "bnb_4bit_compute_dtype": "bfloat16",
+            "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": True,
+        }
         out = _decode_train_request(payload)
         assert out["finetuning_strategy"] == "qlora"
         assert out["lora"] is not None and out["quantization"] is not None

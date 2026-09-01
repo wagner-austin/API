@@ -79,6 +79,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
             "learning_rate": 5e-5,
             "tokenizer_id": None,  # None for hf_lm - uses HF tokenizer from hub_model_id
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.1,
             "seed": 42,
             "pretrained_run_id": None,
@@ -205,6 +206,7 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
             "learning_rate": 5e-4,
             "tokenizer_id": tok_id,
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.01,
             "seed": 42,
             "pretrained_run_id": pretrained_run_id,
@@ -313,6 +315,7 @@ def test_training_worker_passes_resume_flag_to_backend(
             "learning_rate": 5e-4,
             "tokenizer_id": tok_id,
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.01,
             "seed": 42,
             "pretrained_run_id": pretrained_run_id,

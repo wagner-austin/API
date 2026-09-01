@@ -37,6 +37,7 @@ def _base_manifest() -> dict[str, JSONValue]:
         "learning_rate": 0.001,
         "tokenizer_id": "tok",
         "corpus_path": "/tmp/x",
+        "corpus_format": "lines",
         "optimizer": "adamw",
         "freeze_embed": False,
         "gradient_clipping": 1.0,

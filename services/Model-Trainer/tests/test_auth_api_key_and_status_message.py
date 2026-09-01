@@ -74,6 +74,7 @@ def test_api_key_unauthorized_and_authorized(
         "batch_size": 1,
         "learning_rate": 0.0005,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "tokenizer_id": "tok-1",
         "user_id": 123,
     }

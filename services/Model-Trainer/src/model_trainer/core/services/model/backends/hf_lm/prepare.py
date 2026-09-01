@@ -159,7 +159,7 @@ def prepare_hf_lm_with_handle(
     load_model = Hooks.load_hf_model
     load_tokenizer = Hooks.load_hf_tokenizer
 
-    base_model = load_model(hub_model_id)
+    base_model = load_model(hub_model_id, cfg["quantization"])
     hf_tokenizer = load_tokenizer(hub_model_id)
 
     # Get finetuning strategy and adapt the model
@@ -180,6 +180,7 @@ def prepare_hf_lm_with_handle(
         strategy_name=strategy_name,
         hub_model_id=hub_model_id,
         is_peft=adapted.is_peft_model,
+        quantization=cfg["quantization"],
     )
 
 

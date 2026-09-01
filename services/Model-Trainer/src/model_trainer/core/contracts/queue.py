@@ -20,6 +20,10 @@ class TrainRequestPayload(TypedDict):
 
     Attributes:
         model_family: Model architecture. 'hf_lm' for HuggingFace models.
+        corpus_format: How the corpus file divides into training units --
+            'lines' for stripped text lines, 'documents' for JSONL records
+            read verbatim. Required, because the same file read either way
+            yields different units and therefore a different run.
         tokenizer_id: Tokenizer ID. None for hf_lm (uses HF tokenizer).
         hub_model_id: HuggingFace model ID (required for hf_lm).
         finetuning_strategy: Fine-tuning strategy (full, lora, qlora).
@@ -34,6 +38,7 @@ class TrainRequestPayload(TypedDict):
     batch_size: int
     learning_rate: float
     corpus_file_id: str
+    corpus_format: Literal["lines", "documents"]
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     holdout_fraction: float
     seed: int

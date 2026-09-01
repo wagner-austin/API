@@ -247,6 +247,7 @@ def test_runs_train_unsupported_backend_maps_400(
         "batch_size": 1,
         "learning_rate": 1e-3,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "tokenizer_id": "tok",
         "user_id": 1,
     }

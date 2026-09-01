@@ -39,6 +39,7 @@ def make_quantization_config() -> QuantizationConfig:
         "load_in_8bit": False,
         "bnb_4bit_compute_dtype": "float16",
         "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_use_double_quant": False,
     }
 
 
@@ -56,6 +57,7 @@ def make_test_config(
         "learning_rate": 0.001,
         "tokenizer_id": "test-tok",
         "corpus_path": "/tmp/corpus",
+        "corpus_format": "lines",
         "holdout_fraction": 0.1,
         "seed": 42,
         "pretrained_run_id": None,
@@ -128,6 +130,7 @@ class TestRequireQuantizationConfig:
             "load_in_8bit": True,
             "bnb_4bit_compute_dtype": "float16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
         cfg = make_test_config(lora=make_lora_config(), quantization=quant_cfg)
         result = _require_quantization_config(cfg)
@@ -146,6 +149,7 @@ class TestRequireQuantizationConfig:
             "load_in_8bit": False,
             "bnb_4bit_compute_dtype": "float16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
         cfg = make_test_config(lora=make_lora_config(), quantization=quant_cfg)
         with pytest.raises(ValueError, match="load_in_4bit=True or load_in_8bit=True"):

@@ -356,6 +356,7 @@ def test_process_train_job_cancelled_block(
             "learning_rate": 0.001,
             "tokenizer_id": "tok",
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.01,
             "seed": 42,
             "pretrained_run_id": None,

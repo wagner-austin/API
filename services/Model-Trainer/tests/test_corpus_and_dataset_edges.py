@@ -76,7 +76,7 @@ def test_read_corpus_lines_concatenates_in_file_order_and_drops_blanks(
 
 
 def test_split_corpus_no_files_raises_corpus_empty(tmp_path: Path) -> None:
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.5)
+    cfg = DatasetConfig(corpus_path=str(tmp_path), corpus_format="lines", holdout_fraction=0.5)
     with pytest.raises(AppError) as exc:
         split_corpus(cfg)
     assert exc.value.code is ModelTrainerErrorCode.CORPUS_EMPTY
@@ -89,7 +89,9 @@ def test_split_corpus_blank_only_files_raise_corpus_empty(tmp_path: Path) -> Non
     succeeds and the emptiness only appears after reading.
     """
     (tmp_path / "blank.txt").write_text("\n\n   \n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.1, test_split_ratio=0.1)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path), corpus_format="lines", holdout_fraction=0.1, test_split_ratio=0.1
+    )
 
     with pytest.raises(AppError) as exc:
         split_corpus(cfg)
@@ -106,7 +108,9 @@ def test_split_corpus_single_file_partitions_its_lines_disjointly(tmp_path: Path
     """
     lines = [f"line-{i}" for i in range(10)]
     (tmp_path / "only.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.1, test_split_ratio=0.2)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path), corpus_format="lines", holdout_fraction=0.1, test_split_ratio=0.2
+    )
 
     split = split_corpus(cfg)
 
@@ -119,7 +123,12 @@ def test_split_corpus_partitions_share_no_line(tmp_path: Path) -> None:
     """Disjointness is the property the defect violated, so it is asserted directly."""
     lines = [f"line-{i}" for i in range(100)]
     (tmp_path / "only.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.05, test_split_ratio=0.15)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path),
+        corpus_format="lines",
+        holdout_fraction=0.05,
+        test_split_ratio=0.15,
+    )
 
     split = split_corpus(cfg)
 
@@ -138,7 +147,12 @@ def test_split_corpus_spans_multiple_files_as_one_corpus(tmp_path: Path) -> None
     """
     for name in ("a.txt", "b.txt", "c.txt"):
         (tmp_path / name).write_text("\n".join(f"{name}-{i}" for i in range(4)) + "\n", "utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.25, test_split_ratio=0.25)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path),
+        corpus_format="lines",
+        holdout_fraction=0.25,
+        test_split_ratio=0.25,
+    )
 
     split = split_corpus(cfg)
 
@@ -156,7 +170,12 @@ def test_split_corpus_rounds_a_wanted_partition_up_to_one_line(tmp_path: Path) -
     """
     lines = [f"line-{i}" for i in range(10)]
     (tmp_path / "only.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.01, test_split_ratio=0.0)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path),
+        corpus_format="lines",
+        holdout_fraction=0.01,
+        test_split_ratio=0.0,
+    )
 
     split = split_corpus(cfg)
 
@@ -174,7 +193,9 @@ def test_split_corpus_raises_when_the_holdout_would_leave_no_training_lines(
     old behaviour returned that one line as all three partitions.
     """
     (tmp_path / "only.txt").write_text("just one line\n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.5, test_split_ratio=0.5)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path), corpus_format="lines", holdout_fraction=0.5, test_split_ratio=0.5
+    )
 
     with pytest.raises(AppError) as exc:
         split_corpus(cfg)
@@ -192,7 +213,9 @@ def test_split_corpus_single_file_is_allowed_when_no_holdout_is_asked_for(
     configuration a caller uses when the evaluation lives outside the run.
     """
     (tmp_path / "only.txt").write_text("content\n", encoding="utf-8")
-    cfg = DatasetConfig(corpus_path=str(tmp_path), holdout_fraction=0.0, test_split_ratio=0.0)
+    cfg = DatasetConfig(
+        corpus_path=str(tmp_path), corpus_format="lines", holdout_fraction=0.0, test_split_ratio=0.0
+    )
 
     split = split_corpus(cfg)
 

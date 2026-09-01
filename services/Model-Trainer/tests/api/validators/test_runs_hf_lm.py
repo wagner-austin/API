@@ -22,6 +22,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "hub_model_id": "nghuyong/ernie-2.0-base-en",
             "user_id": 0,
         }
@@ -40,6 +41,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "hub_model_id": "bert-base",
             "tokenizer_id": None,
             "user_id": 0,
@@ -57,6 +59,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "hub_model_id": "bert-base",
             "tokenizer_id": "",
             "user_id": 0,
@@ -74,6 +77,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "hub_model_id": "bert-base",
             "tokenizer_id": "custom-tok",
             "user_id": 0,
@@ -91,6 +95,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "hub_model_id": "bert-base",
             "tokenizer_id": 123,
             "user_id": 0,
@@ -111,6 +116,7 @@ class TestHfLmModelFamily:
             "batch_size": 4,
             "learning_rate": 1e-4,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "user_id": 0,
         }
         with pytest.raises(AppError) as exc:
@@ -129,6 +135,7 @@ class TestHfLmModelFamily:
             "batch_size": 1,
             "learning_rate": 1e-3,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "user_id": 0,
         }
         with pytest.raises(AppError) as exc:
@@ -147,6 +154,7 @@ class TestHfLmModelFamily:
             "batch_size": 1,
             "learning_rate": 1e-3,
             "corpus_file_id": "cid",
+            "corpus_format": "lines",
             "tokenizer_id": "",
             "user_id": 0,
         }
@@ -167,6 +175,7 @@ def test_decode_train_request_accepts_llama_family() -> None:
         "batch_size": 2,
         "learning_rate": 1e-4,
         "corpus_file_id": "cid",
+        "corpus_format": "lines",
         "tokenizer_id": "tok",
         "user_id": 0,
     }

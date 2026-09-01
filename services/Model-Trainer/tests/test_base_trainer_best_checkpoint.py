@@ -16,9 +16,11 @@ recording that they describe different models.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import torch
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     EarlyStoppingState,
@@ -29,6 +31,7 @@ from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.infra.paths import model_dir
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.backend_factory import create_char_lstm_backend
+from model_trainer.core.services.model.backends.char_lstm.model import CharLSTMModel
 from model_trainer.core.services.tokenizer.char_backend import CharBackend
 from model_trainer.core.services.training import base_trainer as bt
 from model_trainer.core.types import LMModelProto
@@ -60,11 +63,17 @@ class _DiskBackedLM(_LM):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         torch.save(self._w, Path(out_dir) / _WEIGHT_FILE)
 
-    @classmethod
-    def from_pretrained(cls: type[_DiskBackedLM], path: str) -> LMModelProto:
-        loaded = cls()
-        loaded._w = torch.load(Path(path) / _WEIGHT_FILE, weights_only=True)
-        return loaded
+    def read_back(self: _DiskBackedLM, path: str) -> None:
+        """Load this fake's weight file into itself, in place.
+
+        Named ``read_back`` rather than ``from_pretrained`` deliberately.
+        The old name made the fake advertise a one-argument classmethod
+        loader, which is the signature ``PeftModel`` does NOT have, and a
+        fake carrying that shape is what let the real defect through: the
+        line under test was covered while the behaviour was broken for
+        every PEFT model. See ``services/training/reload.py``.
+        """
+        self._w = torch.load(Path(path) / _WEIGHT_FILE, weights_only=True)
 
     def state_dict(self: _DiskBackedLM) -> dict[str, torch.Tensor]:
         return {"w": self._w}
@@ -75,6 +84,28 @@ class _DiskBackedLM(_LM):
 
     def weight(self: _DiskBackedLM) -> float:
         return float(self._w.item())
+
+
+def _install_disk_reader(model: _DiskBackedLM) -> None:
+    """Point the reload hook at this fake's own reader.
+
+    ``_restore_best_checkpoint`` delegates the read to the hook, so a test
+    of its contract supplies the reader. What is under test here is that the
+    trainer reads from DISK and replaces the live weights; which reader a
+    real artifact needs is covered in ``test_reload_shipped_weights.py``.
+
+    Args:
+        model: The fake whose file should be read back.
+    """
+
+    def _reader(
+        prepared: PreparedLMModel,
+        model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
+        path: str,
+    ) -> None:
+        model.read_back(path)
+
+    _test_hooks.reload_shipped_weights = _reader
 
 
 def _trainer_for(model: _DiskBackedLM) -> bt.BaseTrainer:
@@ -117,6 +148,7 @@ def test_restore_loads_the_shipped_weights_over_the_live_ones(tmp_path: Path) ->
     if model.weight() != 2.0:
         raise AssertionError("fixture failed to advance the live weights")
 
+    _install_disk_reader(model)
     trainer = _trainer_for(model)
     trainer._best_checkpoint_path = best_dir
     trainer._restore_best_checkpoint()
@@ -132,6 +164,7 @@ def test_restore_without_a_holdout_leaves_the_live_model_untouched(
     # A stale directory exists but was never registered as the best path.
     _DiskBackedLM(1.0).save_pretrained(str(tmp_path / "unused"))
 
+    _install_disk_reader(model)
     trainer = _trainer_for(model)
     trainer._best_checkpoint_path = None
     trainer._restore_best_checkpoint()
@@ -190,6 +223,7 @@ def test_a_holdout_run_ships_the_weights_it_scored(
         "max_seq_len": 16,
         "learning_rate": 5e-3,
         "corpus_path": corpus_path,
+        "corpus_format": "lines",
         "tokenizer_id": tokenizer_id,
         "holdout_fraction": 0.2,
         "test_split_ratio": 0.2,
@@ -261,10 +295,17 @@ def test_a_holdout_run_ships_the_weights_it_scored(
             "cannot distinguish a restored model from an unrestored one"
         )
 
-    shipped = prepared.model.from_pretrained(
+    # Read the artifact back with the class that actually owns the format.
+    # `prepared.model.from_pretrained` used to work here by accident: the
+    # model protocol advertised a one-argument classmethod loader that a
+    # PeftModel does not have, which is the defect this run's restore path
+    # now avoids. A char-LSTM run ships a char-LSTM artifact, so the reader
+    # is named rather than reached through the instance.
+    reloaded: LMModelProto = CharLSTMModel.from_pretrained(
         str(model_dir(settings_with_paths, "best-ckpt-e2e"))
-    ).state_dict()
-    scored = prepared.model.state_dict()
+    )
+    shipped: dict[str, torch.Tensor] = reloaded.state_dict()
+    scored: dict[str, torch.Tensor] = prepared.model.state_dict()
 
     assert sorted(shipped.keys()) == sorted(scored.keys())
     for name in sorted(shipped.keys()):

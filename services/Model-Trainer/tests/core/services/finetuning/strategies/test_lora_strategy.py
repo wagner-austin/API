@@ -42,6 +42,7 @@ def make_test_config(lora: LoraConfig | None = None) -> ModelTrainConfig:
         "learning_rate": 0.001,
         "tokenizer_id": "test-tok",
         "corpus_path": "/tmp/corpus",
+        "corpus_format": "lines",
         "holdout_fraction": 0.1,
         "seed": 42,
         "pretrained_run_id": None,

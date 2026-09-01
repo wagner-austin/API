@@ -301,6 +301,7 @@ class _TrainerCore:
         """
         ds_cfg = DatasetConfig(
             corpus_path=self._cfg["corpus_path"],
+            corpus_format=self._cfg["corpus_format"],
             holdout_fraction=self._cfg["holdout_fraction"],
             test_split_ratio=self._cfg["test_split_ratio"],
         )

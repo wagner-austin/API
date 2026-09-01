@@ -113,6 +113,13 @@ class TrainingManifest(TypedDict):
     learning_rate: float
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
+    # The format corpus_path was READ under. Recorded for the same reason the
+    # determinism posture is: it partitions results rather than improving
+    # them. The same path read as lines and as documents yields different
+    # training units, so a manifest that omits it cannot say what its numbers
+    # were produced from, and an evaluation reading it back would pick a
+    # format by default rather than by record.
+    corpus_format: str
     holdout_fraction: float
     optimizer: str
     freeze_embed: bool
@@ -178,6 +185,13 @@ class TrainingManifestConfig(TypedDict):
     learning_rate: float
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
+    # The format corpus_path was READ under. Recorded for the same reason the
+    # determinism posture is: it partitions results rather than improving
+    # them. The same path read as lines and as documents yields different
+    # training units, so a manifest that omits it cannot say what its numbers
+    # were produced from, and an evaluation reading it back would pick a
+    # format by default rather than by record.
+    corpus_format: str
     holdout_fraction: float
     seed: int
     pretrained_run_id: str | None
@@ -210,6 +224,13 @@ class TrainingManifestFull(TypedDict):
     learning_rate: float
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
+    # The format corpus_path was READ under. Recorded for the same reason the
+    # determinism posture is: it partitions results rather than improving
+    # them. The same path read as lines and as documents yields different
+    # training units, so a manifest that omits it cannot say what its numbers
+    # were produced from, and an evaluation reading it back would pick a
+    # format by default rather than by record.
+    corpus_format: str
     holdout_fraction: float
     optimizer: str
     freeze_embed: bool

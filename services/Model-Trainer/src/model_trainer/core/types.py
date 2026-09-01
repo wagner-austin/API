@@ -105,12 +105,20 @@ class LMModelProto(Protocol):
 
     Defines the interface for HuggingFace-compatible language models
     used throughout the training pipeline.
-    """
 
-    @classmethod
-    def from_pretrained(cls: type[LMModelProto], path: str) -> LMModelProto:
-        """Load model from pretrained weights."""
-        ...
+    ``from_pretrained`` IS NOT DECLARED HERE, AND ITS ABSENCE IS THE POINT.
+    A ``PeftModel`` does not satisfy the one-argument form: its
+    ``from_pretrained`` is ``(cls, model, model_id, ...)``, two required
+    parameters, because an adapter is a delta and the base model it applies
+    to has to be supplied again. Declaring the one-argument form here made
+    every PEFT model structurally claim a classmethod it does not have, and
+    the claim was believed at exactly one call site -- the best-checkpoint
+    restore -- which crashed at runtime after a whole training run had been
+    spent. Loading a class from a path is a property of the CLASS, not of a
+    model instance, so it belongs on a loader protocol beside the concrete
+    class that actually offers it. See ``_HFModelClassProto`` for the
+    HuggingFace form and ``_GPT2Loader`` for the GPT-2 one.
+    """
 
     def train(self: LMModelProto) -> None:
         """Set model to training mode."""

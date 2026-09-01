@@ -1,0 +1,352 @@
+"""The three artifact readers behind ``reload_shipped_weights``.
+
+This file exists because the defect it covers was invisible to a suite at
+100% line coverage. ``_restore_best_checkpoint`` called
+``model.from_pretrained(path)``, the only test of it used a fake declaring
+``from_pretrained(cls, path)``, and that is exactly the signature a real
+``PeftModel`` does NOT have. The line was covered; every PEFT run crashed on
+it after training had finished.
+
+A fake that matched the contract we wrote instead of the API we call is what
+let that through, so nothing here is faked. Every test builds a real model,
+saves a real artifact, and reads it back through the real reader.
+"""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from typing import Literal, Protocol
+
+import pytest
+import torch
+from platform_core.errors import AppError, ModelTrainerErrorCode
+
+from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.encoding import Encoder, ListEncoded
+from model_trainer.core.services.finetuning.strategies._test_hooks import (
+    _default_reload_adapter_weights,
+)
+from model_trainer.core.services.model.backends.char_lstm.model import (
+    CharLSTM,
+    CharLSTMModel,
+)
+from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
+    _default_load_hf_model,
+)
+from model_trainer.core.services.training.reload import reload_shipped_weights
+from model_trainer.core.types import LMModelProto
+
+_TINY_GPT2 = "sshleifer/tiny-gpt2"
+
+
+class _Tok:
+    """Character encoder, enough to satisfy the prepared model's field."""
+
+    def encode(self: _Tok, text: str) -> ListEncoded:
+        """Encode one id per character.
+
+        Args:
+            text: Text to encode.
+
+        Returns:
+            The encoded ids.
+        """
+        return ListEncoded([ord(c) for c in text])
+
+    def token_to_id(self: _Tok, token: str) -> int | None:
+        """Map a one-character token to its ordinal.
+
+        Args:
+            token: Token to look up.
+
+        Returns:
+            The ordinal, or None when the token is not one character.
+        """
+        return ord(token) if len(token) == 1 else None
+
+    def get_vocab_size(self: _Tok) -> int:
+        """Report the vocabulary size.
+
+        Returns:
+            The number of representable code points.
+        """
+        return 0x110000
+
+    def decode(self: _Tok, ids: list[int]) -> str:
+        """Decode ids back to text.
+
+        Args:
+            ids: Ids to decode.
+
+        Returns:
+            The decoded string.
+        """
+        return "".join(chr(i) for i in ids)
+
+
+def _prepared(model: LMModelProto, *, is_peft: bool) -> PreparedLMModel:
+    """Wrap a real model as a PreparedLMModel.
+
+    Args:
+        model: The live model.
+        is_peft: Whether the artifact is an adapter.
+
+    Returns:
+        The prepared model.
+    """
+    encoder: Encoder = _Tok()
+    return PreparedLMModel(
+        model=model,
+        tokenizer_id=None,
+        eos_id=0,
+        pad_id=0,
+        max_seq_len=8,
+        tok_for_dataset=encoder,
+        is_peft=is_peft,
+    )
+
+
+def _scatter(model: LMModelProto) -> None:
+    """Overwrite every parameter so a reload has something to undo.
+
+    Args:
+        model: The model to disturb, in place.
+    """
+    state = model.state_dict()
+    disturbed = {name: torch.full_like(tensor, 0.5) for name, tensor in state.items()}
+    _ = model.load_state_dict(disturbed)
+
+
+def _first_tensor(model: LMModelProto) -> torch.Tensor:
+    """Return one named tensor, for comparing before and after a reload.
+
+    Args:
+        model: The model to read.
+
+    Returns:
+        The tensor under the first key in sorted order.
+    """
+    state = model.state_dict()
+    return state[sorted(state.keys())[0]]
+
+
+def _first_adapter_tensor(model: LMModelProto) -> torch.Tensor:
+    """Return one LoRA tensor from a wrapped model.
+
+    A ``PeftModel``'s state dict spans the frozen base as well as the
+    adapter, but the saved artifact holds only the adapter. So the base
+    weights are legitimately NOT restored by an adapter reload, and asserting
+    over them would be asserting the wrong contract.
+
+    Args:
+        model: The wrapped model to read.
+
+    Returns:
+        The tensor under the first LoRA key in sorted order.
+    """
+    state = model.state_dict()
+    lora_keys = sorted(name for name in state if "lora_" in name)
+    assert lora_keys, "the wrapped model carries no LoRA parameters"
+    return state[lora_keys[0]]
+
+
+class _LoraConfigProto(Protocol):
+    """Protocol for a constructed peft LoraConfig."""
+
+    r: int
+
+
+class _LoraConfigClassProto(Protocol):
+    """Protocol for the peft.LoraConfig class."""
+
+    def __call__(
+        self,
+        *,
+        r: int,
+        lora_alpha: int,
+        lora_dropout: float,
+        target_modules: list[str],
+        bias: str,
+    ) -> _LoraConfigProto:
+        """Build a LoRA configuration.
+
+        Args:
+            r: Adapter rank.
+            lora_alpha: Scaling factor.
+            lora_dropout: Dropout probability.
+            target_modules: Module names to wrap.
+            bias: Bias handling mode.
+
+        Returns:
+            The configuration.
+        """
+        ...
+
+
+class _GetPeftModelProto(Protocol):
+    """Protocol for peft.get_peft_model."""
+
+    def __call__(self, model: LMModelProto, config: _LoraConfigProto) -> LMModelProto:
+        """Wrap a base model with adapters.
+
+        Args:
+            model: Base model to wrap.
+            config: Adapter configuration.
+
+        Returns:
+            The wrapped model.
+        """
+        ...
+
+
+class _SafetensorsProto(Protocol):
+    """Protocol for the safetensors.torch functions used here."""
+
+    def load_file(self, filename: str) -> dict[str, torch.Tensor]:
+        """Read a safetensors file.
+
+        Args:
+            filename: File to read.
+
+        Returns:
+            The tensors it holds.
+        """
+        ...
+
+    def save_file(self, tensors: dict[str, torch.Tensor], filename: str) -> None:
+        """Write a safetensors file.
+
+        Args:
+            tensors: Tensors to write.
+            filename: Destination file.
+        """
+        ...
+
+
+def _real_peft_model() -> LMModelProto:
+    """Build a real LoRA-wrapped tiny GPT-2.
+
+    Returns:
+        A live PeftModel, the object whose reload contract is under test.
+    """
+    base = _default_load_hf_model(_TINY_GPT2, None)
+    peft = __import__("peft", fromlist=["LoraConfig", "get_peft_model"])
+    config_cls: _LoraConfigClassProto = peft.LoraConfig
+    get_peft_model: _GetPeftModelProto = peft.get_peft_model
+    config = config_cls(r=4, lora_alpha=8, lora_dropout=0.0, target_modules=["c_attn"], bias="none")
+    return get_peft_model(base, config)
+
+
+class TestAPeftAdapterReloadsInPlace:
+    """The arm that used to crash, against a real PeftModel."""
+
+    def test_a_real_adapter_round_trips(self, tmp_path: Path) -> None:
+        """Save a real adapter, disturb the live weights, read it back.
+
+        This is the test the original suite did not have. Against a real
+        ``PeftModel`` the old one-argument reconstruction raises
+        ``TypeError: missing 1 required positional argument: 'model_id'``.
+        """
+        model = _real_peft_model()
+        saved = tmp_path / "adapter"
+        model.save_pretrained(str(saved))
+        before = _first_adapter_tensor(model).clone()
+
+        _scatter(model)
+        assert not torch.equal(_first_adapter_tensor(model), before)
+
+        reload_shipped_weights(_prepared(model, is_peft=True), "hf_lm", str(saved))
+
+        assert torch.equal(_first_adapter_tensor(model), before)
+
+    def test_the_live_object_survives_the_reload(self, tmp_path: Path) -> None:
+        """Object identity is what keeps the optimizer valid."""
+        model = _real_peft_model()
+        saved = tmp_path / "adapter"
+        model.save_pretrained(str(saved))
+        prepared = _prepared(model, is_peft=True)
+
+        reload_shipped_weights(prepared, "hf_lm", str(saved))
+
+        assert prepared.model is model
+
+    def test_an_adapter_from_another_model_is_refused(self, tmp_path: Path) -> None:
+        """A foreign adapter carries keys this model has no slot for.
+
+        Loading it silently would score parameters that were never trained
+        here, so the reader raises instead.
+        """
+        model = _real_peft_model()
+        saved = tmp_path / "adapter"
+        model.save_pretrained(str(saved))
+
+        # The tampered copy goes in its own directory. safetensors memory-maps
+        # the file it reads, and Windows refuses to rewrite a mapped file
+        # ("a file with a user-mapped section open", os error 1224).
+        foreign = tmp_path / "foreign"
+        shutil.copytree(saved, foreign)
+        safetensors: _SafetensorsProto = __import__(
+            "safetensors.torch", fromlist=["load_file", "save_file"]
+        )
+        tensors = safetensors.load_file(str(saved / "adapter_model.safetensors"))
+        tensors["base_model.model.transformer.h.0.attn.c_attn.lora_A.stranger.weight"] = (
+            torch.zeros(1)
+        )
+        safetensors.save_file(tensors, str(foreign / "adapter_model.safetensors"))
+
+        with pytest.raises(AppError) as raised:
+            _default_reload_adapter_weights(model, str(foreign))
+
+        error: AppError[ModelTrainerErrorCode] = raised.value
+        assert error.code is ModelTrainerErrorCode.ADAPTER_RELOAD_MISMATCH
+        assert "stranger" in error.message
+
+
+class TestAFullModelReloadsThroughItsOwnClass:
+    """The two non-adapter formats, each read by the class that owns it."""
+
+    @pytest.mark.parametrize("family", ["gpt2", "llama", "qwen", "hf_lm"])
+    def test_a_huggingface_artifact_round_trips(
+        self,
+        family: Literal["gpt2", "llama", "qwen", "hf_lm"],
+        tmp_path: Path,
+    ) -> None:
+        """All four HuggingFace families share one format and one reader."""
+        model = _default_load_hf_model(_TINY_GPT2, None)
+        saved = tmp_path / f"model-{family}"
+        model.save_pretrained(str(saved))
+        before = _first_tensor(model).clone()
+
+        _scatter(model)
+        assert not torch.equal(_first_tensor(model), before)
+
+        reload_shipped_weights(_prepared(model, is_peft=False), family, str(saved))
+
+        assert torch.equal(_first_tensor(model), before)
+
+    def test_a_char_lstm_artifact_round_trips(self, tmp_path: Path) -> None:
+        """A char-LSTM directory carries no config.json for the Auto class.
+
+        Reading it with ``AutoModelForCausalLM`` fails with "Unrecognized
+        model", which is what a single HuggingFace-only reader produced.
+        """
+        inner = CharLSTM(
+            vocab_size=10,
+            embed_dim=8,
+            hidden_dim=16,
+            num_layers=1,
+            dropout=0.0,
+            max_seq_len=8,
+        )
+        model = CharLSTMModel(inner)
+        saved = tmp_path / "char-lstm"
+        model.save_pretrained(str(saved))
+        before = _first_tensor(model).clone()
+
+        _scatter(model)
+        assert not torch.equal(_first_tensor(model), before)
+
+        reload_shipped_weights(_prepared(model, is_peft=False), "char_lstm", str(saved))
+
+        assert torch.equal(_first_tensor(model), before)

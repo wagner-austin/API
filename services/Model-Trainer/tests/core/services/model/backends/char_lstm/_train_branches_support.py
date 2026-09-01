@@ -132,6 +132,7 @@ def _make_cfg() -> ModelTrainConfig:
         "learning_rate": 1e-3,
         "tokenizer_id": "tok",
         "corpus_path": "",
+        "corpus_format": "lines",
         "holdout_fraction": 0.01,
         "seed": 42,
         "pretrained_run_id": None,

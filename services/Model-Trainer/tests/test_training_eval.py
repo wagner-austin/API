@@ -78,6 +78,7 @@ class _Manifest(TypedDict):
     loss: float
     tokenizer_id: str
     corpus_path: str
+    corpus_format: str
     optimizer: str
     seed: int
     versions: dict[str, str]
@@ -125,6 +126,7 @@ def test_training_and_eval_tiny(
         "learning_rate": 5e-4,
         "tokenizer_id": tok_id,
         "corpus_path": str(corpus),
+        "corpus_format": "lines",
         "holdout_fraction": 0.1,
         "seed": 42,
         "pretrained_run_id": None,
@@ -227,6 +229,7 @@ def test_training_and_eval_tiny(
     batch_size_v = obj_raw.get("batch_size", 0)
     max_seq_len_v = obj_raw.get("max_seq_len", 0)
     tokenizer_id_v = obj_raw.get("tokenizer_id", "")
+    corpus_format_v = obj_raw.get("corpus_format", "")
     optimizer_v = obj_raw.get("optimizer", "")
     seed_v = obj_raw.get("seed", 0)
 
@@ -239,6 +242,7 @@ def test_training_and_eval_tiny(
         "loss": float(loss),
         "tokenizer_id": str(tokenizer_id_v) if isinstance(tokenizer_id_v, str) else "",
         "corpus_path": corpus_path,
+        "corpus_format": str(corpus_format_v) if isinstance(corpus_format_v, str) else "",
         "optimizer": str(optimizer_v) if isinstance(optimizer_v, str) else "",
         "seed": seed_v if isinstance(seed_v, int) else 0,
         "versions": versions_typed,
@@ -246,6 +250,9 @@ def test_training_and_eval_tiny(
         "git_commit": git_commit if isinstance(git_commit, str) else None,
     }
     assert m["tokenizer_id"] == tok_id
+    # The run trained a .txt corpus, so the manifest must SAY so rather
+    # than leaving the format to be guessed from the path on read-back.
+    assert m["corpus_format"] == "lines"
 
     # Eval metrics
     eval_res = evaluate_gpt2(run_id="run-test", cfg=cfg, settings=settings, dataset_builder=builder)
@@ -299,6 +306,7 @@ def test_cancel_during_eval_returns_partial_results(
         "learning_rate": 5e-4,
         "tokenizer_id": tok_id,
         "corpus_path": str(corpus),
+        "corpus_format": "lines",
         "holdout_fraction": 0.2,  # 20% for validation
         "seed": 42,
         "pretrained_run_id": None,

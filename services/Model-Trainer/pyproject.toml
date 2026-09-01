@@ -33,6 +33,9 @@ httpx = "^0.28"
 sentencepiece = "^0.2.1"
 torch = {version = "^2.5", source = "pytorch-cu124"}
 peft = "^0.14.0"
+# Required by the qlora strategy, not optional to it: without this the
+# 4-bit quantizer refuses to load and a qlora run cannot start.
+bitsandbytes = "^0.45.0"
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 platform-ml = { path = "../../libs/platform_ml", develop = true, extras = ["wandb"] }

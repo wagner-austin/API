@@ -116,6 +116,7 @@ def _create_eval_manifest(run_id: str) -> _ManifestDict:
         "learning_rate": 0.001,
         "tokenizer_id": "tok",
         "corpus_path": "/orig/path",
+        "corpus_format": "lines",
         "holdout_fraction": 0.05,
         "optimizer": "adamw",
         "freeze_embed": False,

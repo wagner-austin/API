@@ -82,6 +82,7 @@ def _reset_test_hooks_impl(
     orig_pkg_version = _test_hooks.pkg_version
     orig_model_dir = _test_hooks.model_dir
     orig_split_corpus = _test_hooks.split_corpus
+    orig_reload_shipped = _test_hooks.reload_shipped_weights
     orig_time_wall_clock = _test_hooks.time_wall_clock
     orig_freeze_embeddings = _test_hooks.freeze_embeddings
     orig_shutil_which = _test_hooks.shutil_which
@@ -156,6 +157,7 @@ def _reset_test_hooks_impl(
     _test_hooks.pkg_version = orig_pkg_version
     _test_hooks.model_dir = orig_model_dir
     _test_hooks.split_corpus = orig_split_corpus
+    _test_hooks.reload_shipped_weights = orig_reload_shipped
     _test_hooks.time_wall_clock = orig_time_wall_clock
     _test_hooks.freeze_embeddings = orig_freeze_embeddings
     _test_hooks.shutil_which = orig_shutil_which

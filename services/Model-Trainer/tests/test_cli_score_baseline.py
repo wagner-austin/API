@@ -23,7 +23,7 @@ from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import score_baseline
 from model_trainer.core import _test_hooks as core_hooks
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem, ClozeItemOutcome
-from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
 from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.types import LMModelProto
@@ -458,8 +458,11 @@ class TestTheProductionHooks:
     def test_the_hub_loader_asks_the_hub_for_the_model_it_was_given(self) -> None:
         loaded: list[str] = []
 
-        def _load_model(model_id_or_path: str) -> LMModelProto:
+        def _load_model(
+            model_id_or_path: str, quantization: QuantizationConfig | None
+        ) -> LMModelProto:
             loaded.append(model_id_or_path)
+            assert quantization is None
             return FakeHFModel(model_id_or_path)
 
         def _load_tokenizer(model_id_or_path: str) -> FakeHFTokenizer:

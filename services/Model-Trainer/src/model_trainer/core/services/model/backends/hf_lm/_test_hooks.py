@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Final
 
+import torch
 from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
@@ -16,10 +18,12 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
+    QuantizationConfig,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import (
+    BitsAndBytesConfigProto,
     CausalLMDatasetProto,
     CreateCausalDatasetFn,
     CreateDataLoaderFn,
@@ -35,25 +39,111 @@ from model_trainer.core.services.model.backends.hf_lm._hook_protocols import (
     ReadTextFileFn,
     TokenizerLoader,
     TrainerProto,
+    _BitsAndBytesConfigClassProto,
     _DataLoaderClassProto,
+    _HFModelClassProto,
     _HFTokenizerClassProto,
 )
 from model_trainer.core.types import LMModelProto
 
+#: Compute dtypes a quantization config may name, resolved to torch dtypes
+#: here rather than by ``getattr(torch, name)`` so the accepted set is the
+#: Literal on :class:`QuantizationConfig` and not the whole torch namespace.
+_COMPUTE_DTYPES: Final[dict[str, torch.dtype]] = {
+    "float16": torch.float16,
+    "bfloat16": torch.bfloat16,
+    "float32": torch.float32,
+}
 
-def _default_load_hf_model(model_id_or_path: str) -> LMModelProto:
+
+def _compute_dtype(quantization: QuantizationConfig) -> torch.dtype:
+    """Resolve a config's compute dtype name to the torch dtype.
+
+    Args:
+        quantization: The quantization configuration.
+
+    Returns:
+        The torch dtype the 4-bit storage is dequantized to.
+    """
+    return _COMPUTE_DTYPES[quantization["bnb_4bit_compute_dtype"]]
+
+
+def _bits_and_bytes_config(quantization: QuantizationConfig) -> BitsAndBytesConfigProto:
+    """Build the transformers quantization config this run asked for.
+
+    Every field is passed. ``bnb_4bit_quant_type`` and
+    ``bnb_4bit_compute_dtype`` carry upstream defaults that are not the
+    QLoRA paper's arm, so leaving either unset would quietly change what the
+    run measures.
+
+    Args:
+        quantization: The quantization configuration to translate.
+
+    Returns:
+        The constructed BitsAndBytesConfig.
+    """
+    transformers = __import__("transformers", fromlist=["BitsAndBytesConfig"])
+    config_cls: _BitsAndBytesConfigClassProto = transformers.BitsAndBytesConfig
+    return config_cls(
+        load_in_4bit=quantization["load_in_4bit"],
+        load_in_8bit=quantization["load_in_8bit"],
+        bnb_4bit_compute_dtype=_compute_dtype(quantization),
+        bnb_4bit_quant_type=quantization["bnb_4bit_quant_type"],
+        bnb_4bit_use_double_quant=quantization["bnb_4bit_use_double_quant"],
+    )
+
+
+def load_arguments(
+    quantization: QuantizationConfig | None,
+) -> tuple[BitsAndBytesConfigProto | None, torch.dtype]:
+    """Decide the two loading arguments a quantization choice implies.
+
+    Separated from the load itself so the decision is testable without a
+    CUDA device: building a 4-bit model requires one, and asserting what
+    would be REQUESTED does not.
+
+    Args:
+        quantization: The quantization to apply, or None for unquantized.
+
+    Returns:
+        A tuple of (quantization config or None, dtype for the layers
+        quantization does not replace).
+    """
+    if quantization is None:
+        return None, torch.float32
+    return _bits_and_bytes_config(quantization), _compute_dtype(quantization)
+
+
+def _default_load_hf_model(
+    model_id_or_path: str, quantization: QuantizationConfig | None
+) -> LMModelProto:
     """Production implementation for loading HuggingFace models.
+
+    When a quantization config is given, the model's linear layers are
+    replaced during loading, which is the only point at which that can
+    happen: the QLoRA strategy adapts an ALREADY-quantized model and does
+    not quantize one itself.
+
+    ``torch_dtype`` is passed in both cases rather than left to default. The
+    4-bit quantizer overrides a None with ``torch.float16`` and reports it
+    only through a log line, so accepting the default means the dtype of
+    every layer quantization did not replace is decided somewhere the run
+    never records.
 
     Args:
         model_id_or_path: HuggingFace model ID or local path.
+        quantization: Quantization to apply while loading, or None to load
+            the weights at their stored precision.
 
     Returns:
         Loaded language model instance.
     """
+    config, dtype = load_arguments(quantization)
     transformers = __import__("transformers", fromlist=["AutoModelForCausalLM"])
-    model_cls: type[LMModelProto] = transformers.AutoModelForCausalLM
-    model: LMModelProto = model_cls.from_pretrained(model_id_or_path)
-    return model
+    model_cls: _HFModelClassProto = transformers.AutoModelForCausalLM
+    return model_cls.from_pretrained(
+        model_id_or_path, quantization_config=config, torch_dtype=dtype
+    )
 
 
 def _default_load_hf_tokenizer(model_id_or_path: str) -> HFTokenizerProto:

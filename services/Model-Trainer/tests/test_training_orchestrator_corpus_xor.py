@@ -35,6 +35,7 @@ def test_train_request_extra_corpus_path_forbidden() -> None:
             "batch_size": 1,
             "learning_rate": 1e-3,
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "corpus_path": "/path.txt",
             "tokenizer_id": "tok",
             "user_id": 0,

@@ -120,14 +120,24 @@ class QLoRAStrategy:
             ValueError: If required configs are missing.
         """
         lora_cfg = _require_lora_config(cfg)
-        # Validate quantization config exists (model should already be quantized)
+        # The model arrives already quantized: the loader builds a
+        # BitsAndBytesConfig from this same field and passes it to
+        # from_pretrained, which is the only point at which linear layers can
+        # be replaced. Re-reading it here is what makes that a checked
+        # precondition rather than an assumption.
         _require_quantization_config(cfg)
 
+        # Ready the quantized model BEFORE adapters are attached. This freezes
+        # every parameter it finds and upcasts the non-4-bit half-precision
+        # ones to fp32; running it after create_peft_model would freeze the
+        # adapter too and leave the run with nothing trainable.
+        prepared_base = Hooks.prepare_for_kbit_training(model)
+
         # Enable gradient checkpointing for memory efficiency if available
-        Hooks.enable_gradient_checkpointing(model)
+        Hooks.enable_gradient_checkpointing(prepared_base)
 
         peft_model = Hooks.create_peft_model(
-            model,
+            prepared_base,
             r=lora_cfg["r"],
             lora_alpha=lora_cfg["lora_alpha"],
             lora_dropout=lora_cfg["lora_dropout"],

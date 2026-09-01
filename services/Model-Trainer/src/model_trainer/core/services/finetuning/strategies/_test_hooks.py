@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
+import torch
+from platform_core.errors import (
+    AppError,
+    ModelTrainerErrorCode,
+    model_trainer_status_for,
+)
+
 from model_trainer.core.types import LMModelProto
 
 # ============================================================================
@@ -83,6 +90,79 @@ class _PeftModelClassProto(Protocol):
         ...
 
 
+class _LoadPeftWeightsFn(Protocol):
+    """Protocol for peft.load_peft_weights.
+
+    Signature mirrors peft v0.14.0 ``utils/save_and_load.py`` L 489: one
+    required argument, a path or hub id. It resolves safetensors-versus-bin
+    itself, so callers do not name a filename.
+    """
+
+    def __call__(self, model_id: str) -> dict[str, torch.Tensor]:
+        """Read an adapter's weights off disk.
+
+        Args:
+            model_id: Directory holding the saved adapter.
+
+        Returns:
+            The adapter's state dict.
+        """
+        ...
+
+
+class _LoadStateDictResultProto(Protocol):
+    """Protocol for the incompatible-keys result of a state-dict load.
+
+    ``set_peft_model_state_dict`` returns whatever ``load_state_dict``
+    returned (peft v0.14.0 ``utils/save_and_load.py`` L 451 and L 474), and
+    that load runs with ``strict=False``. Under ``strict=False`` every base
+    weight is reported missing, which is expected for an adapter and says
+    nothing. An UNEXPECTED key is different: it means the file holds a
+    parameter the live model has no slot for, so the adapter does not belong
+    to this model.
+    """
+
+    unexpected_keys: list[str]
+
+
+class _SetPeftModelStateDictFn(Protocol):
+    """Protocol for peft.set_peft_model_state_dict.
+
+    Signature mirrors peft v0.14.0 ``utils/save_and_load.py`` L 329: the
+    model it takes is the already-wrapped PeftModel, not a base model, and
+    the write happens in place.
+    """
+
+    def __call__(
+        self, model: LMModelProto, peft_model_state_dict: dict[str, torch.Tensor]
+    ) -> _LoadStateDictResultProto:
+        """Write adapter weights into a live PEFT model.
+
+        Args:
+            model: The wrapped PEFT model to mutate.
+            peft_model_state_dict: Weights to install.
+
+        Returns:
+            The load result, whose unexpected keys the caller checks.
+        """
+        ...
+
+
+class _PrepareForKbitTrainingFn(Protocol):
+    """Protocol for peft.prepare_model_for_kbit_training."""
+
+    def __call__(self, model: LMModelProto) -> LMModelProto:
+        """Ready a quantized model for adapter training.
+
+        Args:
+            model: The quantized base model.
+
+        Returns:
+            The same model, prepared in place and returned for chaining.
+        """
+        ...
+
+
 class _AutoModelClassProto(Protocol):
     """Protocol for AutoModelForCausalLM class."""
 
@@ -101,6 +181,34 @@ class _AutoModelClassProto(Protocol):
 # ============================================================================
 # Public Protocols for hooks
 # ============================================================================
+
+
+class AdapterWeightsReloader(Protocol):
+    """Protocol for reloading an adapter's weights into a live PEFT model."""
+
+    def __call__(self, model: LMModelProto, adapter_path: str) -> None:
+        """Reload adapter weights in place.
+
+        Args:
+            model: The live PEFT model to write into.
+            adapter_path: Directory holding the saved adapter.
+        """
+        ...
+
+
+class KbitTrainingPreparer(Protocol):
+    """Protocol for readying a quantized model for adapter training."""
+
+    def __call__(self, model: LMModelProto) -> LMModelProto:
+        """Prepare a quantized model.
+
+        Args:
+            model: The quantized base model.
+
+        Returns:
+            The prepared model.
+        """
+        ...
 
 
 class PeftModelCreator(Protocol):
@@ -252,6 +360,59 @@ def _default_load_peft_model(model: LMModelProto, adapter_path: str) -> LMModelP
     return loaded_model
 
 
+def _default_reload_adapter_weights(model: LMModelProto, adapter_path: str) -> None:
+    """Production reload_adapter_weights - used as default hook.
+
+    Reads the saved adapter and writes it into the model already in memory,
+    rather than constructing a new one. ``PeftModel.from_pretrained`` cannot
+    do this job: it takes a base model AND a path, because it builds a
+    wrapper, and here the wrapper already exists and its optimizer, device
+    placement and surrounding references must survive the reload.
+
+    Args:
+        model: The live PEFT model to write into.
+        adapter_path: Directory holding the saved adapter.
+
+    Raises:
+        AppError: ``ADAPTER_RELOAD_MISMATCH`` when the saved adapter carries
+            parameters this model has no slot for.
+    """
+    peft = __import__("peft", fromlist=["load_peft_weights", "set_peft_model_state_dict"])
+    load_weights: _LoadPeftWeightsFn = peft.load_peft_weights
+    set_state_dict: _SetPeftModelStateDictFn = peft.set_peft_model_state_dict
+    result = set_state_dict(model, load_weights(adapter_path))
+    if result.unexpected_keys:
+        named = ", ".join(sorted(result.unexpected_keys)[:5])
+        raise AppError(
+            ModelTrainerErrorCode.ADAPTER_RELOAD_MISMATCH,
+            (
+                f"the adapter at {adapter_path} carries {len(result.unexpected_keys)} "
+                f"parameter(s) this model has no slot for ({named}); it was saved from "
+                f"a different model and loading it would score weights that were never "
+                f"trained here"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.ADAPTER_RELOAD_MISMATCH),
+        )
+
+
+def _default_prepare_for_kbit_training(model: LMModelProto) -> LMModelProto:
+    """Production prepare_for_kbit_training - used as default hook.
+
+    Must run BEFORE adapters are attached. The function freezes every
+    parameter it finds, so running it afterwards would freeze the adapter
+    too and leave the run with nothing trainable.
+
+    Args:
+        model: The quantized base model.
+
+    Returns:
+        The prepared model.
+    """
+    peft = __import__("peft", fromlist=["prepare_model_for_kbit_training"])
+    prepare: _PrepareForKbitTrainingFn = peft.prepare_model_for_kbit_training
+    return prepare(model)
+
+
 def _default_enable_gradient_checkpointing(model: LMModelProto) -> None:
     """Production implementation for enabling gradient checkpointing.
 
@@ -286,6 +447,8 @@ class Hooks:
     create_peft_model: PeftModelCreator = _default_create_peft_model
     save_peft_model: PeftModelSaver = _default_save_peft_model
     load_peft_model: PeftModelLoader = _default_load_peft_model
+    reload_adapter_weights: AdapterWeightsReloader = _default_reload_adapter_weights
+    prepare_for_kbit_training: KbitTrainingPreparer = _default_prepare_for_kbit_training
     enable_gradient_checkpointing: GradientCheckpointEnabler = (
         _default_enable_gradient_checkpointing
     )
@@ -306,6 +469,8 @@ def reset_hooks() -> None:
     Hooks.create_peft_model = _default_create_peft_model
     Hooks.save_peft_model = _default_save_peft_model
     Hooks.load_peft_model = _default_load_peft_model
+    Hooks.reload_adapter_weights = _default_reload_adapter_weights
+    Hooks.prepare_for_kbit_training = _default_prepare_for_kbit_training
     Hooks.enable_gradient_checkpointing = _default_enable_gradient_checkpointing
     Hooks.load_full_model = _default_load_full_model
 

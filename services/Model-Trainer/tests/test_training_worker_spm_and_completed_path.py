@@ -397,6 +397,7 @@ def test_training_worker_spm_artifact_and_completed(
             "learning_rate": 5e-4,
             "tokenizer_id": tok_id,
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.01,
             "seed": 42,
             "pretrained_run_id": None,

@@ -10,6 +10,7 @@ import pytest
 from platform_core.determinism_record import UNPINNED_STACK, determinism_record
 
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.model import QuantizationConfig
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     HFModelLoader,
     HFTokenizerLoader,
@@ -44,7 +45,9 @@ class _SettingsFactory(Protocol):
 class _FakeModelLoader:
     """Fake model loader that implements HFModelLoader protocol."""
 
-    def __call__(self, model_id_or_path: str) -> LMModelProto:
+    def __call__(
+        self, model_id_or_path: str, quantization: QuantizationConfig | None
+    ) -> LMModelProto:
         return FakeHFModel(model_id_or_path)
 
 
@@ -104,7 +107,9 @@ class _CapturingModelLoader:
     def __init__(self) -> None:
         self.captured: list[str] = []
 
-    def __call__(self, model_id_or_path: str) -> LMModelProto:
+    def __call__(
+        self, model_id_or_path: str, quantization: QuantizationConfig | None
+    ) -> LMModelProto:
         self.captured.append(model_id_or_path)
         return FakeHFModel(model_id_or_path)
 
@@ -131,7 +136,7 @@ class TestHooksCallable:
         hook: HFModelLoader | None = Hooks.load_hf_model
         assert hook is fake_loader
 
-        result = fake_loader("test/model-id")
+        result = fake_loader("test/model-id", None)
 
         assert len(fake_loader.captured) == 1
         assert fake_loader.captured[0] == "test/model-id"
@@ -278,7 +283,7 @@ class TestDefaultLoadHfModel:
     def test_loads_tiny_gpt2_model(self) -> None:
         """Test loading a tiny GPT2 model from HuggingFace Hub."""
         # Use tiny-gpt2 which is a minimal model for testing
-        model = _default_load_hf_model("sshleifer/tiny-gpt2")
+        model = _default_load_hf_model("sshleifer/tiny-gpt2", None)
 
         # Verify model has expected callable
         forward_method = model.forward
@@ -355,7 +360,7 @@ class TestDefaultLoadPreparedModel:
 
         # Set the finetuning strategy hook for loading full models
         def full_loader(model_path: str) -> LMModelProto:
-            return _default_load_hf_model(model_path)
+            return _default_load_hf_model(model_path, None)
 
         FtHooks.load_full_model = full_loader
 
@@ -384,7 +389,7 @@ class TestDefaultLoadPreparedModel:
         handle = _default_load_tokenizer(str(tok_dir))
 
         # Load tiny model and create PreparedLMModel
-        model = _default_load_hf_model("sshleifer/tiny-gpt2")
+        model = _default_load_hf_model("sshleifer/tiny-gpt2", None)
         tokenizer = _default_load_hf_tokenizer("sshleifer/tiny-gpt2")
 
         from model_trainer.core.contracts.model import PreparedLMModel
@@ -440,7 +445,7 @@ class TestDefaultCreateTrainer:
         )
 
         # Load tiny model
-        model = _default_load_hf_model("sshleifer/tiny-gpt2")
+        model = _default_load_hf_model("sshleifer/tiny-gpt2", None)
         tokenizer = _default_load_hf_tokenizer("sshleifer/tiny-gpt2")
 
         # Get token IDs - GPT2 tokenizers always have eos_token_id
@@ -469,6 +474,7 @@ class TestDefaultCreateTrainer:
             "learning_rate": 1e-4,
             "tokenizer_id": "test-tok",
             "corpus_path": str(tmp_path / "corpus"),
+            "corpus_format": "lines",
             "holdout_fraction": 0.1,
             "seed": 42,
             "pretrained_run_id": None,

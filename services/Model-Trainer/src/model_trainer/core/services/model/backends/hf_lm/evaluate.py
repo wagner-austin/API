@@ -124,6 +124,7 @@ def evaluate_hf_lm(
     # Build validation dataset
     ds_cfg = DatasetConfig(
         corpus_path=cfg["corpus_path"],
+        corpus_format=cfg["corpus_format"],
         holdout_fraction=cfg["holdout_fraction"],
         test_split_ratio=cfg["test_split_ratio"],
     )

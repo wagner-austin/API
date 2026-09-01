@@ -74,6 +74,7 @@ def test_runs_train_and_status_and_logs(tmp_path: Path, settings_factory: _Setti
         "batch_size": 1,
         "learning_rate": 0.0005,
         "corpus_file_id": "deadbeef",
+        "corpus_format": "lines",
         "tokenizer_id": "tok-abc",
         "user_id": 1,
     }

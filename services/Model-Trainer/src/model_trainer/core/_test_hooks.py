@@ -45,6 +45,7 @@ from model_trainer.core._hook_defaults import (
     _default_random_factory,
     _default_random_getstate,
     _default_random_setstate,
+    _default_reload_shipped_weights,
     _default_rename_path,
     _default_retry_sleep,
     _default_rq_queue,
@@ -121,6 +122,7 @@ from model_trainer.core._hook_protocols_ml import (
     LoadWandbModuleProto,
     ModelDirProto,
     PinTorchThreadsProto,
+    ReloadShippedWeightsProto,
     SampleTokenProto,
     SplitCorpusProto,
     SpmDecodeIdsProto,
@@ -284,6 +286,8 @@ model_dir: ModelDirProto = _default_model_dir
 split_corpus: SplitCorpusProto = _default_split_corpus
 
 freeze_embeddings: FreezeEmbeddingsProto = _default_freeze_embeddings
+
+reload_shipped_weights: ReloadShippedWeightsProto = _default_reload_shipped_weights
 
 shutil_which: ShutilWhichProto = _default_shutil_which
 

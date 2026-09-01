@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import torch
@@ -274,6 +275,19 @@ def _default_split_corpus(cfg: DatasetConfig) -> CorpusSplit:
     )
 
     return _split(cfg)
+
+
+def _default_reload_shipped_weights(
+    prepared: PreparedLMModel,
+    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
+    path: str,
+) -> None:
+    """Production reload_shipped_weights - used as default hook."""
+    from model_trainer.core.services.training.reload import (
+        reload_shipped_weights as _reload,
+    )
+
+    _reload(prepared, model_family, path)
 
 
 def _default_freeze_embeddings(model: LMModelProto) -> None:

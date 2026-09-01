@@ -10,6 +10,7 @@ from platform_core.validators import (
     validate_float_range,
     validate_int_range,
     validate_optional_literal,
+    validate_required_literal,
 )
 
 from ..schemas.runs import (
@@ -300,8 +301,44 @@ def _decode_lora_config(d: dict[str, JSONValue]) -> LoraConfigRequest:
     }
 
 
+def _require_quant_bool(d: dict[str, JSONValue], field: str) -> bool:
+    """Read a required boolean out of a quantization config.
+
+    Args:
+        d: Raw quantization dictionary.
+        field: Field name, without the ``quantization.`` prefix.
+
+    Returns:
+        The boolean value.
+
+    Raises:
+        AppError: If the field is absent or not a boolean.
+    """
+    raw = d.get(field)
+    if raw is None:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message=f"quantization.{field} is required",
+            http_status=400,
+        )
+    if not isinstance(raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message=f"quantization.{field} must be a boolean",
+            http_status=400,
+        )
+    return raw
+
+
 def _decode_quantization_config(d: dict[str, JSONValue]) -> QuantizationConfigRequest:
     """Decode and validate quantization configuration from JSON dict.
+
+    EVERY FIELD IS REQUIRED. This decoder used to default load_in_4bit to
+    True, load_in_8bit to False, bnb_4bit_compute_dtype to "float16" and
+    bnb_4bit_quant_type to "nf4". Those defaults decided what a run measured
+    without the run ever saying so, and the storage and compute data types
+    are precisely what a quantized run's numbers depend on. A caller that
+    omits one now gets a 400 naming it rather than an arm it did not pick.
 
     Args:
         d: Raw dictionary with quantization config fields.
@@ -310,53 +347,33 @@ def _decode_quantization_config(d: dict[str, JSONValue]) -> QuantizationConfigRe
         Validated QuantizationConfigRequest TypedDict.
 
     Raises:
-        AppError: If required fields are missing or invalid.
+        AppError: If any field is missing or invalid.
     """
-    load_in_4bit_raw = d.get("load_in_4bit")
-    if load_in_4bit_raw is None:
-        load_in_4bit = True
-    elif not isinstance(load_in_4bit_raw, bool):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="quantization.load_in_4bit must be a boolean",
-            http_status=400,
-        )
-    else:
-        load_in_4bit = load_in_4bit_raw
+    load_in_4bit = _require_quant_bool(d, "load_in_4bit")
+    load_in_8bit = _require_quant_bool(d, "load_in_8bit")
+    use_double_quant = _require_quant_bool(d, "bnb_4bit_use_double_quant")
 
-    load_in_8bit_raw = d.get("load_in_8bit")
-    if load_in_8bit_raw is None:
-        load_in_8bit = False
-    elif not isinstance(load_in_8bit_raw, bool):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="quantization.load_in_8bit must be a boolean",
-            http_status=400,
-        )
-    else:
-        load_in_8bit = load_in_8bit_raw
-
-    compute_dtype_raw = validate_optional_literal(
-        d.get("bnb_4bit_compute_dtype"),
-        "quantization.bnb_4bit_compute_dtype",
-        _QUANT_COMPUTE_DTYPES,
-    )
     compute_dtype = _narrow_quant_compute_dtype(
-        compute_dtype_raw if compute_dtype_raw is not None else "float16"
+        validate_required_literal(
+            d.get("bnb_4bit_compute_dtype"),
+            "quantization.bnb_4bit_compute_dtype",
+            _QUANT_COMPUTE_DTYPES,
+        )
     )
-
-    quant_type_raw = validate_optional_literal(
-        d.get("bnb_4bit_quant_type"),
-        "quantization.bnb_4bit_quant_type",
-        _QUANT_TYPES,
+    quant_type = _narrow_quant_type(
+        validate_required_literal(
+            d.get("bnb_4bit_quant_type"),
+            "quantization.bnb_4bit_quant_type",
+            _QUANT_TYPES,
+        )
     )
-    quant_type = _narrow_quant_type(quant_type_raw if quant_type_raw is not None else "nf4")
 
     return {
         "load_in_4bit": load_in_4bit,
         "load_in_8bit": load_in_8bit,
         "bnb_4bit_compute_dtype": compute_dtype,
         "bnb_4bit_quant_type": quant_type,
+        "bnb_4bit_use_double_quant": use_double_quant,
     }
 
 
@@ -466,6 +483,17 @@ def _validate_hf_lm_cross_fields(
         raise AppError(
             code=ErrorCode.INVALID_INPUT,
             message="quantization config is required for finetuning_strategy 'qlora'",
+            http_status=400,
+        )
+    if quantization is not None and finetuning_strategy != "qlora":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message=(
+                f"quantization config requires finetuning_strategy 'qlora', got "
+                f"'{finetuning_strategy}'. The loader applies quantization whenever this "
+                f"config is present, so accepting it under another strategy would train a "
+                f"quantized model while reporting an unquantized one"
+            ),
             http_status=400,
         )
     if gguf_export is not None and finetuning_strategy not in ("lora", "qlora"):

@@ -6,7 +6,7 @@ Runtime protocols: :mod:`model_trainer.core._hook_protocols`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import torch
 from platform_core.determinism_record import DeterminismRecord
@@ -127,6 +127,19 @@ class SplitCorpusProto(Protocol):
 
     def __call__(self, cfg: DatasetConfig) -> CorpusSplit:
         """Partition a corpus into disjoint train/validation/test lines."""
+        ...
+
+
+class ReloadShippedWeightsProto(Protocol):
+    """Protocol for the reload_shipped_weights hook."""
+
+    def __call__(
+        self,
+        prepared: PreparedLMModel,
+        model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
+        path: str,
+    ) -> None:
+        """Load a saved artifact into the live model, in place."""
         ...
 
 

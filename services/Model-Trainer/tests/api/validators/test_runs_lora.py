@@ -19,6 +19,7 @@ def _base_lora_payload() -> dict[str, JSONValue]:
         "batch_size": 4,
         "learning_rate": 1e-4,
         "corpus_file_id": "cid",
+        "corpus_format": "lines",
         "hub_model_id": "bert-base",
         "finetuning_strategy": "lora",
         "user_id": 0,

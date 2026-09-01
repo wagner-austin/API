@@ -27,6 +27,7 @@ class TestTrainRequestPayloadEncoding:
             "batch_size": 4,
             "learning_rate": 5e-5,
             "corpus_file_id": "test-corpus-id",
+            "corpus_format": "lines",
             "tokenizer_id": "tok-123",
             "holdout_fraction": 0.1,
             "seed": 42,
@@ -122,6 +123,7 @@ class TestTrainRequestPayloadEncoding:
             "load_in_8bit": False,
             "bnb_4bit_compute_dtype": "bfloat16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
 
         encoded = encode_train_request_payload(payload)
@@ -133,6 +135,7 @@ class TestTrainRequestPayloadEncoding:
             "load_in_8bit": False,
             "bnb_4bit_compute_dtype": "bfloat16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
 
     def test_decode_all_model_families(self) -> None:
@@ -268,6 +271,7 @@ class TestTrainJobPayloadEncoding:
             "batch_size": 4,
             "learning_rate": 5e-5,
             "corpus_file_id": "test-corpus-id",
+            "corpus_format": "lines",
             "tokenizer_id": "tok-123",
             "holdout_fraction": 0.1,
             "seed": 42,

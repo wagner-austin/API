@@ -25,6 +25,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from model_trainer.core.contracts.dataset import require_corpus_format
 from model_trainer.core.contracts.queue_encoding_configs import (
     _decode_optional_gguf_export,
     _decode_optional_lora,
@@ -79,6 +80,7 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         "batch_size": payload["batch_size"],
         "learning_rate": payload["learning_rate"],
         "corpus_file_id": payload["corpus_file_id"],
+        "corpus_format": payload["corpus_format"],
         "tokenizer_id": payload["tokenizer_id"],
         "holdout_fraction": payload["holdout_fraction"],
         "seed": payload["seed"],
@@ -271,6 +273,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         raise JSONTypeError(
             "Field 'loss_mask_prefix_separator' must not be empty; omit it to disable masking"
         )
+    corpus_format = require_corpus_format(obj, "corpus_format")
     hub_model_id = optional_str(obj, "hub_model_id")
     finetuning_strategy = _narrow_finetuning_strategy(require_str(obj, "finetuning_strategy"))
 
@@ -287,6 +290,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "corpus_file_id": corpus_file_id,
+        "corpus_format": corpus_format,
         "tokenizer_id": tokenizer_id,
         "holdout_fraction": holdout_fraction,
         "seed": seed,

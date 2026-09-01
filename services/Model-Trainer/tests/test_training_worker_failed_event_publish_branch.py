@@ -94,6 +94,7 @@ def test_training_worker_failed_event_publish_branch(
             "learning_rate": 5e-4,
             "tokenizer_id": "tok",
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "holdout_fraction": 0.01,
             "seed": 42,
             "pretrained_run_id": None,

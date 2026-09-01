@@ -137,6 +137,7 @@ class TestQuantizationConfigEncoding:
             "load_in_8bit": False,
             "bnb_4bit_compute_dtype": "float16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
         encoded = encode_quantization_config(config)
         decoded = decode_quantization_config(encoded)
@@ -154,6 +155,7 @@ class TestQuantizationConfigEncoding:
                 "load_in_8bit": False,
                 "bnb_4bit_compute_dtype": dtype,
                 "bnb_4bit_quant_type": "nf4",
+                "bnb_4bit_use_double_quant": False,
             }
             decoded = decode_quantization_config(encoded)
             assert decoded["bnb_4bit_compute_dtype"] == dtype
@@ -166,6 +168,7 @@ class TestQuantizationConfigEncoding:
                 "load_in_8bit": False,
                 "bnb_4bit_compute_dtype": "float16",
                 "bnb_4bit_quant_type": qtype,
+                "bnb_4bit_use_double_quant": False,
             }
             decoded = decode_quantization_config(encoded)
             assert decoded["bnb_4bit_quant_type"] == qtype
@@ -179,6 +182,7 @@ class TestQuantizationConfigEncoding:
                     "load_in_8bit": False,
                     "bnb_4bit_compute_dtype": "invalid",
                     "bnb_4bit_quant_type": "nf4",
+                    "bnb_4bit_use_double_quant": False,
                 }
             )
 
@@ -191,5 +195,6 @@ class TestQuantizationConfigEncoding:
                     "load_in_8bit": False,
                     "bnb_4bit_compute_dtype": "float16",
                     "bnb_4bit_quant_type": "invalid",
+                    "bnb_4bit_use_double_quant": False,
                 }
             )

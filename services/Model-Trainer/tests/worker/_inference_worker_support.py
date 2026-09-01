@@ -71,6 +71,7 @@ def _make_manifest(model_family: str, tokenizer_id: str) -> str:
         "loss": 0.5,
         "learning_rate": 0.001,
         "corpus_path": "/data/corpus",
+        "corpus_format": "lines",
         "holdout_fraction": 0.05,
         "optimizer": "adam",
         "freeze_embed": False,

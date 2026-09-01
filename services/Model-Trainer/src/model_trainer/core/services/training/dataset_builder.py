@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final
+from typing import Final, Literal
 
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
@@ -9,7 +9,12 @@ from platform_core.logging import get_logger
 
 from ...contracts.dataset import CorpusSplit, DatasetConfig
 from ...encoding import Encoded, Encoder
-from ..data.corpus import list_text_files, open_corpus
+from ..data.corpus import (
+    list_document_files,
+    list_text_files,
+    open_corpus,
+    read_corpus_documents,
+)
 
 _logger: Final = get_logger(__name__)
 
@@ -34,6 +39,86 @@ def read_corpus_lines(files: Sequence[str]) -> tuple[str, ...]:
                 if stripped:
                     lines.append(stripped)
     return tuple(lines)
+
+
+def unit_noun(corpus_format: Literal["lines", "documents"]) -> str:
+    """Name what one training unit of a format is, for error messages.
+
+    Stated once here rather than at each message, so a message cannot
+    describe a document corpus in terms of lines.
+
+    Args:
+        corpus_format: The format whose unit to name.
+
+    Returns:
+        The singular noun for one unit of that format.
+    """
+    if corpus_format == "documents":
+        return "document"
+    return "line"
+
+
+def corpus_suffixes(corpus_format: Literal["lines", "documents"]) -> str:
+    """Name the file suffixes a format reads, for error messages.
+
+    Args:
+        corpus_format: The format whose suffixes to name.
+
+    Returns:
+        A human-readable rendering of the suffixes its lister accepts.
+    """
+    if corpus_format == "documents":
+        return ".jsonl"
+    return ".txt/.text"
+
+
+def _read_units(corpus_path: str, corpus_format: Literal["lines", "documents"]) -> tuple[str, ...]:
+    """Read a corpus into the units its format divides it into.
+
+    A unit is whatever the split partitions and the dataset appends an
+    end-of-sequence token after: a stripped line for prose, a whole source
+    file for code. Both formats reduce to the same tuple of strings, so only
+    the reading differs -- everything downstream of here is shared.
+
+    Args:
+        corpus_path: File or directory holding the corpus.
+        corpus_format: Which reader to use.
+
+    Returns:
+        The corpus's units, in the order they are read.
+
+    Raises:
+        AppError: ``CORPUS_EMPTY`` when the path holds no file of the
+            format's suffix, or when those files hold no unit.
+    """
+    suffixes = corpus_suffixes(corpus_format)
+    files = (
+        list_document_files(corpus_path)
+        if corpus_format == "documents"
+        else list_text_files(corpus_path)
+    )
+    if not files:
+        raise AppError(
+            ModelTrainerErrorCode.CORPUS_EMPTY,
+            (
+                f"No {suffixes} files found under {corpus_path}. This corpus is "
+                f"being read as {corpus_format!r}, which reads {suffixes} only"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
+        )
+    units = (
+        read_corpus_documents(files) if corpus_format == "documents" else read_corpus_lines(files)
+    )
+    if not units:
+        raise AppError(
+            ModelTrainerErrorCode.CORPUS_EMPTY,
+            (
+                f"The {len(files)} {suffixes} file(s) under {corpus_path} hold "
+                f"no {unit_noun(corpus_format)}"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
+        )
+    return units
 
 
 def _partition_size(total: int, ratio: float) -> int:
@@ -70,22 +155,9 @@ def split_corpus(cfg: DatasetConfig) -> CorpusSplit:
             holds only blank ones. ``CORPUS_HOLDOUT_UNSATISFIABLE`` when the
             requested fractions would leave no line to train on.
     """
-    files = list_text_files(cfg.corpus_path)
-    if not files:
-        raise AppError(
-            ModelTrainerErrorCode.CORPUS_EMPTY,
-            f"No text files found under {cfg.corpus_path}",
-            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
-        )
-
-    lines = read_corpus_lines(files)
+    lines = _read_units(cfg.corpus_path, cfg.corpus_format)
     total = len(lines)
-    if total == 0:
-        raise AppError(
-            ModelTrainerErrorCode.CORPUS_EMPTY,
-            f"The {len(files)} text file(s) under {cfg.corpus_path} hold no non-blank lines",
-            model_trainer_status_for(ModelTrainerErrorCode.CORPUS_EMPTY),
-        )
+    noun = unit_noun(cfg.corpus_format)
 
     test_n = _partition_size(total, cfg.test_split_ratio)
     val_n = _partition_size(total, cfg.holdout_fraction)
@@ -93,8 +165,8 @@ def split_corpus(cfg: DatasetConfig) -> CorpusSplit:
         raise AppError(
             ModelTrainerErrorCode.CORPUS_HOLDOUT_UNSATISFIABLE,
             (
-                f"A corpus of {total} line(s) cannot yield {val_n} validation and "
-                f"{test_n} test line(s) disjoint from its training lines. Lower "
+                f"A corpus of {total} {noun}(s) cannot yield {val_n} validation and "
+                f"{test_n} test {noun}(s) disjoint from its training {noun}s. Lower "
                 f"holdout_fraction (={cfg.holdout_fraction}) or test_split_ratio "
                 f"(={cfg.test_split_ratio}), enlarge the corpus, or pass 0 for both "
                 f"to train without a holdout."

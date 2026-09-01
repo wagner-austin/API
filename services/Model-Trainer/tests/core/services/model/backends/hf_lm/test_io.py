@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 
-from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     reset_hooks as reset_ft_hooks,
@@ -40,7 +40,9 @@ class _FakeModelLoader:
     def __init__(self, name_prefix: str = "") -> None:
         self._name_prefix = name_prefix
 
-    def __call__(self, model_id_or_path: str) -> LMModelProto:
+    def __call__(
+        self, model_id_or_path: str, quantization: QuantizationConfig | None
+    ) -> LMModelProto:
         return FakeHFModel(f"{self._name_prefix}{model_id_or_path}")
 
 
@@ -139,6 +141,7 @@ class TestEncodeMetadata:
             hub_model_id="test/model",
             tokenizer_id="test-tok",
             is_peft=False,
+            quantization=None,
         )
         result = _encode_metadata(metadata)
         assert result["strategy_name"] == "full"
@@ -157,6 +160,7 @@ class TestDecodeMetadata:
             "hub_model_id": "test/model",
             "tokenizer_id": "test-tok",
             "is_peft": True,
+            "quantization": None,
         }
         result = _decode_metadata(obj)
         assert result["strategy_name"] == "lora"
@@ -266,6 +270,7 @@ class TestSavePreparedHFLM:
             strategy_name=None,
             hub_model_id="test/model",
             is_peft=False,
+            quantization=None,
         )
 
         with (
@@ -290,6 +295,7 @@ class TestSavePreparedHFLM:
             strategy_name="full",
             hub_model_id=None,
             is_peft=False,
+            quantization=None,
         )
 
         with (
@@ -315,6 +321,7 @@ class TestSavePreparedHFLM:
             strategy_name="invalid",
             hub_model_id="test/model",
             is_peft=False,
+            quantization=None,
         )
 
         with (
@@ -339,6 +346,7 @@ class TestSavePreparedHFLM:
             strategy_name="full",
             hub_model_id="test/base-model",
             is_peft=False,
+            quantization=None,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -414,6 +422,7 @@ class TestLoadPreparedHFLMFromHandle:
                 "hub_model_id": "test/base-model",
                 "tokenizer_id": "test-tok",
                 "is_peft": False,
+                "quantization": None,
             }
             (Path(tmpdir) / "hf_lm_metadata.json").write_text(
                 dump_json_str(metadata), encoding="utf-8"

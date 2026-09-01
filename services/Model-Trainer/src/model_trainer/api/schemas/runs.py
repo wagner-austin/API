@@ -41,12 +41,16 @@ class QuantizationConfigRequest(TypedDict, total=True):
         load_in_8bit: Whether to load model in 8-bit precision.
         bnb_4bit_compute_dtype: Compute dtype for 4-bit operations.
         bnb_4bit_quant_type: Quantization type (nf4 or fp4).
+        bnb_4bit_use_double_quant: Whether to quantize the quantization
+            constants. Required, not defaulted: the QLoRA paper uses it in
+            every experiment.
     """
 
     load_in_4bit: bool
     load_in_8bit: bool
     bnb_4bit_compute_dtype: Literal["float16", "bfloat16", "float32"]
     bnb_4bit_quant_type: Literal["nf4", "fp4"]
+    bnb_4bit_use_double_quant: bool
 
 
 class GgufExportConfigRequest(TypedDict, total=True):
@@ -72,6 +76,11 @@ class TrainRequest(TypedDict, total=True):
 
     Attributes:
         model_family: Model architecture. Use 'hf_lm' for HuggingFace models.
+        corpus_format: How the corpus divides into training units -- 'lines'
+            for stripped text lines, 'documents' for JSONL records taken
+            verbatim. Required with no default: a source-code corpus read as
+            lines loses its indentation, and a caller that omitted the field
+            would be given that silently.
         hub_model_id: HuggingFace model ID (required when model_family='hf_lm').
         finetuning_strategy: Strategy for fine-tuning (full, lora, qlora).
         lora: LoRA configuration (required for lora/qlora strategies).
@@ -85,6 +94,7 @@ class TrainRequest(TypedDict, total=True):
     batch_size: int
     learning_rate: float
     corpus_file_id: str
+    corpus_format: Literal["lines", "documents"]
     tokenizer_id: str | None  # Optional for hf_lm (uses HF tokenizer from hub_model_id)
     holdout_fraction: float
     seed: int

@@ -31,6 +31,7 @@ def _make_cfg() -> ModelTrainConfig:
         "learning_rate": 5e-05,
         "tokenizer_id": None,
         "corpus_path": "/data/corpus_cache/abc123.txt",
+        "corpus_format": "lines",
         "holdout_fraction": 0.0,
         "seed": 42,
         "pretrained_run_id": None,
@@ -121,6 +122,7 @@ class TestModelTrainConfigCodec:
             "load_in_8bit": False,
             "bnb_4bit_compute_dtype": "bfloat16",
             "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_use_double_quant": False,
         }
         cfg["gguf_export"] = {"enabled": True, "output_type": "q8_0"}
         assert decode_model_train_config(encode_model_train_config(cfg)) == cfg

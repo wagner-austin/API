@@ -9,6 +9,7 @@ from platform_core.validators import (
     validate_float_range,
     validate_int_range,
     validate_optional_literal,
+    validate_required_literal,
     validate_str,
 )
 
@@ -27,6 +28,7 @@ from model_trainer.api.validators.runs_config import (
     _validate_bool,
     _validate_hf_lm_cross_fields,
 )
+from model_trainer.core.contracts.dataset import CORPUS_FORMATS, as_corpus_format
 
 from ..schemas.runs import (
     BaselineClozeRequest,
@@ -48,6 +50,9 @@ _PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
 _FINETUNING_STRATEGIES: frozenset[str] = frozenset({"full", "lora", "qlora"})
+#: Derived from the CorpusFormat Literal rather than restated, so the HTTP
+#: layer cannot accept a format the decoder rejects, or vice versa.
+_CORPUS_FORMATS: frozenset[str] = frozenset(CORPUS_FORMATS)
 _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
     {
         "model_family",
@@ -57,6 +62,7 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "batch_size",
         "learning_rate",
         "corpus_file_id",
+        "corpus_format",
         "tokenizer_id",
         "holdout_fraction",
         "seed",
@@ -175,6 +181,10 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         d.get("learning_rate"), "learning_rate", ge=0.0, default=5e-4
     )
     corpus_file_id = validate_str(d.get("corpus_file_id"), "corpus_file_id")
+    corpus_format = as_corpus_format(
+        validate_required_literal(d.get("corpus_format"), "corpus_format", _CORPUS_FORMATS),
+        "corpus_format",
+    )
 
     # tokenizer_id validation depends on model_family:
     # - hf_lm: optional (None) - uses HF tokenizer from hub_model_id
@@ -265,6 +275,7 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "corpus_file_id": corpus_file_id,
+        "corpus_format": corpus_format,
         "tokenizer_id": tokenizer_id,
         "holdout_fraction": holdout_fraction,
         "seed": seed,

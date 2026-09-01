@@ -147,6 +147,7 @@ def test_training_cancellation_with_redis(
             "batch_size": 1,
             "learning_rate": 5e-4,
             "corpus_file_id": "deadbeef",
+            "corpus_format": "lines",
             "tokenizer_id": tok_id,
             "holdout_fraction": 0.05,
             "seed": 42,

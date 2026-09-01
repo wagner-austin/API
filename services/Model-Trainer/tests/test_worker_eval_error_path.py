@@ -205,6 +205,7 @@ class _FakeStore:
             "learning_rate": 1e-3,
             "tokenizer_id": "tok",
             "corpus_path": str(dest_dir),
+            "corpus_format": "lines",
             "optimizer": "adamw",
             "freeze_embed": False,
             "gradient_clipping": 1.0,

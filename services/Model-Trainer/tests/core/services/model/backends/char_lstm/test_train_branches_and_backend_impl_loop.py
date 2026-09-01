@@ -230,6 +230,7 @@ def test_train_with_freeze_embed_enabled(tmp_path: Path) -> None:
         **_make_cfg(),
         "freeze_embed": True,
         "corpus_path": str(corpus_dir),
+        "corpus_format": "lines",
     }
 
     train_losses: list[float] = []

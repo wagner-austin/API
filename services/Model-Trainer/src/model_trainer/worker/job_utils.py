@@ -409,6 +409,7 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
         "learning_rate": req["learning_rate"],
         "tokenizer_id": req["tokenizer_id"],
         "corpus_path": corpus_path,
+        "corpus_format": req["corpus_format"],
         "holdout_fraction": req["holdout_fraction"],
         "seed": req["seed"],
         "pretrained_run_id": req["pretrained_run_id"],

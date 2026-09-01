@@ -77,12 +77,25 @@ class QuantizationConfig(TypedDict):
 
     Enables 4-bit or 8-bit quantization to reduce memory footprint
     while maintaining model quality through NF4/FP4 data types.
+
+    EVERY FIELD IS REQUIRED, INCLUDING THE TWO THAT HAVE UPSTREAM DEFAULTS.
+    ``transformers.BitsAndBytesConfig`` defaults ``bnb_4bit_quant_type`` to
+    ``"fp4"`` and ``bnb_4bit_compute_dtype`` to ``torch.float32``. The QLoRA
+    paper measures FP4 as roughly one percentage point behind the 16-bit LoRA
+    baseline where NF4 recovers it, and pairs 4-bit storage with a 16-bit
+    compute type. Inheriting either default therefore selects an arm the
+    paper reports as worse, silently. A run's data type is part of what the
+    run IS, so it is stated rather than defaulted.
     """
 
     load_in_4bit: bool
     load_in_8bit: bool
     bnb_4bit_compute_dtype: Literal["float16", "bfloat16", "float32"]
     bnb_4bit_quant_type: Literal["nf4", "fp4"]
+    # Quantizes the quantization constants themselves. The paper reports this
+    # saving about 0.37 bits per parameter and uses it in every experiment, so
+    # a config that cannot express it cannot express the published arm.
+    bnb_4bit_use_double_quant: bool
 
 
 class GgufExportConfig(TypedDict):
@@ -119,6 +132,11 @@ class ModelTrainConfig(TypedDict):
     learning_rate: float
     tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
+    # Whether corpus_path is read as stripped lines or as JSONL documents.
+    # Carried on the resolved config rather than inferred from the path's
+    # suffix, because the suffix is a naming convention and this decides
+    # what the model is actually shown.
+    corpus_format: Literal["lines", "documents"]
     holdout_fraction: float
     seed: int
     pretrained_run_id: str | None
@@ -226,6 +244,7 @@ class PreparedLMModel:
         strategy_name: Fine-tuning strategy name (for HF LM models).
         hub_model_id: HuggingFace model ID (for HF LM models).
         is_peft: Whether the model uses PEFT adapters.
+        quantization: Quantization the model was loaded under, or None.
     """
 
     model: LMModelProto
@@ -238,6 +257,11 @@ class PreparedLMModel:
     strategy_name: str | None
     hub_model_id: str | None
     is_peft: bool
+    # The quantization this model was LOADED under, or None when it was not
+    # quantized. Carried so a saved run records it: an adapter trained against
+    # 4-bit weights and reloaded onto 16-bit ones is a different model, and
+    # nothing else on disk would say which it was.
+    quantization: QuantizationConfig | None
 
     def __init__(
         self: PreparedLMModel,
@@ -251,6 +275,7 @@ class PreparedLMModel:
         strategy_name: str | None = None,
         hub_model_id: str | None = None,
         is_peft: bool = False,
+        quantization: QuantizationConfig | None = None,
     ) -> None:
         """Initialize a prepared language model.
 
@@ -264,6 +289,7 @@ class PreparedLMModel:
             strategy_name: Fine-tuning strategy name.
             hub_model_id: HuggingFace model ID.
             is_peft: Whether the model uses PEFT adapters.
+            quantization: Quantization the model was loaded under, or None.
         """
         self.model = model
         self.tokenizer_id = tokenizer_id
@@ -274,6 +300,7 @@ class PreparedLMModel:
         self.strategy_name = strategy_name
         self.hub_model_id = hub_model_id
         self.is_peft = is_peft
+        self.quantization = quantization
 
 
 class ModelBackend(Protocol):

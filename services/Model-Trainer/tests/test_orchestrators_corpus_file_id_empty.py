@@ -64,6 +64,7 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         "batch_size": 1,
         "learning_rate": 5e-4,
         "corpus_file_id": " ",
+        "corpus_format": "lines",
         "tokenizer_id": "tok",
         "user_id": 0,
         "holdout_fraction": 0.01,

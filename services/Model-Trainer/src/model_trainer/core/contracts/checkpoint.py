@@ -45,6 +45,7 @@ from model_trainer.core.contracts.queue_encoding_configs import (
     encode_quantization_config,
 )
 
+from .dataset import require_corpus_format
 from .model import ModelTrainConfig
 from .queue_encoding import (
     _narrow_finetuning_strategy,
@@ -232,6 +233,7 @@ def encode_model_train_config(cfg: ModelTrainConfig) -> JSONObject:
         "learning_rate": cfg["learning_rate"],
         "tokenizer_id": cfg["tokenizer_id"],
         "corpus_path": cfg["corpus_path"],
+        "corpus_format": cfg["corpus_format"],
         "holdout_fraction": cfg["holdout_fraction"],
         "seed": cfg["seed"],
         "pretrained_run_id": cfg["pretrained_run_id"],
@@ -277,6 +279,7 @@ def decode_model_train_config(obj: JSONObject) -> ModelTrainConfig:
         "learning_rate": require_float(obj, "learning_rate"),
         "tokenizer_id": optional_str(obj, "tokenizer_id"),
         "corpus_path": require_str(obj, "corpus_path"),
+        "corpus_format": require_corpus_format(obj, "corpus_format"),
         "holdout_fraction": require_float(obj, "holdout_fraction"),
         "seed": require_int(obj, "seed"),
         "pretrained_run_id": optional_str(obj, "pretrained_run_id"),
