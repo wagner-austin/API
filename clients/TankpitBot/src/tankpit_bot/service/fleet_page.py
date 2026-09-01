@@ -97,9 +97,17 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
          border-color:rgba(255,255,255,.22) rgba(0,0,0,.8)
            rgba(0,0,0,.8) rgba(255,255,255,.14);
          box-shadow:0 8px 24px rgba(0,0,0,.6); }
-  form .field { display:flex; flex-direction:column; flex:0 0 auto; }
-  form .field.wide { width:210px; }
-  form .field.num { width:145px; }
+  /* Every field is WIDTH-BOUND. The form is nowrap over overflow-x,
+     so one content-sized field with a long hint scrolls the whole row
+     sideways — which is exactly what the colour readout did. The
+     modifiers below widen; nothing sizes to its text. */
+  form .field { display:flex; flex-direction:column; flex:0 0 auto; width:130px; }
+  form .field.wide { width:150px; }
+  form .field.num { width:130px; }
+  /* The colour field carries the widest hint on the form (five slot
+     counts, or the empty-state line). Content-sized, it stretched the
+     nowrap row until the whole form scrolled sideways. */
+  form .field.tank { width:200px; }
   label { display:block; height:1.1rem; font-size:.75rem; color:#8a93a3;
           margin-bottom:.3rem; text-transform:uppercase;
           letter-spacing:.05em; white-space:nowrap; }
@@ -143,9 +151,9 @@ __CARD_CSS__
   <div class="field wide"><label for="room">Room</label>
     <select id="room"><option value="">Practice</option></select>
     <div class="hint">the lobby's two rooms</div></div>
-  <div class="field"><label for="troop">Color</label>
+  <div class="field tank"><label for="troop">Color</label>
     <select id="troop"></select>
-    <div class="hint" id="troopinfo">own rank + inventory; 5-min recolor cd</div></div>
+    <div class="hint" id="troopinfo">own rank, fuel and stock</div></div>
   <div class="field num"><label for="kills">Stop after kills</label>
     <input id="kills" type="number" min="0" value="20">
     <div class="hint">0 = play until stopped</div></div>
@@ -366,7 +374,7 @@ function paintTroopInfo() {
   const slots = ["AR", "DU", "MI", "HO", "RA"];
   const inv = cell.inventory
     ? slots.map((label, i) => label + cell.inventory[i]).join(" ")
-    : "no inventory reading yet — play this colour once";
+    : "no stock reading — play it once";
   hint.replaceChildren(head, document.createElement("br"), inv);
 }
 
