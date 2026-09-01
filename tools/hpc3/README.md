@@ -25,6 +25,7 @@ runs/
 hpc3-preflight --config runs/hpc3.json --run runs/arm-b.json   # would it start?
 hpc3-submit    --config runs/hpc3.json --run runs/arm-b.json   # start it
 hpc3-watch     --config runs/hpc3.json --job 55519937          # what is it doing, what did it cost
+hpc3-watch     --config runs/hpc3.json --job 1,2,3 --until-done 1   # follow to terminal, emitting state changes
 hpc3-triage    --config runs/hpc3.json                         # is anything wrong that looks fine?
 hpc3-chain     --config runs/hpc3.json --run runs/pipeline.json # stages, each after the last
 hpc3-trace     --config runs/hpc3.json --match 07ab4976…       # which job trained this?
@@ -945,6 +946,7 @@ window for a job to close cleanly.
 | `hpc3-sweep --config C --run S` | the same, per member, recording each as it goes |
 | `hpc3-campaign --config C --run S` | the same sweep document, run repeatedly: submits only the members that are neither finished nor already running |
 | `hpc3-watch --config C --job ID[,ID…]` | state, elapsed, real cost, GPU-hours, state tally; one `sacct` call so a sweep's rows share one moment |
+| `hpc3-watch … --until-done 1 [--poll-seconds N]` | re-reads accounting until EVERY requested job is terminal, emitting only state transitions, then the ordinary summary. Waits for ids accounting has not learned yet (a member absent from `sacct` is in flight, not done) and rules the ids wrong after five straight empty reads rather than spinning on a typo. Replaces the per-session hand-rolled ssh polling loop, one of which false-drained a running panel on a shell quoting bug (2026-08-31) |
 | `hpc3-triage --config C` | the three conditions above; exit 1 if any |
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
