@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "8a87067800f3b229f749014dbd57903918fe3558",
+  "git_commit": "1f6ee8890b8b5356b99c7d2c2a23686676a0b2ff",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -267,6 +267,14 @@
     {
       "module": "model_trainer.cli._test_hooks",
       "attribute": "probed_shapes_hook"
+    },
+    {
+      "module": "model_trainer.core.services.model.deterministic_gemm",
+      "attribute": "OWNED_ARM"
+    },
+    {
+      "module": "model_trainer.core.services.model.owned_backward",
+      "attribute": "OwnedAddmm"
     }
   ],
   "smoke_commands": [
@@ -276,7 +284,7 @@
     "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm.json', '--controls', 'none', '--kernel', 'cublas']))\"",
     "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-rank1.json', '--controls', 'both', '--kernel', 'rank1']))\"",
     "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-block1024.json', '--controls', 'both', '--kernel', 'block1024']))\"",
-    "/opt/env/bin/python -c \"from model_trainer.core.services.model.deterministic_gemm import BLOCK_ARMS, KERNEL_ARMS, require_block_size; assert BLOCK_ARMS == ('block256', 'block1024', 'block1280'), BLOCK_ARMS; assert [require_block_size(a) for a in BLOCK_ARMS] == [256, 1024, 1280]; assert len(KERNEL_ARMS) == 6, KERNEL_ARMS\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.deterministic_gemm import BLOCK_ARMS, KERNEL_ARMS, require_block_size; assert BLOCK_ARMS == ('block256', 'block1024', 'block1280'), BLOCK_ARMS; assert [require_block_size(a) for a in BLOCK_ARMS] == [256, 1024, 1280]; assert len(KERNEL_ARMS) == 7, KERNEL_ARMS; from model_trainer.core.services.model.deterministic_gemm import OWNED_ARM, RANK1_ARM; assert KERNEL_ARMS.index(OWNED_ARM) == KERNEL_ARMS.index(RANK1_ARM) + 1, KERNEL_ARMS\"",
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import blocked_matmul; torch.manual_seed(5); x = torch.randn(8, 4096); w = torch.randn(4096, 64); assert torch.equal(blocked_matmul(x, w, 4096), torch.addmm(torch.zeros(8, 64), x, w)), 'one chunk must be a single addmm onto a zero accumulator'; assert not torch.equal(blocked_matmul(x, w, 64), blocked_matmul(x, w, 4096)), 'chunk width must change the computation'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/gemm.json')); b = json.load(open('/tmp/gemm-rank1.json')); assert a['label'] == 'gemm-attribution-v2-none-cublas', a['label']; assert b['label'] == 'gemm-attribution-v2-both-rank1', b['label']; ka = {o['name'] for o in a['observations']}; assert ka == {o['name'] for o in b['observations']}, 'arms must probe the same shapes'; assert any('large-attn-qkv-M3840-K1280' in n for n in ka), 'the shape the v24 trace broke on is missing'\"",
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import cublas_addmm, rank1_addmm; torch.manual_seed(42); b = torch.randn(384); x = torch.randn(64, 128); w = torch.randn(128, 384); r = rank1_addmm(b, x, w); assert torch.equal(r, rank1_addmm(b, x, w)), 'rank1 did not reproduce itself'; acc = torch.zeros(64, 384); [acc.addr_(x[:, k], w[k, :]) for k in range(128)]; assert torch.equal(r, b + acc), 'rank1 is not an ascending-k accumulation with the bias last'; assert (r - cublas_addmm(b, x, w)).abs().max().item() < 1e-3, 'rank1 is not the same product'\"",
@@ -294,6 +302,9 @@
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.gemm_shapes import GEMM_BATCHED, GEMM_BOUNDARY, GEMM_CROSSOVER, GEMM_SHAPES, GEMM_SWEEP, probed_shapes; p = probed_shapes(); assert len(p) == len(GEMM_SHAPES) + len(GEMM_SWEEP) + len(GEMM_BOUNDARY) + len(GEMM_BATCHED) + len(GEMM_CROSSOVER), len(p); names = {n for n, _ in p}; assert 'batched-large-attn-qkv' in names, 'the batched twins are not digested'; assert any(n.startswith('crossover-') for n in names), 'the batch-size sweep is not digested'\"",
     "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls none --kernel cublas --out /tmp/train-step.json",
     "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls both --kernel rank1 --out /tmp/train-step-rank1.json",
+    "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls both --kernel owned --out /tmp/train-step-owned.json",
+    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-owned.json', '--controls', 'both', '--kernel', 'owned']))\"",
+    "/opt/env/bin/python -c \"import json; r = json.load(open('/tmp/gemm-rank1.json')); o = json.load(open('/tmp/gemm-owned.json')); ro = {x['name']: x['value'] for x in r['observations']}; oo = {x['name']: x['value'] for x in o['observations']}; assert set(ro) == set(oo), 'arms probed different shapes'; assert ro == oo, 'the owned FORWARD must be the rank-one forward bit for bit'; a = json.load(open('/tmp/train-step-rank1.json')); b = json.load(open('/tmp/train-step-owned.json')); assert b['label'].endswith('-both-owned'), b['label']; la = [x['value'] for x in a['observations'] if x['name'] == 'tiny|loss']; lb = [x['value'] for x in b['observations'] if x['name'] == 'tiny|loss']; assert la == lb, 'owned and rank1 share one forward, so one loss'; assert {x['name'] for x in a['observations']} == {x['name'] for x in b['observations']}, 'arms stepped different parameters'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/train-step.json')); b = json.load(open('/tmp/train-step-rank1.json')); assert a['experiment'] == 'train-step-attribution', a['experiment']; assert a['label'].endswith('-none-cublas'), a['label']; assert b['label'].endswith('-both-rank1'), b['label']; na = {o['name'] for o in a['observations']}; assert na == {o['name'] for o in b['observations']}, 'arms must step the same parameters'; assert 'tiny|grad|transformer.h.0.attn.c_attn.weight|digest48' in na, 'the first-divergence parameter has no gradient row'; assert 'tiny|updated|transformer.h.0.attn.c_attn.weight|sum' in na, 'the update was not digested'; assert 'tiny|loss' in na, sorted(na)[:5]\""
   ],
   "labels": {

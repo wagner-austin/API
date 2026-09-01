@@ -127,6 +127,10 @@ class TestTheCommittedSpec:
         keep a CPU smoke from walking ninety-three shapes. Each names
         something v28 did not carry, which is the property that makes a
         required symbol detect a stale wheel at all.
+
+        Thirteenth, 2026-09-01: two symbols for v30's owned-backward arm --
+        ``OWNED_ARM`` on the arm table and ``OwnedAddmm``, the autograd
+        Function whose backward is the entire point. v29 carries neither.
         """
         spec = decode_image_spec(load_json_str(_COMMITTED_SPEC.read_text(encoding="utf-8")))
         symbols = sorted(
@@ -155,6 +159,10 @@ class TestTheCommittedSpec:
             (
                 "model_trainer.core.services.model.deterministic_gemm",
                 "BLOCK_ARMS",
+            ),
+            (
+                "model_trainer.core.services.model.deterministic_gemm",
+                "OWNED_ARM",
             ),
             (
                 "model_trainer.core.services.model.deterministic_gemm",
@@ -192,6 +200,7 @@ class TestTheCommittedSpec:
                 "probe_forward_loss",
             ),
             ("model_trainer.core.services.model.legacy_gemm_probe", "arm_outputs"),
+            ("model_trainer.core.services.model.owned_backward", "OwnedAddmm"),
             ("model_trainer.core.services.model.sdpa_probe", "probe_sdpa"),
             ("model_trainer.core.services.model.sdpa_timing", "backend_context"),
             ("model_trainer.core.services.model.sdpa_timing", "time_sdpa"),
