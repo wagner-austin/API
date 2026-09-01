@@ -15,7 +15,7 @@ source_git_blobs:
   "doctrines/flame-nocover.doctrine": "f2fef915923ca031d05cda11f83029d0e89e195e"
 game_version: "1.15 (code 176, build #28)"
 confidence: high
-fact_checked: 2026-08-17
+fact_checked: 2026-09-01
 hubs: [bot-architecture]
 ---
 
@@ -34,6 +34,7 @@ any AI, any human, any 1vX seating, any map.
 
 | Rung | Configuration | Record | Status |
 |---|---|---|---|
+| Hard, Linux+pinned+ff10 (duel_lake) | `aa-counter-guard` | v8 detection: 15 won + 9 survived-with-army of 24, 0 armyless, 0 stalls (hard24-detect, 2026-09-01) | Standing reference for the pinned regime. v7 ledger-only read 20 won + 4 survived on the same seeds; under v8 no member lost or stalled, but five that won now reach the sample limit with armies standing -- whether that is pace or strength is unmeasured. Windows-path figures do not compare. |
 | Very Hard (duel_lake) | `flame-nocover` | 21/48 fresh seeds (44%) | Standing. Ten modification arms rejected at two scales; local optimum of the current vocabulary. |
 | Impossible (duel_lake) | `flame-nocover` | 0/~120 post-certification, survival floor ~3300 | No adoptable gain: raid 8's +217 REVERSED on a fresh tree (-198, same seeds) and is retracted; kite's +98 is downgraded to unreplicated. |
 | Other maps (Impossible) | `flame-nocover` | bridge 2811 / straits 2317 / hills 2281 vs duel 3325, 0/36 | Terrain-as-parameter closed: every alternative worse, duel_lake retained BECAUSE most favorable (log 2026-08-09). |
