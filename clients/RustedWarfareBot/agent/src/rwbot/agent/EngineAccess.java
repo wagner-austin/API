@@ -300,6 +300,71 @@ final class EngineAccess {
         }
     }
 
+    /**
+     * Reads a field starting the name search at a DECLARED class, not at the
+     * target's own.
+     *
+     * <p>The concrete-class walk the other readers use is wrong for
+     * single-letter names a subclass can shadow: the builder's class
+     * {@code e.b} declares its own static {@code f}, so walking up from it
+     * finds that one before the waypoint count {@code y.f} -- a live crash
+     * the jar gate cannot see, because the gate checks the declaration on
+     * {@code y} while the runtime walk starts lower ([proof run 2026-09-01]).
+     *
+     * @param owner Class declaring the field; the search starts here.
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent.
+     */
+    static Object readFieldOf(Class<?> owner, Object target, String name) {
+        try {
+            return pinnedField(owner, name).get(target);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("rw-agent: cannot read " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
+     * Reads an {@code int} field starting the name search at a declared class.
+     *
+     * <p>See {@link #readFieldOf} for why the declaring class must anchor the
+     * search.
+     *
+     * @param owner Class declaring the field; the search starts here.
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not an int.
+     */
+    static int readIntFieldOf(Class<?> owner, Object target, String name) {
+        try {
+            return pinnedField(owner, name).getInt(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read int " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
+     * Reads a {@code float} field starting the name search at a declared class.
+     *
+     * <p>See {@link #readFieldOf} for why the declaring class must anchor the
+     * search.
+     *
+     * @param owner Class declaring the field; the search starts here.
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not a float.
+     */
+    static float readFloatOf(Class<?> owner, Object target, String name) {
+        try {
+            return pinnedField(owner, name).getFloat(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read float " + name + EngineNames.PIN, e);
+        }
+    }
+
     static Object invoke(Method method, Object target, Object... arguments) {
         try {
             return method.invoke(target, arguments);

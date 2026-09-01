@@ -146,10 +146,19 @@ final class BuildWatch {
      * rule for matching an order to a waypoint. The type is resolved through
      * the same registry the dispatch used, so the reference comparison is the
      * comparison the engine itself makes.
+     *
+     * <p>Every read anchors the name search at the DECLARING class. The
+     * builder's concrete class shadows {@code y}'s one-letter waypoint names
+     * with fields of its own ({@code e.b} declares a static {@code f}), so
+     * the walk-from-the-instance readers find the wrong field and crash the
+     * engine thread -- which the jar gate cannot see, because it checks the
+     * declaration on {@code y} while the runtime walk starts lower.
      */
     private static boolean hasBuildWaypoint(Object builder, Pending order) {
-        Object array = EngineAccess.readField(builder, WaypointNames.WAYPOINT_ARRAY);
-        int count = EngineAccess.readIntField(builder, WaypointNames.WAYPOINT_COUNT);
+        Class<?> orderable = EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS);
+        Class<?> waypointClass = EngineAccess.pinnedClass(WaypointNames.WAYPOINT_CLASS);
+        Object array = EngineAccess.readFieldOf(orderable, builder, WaypointNames.WAYPOINT_ARRAY);
+        int count = EngineAccess.readIntFieldOf(orderable, builder, WaypointNames.WAYPOINT_COUNT);
         if (array == null) {
             return false;
         }
@@ -164,14 +173,16 @@ final class BuildWatch {
             if (waypoint == null) {
                 continue;
             }
-            if (EngineAccess.readField(waypoint, WaypointNames.WAYPOINT_KIND) != buildKind) {
+            if (EngineAccess.readFieldOf(waypointClass, waypoint, WaypointNames.WAYPOINT_KIND)
+                    != buildKind) {
                 continue;
             }
-            if (EngineAccess.readField(waypoint, WaypointNames.WAYPOINT_BUILD_TYPE) != type) {
+            if (EngineAccess.readFieldOf(waypointClass, waypoint, WaypointNames.WAYPOINT_BUILD_TYPE)
+                    != type) {
                 continue;
             }
-            float wx = EngineAccess.readFloat(waypoint, WaypointNames.WAYPOINT_X);
-            float wy = EngineAccess.readFloat(waypoint, WaypointNames.WAYPOINT_Y);
+            float wx = EngineAccess.readFloatOf(waypointClass, waypoint, WaypointNames.WAYPOINT_X);
+            float wy = EngineAccess.readFloatOf(waypointClass, waypoint, WaypointNames.WAYPOINT_Y);
             if (Math.abs(wx - order.x) < WAYPOINT_TOLERANCE
                     && Math.abs(wy - order.y) < WAYPOINT_TOLERANCE) {
                 return true;

@@ -1,0 +1,17 @@
+        object2 = s2.B();
+        if (au2.n) {
+            object2 = com.corrodinggames.rts.game.units.custom.d.b.a;
+        }
+        if (!((com.corrodinggames.rts.game.units.custom.d.a)object2).c(this)) {
+            am3.a();
+            z z3 = bn.a();
+            this.Q = l2.by;
+            if (this.V < 1000.0f) {
+                z3.c = true;
+                object = com.corrodinggames.rts.gameFramework.d.a.a(this.bX, am3.eo, am3.ep);
+                if (object != null) {
+                    ((com.corrodinggames.rts.gameFramework.d.a)object).i = true;
+                }
+            }
+            return z3;
+        }

@@ -10,28 +10,33 @@ related:
   - "[[mechanics-resource-pools]]"
   - "[[mechanics-build-actions]]"
   - "[[policy-threat]]"
+  - "[[engine-silent-refusal]]"
 source_paths:
   - "wiki/sources/m6-wire/world-sample.ndjson:1"
   - "wiki/sources/m6-wire/world-sample.ndjson:2"
-  - "wiki/sources/m6-wire/world-sample.ndjson:21"
-  - "wiki/sources/m6-wire/world-sample.ndjson:67"
-  - "wiki/sources/m6-wire/world-sample.ndjson:72"
-  - "wiki/sources/m6-wire/world-sample.ndjson:190"
-  - "wiki/sources/m6-wire/world-sample.ndjson:379"
+  - "wiki/sources/m6-wire/world-sample.ndjson:22"
+  - "wiki/sources/m6-wire/world-sample.ndjson:69"
+  - "wiki/sources/m6-wire/world-sample.ndjson:75"
+  - "wiki/sources/m6-wire/world-sample.ndjson:234"
+  - "wiki/sources/m6-wire/world-sample.ndjson:467"
   - "agent/src/rwbot/agent/BuildOptions.java"
   - "agent/src/rwbot/agent/StateStream.java"
+  - "agent/src/rwbot/agent/WireChecks.java"
   - "src/rw_bot/control/channel.py"
   - "src/rw_bot/wire/ndjson.py"
   - "src/rw_bot/wire/state.py"
+  - "src/rw_bot/wire/codec.py"
 source_git_blobs:
-  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
   "agent/src/rwbot/agent/BuildOptions.java": "0d5a8a58756ee70bab724662c398ec09c225edbb"
-  "agent/src/rwbot/agent/StateStream.java": "0005edda5cc880aa718832ae0ed7c745e4dc4a52"
+  "agent/src/rwbot/agent/StateStream.java": "206a05fdc2dc96ab22e61714fb6727b68a15930b"
+  "agent/src/rwbot/agent/WireChecks.java": "65d943ad0858873fa084717938e217081210d000"
   "src/rw_bot/control/channel.py": "e5c4521155fea78be4e037ca2e9f631d3a8b8443"
   "src/rw_bot/wire/ndjson.py": "188d5ecd49442155a37cc61e726f27cdffdd06bc"
-  "src/rw_bot/wire/state.py": "3dbc0ef8e704d7542b9c4cb3be5049091213d077"
+  "src/rw_bot/wire/state.py": "4cbdd31f7f3d23470ea1e009f8641bd07d10ae2e"
+  "src/rw_bot/wire/codec.py": "7caa7903e5e14dc20bac2eafb718411f7295dba0"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-01
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -42,14 +47,15 @@ The agent publishes what it sees as newline-delimited JSON and the planner decod
 
 ## The format
 
-Records are discriminated by `kind`. A `frame` record opens a sample and declares how many records of each following kind it carries; each `entity` record is one visible unit or building, carrying the engine id an order is dispatched against ([[issuing-orders]]); each `pool` record is one visible resource pool ([[mechanics-resource-pools]]); and each `option` record is one thing an owned unit can currently make.[^1][^2][^7][^9]
+Records are discriminated by `kind`. A `frame` record opens a sample and declares how many records of each following kind it carries; each `entity` record is one visible unit or building, carrying the engine id an order is dispatched against ([[issuing-orders]]); each `pool` record is one visible resource pool ([[mechanics-resource-pools]]); each `option` record is one thing an owned unit can currently make; and each `refused` record is one build order whose waypoint the engine dropped without building — the silent refusal, reported instead of predicted ([[engine-silent-refusal]]).[^1][^2][^7][^9][^11]
 
 ```
-{"kind":"frame","frame":3492,"clock_ms":11751,"visible":19,"pools":46,"options":161,"players":5,"credits":4315,"defeated":false,"wiped":false,"players_left":5}
-{"kind":"entity","frame":3492,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hostile":true,"movement":"NONE","group":-3,"flying":false,"submerged":false,"touching_water":false,"hp":4000.0,"max_hp":4000.0,"complete":true,"queued":0}
-{"kind":"pool","frame":3492,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":4}
-{"kind":"option","frame":3492,"index":0,"unit_id":213,"produces":"","key":"c_1","placed":false,"available":true,"makes_something":false,"price":0}
-{"kind":"player","frame":3492,"index":0,"team":0,"local":true,"hostile":false,"defeated":false,"wiped":false,"income":18,"army_value":500,"building_value":3000}
+{"kind":"frame","frame":1666,"clock_ms":17218,"visible":20,"pools":46,"options":161,"players":5,"refused":0,"credits":4463,"defeated":false,"wiped":false,"players_left":5}
+{"kind":"entity","frame":1666,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hostile":true,"movement":"NONE","group":-3,"flying":false,"submerged":false,"touching_water":false,"hp":4000.0,"max_hp":4000.0,"complete":true,"queued":0,"damaged_by":""}
+{"kind":"pool","frame":1666,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":19}
+{"kind":"option","frame":1666,"index":7,"unit_id":214,"produces":"landFactory","key":"b_landFactory","placed":true,"available":true,"makes_something":false,"price":700}
+{"kind":"player","frame":1666,"index":1,"team":1,"local":false,"hostile":true,"defeated":false,"wiped":false,"income":32,"army_value":1000,"building_value":3700}
+{"kind":"refused","frame":1918,"index":0,"unit_id":214,"type":"landFactory","x":4450.0,"y":2730.0}
 ```
 
 The option record's `key` is the engine's interned action key — the dispatch handle an ability order fires back, because the engine's per-action index is not a selector — and `price` is the engine's own charge, the only reading that tells a tier unlock from a rally point ([[mechanics-build-actions]]). The `player` records are the engine's own scoreboard, unfogged for every player; the situation layer reads them for the strike window ([[ai-opponent-strategy]]).
@@ -58,7 +64,7 @@ The option record's `key` is the engine's interned action key — the dispatch h
 
 Three of the entity fields exist because they cannot be derived on the reading side. `hostile` is not `not mine` — the engine compares alliance group and excludes the neutral team, so an ally is neither ([[policy-threat]]). `complete` is not presence — a building joins the roster when construction *starts*. And `queued` is the only immediate evidence that a production order was accepted, because a queued unit changes no roster until it is finished ([[mechanics-build-actions]]).
 
-The counts have grown three times, and each time a count rather than a terminator. `owned` became `visible` when the stream widened past the player's own units ([[perception-visibility]]); `pools` joined it when terrain that no entity list can express had to reach the planner; and `options` joined when what a unit can make turned out to be answerable only by asking the unit. A count in the opening record is what lets the reader know a sample is complete before parsing all of it, which is the property the channel frames on.[^8]
+The counts have grown four times, and each time a count rather than a terminator. `owned` became `visible` when the stream widened past the player's own units ([[perception-visibility]]); `pools` joined it when terrain that no entity list can express had to reach the planner; `options` joined when what a unit can make turned out to be answerable only by asking the unit; and `refused` joined when the engine's silent placement refusals had to reach the planner's ledger ([[engine-silent-refusal]]). A count in the opening record is what lets the reader know a sample is complete before parsing all of it, which is the property the channel frames on — asked of one shared field list, so a new record kind cannot leave the channel counting short.[^8]
 
 ## Options are addressed by unit, not by type
 
@@ -88,15 +94,16 @@ The sample is rendered on the game thread and written off it. A position read mi
 
 ## Replay falls out of it
 
-A JSONL stream is itself a corpus. Decoding is a pure function of the lines it is given and reads no file, so the same code serves a live tail and an archived replay with no branch between them.[^6] The tests decode the real capture archived here rather than a fixture written to match the parser, and they cross-check it: the frame and clock deltas across two samples reproduce the ~300 Hz measured independently.[^3][^6]
+A JSONL stream is itself a corpus. Decoding is a pure function of the lines it is given and reads no file, so the same code serves a live tail and an archived replay with no branch between them.[^6] The tests decode the real capture archived here rather than a fixture written to match the parser, and they cross-check it: the clock advances exactly 3 ms per frame across every pair of samples, which is the pinned frame delta the determinism regime sets rather than a measured rate ([[policy-determinism]]).[^3][^6]
 
-[^1]: `wiki/sources/m6-wire/world-sample.ndjson:1` — the opening frame record of a real capture from a live headless skirmish, declaring 19 visible entities, 46 pools and 123 build options.
+[^1]: `wiki/sources/m6-wire/world-sample.ndjson:1` — the opening frame record of a real capture from a live headless skirmish, declaring 20 visible entities, 46 pools, 161 build options, 5 players and 0 refused builds.
 [^2]: `wiki/sources/m6-wire/world-sample.ndjson:2` — the entity record at index 0, an opposing team's `commandCenter` carrying `"mine":false`.
-[^3]: `wiki/sources/m6-wire/world-sample.ndjson:190` and `:379` — the second and third frame records, 3814 at 12810 ms and 4114 at 13810 ms; 300 frames across 1000 ms is 300.0 per second.
-[^7]: `wiki/sources/m6-wire/world-sample.ndjson:21` — the first pool record, tile (115, 6) at world (2310.0, 130.0).
-[^8]: `src/rw_bot/control/channel.py` — `_complete_or_none` reads the opening record's counts and waits for `1 + visible + pools + options` lines before decoding.
-[^9]: `wiki/sources/m6-wire/world-sample.ndjson:67` and `:72` — the Command Center's first option (`builder`, `"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
+[^3]: `wiki/sources/m6-wire/world-sample.ndjson:234` and `:467` — the second and third frame records, 1951 at 18073 ms and 2248 at 18964 ms; 297 frames across 891 ms is exactly 3 ms per frame.
+[^7]: `wiki/sources/m6-wire/world-sample.ndjson:22` — the first pool record, tile (115, 6) at world (2310.0, 130.0).
+[^8]: `src/rw_bot/control/channel.py` — `_complete_or_none` waits for `declared_children(opening) + 1` lines before decoding; `declared_children` sums `CHILD_COUNT_FIELDS` (`src/rw_bot/wire/state.py`), the one list every record kind registers in.
+[^9]: `wiki/sources/m6-wire/world-sample.ndjson:69` and `:75` — the Command Center's `builder` option (`"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
 [^10]: `src/rw_bot/wire/command.py` — `encode_produce` emits `kind`, `unit_id` and `type` and no coordinate; `encode_build` carries `x` and `y`.
 [^4]: `agent/src/rwbot/agent/StateStream.java:31` — the producer, with the flatness constraint and its rationale in the class javadoc; the render-on-game-thread and await are in `Premain.writeSample`.
 [^5]: `src/rw_bot/wire/ndjson.py` — the strict reader, with the `disallow_any_expr` constraint recorded in the module docstring and one traceable code per rejection (`RW-NDJSON-001` … `-006`).
-[^6]: `src/rw_bot/wire/state.py` — `decode_samples` folds records into samples and enforces the declared count (`RW-WIRE-003`); `encode_sample` round-trips, which is what makes a decoded corpus re-emittable as a fixture.
+[^6]: `src/rw_bot/wire/codec.py` — `decode_samples` folds records into samples and enforces every declared count (`RW-WIRE-003` … `-008`); `encode_sample` round-trips, which is what makes a decoded corpus re-emittable as a fixture.
+[^11]: `agent/src/rwbot/agent/WireChecks.java:40-48` — the refused record pinned byte-for-byte: `{"kind":"refused","frame":1918,"index":0,"unit_id":214,"type":"landFactory","x":4450.0,"y":2730.0}`; the example line above is this pinned shape, since a healthy capture carries none.

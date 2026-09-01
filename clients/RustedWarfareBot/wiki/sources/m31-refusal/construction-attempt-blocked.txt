@@ -1,0 +1,32 @@
+    public z a(au au2, as as2, int n2, float f2, float f3) {
+        if (n2 != 1 && am3 instanceof y) {
+            ((y)am3).a(n2);
+        }
+        am3.cP();
+        if (am3 instanceof y) {
+            object2 = (y)am3;
+            boolean bl2 = false;
+            object = null;
+            if (this.al()) {
+                object = this;
+            } else if (!this.bT && !this.bI()) {
+                object = this;
+            }
+            if (((y)object2).a((am)object, null)) {
+                bl2 = true;
+            }
+            if (!bl2 && !((y)object2).a(true, null)) {
+                bl2 = true;
+            }
+            if (bl2) {
+                am3.a();
+                z z2 = bn.a();
+                y y2 = ((y)am3).bs();
+                z2.b = y2;
+                z2.d = s2;
+                if (y2 == null) {
+                    // empty if block
+                }
+                return z2;
+            }
+        }

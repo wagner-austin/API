@@ -14,6 +14,8 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 
 [Building Structures](../pages/building-structures.md) -- construction reuses the move machinery; the integer is a build-action selector, not a rotation
 
+[Silent Placement Refusal — Detection, Not Prediction](../pages/engine-silent-refusal.md) -- the construction attempt drops a blocked site's waypoint with no log line; the agent detects the drop instead of mirroring terrain rules
+
 [Command Channel](../pages/command-channel.md) -- orders originate in Python: one loopback socket, id-addressed units, and the backpressure rule that protects the tick
 
 [Unit value table](../pages/mechanics-unit-value.md) -- per-type worth derived from the live type registry dump, with the arithmetic error that was nearly acted on recorded beside it

@@ -1,0 +1,7 @@
+    public boolean a(as as2, float f2, float f3) {
+        for (int i2 = 0; i2 < this.f; ++i2) {
+            au au2 = this.g[i2];
+            if (au2.a != com.corrodinggames.rts.game.units.av.c || au2.b != as2 || !(com.corrodinggames.rts.gameFramework.f.c(au2.e - f2) < 10.0f) || !(com.corrodinggames.rts.gameFramework.f.c(au2.f - f3) < 10.0f)) continue;
+            return true;
+        }
+        return false;

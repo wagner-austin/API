@@ -1,0 +1,33 @@
+            } else if (!(bl4 || this.b_() && com.corrodinggames.rts.gameFramework.f.c(this.b(f2, f3, f4)) > 30.0f)) {
+                z z2 = this.a(au2, au2.b, au2.d, au2.e, au2.f);
+                am am2 = null;
+                if (z2.a != null) {
+                    am2 = z2.a;
+                } else if (z2.b != null) {
+                    am2 = z2.b;
+                }
+                if (am2 != null) {
+                    z2.d.a((am)this, am2);
+                    if (this.a(am2)) {
+                        if (this.b(am2) > 10000.0f) {
+                            am2.r(1.0f);
+                            this.ax();
+                        } else {
+                            au2.e();
+                            au2.a = com.corrodinggames.rts.game.units.av.d;
+                            au2.h = am2;
+                            this.aH();
+                        }
+                    } else {
+                        this.ay();
+                    }
+                    this.Q = -9999;
+                } else {
+                    if (au2.b == null) {
+                        com.corrodinggames.rts.gameFramework.l.e("active.build==null");
+                    }
+                    if (!z2.c) {
+                        this.ay();
+                    }
+                }
+            }

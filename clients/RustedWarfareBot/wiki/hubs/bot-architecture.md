@@ -13,6 +13,8 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 
 [Perception: Visible Entities, Economy and Health](../pages/perception-visibility.md) -- enemies, credits and hit points, gated through the engine's own fog test rather than the master list
 [Wire Contract — NDJSON World Stream](../pages/wire-contract-ndjson.md) -- the agent publishes the roster as flat NDJSON; why flatness is forced by the planner's type checker
+
+[Silent Placement Refusal — Detection, Not Prediction](../pages/engine-silent-refusal.md) -- BuildWatch reports a dropped build waypoint as a wire record; one report reopens the slot, frees the worker and feeds the ledger
 [Unit Catalogue and the Mobility Predicate](../pages/mechanics-unit-catalogue.md) -- what a unit costs and whether it can move at all, read rather than discovered by ordering
 [Issuing Orders](../pages/issuing-orders.md) -- the three-call command path, its threading rule, and the order that finally moved a unit
 
