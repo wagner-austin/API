@@ -13,9 +13,11 @@ This hub covers each client's architecture, its integration surface into the sha
 
 They maintain full three-tier, schema-conformant wikis and are the source of truth for their own domains — this hub does NOT restate any of it.
 
-- [TankpitBot wiki index](../../clients/TankpitBot/wiki/index.md) — 6 hubs, 67 content pages: game mechanics, protocol, combat, JS client, architecture, codebase.
+- [TankpitBot wiki index](../../clients/TankpitBot/wiki/index.md) — 6 hubs, 75 content pages (counted 2026-09-01): game mechanics, protocol, combat, JS client, architecture, codebase.
 - [RustedWarfareBot wiki index](../../clients/RustedWarfareBot/wiki/index.md) — engine internals, the headless harness, game mechanics, bot architecture, multiplayer constraints. Claims about engine internals are pinned to a game build (`game_version` frontmatter) because the jar is obfuscated and class names change silently between releases.
-- [NavProbe wiki index](../../clients/NavProbe/wiki/index.md) — 5 hubs, 27 content pages: determinism measurement, rendered observations, instrument design, simulator adapters, platform constraints. A measurement page carries a `measured_with` block, because a determinism verdict without its seed, step count, batch width and backend states nothing.
+- [NavProbe wiki index](../../clients/NavProbe/wiki/index.md) — 5 hubs, 37 content pages (counted 2026-09-01): determinism measurement, rendered observations, instrument design, simulator adapters, platform constraints. A measurement page carries a `measured_with` block, because a determinism verdict without its seed, step count, batch width and backend states nothing.
+
+  NavProbe measures determinism in *someone else's simulator*; `platform_core.determinism_env` configures it in *this monorepo's own training stack*. The two are the same question asked from opposite sides, and the shared finding — that reduction order is set by a variable read once at library load — is written up at [Reduction order is an environment variable read once](../pages/determinism-env-read-once-at-library-load.md).
 
 Cross-platform client facts that would belong *here* rather than in a client-specific wiki are integration surfaces into the monorepo — `platform_core.logging` config, `monorepo_guards` conformance, hypothetical future `platform_workers` job-enqueue paths. None of that has been written yet; add pages here as those surfaces materialise.
 

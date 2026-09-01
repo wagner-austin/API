@@ -4,4 +4,6 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [Service Port Map](../pages/service-port-map.md) -- every FastAPI service + its assigned 80xx port + purpose; hypercorn `--bind` port-binding convention + Traefik routing
 
+[Covenant Radar's backend registry](../pages/covenant-radar-backend-registry.md) -- one interface over seven classifiers and five regressors, split across `covenant_ml` and `covenant_nn`; why the `Literal` is canonical and not either registry; and the README count that drifted one low
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

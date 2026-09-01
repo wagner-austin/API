@@ -1,5 +1,5 @@
 ---
-title: ClearGBM — the decorative-knob class: five config fields that never reached training
+title: "ClearGBM — the decorative-knob class: five config fields that never reached training"
 tags: [ml, cleargbm, covenant_ml, bugs, negative-result, class-weighting]
 related:
   - "[[cleargbm-f32-score-narrowing-reverted]]"

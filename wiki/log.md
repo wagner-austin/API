@@ -171,3 +171,22 @@ Notes: NavProbe had been on disk since 08-13 with 27 wiki pages of its own and a
 The growth-policy experiment scripts moved from libs/cleargbm/scripts/ to libs/covenant_ml/scripts/, and the measurement logic they used to inline now lives in the covenant_ml.growth_policy package. The move was not tidying: libs/cleargbm depends only on numpy and cleargbm_rs, so xgboost, lightgbm and scikit-learn are all absent from its environment and the dataset path resolved only from libs/covenant_ml — the scripts could not have run where they were filed. libs/covenant_ml carries all three vendors plus the dataset at the exact relative path they read.
 
 Rule this suggests: a script belongs in the package whose environment can run it, and "which venv has these imports" is worth checking before filing one. Two gates agreed the scripts were misplaced and neither was consulted at the time — libs/cleargbm's make check was red on them for strict-mypy, ruff ANN, the guards' print ban and its 100% coverage gate over scripts/, all at once.
+
+## [2026-09-01] fill | the first two non-ClearGBM pages in a month, and a backend count that drifted
+
+Pages written: `covenant-radar-backend-registry` (services), `determinism-env-read-once-at-library-load` (libs + infrastructure + clients)
+Hubs updated: services, libs, infrastructure, clients
+Index updated: 25 -> 27 pages; services 1 -> 2, libs 23 -> 24, infrastructure 1 -> 2; a stated coverage-shape paragraph added
+Notes: this wiki was 22 ClearGBM pages out of 25. The index now says so in its own header, because a reader finding four hubs and no service pages should be told which silences are deliberate. Client depth IS deliberate — TankpitBot, RustedWarfareBot and NavProbe keep their own full wikis. Service and infrastructure depth is a real gap, and naming it is cheaper than letting the next session rediscover it.
+
+**The clients hub carried stale counts for its own siblings**: TankpitBot 67 (actual 75) and NavProbe 27 (actual 37). Both now carry the date they were counted.
+
+**The backend count.** `services/covenant-radar-api/README.md` says "Eleven model backends behind one interface — seven classifiers … plus four regressors", and elsewhere "all four `*_reg` backends". The seven is right. The four is not: `RegressorBackendName` is a `Literal` of five, so the total is twelve. The declaration is split across two libraries, which is how the miscount survives — `covenant_ml`'s `default_regressor_registry` wires three, and `mlp_reg` / `lstm_reg` come from `covenant_nn`. **Read the `Literal`, not either registry.**
+
+Two commits date the divergence: `7e9b23d0` (2026-08-05) wrote the README's wording, `46b8d4a5` (2026-08-21) put the five-name Literal in `types_regression.py`. That second commit is a 32-file role split, so it dates the declaration's arrival in the file rather than in the codebase — the page says exactly that and no more, after the `no-deferral` rule refused an earlier draft that hedged with "not established here". The rule's message is worth repeating: *cite the source you DID read, or drop the claim*.
+
+Not fixed here, deliberately: the README itself. Editing it to twelve buys agreement until the next backend lands. The durable form is a test asserting the README's count against `len(get_args(RegressorBackendName))`, which is a code change and belongs in its own commit.
+
+**Why the determinism page is here rather than only in NavProbe's wiki.** `platform_core.determinism_env` is where this monorepo's run-comparability story actually lives, and it is unusually well-documented in place — measurements with dates, drivers and torch versions, and an explicit statement of what the control does NOT buy (not one of 72 SDPA digests moves, because the memory-efficient attention kernel is not a cuBLASLt call). NavProbe measures determinism in someone else's simulator; this configures it in ours. The clients hub now names that symmetry and links across, which is why the page declares three hubs.
+
+Verified: both pages `wiki_audit_page` 0 errors / 0 warnings. The determinism page's first pass failed `hubs-membership-consistent` — the cross-link from hubs/clients.md counted as membership while the frontmatter listed only libs + infrastructure. The check reads prose links, not just inclusion-list lines.

@@ -31,4 +31,6 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [ClearGBM — the decorative-knob class](../pages/cleargbm-decorative-knob-class.md) -- five config fields that never reached training (reg hardcodes, phantom scale_pos_weight, dropped max_features, unimplementable track_contributions, the sweep-save crash), all fixed/removed 2026-08-22; +1.5 AUC pts recovered on rw_matches, the us "0.87" exposed as a model production never trained, and the knob-sensitivity detector that catches the class
 [ClearGBM vs LightGBM — leaf-normalized benchmarking](../pages/cleargbm-leaf-normalized-benchmarking.md) -- why a wall-clock ratio between a depth-wise and a leaf-wise learner is not an implementation verdict; at depth 6 cleargbm builds 1.87× the leaves, and is 0.937× per leaf (i.e. ~6% faster at equal work); the measurement protocol and where the harness lives
 
+[Reduction order is an environment variable read once](../pages/determinism-env-read-once-at-library-load.md) -- `platform_core.determinism_env`: why the cuBLAS / cuBLASLt / BLAS-thread strings live in the dependency-free tier, the read-once-at-load timing trap, and `SetEnvProtocol`'s deliberately absent read side
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
