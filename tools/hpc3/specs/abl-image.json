@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "1f6ee8890b8b5356b99c7d2c2a23686676a0b2ff",
+  "git_commit": "0a4975e5bd80f2ad13976e55b90b4726bcbd21ce",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -316,7 +316,7 @@
     "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-owned.json', '--controls', 'both', '--kernel', 'owned']))\"",
     "/opt/env/bin/python -c \"import json; r = json.load(open('/tmp/gemm-rank1.json')); o = json.load(open('/tmp/gemm-owned.json')); ro = {x['name']: x['value'] for x in r['observations']}; oo = {x['name']: x['value'] for x in o['observations']}; assert set(ro) == set(oo), 'arms probed different shapes'; assert ro == oo, 'the owned FORWARD must be the rank-one forward bit for bit'; a = json.load(open('/tmp/train-step-rank1.json')); b = json.load(open('/tmp/train-step-owned.json')); assert b['label'].endswith('-both-owned'), b['label']; la = [x['value'] for x in a['observations'] if x['name'] == 'tiny|loss']; lb = [x['value'] for x in b['observations'] if x['name'] == 'tiny|loss']; assert la == lb, 'owned and rank1 share one forward, so one loss'; assert {x['name'] for x in a['observations']} == {x['name'] for x in b['observations']}, 'arms stepped different parameters'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/train-step.json')); b = json.load(open('/tmp/train-step-rank1.json')); assert a['experiment'] == 'train-step-attribution', a['experiment']; assert a['label'].endswith('-none-cublas'), a['label']; assert b['label'].endswith('-both-rank1'), b['label']; na = {o['name'] for o in a['observations']}; assert na == {o['name'] for o in b['observations']}, 'arms must step the same parameters'; assert 'tiny|grad|transformer.h.0.attn.c_attn.weight|digest48' in na, 'the first-divergence parameter has no gradient row'; assert 'tiny|updated|transformer.h.0.attn.c_attn.weight|sum' in na, 'the update was not digested'; assert 'tiny|loss' in na, sorted(na)[:5]\"",
-    "/opt/env/bin/python -c \"from ordered_kernels.kernels import CUDA_SOURCE, NVRTC_OPTIONS; assert '--fmad=false' in NVRTC_OPTIONS, NVRTC_OPTIONS; assert 'acc + xr[i] * wc[j]' in CUDA_SOURCE, 'the separate multiply-add is the bit-compatibility linchpin'; import ordered_kernels.cli.gemm_probe; import ordered_kernels.cli.train_step; import ordered_kernels.cli.bench\""
+    "/opt/env/bin/python -c \"from ordered_kernels.kernels import CUDA_SOURCE, NVRTC_OPTIONS; assert '--fmad=false' in NVRTC_OPTIONS, NVRTC_OPTIONS; assert 'acc[i][j] + xr[i] * wc[j]' in CUDA_SOURCE, 'the separate multiply-add is the bit-compatibility linchpin'; import ordered_kernels.cli.gemm_probe; import ordered_kernels.cli.train_step; import ordered_kernels.cli.bench\""
   ],
   "labels": {
     "org.corvis.project": "mi",
