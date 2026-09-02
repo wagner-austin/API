@@ -1,0 +1,256 @@
+{
+  "project": "rusted",
+  "name": "ab48b-v8",
+  "experiment": {
+    "batch": "ab48b-v8",
+    "matches": "48",
+    "arms": "champion",
+    "lockstep": "75",
+    "fast_forward": "10",
+    "map": "maps/skirmish/[p2]duel_lake.tmx",
+    "difficulty": "1",
+    "payload": "payload-v8h48"
+  },
+  "members": [
+    {
+      "suffix": "champion-s4903",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 4903 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s4903.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s4903.txt"
+    },
+    {
+      "suffix": "champion-s5003",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5003 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5003.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5003.txt"
+    },
+    {
+      "suffix": "champion-s5101",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5101 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5101.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5101.txt"
+    },
+    {
+      "suffix": "champion-s5209",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5209 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5209.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5209.txt"
+    },
+    {
+      "suffix": "champion-s5303",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5303 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5303.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5303.txt"
+    },
+    {
+      "suffix": "champion-s5407",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5407 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5407.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5407.txt"
+    },
+    {
+      "suffix": "champion-s5501",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5501 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5501.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5501.txt"
+    },
+    {
+      "suffix": "champion-s5623",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5623 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5623.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5623.txt"
+    },
+    {
+      "suffix": "champion-s5701",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5701 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5701.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5701.txt"
+    },
+    {
+      "suffix": "champion-s5801",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5801 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5801.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5801.txt"
+    },
+    {
+      "suffix": "champion-s5903",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 5903 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5903.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s5903.txt"
+    },
+    {
+      "suffix": "champion-s6007",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6007 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6007.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6007.txt"
+    },
+    {
+      "suffix": "champion-s6101",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6101 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6101.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6101.txt"
+    },
+    {
+      "suffix": "champion-s6203",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6203 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6203.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6203.txt"
+    },
+    {
+      "suffix": "champion-s6301",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6301 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6301.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6301.txt"
+    },
+    {
+      "suffix": "champion-s6421",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6421 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6421.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6421.txt"
+    },
+    {
+      "suffix": "champion-s6521",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6521 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6521.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6521.txt"
+    },
+    {
+      "suffix": "champion-s6607",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6607 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6607.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6607.txt"
+    },
+    {
+      "suffix": "champion-s6701",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6701 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6701.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6701.txt"
+    },
+    {
+      "suffix": "champion-s6803",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6803 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6803.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6803.txt"
+    },
+    {
+      "suffix": "champion-s6907",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 6907 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6907.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s6907.txt"
+    },
+    {
+      "suffix": "champion-s7001",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7001 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7001.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7001.txt"
+    },
+    {
+      "suffix": "champion-s7103",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7103 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7103.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7103.txt"
+    },
+    {
+      "suffix": "champion-s7207",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7207 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7207.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7207.txt"
+    },
+    {
+      "suffix": "champion-s7307",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7307 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7307.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7307.txt"
+    },
+    {
+      "suffix": "champion-s7411",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7411 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7411.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7411.txt"
+    },
+    {
+      "suffix": "champion-s7507",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7507 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7507.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7507.txt"
+    },
+    {
+      "suffix": "champion-s7603",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7603 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7603.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7603.txt"
+    },
+    {
+      "suffix": "champion-s7703",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7703 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7703.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7703.txt"
+    },
+    {
+      "suffix": "champion-s7817",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7817 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7817.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7817.txt"
+    },
+    {
+      "suffix": "champion-s7907",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 7907 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7907.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s7907.txt"
+    },
+    {
+      "suffix": "champion-s8009",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8009 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8009.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8009.txt"
+    },
+    {
+      "suffix": "champion-s8101",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8101 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8101.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8101.txt"
+    },
+    {
+      "suffix": "champion-s8209",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8209 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8209.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8209.txt"
+    },
+    {
+      "suffix": "champion-s8311",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8311 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8311.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8311.txt"
+    },
+    {
+      "suffix": "champion-s8419",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8419 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8419.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8419.txt"
+    },
+    {
+      "suffix": "champion-s8501",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8501 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8501.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8501.txt"
+    },
+    {
+      "suffix": "champion-s8609",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8609 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8609.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8609.txt"
+    },
+    {
+      "suffix": "champion-s8707",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8707 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8707.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8707.txt"
+    },
+    {
+      "suffix": "champion-s8803",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8803 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8803.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8803.txt"
+    },
+    {
+      "suffix": "champion-s8923",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 8923 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8923.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s8923.txt"
+    },
+    {
+      "suffix": "champion-s9001",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9001 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9001.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9001.txt"
+    },
+    {
+      "suffix": "champion-s9103",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9103 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9103.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9103.txt"
+    },
+    {
+      "suffix": "champion-s9203",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9203 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9203.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9203.txt"
+    },
+    {
+      "suffix": "champion-s9311",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9311 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9311.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9311.txt"
+    },
+    {
+      "suffix": "champion-s9403",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9403 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9403.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9403.txt"
+    },
+    {
+      "suffix": "champion-s9511",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9511 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9511.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9511.txt"
+    },
+    {
+      "suffix": "champion-s9601",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v8h48/sweeps/hard48b.txt --batch ab48b-v8 --label champion --seed 9601 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v8h48 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 1 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9601.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/ab48b-v8/champion-s9601.txt"
+    }
+  ]
+}

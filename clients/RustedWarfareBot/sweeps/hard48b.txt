@@ -1,0 +1,60 @@
+# The third wave of the v7-vs-v8 pace question: 48 more fresh seeds,
+# disjoint from hard24.txt's and hard48.txt's.
+#
+# At 72 pairs the discordant split reads 16:6 toward v7 (two-sided binomial
+# p = 0.052) -- the direction REPEATED across independent seed sets (7:2,
+# then 9:4), which a symmetric butterfly would not do, and the p sits
+# exactly at the threshold where stopping is the worst option. If the flip
+# rate and split hold, 120 combined pairs lands near p ~= 0.015; if they
+# flatten, the null is answered. Same regime as the first two waves:
+# duel_lake, difficulty 1, pinned+ff10, lockstep 75.
+#
+# label | seed | doctrine | samples
+champion|4903|doctrines/aa-counter-guard.doctrine|4000
+champion|5003|doctrines/aa-counter-guard.doctrine|4000
+champion|5101|doctrines/aa-counter-guard.doctrine|4000
+champion|5209|doctrines/aa-counter-guard.doctrine|4000
+champion|5303|doctrines/aa-counter-guard.doctrine|4000
+champion|5407|doctrines/aa-counter-guard.doctrine|4000
+champion|5501|doctrines/aa-counter-guard.doctrine|4000
+champion|5623|doctrines/aa-counter-guard.doctrine|4000
+champion|5701|doctrines/aa-counter-guard.doctrine|4000
+champion|5801|doctrines/aa-counter-guard.doctrine|4000
+champion|5903|doctrines/aa-counter-guard.doctrine|4000
+champion|6007|doctrines/aa-counter-guard.doctrine|4000
+champion|6101|doctrines/aa-counter-guard.doctrine|4000
+champion|6203|doctrines/aa-counter-guard.doctrine|4000
+champion|6301|doctrines/aa-counter-guard.doctrine|4000
+champion|6421|doctrines/aa-counter-guard.doctrine|4000
+champion|6521|doctrines/aa-counter-guard.doctrine|4000
+champion|6607|doctrines/aa-counter-guard.doctrine|4000
+champion|6701|doctrines/aa-counter-guard.doctrine|4000
+champion|6803|doctrines/aa-counter-guard.doctrine|4000
+champion|6907|doctrines/aa-counter-guard.doctrine|4000
+champion|7001|doctrines/aa-counter-guard.doctrine|4000
+champion|7103|doctrines/aa-counter-guard.doctrine|4000
+champion|7207|doctrines/aa-counter-guard.doctrine|4000
+champion|7307|doctrines/aa-counter-guard.doctrine|4000
+champion|7411|doctrines/aa-counter-guard.doctrine|4000
+champion|7507|doctrines/aa-counter-guard.doctrine|4000
+champion|7603|doctrines/aa-counter-guard.doctrine|4000
+champion|7703|doctrines/aa-counter-guard.doctrine|4000
+champion|7817|doctrines/aa-counter-guard.doctrine|4000
+champion|7907|doctrines/aa-counter-guard.doctrine|4000
+champion|8009|doctrines/aa-counter-guard.doctrine|4000
+champion|8101|doctrines/aa-counter-guard.doctrine|4000
+champion|8209|doctrines/aa-counter-guard.doctrine|4000
+champion|8311|doctrines/aa-counter-guard.doctrine|4000
+champion|8419|doctrines/aa-counter-guard.doctrine|4000
+champion|8501|doctrines/aa-counter-guard.doctrine|4000
+champion|8609|doctrines/aa-counter-guard.doctrine|4000
+champion|8707|doctrines/aa-counter-guard.doctrine|4000
+champion|8803|doctrines/aa-counter-guard.doctrine|4000
+champion|8923|doctrines/aa-counter-guard.doctrine|4000
+champion|9001|doctrines/aa-counter-guard.doctrine|4000
+champion|9103|doctrines/aa-counter-guard.doctrine|4000
+champion|9203|doctrines/aa-counter-guard.doctrine|4000
+champion|9311|doctrines/aa-counter-guard.doctrine|4000
+champion|9403|doctrines/aa-counter-guard.doctrine|4000
+champion|9511|doctrines/aa-counter-guard.doctrine|4000
+champion|9601|doctrines/aa-counter-guard.doctrine|4000
