@@ -1,0 +1,60 @@
+# The closing arm at Hard: control vs close-3, paired on hard48b's seeds.
+#
+# The 120-pair panels (log 2026-09-01) measured every one of 240 matches
+# winning by counter-attrition alone -- marches 0 throughout -- with 48
+# survivors at the sample limit, 32 of them ahead or actively finishing.
+# The close latch (3x dominance held CLOSE_HOLD samples, the flame-family
+# setting) exists to end a decided match while it is decided; this batch
+# measures whether it converts that class at Hard without wiping wins the
+# way the pre-latch designs did (9 won / 13 lost, log 2026-08-01). Both
+# arms in one batch, same seeds, same tree: the pairing IS the experiment.
+#
+# label | seed | doctrine | samples
+control|4903|doctrines/aa-counter-guard.doctrine|4000
+control|5003|doctrines/aa-counter-guard.doctrine|4000
+control|5101|doctrines/aa-counter-guard.doctrine|4000
+control|5209|doctrines/aa-counter-guard.doctrine|4000
+control|5303|doctrines/aa-counter-guard.doctrine|4000
+control|5407|doctrines/aa-counter-guard.doctrine|4000
+control|5501|doctrines/aa-counter-guard.doctrine|4000
+control|5623|doctrines/aa-counter-guard.doctrine|4000
+control|5701|doctrines/aa-counter-guard.doctrine|4000
+control|5801|doctrines/aa-counter-guard.doctrine|4000
+control|5903|doctrines/aa-counter-guard.doctrine|4000
+control|6007|doctrines/aa-counter-guard.doctrine|4000
+control|6101|doctrines/aa-counter-guard.doctrine|4000
+control|6203|doctrines/aa-counter-guard.doctrine|4000
+control|6301|doctrines/aa-counter-guard.doctrine|4000
+control|6421|doctrines/aa-counter-guard.doctrine|4000
+control|6521|doctrines/aa-counter-guard.doctrine|4000
+control|6607|doctrines/aa-counter-guard.doctrine|4000
+control|6701|doctrines/aa-counter-guard.doctrine|4000
+control|6803|doctrines/aa-counter-guard.doctrine|4000
+control|6907|doctrines/aa-counter-guard.doctrine|4000
+control|7001|doctrines/aa-counter-guard.doctrine|4000
+control|7103|doctrines/aa-counter-guard.doctrine|4000
+control|7207|doctrines/aa-counter-guard.doctrine|4000
+close|4903|doctrines/aa-counter-close.doctrine|4000
+close|5003|doctrines/aa-counter-close.doctrine|4000
+close|5101|doctrines/aa-counter-close.doctrine|4000
+close|5209|doctrines/aa-counter-close.doctrine|4000
+close|5303|doctrines/aa-counter-close.doctrine|4000
+close|5407|doctrines/aa-counter-close.doctrine|4000
+close|5501|doctrines/aa-counter-close.doctrine|4000
+close|5623|doctrines/aa-counter-close.doctrine|4000
+close|5701|doctrines/aa-counter-close.doctrine|4000
+close|5801|doctrines/aa-counter-close.doctrine|4000
+close|5903|doctrines/aa-counter-close.doctrine|4000
+close|6007|doctrines/aa-counter-close.doctrine|4000
+close|6101|doctrines/aa-counter-close.doctrine|4000
+close|6203|doctrines/aa-counter-close.doctrine|4000
+close|6301|doctrines/aa-counter-close.doctrine|4000
+close|6421|doctrines/aa-counter-close.doctrine|4000
+close|6521|doctrines/aa-counter-close.doctrine|4000
+close|6607|doctrines/aa-counter-close.doctrine|4000
+close|6701|doctrines/aa-counter-close.doctrine|4000
+close|6803|doctrines/aa-counter-close.doctrine|4000
+close|6907|doctrines/aa-counter-close.doctrine|4000
+close|7001|doctrines/aa-counter-close.doctrine|4000
+close|7103|doctrines/aa-counter-close.doctrine|4000
+close|7207|doctrines/aa-counter-close.doctrine|4000
