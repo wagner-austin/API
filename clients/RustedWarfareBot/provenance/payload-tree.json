@@ -1,5 +1,5 @@
 {
-  "git_commit": "ad19cdbb11bb0ad5d8abc0f621e82afd83ad82ae",
+  "git_commit": "ef557386e7ee7f43b6431fdfd9090b762624e3b4",
   "carries": [
     "scripts",
     "doctrines",
@@ -13,6 +13,11 @@
       "path": ".complete",
       "sha256": "7df47f7b246fea3ffd24d7156553888a9b1d0fa1c52211d2955052a55e9c77c3",
       "size_bytes": 8
+    },
+    {
+      "path": "doctrines/aa-counter-close.doctrine",
+      "sha256": "d45657ca012698300bd85065e477e030e72e9fc53c3d26854206a4aed61b0411",
+      "size_bytes": 974
     },
     {
       "path": "doctrines/aa-counter-guard-aa.doctrine",
@@ -646,8 +651,8 @@
     },
     {
       "path": "scripts/campaign_doc.py",
-      "sha256": "9058233c445c0e0781ff632e8f491bf811a30b9be7af90757a6e3712ec1a6d02",
-      "size_bytes": 9541
+      "sha256": "6026d944f7e45b629d62883a1953507985a0a0f955a7f7af7bbaba4c3f8af877",
+      "size_bytes": 10526
     },
     {
       "path": "scripts/detprobe.py",
@@ -758,6 +763,11 @@
       "path": "scripts/py.typed",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size_bytes": 0
+    },
+    {
+      "path": "scripts/refusal_probe.py",
+      "sha256": "f87a6d87f73c8bd035b2a569833b4b7850704fbba60e69159cb9180eb77caaa9",
+      "size_bytes": 4306
     },
     {
       "path": "scripts/replicate.py",
@@ -871,13 +881,13 @@
     },
     {
       "path": "src/rw_bot/harness/campaign.py",
-      "sha256": "5e8e25e9b21b022c7b7f59a7a41635285e2d1eb65eafeb7b8e794ebc756cace8",
-      "size_bytes": 9707
+      "sha256": "063bb49811d68001e0e0d5d767f6e44368d826142dd7329405bc3bb63bc44deb",
+      "size_bytes": 11090
     },
     {
       "path": "src/rw_bot/harness/campaign_match.py",
-      "sha256": "7a7dfe9303940ab1bc3a00dac2cc97a0775b1318b7330d99e357b26b645f2e7e",
-      "size_bytes": 15061
+      "sha256": "e72fade2649d593ddc3448a28cd8a494312192c72c0f127621f7b589bbf77149",
+      "size_bytes": 15593
     },
     {
       "path": "src/rw_bot/harness/clone.py",
@@ -946,8 +956,8 @@
     },
     {
       "path": "src/rw_bot/harness/results_layout.py",
-      "sha256": "2ef95724df770d7830e20e6c62a24255925170113658bb606193746b8e2aecda",
-      "size_bytes": 9879
+      "sha256": "bcfdded4a6274d9b1d4b1a7f847c6da6f7db6bbc4ad9e2cd69a99fdde98f5eca",
+      "size_bytes": 8118
     },
     {
       "path": "src/rw_bot/harness/runner.py",
@@ -1405,6 +1415,11 @@
       "size_bytes": 1439
     },
     {
+      "path": "sweeps/close48.txt",
+      "sha256": "873e714b0438b3aa9489969451dfc6e21a09b053db4179f08ccb35b6c44b49c2",
+      "size_bytes": 3244
+    },
+    {
       "path": "sweeps/comp-arms.txt",
       "sha256": "54409cb63d913a4cb20cabdd6d185939b30c18148d3939324c53368d7b6fcc6d",
       "size_bytes": 2247
@@ -1513,6 +1528,16 @@
       "path": "sweeps/hard24.txt",
       "sha256": "ddede9d453519986b80738119cb31191abbc0e0ec174cbfa00f99174ad328140",
       "size_bytes": 2113
+    },
+    {
+      "path": "sweeps/hard48.txt",
+      "sha256": "e98fedbf1445e7b4e667523e96d19fd8b3fe310ddc98b36d972d2e746dc502b5",
+      "size_bytes": 3356
+    },
+    {
+      "path": "sweeps/hard48b.txt",
+      "sha256": "3bf9174a21b25f6f4bd93b9825328559d326b58bf13a1ca50978d87cb1921a8b",
+      "size_bytes": 3286
     },
     {
       "path": "sweeps/imp-bridge12.txt",
@@ -2060,8 +2085,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "bc951587c6f6b23299606217e0c63608b1780e4530be4aeec30d13f539148283",
+  "tree_sha256": "639852da758ccb0b593ad19dd1bc3cf3021882e01f3b6cd4430c706c851dfef3",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "4d6ee4c08d5592257710be6beb5478135ffb8d1be28cf89d7ca3fa943ce7ad3f",
-  "archive_size_bytes": 2283520
+  "archive_sha256": "805d3ed83be519c1d9d155b7e46b321c15bdea93a927217037cbf3c26c5466d8",
+  "archive_size_bytes": 2304000
 }
