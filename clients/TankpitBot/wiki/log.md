@@ -5415,3 +5415,20 @@ The detached HOST lifecycle entry points (`tankpit-fleet-up`/`-down`, `fleet_con
 **Transition rule, enforced by physics not policy:** a container manager cannot adopt HOST bot processes (different pid namespace — the spawn records on the shared volume would read as dead and invite double-logins on the same accounts). The last host fleet must drain before the first containerized `make up`. Discovered to be LIVE during verification: a host manager on 27300 (started 20:58) with artax playing Practice — left untouched, so the first containerized `make up` is operator-gated on that drain.
 
 Wiki: [[make-targets]] and [[fleet-lifecycle]] operator-surface tables rewritten; [[bot-service-architecture]] pointer updated.
+
+---
+## [2026-09-01] lift + crack | The response-shape differ is a module again, and the current sim has one systematic divergence
+
+[[capture-differ]] stage 3 was the conformance replay all along — the tool that answers "how faithful is the sim" mechanically. It was retired to a blob pin; `analysis/response_shapes.py` + `_types.py` + `scripts/analyze_response_shapes.py` (`make analyze-response-shapes`) are its durable form, recovered from the pin rather than reimplemented from prose. Method (window law, token alphabet) is the original's; packaging, typing and tests are new. NOT carried over: the numeric law checks that rode the same pass (teleport cost, window-bound acceptance) — different question, own validators, stated so nobody assumes coverage.
+
+**Faithfulness of the lift, checked before trusting it:** the rebuilt differ independently reproduces the divergence rows the wiki recorded from the original — `move 47self 5A 3Dself` at 391 against the recorded 392, plus the `move 52c6` and `pickup_equipment 67 49 pickup` rows. Same shapes, same buckets, separate implementation.
+
+**`runs/sim` is not a baseline, it is a sediment.** The directory accumulates every baseline ever generated, so the first run reported 34 invented laws — dominated by `shoot 53self 49` (n=709), `radar 4F 46 49` (n=601) and `teleport landed 3Dself 5A` (n=302), ALL of which [[capture-differ]] records as FIXED on 2026-08-01. Those captures span Jul 22 – Aug 7 and measure several different sims at once. Any future run must generate a fresh baseline and diff against that alone; the default target is kept as-is only because a mixed directory is still the honest default answer to "what is in runs/sim".
+
+**Against a baseline generated today: 12 invented shapes, and 8 are one bug.** Eight of the twelve are a known-good shape with a trailing `5A` — `teleport 5A 3Dself landed 5A`, `radar 49 4F 46 5A`, `map_open 4C 5A`, `scope 5A 3Dself 5A` and four more. One cause: the end-of-tick dynamic-layer refresh emits a viewport update the real server does not, because sim ferries drift every tick and repaint the patch grid, while live 0x5A is event-driven. The remaining four are the queue-compression artifact already bucketed on that page. **This is the next fidelity fix and it is a single one.**
+
+**Two independent confirmations rode the same run.** The equipment-on-landing invention removed earlier today appeared at n=70 against the sediment baseline and ZERO against the fresh one — the differ confirming, by a completely different method, the wire sweep that found it. The 2026-08-01 fixes confirm present the same way.
+
+**Methodological limit, stated because the numbers invite the wrong reading:** 764 sim windows against 73,053 live. At that ratio the "missing law" side is dominated by sampling — most of its 208 rows are shapes a small sim sample has not produced yet, not laws the sim lacks. The INVENTED side is sound at any sample size, because a shape the sim emitted is one it emits. Read invented first; missing needs a baseline nearer live's size before it means anything.
+
+Gate: 91 tests over the analysis and script lanes; `response_shapes.py`, `response_shapes_types.py` and `scripts/analyze_response_shapes.py` all at 100.00% statement and branch; guard exit 0; mypy strict clean over 1,211 files.

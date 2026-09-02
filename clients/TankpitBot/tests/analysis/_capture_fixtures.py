@@ -17,9 +17,13 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
-from tankpit_bot.protocol.encoders import encode_build_pickup, encode_tank_info
+from tankpit_bot.protocol.encoders import (
+    encode_build_pickup,
+    encode_radar_result,
+    encode_tank_info,
+)
 from tankpit_bot.protocol.framing import encode_frame
-from tankpit_bot.protocol.types import BuildPickupDict, TankInfoDict
+from tankpit_bot.protocol.types import BuildPickupDict, RadarResultDict, TankInfoDict
 
 MAGIC = "abcdefgh"
 
@@ -201,14 +205,47 @@ def _build_pickup(tank_id: int) -> bytes:
     return _ciphered(bytes([0x42]) + payload)
 
 
+def _command(framed: bytes) -> bytes:
+    """Cipher one client command into its sent-frame body.
+
+    The production ``build_*_command`` helpers return a COMPLETE framed
+    message — a 2-byte LE length prefix, then ``!``, then the command —
+    so the prefix is dropped here and :func:`_payload` re-frames. Left
+    on, the frame's leading byte reads 0x05 instead of ``!`` and a
+    sweep correctly declines to treat it as a command at all.
+
+    Args:
+        framed: Bytes from a production ``build_*_command``.
+
+    Returns:
+        Wire body the scanner decodes back to that command.
+    """
+    return _ciphered(framed[2:])
+
+
+def _radar_result(*, found: bool = True) -> bytes:
+    """Build a ciphered 0x46 RadarResult frame body.
+
+    Args:
+        found: Whether the scan reports an enemy.
+
+    Returns:
+        Wire body: the 0x46 type byte then the ciphered payload.
+    """
+    payload = encode_radar_result(RadarResultDict(msg_type=0x46, detection_type=0, found=found))
+    return _ciphered(bytes([0x46]) + payload)
+
+
 __all__ = [
     "FOREIGN_TANK",
     "MAGIC",
     "OWN_TANK",
     "_build_pickup",
     "_ciphered",
+    "_command",
     "_expected_body",
     "_payload",
+    "_radar_result",
     "_received",
     "_sent",
     "_session_json",

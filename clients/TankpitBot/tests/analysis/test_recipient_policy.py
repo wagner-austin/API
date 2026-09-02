@@ -50,6 +50,7 @@ from tests.analysis._capture_fixtures import (
     OWN_TANK,
     _build_pickup,
     _ciphered,
+    _command,
     _payload,
     _received,
     _sent,
@@ -62,24 +63,6 @@ _BUILD_PICKUP_INDEX = 0
 _TERRAIN_INDEX = 1
 _TOGGLE_INDEX = 2
 _TELEPORT_LANDED_INDEX = 6
-
-
-def _command(framed: bytes) -> bytes:
-    """Cipher one client command into its sent-frame body.
-
-    The production ``build_*_command`` helpers return a COMPLETE framed
-    message — a 2-byte LE length prefix, then ``!``, then the command —
-    so the prefix is dropped here and :func:`_payload` re-frames. Left
-    on, the frame's leading byte reads 0x05 instead of ``!`` and the
-    sweep correctly declines to treat it as a command at all.
-
-    Args:
-        framed: Bytes from a production ``build_*_command``.
-
-    Returns:
-        Wire body the scanner decodes back to that command.
-    """
-    return _ciphered(framed[2:])
 
 
 def _scan(tmp_path: Path, *messages: JSONObject) -> ScannedSessionDict:
