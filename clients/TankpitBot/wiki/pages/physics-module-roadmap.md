@@ -1204,6 +1204,60 @@ sections still describe the behaviour correctly, just not its address:[^2]
 split — the fidelity statement and every shadow verdict above stand as
 written[^3].
 
+### Resolve/narrate completed: combat was the last impure surface (2026-09-02)
+
+The 2026-07-31 split above gave the emission concerns their own
+modules but kept the two jobs inside each function: an emitter both
+MUTATED the world through a law module and appended the messages the
+single client should see. That is indistinguishable from correct while
+exactly one connection exists and wrong the moment a second appears,
+because calling such a function once per observer applies every
+mutation once per observer.
+
+`emissions.py` was replaced by the pure `sim/narrate/` package on
+2026-09-01. `combat_emissions.py` was the last holdout, and it held out
+because combat is the family with the most state: `emit_shot` resolved
+the shot, applied the radar-zero kill reward to the killer's counts,
+advanced the deferred-debit and corpse clocks, and wrote the wire, all
+in one call taking the client id. Narrating a second connection would
+have fired the shot twice.
+
+It is now three pieces:
+
+- **`combat.py`** — `process_shot` resolves the WHOLE shot, ballistics
+  and kill reward together, and returns an outcome carrying
+  `shooter_team` and `mercy` so narration re-reads nothing. The
+  reward's own resolver, `resolve_kill_mercy`, sits in `equipment.py`
+  beside the `MERCY_BUNDLE` constants it applies.
+- **`narrate/combat.py`** — `narrate_shot(outcome, observer_id)` and
+  `narrate_corpse_removals(tank_ids)`: pure, no mutation.
+- **`combat_clock.py`** — `CombatClock`, the deferred debits, the
+  corpse windows, and the kill book.
+
+The clock's placement is the correction the split was worth making
+for. Its predecessor hung off `ClientSession` because with one
+connection "the client's corpse clocks" and "the room's corpse
+clocks" were the same object. **They are not the same fact:** a corpse
+clears once for the field, a firing cost is billed once against the
+shooter, and a kill is scored once — however many connections watch.
+A per-connection copy fanned out across N connections would clear
+each corpse N times and bill each shot N times. `CombatClock` is
+field state on `SimServer`, keyed by tank, and the 0x56 Statistics
+answer reports the asking tank's row of a book the field keeps.
+
+`ClientSession` is now exactly three holders — viewport, progression,
+awards — and every one of them is genuinely per-connection. The shoot
+routing moved to `server_combat.py` alongside the existing
+`server_move.py` mixin, which kept `server.py` under the file
+ceiling and put both routers in the shape the whole emission side now
+follows: **resolve once against the world, book what the field must
+remember, narrate for one connection.**
+
+Multi-client items still open: the session registry, the
+`advance_tick` fan-out, per-connection command intake, mid-session
+join, and the per-connection window check at
+`server_move.py:89`. None of them is blocked on purity any more.
+
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
 The "healing ladder" gap died to a user correction ("tanks dont heal…

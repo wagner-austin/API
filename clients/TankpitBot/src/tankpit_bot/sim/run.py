@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TypedDict
 
 from platform_core.json_utils import dump_json_str
@@ -42,7 +43,6 @@ from tankpit_bot.sim.run_boot import (
     _queue_round_opponents,
 )
 from tankpit_bot.sim.scenarios import (
-    _SIM_DIR,
     SIM_CLIENT_ID,
     SIM_ENEMY_ID,
     SIM_MAGIC,
@@ -80,6 +80,7 @@ class SimRunResultDict(TypedDict):
 def run_sim_session(
     rounds: int,
     *,
+    archive_dir: Path,
     opponent: bool = True,
     practice: bool = False,
     ferry: bool = False,
@@ -92,6 +93,13 @@ def run_sim_session(
 
     Args:
         rounds: Maximum server ticks to play.
+        archive_dir: Directory the capture and world artifacts are
+            written to. Required rather than defaulted because WHICH
+            archive a session lands in decides which corpus the
+            response-shape differ later reads it as: ``runs/sim``
+            accumulates every generation of the sim ever run, so a
+            fidelity verdict has to be taken over a directory holding
+            one generation only ([[capture-differ]]).
         opponent: Whether the scripted opponent returns fire (ignored
             in practice and ferry modes).
         practice: Face the certified practice-bot roster
@@ -190,8 +198,8 @@ def run_sim_session(
             tracker.first_divergence_tick,
             tracker.final_drift,
         )
-    capture_path = _SIM_DIR / f"sim-{run_stamp}.capture_session.json"
-    world_path = _SIM_DIR / f"sim-{run_stamp}.world.json"
+    capture_path = archive_dir / f"sim-{run_stamp}.capture_session.json"
+    world_path = archive_dir / f"sim-{run_stamp}.world.json"
     session = build_capture_session(link, SIM_MAGIC, f"sim-{run_stamp}")
     _test_hooks.write_text(capture_path, dump_json_str(encode_capture_session(session)))
     _test_hooks.write_text(world_path, dump_json_str(encode_sim_world(server.world)))
@@ -225,8 +233,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     Args:
         argv: Command-line arguments (``--rounds N``,
             ``--no-opponent``, ``--stamp S``, ``--human-opponent
-            NAME``, ``--ferry``, ``--from-atlas [PATH]``). Uses
-            ``sys.argv[1:]`` when None.
+            NAME``, ``--ferry``, ``--from-atlas [PATH]``, ``--out
+            DIR``). Uses ``sys.argv[1:]`` when None.
 
     Returns:
         Process exit code (0 — a session that ends via the production
@@ -235,6 +243,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = _parse_cli(list(argv) if argv is not None else list(sys.argv[1:]))
     result = run_sim_session(
         parsed["rounds"],
+        archive_dir=Path(parsed["out"]),
         opponent=parsed["opponent"],
         practice=parsed["practice"],
         ferry=parsed["ferry"],

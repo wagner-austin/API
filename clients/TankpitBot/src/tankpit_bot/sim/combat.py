@@ -40,6 +40,7 @@ from tankpit_bot.physics.damage import (
     SINGLE_HIT_VICTIM_COST,
 )
 from tankpit_bot.sim.blocks import BLOCK_LAND, BLOCK_STACKED, block_tile_value
+from tankpit_bot.sim.equipment import MercyGrantDict, resolve_kill_mercy
 from tankpit_bot.sim.world import SimTankDict, SimWorldDict
 from tankpit_bot.state.scan_coverage import tile_key
 
@@ -83,9 +84,18 @@ class ShotOutcomeDict(TypedDict):
     or None. ``mine_cascade`` carries up to two detonation packets:
     the directly-shot mine, then its adjacent chain. ``shooter_debit``
     is the firing cost the server bills at the NEXT tick.
+
+    ``shooter_team`` and ``mercy`` are carried rather than looked up
+    because they are what narration needs and narration may run once
+    per connection: the team stamps the 0x53 echo, and the kill reward
+    is the one world effect a shot has that is not a hit. Reading
+    either from the world at emission time would make the wire depend
+    on WHEN a connection was narrated to rather than on what the shot
+    did.
     """
 
     shooter_id: int
+    shooter_team: int
     weapon: int
     source_x: int
     source_y: int
@@ -99,6 +109,7 @@ class ShotOutcomeDict(TypedDict):
     mine_cascade: list[list[tuple[int, int]]]
     shooter_debit: int
     ammo_slot: int | None
+    mercy: MercyGrantDict | None
     kind: Literal["shot"]
 
 
@@ -323,6 +334,7 @@ def _reroute_departed(
     weapon = WEAPON_HOMING if rerouted else WEAPON_SINGLE
     outcome = ShotOutcomeDict(
         shooter_id=shooter["tank_id"],
+        shooter_team=shooter["team"],
         weapon=weapon,
         source_x=shooter["x"],
         source_y=shooter["y"],
@@ -336,6 +348,7 @@ def _reroute_departed(
         mine_cascade=[],
         shooter_debit=_FIRING_COSTS[weapon],
         ammo_slot=None,
+        mercy=None,
         kind="shot",
     )
     if rerouted:
@@ -343,6 +356,76 @@ def _reroute_departed(
         _apply_hit(target, WEAPON_HOMING, outcome)
         shooter["counts"][SLOT_HOMING] = max(0, shooter["counts"][SLOT_HOMING] - 1)
         outcome["ammo_slot"] = SLOT_HOMING
+    return outcome
+
+
+def _resolve_impact(
+    world: SimWorldDict,
+    terrain: TerrainMapProtocol,
+    shooter: SimTankDict,
+    target_x: int,
+    target_y: int,
+    moved_this_tick: frozenset[int],
+) -> ShotOutcomeDict:
+    """Resolve one shot's ballistics against the current tile state.
+
+    The positional half of a shot: weapon selection, obstruction
+    clipping, the damage table, ammo debit and the mine cascade. The
+    departed-target reroute has its own resolver
+    (:func:`_reroute_departed`); the kill reward is applied by
+    :func:`process_shot` once either has produced an outcome.
+
+    Args:
+        world: Simulated world (mutated).
+        terrain: Static terrain of the world's field.
+        shooter: The firing tank (mutated on ammo debit).
+        target_x: Aim tile X, already rerouted to a visible target.
+        target_y: Aim tile Y.
+        moved_this_tick: Ids of tanks whose move commands processed
+            earlier in this same tick (drives homing selection).
+
+    Returns:
+        The typed outcome, with ``mercy`` not yet resolved.
+    """
+    enemy_at_click = _living_enemy_at(world, shooter, target_x, target_y)
+    impact_x, impact_y, obstructed = _clip_impact(world, terrain, shooter, target_x, target_y)
+    weapon = _select_weapon(
+        shooter,
+        enemy_at_click,
+        obstructed,
+        enemy_at_click is not None and enemy_at_click["tank_id"] in moved_this_tick,
+    )
+    if weapon in (WEAPON_MISSILE, WEAPON_HOMING):
+        impact_x, impact_y = target_x, target_y
+    outcome = ShotOutcomeDict(
+        shooter_id=shooter["tank_id"],
+        shooter_team=shooter["team"],
+        weapon=weapon,
+        source_x=shooter["x"],
+        source_y=shooter["y"],
+        aim_x=target_x,
+        aim_y=target_y,
+        impact_x=impact_x,
+        impact_y=impact_y,
+        victim_id=None,
+        victim_deactivated=False,
+        shields_consumed=0,
+        mine_cascade=[],
+        shooter_debit=_FIRING_COSTS[weapon],
+        ammo_slot=None,
+        mercy=None,
+        kind="shot",
+    )
+    victim = _living_enemy_at(world, shooter, impact_x, impact_y)
+    if victim is not None:
+        outcome["victim_id"] = victim["tank_id"]
+        _apply_hit(victim, weapon, outcome)
+        ammo_slot = _AMMO_SLOT.get(weapon)
+        if ammo_slot is not None:
+            shooter["counts"][ammo_slot] = max(0, shooter["counts"][ammo_slot] - 1)
+            outcome["ammo_slot"] = ammo_slot
+    else:
+        _detonate_mines(world, impact_x, impact_y, outcome)
     return outcome
 
 
@@ -357,6 +440,13 @@ def process_shot(
     departed_age_ms: int | None,
 ) -> ShotOutcomeDict:
     """Process one shoot command at the current tick.
+
+    The shot's whole world effect, in one call: the ballistics (or the
+    law-4 reroute, for a target that has already left the window),
+    then the radar-zero kill reward a deactivation earns. Both halves
+    resolve HERE so that nothing downstream has to mutate — the
+    narrator is a pure function of the outcome this returns
+    ([[recipient-policy]]).
 
     Args:
         world: Simulated world (mutated).
@@ -381,47 +471,14 @@ def process_shot(
     """
     shooter = world["tanks"][shooter_id]
     target = world["tanks"].get(target_id) if target_id != 0 else None
-    if target is not None and target["alive"]:
-        if departed_age_ms is not None:
-            return _reroute_departed(shooter, target, target_x, target_y, departed_age_ms)
-        target_x, target_y = target["x"], target["y"]
-    enemy_at_click = _living_enemy_at(world, shooter, target_x, target_y)
-    impact_x, impact_y, obstructed = _clip_impact(world, terrain, shooter, target_x, target_y)
-    weapon = _select_weapon(
-        shooter,
-        enemy_at_click,
-        obstructed,
-        enemy_at_click is not None and enemy_at_click["tank_id"] in moved_this_tick,
-    )
-    if weapon in (WEAPON_MISSILE, WEAPON_HOMING):
-        impact_x, impact_y = target_x, target_y
-    outcome = ShotOutcomeDict(
-        shooter_id=shooter_id,
-        weapon=weapon,
-        source_x=shooter["x"],
-        source_y=shooter["y"],
-        aim_x=target_x,
-        aim_y=target_y,
-        impact_x=impact_x,
-        impact_y=impact_y,
-        victim_id=None,
-        victim_deactivated=False,
-        shields_consumed=0,
-        mine_cascade=[],
-        shooter_debit=_FIRING_COSTS[weapon],
-        ammo_slot=None,
-        kind="shot",
-    )
-    victim = _living_enemy_at(world, shooter, impact_x, impact_y)
-    if victim is not None:
-        outcome["victim_id"] = victim["tank_id"]
-        _apply_hit(victim, weapon, outcome)
-        ammo_slot = _AMMO_SLOT.get(weapon)
-        if ammo_slot is not None:
-            shooter["counts"][ammo_slot] = max(0, shooter["counts"][ammo_slot] - 1)
-            outcome["ammo_slot"] = ammo_slot
+    if target is not None and target["alive"] and departed_age_ms is not None:
+        outcome = _reroute_departed(shooter, target, target_x, target_y, departed_age_ms)
     else:
-        _detonate_mines(world, impact_x, impact_y, outcome)
+        if target is not None and target["alive"]:
+            target_x, target_y = target["x"], target["y"]
+        outcome = _resolve_impact(world, terrain, shooter, target_x, target_y, moved_this_tick)
+    if outcome["victim_deactivated"]:
+        outcome["mercy"] = resolve_kill_mercy(world, shooter_id)
     return outcome
 
 

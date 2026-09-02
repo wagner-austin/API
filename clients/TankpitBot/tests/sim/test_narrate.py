@@ -203,6 +203,55 @@ def test_a_blocked_hop_confirms_the_origin_to_the_hopper_only() -> None:
     assert narrate_teleport(world, outcome, BYSTANDER) == []
 
 
+def test_a_landing_confirms_to_the_hopper_only() -> None:
+    """THE HOLE THE FIRST ONE-GENERATION BASELINE FOUND.
+
+    Refusals and blocked hops were pinned for both observers; a
+    SUCCESSFUL landing was pinned only for the actor, so the narrator
+    announced every tank's hop to every connection and nothing failed.
+    It showed up as wire: 31 of the practice roster's 76 teleport
+    windows read ``3Dself landed`` with no leading 0x5A, a shape the
+    live archive does not contain once in 10,683 teleport windows
+    (2026-09-02). TeleportLanded is per-recipient — 10,541 arrivals
+    against 10,683 own commands, ZERO zero-trigger
+    ([[recipient-policy]]) — and a foreign tank's new tile reaches the
+    client from the membership diff instead.
+    """
+    world = _world()
+    outcome = process_teleport(world, InMemoryTerrainMap(), ACTOR, 60, 60)
+    assert outcome["kind"] == "landed"
+
+    assert _kinds(narrate_teleport(world, outcome, ACTOR)) == [0x3D, "teleport_landed"]
+    assert narrate_teleport(world, outcome, BYSTANDER) == []
+
+
+def test_a_landings_auto_pick_records_still_broadcast() -> None:
+    """Only the confirm is private — observers still see consumption.
+
+    The records are how another connection learns the container
+    drained ([[recipient-policy]]), so gating the landing on the actor
+    must not take them with it.
+    """
+    world = _world()
+    world["containers"].append(SimContainerDict(x=60, y=60, volume=500, dotted=True))
+    # Fuel is left alone: the hop itself has to be affordable, and its
+    # cost is what opens the headroom the landing then picks up into.
+    outcome = process_teleport(world, InMemoryTerrainMap(), ACTOR, 60, 60)
+    assert outcome["kind"] == "landed"
+    assert outcome["pickups"]
+
+    assert _kinds(narrate_teleport(world, outcome, ACTOR)) == [
+        0x3D,
+        "teleport_landed",
+        "container_pickup",
+        "container_pickup",
+    ]
+    assert _kinds(narrate_teleport(world, outcome, BYSTANDER)) == [
+        "container_pickup",
+        "container_pickup",
+    ]
+
+
 def test_fuel_pickup_records_broadcast_and_the_close_does_not() -> None:
     """Observers track consumption through the records; the 0x44 and
     the 0x52 close are per-connection ([[fuel-system]])."""

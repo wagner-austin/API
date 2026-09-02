@@ -132,6 +132,60 @@ def _grant(tank: SimTankDict) -> list[int]:
     return gained
 
 
+class MercyGrantDict(TypedDict):
+    """The silent multi-slot bundle one radar-zero kill granted.
+
+    Attributes:
+        killer_id: The tank that scored the kill and holds the bundle.
+            Narration is per-recipient on this id — production treats
+            any 0x67 as a SELF gain ([[recipient-policy]]).
+        gained: The five-slot 0x67 payload added to the killer's
+            counts, captured at resolution so the narrator never
+            re-reads them.
+    """
+
+    killer_id: int
+    gained: list[int]
+
+
+def resolve_kill_mercy(world: SimWorldDict, killer_id: int) -> MercyGrantDict | None:
+    """Apply the radar-zero kill reward (archive-cracked 2026-07-22).
+
+    A kill scored while the killer's extra-radar count is ZERO grants
+    a silent (``show_message=False``) multi-slot bundle — deterministic
+    in the corpus: 5/5 radar-zero kills granted, 0/254 kills at
+    radar > 0 granted, no exceptions. Measured amounts: dual +1..4,
+    homing exactly +1, radar +1..2, and the bundle may OVERFILL past
+    the 25 cap (one sample landed dual at 26). The sim grants the
+    deterministic medians (+2/+1/+1), which is why no cap clip runs
+    here.
+
+    This is the RESOLVE half of the reward: it owns the whole world
+    effect, so
+    :func:`tankpit_bot.sim.narrate.combat.narrate_shot` can decide who
+    hears about it without touching the counts. Before the split, the
+    grant was applied inside the emitter, so fanning that emitter out
+    across connections would have paid the bundle once per observer
+    ([[physics-module-roadmap]]).
+
+    Args:
+        world: Simulated world (mutated: the bundle is added to the
+            killer's counts when the reward triggers).
+        killer_id: The tank that scored the kill.
+
+    Returns:
+        The resolved grant, or None when the killer held extra radars
+        and the reward does not trigger.
+    """
+    killer = world["tanks"][killer_id]
+    if not kill_grants_mercy(killer["counts"][RADAR_SLOT]):
+        return None
+    gained = list(MERCY_BUNDLE)
+    for slot, amount in enumerate(gained):
+        killer["counts"][slot] += amount
+    return MercyGrantDict(killer_id=killer_id, gained=gained)
+
+
 def toggle_equipment_slot(world: SimWorldDict, tank_id: int, slot: int) -> None:
     """Flip one equipment slot for a tank.
 
@@ -163,7 +217,9 @@ __all__ = [
     "WEAPON_STACK",
     "WEAPON_STACK_ROLL",
     "EquipmentGrantDict",
+    "MercyGrantDict",
     "kill_grants_mercy",
     "resolve_equipment_pickup",
+    "resolve_kill_mercy",
     "toggle_equipment_slot",
 ]

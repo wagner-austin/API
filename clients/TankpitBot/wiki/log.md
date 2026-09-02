@@ -5524,3 +5524,46 @@ Operator ruling, verbatim: *"ferries only move when someone is riding them and m
 **Method note worth keeping.** The operator asked "ferries only move when a player moves them, right?" before any of this was measured, and was right. The answer had been on [[ferry-mechanics]] since 2026-08-04. I had read `sim/ferries.py`'s own docstring first and taken it as the law — a module's account of the mechanic it implements is not evidence for that mechanic. Grep the wiki first.
 
 Gate: 367 sim tests, guard exit 0, ruff and mypy strict clean over 1,212 files.
+
+---
+## [2026-09-02] lift | Combat resolve/narrate closed, and the first one-generation sim baseline
+
+Three items in one pass: the last impure emission surface, a fidelity baseline that measures the CURRENT sim, and the full gate.
+
+### `make check` is green
+
+**6,771 tests, 100.00% statements AND branches over 33,437 statements / 9,582 branches, guard exit 0, mypy strict clean over 1,217 files.** The gate had been blocked for days by another session's uncommitted `bot/ai` work; that landed in `a386d152` and the tree is clean.
+
+### Combat resolve/narrate — the last impure surface
+
+`combat_emissions.py` was the one emitter still doing both jobs: `emit_shot` resolved the shot, applied the radar-zero kill reward to the killer's counts, advanced two clocks, and wrote the wire, in one call taking the client id. Narrating a second connection would have fired the shot twice. Now three pieces — `process_shot` resolving ballistics AND reward into one outcome carrying `shooter_team` and `mercy`; `narrate/combat.py` pure; `combat_clock.py` holding the clocks.
+
+**The clock's placement is the correction worth having made.** It hung off `ClientSession` because with one connection "the client's corpse clocks" and "the room's corpse clocks" were the same object. They are not the same fact: a corpse clears once for the field, a firing cost is billed once against the shooter, a kill is scored once. A per-connection copy fanned out across N connections clears each corpse N times. `ClientSession` is now exactly three holders and every one is genuinely per-connection ([[physics-module-roadmap]]).
+
+Shoot routing moved to `server_combat.py` beside the existing `server_move.py` mixin — `server.py` had crossed the 600-line ceiling, and the guard said so.
+
+### The baseline was a graveyard, and the sim is byte-deterministic
+
+Two findings, both measured ([[capture-differ]]):
+
+`runs/sim` is where `tankpit-sim-run` has always archived, so it accumulates every generation of the sim ever run. On 2026-09-02 it held 91 sessions of which **76 predated that morning's fixes**, and the differ reported **36 invented laws** most of which existed in no code path any more — `shoot 53self 49` n=709, `radar 4F 46 49` n=601, all fixed weeks earlier and still being reported.
+
+And repetition cannot fix it, because **three sessions of the same scenario produced byte-identical wire** — 168 messages, same payloads, same order, same file size. Running one scenario N times adds N copies of one sample. A baseline widens by SCENARIO and deepens by ROUNDS, never by repetition.
+
+`make sim-baseline` (`scripts/build_sim_baseline.py`) sweeps five scenarios into a stamped directory that has never held anything else, then diffs exactly those sessions. First verdict: **invented laws 36 -> 4**, and every surviving row is n=1 (queue-compression artifacts). Across 527 windows from the current sim, every shape it produces more than once also occurs in the 73,053-window live archive.
+
+### What the fresh baseline caught on its first run
+
+`teleport 3Dself landed` at n=31 — a confirm with no leading 0x5A, a shape the live archive does not contain once in 10,683 teleport windows. All 31 came from `practice`, the only scenario whose bots teleport off, and the cause was a recipient-policy hole: `narrate_teleport` gated its refusal and blocked branches on the actor and **narrated every successful landing to every observer**. TeleportLanded is per-recipient — 10,541 arrivals against 10,683 own commands, zero zero-trigger ([[recipient-policy]]). Gating it took invented laws 7 -> 4 and the row to zero.
+
+**The tests had refusals and blocked hops pinned for both observers and the successful landing pinned only for the actor, so nothing failed.** Same shape as every other miss in this log: a check that cannot observe its own failure.
+
+### What is still not answerable, stated plainly
+
+The MISSING-law side reports 208 rows and means almost nothing, and the differ is not the reason. Four of five scenarios end in 11-79 rounds through the production bot's own exit path (`no_viable_targets`, `no_productive_collect`); only `practice` sustains 400. Raising `--rounds` deepens one scenario and nothing else. 527 sim windows cannot support "the sim never does this" against 73,053 live ones. Closing that needs scenarios that keep the bot supplied with work — not a bigger round budget, and not more copies of the same session.
+
+### A standards conflict, flagged rather than silently resolved
+
+The stated rule is "every TypedDict needs encode/decode functions". The repo's actual practice is codecs at SERIALIZATION BOUNDARIES: in `sim/` only `world.py`, `commands.py` and `fuel_pickup.py` have them, against ~30 TypedDicts. `fuel_pickup`'s pair (written 2026-09-01 under the literal rule) has exactly one caller — a round-trip test that exists to cover it. I followed the boundary convention for combat rather than propagate code kept alive by its own test, and am flagging it rather than deciding a repo-wide sweep unasked.
+
+Multi-client items still open: session registry, `advance_tick` fan-out, per-connection command intake, mid-session join, the per-connection window check at `server_move.py:89`. None is blocked on purity any more.

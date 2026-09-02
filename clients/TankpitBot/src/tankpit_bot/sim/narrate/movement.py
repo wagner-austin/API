@@ -146,6 +146,27 @@ def narrate_teleport(
     sent CANT_GO here, a wire shape the live server never produces
     for teleports ([[teleport-mechanics]] § the refusal law).
 
+    A LANDING IS PER-RECIPIENT, measured 2026-09-02: 10,541
+    TeleportLanded arrived against 10,683 own teleport commands, with
+    ZERO zero-trigger arrivals across 341 sessions
+    ([[recipient-policy]]) — another tank's hop is never announced to
+    this connection. The position statement is withheld for the same
+    reason the join burst withholds one: a foreign tank's new tile
+    reaches the client from the end-of-tick membership diff, and
+    stating it here as well would DOUBLE it, the identical trap
+    ``SimServer.relocate_tank`` documents.
+
+    The sim narrated every landing to every observer until the first
+    one-generation baseline caught it (2026-09-02): 31 of the practice
+    roster's 76 teleport windows read ``3Dself landed`` with no
+    leading 0x5A — a shape the live archive does not contain once in
+    10,683 teleport windows, because on the real wire a confirm only
+    ever follows the connection's OWN hop. Only the practice scenario
+    produced it, being the only one whose bots teleport off.
+
+    The auto-pick records still broadcast: observers track container
+    consumption through them ([[recipient-policy]]).
+
     Args:
         world: Simulated world, post-teleport. Read only.
         outcome: The teleport's resolved outcome.
@@ -174,10 +195,12 @@ def narrate_teleport(
             position_statement(world, tank_id),
             TeleportLandedDict(msg_type="teleport_landed", subtype=TELEPORT_LANDED_SUBTYPE),
         ]
-    messages: list[BinaryMessage] = [
-        position_statement(world, tank_id),
-        TeleportLandedDict(msg_type="teleport_landed", subtype=TELEPORT_LANDED_SUBTYPE),
-    ]
+    messages: list[BinaryMessage] = []
+    if is_actor:
+        messages.append(position_statement(world, tank_id))
+        messages.append(
+            TeleportLandedDict(msg_type="teleport_landed", subtype=TELEPORT_LANDED_SUBTYPE)
+        )
     if outcome["pickups"]:
         # The duplicate-record law: landing auto-picks double their
         # container record (31% of 7,176 live teleports read

@@ -9,6 +9,10 @@ related:
   - "[[mine-mechanics]]"
   - "[[equipment-system]]"
 source_paths:
+  - "src/tankpit_bot/sim/narrate/movement.py"
+  - "src/tankpit_bot/sim/narrate/combat.py"
+  - "src/tankpit_bot/sim/narrate/resources.py"
+  - "src/tankpit_bot/sim/narrate/world.py"
   - "src/tankpit_bot/sim/emissions.py"
   - "src/tankpit_bot/sim/combat_emissions.py"
   - "src/tankpit_bot/sim/server.py"
@@ -85,6 +89,36 @@ sessions where the client never triggered one.[^1]
 it carries no tank id and is a per-connection view resync — and its
 trigger set is genuinely multi-source (1,277 of 1,528 follow a
 move).[^10]
+
+## The sim broke the TeleportLanded rule for two months (2026-09-02)
+
+The per-recipient table above has carried `TeleportLanded — 10,541
+received, 10,683 own triggers, **0** zero-trigger arrivals` since the
+sweep. The simulator violated it anyway: `narrate_teleport` gated its
+refusal and blocked branches on the actor and narrated every
+SUCCESSFUL landing to every observer, so a practice bot hopping away
+announced itself to the client as `3Dself landed`.
+
+It survived because the tests pinned the two branches that were right
+and left the one that was wrong unpinned for a bystander — and because
+no single-client run can tell the two apart. The first one-generation
+response-shape baseline caught it on the wire: 31 of the practice
+roster's 76 teleport windows carried a confirm with no leading 0x5A, a
+shape the live archive does not contain once in 10,683 teleport
+windows ([[capture-differ]]).
+
+The position statement went with it, for a second measured reason: a
+foreign tank's new tile reaches a client from the end-of-tick
+membership diff, so stating it at teleport time DOUBLES it — the same
+trap `SimServer.relocate_tank` already documents for ghost placement.
+The landing's auto-pick records still broadcast; observers track
+container consumption through them.
+
+**The general rule this is the second instance of:** a per-recipient
+message narrated without an `observer_id` gate passes every
+single-client test in the suite. Only two things catch it — a
+bystander assertion in the narrator's own test, and the response-shape
+differ against a fresh baseline.
 
 ## 0x74 is a join message, not a toggle response
 

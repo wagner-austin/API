@@ -7,13 +7,15 @@ related:
   - "[[viewport-shift-protocol]]"
   - "[[ferry-mechanics]]"
 source_paths:
+  - "scripts/build_sim_baseline.py"
+  - "scripts/analyze_response_shapes.py"
   - "analysis_scripts/mine_container_atlas.py"
   - "analysis_scripts/diff_server_laws.py"
   - "runs/analysis"
 source_git_blobs:
   "analysis_scripts/mine_container_atlas.py": "b94d5f5fd8ee4369d02a9a8d50143ed059688067"
   "analysis_scripts/diff_server_laws.py": "7bb83c8dd8aee438f9ad0e3da1f00dc01ef2829b"
-fact_checked: "2026-08-07"
+fact_checked: "2026-09-02"
 confidence: high
 hubs: [protocol]
 ---
@@ -201,15 +203,101 @@ archive (310 sessions, 29 bot-hours) and closed the loop:[^7]
   ghosts reactivate by the corpse-window law. Human-named ghosts
   stay pure recordings. Remaining: per-player human style models.
 
+## The baseline is the measurement (2026-09-02)
+
+A response-shape verdict is only as good as the sim corpus behind it,
+and until 2026-09-02 that corpus was `runs/sim` — which is not a
+corpus. It is a **graveyard**: `tankpit-sim-run` has always archived
+there, so it accumulates every generation of the sim ever run. On
+2026-09-02 it held 91 sessions of which **76 predated that morning's
+fixes**, and the differ dutifully reported **36 invented laws** most of
+which existed in no code path any more (`shoot 53self 49` n=709,
+`radar 4F 46 49` n=601, `teleport landed 3Dself 5A` n=302 — all fixed
+weeks earlier, all still being reported). A verdict taken over that
+directory describes the union of every sim ever written.
+
+### The sim is byte-deterministic, so repetition buys nothing
+
+Three sessions of the same scenario run minutes apart produced
+**identical wire** — 168 messages, the same payloads in the same
+order, the same file size to the byte. That kills the obvious way to
+enlarge a baseline: running one scenario N times adds N copies of one
+sample and no information at all. The 91-session archive was never 91
+samples either.
+
+A baseline therefore widens by **scenario** and deepens by **rounds**,
+never by repetition. `scripts/build_sim_baseline.py`
+(`make sim-baseline`) sweeps five scenarios that drive genuinely
+different command vocabularies out of the production bot — `duel`,
+`solo`, `practice`, `ferry`, `human` — into a stamped directory that
+has never held anything else, then diffs exactly those sessions.[^10]
+
+### First one-generation verdict
+
+| | mixed `runs/sim` (91 sessions) | fresh baseline (5 scenarios) |
+|---|---|---|
+| sim windows | 11,805 | 527 |
+| invented laws | **36** | **4** |
+| largest invented row | n=709 | **n=1** |
+
+Every invented row above n=1 disappeared, which is the measurement
+that the 36 were historical. The four survivors are all single-sample
+queue-compression artifacts (a chat window that swallowed the radar
+answers; a fuel-pickup window that swallowed a trailing 0x5A).
+
+**Across 527 command windows from the current sim, every response
+shape it produces more than once also occurs in the 73,053-window live
+archive.**
+
+### What the fresh baseline immediately caught
+
+The first run reported `teleport  3Dself landed` at **n=31** — a
+teleport confirm with no leading 0x5A. The live archive does not
+contain that shape once in 10,683 teleport windows: every live confirm
+reads `5A 3Dself landed` (56.7%) or `5A 3Dself landed pickup pickup`
+(38.5%).
+
+Attributing it by scenario put all 31 in `practice`, the only scenario
+whose bots teleport off — and the cause was a recipient-policy hole:
+`narrate_teleport` gated its refusal and blocked branches on the actor
+but **narrated every successful landing to every observer**. On the
+real wire TeleportLanded is per-recipient (10,541 arrivals against
+10,683 own commands, **zero** zero-trigger — see [[recipient-policy]]),
+and a foreign tank's new tile reaches a client from the end-of-tick
+membership diff, so stating it here doubled it as well. Gating the
+landed branch on the actor took the invented rows from 7 to 4 and the
+row itself to zero. The auto-pick records still broadcast.
+
+The tests had refusals and blocked hops pinned for both observers and
+the successful landing pinned only for the actor — so nothing failed.
+That is the same shape as every other miss recorded here: **a check
+that cannot observe its own failure.**
+
+### What is still not answerable
+
+The MISSING-law side reported 208 rows and means almost nothing, and
+the reason is not the differ. Four of the five scenarios end in 11–79
+rounds through the production bot's own exit path
+(`no_viable_targets`, `no_productive_collect`); only `practice`
+sustains 400. Raising `--rounds` therefore deepens one scenario and
+nothing else, and 527 sim windows cannot support "the sim never does
+this" against 73,053 live ones. Closing that gap needs scenarios that
+keep the bot supplied with work, not a bigger round budget.
+
 ## How to re-run
 
 ```
 poetry run python analysis_scripts/mine_container_atlas.py
 poetry run python analysis_scripts/analyze_container_atlas.py
 poetry run python analysis_scripts/mine_deposit_attribution.py
-# fresh sim baseline (any stamps sharing a prefix), then:
-poetry run python analysis_scripts/diff_server_laws.py "" sim-<prefix>
+# the fidelity verdict: generate a one-generation corpus and diff it
+make sim-baseline
+# re-read an existing baseline without regenerating it
+poetry run python -m scripts.analyze_response_shapes runs/sim-baseline/<stamp>
 ```
+
+Never diff against bare `runs/sim` for a verdict — see "The baseline
+is the measurement" above.
 
 Every future live session extends the atlas and the shape corpus for
 free; every sim law change re-verifies against 38,000+ recorded
@@ -245,4 +333,5 @@ coverage, harvest memory, and belief freshness exactly like a
 [^6]: **Point-in-time measurement, no committed artifact.** The 10/150-round / first-divergence-2 / drift-53 baseline was read from a ghost replay of `runs/bot/bot-20260802-205105` on 2026-08-02. The capture is on disk; the replay summary is not, so re-run rather than carry the numbers forward.
 [^7]: `src/tankpit_bot/sim/bot_policy.py` — the archive-mined roster policy. The reactive-ghost driver is `PracticeRoomDriver` at `src/tankpit_bot/sim/practice_room.py:84`, pinned by `tests/sim/test_ghost_reactive.py`. Verified present 2026-08-07.
 [^8]: `analysis_scripts/mine_container_atlas.py:41-45` — the migration note recording that both mining scripts now read through `scan_session` (`src/tankpit_bot/analysis/scan.py:121`) and that results reproduce exactly.
+[^10]: `scripts/build_sim_baseline.py` — the one-generation baseline builder behind `make sim-baseline`; its scenario matrix is `SCENARIOS` and the per-run archive directory reaches `run_sim_session` through the `--out` flag (`src/tankpit_bot/sim/run.py:80`). The determinism measurement compared `runs/sim/sim-20260902-155056`, `-155100` and `-155104` payload-by-payload. Verified present 2026-09-02.
 [^9]: `run_sim_session` at `src/tankpit_bot/sim/run.py:80`, paced by `TickPacedClock` at `src/tankpit_bot/sim/run_boot.py:57`. Verified present 2026-08-07.

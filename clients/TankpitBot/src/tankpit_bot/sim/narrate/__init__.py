@@ -18,6 +18,7 @@ those are is measured, not assumed ([[recipient-policy]]).
 
 from __future__ import annotations
 
+from tankpit_bot.sim.narrate.combat import narrate_corpse_removals, narrate_shot
 from tankpit_bot.sim.narrate.movement import (
     TELEPORT_LANDED_SUBTYPE,
     narrate_fuel_pickup,
@@ -37,12 +38,14 @@ __all__ = [
     "TELEPORT_LANDED_SUBTYPE",
     "narrate_block_action",
     "narrate_chat",
+    "narrate_corpse_removals",
     "narrate_equipment_pickup",
     "narrate_equipment_toggle",
     "narrate_fuel_pickup",
     "narrate_mine_press",
     "narrate_move",
     "narrate_radar",
+    "narrate_shot",
     "narrate_teleport",
     "pickup_message",
 ]

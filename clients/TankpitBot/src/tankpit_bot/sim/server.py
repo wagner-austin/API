@@ -9,9 +9,9 @@ damage bills instantly inside :mod:`tankpit_bot.sim.combat`.
 The server here is routing and orchestration only. Each concern owns
 its module: :mod:`tankpit_bot.sim.viewport_window` (the client's
 stored 0x5A window, patch memory, and visibility diffs),
-:mod:`tankpit_bot.sim.combat_emissions` (shots, kill rewards, the
-deferred-debit and corpse-window clocks),
-:mod:`tankpit_bot.sim.emissions` (per-command wire emission), and
+:mod:`tankpit_bot.sim.combat_clock` (the deferred-debit and
+corpse-window clocks and the kill book),
+:mod:`tankpit_bot.sim.narrate` (pure per-observer wire narration), and
 :mod:`tankpit_bot.sim.wire_statements` (pure message builders).
 
 The processor emits decoded ``BinaryMessage`` dicts; the transport
@@ -31,9 +31,8 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.actions import build_map_data, process_mine_press, process_radar
 from tankpit_bot.sim.blocks import process_block_press
-from tankpit_bot.sim.bot_policy import reactivate_practice_bot
 from tankpit_bot.sim.client_session import ClientSession
-from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS
+from tankpit_bot.sim.combat_clock import CORPSE_WINDOW_TICKS, CombatClock
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.equipment import toggle_equipment_slot
 from tankpit_bot.sim.narrate import (
@@ -43,6 +42,7 @@ from tankpit_bot.sim.narrate import (
     narrate_mine_press,
     narrate_radar,
 )
+from tankpit_bot.sim.server_combat import SimServerCombatMixin
 from tankpit_bot.sim.server_move import SimServerMoveMixin
 from tankpit_bot.sim.visitors import RoomChurn
 from tankpit_bot.sim.wire_statements import (
@@ -75,15 +75,15 @@ _SUPPORTED_KINDS = frozenset(
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
 
 
-class SimServer(SimServerMoveMixin):
+class SimServer(SimServerCombatMixin, SimServerMoveMixin):
     """The fake server: one world, one command queue, one client.
 
     The server owns FIELD state directly — the world, its terrain, the
-    command queue every tank feeds, and the room's churn — and holds
-    the connected client's own state in a :class:`ClientSession`. That
-    boundary is the point: the session's four holders are precisely
-    what a second connection would need its own copy of, and nothing
-    else here is.
+    command queue every tank feeds, the room's churn, and the combat
+    clocks — and holds the connected client's own state in a
+    :class:`ClientSession`. That boundary is the point: the session's
+    three holders are precisely what a second connection would need
+    its own copy of, and nothing else here is.
 
     ``client_id`` is the tank whose connection this server speaks for
     — it receives its own fuel syncs and inventory snapshots; other
@@ -111,6 +111,10 @@ class SimServer(SimServerMoveMixin):
         self.world = world
         self.terrain = terrain
         self.session = ClientSession(world, terrain, client_id)
+        # FIELD state, deliberately not on the session: a corpse
+        # clears once for the room and a firing cost is billed once
+        # against the shooter, however many connections watch.
+        self.combat = CombatClock(world)
         self._roster_ids = roster_ids
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_announcements: list[BinaryMessage] = []
@@ -321,15 +325,7 @@ class SimServer(SimServerMoveMixin):
             self._process_move_command(tank_id, kind, command, messages, ammo_changed, moved)
             return
         if kind == "shoot":
-            self.session.combat.emit_shot(
-                self.world["tanks"][tank_id]["team"],
-                messages,
-                ammo_changed,
-                tank_id,
-                command,
-                frozenset(moved),
-                self.session.viewport.removed_at.get(command["target_id"]),
-            )
+            self._process_shoot_command(tank_id, command, messages, ammo_changed, moved)
             return
         if kind == "teleport":
             self._process_teleport_command(tank_id, command, messages, ammo_changed, moved)
@@ -379,8 +375,8 @@ class SimServer(SimServerMoveMixin):
                 messages.append(
                     statistics_statement(
                         self.world["tick"],
-                        self.session.combat.client_destroyed,
-                        self.session.combat.client_deactivated,
+                        self.combat.destroyed_by(self.session.client_id),
+                        self.combat.deactivations_of(self.session.client_id),
                     )
                 )
             return
@@ -462,7 +458,7 @@ class SimServer(SimServerMoveMixin):
         messages: list[BinaryMessage] = list(self._pending_announcements)
         self._pending_announcements = []
         ammo_changed: set[int] = set()
-        self.session.combat.apply_pending_debits()
+        self.combat.apply_pending_debits()
         moved: set[int] = set()
         # Within-round resolution order is ASCENDING TANK ID — the
         # measured law (2026-07-25, `analysis_scripts/mine_round_order.py`:
@@ -486,14 +482,7 @@ class SimServer(SimServerMoveMixin):
             for message in messages
         ):
             self.session.progression.note_deactivation(self.world, messages)
-        for tank_id in self.session.combat.expire_corpses(messages):
-            if tank_id in self._roster_ids:
-                # Roster bots come back the same tick their corpse
-                # clears: same id, full fuel, respawned FAR from
-                # the corpse — the viewport diff below announces
-                # them if the landing is in view, and the sync
-                # loop resumes their tier-3 cadence either way.
-                reactivate_practice_bot(self.world, self.terrain, tank_id)
+        self._close_corpse_windows(messages)
         # Room churn runs BEFORE the viewport diff, so a visitor who
         # lands inside the client's window is announced by the same
         # membership pass that announces any other arrival
@@ -530,8 +519,8 @@ class SimServer(SimServerMoveMixin):
         # ([[session-state-deglobalisation]]).
         self.session.awards.advance(
             self.world["tanks"][self.session.client_id]["rank"],
-            self.session.combat.client_destroyed,
-            self.session.combat.client_deactivated,
+            self.combat.destroyed_by(self.session.client_id),
+            self.combat.deactivations_of(self.session.client_id),
             self.world["tick"] * TICK_RATE_MS // 1000,
             messages,
         )

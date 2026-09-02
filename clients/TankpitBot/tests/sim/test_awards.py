@@ -164,12 +164,20 @@ def test_the_join_burst_carries_the_clients_awards() -> None:
 
 
 def test_the_server_grants_on_the_tick() -> None:
-    """The tick processor drives the ledger, not just the unit."""
+    """The tick processor drives the ledger, not just the unit.
+
+    The kills are booked through the field's real recording API — the
+    same call a resolved deactivation makes — rather than by writing a
+    counter, so the award reads the kill book the 0x56 answer reads.
+    Each victim is distinct because a deactivation opens that victim's
+    corpse window, and one tank cannot die a hundred times at once.
+    """
     from tankpit_bot.sim.server import SimServer
 
     world = _world()
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
-    server.session.combat.client_destroyed = TANK_KILLS[0]
+    for victim_id in range(1000, 1000 + TANK_KILLS[0]):
+        server.combat.record_deactivation(9, victim_id)
 
     batch = server.advance_tick()
 

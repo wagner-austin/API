@@ -39,6 +39,10 @@ from tankpit_bot.types import decode_capture_session
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+#: Where these sessions archive. The fake file system captures the
+#: writes, so this names the real default rather than a temp path.
+_SIM_ARCHIVE = Path("runs") / "sim"
+
 
 def _install_fake_terrain(fake_fs: FakeFileSystem) -> None:
     """Provide the field GIF and an all-passable terrain loader.
@@ -85,7 +89,7 @@ def test_seed_validation_rejects_impassable_tiles() -> None:
 def test_run_writes_capture_world_and_events(fake_fs: FakeFileSystem) -> None:
     """A short session archives all three artifacts in standard shapes."""
     _install_fake_terrain(fake_fs)
-    result = run_sim_session(12, opponent=True, stamp="20260722-000004")
+    result = run_sim_session(12, archive_dir=_SIM_ARCHIVE, opponent=True, stamp="20260722-000004")
     assert result["stamp"] == "20260722-000004"
     assert 0 < result["rounds_played"] <= 12
     assert result["commands_sent"] > 0
@@ -112,7 +116,7 @@ def test_run_records_a_production_session_exit(fake_fs: FakeFileSystem) -> None:
     run must record the ``SessionExitError`` instead of crashing.
     """
     _install_fake_terrain(fake_fs)
-    result = run_sim_session(200, opponent=False, stamp="20260722-000005")
+    result = run_sim_session(200, archive_dir=_SIM_ARCHIVE, opponent=False, stamp="20260722-000005")
     assert result["rounds_played"] < 200
     assert result["exit_reason"] in (
         "no_viable_targets",
@@ -126,7 +130,7 @@ def test_run_records_a_production_session_exit(fake_fs: FakeFileSystem) -> None:
 def test_boot_refuses_missing_terrain_and_missing_key(fake_fs: FakeFileSystem) -> None:
     """Both boot preconditions fail loudly, never best-effort."""
     with pytest.raises(RuntimeError, match="terrain GIF"):
-        run_sim_session(1, opponent=False, stamp="20260722-000006")
+        run_sim_session(1, archive_dir=_SIM_ARCHIVE, opponent=False, stamp="20260722-000006")
     _install_fake_terrain(fake_fs)
     fake_fs.remove(static_key_file_path())
     # The static KEY is cached process-wide (only the session TABLE is
@@ -134,7 +138,7 @@ def test_boot_refuses_missing_terrain_and_missing_key(fake_fs: FakeFileSystem) -
     # the earlier boot already read it ([[session-state-deglobalisation]]).
     reset_static_key_cache()
     with pytest.raises(XorStaticKeyUnavailableError, match="static XOR key unavailable"):
-        run_sim_session(1, opponent=False, stamp="20260722-000007")
+        run_sim_session(1, archive_dir=_SIM_ARCHIVE, opponent=False, stamp="20260722-000007")
 
 
 def test_main_parses_arguments_and_reports(fake_fs: FakeFileSystem) -> None:
@@ -146,6 +150,31 @@ def test_main_parses_arguments_and_reports(fake_fs: FakeFileSystem) -> None:
     assert exit_code == 0
     files = fake_fs.get_written_files()
     assert any("sim-20260722-000008.capture_session.json" in path for path in files)
+
+
+def test_out_sends_the_archive_somewhere_other_than_runs_sim(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """``--out`` is what makes a one-generation baseline possible.
+
+    ``runs/sim`` accumulates every sim ever run, so a fidelity verdict
+    taken over it describes their union. ``scripts.build_sim_baseline``
+    points each sweep at a directory of its own through this flag; the
+    capture and the world must both follow it, or the baseline would
+    be a directory holding half a session ([[capture-differ]]).
+    """
+    _install_fake_terrain(fake_fs)
+    elsewhere = Path("runs") / "sim-baseline" / "20260902-000001"
+
+    exit_code = main(
+        ["--rounds", "3", "--no-opponent", "--stamp", "20260902-000001", "--out", str(elsewhere)]
+    )
+
+    assert exit_code == 0
+    files = fake_fs.get_written_files()
+    assert str(elsewhere / "sim-20260902-000001.capture_session.json") in files
+    assert str(elsewhere / "sim-20260902-000001.world.json") in files
+    assert not any(path.startswith(str(_SIM_ARCHIVE) + "\\") for path in files)
 
 
 def test_human_opponent_session_runs_under_the_consent_gate(fake_fs: FakeFileSystem) -> None:
@@ -197,7 +226,7 @@ def test_practice_session_seeds_the_mined_layout_and_population(
     container field (dotted atlas + hidden fuel + hidden equipment).
     The session archives normally."""
     _install_fake_terrain(fake_fs)
-    result = run_sim_session(14, practice=True, stamp="20260725-000001")
+    result = run_sim_session(14, archive_dir=_SIM_ARCHIVE, practice=True, stamp="20260725-000001")
     assert result["rounds_played"] >= 1
     layout = select_practice_layout("20260725-000001")
     world_doc = narrow_json_to_dict(load_json_str(fake_fs.read_text(Path(result["world_path"]))))
@@ -509,4 +538,4 @@ def test_a_session_whose_join_never_reaches_a_room_fails_loudly(
     fake_env.set("TANKPIT_ROOM", "Atlantis")
 
     with pytest.raises(RuntimeError, match="did not reach a room"):
-        run_sim_session(3, opponent=True, stamp="20260807-000001")
+        run_sim_session(3, archive_dir=_SIM_ARCHIVE, opponent=True, stamp="20260807-000001")

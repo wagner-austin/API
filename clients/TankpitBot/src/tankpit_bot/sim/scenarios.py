@@ -332,7 +332,13 @@ def _resolve_session_mode(
 
 
 class _CliArgsDict(TypedDict):
-    """The sim CLI's parsed flags."""
+    """The sim CLI's parsed flags.
+
+    ``out`` is the archive directory the session's capture and world
+    land in; it defaults to the shared ``runs/sim`` archive and is
+    pointed elsewhere by ``scripts.build_sim_baseline``, which needs a
+    directory holding exactly one generation of the sim.
+    """
 
     rounds: int
     opponent: bool
@@ -342,10 +348,78 @@ class _CliArgsDict(TypedDict):
     ghost: str | None
     stamp: str | None
     opponent_name: str
+    out: str
+
+
+def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
+    """Apply one flag whose meaning is carried by the NEXT token.
+
+    Args:
+        parsed: The bundle being filled (mutated on a match).
+        token: The flag token.
+        value: The token following it.
+
+    Returns:
+        True when ``token`` is a valued flag and both tokens are
+        consumed; False when it is not one, leaving it for
+        :func:`_apply_bare_flag`.
+
+    Raises:
+        ValueError: If ``--rounds`` names a non-integer. A tick count
+            the caller mistyped is not something to guess at.
+    """
+    if token == "--rounds":
+        parsed["rounds"] = int(value)
+    elif token == "--ghost":
+        parsed["ghost"] = value
+    elif token == "--stamp":
+        parsed["stamp"] = value
+    elif token == "--human-opponent":
+        parsed["opponent_name"] = value
+    elif token == "--out":
+        parsed["out"] = value
+    else:
+        return False
+    return True
+
+
+def _apply_bare_flag(parsed: _CliArgsDict, token: str, rest: list[str]) -> int:
+    """Apply one flag that stands on its own.
+
+    ``--from-atlas`` is the reason this takes ``rest`` rather than a
+    single value: its path is OPTIONAL, so it reads the next token
+    only when that token is not itself a flag.
+
+    Args:
+        parsed: The bundle being filled (mutated on a match).
+        token: The flag token.
+        rest: The tokens after it.
+
+    Returns:
+        How many tokens were consumed — 2 for ``--from-atlas PATH``,
+        1 for everything else including tokens this does not
+        recognise, which are skipped.
+    """
+    if token == "--no-opponent":
+        parsed["opponent"] = False
+    elif token in ("--practice", "--ferry"):
+        parsed["practice" if token == "--practice" else "ferry"] = True
+    elif token == "--from-atlas":
+        if rest and not rest[0].startswith("--"):
+            parsed["atlas"] = rest[0]
+            return 2
+        parsed["atlas"] = str(DEFAULT_ATLAS_PATH)
+    return 1
 
 
 def _parse_cli(args: list[str]) -> _CliArgsDict:
     """Parse the manual flag loop into one typed bundle.
+
+    The two flag SHAPES are parsed separately — a flag whose value is
+    the next token, and a flag that stands alone — because a single
+    chain covering both grew past the branch ceiling the moment a
+    seventh flag arrived, and the two shapes have genuinely different
+    consumption rules.
 
     Args:
         args: Raw CLI tokens.
@@ -362,37 +436,15 @@ def _parse_cli(args: list[str]) -> _CliArgsDict:
         ghost=None,
         stamp=None,
         opponent_name="",
+        out=str(_SIM_DIR),
     )
     index = 0
     while index < len(args):
         token = args[index]
-        if token == "--rounds" and index + 1 < len(args):
-            parsed["rounds"] = int(args[index + 1])
+        if index + 1 < len(args) and _apply_valued_flag(parsed, token, args[index + 1]):
             index += 2
-        elif token == "--no-opponent":
-            parsed["opponent"] = False
-            index += 1
-        elif token in ("--practice", "--ferry"):
-            parsed["practice" if token == "--practice" else "ferry"] = True
-            index += 1
-        elif token == "--ghost" and index + 1 < len(args):
-            parsed["ghost"] = args[index + 1]
-            index += 2
-        elif token == "--from-atlas":
-            if index + 1 < len(args) and not args[index + 1].startswith("--"):
-                parsed["atlas"] = args[index + 1]
-                index += 2
-            else:
-                parsed["atlas"] = str(DEFAULT_ATLAS_PATH)
-                index += 1
-        elif token == "--stamp" and index + 1 < len(args):
-            parsed["stamp"] = args[index + 1]
-            index += 2
-        elif token == "--human-opponent" and index + 1 < len(args):
-            parsed["opponent_name"] = args[index + 1]
-            index += 2
-        else:
-            index += 1
+            continue
+        index += _apply_bare_flag(parsed, token, args[index + 1 :])
     return parsed
 
 
