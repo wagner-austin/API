@@ -24,6 +24,7 @@ from tankpit_bot.analysis.recipient_policy import (
 from tankpit_bot.analysis.recipient_policy_types import (
     VERDICT_BROADCAST,
     VERDICT_PER_RECIPIENT,
+    VERDICT_UNDETERMINED,
     FamilyCountDict,
     FamilyEvidenceDict,
     RecipientPolicyDict,
@@ -43,70 +44,24 @@ from tankpit_bot.protocol.commands import (
     build_block_command,
     build_teleport_command,
 )
-from tankpit_bot.protocol.encoders import encode_build_pickup, encode_tank_info
 from tankpit_bot.protocol.framing import encode_frame
-from tankpit_bot.protocol.types import BuildPickupDict, TankInfoDict
 from tests.analysis._capture_fixtures import (
+    FOREIGN_TANK,
+    OWN_TANK,
+    _build_pickup,
     _ciphered,
     _payload,
     _received,
     _sent,
     _session_json,
+    _tank_info,
     _write,
 )
 
-_OWN = 601
-_FOREIGN = 709
 _BUILD_PICKUP_INDEX = 0
 _TERRAIN_INDEX = 1
+_TOGGLE_INDEX = 2
 _TELEPORT_LANDED_INDEX = 6
-
-
-def _tank_info(tank_id: int) -> bytes:
-    """Build a ciphered 0x21 TankInfo frame body.
-
-    Args:
-        tank_id: The tank the identity names.
-
-    Returns:
-        Wire body: the 0x21 type byte then the ciphered payload.
-    """
-    payload = encode_tank_info(
-        TankInfoDict(
-            msg_type=0x21,
-            tank_id=tank_id,
-            team=1,
-            decoration_state=bytes(4),
-            persistent_tank_id=7,
-            name="red-9",
-        )
-    )
-    return _ciphered(bytes([0x21]) + payload)
-
-
-def _build_pickup(tank_id: int) -> bytes:
-    """Build a ciphered 0x42 BuildPickup frame body.
-
-    Args:
-        tank_id: The tank the block action names as its actor.
-
-    Returns:
-        Wire body: the 0x42 type byte then the ciphered payload.
-    """
-    payload = encode_build_pickup(
-        BuildPickupDict(
-            msg_type=0x42,
-            tank_id=tank_id,
-            source_x=253,
-            source_y=9,
-            drop_x=254,
-            drop_y=9,
-            direction=0,
-            obstacle_type=2,
-            flag=0,
-        )
-    )
-    return _ciphered(bytes([0x42]) + payload)
 
 
 def _command(framed: bytes) -> bytes:
@@ -179,12 +134,12 @@ def test_sweep_counts_received_families_and_finds_the_own_tank(tmp_path: Path) -
     entry = sweep_session(
         _scan(
             tmp_path,
-            _received(_payload(_tank_info(_OWN))),
-            _received(_payload(_build_pickup(_OWN), _build_pickup(_OWN))),
+            _received(_payload(_tank_info(OWN_TANK))),
+            _received(_payload(_build_pickup(OWN_TANK), _build_pickup(OWN_TANK))),
         )
     )
     assert entry["session_id"] == "s-1"
-    assert entry["own_tank_id"] == _OWN
+    assert entry["own_tank_id"] == OWN_TANK
     assert entry["identified_own_tank"] is True
     assert _family(entry, _BUILD_PICKUP_INDEX)["received"] == 2
     assert _family(entry, _BUILD_PICKUP_INDEX)["foreign_actor_hits"] == 0
@@ -202,8 +157,8 @@ def test_sweep_flags_a_build_pickup_naming_another_tank(tmp_path: Path) -> None:
     entry = sweep_session(
         _scan(
             tmp_path,
-            _received(_payload(_tank_info(_OWN))),
-            _received(_payload(_build_pickup(_FOREIGN))),
+            _received(_payload(_tank_info(OWN_TANK))),
+            _received(_payload(_build_pickup(FOREIGN_TANK))),
         )
     )
     assert _family(entry, _BUILD_PICKUP_INDEX)["foreign_actor_hits"] == 1
@@ -215,7 +170,7 @@ def test_sweep_cannot_judge_a_foreign_actor_without_an_own_tank(tmp_path: Path) 
     Reporting a hit against a fabricated id would invent evidence for
     the verdict this module exists to decide.
     """
-    entry = sweep_session(_scan(tmp_path, _received(_payload(_build_pickup(_FOREIGN)))))
+    entry = sweep_session(_scan(tmp_path, _received(_payload(_build_pickup(FOREIGN_TANK)))))
     assert entry["identified_own_tank"] is False
     assert entry["own_tank_id"] == 0
     assert _family(entry, _BUILD_PICKUP_INDEX)["received"] == 1
@@ -226,26 +181,52 @@ def test_sweep_finds_the_own_tank_past_leading_noise(tmp_path: Path) -> None:
     """The identity is found behind sent, unclaimed and other frames.
 
     A real session opens with lobby and command traffic before the
-    roster dump, so the search walks past three kinds of frame that are
-    not the answer: a sent command, a frame no decoder claims, and a
-    decoded message that is simply not a 0x21.
+    roster dump, so the search walks past four kinds of frame that are
+    not the answer: a sent command, a frame no decoder claims, a SHORT
+    frame of a known type, and a decoded message that is simply not a
+    0x21. The short frame matters — the archive holds 101 short 0x41s
+    and any of them can precede the identity.
     """
     entry = sweep_session(
         _scan(
             tmp_path,
             _sent(_payload(_command(build_block_command(1, 2)))),
             _received(_payload(_ciphered(bytes([0x01, 0x99])))),
-            _received(_payload(_build_pickup(_FOREIGN))),
-            _received(_payload(_tank_info(_OWN))),
+            _received(_payload(_ciphered(bytes([0x41, 0x99])))),
+            _received(_payload(_build_pickup(FOREIGN_TANK))),
+            _received(_payload(_tank_info(OWN_TANK))),
         )
     )
     assert entry["identified_own_tank"] is True
-    assert entry["own_tank_id"] == _OWN
+    assert entry["own_tank_id"] == OWN_TANK
     assert entry["undecodable_frames"] == 1
+    assert entry["malformed_frames"] == 1
     # The 0x42 arrived BEFORE the identity and is still judged against
     # it: the own tank is resolved in its own pass, so ordering inside
     # the session cannot hide a foreign actor.
     assert _family(entry, _BUILD_PICKUP_INDEX)["foreign_actor_hits"] == 1
+
+
+def test_sweep_separates_a_short_known_frame_from_an_unknown_one(tmp_path: Path) -> None:
+    """A short 0x41 is malformed, not undecodable — different facts.
+
+    An unknown message type says the decoder has a gap; a KNOWN type
+    whose body fails validation says the capture holds a short frame.
+    Conflating them hides both. This is the archive's actual shape:
+    101 of its 262,588 received frames are short 0x41 Deactivations,
+    and the real sweep died on the first one until they were counted.
+    """
+    entry = sweep_session(
+        _scan(
+            tmp_path,
+            _received(_payload(_tank_info(OWN_TANK))),
+            _received(_payload(_ciphered(bytes([0x41, 0x99])))),
+            _received(_payload(_ciphered(bytes([0x01, 0x99])))),
+        )
+    )
+    assert entry["malformed_frames"] == 1
+    assert entry["undecodable_frames"] == 1
+    assert entry["identified_own_tank"] is True
 
 
 def test_sweep_counts_own_triggers_from_sent_command_frames(tmp_path: Path) -> None:
@@ -253,7 +234,7 @@ def test_sweep_counts_own_triggers_from_sent_command_frames(tmp_path: Path) -> N
     entry = sweep_session(
         _scan(
             tmp_path,
-            _received(_payload(_tank_info(_OWN))),
+            _received(_payload(_tank_info(OWN_TANK))),
             _sent(_payload(_command(build_block_command(10, 11)))),
             _sent(_payload(_command(build_teleport_command(12, 13)))),
         )
@@ -268,7 +249,7 @@ def test_sweep_ignores_sent_frames_that_are_not_commands(tmp_path: Path) -> None
     entry = sweep_session(
         _scan(
             tmp_path,
-            _received(_payload(_tank_info(_OWN))),
+            _received(_payload(_tank_info(OWN_TANK))),
             _sent(_payload(_ciphered(bytes([0x2B, 0x01, 0x02])))),
         )
     )
@@ -285,7 +266,7 @@ def test_sweep_counts_frames_no_decoder_claims(tmp_path: Path) -> None:
     entry = sweep_session(
         _scan(
             tmp_path,
-            _received(_payload(_tank_info(_OWN))),
+            _received(_payload(_tank_info(OWN_TANK))),
             _received(_payload(_ciphered(bytes([0x01, 0x99])))),
         )
     )
@@ -329,6 +310,34 @@ def test_merge_rules_per_recipient_when_the_archive_is_silent() -> None:
     assert family["verdict"] == VERDICT_PER_RECIPIENT
 
 
+def test_a_family_no_command_triggers_is_left_undetermined() -> None:
+    """The zero-trigger test cannot rule on a join-burst family.
+
+    0x74 arrives once per session having answered no command, which
+    says "not command-triggered" — a different fact from "broadcast".
+    Emitting a verdict here would put the machine in silent conflict
+    with the structural ruling in [[recipient-policy]], and a future
+    reader would trust the machine.
+    """
+    entry = _evidence(received=1, own_triggers=0, index=_TOGGLE_INDEX)
+    result = merge_session_evidence(
+        [entry], sessions_examined=1, sessions_without_magic=0, framing_errors=0
+    )
+    family = result["families"][_TOGGLE_INDEX]
+    assert family["trigger_kind"] == ""
+    assert family["zero_trigger_sessions"] == 1
+    assert family["verdict"] == VERDICT_UNDETERMINED
+
+
+def test_a_foreign_actor_outranks_a_missing_trigger() -> None:
+    """Direct proof settles broadcast even with no triggering command."""
+    entry = _evidence(received=1, own_triggers=0, foreign=1, index=_TOGGLE_INDEX)
+    result = merge_session_evidence(
+        [entry], sessions_examined=1, sessions_without_magic=0, framing_errors=0
+    )
+    assert result["families"][_TOGGLE_INDEX]["verdict"] == VERDICT_BROADCAST
+
+
 def test_merge_carries_the_skip_denominators() -> None:
     """Skips are reported, so the denominator stays honest."""
     result = merge_session_evidence(
@@ -348,8 +357,8 @@ def test_analyze_sweeps_a_directory_and_tallies_both_skip_kinds(tmp_path: Path) 
         "a.capture_session.json",
         _session_json(
             messages=[
-                _received(_payload(_tank_info(_OWN))),
-                _received(_payload(_build_pickup(_FOREIGN))),
+                _received(_payload(_tank_info(OWN_TANK))),
+                _received(_payload(_build_pickup(FOREIGN_TANK))),
             ]
         ),
     )
@@ -382,17 +391,21 @@ def test_format_names_every_family_and_its_verdict() -> None:
     assert "sessions_decoded=1" in text
     assert f"0x42 BuildPickup -> {VERDICT_BROADCAST}" in text
     assert "zero_trigger_sessions=1" in text
+    assert "malformed_frames=0" in text
     for _key, label, _trigger in FAMILY_TABLE:
         assert label in text
 
 
-def _evidence(*, received: int, own_triggers: int, foreign: int = 0) -> SessionEvidenceDict:
-    """Build one session's evidence with only 0x42 populated.
+def _evidence(
+    *, received: int, own_triggers: int, foreign: int = 0, index: int = _BUILD_PICKUP_INDEX
+) -> SessionEvidenceDict:
+    """Build one session's evidence with a single family populated.
 
     Args:
-        received: 0x42 arrivals.
-        own_triggers: Block commands the client sent.
-        foreign: 0x42s naming another tank.
+        received: Arrivals of the family at ``index``.
+        own_triggers: Triggering commands the client sent.
+        foreign: Arrivals naming another tank as actor.
+        index: Which family in :data:`FAMILY_TABLE` to populate.
 
     Returns:
         Session evidence in :data:`FAMILY_TABLE` order.
@@ -400,19 +413,20 @@ def _evidence(*, received: int, own_triggers: int, foreign: int = 0) -> SessionE
     families = [
         FamilyCountDict(
             label=label,
-            received=received if index == _BUILD_PICKUP_INDEX else 0,
-            own_triggers=own_triggers if index == _BUILD_PICKUP_INDEX else 0,
-            foreign_actor_hits=foreign if index == _BUILD_PICKUP_INDEX else 0,
+            received=received if position == index else 0,
+            own_triggers=own_triggers if position == index else 0,
+            foreign_actor_hits=foreign if position == index else 0,
         )
-        for index, (_key, label, _trigger) in enumerate(FAMILY_TABLE)
+        for position, (_key, label, _trigger) in enumerate(FAMILY_TABLE)
     ]
     return SessionEvidenceDict(
         session_id="s-1",
-        own_tank_id=_OWN,
+        own_tank_id=OWN_TANK,
         identified_own_tank=True,
         families=families,
         framing_errors=0,
         undecodable_frames=0,
+        malformed_frames=0,
     )
 
 

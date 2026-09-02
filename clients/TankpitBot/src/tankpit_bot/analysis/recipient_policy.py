@@ -21,6 +21,15 @@ The own tank is the session's first 0x21 TankInfo, which is the archive
 convention the audit validators key self-attribution on
 ([[session-state-deglobalisation]]).
 
+The zero-trigger test has a limit worth stating, because ignoring it
+produces a confidently wrong answer. It asks whether a family answers
+the client's own COMMAND, which is the recipient question only for
+families a command can trigger. 0x74 rides the JOIN burst instead, so
+its 325 zero-trigger sessions say "not command-triggered", not
+"broadcast" — and this sweep reports :data:`VERDICT_UNDETERMINED` for
+it rather than a verdict the evidence does not support. Its policy is
+settled structurally in [[recipient-policy]].
+
 The session walk is NOT re-implemented here: :mod:`analysis.scan` owns
 the load-XOR-split-decode pipeline and its typed skips, and this module
 consumes them.
@@ -35,6 +44,7 @@ from typing import Final
 from tankpit_bot.analysis.recipient_policy_types import (
     VERDICT_BROADCAST,
     VERDICT_PER_RECIPIENT,
+    VERDICT_UNDETERMINED,
     FamilyCountDict,
     FamilyEvidenceDict,
     RecipientPolicyDict,
@@ -45,6 +55,7 @@ from tankpit_bot.analysis.types import DecodedFrameDict, ScannedSessionDict
 from tankpit_bot.protocol import try_decode_binary_message
 from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.sim.commands import decode_client_command
+from tankpit_bot.wire.helpers import DecodeError
 
 #: Declared ``Final`` so mypy carries the literal type: the
 #: ``BinaryMessage`` union is discriminated on ``msg_type``, and
@@ -57,10 +68,18 @@ _BUILD_PICKUP: Final = 0x42
 #: Each family, its label, and the client command kind that would
 #: trigger it if the family were per-recipient. Order is the report
 #: order and the order of every ``families`` list this module builds.
+#:
+#: An EMPTY trigger means no client command produces the family, so the
+#: zero-trigger test cannot speak to it. 0x74 is the case: it rides the
+#: join burst, one per session, and 325 of 341 sessions receive it
+#: having sent no toggle -- which says "not command-triggered", NOT
+#: "broadcast". Its recipient policy is settled structurally instead
+#: (no tank id, describes the recipient's own loadout) in
+#: [[recipient-policy]], which is reasoning this sweep cannot do.
 FAMILY_TABLE: tuple[tuple[int | str, str, str], ...] = (
     (0x42, "0x42 BuildPickup", "block"),
     (0x4A, "0x4A TerrainUpdate", "block"),
-    (0x74, "0x74 EquipmentToggle", "toggle_equipment"),
+    (0x74, "0x74 EquipmentToggle", ""),
     (0x4F, "0x4F RadarScanResult", "radar"),
     (0x46, "0x46 RadarResult", "radar"),
     (0x4C, "0x4C MapData", "map_open"),
@@ -86,7 +105,14 @@ def _own_tank_id(frames: list[DecodedFrameDict]) -> int | None:
     for frame in frames:
         if frame["direction"] != "received":
             continue
-        message = try_decode_binary_message(frame["msg_type"], frame["body"])
+        try:
+            message = try_decode_binary_message(frame["msg_type"], frame["body"])
+        except DecodeError:
+            # A short frame of a known type is archive noise, not the
+            # identity: 101 of the archive's 262,588 received frames
+            # are short 0x41s, and any one of them can precede the
+            # roster dump. :func:`sweep_session` counts them.
+            continue
         if message is None:
             continue
         # The DECODED type decides, not the frame's leading byte: a
@@ -105,16 +131,25 @@ def sweep_session(scanned: ScannedSessionDict) -> SessionEvidenceDict:
             :func:`analysis.scan.scan_session`.
 
     Returns:
-        The session's per-family tallies, its own tank id, and the
-        count of frames no decoder claimed. Undecodable frames are
-        COUNTED, never dropped silently — an unreported skip would
-        understate every ``received`` tally it hides.
+        The session's per-family tallies, its own tank id, and the two
+        skip counts. Both are COUNTED, never dropped silently — an
+        unreported skip would understate every ``received`` tally it
+        hides.
+
+        The two are kept apart because they say different things about
+        the archive, the same split ``capture.protocol_census`` draws:
+        an unknown message type means the decoder has a gap, while a
+        known type whose body fails validation means the capture holds
+        a short frame. Catching the validation error here classifies
+        it; it does not soften anything, and a census that died on the
+        101 short 0x41s in the archive would measure nothing at all.
     """
     own_id = _own_tank_id(scanned["frames"])
     received: Counter[int | str] = Counter()
     triggers: Counter[str] = Counter()
     foreign: Counter[int | str] = Counter()
     undecodable = 0
+    malformed = 0
 
     for frame in scanned["frames"]:
         if frame["direction"] == "sent":
@@ -122,7 +157,11 @@ def sweep_session(scanned: ScannedSessionDict) -> SessionEvidenceDict:
                 continue
             triggers[decode_client_command(frame["body"])["kind"]] += 1
             continue
-        message = try_decode_binary_message(frame["msg_type"], frame["body"])
+        try:
+            message = try_decode_binary_message(frame["msg_type"], frame["body"])
+        except DecodeError:
+            malformed += 1
+            continue
         if message is None:
             undecodable += 1
             continue
@@ -153,7 +192,38 @@ def sweep_session(scanned: ScannedSessionDict) -> SessionEvidenceDict:
         families=families,
         framing_errors=0,
         undecodable_frames=undecodable,
+        malformed_frames=malformed,
     )
+
+
+def _verdict(trigger: str, zero_trigger_sessions: int, foreign_actor_hits: int) -> str:
+    """Rule on one family from its evidence.
+
+    A foreign actor settles broadcast outright — it is direct proof
+    another connection's action reached this one. Otherwise a
+    zero-trigger arrival settles broadcast, but ONLY for a family a
+    client command can trigger: with no such command the test measures
+    nothing about recipients and the family is left undetermined for a
+    human to settle structurally.
+
+    Args:
+        trigger: The triggering client command kind, empty when no
+            command produces the family.
+        zero_trigger_sessions: Sessions that received it having sent no
+            triggering command.
+        foreign_actor_hits: Arrivals naming another tank as the actor.
+
+    Returns:
+        One of :data:`VERDICT_BROADCAST`, :data:`VERDICT_PER_RECIPIENT`
+        or :data:`VERDICT_UNDETERMINED`.
+    """
+    if foreign_actor_hits > 0:
+        return VERDICT_BROADCAST
+    if not trigger:
+        return VERDICT_UNDETERMINED
+    if zero_trigger_sessions > 0:
+        return VERDICT_BROADCAST
+    return VERDICT_PER_RECIPIENT
 
 
 def merge_session_evidence(
@@ -195,7 +265,6 @@ def merge_session_evidence(
             foreign_actor_hits += tally["foreign_actor_hits"]
             if tally["received"] > 0 and tally["own_triggers"] == 0:
                 zero_trigger_sessions += 1
-        broadcast = zero_trigger_sessions > 0 or foreign_actor_hits > 0
         families.append(
             FamilyEvidenceDict(
                 label=label,
@@ -204,7 +273,7 @@ def merge_session_evidence(
                 own_triggers=own_triggers,
                 zero_trigger_sessions=zero_trigger_sessions,
                 foreign_actor_hits=foreign_actor_hits,
-                verdict=VERDICT_BROADCAST if broadcast else VERDICT_PER_RECIPIENT,
+                verdict=_verdict(trigger, zero_trigger_sessions, foreign_actor_hits),
             )
         )
     return RecipientPolicyDict(
@@ -213,6 +282,7 @@ def merge_session_evidence(
         sessions_without_magic=sessions_without_magic,
         framing_errors=framing_errors,
         undecodable_frames=sum(entry["undecodable_frames"] for entry in entries),
+        malformed_frames=sum(entry["malformed_frames"] for entry in entries),
         families=families,
     )
 
@@ -268,6 +338,7 @@ def format_recipient_policy(result: RecipientPolicyDict) -> str:
         f"sessions_without_magic={result['sessions_without_magic']}",
         f"framing_errors={result['framing_errors']}",
         f"undecodable_frames={result['undecodable_frames']}",
+        f"malformed_frames={result['malformed_frames']}",
         "families:",
     ]
     for family in result["families"]:

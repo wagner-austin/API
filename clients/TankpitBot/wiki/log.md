@@ -5299,3 +5299,16 @@ Groundwork for standing the sim up as a multi-client server ([[physics-module-ro
 **One lift fell out of the consumer.** `analysis.scan.scan_archive` returned `ScannedSessionDict | SkippedSessionDict` discriminated only by which keys exist, and mypy does not narrow a TypedDict union on key presence (probe-verified against 1.19.1) — so no consumer could read it without a cast, which the codebase forbids. Both shapes now carry an explicit `kind` tag. Not a mypy-version problem: the tag narrows on the pinned version, and an implicit discriminator would have broken silently the first time a field was added to either shape.
 
 Gate: 393 tests across `tests/analysis` + `tests/sim`, `sim/server.py` at 100.00% statement and branch, guard 0 violations, ruff and mypy strict clean over all 1,191 files.
+
+---
+## [2026-09-01] lift + corrected | The sweep became a module, and the archive corrected its verdict rule twice
+
+The rulings in [[recipient-policy]] were mined by throwaway scripts. They are now `analysis/recipient_policy.py` with a typed contract and `scripts/analyze_recipient_policy.py` over it (`make analyze-recipient-policy`), so a future archive can overturn them by measurement. The session walk is NOT re-implemented — `analysis.scan` owns that pipeline and this consumes it.
+
+**The real archive broke the module twice, and the tests could not have.** First run against `runs/`: `DecodeError: Deactivation: expected >= 6 bytes, got 1`. `try_decode_binary_message` returns None only for an UNKNOWN type; a KNOWN type with a bad body RAISES. The scratch script had swallowed those silently. Measured: **101 of 262,588 received frames, every one a short 0x41**. They are now a counted category distinct from unknown types — the same split `capture.protocol_census` draws between `short_or_invalid` and `unsupported`. Counting is the census, not best-effort: a sweep that dies on 0.04% of the archive measures nothing.
+
+**Second, and worse: the module's verdict disagreed with this wiki.** It ruled 0x74 BROADCAST off 340 zero-trigger sessions while the page rules it per-recipient. The page is right and the rule was wrong. The zero-trigger test asks whether a family answers the client's own COMMAND — which is the recipient question only for families a command can trigger. 0x74 rides the JOIN burst, so its zero-trigger sessions say "not command-triggered", a different fact. Every other family happens to make the two coincide, which is why the flaw was invisible until a family broke the coincidence. The sweep now reports `undetermined` for it and the page carries the reason, because a machine that silently contradicts the prose is worse than one that declines: the next reader trusts the machine.
+
+Method note worth keeping: both defects were found by running against the real corpus, not by the 63 tests, which all passed throughout. Fixtures agree with whatever the author believed.
+
+Gate: 421 tests, all three new files at 100.00% statement and branch, guard 0 violations, ruff and mypy strict clean over 1,195 files.

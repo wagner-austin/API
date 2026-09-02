@@ -17,9 +17,15 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from tankpit_bot.capture.xor import build_session_xor_table, xor_decode_body
+from tankpit_bot.protocol.encoders import encode_build_pickup, encode_tank_info
 from tankpit_bot.protocol.framing import encode_frame
+from tankpit_bot.protocol.types import BuildPickupDict, TankInfoDict
 
 MAGIC = "abcdefgh"
+
+#: The capturing client in fixture sessions, and a tank that is not it.
+OWN_TANK = 601
+FOREIGN_TANK = 709
 
 
 def _expected_body(body: bytes) -> bytes:
@@ -148,13 +154,64 @@ def _write(tmp_path: Path, name: str, text: str) -> Path:
     return path
 
 
+def _tank_info(tank_id: int) -> bytes:
+    """Build a ciphered 0x21 TankInfo frame body.
+
+    Args:
+        tank_id: The tank the identity names.
+
+    Returns:
+        Wire body: the 0x21 type byte then the ciphered payload.
+    """
+    payload = encode_tank_info(
+        TankInfoDict(
+            msg_type=0x21,
+            tank_id=tank_id,
+            team=1,
+            decoration_state=bytes(4),
+            persistent_tank_id=7,
+            name="red-9",
+        )
+    )
+    return _ciphered(bytes([0x21]) + payload)
+
+
+def _build_pickup(tank_id: int) -> bytes:
+    """Build a ciphered 0x42 BuildPickup frame body.
+
+    Args:
+        tank_id: The tank the block action names as its actor.
+
+    Returns:
+        Wire body: the 0x42 type byte then the ciphered payload.
+    """
+    payload = encode_build_pickup(
+        BuildPickupDict(
+            msg_type=0x42,
+            tank_id=tank_id,
+            source_x=253,
+            source_y=9,
+            drop_x=254,
+            drop_y=9,
+            direction=0,
+            obstacle_type=2,
+            flag=0,
+        )
+    )
+    return _ciphered(bytes([0x42]) + payload)
+
+
 __all__ = [
+    "FOREIGN_TANK",
     "MAGIC",
+    "OWN_TANK",
+    "_build_pickup",
     "_ciphered",
     "_expected_body",
     "_payload",
     "_received",
     "_sent",
     "_session_json",
+    "_tank_info",
     "_write",
 ]

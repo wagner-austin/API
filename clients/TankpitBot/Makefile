@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -445,6 +445,11 @@ decode:
 	@Write-Host ""
 	@Write-Host "==> decode" -ForegroundColor Cyan
 	poetry run python -m scripts.decode
+
+analyze-recipient-policy:
+	@Write-Host ""
+	@Write-Host "==> analyze recipient policy" -ForegroundColor Cyan
+	poetry run python -m scripts.analyze_recipient_policy
 
 analyze-viewport:
 	@Write-Host ""

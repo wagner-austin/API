@@ -29,6 +29,13 @@ from platform_core.json_utils import (
 VERDICT_BROADCAST = "broadcast"
 VERDICT_PER_RECIPIENT = "per_recipient"
 
+#: The zero-trigger test asks whether a family answers the client's own
+#: COMMAND. For a family no command triggers -- 0x74 rides the join
+#: burst ([[recipient-policy]]) -- a zero-trigger arrival says only
+#: "not command-triggered", which is not the recipient question. The
+#: sweep reports that rather than emitting a verdict it cannot support.
+VERDICT_UNDETERMINED = "undetermined"
+
 
 class FamilyCountDict(TypedDict):
     """One family's tallies within ONE capture session.
@@ -63,9 +70,17 @@ class SessionEvidenceDict(TypedDict):
             recorded rather than inferred from a zero id.
         families: Per-family tallies, in family-table order.
         framing_errors: Payloads that failed frame splitting.
-        undecodable_frames: Frames a decoder rejected. Counted, never
-            silently dropped — an unreported skip would understate
-            every ``received`` tally it hides.
+        undecodable_frames: Frames NO decoder claims — an unknown
+            message type. Counted, never silently dropped: an
+            unreported skip would understate every ``received`` tally
+            it hides.
+        malformed_frames: Frames of a KNOWN type whose body failed the
+            decoder's validation. Distinct from ``undecodable_frames``
+            because the two say different things about the archive —
+            the same split ``capture.protocol_census`` draws between
+            ``unsupported`` and ``short_or_invalid``. Measured
+            2026-09-01: 101 of 262,588 received frames, every one a
+            short 0x41 Deactivation.
     """
 
     session_id: str
@@ -74,6 +89,7 @@ class SessionEvidenceDict(TypedDict):
     families: list[FamilyCountDict]
     framing_errors: int
     undecodable_frames: int
+    malformed_frames: int
 
 
 class FamilyEvidenceDict(TypedDict):
@@ -114,7 +130,9 @@ class RecipientPolicyDict(TypedDict):
             they cannot be XOR-decoded, and counting them keeps the
             denominator honest.
         framing_errors: Total payloads that failed frame splitting.
-        undecodable_frames: Total frames a decoder rejected.
+        undecodable_frames: Total frames of an unknown type.
+        malformed_frames: Total frames of a known type whose body
+            failed validation.
         families: Per-family evidence, in family-table order.
     """
 
@@ -123,6 +141,7 @@ class RecipientPolicyDict(TypedDict):
     sessions_without_magic: int
     framing_errors: int
     undecodable_frames: int
+    malformed_frames: int
     families: list[FamilyEvidenceDict]
 
 
@@ -180,6 +199,7 @@ def encode_session_evidence(entry: SessionEvidenceDict) -> JSONObject:
         "families": [encode_family_count(family) for family in entry["families"]],
         "framing_errors": entry["framing_errors"],
         "undecodable_frames": entry["undecodable_frames"],
+        "malformed_frames": entry["malformed_frames"],
     }
 
 
@@ -206,6 +226,7 @@ def decode_session_evidence(data: JSONObject) -> SessionEvidenceDict:
         ],
         framing_errors=require_int(data, "framing_errors"),
         undecodable_frames=require_int(data, "undecodable_frames"),
+        malformed_frames=require_int(data, "malformed_frames"),
     )
 
 
@@ -268,6 +289,7 @@ def encode_recipient_policy(result: RecipientPolicyDict) -> JSONObject:
         "sessions_without_magic": result["sessions_without_magic"],
         "framing_errors": result["framing_errors"],
         "undecodable_frames": result["undecodable_frames"],
+        "malformed_frames": result["malformed_frames"],
         "families": [encode_family_evidence(family) for family in result["families"]],
     }
 
@@ -291,6 +313,7 @@ def decode_recipient_policy(data: JSONObject) -> RecipientPolicyDict:
         sessions_without_magic=require_int(data, "sessions_without_magic"),
         framing_errors=require_int(data, "framing_errors"),
         undecodable_frames=require_int(data, "undecodable_frames"),
+        malformed_frames=require_int(data, "malformed_frames"),
         families=[
             decode_family_evidence(narrow_json_to_dict(item))
             for item in require_list(data, "families")

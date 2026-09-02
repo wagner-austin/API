@@ -101,10 +101,20 @@ sent account for the multi-hit sessions.[^1]
 Recipient-wise it is still actor-only: it carries no tank id and
 describes the recipient's own loadout.
 
-**Consequence for the sim:** `SimServer.handshake()` emits 0x21, 0x3E,
-0x5A, 0x3D, 0x44, 0x49, other tanks' identities, then 0x3F — and no
-0x74. 324 of 341 real sessions carry one and the sim produces zero, the
-same shape as the 0x3E gap ([[session-state-deglobalisation]]).[^11]
+That ruling is STRUCTURAL, and the mechanical sweep cannot reach it:
+`scripts/analyze_recipient_policy.py` reports 0x74 as `undetermined`
+by design. Its zero-trigger test asks whether a family answers the
+client's own COMMAND, and a join-burst family answers none — so 340
+zero-trigger sessions say "not command-triggered", not "broadcast".
+A sweep that ruled on it would contradict this page silently.[^1]
+
+**Consequence for the sim — FIXED 2026-09-01.** Finding the 0x74 meant
+measuring the whole join burst, and `SimServer.handshake()` diverged
+from it five ways: no 0x74, a single 0x49 where the server sends two,
+that 0x49 in the self block rather than the tail, an invented 0x44, and
+a 0x3D riding every viewport-visible tank. The burst is now emitted as
+measured and pinned by test; the shape and its consequences are in the
+2026-09-01 `log.md` entry.[^11]
 
 [^1]: Archive sweep 2026-09-01 over 341 of 342 capture sessions in `runs/bot` and `runs/sniff` (one carries no magic and cannot be XOR-decoded), decoded through `capture.frames.split_payload_frames` + `capture.xor.build_session_xor_table` + `protocol.try_decode_binary_message`, with client commands decoded through `sim.transport.decode_client_payload`. Re-runnable as `scripts/analyze_recipient_policy.py`.
 [^2]: `runs/bot/bot-20260826-003928.capture_session.json`; decoded 0x42 body `{tank_id: 709, source_x: 253, source_y: 9, drop_x: 254, drop_y: 9, direction: 0, obstacle_type: 2, flag: 0}`. `direction=0` is a DROP and `obstacle_type=2` is placed-on-land per [[movable-blocks]].
