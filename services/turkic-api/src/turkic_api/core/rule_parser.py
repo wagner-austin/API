@@ -61,8 +61,9 @@ class Rule(NamedTuple):
     Attributes:
         before: Elements matched right-anchored against the converted
             output, in order.
-        anchor_start: Whether the rule only applies at the start of the
-            text.
+        anchor_start: Whether the rule only applies where nothing has been
+            emitted yet. Like ``before``, it reads the converted output, so
+            a preceding run of deletions leaves the position initial.
         source: Elements matched against the source at the cursor. Never
             empty; its length is what the cursor advances by.
         after: Elements matched against the source following ``source``.

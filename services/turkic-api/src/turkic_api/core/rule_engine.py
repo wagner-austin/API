@@ -17,6 +17,11 @@ specification, and the frozen goldens pin every one of them:
 * A **context position past an end of the text matches a negated set** and no
   other kind of element, so ``ئ } [^$AsuVowel]`` in ``ar_lat.rules`` fires on a
   word-final hamza carrier as well as on one followed by a consonant.
+* The **start anchor asks whether the output is empty**, not whether the source
+  cursor is at zero. ``^`` is a before context like any other, and before
+  contexts read the converted output, so a rule that deleted everything to the
+  left leaves the next position initial. Measured on PyICU 78.3:
+  ``x > ; ^ a > S ; a > A ;`` turns ``xa`` into ``S``, and ``bxa`` into ``bA``.
 
 An earlier version of this engine read ``}`` as a *left* context and matched it
 against the source. Two wrongs cancelled for the rule files of the time, and
@@ -43,7 +48,7 @@ def _matches(rule: Rule, out: list[str], source: str, cursor: int) -> bool:
         Whether the before context, the source elements, and the after
         context all match.
     """
-    if rule.anchor_start and cursor != 0:
+    if rule.anchor_start and out:
         return False
 
     width = len(rule.before)

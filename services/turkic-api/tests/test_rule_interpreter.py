@@ -109,15 +109,32 @@ class TestContexts:
 
 
 class TestAnchors:
-    """``^`` restricts a rule to the start of the text."""
+    """``^`` restricts a rule to a position with no output to its left.
+
+    It is a before context like any other, and before contexts read the
+    converted output rather than the source, so the question it asks is
+    whether anything has been emitted yet — not whether the source cursor
+    sits at zero. Every expectation below was measured on PyICU 78.3.
+    """
 
     def test_start_anchor_applies_only_at_position_zero(self) -> None:
         assert run("^ a > S ; a > A ;", "aa") == "SA"
         assert run("^ a > S ; a > A ;", "ba") == "bA"
 
-    def test_start_anchor_after_a_deletion_still_means_position_zero(self) -> None:
-        """Deleting the first character must not make the second one initial."""
-        assert run("x > ; ^ a > S ; a > A ;", "xa") == "A"
+    def test_start_anchor_after_a_deletion_treats_the_next_position_as_initial(self) -> None:
+        """A rule that deleted everything to the left leaves the next char initial.
+
+        This file previously asserted the opposite, as a ``must``, and it was
+        never measured: ICU turns ``xa`` into ``S`` here, not ``A``. The engine
+        agreed with the test rather than with ICU, which made ``Ъ > ;`` plus
+        ``^ Е > je ;`` in ``ru_ipa.rules`` diverge on twelve probes.
+        """
+        assert run("x > ; ^ a > S ; a > A ;", "xa") == "S"
+        assert run("x > ; ^ a > S ; a > A ;", "xxa") == "S"
+
+    def test_start_anchor_is_blocked_by_output_even_when_a_deletion_precedes(self) -> None:
+        """The anchor asks about output, so one surviving character closes it."""
+        assert run("x > ; ^ a > S ; a > A ;", "bxa") == "bA"
 
     def test_anchor_away_from_the_front_is_refused(self) -> None:
         with pytest.raises(RuleParseError, match="only allowed at the start"):
