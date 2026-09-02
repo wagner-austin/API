@@ -11,24 +11,25 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from aiohttp import web
 
-from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks.fs import PathExistsProtocol
 from tankpit_bot.runtime_artifacts import bot_run_dir
-from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service._test_hooks import _real_run_web_app, _real_spawn_bot_process
-from tankpit_bot.service.fleet import main
-from tankpit_bot.service.fleet_manager import (
+from tankpit_bot.service._test_hooks import _real_spawn_bot_process
+from tankpit_bot.service.fleet_config import (
     FLEET_PORT_DEFAULT,
-    FleetError,
-    FleetManager,
+    configured_accounts,
+    lobby_rooms,
     resolve_fleet_port,
+    tank_registry,
+    troop_colors,
 )
+from tankpit_bot.service.fleet_error import FleetError
+from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.types.constants import TEAM_BLUE
 from tankpit_bot.types.rooms import DEFAULT_LOBBY_ROOM
 from tests.conftest import FakeEnv
+from tests.service._artifact_fixtures import FakeArtifact
 from tests.service._fleet_fixtures import (
     _FakeSpawner,
     _restore_account_hooks,
@@ -111,7 +112,7 @@ def test_accounts_lists_configured_usernames_only(spawner: _FakeSpawner) -> None
     originals = _with_configured_accounts()
     try:
         manager = FleetManager()
-        names = manager.accounts()
+        names = configured_accounts()
         row = manager.spawn(instance="alpha", account="second", kills=0, seconds=0)
         with pytest.raises(FleetError, match=r"not in accounts\.json"):
             manager.spawn(instance="bravo", account="intruder", kills=0, seconds=0)
@@ -135,7 +136,7 @@ def test_accounts_without_a_file_is_empty_and_default_still_spawns(
     top_hooks.path_exists = fake_exists
     try:
         manager = FleetManager()
-        names = manager.accounts()
+        names = configured_accounts()
         manager.spawn(instance="alpha", account="", kills=0, seconds=0)
         with pytest.raises(FleetError, match="none configured"):
             manager.spawn(instance="bravo", account="anyone", kills=0, seconds=0)
@@ -184,9 +185,8 @@ def test_rooms_offers_world_first_but_the_env_fallback_stays_practice(
     where a deactivation costs a rank.
     """
     _ = spawner
-    manager = FleetManager()
 
-    names = manager.rooms()
+    names = lobby_rooms()
 
     assert names == ["World", "Practice"]
     assert names[0] != DEFAULT_LOBBY_ROOM
@@ -210,7 +210,7 @@ def test_tanks_serves_the_measured_registry(spawner: _FakeSpawner) -> None:
     original = top_hooks.read_text
     top_hooks.read_text = fake_read
     try:
-        registry = FleetManager().tanks()
+        registry = tank_registry()
     finally:
         top_hooks.read_text = original
 
@@ -231,7 +231,7 @@ def test_tanks_without_a_registry_is_empty_not_an_error(spawner: _FakeSpawner) -
     original = top_hooks.read_text
     top_hooks.read_text = fake_read
     try:
-        registry = FleetManager().tanks()
+        registry = tank_registry()
     finally:
         top_hooks.read_text = original
 
@@ -251,7 +251,7 @@ def test_troops_are_team_id_ordered_and_reach_the_child_as_the_wire_id(
     """
     manager = FleetManager()
 
-    names = manager.troops()
+    names = troop_colors()
     row = manager.spawn(instance="alpha", account="", kills=0, seconds=0, troop="orange")
     with pytest.raises(FleetError, match="not a tank color"):
         manager.spawn(instance="bravo", account="", kills=0, seconds=0, troop="chartreuse")
@@ -421,9 +421,12 @@ def test_restart_respawns_a_dead_instance_with_its_parameters(
     assert spawner.envs[1] == spawner.envs[0]
 
 
-def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
-    """The stats summary reads the instance's events via the digest."""
-    events = "\n".join(
+def test_stats_summarizes_the_instance_events(
+    spawner: _FakeSpawner,
+    artifact: FakeArtifact,
+) -> None:
+    """The stats summary folds the instance's own events artifact."""
+    artifact.start_run(
         [
             '{"timestamp":"2026-08-06T10:00:00","level":"INFO","logger":"l",'
             '"mode":"bot","channel":"STATE","message":"INITIALIZING"}',
@@ -435,24 +438,16 @@ def test_stats_summarizes_the_instance_events(spawner: _FakeSpawner) -> None:
             '"diagnostic_kind":"tank_deactivated","victim_id":529,"killer_id":601}',
         ]
     )
-    reads: list[Path] = []
-
-    def fake_read(path: Path) -> str:
-        reads.append(Path(path))
-        return events
 
     original_exists = _without_accounts()
-    original_read = top_hooks.read_text
-    top_hooks.read_text = fake_read
     try:
         manager = FleetManager()
         manager.spawn(instance="alpha", account="", kills=0, seconds=0)
         summary = manager.stats("alpha")
     finally:
-        top_hooks.read_text = original_read
         top_hooks.path_exists = original_exists
 
-    assert reads == [Path("runs/bot/alpha/latest.events.jsonl")]
+    assert artifact.read_offsets == [0]
     assert summary["available"] is True
     assert summary["kills"] == 1
     assert summary["deaths"] == 0
@@ -497,67 +492,6 @@ def test_resolve_fleet_port_contract() -> None:
             resolve_fleet_port()
     finally:
         top_hooks.get_env = original_get_env
-
-
-def test_main_wires_the_app_onto_the_resolved_port() -> None:
-    """``main`` loads dotenv, resolves the port, and serves the routes."""
-    served: list[tuple[web.Application, str, int]] = []
-    loads: list[str] = []
-
-    def fake_dotenv() -> None:
-        loads.append("dotenv")
-
-    def fake_run(app: web.Application, *, host: str, port: int) -> None:
-        served.append((app, host, port))
-
-    original_dotenv = core_hooks.load_dotenv
-    original_run = service_hooks.run_web_app
-    original_get_env = top_hooks.get_env
-    try:
-        core_hooks.load_dotenv = fake_dotenv
-        service_hooks.run_web_app = fake_run
-        top_hooks.get_env = FakeEnv({"TANKPIT_FLEET_PORT": "27311"})
-        main()
-    finally:
-        core_hooks.load_dotenv = original_dotenv
-        service_hooks.run_web_app = original_run
-        top_hooks.get_env = original_get_env
-
-    assert loads == ["dotenv"]
-    if len(served) != 1:
-        raise AssertionError(f"expected one serve call, got {served!r}")
-    app, host, port = served[0]
-    assert (host, port) == ("127.0.0.1", 27311)
-    canonical = {resource.canonical for resource in app.router.resources()}
-    assert canonical == {
-        "/",
-        "/accounts",
-        "/rooms",
-        "/troops",
-        "/tanks",
-        "/bots",
-        "/bots/{instance}/stats",
-        "/bots/{instance}/hud",
-        "/bots/{instance}/activity",
-        "/bots/{instance}/stop",
-        "/bots/{instance}/restart",
-        "/bots/{instance}",
-    }
-
-
-def test_real_run_web_app_drives_aiohttp_until_interrupted() -> None:
-    """The production runner reaches app startup and unwinds cleanly."""
-    app = web.Application()
-    reached: list[str] = []
-
-    async def interrupt(started_app: web.Application) -> None:
-        _ = started_app
-        reached.append("startup")
-        raise KeyboardInterrupt
-
-    app.on_startup.append(interrupt)
-    _real_run_web_app(app, host="127.0.0.1", port=0)
-    assert reached == ["startup"]
 
 
 def test_real_spawn_bot_process_launches_a_live_python_child() -> None:

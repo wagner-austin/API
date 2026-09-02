@@ -31,7 +31,6 @@ from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service._test_hooks import SiteRunnerProtocol
 from tankpit_bot.service.config import resolve_idle_exit_seconds
 from tankpit_bot.service.constants import (
     SERVICE_HOST,
@@ -40,6 +39,7 @@ from tankpit_bot.service.constants import (
     resolve_service_port,
 )
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
+from tankpit_bot.service.serving import run_until_stopped
 from tankpit_bot.service.session_runner import SessionRunner
 
 log = get_logger(__name__)
@@ -58,32 +58,6 @@ def resolve_service_stop_file() -> Path:
     instance = resolve_bot_instance()
     state_dir = Path("runs/state") / instance if instance else Path("runs/state")
     return state_dir / "STOP"
-
-
-async def run_service_forever(
-    site: SiteRunnerProtocol,
-    stop_event: asyncio.Event,
-) -> None:
-    """Serve until ``stop_event`` is set, then tear the site down.
-
-    ``site.cleanup`` runs even when ``site.start`` raises — the site's
-    ``AppRunner`` may have partially set up (opened the socket, wired
-    handlers) before start failed, and cleanup is idempotent. The
-    ``finally`` wraps both stages for that reason.
-
-    Args:
-        site: The aiohttp site backing the HTTP surface.
-        stop_event: Signal the caller sets to request shutdown —
-            typically wired to SIGINT / SIGTERM handlers or a test
-            harness that just calls ``stop_event.set()``.
-    """
-    try:
-        await site.start()
-        log.info("Bot service ready")
-        await stop_event.wait()
-    finally:
-        log.info("Bot service shutting down")
-        await site.cleanup()
 
 
 async def exit_when_idle(
@@ -186,7 +160,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
         )
     )
     try:
-        await run_service_forever(site, stop_event)
+        await run_until_stopped(site, stop_event, name="Bot service")
     finally:
         idle_monitor.cancel()
 
@@ -227,5 +201,4 @@ def main() -> None:
 __all__ = [
     "exit_when_idle",
     "main",
-    "run_service_forever",
 ]

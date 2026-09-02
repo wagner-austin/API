@@ -29,6 +29,33 @@ _DEFAULT_BOT_ARTIFACT: Path = Path("runs") / "bot" / "latest.events.jsonl"
 _ReportT = TypeVar("_ReportT")
 
 
+def decode_event_lines(lines: list[str]) -> list[RuntimeEventRecordDict]:
+    """Decode JSONL event lines, skipping blank ones.
+
+    The one place event text becomes event records, shared by the
+    whole-file loader and the incremental tail reader
+    (:mod:`tankpit_bot.diagnostics.event_tail`) so the two can never
+    disagree about what a line means.
+
+    Args:
+        lines: Raw JSONL lines in file order.
+
+    Returns:
+        Decoded :class:`RuntimeEventRecordDict` rows in the same order.
+
+    Raises:
+        JSONTypeError: When any non-blank line fails strict event
+            decoding; malformed artifacts are surfaced instead of
+            silently dropped.
+    """
+    records: list[RuntimeEventRecordDict] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        records.append(decode_runtime_event_record(narrow_json_to_dict(load_json_str(line))))
+    return records
+
+
 def load_event_records(source_path: Path) -> list[RuntimeEventRecordDict]:
     """Load and decode every event line from a JSONL artifact.
 
@@ -42,13 +69,7 @@ def load_event_records(source_path: Path) -> list[RuntimeEventRecordDict]:
         JSONTypeError: When any line fails strict event decoding;
             malformed artifacts are surfaced instead of silently dropped.
     """
-    text = _test_hooks.read_text(source_path)
-    records: list[RuntimeEventRecordDict] = []
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        records.append(decode_runtime_event_record(narrow_json_to_dict(load_json_str(line))))
-    return records
+    return decode_event_lines(_test_hooks.read_text(source_path).splitlines())
 
 
 def scan_diagnostic_records(
@@ -140,6 +161,7 @@ def resolve_source_path(argv: list[str]) -> Path:
 
 
 __all__ = [
+    "decode_event_lines",
     "load_event_records",
     "resolve_source_path",
     "run_analyzer_cli",

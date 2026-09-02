@@ -183,3 +183,64 @@ def test_real_replace_text_drops_the_beat_under_reader_contention(tmp_path: Path
 
     assert target.read_text(encoding="utf-8") == "old"
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_real_file_marker_reports_identity_and_size(tmp_path: Path) -> None:
+    """The marker grows with the file and keeps the same identity."""
+    target = tmp_path / "latest.events.jsonl"
+    target.write_bytes(b"one\n")
+
+    first_identity, first_size = _test_hooks._real_file_marker(target)
+    target.write_bytes(b"one\ntwo\n")
+    second_identity, second_size = _test_hooks._real_file_marker(target)
+
+    assert first_size == 4
+    assert second_size == 8
+    assert first_identity == second_identity
+
+
+def test_real_file_marker_identity_changes_when_the_path_is_recreated(
+    tmp_path: Path,
+) -> None:
+    """A new file under the same name is a different file.
+
+    This is what tells the incremental reader that a bot started a new
+    run, rather than that its old one grew.
+    """
+    target = tmp_path / "latest.events.jsonl"
+    target.write_text("first run\n", encoding="utf-8")
+    before, _ = _test_hooks._real_file_marker(target)
+
+    target.unlink()
+    target.write_text("second run\n", encoding="utf-8")
+    after, _ = _test_hooks._real_file_marker(target)
+
+    assert before != after
+
+
+def test_real_file_marker_raises_for_a_missing_file(tmp_path: Path) -> None:
+    """An artifact that does not exist is an error, not a zero size."""
+    with pytest.raises(OSError):
+        _test_hooks._real_file_marker(tmp_path / "never-written")
+
+
+def test_real_read_bytes_from_reads_the_tail(tmp_path: Path) -> None:
+    """Reading from an offset returns only what follows it."""
+    target = tmp_path / "latest.events.jsonl"
+    target.write_bytes(b"alpha\nbravo\n")
+
+    assert _test_hooks._real_read_bytes_from(target, 6) == b"bravo\n"
+
+
+def test_real_read_bytes_from_at_the_end_reads_nothing(tmp_path: Path) -> None:
+    """A cursor already at the end costs a read and returns no bytes."""
+    target = tmp_path / "latest.events.jsonl"
+    target.write_bytes(b"alpha\n")
+
+    assert _test_hooks._real_read_bytes_from(target, 6) == b""
+
+
+def test_real_read_bytes_from_raises_for_a_missing_file(tmp_path: Path) -> None:
+    """A cursor cannot read an artifact that is not there."""
+    with pytest.raises(OSError):
+        _test_hooks._real_read_bytes_from(tmp_path / "never-written", 0)

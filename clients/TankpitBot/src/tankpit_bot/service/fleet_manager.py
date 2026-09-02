@@ -1,211 +1,99 @@
 """Fleet domain: the instance registry behind the HTTP surface.
 
-Owns spawn/stop/restart/remove/stats over one bot child process per
-instance name, and nothing about HTTP. Each bot is a CHILD PROCESS, so
-an orchestrator dying can never kill a live tank.
+Owns spawn/adopt/stop/restart/remove/drain over one bot child process
+per instance name, and nothing about HTTP. Each bot is a CHILD
+PROCESS, so an orchestrator dying can never kill a live tank -- and
+because they outlive it, the manager both drains them on the way out
+and adopts the survivors on the way back in ([[fleet-lifecycle]]).
+
+What an operator may ASK for -- accounts, rooms, colours, roles, the
+port -- is :mod:`tankpit_bot.service.fleet_config`; this module is
+what is actually running.
 """
 
 from __future__ import annotations
 
-from platform_core.json_utils import (
-    JSONObject,
-    load_json_str,
-    narrow_json_to_dict,
-)
+from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
-from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
-from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, TANK_REGISTRY_PATH, bot_run_dir
+from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
+from tankpit_bot.service.fleet_adoption import adopt_recorded_bots
 from tankpit_bot.service.fleet_bot import (
     FleetBotDict,
     _child_environment,
     _ManagedBot,
 )
+from tankpit_bot.service.fleet_config import (
+    configured_accounts,
+    derive_instance,
+    resolve_role,
+    resolve_troop,
+)
+from tankpit_bot.service.fleet_error import FleetError
+from tankpit_bot.service.fleet_record import (
+    FleetProcessRecordDict,
+    forget_process_record,
+    write_process_record,
+)
 from tankpit_bot.service.fleet_telemetry import FleetTelemetry
-from tankpit_bot.types.constants import TROOP_COLOR_NAMES
-from tankpit_bot.types.rooms import LOBBY_ROOMS
 
 log = get_logger(__name__)
-
-FLEET_PORT_DEFAULT = 27300
-
-
-def resolve_fleet_port() -> int:
-    """Resolve the fleet manager's port from the environment.
-
-    Returns:
-        ``TANKPIT_FLEET_PORT`` when set, else :data:`FLEET_PORT_DEFAULT`.
-
-    Raises:
-        ValueError: If the value is not an integer in [1024, 65535].
-    """
-    raw = top_hooks.get_env("TANKPIT_FLEET_PORT")
-    if raw is None or raw == "":
-        return FLEET_PORT_DEFAULT
-    port = int(raw)
-    if not 1024 <= port <= 65535:
-        raise ValueError(f"TANKPIT_FLEET_PORT {port} outside [1024, 65535]")
-    return port
-
-
-class FleetError(RuntimeError):
-    """A fleet operation the HTTP layer maps to a 4xx response."""
-
-
-def _resolve_role(role: str) -> FleetRole:
-    """Resolve a spawn request's role selector to a fleet role.
-
-    Args:
-        role: Role selector; empty means fighter — the full doctrine
-            is the primary configuration, a gatherer is an explicit
-            operator choice ([[fleet-coordination]]).
-
-    Returns:
-        The resolved role.
-
-    Raises:
-        FleetError: If the selector is not a fleet role.
-    """
-    candidate = role or "fighter"
-    for known in FLEET_ROLES:
-        if candidate == known:
-            return known
-    known_roles = ", ".join(FLEET_ROLES)
-    raise FleetError(f"role {role!r} is not a fleet role (one of: {known_roles})")
-
-
-def _resolve_troop(troop: str) -> str:
-    """Resolve a spawn request's color selector to a tank color name.
-
-    Args:
-        troop: Color name, or ``""`` to keep the account's own default
-            tank color for the map it joins.
-
-    Returns:
-        The validated color name, or ``""``.
-
-    Raises:
-        FleetError: If the selector is not a tank color.
-    """
-    if troop == "":
-        return ""
-    for known in TROOP_COLOR_NAMES:
-        if troop == known:
-            return known
-    known_colors = ", ".join(TROOP_COLOR_NAMES)
-    raise FleetError(f"troop {troop!r} is not a tank color (one of: {known_colors})")
 
 
 class FleetManager:
     """Spawn and track one bot process per instance name."""
 
     def __init__(self) -> None:
-        """Start with an empty registry."""
+        """Start with an empty registry and a fresh boot identity."""
         self._bots: dict[str, _ManagedBot] = {}
         self._telemetry = FleetTelemetry()
+        self._draining = False
+        self._boot_id = str(top_hooks.get_current_time_ms())
 
-    def accounts(self) -> list[str]:
-        """Return the configured account usernames.
+    @property
+    def boot_id(self) -> str:
+        """Identify THIS manager process to its clients.
 
-        Accounts are CONFIG (``accounts.json``), never free text — the
-        spawn surface only accepts a selector from this list, and the
-        control page renders it as a dropdown. Usernames only;
-        passwords never leave the file.
+        The control page keeps per-instance state (rows, HUD cards,
+        cached summaries) keyed by names it learned from a previous
+        poll. When the manager restarts, every one of those names is
+        meaningless to the new process, and a page that kept polling
+        them just drew 404s at itself. It compares this value instead
+        and reloads when it changes.
 
-        Returns:
-            Usernames in file order (the first is the default), empty
-            when no accounts file exists.
-        """
-        if not top_hooks.path_exists(_ACCOUNTS_PATH):
-            return []
-        return [account["username"] for account in load_accounts(_ACCOUNTS_PATH)]
-
-    def rooms(self) -> list[str]:
-        """Return the room selectors the control page offers.
-
-        The lobby lists two rooms, and the world's display name
-        carries the current map, so the page offers the durable
-        PREFIXES the join resolver matches on
-        ([[game-rules]], :mod:`tankpit_bot.types.rooms`) rather than
-        asking a human to type a name that rotates. Spawn still
-        accepts any selector: this list is what the dropdown shows,
-        not a closed set.
+        Two managers cannot share a value in practice because they
+        cannot share a port: the second one fails to bind before it
+        can serve anything.
 
         Returns:
-            Room selectors in lobby order; the first is the default.
+            An opaque per-process identifier.
         """
-        return list(LOBBY_ROOMS)
+        return self._boot_id
 
-    def troops(self) -> list[str]:
-        """Return the tank colors the control page offers.
+    def adopt(self) -> list[str]:
+        """Re-attach to bots left running by a previous manager.
 
-        Four colors, in TEAM ID order — the index is the wire's team
-        id, so the list doubles as the name->id table the spawn
-        environment converts through. An account holds FOUR TANKS PER
-        WORLD, one per color, each with its own RANK, inventory, fuel
-        and points (awards alone are shared) — so picking a color
-        picks WHICH TANK plays, not a skin, and a fresh color starts
-        that world from scratch. The worlds are independent: four on
-        the main world plus four on Practice. Switching is throttled
-        per world — 5 minutes between exiting a world and re-entering
-        it on a different color ([[game-rules]]).
+        Called once at boot, before serving. Bots whose processes are
+        gone have their records cleared; survivors join the registry
+        as if this manager had spawned them, carrying their original
+        account, role, room, troop, bounds and start time.
 
         Returns:
-            Color names in team-id order.
+            The adopted instance names, in sorted order.
+
+        Raises:
+            OSError: If a spawn record cannot be read.
+            InvalidJsonError: If a spawn record is not valid JSON.
+            JSONTypeError: If a spawn record is malformed.
         """
-        return list(TROOP_COLOR_NAMES)
-
-    def tanks(self) -> JSONObject:
-        """Return the measured per-colour tank registry.
-
-        An account holds four tanks per world with INDEPENDENT rank
-        ([[game-rules]]), and rank sets both the fuel cap
-        (``1000 + 100*rank``) and the radar radius (``2 + rank//3``),
-        so which colour an operator picks decides how strong the tank
-        is. Nothing on the wire reports the ranks of colours the
-        account is not currently playing -- the lobby names only the
-        last-played one -- so this is MEASURED state, filled by
-        entering each colour once, not something the page can derive.
-
-        Returns:
-            The registry as stored, or an empty object when the file
-            is absent (an operator who has never run the census sees
-            an empty panel, not an error).
-        """
-        try:
-            raw = top_hooks.read_text(TANK_REGISTRY_PATH)
-        except OSError as error:
-            log.info("Fleet: no tank registry at %s: %s", TANK_REGISTRY_PATH, error)
-            return {}
-        return narrow_json_to_dict(load_json_str(raw))
-
-    def derive_instance(self, account: str) -> str:
-        """Derive the instance name from the account — programmatic, reliable.
-
-        One account can hold at most one live tank (the game refuses a
-        second login), so the account IS the natural bot identity: the
-        instance is its username lowered and sanitized to the
-        namespace grammar. No account configured falls back to
-        ``bot``. Callers may still name instances explicitly through
-        the API; the control page never asks a human to invent one.
-
-        Args:
-            account: Selected account username, empty for the default.
-
-        Returns:
-            A valid instance name.
-        """
-        configured = self.accounts()
-        source = account or (configured[0] if configured else "bot")
-        cleaned = "".join(
-            ch if ch.isascii() and (ch.isalnum() or ch in "-_") else "-" for ch in source.lower()
-        )[:32]
-        if not cleaned or not (cleaned[0].isascii() and cleaned[0].isalnum()):
-            cleaned = f"b{cleaned}"[:32]
-        return cleaned
+        for bot in adopt_recorded_bots():
+            self._bots[bot.instance] = bot
+        adopted = sorted(self._bots)
+        if adopted:
+            log.info("Fleet: adopted %d running bot(s): %s", len(adopted), ", ".join(adopted))
+        return adopted
 
     def spawn(
         self,
@@ -248,7 +136,7 @@ class FleetManager:
                 is not a known one.
         """
         if not instance:
-            instance = self.derive_instance(account)
+            instance = derive_instance(account)
         if not _INSTANCE_NAME.match(instance):
             raise FleetError(
                 f"instance {instance!r} is not a valid instance name "
@@ -256,17 +144,17 @@ class FleetManager:
             )
         if kills < 0 or seconds < 0:
             raise FleetError("bounds must be non-negative")
-        resolved_role = _resolve_role(role)
-        resolved_troop = _resolve_troop(troop)
+        resolved_role = resolve_role(role)
+        resolved_troop = resolve_troop(troop)
         if account:
-            configured = self.accounts()
+            configured = configured_accounts()
             if account not in configured:
                 known = ", ".join(configured) or "none configured"
                 raise FleetError(
                     f"account {account!r} is not in accounts.json (accounts are "
                     f"config, not free text; configured: {known})"
                 )
-        configured = self.accounts()
+        configured = configured_accounts()
         resolved_account = account or (configured[0] if configured else "")
         for other in self._bots.values():
             other_account = other.account or (configured[0] if configured else "")
@@ -302,6 +190,7 @@ class FleetManager:
             process=process,
         )
         self._bots[instance] = bot
+        self._record_spawn(bot)
         log.info(
             "Fleet: spawned instance %r pid %d (role=%s kills=%d seconds=%d)",
             instance,
@@ -311,6 +200,44 @@ class FleetManager:
             seconds,
         )
         return bot.report()
+
+    def _record_spawn(self, bot: _ManagedBot) -> None:
+        """Persist what a future manager needs to find this bot again.
+
+        A child that has already exited by the time it is asked for
+        its identity leaves NO record, on purpose: there is nothing
+        for a later manager to adopt, and a record naming a dead pid
+        would only be re-checked and discarded on every future boot.
+
+        Args:
+            bot: The freshly registered bot.
+
+        Returns:
+            None.
+        """
+        created_at = service_hooks.process_identity(bot.process.pid)
+        if created_at is None:
+            log.warning(
+                "Fleet: instance %r (pid %d) exited before it could be recorded; "
+                "a later manager will not be able to adopt it",
+                bot.instance,
+                bot.process.pid,
+            )
+            return
+        write_process_record(
+            FleetProcessRecordDict(
+                instance=bot.instance,
+                account=bot.account,
+                role=bot.role,
+                room=bot.room,
+                troop=bot.troop,
+                kills=bot.kills,
+                seconds=bot.seconds,
+                started_ms=bot.started_ms,
+                pid=bot.process.pid,
+                created_at=created_at,
+            )
+        )
 
     def report(self) -> list[FleetBotDict]:
         """Return every registered instance's current state.
@@ -339,10 +266,65 @@ class FleetManager:
         bot = self._bots.get(instance)
         if bot is None:
             raise FleetError(f"unknown instance {instance!r}")
-        sentinel = bot_run_dir(instance) / "STOP"
-        top_hooks.write_text(sentinel, "")
-        log.info("Fleet: stop requested for %r (sentinel %s)", instance, sentinel)
+        self._request_stop(bot)
         return bot.report()
+
+    def _request_stop(self, bot: _ManagedBot) -> None:
+        """Write one bot's stop sentinel.
+
+        Args:
+            bot: The registered bot to ask to stop.
+
+        Returns:
+            None.
+        """
+        sentinel = bot_run_dir(bot.instance) / "STOP"
+        top_hooks.write_text(sentinel, "")
+        log.info("Fleet: stop requested for %r (sentinel %s)", bot.instance, sentinel)
+
+    def live_instances(self) -> list[str]:
+        """Return the instances whose processes are still running.
+
+        Returns:
+            Instance names in sorted order.
+        """
+        return sorted(name for name, bot in self._bots.items() if bot.process.poll() is None)
+
+    def draining(self) -> bool:
+        """Report whether a shutdown drain has been requested.
+
+        Returns:
+            True once :meth:`request_drain` has been called.
+        """
+        return self._draining
+
+    def request_drain(self) -> list[str]:
+        """Ask every live bot to stop, so the manager can exit cleanly.
+
+        This is a DRAIN, never a kill. Each bot gets the same stop
+        sentinel a single ``stop`` writes, and tears down the same way
+        -- scorecard, capture save, archive, and the quit-to-lobby
+        that stops the tank being left exposed in a live game. A tank
+        killed outright instead would lose its rank.
+
+        Idempotent: calling it again re-writes the sentinels, which a
+        bot mid-teardown ignores.
+
+        Returns:
+            The instances asked to stop, in sorted order. Empty means
+            nothing was running and the manager can exit immediately.
+        """
+        self._draining = True
+        draining = []
+        for instance in self.live_instances():
+            self._request_stop(self._bots[instance])
+            draining.append(instance)
+        log.info(
+            "Fleet: drain requested; %d bot(s) tearing down: %s",
+            len(draining),
+            ", ".join(draining) or "none",
+        )
+        return draining
 
     def restart(self, instance: str) -> FleetBotDict:
         """Respawn a finished instance with the parameters it had.
@@ -454,14 +436,12 @@ class FleetManager:
         if bot.process.poll() is None:
             raise FleetError(f"instance {instance!r} is still running; stop it first")
         del self._bots[instance]
+        forget_process_record(instance)
+        self._telemetry.forget(instance)
         return bot.report()
 
 
 __all__ = [
-    "FLEET_PORT_DEFAULT",
-    "FleetBotDict",
     "FleetError",
     "FleetManager",
-    "log",
-    "resolve_fleet_port",
 ]

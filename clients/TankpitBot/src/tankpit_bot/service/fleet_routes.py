@@ -22,38 +22,22 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.runtime_artifacts import bot_run_dir
-from tankpit_bot.service.fleet_manager import (
-    FleetBotDict,
-    FleetError,
-    FleetManager,
+from tankpit_bot.service.fleet_config import (
+    configured_accounts,
+    lobby_rooms,
+    tank_registry,
+    troop_colors,
 )
+from tankpit_bot.service.fleet_error import FleetError
+from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_page import FLEET_PAGE_HTML
+from tankpit_bot.service.fleet_wire import (
+    FleetSnapshotDict,
+    encode_fleet_bot,
+    encode_fleet_snapshot,
+)
 
 log = get_logger(__name__)
-
-
-def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
-    """Encode one report row for the HTTP surface.
-
-    Args:
-        bot: The report row.
-
-    Returns:
-        JSON-serializable object.
-    """
-    return {
-        "instance": bot["instance"],
-        "account": bot["account"],
-        "role": bot["role"],
-        "room": bot["room"],
-        "troop": bot["troop"],
-        "pid": bot["pid"],
-        "alive": bot["alive"],
-        "returncode": bot["returncode"],
-        "kills": bot["kills"],
-        "seconds": bot["seconds"],
-        "started_ms": bot["started_ms"],
-    }
 
 
 def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str, str]:
@@ -110,33 +94,47 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         return web.Response(text=FLEET_PAGE_HTML, content_type="text/html")
 
     async def list_bots(request: web.Request) -> web.Response:
-        """``GET /bots`` — every instance's current state."""
+        """``GET /bots`` — every instance's current state.
+
+        Carries the manager's ``boot`` identity and whether it is
+        ``draining``. Both are for the page rather than the registry:
+        a boot id it does not recognise means every name it is holding
+        belongs to a manager that no longer exists, and a draining
+        manager is one whose bots are on their way out.
+        """
         _ = request
-        rows: list[JSONValue] = [encode_fleet_bot(bot) for bot in manager.report()]
-        return _json_response({"bots": rows})
+        return _json_response(
+            encode_fleet_snapshot(
+                FleetSnapshotDict(
+                    boot=manager.boot_id,
+                    draining=manager.draining(),
+                    bots=manager.report(),
+                )
+            )
+        )
 
     async def list_accounts(request: web.Request) -> web.Response:
         """``GET /accounts`` — configured usernames, first is default."""
         _ = request
-        names: list[JSONValue] = list(manager.accounts())
+        names: list[JSONValue] = list(configured_accounts())
         return _json_response({"accounts": names})
 
     async def list_rooms(request: web.Request) -> web.Response:
         """``GET /rooms`` — room selectors, first is the default."""
         _ = request
-        names: list[JSONValue] = list(manager.rooms())
+        names: list[JSONValue] = list(lobby_rooms())
         return _json_response({"rooms": names})
 
     async def list_troops(request: web.Request) -> web.Response:
         """``GET /troops`` — tank colors, in wire team-id order."""
         _ = request
-        names: list[JSONValue] = list(manager.troops())
+        names: list[JSONValue] = list(troop_colors())
         return _json_response({"troops": names})
 
     async def list_tanks(request: web.Request) -> web.Response:
         """``GET /tanks`` — measured rank per account, world and colour."""
         _ = request
-        return _json_response({"tanks": manager.tanks()})
+        return _json_response({"tanks": tank_registry()})
 
     app.router.add_get("/", control_page)
     app.router.add_get("/accounts", list_accounts)
@@ -265,6 +263,35 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     app.router.add_delete("/bots/{instance}", remove_bot)
 
 
+def _add_shutdown_route(app: web.Application, manager: FleetManager) -> None:
+    """Wire the manager's own shutdown.
+
+    Its own registrar rather than one more branch of the lifecycle
+    group: those routes act on ONE instance, this one acts on the
+    manager and everything it holds.
+
+    Args:
+        app: Application under construction.
+        manager: The fleet registry to drain.
+    """
+
+    async def shutdown_fleet(request: web.Request) -> web.Response:
+        """``POST /shutdown`` — drain every bot, then exit.
+
+        Returns 202 immediately, naming the bots asked to stop. The
+        manager does NOT exit here: it stays up, supervising, until
+        the last child has finished its own teardown. That is what
+        makes an interrupted ``make down`` harmless — the client
+        walking away does not orphan anything, because the manager is
+        still the one holding the drain.
+        """
+        _ = request
+        draining: list[JSONValue] = list(manager.request_drain())
+        return _json_response({"draining": draining}, status=202)
+
+    app.router.add_post("/shutdown", shutdown_fleet)
+
+
 def make_fleet_app(manager: FleetManager) -> web.Application:
     """Build the fleet manager's aiohttp application.
 
@@ -278,11 +305,11 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
     _add_observation_routes(app, manager)
     _add_telemetry_routes(app, manager)
     _add_lifecycle_routes(app, manager)
+    _add_shutdown_route(app, manager)
     return app
 
 
 __all__ = [
-    "encode_fleet_bot",
     "log",
     "make_fleet_app",
     "parse_spawn_request",

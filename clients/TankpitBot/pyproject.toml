@@ -24,6 +24,7 @@ pillow = "^11.0"
 aiohttp = "^3.10"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
+psutil = "^7.0"
 
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer.core:main"
@@ -48,6 +49,8 @@ tankpit-issue-report = "tankpit_bot.diagnostics.issue_report_renderer:main"
 tankpit-run-digest = "tankpit_bot.diagnostics.run_digest:main"
 tankpit-corpus-audit = "tankpit_bot.diagnostics.corpus_audit:main"
 tankpit-fleet = "tankpit_bot.service.fleet:main"
+tankpit-fleet-up = "tankpit_bot.service.fleet_control:up"
+tankpit-fleet-down = "tankpit_bot.service.fleet_control:down"
 tankpit-audit = "tankpit_bot.validate.audit:main"
 tankpit-shadow = "tankpit_bot.validate.shadow:main"
 tankpit-roundtrip = "tankpit_bot.validate.roundtrip:main"
@@ -73,6 +76,7 @@ pytest-cov = "^7.0.0"
 pytest-xdist = "^3.8"
 ruff = "^0.14.4"
 mypy = "^1.19"
+types-psutil = "^7.0"
 
 [tool.mypy]
 python_version = "3.11"

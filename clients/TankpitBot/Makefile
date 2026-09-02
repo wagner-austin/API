@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down analyze analyze-timing queue-probe download-fields decode analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -51,6 +51,8 @@ help:
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
 	@Write-Host "  make fleet                       AI-operated fleet manager (spawn/list/stop bots over HTTP)"
+	@Write-Host "  make up                          start the fleet manager detached (adopts bots already running)"
+	@Write-Host "  make down                        drain every bot, then stop the manager"
 	@Write-Host "  make analyze                     issue report + run audit + cross-session stats"
 	@Write-Host "  make digest                      compact per-run truth table (works on crashed runs)"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
@@ -335,6 +337,24 @@ fleet-dev: install
 	@Write-Host ""
 	@Write-Host "==> fleet-dev (HOT TREE -- live sessions can break under mid-surgery edits)" -ForegroundColor Yellow
 	poetry run tankpit-fleet
+
+# ``make up`` / ``make down`` are the lifecycle pair. ``up`` launches
+# the manager from the newest release into its own window and waits
+# until it answers, adopting any bots still running from a previous
+# manager. ``down`` drains: every bot is asked to stop, tears down,
+# and quits to the lobby, and the manager exits after the last one
+# lands. Neither ever kills a tank -- that is what would cost its
+# rank -- so ``down`` waits as long as the teardowns take. Interrupting
+# ``make down`` is safe: the manager owns the drain, not the command.
+up:
+	@Write-Host ""
+	@Write-Host "==> up (fleet manager, newest release, detached)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Starting from $$($$rel.Name); 'make down' to stop it." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-up; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
+
+down:
+	@Write-Host ""
+	@Write-Host "==> down (drain every bot, then stop the manager)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the manager exits; this waits for them." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-down; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
 
 run: install
 	@Write-Host ""

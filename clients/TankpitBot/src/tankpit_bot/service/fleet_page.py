@@ -173,6 +173,8 @@ const HUD_BODY = __HUD_BODY__;
 const registry = {};
 const stats = {};
 const huds = {};
+let bootId = null;
+let draining = false;
 
 function fmtDuration(s) {
   if (s === null || s === undefined || s < 0) return "";
@@ -245,10 +247,14 @@ function row(bot) {
   const h = huds[bot.instance];
   const tr = document.createElement("tr");
   if (!bot.alive) tr.className = "dead";
+  // An adopted bot that ended before this manager could observe it
+  // has no exit code to report — "exited" is the honest word for
+  // that, where "exit null" was just the absence showing through.
   const status = bot.alive ? '<span class="alive">running</span>'
     : (s.available && s.clean_exit
        ? '<span class="done">' + (s.exit_reason || "finished") + "</span>"
-       : '<span class="crash">exit ' + bot.returncode + "</span>");
+       : '<span class="crash">' +
+         (bot.returncode === null ? "exited" : "exit " + bot.returncode) + "</span>");
   const limits = ((bot.kills ? bot.kills + " kills" : "") +
     (bot.kills && bot.seconds ? " / " : "") +
     (bot.seconds ? bot.seconds + " s" : "")) || "none";
@@ -300,26 +306,40 @@ function row(bot) {
   return tr;
 }
 
-async function poll() {
+async function pollBot(name) {
   try {
-    const body = await (await fetch("/bots")).json();
-    for (const name of Object.keys(registry)) delete registry[name];
-    for (const bot of body.bots) registry[bot.instance] = bot;
+    const [statsResp, hudResp] = await Promise.all([
+      fetch("/bots/" + name + "/stats"), fetch("/bots/" + name + "/hud")]);
+    if (statsResp.ok) stats[name] = await statsResp.json();
+    if (hudResp.ok) huds[name] = await hudResp.json();
+  } catch (e) { /* keep last known */ }
+  paintHud(name);
+}
+
+async function poll() {
+  let body;
+  try {
+    body = await (await fetch("/bots")).json();
   } catch (e) {
     document.getElementById("headline").innerHTML =
       '<span class="dot off"></span>fleet unreachable';
     return;
   }
+  // A manager restart makes every name this page is holding
+  // meaningless at once: the rows, the HUD cards and the cached
+  // summaries all describe a registry that no longer exists, and
+  // polling them just aims 404s at a manager that never heard of
+  // them. One reload re-syncs the whole page against the new boot.
+  if (bootId !== null && body.boot !== bootId) { location.reload(); return; }
+  bootId = body.boot;
+  draining = body.draining;
+  for (const name of Object.keys(registry)) delete registry[name];
+  for (const bot of body.bots) registry[bot.instance] = bot;
   const names = Object.keys(registry).sort();
-  for (const name of names) {
-    try {
-      const [statsResp, hudResp] = await Promise.all([
-        fetch("/bots/" + name + "/stats"), fetch("/bots/" + name + "/hud")]);
-      if (statsResp.ok) stats[name] = await statsResp.json();
-      if (hudResp.ok) huds[name] = await hudResp.json();
-    } catch (e) { /* keep last known */ }
-    paintHud(name);
-  }
+  // Concurrently, not one bot at a time: a cold load waited out every
+  // bot's summaries in turn before it painted anything, so first
+  // paint cost the SUM of the fleet instead of its slowest member.
+  await Promise.all(names.map(pollBot));
   for (const wrap of document.querySelectorAll(".hudwrap")) {
     if (!registry[wrap.dataset.hud]) wrap.remove();
   }
@@ -332,8 +352,9 @@ async function poll() {
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;
   document.getElementById("headline").innerHTML =
-    '<span class="dot"></span>fleet online · ' +
-    names.length + " bot" + (names.length === 1 ? "" : "s") +
+    '<span class="dot' + (draining ? " off" : "") + '"></span>' +
+    (draining ? "fleet draining — exits when the last bot lands" : "fleet online") +
+    " · " + names.length + " bot" + (names.length === 1 ? "" : "s") +
     " · " + running + " running";
 }
 

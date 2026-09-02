@@ -1,0 +1,126 @@
+---
+title: Fleet Manager Lifecycle
+tags: [fleet, architecture, lifecycle, operations]
+related:
+  - "[[fleet-coordination]]"
+  - "[[bot-service-architecture]]"
+  - "[[fleet-live-reads]]"
+source_paths:
+  - "src/tankpit_bot/service/fleet.py"
+  - "src/tankpit_bot/service/fleet_control.py"
+  - "src/tankpit_bot/service/fleet_record.py"
+  - "src/tankpit_bot/service/fleet_adoption.py"
+  - "src/tankpit_bot/service/fleet_manager.py"
+  - "src/tankpit_bot/service/serving.py"
+source_git_blobs:
+  "src/tankpit_bot/service/fleet.py": "3bdbe67257c01d402b4a4f5dce81fb337e1363ff"
+  "src/tankpit_bot/service/fleet_control.py": "847007ba72621abd7a0e23942c4d109a1a6fafac"
+  "src/tankpit_bot/service/fleet_record.py": "8cc5acfca6333d8c51ec46921d7b7dc5a6bfc898"
+  "src/tankpit_bot/service/fleet_adoption.py": "8de564766a3bb4a389c4df6996d9a637e0a86f11"
+  "src/tankpit_bot/service/fleet_manager.py": "f9f31cc03765d47e659993317d8a0ad02e4cf0cf"
+  "src/tankpit_bot/service/serving.py": "5bc4eeb8e04acca18551ab9bb153b812f6b50dbf"
+fact_checked: "2026-09-01"
+confidence: high
+hubs: [architecture]
+---
+
+# Fleet manager lifecycle: no orphans, no killed tanks
+
+*Established 2026-09-01 (operator ruling: "i dont want orphaned
+processes"), against the older doctrine that the manager may simply
+walk away from its children.*
+
+The fleet spawns bots as **child processes** so that losing the
+manager can never kill a live tank.[^1] That choice bought safety and
+cost supervision: the registry lived only in memory, so every manager
+restart produced bots that were still fighting and no longer
+reachable — not stoppable, not inspectable, not visible on the page.
+The only way to end one was to find its pid by hand.
+
+Two mechanisms close that gap from opposite ends.
+
+## Draining: the manager exits last
+
+An interrupt, or `POST /shutdown`, asks every live bot to stop and the
+manager **keeps serving while they tear down**, exiting only once the
+last one is gone.[^2] That is the only moment at which exiting orphans
+nothing.
+
+Draining never kills. Each bot ends through the same stop sentinel a
+bounded session ends on, so it writes its scorecard and **quits to the
+lobby** rather than being cut down mid-game — a tank killed outright
+loses its rank ([[bot-behavior-contract]]).[^3] The wait therefore has
+**no deadline**: hurrying a teardown to meet a timeout is precisely
+how a tank gets left exposed.
+
+`make down` is a CLIENT of that drain, not the thing performing it.[^4]
+It posts the shutdown and watches the port; interrupting it changes
+nothing, because the manager owns the drain and still exits only when
+its bots have landed. An indefinite wait can therefore never itself
+create the orphans it is avoiding.
+
+## Adoption: a restarted manager finds its bots
+
+If the manager dies anyway — a crash, a closed window — the bots
+survive by design, and the **next** manager adopts them. Every spawn
+writes `runs/bot/<instance>/process.json`; every boot reads those
+records back, re-attaches to the processes still alive, and deletes
+the records of the ones that finished unwatched.[^5]
+
+A record names an **identity, not a pid**. Windows recycles pids, so a
+manager restarted minutes later could otherwise adopt an unrelated
+program that inherited the number, then refuse to restart that
+instance forever because its imaginary bot never exits. The process
+creation time is recorded beside the pid and compared **exactly** —
+the same `(pid, create_time)` identity psutil itself uses.[^6]
+
+Records are written atomically, so a record that fails to decode is
+real corruption rather than a torn write. Adoption **raises** on one
+instead of skipping it: starting a manager on top of a damaged record
+would mean silently forgetting a tank that may still be playing.[^5]
+
+## Boot identity: the page re-syncs itself
+
+`GET /bots` carries the manager's `boot` id.[^7] A control page that
+sees it change knows every instance name it holds belongs to a manager
+that no longer exists, and reloads. Before this, a tab left open
+across a restart kept polling names the new process had never heard
+of, aiming a steady stream of 404s at it — the symptom that opened
+this work.
+
+## Operator surface
+
+| Command | Effect |
+|---|---|
+| `make up` | Start the manager detached, adopting anything still running. Idempotent: a manager already listening is reported and left alone. |
+| `make down` | Drain every bot, then wait for the manager to exit. |
+| `make fleet` | Run the manager in the foreground, as before. |
+
+A detached manager has no terminal, so its console goes to
+`runs/fleet/manager.log` — the same reasoning that sends each bot's
+child console to a file.[^8]
+
+[^1]: `src/tankpit_bot/service/fleet.py:3-6` states the doctrine; the
+      children are `subprocess.Popen` handles created in
+      `_real_spawn_bot_process`
+      (`service/_test_hooks/processes.py`).
+[^2]: `exit_when_drained` (`service/fleet.py`) polls
+      `FleetManager.live_instances` and sets the serve loop's stop
+      event only when it is empty.
+[^3]: `FleetManager.request_drain` (`service/fleet_manager.py`) writes
+      the same `runs/bot/<instance>/STOP` sentinel as `stop`, via the
+      shared `_request_stop`.
+[^4]: `down` in `src/tankpit_bot/service/fleet_control.py`; the
+      module docstring records why the waiting belongs to the manager.
+[^5]: `adopt_recorded_bots` (`service/fleet_adoption.py`) over the
+      records defined in `service/fleet_record.py`.
+[^6]: `_real_open_adopted_process`
+      (`service/_test_hooks/processes.py`) compares
+      `psutil.Process.create_time()` against the recorded value.
+      Verified against real processes in
+      `tests/service/test_fleet_process_hooks.py`, including the
+      recycled-pid refusal.
+[^7]: `FleetManager.boot_id`, served by `encode_fleet_snapshot`
+      (`service/fleet_wire.py`) and compared in the page's poll loop
+      (`service/fleet_page.py`).
+[^8]: `FLEET_LOG_PATH` (`src/tankpit_bot/runtime_artifacts.py`).

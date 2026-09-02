@@ -118,6 +118,51 @@ class GlobPathsProtocol(Protocol):
         ...
 
 
+class FileMarkerProtocol(Protocol):
+    """Protocol for identifying a file and measuring it in one call."""
+
+    def __call__(self, path: Path) -> tuple[int, int]:
+        """Return the file's identity and current size.
+
+        One call rather than an exists-then-stat pair: a growing file
+        that is replaced between the two calls would otherwise report
+        the new run's size against the old run's identity.
+
+        Args:
+            path: File to inspect.
+
+        Returns:
+            ``(identity, size_bytes)``. ``identity`` is the
+            filesystem's own file number, which changes when the path
+            is re-created for a new run — the signal an incremental
+            reader uses to know its consumed offset is meaningless.
+
+        Raises:
+            OSError: If the file does not exist.
+        """
+        ...
+
+
+class ReadBytesFromProtocol(Protocol):
+    """Protocol for reading a file's bytes from a starting offset."""
+
+    def __call__(self, path: Path, offset: int) -> bytes:
+        """Read from ``offset`` to end of file.
+
+        Args:
+            path: File to read.
+            offset: Byte offset to start at; a offset at or past the
+                end yields empty bytes.
+
+        Returns:
+            Every byte from ``offset`` onward.
+
+        Raises:
+            OSError: If the file does not exist.
+        """
+        ...
+
+
 class ReplaceTextProtocol(Protocol):
     """Protocol for atomically replacing a file's text content."""
 
@@ -238,6 +283,42 @@ def _real_remove_file(path: Path) -> None:
     path.unlink(missing_ok=True)
 
 
+def _real_file_marker(path: Path) -> tuple[int, int]:
+    """Real implementation using a single Path.stat().
+
+    Args:
+        path: File to inspect.
+
+    Returns:
+        ``(st_ino, st_size)``. On Windows ``st_ino`` is the NTFS file
+        index, so it distinguishes a re-created path from a grown one.
+
+    Raises:
+        OSError: If the file does not exist.
+    """
+    status = path.stat()
+    return (status.st_ino, status.st_size)
+
+
+def _real_read_bytes_from(path: Path, offset: int) -> bytes:
+    """Real implementation seeking to ``offset`` and reading to EOF.
+
+    Args:
+        path: File to read.
+        offset: Byte offset to start at.
+
+    Returns:
+        Every byte from ``offset`` onward; empty when the offset is at
+        or past the end.
+
+    Raises:
+        OSError: If the file does not exist.
+    """
+    with path.open("rb") as handle:
+        handle.seek(offset)
+        return handle.read()
+
+
 def _real_glob_paths(directory: Path, pattern: str) -> list[Path]:
     """Real implementation using Path.glob().
 
@@ -260,6 +341,8 @@ append_text: AppendTextProtocol = _real_append_text
 path_exists: PathExistsProtocol = _real_path_exists
 remove_file: RemoveFileProtocol = _real_remove_file
 glob_paths: GlobPathsProtocol = _real_glob_paths
+file_marker: FileMarkerProtocol = _real_file_marker
+read_bytes_from: ReadBytesFromProtocol = _real_read_bytes_from
 
 
 __all__ = [

@@ -15,7 +15,7 @@ import pytest
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks.fs import PathExistsProtocol, ReadTextProtocol
-from tankpit_bot.service.fleet_manager import FleetManager
+from tankpit_bot.service.fleet_config import derive_instance
 
 
 @pytest.fixture()
@@ -43,21 +43,21 @@ def _accounts() -> Generator[list[str], None, None]:
 
 def test_derive_instance_falls_back_to_bot_without_accounts(_accounts: list[str]) -> None:
     """No account configured and none passed leaves the default identity."""
-    assert FleetManager().derive_instance("") == "bot"
+    assert derive_instance("") == "bot"
 
 
 def test_derive_instance_uses_the_first_configured_account(_accounts: list[str]) -> None:
     """An empty selector takes the accounts file's first entry."""
     _accounts.extend(["Zephyr", "Second"])
-    assert FleetManager().derive_instance("") == "zephyr"
+    assert derive_instance("") == "zephyr"
 
 
 def test_derive_instance_lowers_and_replaces_foreign_characters(
     _accounts: list[str],
 ) -> None:
     """Anything outside the grammar becomes a dash; hyphen and underscore stay."""
-    assert FleetManager().derive_instance("Tank Pit.Bot/9") == "tank-pit-bot-9"
-    assert FleetManager().derive_instance("keep-me_2") == "keep-me_2"
+    assert derive_instance("Tank Pit.Bot/9") == "tank-pit-bot-9"
+    assert derive_instance("keep-me_2") == "keep-me_2"
 
 
 def test_derive_instance_prefixes_a_name_that_starts_non_alphanumeric(
@@ -69,18 +69,18 @@ def test_derive_instance_prefixes_a_name_that_starts_non_alphanumeric(
     character was replaced -- ``spawn`` would then reject the very
     name this function exists to hand it.
     """
-    assert FleetManager().derive_instance("_leading") == "b_leading"
-    assert FleetManager().derive_instance(".dotted") == "b-dotted"
+    assert derive_instance("_leading") == "b_leading"
+    assert derive_instance(".dotted") == "b-dotted"
 
 
 def test_derive_instance_prefixes_an_account_that_sanitises_to_nothing(
     _accounts: list[str],
 ) -> None:
     """An all-foreign username still yields a usable instance name."""
-    assert FleetManager().derive_instance("...") == "b---"
+    assert derive_instance("...") == "b---"
 
 
 def test_derive_instance_truncates_to_the_namespace_bound(_accounts: list[str]) -> None:
     """Long usernames are cut to 32 characters, prefix included."""
-    assert FleetManager().derive_instance("a" * 40) == "a" * 32
-    assert len(FleetManager().derive_instance("_" + "b" * 40)) == 32
+    assert derive_instance("a" * 40) == "a" * 32
+    assert len(derive_instance("_" + "b" * 40)) == 32

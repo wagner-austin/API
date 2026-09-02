@@ -26,6 +26,14 @@ currently playing. ``make release`` copies it into the snapshot for
 the same reason it copies ``accounts.json``."""
 
 _RUNS_DIR = Path("runs")
+
+FLEET_LOG_PATH = _RUNS_DIR / "fleet" / "manager.log"
+"""Console output of a fleet manager started by ``make up``.
+
+The detached manager has no terminal of its own, so this file is where
+a failed boot explains itself -- the same reason each bot's child
+console goes to a file rather than into the launching window."""
+
 _BOT_DIR = _RUNS_DIR / "bot"
 _SNIFF_DIR = _RUNS_DIR / "sniff"
 _PROBE_DIR = _RUNS_DIR / "probe"
@@ -367,6 +375,7 @@ def decode_sniff_run_artifacts(data: JSONObject) -> SniffRunArtifactsDict:
 
 
 __all__ = [
+    "FLEET_LOG_PATH",
     "TANK_REGISTRY_PATH",
     "BotRunArtifactsDict",
     "ProbeRunArtifactsDict",

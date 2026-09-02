@@ -39,44 +39,13 @@ from tankpit_bot.service.constants import (
 from tankpit_bot.service.service_main import (
     _async_main,
     main,
-    run_service_forever,
 )
 from tests.conftest import FakeEnv
 from tests.service._service_main_harness import (
     _CancellingSite,
     _make_recording_bot_factory,
     _RecordingBot,
-    _RecordingSite,
 )
-
-
-class TestRunServiceForever:
-    """The blocking serve loop that binds a site to a stop signal."""
-
-    async def test_starts_the_site_and_waits_on_the_stop_event(self) -> None:
-        """Site is started, teardown waits until the stop event fires."""
-        site = _RecordingSite()
-        stop_event = asyncio.Event()
-
-        async def flip_after_first_tick() -> None:
-            await asyncio.sleep(0)
-            stop_event.set()
-
-        await asyncio.gather(run_service_forever(site, stop_event), flip_after_first_tick())
-
-        assert site.start_calls == 1
-        assert site.cleanup_calls == 1
-
-    async def test_cleanup_runs_even_when_stop_event_is_pre_set(self) -> None:
-        """A stop event set before the wait still tears the site down."""
-        site = _RecordingSite()
-        stop_event = asyncio.Event()
-        stop_event.set()
-
-        await run_service_forever(site, stop_event)
-
-        assert site.start_calls == 1
-        assert site.cleanup_calls == 1
 
 
 class TestRealBuildBotFactory:

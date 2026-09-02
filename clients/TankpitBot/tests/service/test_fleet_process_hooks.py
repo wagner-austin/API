@@ -1,0 +1,187 @@
+"""The production process seams, against real OS processes.
+
+Adoption's whole claim is about processes the manager did not fork:
+that it can find one by pid, refuse a pid that now belongs to
+something else, and still read the exit code after it dies. None of
+that is testable against a double -- the behaviour under test IS the
+operating system's -- so these start real children and watch them.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from collections.abc import Generator
+
+import pytest
+
+from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH
+from tankpit_bot.service._test_hooks import (
+    _FLEET_BOOTSTRAP,
+    SpawnedProcessProtocol,
+    _real_open_adopted_process,
+    _real_process_identity,
+    _real_sleep_seconds,
+    _real_spawn_fleet_manager,
+)
+
+_SLEEPER = "import time; time.sleep(120)"
+
+
+def _identity_of(pid: int) -> float:
+    """Return a live pid's creation time, failing loudly when absent.
+
+    Args:
+        pid: Process id expected to be running.
+
+    Returns:
+        The creation time in epoch seconds.
+
+    Raises:
+        AssertionError: If the seam reports no such process.
+    """
+    created_at = _real_process_identity(pid)
+    if created_at is None:
+        raise AssertionError(f"pid {pid} is running but reported no creation time")
+    return created_at
+
+
+def _adopt(pid: int, created_at: float) -> SpawnedProcessProtocol:
+    """Adopt a process, failing loudly when the seam refuses.
+
+    Args:
+        pid: Process id to adopt.
+        created_at: Its recorded creation time.
+
+    Returns:
+        The adopted handle.
+
+    Raises:
+        AssertionError: If the seam declined to adopt.
+    """
+    adopted = _real_open_adopted_process(pid, created_at)
+    if adopted is None:
+        raise AssertionError(f"pid {pid} is running but was not adopted")
+    return adopted
+
+
+@pytest.fixture()
+def sleeper() -> Generator[subprocess.Popen[bytes], None, None]:
+    """Start a real child process that idles until killed.
+
+    Yields:
+        The running child.
+    """
+    process = subprocess.Popen([sys.executable, "-c", _SLEEPER])
+    try:
+        yield process
+    finally:
+        process.kill()
+        process.wait(timeout=30)
+
+
+def test_identity_reads_a_live_process_creation_time(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """A running pid has a creation time, and it is stable."""
+    first = _identity_of(sleeper.pid)
+    second = _identity_of(sleeper.pid)
+
+    assert first == second
+    assert first > 0.0
+
+
+def test_identity_of_a_pid_that_is_not_running_is_absent() -> None:
+    """A child that died before it could be recorded has no identity.
+
+    That is the case the spawn path treats as "nothing to adopt
+    later", rather than as a failure to record.
+    """
+    process = subprocess.Popen([sys.executable, "-c", "raise SystemExit(0)"])
+    process.wait(timeout=30)
+
+    assert _real_process_identity(process.pid) is None
+
+
+def test_a_live_process_is_adopted_and_reports_itself_running(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """The handle satisfies the same surface a spawned child does."""
+    adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
+
+    assert adopted.pid == sleeper.pid
+    assert adopted.poll() is None
+
+
+def test_an_adopted_process_reports_its_exit_code_after_it_dies(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """The handle outlives the process, which is why the code survives.
+
+    A pid looked up fresh at this point would already be gone; holding
+    the handle is what keeps the exit observable.
+    """
+    adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
+
+    sleeper.kill()
+    expected = sleeper.wait(timeout=30)
+
+    # The adopted handle agrees with the parent's own handle, and keeps
+    # agreeing: the exit code is not a one-shot reading.
+    assert adopted.poll() == expected
+    assert adopted.poll() == expected
+
+
+def test_a_pid_that_is_not_running_cannot_be_adopted() -> None:
+    """Nothing under the pid means the bot finished unsupervised."""
+    process = subprocess.Popen([sys.executable, "-c", "raise SystemExit(0)"])
+    process.wait(timeout=30)
+
+    assert _real_open_adopted_process(process.pid, 1.0) is None
+
+
+def test_a_recycled_pid_is_refused(sleeper: subprocess.Popen[bytes]) -> None:
+    """A live pid whose creation time differs is not our bot.
+
+    Windows reuses pids. Without this check a restarted manager would
+    adopt whatever inherited the number, then refuse to restart the
+    instance forever because its imaginary bot never exits.
+    """
+    created_at = _identity_of(sleeper.pid)
+
+    assert _real_open_adopted_process(sleeper.pid, created_at + 1.0) is None
+
+
+def test_the_real_sleep_returns_after_waiting() -> None:
+    """The production sleep is a real, if very short, wait."""
+    _real_sleep_seconds(0.01)
+
+
+def test_the_fleet_bootstrap_is_valid_and_reaches_the_entry_point() -> None:
+    """The detached launcher's bootstrap imports and calls the entry."""
+    assert "from tankpit_bot.service.fleet import main" in _FLEET_BOOTSTRAP
+    assert _FLEET_BOOTSTRAP.rstrip().endswith("main()")
+    compile(_FLEET_BOOTSTRAP, "<bootstrap>", "exec")
+
+
+def test_real_spawn_fleet_manager_launches_a_detached_child() -> None:
+    """The production launcher starts a real manager, logged to a file.
+
+    Killed immediately, exactly as the bot spawner's own test does:
+    interpreter startup and this package's imports take far longer
+    than the kill lands, so the child never reaches the point of
+    binding a port or adopting anything.
+
+    The log file is opened even for a child that dies instantly,
+    because the stream the interpreter prints a fatal traceback to IS
+    this one.
+    """
+    process = _real_spawn_fleet_manager()
+    try:
+        assert process.pid > 0
+        assert FLEET_LOG_PATH.exists()
+    finally:
+        process.kill()
+        process.wait(timeout=30)
+    if process.poll() is None:
+        raise AssertionError("fleet manager still running after kill + wait")

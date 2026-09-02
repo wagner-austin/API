@@ -42,7 +42,7 @@ class _CancellingSite:
     """SiteRunnerProtocol stand-in that cancels the caller on ``start``.
 
     Raises :class:`asyncio.CancelledError` synchronously from ``start``
-    so :func:`run_service_forever`'s ``finally`` runs the site's
+    so :func:`run_until_stopped`'s ``finally`` runs the site's
     ``cleanup`` before the exception propagates. Simpler and stricter-
     typed than reaching for ``asyncio.current_task().cancel``, which
     leaks ``Any`` through mypy's strict rules.

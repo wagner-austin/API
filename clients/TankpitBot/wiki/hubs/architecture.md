@@ -1,12 +1,14 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (19 pages)
+Codebase design decisions, patterns, and coding standards. (21 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
 [Tank Freshness Model](../pages/tank-freshness-model.md) -- three independent freshness timestamps + observation-based mutator; the architecture that makes the stale-position combat bug impossible to reintroduce
 [Bot Behavior Contract](../pages/bot-behavior-contract.md) -- MUST/MUST NOT/Verified-by table for every bot behavior; consult before proposing fixes; locks in anti-pattern prevention
 [Fleet Coordination](../pages/fleet-coordination.md) -- the shared knowledge layer: same-team bots exchanging beliefs via atomic knowledge.json files, focus-fire ranking, fighter/gatherer roles, color assignment
+[Fleet Manager Lifecycle](../pages/fleet-lifecycle.md) -- no orphans, no killed tanks: the drain that makes the manager exit last, adoption of bots a dead manager left running, identity as (pid, create_time), and the make up / make down pair
+[Fleet Live Reads](../pages/fleet-live-reads.md) -- following a growing events artifact instead of re-reading it: the resumable digest fold, the byte cursor with line-boundary and run-identity safety, and the 13.5 MB-per-poll cost it replaced
 [Self-Observing Bot Architecture](../pages/self-observing-architecture.md) -- fail-hard-on-state-entry philosophy, four-layer stack (Facts/Decisions/Ledger/Memory), the 15 blind spots the 20:47:31 deadlock exposed, phase roadmap
 [Bot Service Architecture](../pages/bot-service-architecture.md) -- the SPA-driven long-running service: ModeBridge + StatusBus + SessionRunner primitives, five aiohttp routes, session lifecycle, DI hooks in service/_test_hooks.py
 [Executor Rejection Silent Loops](../pages/executor-rejection-loops.md) -- structural pattern behind the 2026-07-06 20:47:31 deadlock class: AI-state rollback + unwired rejection paths let executor validators loop silently; mine class killed at the root 2026-07-20, instances #2/#3 (stale anchors, pickup races) still open
