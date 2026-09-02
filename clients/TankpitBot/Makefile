@@ -370,16 +370,20 @@ image:
 	@Write-Host "==> image (fleet container from the newest release snapshot)" -ForegroundColor Cyan
 	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[image] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Building tankpit-fleet:$$($$rel.Name) from $$($$rel.FullName)" -ForegroundColor DarkGray; docker build -f (Join-Path $$rel.FullName "clients/TankpitBot/Dockerfile") -t "tankpit-fleet:$$($$rel.Name)" $$rel.FullName; exit $$LASTEXITCODE
 
+# Both docker lifecycle targets hop into the NEWEST RELEASE folder
+# before compose runs, exactly like ``up``/``down`` do: the volume
+# mounts (./runs, ./accounts.json) must resolve to the release's own
+# copies, so the container's artifacts, spawn records and account
+# pool ride the same ladder its code does -- never the hot tree's.
 up-docker:
 	@Write-Host ""
 	@Write-Host "==> up-docker (fleet container, newest release image)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up-docker] no release found -- run 'make release' then 'make image' first" -ForegroundColor Red; exit 1 }; $$env:FLEET_IMAGE = "tankpit-fleet:$$($$rel.Name)"; Write-Host "  Image $$env:FLEET_IMAGE; 'make down-docker' to drain and stop." -ForegroundColor DarkGray; docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up-docker] no release found -- run 'make release' then 'make image' first" -ForegroundColor Red; exit 1 }; $$env:FLEET_IMAGE = "tankpit-fleet:$$($$rel.Name)"; Write-Host "  Image $$env:FLEET_IMAGE; 'make down-docker' to drain and stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; Pop-Location; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
 
 down-docker:
 	@Write-Host ""
 	@Write-Host "==> down-docker (drain every bot, then stop the container)" -ForegroundColor Cyan
-	@Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray
-	docker compose stop fleet
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down-docker] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose stop fleet; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
 
 run: install
 	@Write-Host ""
