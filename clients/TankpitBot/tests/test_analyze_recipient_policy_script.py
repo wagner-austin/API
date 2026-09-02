@@ -16,6 +16,10 @@ import pytest
 from scripts.analyze_recipient_policy import DEFAULT_DIRECTORIES, main
 
 from scripts import _test_hooks as script_hooks
+from tankpit_bot.analysis.recipient_policy import (
+    analyze_recipient_policy,
+    format_recipient_policy,
+)
 from tankpit_bot.analysis.recipient_policy_types import VERDICT_BROADCAST
 from tests.analysis._capture_fixtures import (
     FOREIGN_TANK,
@@ -88,13 +92,15 @@ def test_main_reports_every_family_and_its_verdict(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], _argv: None
 ) -> None:
     """A named directory is swept and each family's verdict printed."""
-    sys.argv = ["analyze_recipient_policy", str(_archive(tmp_path))]
+    archive = _archive(tmp_path)
+    sys.argv = ["analyze_recipient_policy", str(archive)]
     main()
-    output = capsys.readouterr().out
-    assert "sessions_examined=1" in output
-    assert "sessions_decoded=1" in output
-    assert f"0x42 BuildPickup -> {VERDICT_BROADCAST}" in output
-    assert "foreign_actor_hits=1" in output
+    # Exact equality against the module's own rendering: a substring
+    # check would still pass if the report silently lost a family.
+    expected = format_recipient_policy(analyze_recipient_policy([archive])) + "\n"
+    assert capsys.readouterr().out == expected
+    assert f"0x42 BuildPickup -> {VERDICT_BROADCAST}" in expected
+    assert "foreign_actor_hits=1" in expected
 
 
 def test_main_sweeps_both_archive_directories_by_default(
@@ -131,7 +137,7 @@ def test_main_sweeps_both_archive_directories_by_default(
 
     assert excinfo.value.code == 1
     assert missing == [Path("runs") / "bot"]
-    assert "No such directory" in capsys.readouterr().out
+    assert capsys.readouterr().out == f"No such directory: {Path('runs') / 'bot'}\n"
 
 
 def test_main_refuses_a_directory_that_does_not_exist(
@@ -147,14 +153,21 @@ def test_main_refuses_a_directory_that_does_not_exist(
     with pytest.raises(SystemExit) as excinfo:
         main()
     assert excinfo.value.code == 1
-    assert f"No such directory: {absent}" in capsys.readouterr().out
+    assert capsys.readouterr().out == f"No such directory: {absent}\n"
 
 
 def test_module_runs_as_a_script(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], _argv: None
 ) -> None:
-    """The ``__main__`` entry point drives the same sweep."""
-    sys.argv = ["analyze_recipient_policy", str(_archive(tmp_path))]
+    """The ``__main__`` entry point drives the same sweep.
+
+    Asserted as byte equality against the library called directly on
+    the same archive: the entry point adds argv resolution and a
+    trailing newline and must add nothing else.
+    """
+    archive = _archive(tmp_path)
+    expected = format_recipient_policy(analyze_recipient_policy([archive])) + "\n"
+    sys.argv = ["analyze_recipient_policy", str(archive)]
     sys.modules.pop("scripts.analyze_recipient_policy", None)
     runpy.run_module("scripts.analyze_recipient_policy", run_name="__main__")
-    assert "sessions_decoded=1" in capsys.readouterr().out
+    assert capsys.readouterr().out == expected

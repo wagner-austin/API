@@ -13,11 +13,16 @@ so a narrator that reads world state for the observer still resolves.
 
 from __future__ import annotations
 
+from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_INVENTORY_FULL
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.actions import process_mine_press, process_radar, process_teleport
 from tankpit_bot.sim.blocks import process_block_press
 from tankpit_bot.sim.commands import ClientCommandDict
-from tankpit_bot.sim.equipment import resolve_equipment_pickup, toggle_equipment_slot
+from tankpit_bot.sim.equipment import (
+    EquipmentGrantDict,
+    resolve_equipment_pickup,
+    toggle_equipment_slot,
+)
 from tankpit_bot.sim.fuel_pickup import (
     FuelPickupOutcomeDict,
     decode_fuel_pickup_outcome,
@@ -126,13 +131,15 @@ def test_equipment_grant_is_private_to_the_arriving_tank() -> None:
     """0x67 is a SELF gain in production, so a bystander hears nothing."""
     world = _world()
     world["equipment"].append(SimEquipmentDict(x=10, y=10))
-    grant = resolve_equipment_pickup(world, ACTOR)
-    assert grant is not None
-    assert grant["kind"] == "granted"
+    granted = EquipmentGrantDict(kind="granted", gained=[7, 0, 0, 0, 0])
+    assert resolve_equipment_pickup(world, ACTOR) == granted
 
-    actor_view = narrate_equipment_pickup(world, grant, ACTOR, "move", ACTOR)
+    actor_view = narrate_equipment_pickup(world, granted, ACTOR, "move", ACTOR)
     assert _kinds(actor_view) == [0x67, 0x49, "container_pickup"]
-    assert narrate_equipment_pickup(world, grant, ACTOR, "move", BYSTANDER) == []
+    gain = actor_view[0]
+    assert gain["msg_type"] == 0x67
+    assert gain["gained"] == [7, 0, 0, 0, 0]
+    assert narrate_equipment_pickup(world, granted, ACTOR, "move", BYSTANDER) == []
 
 
 def test_a_full_inventory_refuses_only_an_explicit_click() -> None:
@@ -140,13 +147,15 @@ def test_a_full_inventory_refuses_only_an_explicit_click() -> None:
     world = _world()
     world["tanks"][ACTOR]["counts"] = [25, 25, 25, 25, 25]
     world["equipment"].append(SimEquipmentDict(x=10, y=10))
-    grant = resolve_equipment_pickup(world, ACTOR)
-    assert grant is not None
-    assert grant["kind"] == "inventory_full"
+    refused = EquipmentGrantDict(kind="inventory_full", gained=[0, 0, 0, 0, 0])
+    assert resolve_equipment_pickup(world, ACTOR) == refused
 
-    assert narrate_equipment_pickup(world, grant, ACTOR, "move", ACTOR) == []
-    clicked = narrate_equipment_pickup(world, grant, ACTOR, "pickup_equipment", ACTOR)
+    assert narrate_equipment_pickup(world, refused, ACTOR, "move", ACTOR) == []
+    clicked = narrate_equipment_pickup(world, refused, ACTOR, "pickup_equipment", ACTOR)
     assert _kinds(clicked) == [0x52]
+    close = clicked[0]
+    assert close["msg_type"] == 0x52
+    assert close["error_code"] == SUPERVISOR_ERROR_INVENTORY_FULL
 
 
 def test_a_cant_go_close_reaches_only_the_walker() -> None:
