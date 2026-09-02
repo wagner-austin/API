@@ -1,9 +1,8 @@
-"""Running the checkers, and the CLI that drives a sweep.
+"""The CLI that drives a sweep, and where it expects generations to live.
 
-The one test that runs a REAL checker is
-``test_the_production_runner_actually_runs_a_checker``. It calls ruff on a
-file that genuinely violates a rule, because a runner asserted only against
-a fake would pass while invoking nothing.
+The layout is part of the contract rather than an implementation detail: the
+guards are scoped to a directory, so where a generated file sits decides
+whether they read it at all.
 """
 
 from __future__ import annotations
@@ -19,208 +18,15 @@ from code_style_eval.cli import _test_hooks as cli_hooks
 from code_style_eval.cli.evaluate import (
     entrypoint,
     generated_path,
+    item_root,
     main,
     parse_arguments,
 )
 from code_style_eval.contracts.outcomes import decode_item_outcome
 from code_style_eval.core import _test_hooks as core_hooks
-from code_style_eval.core.checks import checker_command, run_check, score_item
+from tests.conftest import _Recorder, _write_generation
 
-_SOURCE = "".join(f"line{i}\n" for i in range(10))
-
-
-class _Finished:
-    """A finished process with the three fields the package reads."""
-
-    def __init__(self, returncode: int, stdout: str = "", stderr: str = "") -> None:
-        """Store the result.
-
-        Args:
-            returncode: Exit status.
-            stdout: Captured stdout.
-            stderr: Captured stderr.
-        """
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-
-
-class _Recorder:
-    """Checker runner that records its calls and replays scripted results."""
-
-    def __init__(self, results: dict[str, _Finished]) -> None:
-        """Store the scripted results.
-
-        Args:
-            results: Result per checker module name.
-        """
-        self.results = results
-        self.calls: list[tuple[str, ...]] = []
-
-    def __call__(self, command: tuple[str, ...], cwd: pathlib.Path) -> _Finished:
-        """Record a call and return its scripted result.
-
-        Args:
-            command: The composed argv.
-            cwd: Directory the checker would run in.
-
-        Returns:
-            The scripted result.
-        """
-        self.calls.append(command)
-        for name, finished in self.results.items():
-            if name in command:
-                return finished
-        return _Finished(0)
-
-
-@pytest.fixture(autouse=True)
-def _reset() -> None:
-    """Restore both hook containers around every test."""
-    core_hooks.reset_hooks()
-    cli_hooks.reset_hooks()
-
-
-class TestComposingCheckerCommands:
-    """Every checker is invoked through a named interpreter."""
-
-    def test_ruff_checks_the_target(self) -> None:
-        """A bare name would resolve against PATH to another version."""
-        command = checker_command("ruff", "py", pathlib.Path("a.py"))
-
-        assert command == ("py", "-m", "ruff", "check", "a.py")
-
-    def test_mypy_checks_the_target(self) -> None:
-        """Same reasoning, same shape."""
-        command = checker_command("mypy", "py", pathlib.Path("a.py"))
-
-        assert command == ("py", "-m", "mypy", "a.py")
-
-    def test_the_guards_run_over_their_package(self) -> None:
-        """scripts.guard takes no target; it reads the package it runs in."""
-        command = checker_command("guards", "py", pathlib.Path("a.py"))
-
-        assert command == ("py", "-m", "scripts.guard")
-
-    def test_an_unknown_checker_is_refused(self) -> None:
-        """The set is closed at the composition point too."""
-        with pytest.raises(ValueError, match="unknown checker"):
-            _ = checker_command("pylint", "py", pathlib.Path("a.py"))
-
-
-class TestRunningOneCheck:
-    """A checker's exit status is the verdict."""
-
-    def test_a_zero_exit_passes_and_carries_no_detail(self) -> None:
-        """A clean run has nothing to say."""
-        core_hooks.Hooks.run_checker = _Recorder({"ruff": _Finished(0, "all good")})
-
-        outcome = run_check("ruff", "py", pathlib.Path("a.py"), pathlib.Path("."))
-
-        assert outcome["passed"] is True
-        assert outcome["exit_code"] == 0
-        assert outcome["detail"] == ""
-
-    def test_a_failure_carries_the_first_output_line(self) -> None:
-        """An index into the logs, not a replacement for them."""
-        core_hooks.Hooks.run_checker = _Recorder(
-            {"ruff": _Finished(1, "\n  a.py:1:1 E501 line too long\nmore\n")}
-        )
-
-        outcome = run_check("ruff", "py", pathlib.Path("a.py"), pathlib.Path("."))
-
-        assert outcome["passed"] is False
-        assert outcome["exit_code"] == 1
-        assert outcome["detail"] == "a.py:1:1 E501 line too long"
-
-    def test_stderr_is_used_when_stdout_is_empty(self) -> None:
-        """mypy crashes report on stderr, and a crash is not a pass."""
-        core_hooks.Hooks.run_checker = _Recorder({"mypy": _Finished(2, "", "internal error")})
-
-        outcome = run_check("mypy", "py", pathlib.Path("a.py"), pathlib.Path("."))
-
-        assert outcome["exit_code"] == 2
-        assert outcome["detail"] == "internal error"
-
-    def test_a_failure_with_no_output_still_records_the_code(self) -> None:
-        """Silence plus non-zero is still a failure."""
-        core_hooks.Hooks.run_checker = _Recorder({"ruff": _Finished(3, "", "")})
-
-        outcome = run_check("ruff", "py", pathlib.Path("a.py"), pathlib.Path("."))
-
-        assert outcome["passed"] is False
-        assert outcome["detail"] == ""
-
-
-class TestScoringOneItem:
-    """All three checkers run, regardless of earlier failures."""
-
-    def test_every_checker_runs_even_after_one_fails(self) -> None:
-        """Stopping early would make the rates depend on order."""
-        recorder = _Recorder({"ruff": _Finished(1, "bad")})
-        core_hooks.Hooks.run_checker = recorder
-
-        outcome = score_item(
-            item_id="a.py",
-            arm="base",
-            interpreter="py",
-            target=pathlib.Path("a.py"),
-            cwd=pathlib.Path("."),
-        )
-
-        assert len(recorder.calls) == 3
-        assert [c["checker"] for c in outcome["checks"]] == ["ruff", "mypy", "guards"]
-        assert outcome["all_passed"] is False
-
-    def test_all_passing_sets_the_summary(self) -> None:
-        """The summary is derived, never asserted independently."""
-        core_hooks.Hooks.run_checker = _Recorder({})
-
-        outcome = score_item(
-            item_id="a.py",
-            arm="base",
-            interpreter="py",
-            target=pathlib.Path("a.py"),
-            cwd=pathlib.Path("."),
-        )
-
-        assert outcome["all_passed"] is True
-
-
-class TestTheProductionRunner:
-    """The default hook actually starts a process."""
-
-    def test_the_production_runner_actually_runs_a_checker(self, tmp_path: pathlib.Path) -> None:
-        """Runs real ruff on a file that genuinely violates a rule.
-
-        A runner asserted only against a fake would pass while invoking
-        nothing, which is the failure mode this whole package exists to
-        avoid measuring.
-        """
-        offender = tmp_path / "offender.py"
-        offender.write_text("import os\n", encoding="utf-8")
-        clean = tmp_path / "clean.py"
-        clean.write_text("x = 1\n", encoding="utf-8")
-
-        def _ruff(target: pathlib.Path) -> int:
-            """Run real ruff over one file and return its exit status.
-
-            Args:
-                target: File to check.
-
-            Returns:
-                The exit status.
-            """
-            return core_hooks.Hooks.run_checker(
-                ("python", "-m", "ruff", "check", "--select", "F401", str(target)),
-                tmp_path,
-            ).returncode
-
-        # Asserted as a PAIR rather than on output text: the exit statuses
-        # must DIFFER between a violating file and a clean one, which is the
-        # property the instrument depends on and is stable across versions.
-        assert _ruff(offender) == 1
-        assert _ruff(clean) == 0
+_SOURCE = "".join(f"line{i}" + chr(10) for i in range(10))
 
 
 class TestParsingArguments:
@@ -246,28 +52,40 @@ class TestParsingArguments:
             "candidate",
             "--out",
             str(tmp_path / "out.jsonl"),
+            "--check-cwd",
+            str(tmp_path / "pkg"),
         ]
 
     def test_a_minimal_command_line_parses(self, tmp_path: pathlib.Path) -> None:
-        """Prompt length and check directory default."""
+        """Only the prompt length defaults."""
         arguments = parse_arguments(self._base(tmp_path))
 
         assert arguments.arm == "candidate"
         assert arguments.prompt_lines == 20
-        assert arguments.check_cwd == tmp_path / "gen"
-
-    def test_the_check_directory_can_be_overridden(self, tmp_path: pathlib.Path) -> None:
-        """The guards must run where the package they check lives."""
-        arguments = parse_arguments([*self._base(tmp_path), "--check-cwd", str(tmp_path / "pkg")])
-
         assert arguments.check_cwd == tmp_path / "pkg"
+
+    def test_the_check_directory_has_no_default(self, tmp_path: pathlib.Path) -> None:
+        """It used to default to the generated directory, which is wrong.
+
+        The checkers are invoked from a package whose ``scripts/guard.py``
+        makes ``python -m scripts.guard`` resolve. The generated directory
+        holds no such file, so the old default could only ever have produced
+        an import failure scored as a guard verdict. There is no sensible
+        default, so the flag is required.
+        """
+        tokens = self._base(tmp_path)
+        index = tokens.index("--check-cwd")
+        del tokens[index : index + 2]
+
+        with pytest.raises(ValueError, match="--check-cwd is required"):
+            _ = parse_arguments(tokens)
 
     @pytest.mark.parametrize(
         "missing",
-        ["--holdout", "--generated-dir", "--interpreter", "--arm", "--out"],
+        ["--holdout", "--generated-dir", "--interpreter", "--arm", "--out", "--check-cwd"],
     )
     def test_each_required_flag_is_required(self, missing: str, tmp_path: pathlib.Path) -> None:
-        """Parametrised so a sixth required flag cannot be added untested.
+        """Parametrised so a seventh required flag cannot be added untested.
 
         Args:
             missing: The flag to drop.
@@ -311,13 +129,38 @@ class TestLocatingGenerations:
         """Joining would let '..' escape the directory."""
         located = generated_path(tmp_path, "src/pkg/mod.py")
 
-        assert located == tmp_path / "src__pkg__mod.py.py"
+        assert located == tmp_path / "src__pkg__mod.py" / "src" / "src__pkg__mod.py"
 
     def test_a_windows_separator_is_flattened_too(self, tmp_path: pathlib.Path) -> None:
         """The corpus is emitted on Windows as well as read there."""
         located = generated_path(tmp_path, "src\\pkg\\mod.py")
 
-        assert located == tmp_path / "src__pkg__mod.py.py"
+        assert located == tmp_path / "src__pkg__mod.py" / "src" / "src__pkg__mod.py"
+
+    def test_the_file_sits_under_the_items_own_root(self, tmp_path: pathlib.Path) -> None:
+        """The guards are pointed at the root, so the file must be inside it."""
+        located = generated_path(tmp_path, "src/pkg/mod.py")
+
+        assert located.parent.parent == item_root(tmp_path, "src/pkg/mod.py")
+
+    def test_the_file_sits_in_a_directory_the_guards_scan(self, tmp_path: pathlib.Path) -> None:
+        """The guards glob under src, scripts and tests, and nowhere else.
+
+        A file placed directly in the item root would be invisible to them,
+        and every item would score a guards pass for never being read.
+        """
+        located = generated_path(tmp_path, "src/pkg/mod.py")
+
+        assert located.parent.name == "src"
+
+    def test_two_items_get_separate_roots(self, tmp_path: pathlib.Path) -> None:
+        """One shared root would give every item the same guards verdict."""
+        assert item_root(tmp_path, "a.py") != item_root(tmp_path, "b.py")
+
+    def test_an_item_that_is_not_python_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """The guards glob *.py, so anything else would pass by being unseen."""
+        with pytest.raises(ValueError, match="not a Python file"):
+            _ = generated_path(tmp_path, "README.md")
 
 
 class TestTheSweep:
@@ -348,7 +191,7 @@ class TestTheSweep:
         generated = tmp_path / "gen"
         generated.mkdir()
         for name in ("a.py", "b.py"):
-            generated_path(generated, name).write_text("x = 1\n", encoding="utf-8")
+            _write_generation(generated, name)
         core_hooks.Hooks.run_checker = _Recorder({})
         out = tmp_path / "out.jsonl"
 
@@ -366,6 +209,8 @@ class TestTheSweep:
                 str(out),
                 "--prompt-lines",
                 "3",
+                "--check-cwd",
+                str(tmp_path),
             ]
         )
 
@@ -384,7 +229,7 @@ class TestTheSweep:
         holdout = self._holdout(tmp_path, ["present.py", "absent.py"])
         generated = tmp_path / "gen"
         generated.mkdir()
-        generated_path(generated, "present.py").write_text("x = 1\n", encoding="utf-8")
+        _write_generation(generated, "present.py")
         core_hooks.Hooks.run_checker = _Recorder({})
         out = tmp_path / "out.jsonl"
         emitted: list[str] = []
@@ -404,6 +249,8 @@ class TestTheSweep:
                 str(out),
                 "--prompt-lines",
                 "3",
+                "--check-cwd",
+                str(tmp_path),
             ]
         )
 
@@ -415,7 +262,7 @@ class TestTheSweep:
         holdout = self._holdout(tmp_path, ["a.py"])
         generated = tmp_path / "gen"
         generated.mkdir()
-        generated_path(generated, "a.py").write_text("x = 1\n", encoding="utf-8")
+        _write_generation(generated, "a.py")
         core_hooks.Hooks.run_checker = _Recorder({})
         out = tmp_path / "nested" / "deep" / "out.jsonl"
 
@@ -433,6 +280,8 @@ class TestTheSweep:
                 str(out),
                 "--prompt-lines",
                 "3",
+                "--check-cwd",
+                str(tmp_path),
             ]
         )
 
@@ -478,7 +327,7 @@ class TestTheEntryPoint:
         )
         generated = tmp_path / "gen"
         generated.mkdir()
-        generated_path(generated, "a.py").write_text("x = 1\n", encoding="utf-8")
+        _write_generation(generated, "a.py")
         core_hooks.Hooks.run_checker = _Recorder({})
         out = tmp_path / "out.jsonl"
         argv[:] = [
@@ -495,6 +344,8 @@ class TestTheEntryPoint:
             str(out),
             "--prompt-lines",
             "3",
+            "--check-cwd",
+            str(tmp_path),
         ]
 
         with pytest.raises(SystemExit) as raised:
@@ -514,22 +365,3 @@ class TestTheEmitHook:
         cli_hooks.emit("hello")
 
         assert capsys.readouterr().out == "hello\n"
-
-
-class TestResettingTheHookContainer:
-    """The container's reset() is the seam an autouse fixture names."""
-
-    def test_reset_restores_the_production_runner(self) -> None:
-        """Assigned away, then restored, and the restoration is asserted.
-
-        Not a smoke test: a reset() that quietly did nothing would leave a
-        fake checker installed for every test that ran afterwards, and the
-        sweep would score whatever that fake said.
-        """
-        replacement = _Recorder({})
-        core_hooks.Hooks.run_checker = replacement
-        assert core_hooks.Hooks.run_checker is replacement
-
-        core_hooks.Hooks.reset()
-
-        assert core_hooks.Hooks.run_checker is core_hooks._default_run_checker

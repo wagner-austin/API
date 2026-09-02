@@ -15,6 +15,8 @@ from platform_core.json_utils import (
     JSONTypeError,
     narrow_json_to_dict,
     require_bool,
+    require_dict,
+    require_float,
     require_int,
     require_list,
     require_str,
@@ -105,6 +107,106 @@ class PairedCounts(TypedDict):
     baseline_only: int
     candidate_only: int
     neither: int
+
+
+class ComparisonReport(TypedDict):
+    """Everything a two-arm comparison concluded, in one record.
+
+    The p-values are carried as a PAIR rather than one number. The mid-p
+    value is the one to read, and the exact conditional value is kept beside
+    it because it is the guaranteed-level reference mid-p is derived from,
+    and because a reader who expects the conservative figure should be able
+    to see it rather than wonder which was computed.
+
+    ``net_improvement`` is stored alongside them because a p-value on two
+    discordant pairs still describes two files, and a report that carried
+    significance without effect size would invite reading the first as the
+    second.
+
+    Attributes:
+        baseline_arm: Name recorded on the baseline outcomes.
+        candidate_arm: Name recorded on the candidate outcomes.
+        shared_items: Items both arms produced a completion for. The
+            denominator every figure below is computed over.
+        baseline_pass_rate: Fraction of shared items the baseline passed.
+        candidate_pass_rate: Fraction of shared items the candidate passed.
+        counts: The 2x2 table.
+        net_improvement: Items fixed minus items broken.
+        mid_p: Two-sided McNemar mid-p value.
+        exact_p: Two-sided exact conditional McNemar p-value.
+    """
+
+    baseline_arm: str
+    candidate_arm: str
+    shared_items: int
+    baseline_pass_rate: float
+    candidate_pass_rate: float
+    counts: PairedCounts
+    net_improvement: int
+    mid_p: float
+    exact_p: float
+
+
+def encode_comparison_report(report: ComparisonReport) -> JSONObject:
+    """Encode a ComparisonReport to a JSON object.
+
+    Args:
+        report: The report to encode.
+
+    Returns:
+        The JSON-serializable form.
+    """
+    return {
+        "baseline_arm": report["baseline_arm"],
+        "candidate_arm": report["candidate_arm"],
+        "shared_items": report["shared_items"],
+        "baseline_pass_rate": report["baseline_pass_rate"],
+        "candidate_pass_rate": report["candidate_pass_rate"],
+        "counts": encode_paired_counts(report["counts"]),
+        "net_improvement": report["net_improvement"],
+        "mid_p": report["mid_p"],
+        "exact_p": report["exact_p"],
+    }
+
+
+def decode_comparison_report(obj: JSONObject) -> ComparisonReport:
+    """Decode a JSON object to a ComparisonReport.
+
+    Args:
+        obj: The object to decode.
+
+    Returns:
+        The validated report.
+
+    Raises:
+        JSONTypeError: If a field is missing, has the wrong type, or the
+            stored table does not sum to the stored item count.
+    """
+    counts = decode_paired_counts(require_dict(obj, "counts"))
+    shared_items = require_int(obj, "shared_items")
+    total = (
+        counts["both_passed"]
+        + counts["baseline_only"]
+        + counts["candidate_only"]
+        + counts["neither"]
+    )
+    if total != shared_items:
+        raise JSONTypeError(
+            f"Field 'shared_items' is {shared_items} but the 2x2 table sums to "
+            f"{total}; a report whose denominator disagrees with its own table "
+            f"cannot be read"
+        )
+    return ComparisonReport(
+        baseline_arm=require_str(obj, "baseline_arm"),
+        candidate_arm=require_str(obj, "candidate_arm"),
+        shared_items=shared_items,
+        baseline_pass_rate=require_float(obj, "baseline_pass_rate"),
+        candidate_pass_rate=require_float(obj, "candidate_pass_rate"),
+        counts=counts,
+        net_improvement=require_int(obj, "net_improvement"),
+        mid_p=require_float(obj, "mid_p"),
+        exact_p=require_float(obj, "exact_p"),
+    )
 
 
 def encode_check_outcome(outcome: CheckOutcome) -> JSONObject:
@@ -231,13 +333,16 @@ def decode_paired_counts(obj: JSONObject) -> PairedCounts:
 __all__ = [
     "CHECKERS",
     "CheckOutcome",
+    "ComparisonReport",
     "ItemOutcome",
     "PairedCounts",
     "as_checker",
     "decode_check_outcome",
+    "decode_comparison_report",
     "decode_item_outcome",
     "decode_paired_counts",
     "encode_check_outcome",
+    "encode_comparison_report",
     "encode_item_outcome",
     "encode_paired_counts",
 ]

@@ -11,6 +11,7 @@ from __future__ import annotations
 from code_style_eval.contracts.outcomes import CheckOutcome, ItemOutcome, PairedCounts
 from code_style_eval.core.scoring import (
     exact_mcnemar_p,
+    mid_p_mcnemar_p,
     net_improvement,
     paired_counts,
     pass_rate,
@@ -219,3 +220,80 @@ class TestNetImprovement:
         counts = PairedCounts(both_passed=0, baseline_only=6, candidate_only=1, neither=0)
 
         assert net_improvement(counts) == -5
+
+
+class TestMidP:
+    """The variant this package reports, and why it differs from exact."""
+
+    def test_no_discordant_pairs_is_p_one(self) -> None:
+        """Same answer as exact: identical arms carry no evidence."""
+        counts = PairedCounts(both_passed=9, baseline_only=0, candidate_only=0, neither=9)
+
+        assert mid_p_mcnemar_p(counts) == 1.0
+
+    def test_mid_p_is_the_exact_value_minus_the_point_probability(self) -> None:
+        """Ten fixed, none broken: 2/1024 exact, less 1/1024, is 1/1024."""
+        counts = PairedCounts(both_passed=0, baseline_only=0, candidate_only=10, neither=0)
+
+        assert exact_mcnemar_p(counts) == 2.0 / 1024.0
+        assert mid_p_mcnemar_p(counts) == 1.0 / 1024.0
+
+    def test_an_even_split_uses_its_own_form(self) -> None:
+        """With the cells equal the general form would exceed 1.
+
+        Five and five over ten discordant pairs: 1 - C(10,5)/2**11.
+        """
+        counts = PairedCounts(both_passed=0, baseline_only=5, candidate_only=5, neither=0)
+
+        assert exact_mcnemar_p(counts) == 1.0
+        assert mid_p_mcnemar_p(counts) == 1.0 - (252.0 / 1024.0) / 2.0
+
+    def test_mid_p_is_never_more_conservative_than_exact(self) -> None:
+        """The property the whole substitution rests on.
+
+        Swept rather than spot-checked: for every table up to 12 discordant
+        pairs the mid-p value must be no larger than the exact one, because
+        it is that value less a non-negative point probability.
+        """
+        for baseline_only in range(13):
+            for candidate_only in range(13):
+                counts = PairedCounts(
+                    both_passed=4,
+                    baseline_only=baseline_only,
+                    candidate_only=candidate_only,
+                    neither=4,
+                )
+                assert mid_p_mcnemar_p(counts) <= exact_mcnemar_p(counts)
+
+    def test_mid_p_stays_in_the_unit_interval(self) -> None:
+        """A probability that left [0, 1] would be a reporting bug."""
+        for baseline_only in range(13):
+            for candidate_only in range(13):
+                counts = PairedCounts(
+                    both_passed=0,
+                    baseline_only=baseline_only,
+                    candidate_only=candidate_only,
+                    neither=0,
+                )
+                value = mid_p_mcnemar_p(counts)
+                assert 0.0 <= value <= 1.0
+
+    def test_the_conservativeness_gap_changes_a_verdict(self) -> None:
+        """The measured reason for preferring mid-p, as a test.
+
+        Nine items fixed against two broken: the exact test returns 0.065 and
+        declines to call it at the 0.05 level, the mid-p test returns 0.039
+        and calls it. Fagerland et al. found that pattern across 9,595
+        scenarios, which is why this package reports the latter.
+        """
+        counts = PairedCounts(both_passed=3, baseline_only=2, candidate_only=9, neither=4)
+
+        assert exact_mcnemar_p(counts) > 0.05
+        assert mid_p_mcnemar_p(counts) < 0.05
+
+    def test_mid_p_is_symmetric(self) -> None:
+        """Swapping the arms cannot change the strength of the evidence."""
+        forward = PairedCounts(both_passed=3, baseline_only=2, candidate_only=9, neither=4)
+        reversed_arms = PairedCounts(both_passed=3, baseline_only=9, candidate_only=2, neither=4)
+
+        assert mid_p_mcnemar_p(forward) == mid_p_mcnemar_p(reversed_arms)

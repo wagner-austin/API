@@ -28,6 +28,7 @@ pytest-xdist = "^3.6.1"
 
 [tool.poetry.scripts]
 code-style-eval = "code_style_eval.cli.evaluate:entrypoint"
+code-style-eval-compare = "code_style_eval.cli.compare:entrypoint"
 
 [tool.mypy]
 python_version = "3.11"

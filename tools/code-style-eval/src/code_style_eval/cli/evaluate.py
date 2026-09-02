@@ -7,7 +7,7 @@ guard rule changes without regenerating anything.
 
 Usage:
     code-style-eval --holdout H.jsonl --generated-dir D --interpreter P \\
-        --arm candidate --out outcomes.jsonl
+        --arm candidate --out outcomes.jsonl --check-cwd PACKAGE_DIR
 """
 
 from __future__ import annotations
@@ -54,7 +54,9 @@ class Arguments:
         arm: Name recorded on every outcome, identifying the model.
         out: Where to write the outcomes, one JSON object per line.
         prompt_lines: How many lines of each file the model was shown.
-        check_cwd: Directory the checkers run in.
+        check_cwd: Package directory the checkers are invoked from, which is
+            what makes ``python -m scripts.guard`` resolve. It is not the
+            tree being checked: each item's own root is.
     """
 
     __slots__ = (
@@ -87,7 +89,7 @@ class Arguments:
             arm: Arm name.
             out: Output path.
             prompt_lines: Prompt length in lines.
-            check_cwd: Directory the checkers run in.
+            check_cwd: Package directory the checkers are invoked from.
         """
         self.holdout = holdout
         self.generated_dir = generated_dir
@@ -139,7 +141,14 @@ def parse_arguments(tokens: Sequence[str]) -> Arguments:
         values[token] = _take_value(tokens, index, token)
         index += 2
 
-    for required in (_HOLDOUT_FLAG, _GENERATED_FLAG, _INTERPRETER_FLAG, _ARM_FLAG, _OUT_FLAG):
+    for required in (
+        _HOLDOUT_FLAG,
+        _GENERATED_FLAG,
+        _INTERPRETER_FLAG,
+        _ARM_FLAG,
+        _OUT_FLAG,
+        _CWD_FLAG,
+    ):
         if required not in values:
             raise ValueError(f"{required} is required")
 
@@ -147,24 +156,69 @@ def parse_arguments(tokens: Sequence[str]) -> Arguments:
     if not raw_lines.isdigit() or int(raw_lines) <= 0:
         raise ValueError(f"{_PROMPT_LINES_FLAG} must be a positive integer, got '{raw_lines}'")
 
-    generated = pathlib.Path(values[_GENERATED_FLAG])
     return Arguments(
         holdout=pathlib.Path(values[_HOLDOUT_FLAG]),
-        generated_dir=generated,
+        generated_dir=pathlib.Path(values[_GENERATED_FLAG]),
         interpreter=values[_INTERPRETER_FLAG],
         arm=values[_ARM_FLAG],
         out=pathlib.Path(values[_OUT_FLAG]),
         prompt_lines=int(raw_lines),
-        check_cwd=pathlib.Path(values.get(_CWD_FLAG, str(generated))),
+        check_cwd=pathlib.Path(values[_CWD_FLAG]),
     )
+
+
+def flatten_item_id(item_id: str) -> str:
+    """Flatten a repository-relative item id into a single path segment.
+
+    The item id is a path, so it is flattened rather than joined: joining
+    would let an item id containing ``..`` write outside the directory, and
+    the flattened name stays readable in a listing.
+
+    Args:
+        item_id: The item's path within its repository.
+
+    Returns:
+        The single-segment name.
+
+    Raises:
+        ValueError: If the id does not name a Python file. The guards find
+            their work by globbing ``*.py``, so an item stored under any
+            other suffix would be invisible to them and score a vacuous
+            pass rather than a refusal.
+    """
+    if not item_id.endswith(".py"):
+        raise ValueError(f"item id '{item_id}' is not a Python file")
+    return item_id.replace("/", "__").replace("\\", "__")
+
+
+def item_root(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path:
+    """Locate the guard root for one item.
+
+    Every item gets its OWN root holding only its own generated file. The
+    monorepo guards are scoped to a tree rather than to a file -- they run
+    over ``<root>/src``, ``<root>/scripts`` and ``<root>/tests`` -- so a
+    single root shared by a whole sweep would return one verdict for all of
+    it. Every item would then carry the same guards column, the paired table
+    would compare two constants, and a sweep in which the adapter fixed real
+    violations would report no difference for a reason having nothing to do
+    with the models.
+
+    Args:
+        generated_dir: Directory of generated files.
+        item_id: The item's path within its repository.
+
+    Returns:
+        The directory the guards are pointed at for this item.
+    """
+    return generated_dir / flatten_item_id(item_id)
 
 
 def generated_path(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path:
     """Locate the generated file for one item.
 
-    The item id is a repository-relative path, so it is flattened rather than
-    joined: joining would let an item id containing ``..`` write outside the
-    directory, and the flattened name stays readable in a listing.
+    The file sits under the item's own root at ``src/``, which is one of the
+    directories the guards scan. Placing it anywhere else in the root would
+    hide it from them and score every item as clean.
 
     Args:
         generated_dir: Directory of generated files.
@@ -173,8 +227,8 @@ def generated_path(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path:
     Returns:
         The path the generation is expected at.
     """
-    flat = item_id.replace("/", "__").replace("\\", "__")
-    return generated_dir / f"{flat}.py"
+    flat = flatten_item_id(item_id)
+    return generated_dir / flat / "src" / flat
 
 
 def score_arm(arguments: Arguments, prompts: Sequence[EvalPrompt]) -> list[ItemOutcome]:
@@ -203,6 +257,7 @@ def score_arm(arguments: Arguments, prompts: Sequence[EvalPrompt]) -> list[ItemO
                 arm=arguments.arm,
                 interpreter=arguments.interpreter,
                 target=target,
+                root=item_root(arguments.generated_dir, prompt["item_id"]),
                 cwd=arguments.check_cwd,
             )
         )
@@ -243,4 +298,13 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["Arguments", "entrypoint", "generated_path", "main", "parse_arguments", "score_arm"]
+__all__ = [
+    "Arguments",
+    "entrypoint",
+    "flatten_item_id",
+    "generated_path",
+    "item_root",
+    "main",
+    "parse_arguments",
+    "score_arm",
+]
