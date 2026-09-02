@@ -130,7 +130,7 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     # 0x21 in 340 of 340 archived sessions ([[recipient-policy]]).
     assert burst[5]["msg_type"] == 0x21
     assert burst[5]["tank_id"] == 11
-    assert 11 in server._viewport.visible
+    assert 11 in server.session.viewport.visible
 
 
 def test_handshake_tail_is_the_measured_inventory_pair_toggle_sync() -> None:

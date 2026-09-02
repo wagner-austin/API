@@ -153,8 +153,8 @@ def test_scope_shift_reveals_tanks_entering_the_window() -> None:
 def test_non_client_scope_command_moves_no_window() -> None:
     """Another tank's scope press never touches the client's window."""
     server = _server()
-    before = server._viewport.window
+    before = server.session.viewport.window
     server.queue_command(11, decode_client_command(_scope_payload(SCOPE_EAST)))
     batch = server.advance_tick()
-    assert server._viewport.window == before
+    assert server.session.viewport.window == before
     assert [m for m in batch if m["msg_type"] == 0x5A] == []

@@ -5312,3 +5312,18 @@ The rulings in [[recipient-policy]] were mined by throwaway scripts. They are no
 Method note worth keeping: both defects were found by running against the real corpus, not by the 63 tests, which all passed throughout. Fixtures agree with whatever the author believed.
 
 Gate: 421 tests, all three new files at 100.00% statement and branch, guard 0 violations, ruff and mypy strict clean over 1,195 files.
+
+---
+## [2026-09-01] lift | ClientSession drawn out of SimServer — and half the planned split deleted as cosmetic
+
+Phase 1 of the multi-client track ([[physics-module-roadmap]]). The four holders that already took `client_id` at construction — `ViewportTracker`, `CombatLedger`, `RankProgression`, `AwardLedger` — now live on a `ClientSession` the server composes. They are precisely what a second connection needs its own copy of, and nothing else on the server is.
+
+**The other half was dropped after measuring it.** The plan (board task b008ab91) also called for a `SimField` owning world/terrain/queue/churn. Measurement killed it: `server.world` and `server.terrain` are read from 50+ sites across `sim/run.py`, `run_boot.py`, `opponent.py` and a dozen test modules, so hiding them behind a field object costs either 50+ call-site edits for zero behavior change, or `world`/`terrain` properties that delegate — a thin wrapper the standards forbid. `SimServer` already IS the field; renaming it is cosmetic until a session registry exists to justify it. Deferred to the step that adds one.
+
+`self.session` is deliberately SINGULAR, not a dict holding one entry. The server genuinely has one client today; a registry now would be speculative generality, and the shape that survives contact with fan-out is not yet known.
+
+Blast radius as measured beforehand and as it landed: 119 attribute references inside `server.py` + `server_move.py`, 12 test touchpoints, ONE external contract break (`session.py` read `server.client_id`). Zero construction sites moved — `SimServer.__init__` keeps its signature, which is why none of the 46 call sites noticed.
+
+What still blocks N>1 is unchanged and is NOT this seam: `sim/emissions.py` interleaves world mutation with narration and takes the observer as a parameter, so fanning the emitters out per session would apply every mutation once per connection. That is the resolve/narrate split, and it is the next real piece.
+
+Gate: 358 sim tests, `server.py` / `server_move.py` / `client_session.py` all at 100.00% statement and branch, guard 0 violations, ruff and mypy strict clean over 1,196 files.

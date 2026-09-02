@@ -58,20 +58,20 @@ def test_viewport_exit_emits_tank_remove_and_reentry_restates_position() -> None
     """Leaving the viewport draws 0x58 once; re-entering draws 0x3D."""
     world = _arena()
     server = _server(world)
-    assert server._viewport.visible == {11}
+    assert server.session.viewport.visible == {11}
     server.queue_command(9, _teleport(40, 40))
     away = server.advance_tick()
     removes = [m for m in away if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [11]
-    assert server._viewport.removed_at == {11: 1}
+    assert server.session.viewport.removed_at == {11: 1}
     quiet = server.advance_tick()
     assert [m for m in quiet if m["msg_type"] == 0x58] == []
     server.queue_command(9, _teleport(15, 12))
     back = server.advance_tick()
     positions = [m for m in back if m["msg_type"] == 0x3D and m["tank_id"] == 11]
     assert len(positions) == 1
-    assert server._viewport.visible == {11}
-    assert server._viewport.removed_at == {}
+    assert server.session.viewport.visible == {11}
+    assert server.session.viewport.removed_at == {}
 
 
 def test_handshake_positions_are_self_only_even_inside_the_viewport() -> None:
@@ -97,7 +97,7 @@ def test_handshake_positions_are_self_only_even_inside_the_viewport() -> None:
     positions = [m["tank_id"] for m in burst if m["msg_type"] == 0x3D]
     assert identities == [9, 11, 12]
     assert positions == [9]
-    assert server._viewport.visible == {11}
+    assert server.session.viewport.visible == {11}
 
 
 def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:
@@ -109,7 +109,7 @@ def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:
     server.queue_command(9, _id_shot(15, 10, 11))
     messages = server.advance_tick()
     assert [m["msg_type"] for m in messages if m["msg_type"] in (0x41, 0x58)] == [0x41]
-    assert server._viewport.visible == set()
+    assert server.session.viewport.visible == set()
 
 
 def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:

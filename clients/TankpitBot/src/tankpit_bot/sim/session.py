@@ -302,7 +302,7 @@ class SimCDPSession:
                 self.map_visible = True
             if command["kind"] == "teleport":
                 self.map_visible = False
-            self.server.queue_command(self.server.client_id, command)
+            self.server.queue_command(self.server.session.client_id, command)
         now = get_current_time_ms()
         self._last_send_ms = now
         self.wire_log.append(

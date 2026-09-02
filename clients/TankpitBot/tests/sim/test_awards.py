@@ -147,11 +147,11 @@ def test_the_join_burst_carries_the_clients_awards() -> None:
     from tankpit_bot.sim.server import SimServer
 
     server = SimServer(_world(), InMemoryTerrainMap(), client_id=9)
-    server._awards.levels[SLOT_TANK] = 3
+    server.session.awards.levels[SLOT_TANK] = 3
 
     burst = server.handshake()
 
-    expected = server._awards.decoration_state
+    expected = server.session.awards.decoration_state
     assert expected != bytes(4)
     match burst[0], burst[1]:
         case (
@@ -169,7 +169,7 @@ def test_the_server_grants_on_the_tick() -> None:
 
     world = _world()
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
-    server._combat.client_destroyed = TANK_KILLS[0]
+    server.session.combat.client_destroyed = TANK_KILLS[0]
 
     batch = server.advance_tick()
 

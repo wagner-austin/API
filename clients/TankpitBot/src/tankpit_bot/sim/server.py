@@ -30,9 +30,9 @@ from tankpit_bot.protocol.types import (
     SyncDict,
 )
 from tankpit_bot.sim.actions import build_map_data
-from tankpit_bot.sim.awards import AwardLedger
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
-from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS, CombatLedger
+from tankpit_bot.sim.client_session import ClientSession
+from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.emissions import (
     emit_block_action,
@@ -42,9 +42,7 @@ from tankpit_bot.sim.emissions import (
     emit_radar,
 )
 from tankpit_bot.sim.ferries import drift_ferries
-from tankpit_bot.sim.progression import RankProgression
 from tankpit_bot.sim.server_move import SimServerMoveMixin
-from tankpit_bot.sim.viewport_window import ViewportTracker
 from tankpit_bot.sim.visitors import RoomChurn
 from tankpit_bot.sim.wire_statements import (
     full_status_statement,
@@ -79,6 +77,13 @@ _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
 class SimServer(SimServerMoveMixin):
     """The fake server: one world, one command queue, one client.
 
+    The server owns FIELD state directly — the world, its terrain, the
+    command queue every tank feeds, and the room's churn — and holds
+    the connected client's own state in a :class:`ClientSession`. That
+    boundary is the point: the session's four holders are precisely
+    what a second connection would need its own copy of, and nothing
+    else here is.
+
     ``client_id`` is the tank whose connection this server speaks for
     — it receives its own fuel syncs and inventory snapshots; other
     tanks' commands are queued by the opponent policies directly.
@@ -104,15 +109,11 @@ class SimServer(SimServerMoveMixin):
         """
         self.world = world
         self.terrain = terrain
-        self.client_id = client_id
+        self.session = ClientSession(world, terrain, client_id)
         self._roster_ids = roster_ids
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_announcements: list[BinaryMessage] = []
-        self._viewport = ViewportTracker(world, terrain, client_id)
-        self._combat = CombatLedger(world, terrain, client_id)
         self._churn = RoomChurn()
-        self._progression = RankProgression(client_id)
-        self._awards = AwardLedger(client_id)
 
     def handshake(self) -> list[BinaryMessage]:
         """Build the session-start burst the client receives on join.
@@ -163,7 +164,7 @@ class SimServer(SimServerMoveMixin):
         Returns:
             The decoded messages of the join burst, in order.
         """
-        client = self.world["tanks"][self.client_id]
+        client = self.world["tanks"][self.session.client_id]
         inventory = InventoryDict(
             msg_type=0x49,
             show=True,
@@ -172,11 +173,17 @@ class SimServer(SimServerMoveMixin):
             enabled=list(client["enabled"]),
         )
         messages: list[BinaryMessage] = [
-            identity_statement(self.world, self.client_id, self._awards.decoration_state),
-            full_status_statement(self.world, self.client_id, self._awards.decoration_state),
-            self._viewport.build_update(),
-            position_statement(self.world, self.client_id),
-            status_sync(self.client_id, self.world, True, self._progression.promo_state),
+            identity_statement(
+                self.world, self.session.client_id, self.session.awards.decoration_state
+            ),
+            full_status_statement(
+                self.world, self.session.client_id, self.session.awards.decoration_state
+            ),
+            self.session.viewport.build_update(),
+            position_statement(self.world, self.session.client_id),
+            status_sync(
+                self.session.client_id, self.world, True, self.session.progression.promo_state
+            ),
         ]
         # The identity run is PURE 0x21 — no position statements ride
         # it. Measured 340/340 (2026-09-01, [[recipient-policy]]): with
@@ -186,7 +193,7 @@ class SimServer(SimServerMoveMixin):
         # membership diff, never from the join burst.
         for tank_id in sorted(self.world["tanks"]):
             tank = self.world["tanks"][tank_id]
-            if tank_id == self.client_id or not tank["alive"]:
+            if tank_id == self.session.client_id or not tank["alive"]:
                 continue
             messages.append(identity_statement(self.world, tank_id))
         # The burst TAIL, measured 340/340: the inventory arrives
@@ -242,9 +249,9 @@ class SimServer(SimServerMoveMixin):
         tank["x"] = x
         tank["y"] = y
         if (
-            tank_id != self.client_id
-            and tank_id in self._viewport.visible
-            and self._viewport.in_window(x, y)
+            tank_id != self.session.client_id
+            and tank_id in self.session.viewport.visible
+            and self.session.viewport.in_window(x, y)
         ):
             # In-window movement of an ALREADY-visible tank re-states
             # its position (0x3D, viewport-scoped like live); a tank
@@ -280,7 +287,7 @@ class SimServer(SimServerMoveMixin):
         if tank is None:
             raise SimError(f"no tank {tank_id} to command")
         if not tank["alive"]:
-            if tank_id == self.client_id:
+            if tank_id == self.session.client_id:
                 return
             raise SimError(f"no living tank {tank_id} to command")
         self._queue.append((tank_id, command))
@@ -313,14 +320,14 @@ class SimServer(SimServerMoveMixin):
             self._process_move_command(tank_id, kind, command, messages, ammo_changed, moved)
             return
         if kind == "shoot":
-            self._combat.emit_shot(
+            self.session.combat.emit_shot(
                 self.world["tanks"][tank_id]["team"],
                 messages,
                 ammo_changed,
                 tank_id,
                 command,
                 frozenset(moved),
-                self._viewport.removed_at.get(command["target_id"]),
+                self.session.viewport.removed_at.get(command["target_id"]),
             )
             return
         if kind == "teleport":
@@ -328,7 +335,12 @@ class SimServer(SimServerMoveMixin):
             return
         if kind == "radar":
             emit_radar(
-                self.world, self.client_id, self._viewport.window, tank_id, messages, ammo_changed
+                self.world,
+                self.session.client_id,
+                self.session.viewport.window,
+                tank_id,
+                messages,
+                ammo_changed,
             )
             return
         self._process_stateless_command(tank_id, command, messages)
@@ -348,7 +360,7 @@ class SimServer(SimServerMoveMixin):
         """
         kind = command["kind"]
         if kind == "mine":
-            emit_mine_press(self.world, self.terrain, self.client_id, tank_id, messages)
+            emit_mine_press(self.world, self.terrain, self.session.client_id, tank_id, messages)
             return
         if kind == "toggle_equipment":
             emit_equipment_toggle(self.world, tank_id, command["slot"], messages)
@@ -365,12 +377,12 @@ class SimServer(SimServerMoveMixin):
         if kind == "statistics":
             # Per-connection, like every other answer: the statistics
             # of the tank that asked, and only to that tank.
-            if tank_id == self.client_id:
+            if tank_id == self.session.client_id:
                 messages.append(
                     statistics_statement(
                         self.world["tick"],
-                        self._combat.client_destroyed,
-                        self._combat.client_deactivated,
+                        self.session.combat.client_destroyed,
+                        self.session.combat.client_deactivated,
                     )
                 )
             return
@@ -394,10 +406,10 @@ class SimServer(SimServerMoveMixin):
             messages: This tick's outgoing batch (appended).
         """
         landed = emit_block_action(
-            self.world, self.terrain, self.client_id, tank_id, command, messages
+            self.world, self.terrain, self.session.client_id, tank_id, command, messages
         )
-        if landed and tank_id == self.client_id:
-            messages.append(self._viewport.build_update())
+        if landed and tank_id == self.session.client_id:
+            messages.append(self.session.viewport.build_update())
 
     def _process_scope_command(
         self,
@@ -422,10 +434,10 @@ class SimServer(SimServerMoveMixin):
             command: The queued scope command.
             messages: This tick's outgoing batch (appended).
         """
-        if tank_id != self.client_id:
+        if tank_id != self.session.client_id:
             return
-        self._viewport.apply_scope_shift(command["direction"])
-        messages.append(self._viewport.build_update())
+        self.session.viewport.apply_scope_shift(command["direction"])
+        messages.append(self.session.viewport.build_update())
         messages.append(position_statement(self.world, tank_id))
 
     def advance_tick(self) -> list[BinaryMessage]:
@@ -452,7 +464,7 @@ class SimServer(SimServerMoveMixin):
         messages: list[BinaryMessage] = list(self._pending_announcements)
         self._pending_announcements = []
         ammo_changed: set[int] = set()
-        self._combat.apply_pending_debits()
+        self.session.combat.apply_pending_debits()
         moved: set[int] = set()
         # Within-round resolution order is ASCENDING TANK ID — the
         # measured law (2026-07-25, `analysis_scripts/mine_round_order.py`:
@@ -472,11 +484,11 @@ class SimServer(SimServerMoveMixin):
         # the ledger's job is to produce it, not to interpret it
         # ([[session-state-deglobalisation]]).
         if any(
-            message["msg_type"] == 0x41 and message["victim_id"] == self.client_id
+            message["msg_type"] == 0x41 and message["victim_id"] == self.session.client_id
             for message in messages
         ):
-            self._progression.note_deactivation(self.world, messages)
-        for tank_id in self._combat.expire_corpses(messages):
+            self.session.progression.note_deactivation(self.world, messages)
+        for tank_id in self.session.combat.expire_corpses(messages):
             if tank_id in self._roster_ids:
                 # Roster bots come back the same tick their corpse
                 # clears: same id, full fuel, respawned FAR from
@@ -494,19 +506,19 @@ class SimServer(SimServerMoveMixin):
         # membership pass that announces any other arrival
         # ([[session-state-deglobalisation]]).
         self._churn.advance(self.world, self.terrain, messages)
-        self._viewport.emit_transitions(messages)
+        self.session.viewport.emit_transitions(messages)
         # Dynamic-layer refresh is EVENT-driven, never walk-driven:
         # the client's window is static between teleports (autoscroll
         # OFF, [[viewport-shift-protocol]] — 16+ probed walks drew
         # zero 0x5A), but a ferry or block moving inside the patch
         # grid repaints it (the 2026-07-20 block captures show 0x5A
         # after block operations). An empty patch is not sent.
-        refresh = self._viewport.build_update()
+        refresh = self.session.viewport.build_update()
         if refresh["entities"]:
             messages.append(refresh)
         # The promotion that ends a recovery window, before the syncs
         # so this tick's bar already reads the restored steady state.
-        self._progression.advance(self.world, messages)
+        self.session.progression.advance(self.world, messages)
         # Awards are granted from the same counters the 0x56 reports,
         # against the thresholds the in-client guide names
         # ([[decoration-encoding]]): 100/200/500 kills, 20/50/100
@@ -514,10 +526,10 @@ class SimServer(SimServerMoveMixin):
         # caught exactly one grant — Artax's 500th kill stepping the
         # Tank award to golden on 2026-07-29
         # ([[session-state-deglobalisation]]).
-        self._awards.advance(
-            self.world["tanks"][self.client_id]["rank"],
-            self._combat.client_destroyed,
-            self._combat.client_deactivated,
+        self.session.awards.advance(
+            self.world["tanks"][self.session.client_id]["rank"],
+            self.session.combat.client_destroyed,
+            self.session.combat.client_deactivated,
             self.world["tick"] * TICK_RATE_MS // 1000,
             messages,
         )
@@ -527,12 +539,12 @@ class SimServer(SimServerMoveMixin):
                     status_sync(
                         tank_id,
                         self.world,
-                        tank_id == self.client_id,
-                        self._progression.promo_state,
+                        tank_id == self.session.client_id,
+                        self.session.progression.promo_state,
                     )
                 )
-        if self.client_id in ammo_changed:
-            client = self.world["tanks"][self.client_id]
+        if self.session.client_id in ammo_changed:
+            client = self.world["tanks"][self.session.client_id]
             messages.append(
                 InventoryDict(
                     msg_type=0x49,

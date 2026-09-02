@@ -144,7 +144,7 @@ def test_corpse_window_closes_with_0x58_after_exactly_22_seconds() -> None:
     closing = server.advance_tick()
     removes = [m for m in closing if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [11]
-    assert server._viewport.removed_at == {}
+    assert server.session.viewport.removed_at == {}
 
 
 def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:

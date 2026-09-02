@@ -17,6 +17,7 @@ from tankpit_bot.protocol.types import (
     SupervisorDict,
     SyncDict,
 )
+from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.emissions import (
     emit_equipment_pickup,
@@ -25,7 +26,6 @@ from tankpit_bot.sim.emissions import (
     emit_teleport,
 )
 from tankpit_bot.sim.movement import process_move
-from tankpit_bot.sim.viewport_window import ViewportTracker
 from tankpit_bot.sim.world import SimWorldDict
 
 
@@ -46,8 +46,7 @@ class SimServerMoveMixin:
 
     world: SimWorldDict
     terrain: TerrainMapProtocol
-    client_id: int
-    _viewport: ViewportTracker
+    session: ClientSession
 
     def _process_move_command(
         self,
@@ -84,7 +83,9 @@ class SimServerMoveMixin:
             ammo_changed: Accumulator of tanks whose counts moved.
             moved: Accumulator of tanks that relocated this tick.
         """
-        if tank_id == self.client_id and not self._viewport.in_window(command["x"], command["y"]):
+        if tank_id == self.session.client_id and not self.session.viewport.in_window(
+            command["x"], command["y"]
+        ):
             messages.append(
                 SupervisorDict(
                     msg_type=0x52,
@@ -95,7 +96,7 @@ class SimServerMoveMixin:
             )
             return
         if not self._pickup_target_stocked(kind, command["x"], command["y"]):
-            if tank_id == self.client_id:
+            if tank_id == self.session.client_id:
                 messages.append(
                     SupervisorDict(
                         msg_type=0x52,
@@ -112,7 +113,7 @@ class SimServerMoveMixin:
         choreographed = kind == "pickup_fuel" and outcome["kind"] == "moved"
         emit_move(
             self.world,
-            self.client_id,
+            self.session.client_id,
             outcome,
             messages,
             include_pickups=not choreographed,
@@ -120,7 +121,7 @@ class SimServerMoveMixin:
         if choreographed:
             emit_fuel_pickup_close(
                 self.world,
-                self.client_id,
+                self.session.client_id,
                 tank_id,
                 command["x"],
                 command["y"],
@@ -129,8 +130,10 @@ class SimServerMoveMixin:
                 messages=messages,
             )
         if outcome["kind"] == "moved":
-            emit_equipment_pickup(self.world, self.client_id, tank_id, kind, messages, ammo_changed)
-            if tank_id == self.client_id and outcome["path"] != "":
+            emit_equipment_pickup(
+                self.world, self.session.client_id, tank_id, kind, messages, ammo_changed
+            )
+            if tank_id == self.session.client_id and outcome["path"] != "":
                 # The 0x3F Sync trails a walk that actually relocated
                 # the client — an own-tile click resolves as a "moved"
                 # outcome with an EMPTY path and draws none. Archive
@@ -173,7 +176,7 @@ class SimServerMoveMixin:
             moved: Accumulator of tanks that relocated this tick.
         """
         if self.world["tanks"][tank_id]["carrying"]:
-            if tank_id == self.client_id:
+            if tank_id == self.session.client_id:
                 messages.append(
                     SupervisorDict(
                         msg_type=0x52,
@@ -184,14 +187,16 @@ class SimServerMoveMixin:
                 )
             return
         landing: list[BinaryMessage] = []
-        if emit_teleport(self.world, self.terrain, self.client_id, tank_id, command, landing):
+        if emit_teleport(
+            self.world, self.terrain, self.session.client_id, tank_id, command, landing
+        ):
             moved.add(tank_id)
-            if tank_id == self.client_id:
-                self._viewport.recenter()
-                messages.append(self._viewport.build_update())
+            if tank_id == self.session.client_id:
+                self.session.viewport.recenter()
+                messages.append(self.session.viewport.build_update())
             messages.extend(landing)
             emit_equipment_pickup(
-                self.world, self.client_id, tank_id, "teleport", messages, ammo_changed
+                self.world, self.session.client_id, tank_id, "teleport", messages, ammo_changed
             )
         else:
             messages.extend(landing)
