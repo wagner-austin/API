@@ -16,7 +16,12 @@ from pathlib import Path
 import pytest
 
 from rw_bot.harness import _test_hooks
-from rw_bot.harness.cluster_round import CONVERGE_PASSES, ClusterRound, ClusterRoundError
+from rw_bot.harness.cluster_round import (
+    CONVERGE_PASSES,
+    TRANSPORT_BUDGET,
+    ClusterRound,
+    ClusterRoundError,
+)
 
 _JOBS = (
     "# the round's members",
@@ -178,6 +183,107 @@ def test_a_failed_command_raises_with_its_own_words(tmp_path: Path) -> None:
     assert "command failed (3)" in caught.value.message
     assert "the freeze refused" in caught.value.message
     assert "a second line" in caught.value.message
+
+
+def test_a_dropped_connection_is_ridden_out_and_reported(tmp_path: Path) -> None:
+    """The measured 2026-09-02 shape: ssh/scp exits 255 because the
+    websocket leg dropped, the command itself is fine, and a retry a poll
+    later carries it. The drop is reported, never silent."""
+
+    class _Dropping(_Cluster):
+        def __init__(self) -> None:
+            super().__init__(filed=[2], queued=[])
+            self.scp_calls = 0
+
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "scp":
+                self.scp_calls += 1
+                if self.scp_calls == 1:
+                    self.argvs.append(tuple(argv))
+                    return 255, ("client_loop: send disconnect: Broken pipe",)
+            return super().run(argv)
+
+    reported: list[str] = []
+
+    def record_line(text: str) -> None:
+        reported.append(text)
+
+    dropping = _Dropping()
+    saved = _test_hooks.write_line
+    _test_hooks.write_line = record_line
+    try:
+        _, slept = _drive(tmp_path, dropping)
+    finally:
+        _test_hooks.write_line = saved
+    assert dropping.scp_calls == 2
+    assert slept == [5.0]
+    drops = [line for line in reported if "transport dropped" in line]
+    assert len(drops) == 1
+    assert f"(1/{TRANSPORT_BUDGET})" in drops[0]
+    assert "scp" in drops[0]
+
+
+def test_a_route_down_through_the_whole_budget_is_the_finding(tmp_path: Path) -> None:
+    """Five consecutive drops is an outage; the error names the route and
+    the budget rather than spending hours discovering it."""
+
+    class _Down(_Cluster):
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "ssh":
+                self.argvs.append(tuple(argv))
+                return 255, ("websocket: bad handshake",)
+            return super().run(argv)
+
+    saved = _test_hooks.write_line
+
+    def swallow(text: str) -> None:
+        del text
+
+    _test_hooks.write_line = swallow
+    try:
+        with pytest.raises(ClusterRoundError) as caught:
+            _drive(tmp_path, _Down(filed=[], queued=[]))
+    finally:
+        _test_hooks.write_line = saved
+    assert caught.value.code == "RW-CROUND-003"
+    assert f"transport down through {TRANSPORT_BUDGET} consecutive" in caught.value.message
+    assert "websocket: bad handshake" in caught.value.message
+
+
+def test_a_local_command_exiting_255_is_a_command_failure(tmp_path: Path) -> None:
+    """255 is only a transport verdict from ssh/scp; a python tool that
+    happens to exit 255 failed on its own terms and is never retried."""
+
+    class _Local255(_Cluster):
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if "scripts.stage_payload" in " ".join(argv):
+                self.argvs.append(tuple(argv))
+                return 255, ("the freeze exploded",)
+            return super().run(argv)
+
+    with pytest.raises(ClusterRoundError) as caught:
+        _drive(tmp_path, _Local255(filed=[], queued=[]))
+    assert caught.value.code == "RW-CROUND-001"
+    assert "command failed (255)" in caught.value.message
+
+
+def test_an_ssh_command_failing_on_its_own_terms_is_not_retried(tmp_path: Path) -> None:
+    """A remote command that itself exits non-zero comes back through ssh
+    with that status, not 255 -- a defect surfacing, raised immediately."""
+
+    class _RemoteFailure(_Cluster):
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "ssh":
+                self.argvs.append(tuple(argv))
+                return 2, ("tar: rw-payload.tar: Cannot open",)
+            return super().run(argv)
+
+    cluster = _RemoteFailure(filed=[], queued=[])
+    with pytest.raises(ClusterRoundError) as caught:
+        _drive(tmp_path, cluster)
+    assert caught.value.code == "RW-CROUND-001"
+    assert "command failed (2)" in caught.value.message
+    assert len([argv for argv in cluster.argvs if argv[0] == "ssh"]) == 1
 
 
 def test_the_search_entry_point_routes_the_cluster_prefix(tmp_path: Path) -> None:

@@ -14,13 +14,24 @@ What a round leaves behind is the same thing the queue path leaves behind:
 one scorecard per job under ``<sweeps_root>/<batch>/``, which is all the
 margin scorer reads. The cluster's own copies stay on the cluster.
 
-Failure is loud and typed. A command that exits non-zero raises with the
-command and its output; a round that cannot reach its expected scorecard
-count within the convergence budget raises naming the gap. Nothing retries
-a command verbatim -- the one loop here is ``hpc3-campaign``'s own
-documented idempotent convergence, re-invoked only after the queue drains
-with members still missing (the boot-casualty shape measured on 2026-09-01,
-where every resubmission completed).
+Failure is loud and typed, and the loudness discriminates. A COMMAND that
+fails -- non-zero from the thing the command ran -- raises immediately
+with the command and its output, because that is a defect surfacing and
+retrying it would hide it. A TRANSPORT loss is different: ``ssh`` and
+``scp`` exit 255 when the connection itself died, which says nothing about
+the command they were carrying, and every cluster command in this chain is
+idempotent by design (probes read, extraction recreates, staging is
+digest-verified, convergence is the documented idempotent resubmit). Those
+are retried up to a bounded consecutive budget with each drop reported --
+because a search's drain loop issues hundreds of sequential probes over
+hours, and a driver that dies on any single drop statistically cannot
+finish its own runtime (vhsearch3 died twice in 30 minutes on 2026-09-02,
+once at the round-0 pull and once at a drain probe, both on the
+Cloudflare-websocket leg, with all cluster work intact both times). A
+round that cannot reach its expected scorecard count within the
+convergence budget still raises naming the gap; the one resubmission loop
+is ``hpc3-campaign``'s own convergence, re-invoked only after the queue
+drains with members still missing.
 """
 
 from __future__ import annotations
@@ -38,6 +49,17 @@ from rw_bot.harness import _test_hooks
 #: with shared-filesystem clones and 0 of 96 with node-local ones.
 CONVERGE_PASSES = 6
 
+#: The exit status OpenSSH's ssh and scp reserve for "the connection
+#: failed", as opposed to any status the remote command returned. Both
+#: 2026-09-02 websocket-leg drops surfaced as exactly this.
+TRANSPORT_EXIT = 255
+
+#: How many CONSECUTIVE transport losses one command may ride out before
+#: the route itself is the finding. Resets on any success; five drops in a
+#: row spaced a poll apart is an outage, not a blip, and pretending
+#: otherwise would spend hours discovering what the error says in seconds.
+TRANSPORT_BUDGET = 5
+
 
 class ClusterRoundError(RwBotError):
     """A cluster round could not deliver its scorecards.
@@ -45,7 +67,9 @@ class ClusterRoundError(RwBotError):
     Args:
         code: Stable machine-readable identifier -- ``RW-CROUND-001`` for a
             child command that failed, ``RW-CROUND-002`` for a round still
-            short of its expected scorecards after the convergence budget.
+            short of its expected scorecards after the convergence budget,
+            ``RW-CROUND-003`` for a transport route that stayed down
+            through the whole retry budget.
         message: Human-readable description carrying the command or the gap.
     """
 
@@ -111,6 +135,14 @@ class ClusterRound:
     def _capture(self, argv: Sequence[str]) -> tuple[str, ...]:
         """Run one child command, raising on failure.
 
+        ``ssh`` and ``scp`` commands whose CONNECTION died (exit
+        :data:`TRANSPORT_EXIT`) are re-run up to :data:`TRANSPORT_BUDGET`
+        consecutive times, a poll interval apart, each drop reported --
+        every cluster command this runner issues is idempotent by design,
+        so re-carrying one after a dropped connection repeats no work and
+        hides no defect. Any other non-zero status is the command itself
+        failing and raises immediately.
+
         Args:
             argv: Argument vector, program first.
 
@@ -121,16 +153,33 @@ class ClusterRound:
             ClusterRoundError: With ``RW-CROUND-001`` when the command exits
                 non-zero, carrying the command and everything it printed --
                 the child's own words are the diagnostic, and swallowing
-                them would leave a code with nothing behind it.
+                them would leave a code with nothing behind it. With
+                ``RW-CROUND-003`` when an ssh/scp route stays down through
+                the whole transport budget.
         """
-        status, lines = _test_hooks.run_capture(argv)
-        if status != 0:
+        transported = argv[0] in ("ssh", "scp")
+        drops = 0
+        while True:
+            status, lines = _test_hooks.run_capture(argv)
+            if status == 0:
+                return lines
             printed = "\n".join(lines)
-            raise ClusterRoundError(
-                "RW-CROUND-001",
-                f"command failed ({status}): {' '.join(argv)}\n{printed}",
+            if not (transported and status == TRANSPORT_EXIT):
+                raise ClusterRoundError(
+                    "RW-CROUND-001",
+                    f"command failed ({status}): {' '.join(argv)}\n{printed}",
+                )
+            drops += 1
+            if drops >= TRANSPORT_BUDGET:
+                raise ClusterRoundError(
+                    "RW-CROUND-003",
+                    f"transport down through {TRANSPORT_BUDGET} consecutive "
+                    f"attempts: {' '.join(argv)}\n{printed}",
+                )
+            _test_hooks.write_line(
+                f"# transport dropped ({drops}/{TRANSPORT_BUDGET}), retrying: {' '.join(argv)}"
             )
-        return lines
+            _test_hooks.sleep(self.poll_seconds)
 
     def _remote(self, command: str) -> tuple[str, ...]:
         """Run one command on the cluster.
@@ -348,4 +397,10 @@ class ClusterRound:
         )
 
 
-__all__ = ["CONVERGE_PASSES", "ClusterRound", "ClusterRoundError"]
+__all__ = [
+    "CONVERGE_PASSES",
+    "TRANSPORT_BUDGET",
+    "TRANSPORT_EXIT",
+    "ClusterRound",
+    "ClusterRoundError",
+]
