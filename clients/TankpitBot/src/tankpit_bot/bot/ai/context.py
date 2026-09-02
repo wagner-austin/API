@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.world_types import EnemyThreatDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand
+from tankpit_bot.fleetshare.claims import fresh_denied_claim_tiles
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.sniffer.world_service import WorldService
@@ -124,8 +125,16 @@ class DecideCtx:
             timestamp_ms,
             self.config["kill_cooldown_ms"],
         )
+        # Siblings' advisory claim rows UNION this session's own claim
+        # denials: the advisory set is replaced wholesale each merge, so
+        # a tile whose mutex a sibling holds must be remembered here or
+        # a crashed winner (no advisory row ever published) would be
+        # re-picked for one denied beat per tick until its claim aged
+        # out ([[fleet-forage-allocation]]).
         self.filtered: WorldStateDict = filter_fleet_claimed_containers(
-            filter_killed_tanks(world, self.killed), ws.fleet_claimed_containers
+            filter_killed_tanks(world, self.killed),
+            ws.fleet_claimed_containers
+            | fresh_denied_claim_tiles(ws.claim_denied_tiles, timestamp_ms),
         )
         self.base: AIStateDict = AIStateDict(
             **{

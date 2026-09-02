@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.scoring_types import make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_hold_command
 from tankpit_bot.fleetshare import acquire_container_claim, release_container_claim
+from tankpit_bot.fleetshare.claims import CLAIM_TTL_MS
 from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
@@ -62,9 +63,10 @@ def _arbitrate_collect_claim(
     the same tick, the plan dies HERE, for the price of one held beat,
     instead of after the journey the contention measurement priced
     ([[fleet-forage-allocation]]: 273 contested tiles, median gap
-    0 s). The denied tile is stamped into the advisory claimed set so
-    the very next derivation plans around it, bridging the beat until
-    the winner's own report row lands.
+    0 s). A denied tile lands in the session's own denial memory —
+    NOT the advisory claimed set, which every merge pass replaces
+    wholesale — so the very next derivation plans around it even when
+    the winner crashed before ever publishing its advisory row.
 
     Reconciling state each tick rather than tracking transitions also
     self-heals the executor-refusal case: when a dispatch fails, the
@@ -88,6 +90,11 @@ def _arbitrate_collect_claim(
         sibling owns the container.
     """
     instance = resolve_bot_instance()
+    ws.claim_denied_tiles = {
+        tile: denied_ms
+        for tile, denied_ms in ws.claim_denied_tiles.items()
+        if now_ms - denied_ms <= CLAIM_TTL_MS
+    }
     next_state = decision["updated_ai_state"]
     plan = current_collect_plan(next_state)
     if plan is None:
@@ -124,7 +131,7 @@ def _arbitrate_collect_claim(
         x=target_x,
         y=target_y,
     )
-    ws.fleet_claimed_containers.add(f"{target_x},{target_y}")
+    ws.claim_denied_tiles[f"{target_x},{target_y}"] = now_ms
     released = release_collect_plan(next_state, reason="claim_lost")
     return make_tick_decision(
         command=make_hold_command(),

@@ -251,6 +251,31 @@ def acquire_container_claim(
     return _test_hooks.create_text_exclusive(path, content)
 
 
+def fresh_denied_claim_tiles(denied: dict[str, int], now_ms: int) -> set[str]:
+    """Tiles whose claim denial is still standing.
+
+    The denial memory exists because the advisory claimed set is
+    replaced WHOLESALE by every merge pass: a denial stamped into it
+    would survive only until the same tick's exchange, and a winner
+    that crashed right after claiming never publishes the advisory
+    row at all — leaving the loser to re-pick the tile and lose one
+    beat per tick until the dead claim aged out. Remembering own
+    denials locally, bounded by :data:`CLAIM_TTL_MS`, caps that at
+    ONE denied beat: past the horizon the denying claim is itself
+    reapable, so re-contending becomes legitimate exactly when the
+    memory expires.
+
+    Args:
+        denied: Session denial memory, tile key (``"x,y"``) to the
+            denial's stamp.
+        now_ms: Current wall-clock ms.
+
+    Returns:
+        The tile keys still inside the denial horizon.
+    """
+    return {tile for tile, denied_ms in denied.items() if now_ms - denied_ms <= CLAIM_TTL_MS}
+
+
 def release_container_claim(room: str, x: int, y: int, *, instance: str) -> bool:
     """Release this bot's claim on one container tile.
 
@@ -281,5 +306,6 @@ __all__ = [
     "claim_path",
     "decode_container_claim",
     "encode_container_claim",
+    "fresh_denied_claim_tiles",
     "release_container_claim",
 ]

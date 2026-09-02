@@ -267,6 +267,14 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # planning, this pair records what the filesystem granted.
         self.held_claim_x: int = -1
         self.held_claim_y: int = -1
+        # Own claim DENIALS, tile key -> stamp — the arbitration's
+        # local memory. Needed because the advisory set above is
+        # replaced wholesale each merge, so a denial stamped there
+        # would not outlive the tick, and a winner that crashed after
+        # claiming never publishes its advisory row at all. Pruned
+        # each arbitration pass; read through
+        # ``fresh_denied_claim_tiles`` at ctx construction.
+        self.claim_denied_tiles: dict[str, int] = {}
         # Consent evidence inherited from same-color siblings
         # ([[fleet-coordination]], operator ruling 2026-08-26): ids the
         # FLEET has proof consented to combat. Replaced wholesale per

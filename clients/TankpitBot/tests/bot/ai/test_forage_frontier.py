@@ -389,6 +389,27 @@ def test_claimed_container_filter_prunes_and_passes_through() -> None:
     assert "120,100" not in ctx.filtered["containers"]
     assert "121,101" in ctx.filtered["containers"]
 
+    # An own claim DENIAL filters exactly like a sibling's advisory
+    # row — and outlives the merge's wholesale replacement, which is
+    # why it is a separate memory ([[fleet-forage-allocation]]).
+    ws_denied = WorldService()
+    ws_denied.claim_denied_tiles = {"120,100": _NOW}
+    world_denied, self_denied = make_world(fuel=800, scanned=False)
+    world_denied["containers"]["120,100"] = make_container_state(
+        x=120, y=100, is_fuel=False, volume=0, timestamp_ms=_NOW
+    )
+    ctx_denied = DecideCtx(
+        world_denied,
+        self_denied,
+        make_scanned_ai_state(),
+        _deficient_inventory(),
+        _NOW,
+        InMemoryTerrainMap(),
+        "",
+        ws=ws_denied,
+    )
+    assert "120,100" not in ctx_denied.filtered["containers"]
+
     # A claim set that touches nothing believed returns the world as-is.
     ws_untouched = WorldService()
     ws_untouched.fleet_claimed_containers = {"999,999"}

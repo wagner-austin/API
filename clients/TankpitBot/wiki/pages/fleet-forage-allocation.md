@@ -108,8 +108,15 @@ with the committed plan BETWEEN decide and execute: a plan that just
 latched pays one exclusive create, and when a sibling won it the same
 tick, the plan dies right there — `plan_released` reason
 `claim_lost`, a hold command instead of the doomed dispatch, and the
-tile stamped into the advisory claimed set so the very next
-derivation plans around it. A session with no selected room passes
+tile remembered in the session's OWN denial memory
+(`ws.claim_denied_tiles`, unioned into the planner's filter, expiring
+at the claim horizon). The denial deliberately does NOT ride the
+advisory claimed set: every merge pass replaces that set wholesale,
+and a winner that crashes right after claiming never publishes an
+advisory row at all — the double-check found that a stamped denial
+died within the tick, leaving the loser to re-pick the dead-claimed
+tile for one denied beat per tick for up to the 30 s horizon. The
+local memory caps it at one beat. A session with no selected room passes
 through unclaimed (the same scope law as `build_fleet_report`'s
 pre-join return — no room, no fleet channel, nobody to contend
 with), which is also what keeps the sim seam byte-identical.

@@ -21,6 +21,7 @@ from tankpit_bot.fleetshare.claims import (
     claim_path,
     decode_container_claim,
     encode_container_claim,
+    fresh_denied_claim_tiles,
     release_container_claim,
 )
 from tests.conftest import FakeFileSystem
@@ -187,6 +188,24 @@ class TestAcquire:
         fake_fs.write_text(claim_path("6", 10, 20), dump_json_str({"instance": "artax"}))
 
         assert not acquire_container_claim("6", 10, 20, instance="artax", tank_id=7, now_ms=_NOW)
+
+
+class TestDenialMemory:
+    """The freshness read over the session's own denial stamps."""
+
+    def test_only_denials_inside_the_horizon_stand(self) -> None:
+        """The boundary is inclusive; past it the claim is reapable."""
+        denied = {
+            "1,1": _NOW - CLAIM_TTL_MS - 1,
+            "2,2": _NOW - CLAIM_TTL_MS,
+            "3,3": _NOW,
+        }
+
+        assert fresh_denied_claim_tiles(denied, _NOW) == {"2,2", "3,3"}
+
+    def test_an_empty_memory_stands_nothing(self) -> None:
+        """No denials, no filtered tiles."""
+        assert fresh_denied_claim_tiles({}, _NOW) == set()
 
 
 class TestRelease:

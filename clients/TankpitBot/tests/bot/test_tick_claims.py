@@ -18,6 +18,7 @@ from tankpit_bot.bot.tick_claims import _arbitrate_collect_claim, _drop_held_cla
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_hold_command
 from tankpit_bot.fleetshare.claims import (
+    CLAIM_TTL_MS,
     ContainerClaimDict,
     claim_path,
     decode_container_claim,
@@ -154,10 +155,13 @@ def test_a_switched_plan_releases_the_old_claim_and_wins_the_new(
 def test_a_sibling_owned_container_kills_the_plan_before_dispatch(
     fake_env: FakeEnv, fake_fs: FakeFileSystem
 ) -> None:
-    """The denial arm: hold command, plan released, tile bridged.
+    """The denial arm: hold command, plan released, tile remembered.
 
     The whole point of the mutex — the loser pays one held beat here
-    instead of the journey the contention measurement priced.
+    instead of the journey the contention measurement priced. The
+    denial lands in the session's OWN memory, not the advisory set
+    the merge replaces wholesale, so it survives the exchange even
+    when the winner never publishes an advisory row.
     """
     ws = _entered_ws()
     _plant_claim(fake_fs, "yuppler")
@@ -169,8 +173,26 @@ def test_a_sibling_owned_container_kills_the_plan_before_dispatch(
     assert result["behavior"]["reason_kind"] == "claim_denied"
     assert result["updated_ai_state"]["resource_target_kind"] == ""
     assert result["desired_equipment"] == [1, 2]
-    assert "10,20" in ws.fleet_claimed_containers
+    assert ws.claim_denied_tiles == {"10,20": _NOW}
+    assert ws.fleet_claimed_containers == set()
     assert (ws.held_claim_x, ws.held_claim_y) == (-1, -1)
+
+
+def test_denial_memory_expires_at_the_claim_horizon(
+    fake_env: FakeEnv, fake_fs: FakeFileSystem
+) -> None:
+    """An aged denial is pruned: past the TTL the denying claim is
+    itself reapable, so re-contending becomes legitimate."""
+    ws = _entered_ws()
+    ws.claim_denied_tiles = {
+        "1,1": _NOW - CLAIM_TTL_MS - 1,
+        "2,2": _NOW - CLAIM_TTL_MS,
+    }
+    decision = _decision(make_initial_ai_state())
+
+    _arbitrate_collect_claim(ws, decision, _TANK_ID, _NOW)
+
+    assert ws.claim_denied_tiles == {"2,2": _NOW - CLAIM_TTL_MS}
 
 
 def test_a_roomless_session_passes_through_unclaimed(
