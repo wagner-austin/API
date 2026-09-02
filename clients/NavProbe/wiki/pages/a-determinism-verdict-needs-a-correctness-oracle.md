@@ -58,7 +58,7 @@ No retraction is owed. The claim stands, and now rests on a check its original r
 
 ## What to do with this
 
-The lesson is not "add a physics oracle" — that would cost the vendor-agnosticism the design is built on. It is narrower and cheaper: **a determinism verdict should carry a liveness witness from the scene it was measured on.** Contact count is the obvious one here, costs one array read per step, and would have flagged the tactile fixture immediately while leaving the ten scenes untouched. A verdict of `deterministic: true` on a scene that recorded zero contacts is a result to distrust, and nothing currently records enough to notice.
+The lesson is not "add a physics oracle" — that would cost the vendor-agnosticism the design is built on. It is narrower and cheaper: **a determinism verdict should carry a liveness witness from the scene it was measured on.** Contact count is the obvious one here, costs one array read per step, and would have flagged the tactile fixture immediately while leaving the ten scenes untouched. A verdict of `deterministic: true` on a scene that recorded zero contacts is a result to distrust — and as of commit `32f1af0f` the witness exists: `scripts/collision_pair_probe.py` carries a `ContactWitnessEntry` beside every verdict (codec `navprobe/codecs/contact_witness.py`), and the adapter exposes the `contact_count` read it is built on. The witness earned its keep before it ever shipped: during the flex verification it flagged a vendor fixture that could never make contact (`LIVE: False`, contacts `[0,0,0]` in both modes) before its clean-looking digests could be read as a result ([[heightfield-narrowphase-shares-the-contact-drop]]).
 
 ## What this does not establish
 

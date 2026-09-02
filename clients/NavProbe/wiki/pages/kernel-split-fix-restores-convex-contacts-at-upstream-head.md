@@ -69,6 +69,30 @@ the negative control [[warp-binds-determinism-mode-at-first-compile]] makes mand
 in-flight determinism PRs upstream (#1422/#1425/#1533) touch none of `collision_convex.py`,
 and issue #562 by a core MuJoCo developer is the open umbrella this addresses.[^6]
 
+**Filed upstream 2026-09-02**, after a same-day re-validation of every claim at the rebased
+tip (upstream `595bd6f`): bug report
+<https://github.com/google-deepmind/mujoco_warp/issues/1635> and fix PR
+<https://github.com/google-deepmind/mujoco_warp/pull/1636> (branch `deterministic-ccd`,
+commit `7b40fbe`, pushed to the `wagner-austin` fork). The re-validation: suite 1,355 passed
+with the same sole pre-existing failure re-confirmed on untouched main; negative control
+re-run in both directions (`NACON 0` with the dispatch forced off, `NACON 4` restored); the
+seven-pair sweep and both digest results reproduced, `42c2ef639e147693` again; and both the
+defect and the fix replicated on a second architecture — a GTX 1630 (sm_75) reproduces main's
+fall-through at the same final z to the digit and the branch's exact default trajectory — plus
+the fix re-confirmed on warp-lang 1.16.0 in a fresh venv.[^7]
+
+[^7]: `[observed]` — 2026-09-02 on the RTX 3090 Ti unless noted: `uv run pytest -n 8` at
+`7b40fbe` = 1,355 passed / 1 failed (`test_collision20`, re-run alone on detached
+`origin/main` `595bd6f`: fails identically); negative control by editing the
+`convex_narrowphase` dispatch to `deterministic = False`, running the probe subprocess
+(`NACON 0`), restoring (`NACON 4`); `sweep_pairs.py` both modes (all seven pairs identical
+final z and contact totals) and `repro_determinism.py` (default 3 reps → 3 digests,
+`RUN_TO_RUN` 3 reps → 1 digest `42c2ef639e147693`); GTX 1630 cells via a pinned venv
+(warp 1.15.0, mujoco 3.12.0) over git archives of `main` and the branch — main
+`RUN_TO_RUN` `final_z=-4.579524 / 0 contacts`, branch `RUN_TO_RUN`
+`final_z=0.299892 / 720 contacts`, equal to default; warp 1.16.0 venv, branch
+`RUN_TO_RUN` `final_z=0.299892 / 720 contacts`, equal to default.
+
 [^1]: `[observed]` — `uv run python repro_contact_drop.py RUN_TO_RUN box_box 64` at HEAD `3879591`, warp 1.15.0: `final_z=-4.579524 total_contacts=0 zero_contact_steps=200/200`, exit 0; default mode `final_z=0.299892 total_contacts=720`. Script: `C:\Users\Test\PROJECTS\upstream\mujoco_warp-repro\repro_contact_drop.py`.
 [^2]: warp-lang 1.16.0 `warp/_src/codegen.py` L5288-5293 — "Deterministic two-pass mode must suppress normal array writes in phase 0 so the counting pass does not introduce side effects"; `warp/_src/deterministic.py` L696-703 — `needs_store_guard` returns true kernel-wide when the kernel has any counter.
 [^3]: `mujoco_warp/_src/collision_convex.py` (branch `deterministic-ccd`), `ccd_kernel_builder` — staging via `ccd_ncollision/ccd_dist/ccd_witness1/ccd_witness2/ccd_dists` keyed by `collisionid`; `ccd_write_kernel` reserves via the unmodified shared `write_contact`.
