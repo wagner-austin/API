@@ -5461,3 +5461,17 @@ Operator watched Artax in PRACTICE (room 7) off release `v0.1.0-fa1c1ae7` and ra
 **Clock inventory.** 15 constants across 12 modules. Three in `world_service.py` are dead forks nothing reads (a module split forked instead of lifting); six of seventeen carry no docstring; four policy knobs sit as module literals while `kill_cooldown_ms`/`scan_cooldown_ms`/`map_open_cooldown_ms`/`map_intel_horizon_ms` already live in `AIConfigDict` with codec, `require_int` and env override. For the record — no 30-minute clock exists anywhere; the world-map read is 12 s and the longest clock in the bot is the 10-minute harvest veto.
 
 Nothing fixed here: `bot/ai/**` is another session's active surface and was not touched. Ten open items in the page's fix-status table.
+
+## [2026-09-02] live incident + code | "make down doesn't kill them all" — the page was never the container's: Windows let two managers share 127.0.0.1:27300
+
+Operator's first transition to the containerized fleet went sideways and the report was exact: `make down` stopped the container in 1.4 s, yet http://127.0.0.1:27300/ still showed the fleet online. Diagnosis from the live box: port 27300 was owned by host python pid 51252 — a HOST-mode manager that an old-style `make up` (pre-consolidation Makefile, `poetry run tankpit-fleet-up` from v0.1.0-fa1c1ae7) had started detached during the switchover. Its `/bots` showed all four tanks dead (returncode 75; artax stopped via dashboard, the "four bots up already" were its spawn-record adoption). The container's 1.4 s stop was CORRECT — zero bots inside, nothing to drain. The lifecycle was sound; the port was lying.
+
+The mechanism is a Windows loopback property, both directions:
+- Host manager first → Docker's port proxy co-binds `127.0.0.1:27300` without error (no exclusive bind by default) and silently never serves. `docker compose up` reports Started; the page stays the host manager's.
+- Container exists (even stopped) → Docker reserves the port with a socket netstat does not list; a host bind gets WinError 10048. Releases seconds after `docker compose down` removes the container.
+
+Resolution live: drained the host manager (`poetry run tankpit-fleet-down`, instant — all bots already dead), port freed, container force-recreated once to shed the dead proxy, page verified answering from INSIDE the container outward.
+
+Hardening, all three arms tested against the real port: `make up` now (1) refuses to start behind a non-Docker listener on 27300, naming the process/pid and the drain command — proven with a planted host listener, exit 2; (2) after composing, probes `/bots` up to 10 s and force-recreates once on a stale proxy; the green URL prints only after a real response — proven by clean run. `make down` names any non-Docker survivor on the port after the container stops — proven quiet on a free port. [[fleet-lifecycle]] gains the port-arbitration section.
+
+End state: containerized fleet up from tankpit-fleet:v0.1.0-bc45e3e1, page answering with an empty fleet, ready for spawns.

@@ -116,6 +116,32 @@ pre-container host fleet must be drained (`poetry run
 tankpit-fleet-down` from its release folder) before the first
 containerized `make up`.
 
+## Port 27300 is arbitrated, because Windows loopback is not
+
+Observed live 2026-09-02, the first transition attempt: a leftover
+HOST manager held `127.0.0.1:27300`, and the containerized `make up`
+still reported `Started` — Windows loopback has no exclusive bind by
+default, so Docker's host-side port proxy co-bound without error and
+then never worked. Every request went to the host manager: the
+operator watched a "fleet online" page through a full container
+up/down cycle (the container stopped in 1.4 s because it held zero
+bots — the drain was correct, the page was somebody else's). The
+reverse direction also fails invisibly: while a fleet container
+EXISTS (even stopped), Docker reserves `127.0.0.1:27300` with a
+socket `netstat` does not list, and a host bind gets `WinError
+10048`; the reservation releases seconds after `docker compose down`
+removes the container.
+
+Both `make` targets therefore check WHO owns the port. `up` refuses
+to start behind a non-Docker listener (names the process and pid,
+prints the drain command), then after composing verifies the page
+actually answers `/bots` and force-recreates once if the proxy is
+stale — the URL is printed only after a real response. `down` names
+any non-Docker survivor on the port after the container stops, so
+"still online" is never a mystery. The in-container manager needs no
+guard: it binds `0.0.0.0` in its own namespace, and the observed
+failure was never inside the container.
+
 A detached manager has no terminal, so its console goes to
 `runs/fleet/manager.log` — the same reasoning that sends each bot's
 child console to a file.[^8]
