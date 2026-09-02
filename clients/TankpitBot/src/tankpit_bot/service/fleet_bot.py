@@ -67,12 +67,21 @@ def _child_environment(
     room: str,
     troop: str,
     doctrine: str,
+    human_min_rank: int,
 ) -> dict[str, str]:
     """Build one child's spawn environment.
 
-    ``TANKPIT_ROLE`` is always explicit: the child inherits the
-    manager's whole environment, and a role lingering there must never
-    silently re-role the entire fleet. Empty account, room, troop and
+    ``TANKPIT_ROLE`` and ``TANKPIT_BOT_HUMAN_MIN_RANK`` are always
+    explicit: the child inherits the manager's whole environment, and
+    a value lingering there must never silently re-role the fleet or
+    quietly lower the rank floor a room's policy set. The floor in
+    particular is a POLICY the fleet owns per room
+    (:func:`~tankpit_bot.service.fleet_config.resolve_human_min_rank`),
+    so a global ``TANKPIT_BOT_HUMAN_MIN_RANK`` in the operator's
+    ``.env`` does NOT reach a fleet-spawned bot -- it cannot, because
+    one global cannot say "lieutenant on World, recruit on Practice".
+    Bots started outside the fleet (``make run``, the probes) still
+    read that variable normally. Empty account, room, troop and
     doctrine omit their selectors so the child keeps its defaults
     (accounts.json default; the Practice room; the account's own tank
     color for that map; skirmish).
@@ -96,6 +105,8 @@ def _child_environment(
         troop: Tank color name ("" = the account's default).
         doctrine: Engagement doctrine ("" = skirmish, the unset
             behaviour).
+        human_min_rank: Lowest human rank this bot may open a fight
+            on, resolved from the room it is joining.
 
     Returns:
         Environment overrides for the spawned child.
@@ -105,6 +116,7 @@ def _child_environment(
         "TANKPIT_BOT_SESSION_KILLS": str(kills),
         "TANKPIT_BOT_SESSION_SECONDS": str(seconds),
         "TANKPIT_ROLE": resolved_role,
+        "TANKPIT_BOT_HUMAN_MIN_RANK": str(human_min_rank),
     }
     if account:
         env["TANKPIT_ACCOUNT"] = account

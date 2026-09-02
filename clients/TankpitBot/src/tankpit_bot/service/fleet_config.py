@@ -122,6 +122,49 @@ def resolve_doctrine(doctrine: str) -> str:
     )
 
 
+#: Lowest human rank a bot may open a fight on in the PRACTICE room.
+#: 1 spares recruits only, which is the bot's own default and the
+#: right floor where a deactivation costs nothing.
+PRACTICE_HUMAN_MIN_RANK = 1
+
+#: Lowest human rank a bot may open a fight on in the WORLD room:
+#: lieutenant. Recruit through sergeant are spared entirely.
+#:
+#: Operator ruling 2026-09-02, after watching a five-bot World fleet
+#: converge on one low-rank human: "they cant be mowing down
+#: seargents and lower. on world it should be only initiating on
+#: lieutenant and higher". The number is the rank ladder's index for
+#: lieutenant (recruit 0 .. general 8), so moving the floor means
+#: naming a different rank, not tuning a magic constant.
+WORLD_HUMAN_MIN_RANK = 4
+
+
+def resolve_human_min_rank(room: str) -> int:
+    """Return the human-rank floor a bot spawned into ``room`` fights by.
+
+    The floor is a property of the ROOM, not of the operator's
+    environment, because the two rooms differ in what a fight costs
+    the person on the other side. Practice is consequence-free and
+    populated by bots; World holds real ranked tanks, and a five-bot
+    swarm on a sergeant is a mugging rather than a fight.
+
+    Matching is on the room's PREFIX because the world's display name
+    carries the current map ("World (Desert)") and rotates
+    ([[game-rules]]); the prefix is the durable part, which is why the
+    lobby list offers prefixes in the first place.
+
+    Args:
+        room: Room selector the bot was spawned with; ``""`` means
+            the child's own default, which is Practice.
+
+    Returns:
+        The lowest human rank the bot may initiate against.
+    """
+    if room.strip().lower().startswith("world"):
+        return WORLD_HUMAN_MIN_RANK
+    return PRACTICE_HUMAN_MIN_RANK
+
+
 def configured_accounts() -> list[str]:
     """Return the configured account usernames.
 
@@ -247,12 +290,15 @@ def derive_instance(account: str) -> str:
 
 __all__ = [
     "FLEET_PORT_DEFAULT",
+    "PRACTICE_HUMAN_MIN_RANK",
+    "WORLD_HUMAN_MIN_RANK",
     "configured_accounts",
     "derive_instance",
     "engagement_doctrines",
     "lobby_rooms",
     "resolve_doctrine",
     "resolve_fleet_port",
+    "resolve_human_min_rank",
     "resolve_role",
     "resolve_troop",
     "tank_registry",

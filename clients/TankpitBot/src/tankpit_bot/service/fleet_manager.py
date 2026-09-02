@@ -29,6 +29,7 @@ from tankpit_bot.service.fleet_config import (
     configured_accounts,
     derive_instance,
     resolve_doctrine,
+    resolve_human_min_rank,
     resolve_role,
     resolve_troop,
 )
@@ -186,6 +187,7 @@ class FleetManager:
                 room=room,
                 troop=resolved_troop,
                 doctrine=resolved_doctrine,
+                human_min_rank=resolve_human_min_rank(room),
             )
         )
         bot = _ManagedBot(

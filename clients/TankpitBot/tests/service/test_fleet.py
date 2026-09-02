@@ -69,6 +69,7 @@ def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
             "TANKPIT_BOT_SESSION_KILLS": "30",
             "TANKPIT_BOT_SESSION_SECONDS": "2700",
             "TANKPIT_ROLE": "fighter",
+            "TANKPIT_BOT_HUMAN_MIN_RANK": "1",
             "TANKPIT_ACCOUNT": "second",
         }
     ]
@@ -105,6 +106,69 @@ def test_spawn_role_is_explicit_validated_and_carried_by_restart(
     assert spawner.envs[0]["TANKPIT_ROLE"] == "gatherer"
     assert restarted["role"] == "gatherer"
     assert spawner.envs == [spawner.envs[0], spawner.envs[0]]
+
+
+def test_the_rank_floor_follows_the_room_a_bot_joins(
+    spawner: _FakeSpawner,
+) -> None:
+    """World spares recruit..sergeant; Practice spares recruits only.
+
+    Operator ruling 2026-09-02, after a five-bot World fleet converged
+    on one low-rank human. The two rooms differ in what a fight costs
+    the person on the other side, so the floor is a property of the
+    room rather than of the operator's environment.
+    """
+    original = _without_accounts()
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="w", account="", kills=0, seconds=0, room="World")
+        manager.spawn(instance="p", account="", kills=0, seconds=0, room="Practice")
+        manager.spawn(instance="d", account="", kills=0, seconds=0)
+    finally:
+        top_hooks.path_exists = original
+
+    assert spawner.envs[0]["TANKPIT_BOT_HUMAN_MIN_RANK"] == "4"
+    assert spawner.envs[1]["TANKPIT_BOT_HUMAN_MIN_RANK"] == "1"
+    # No room named means the child's own default, which is Practice.
+    assert spawner.envs[2]["TANKPIT_BOT_HUMAN_MIN_RANK"] == "1"
+
+
+def test_the_rank_floor_survives_the_worlds_map_rotation(
+    spawner: _FakeSpawner,
+) -> None:
+    """A map-stamped world name still resolves to the World floor.
+
+    The world's display name carries the current map and rotates, so
+    matching the whole string would silently drop the fleet back to
+    the Practice floor the first time the map changed.
+    """
+    original = _without_accounts()
+    try:
+        FleetManager().spawn(
+            instance="w", account="", kills=0, seconds=0, room="World (Desert)"
+        )
+    finally:
+        top_hooks.path_exists = original
+
+    assert spawner.envs[0]["TANKPIT_BOT_HUMAN_MIN_RANK"] == "4"
+
+
+def test_the_rank_floor_is_always_stated_never_inherited(
+    spawner: _FakeSpawner,
+) -> None:
+    """Every spawn names the floor, so a stale global cannot lower it.
+
+    Same reasoning as TANKPIT_ROLE: the child inherits the manager's
+    whole environment, and one global cannot express "lieutenant on
+    World, recruit on Practice" — so the fleet states it every time.
+    """
+    original = _without_accounts()
+    try:
+        FleetManager().spawn(instance="p", account="", kills=0, seconds=0)
+    finally:
+        top_hooks.path_exists = original
+
+    assert "TANKPIT_BOT_HUMAN_MIN_RANK" in spawner.envs[0]
 
 
 def test_accounts_lists_configured_usernames_only(spawner: _FakeSpawner) -> None:
