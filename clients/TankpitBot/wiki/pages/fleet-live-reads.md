@@ -36,13 +36,28 @@ session, and the page polls once a second against a two-second
 cache.[^2]
 
 Measured on a real run: `runs/bot/yuppler/latest.events.jsonl` reached
-**13.5 MB after about six minutes** of play.[^3] A five-bot fleet was
-therefore re-reading and re-parsing on the order of 65 MB every two
-seconds, and the page's poll loop awaited each bot **in turn**, so a
-cold load paid the sum of the fleet rather than its slowest member.
+**13.5 MB after about six minutes** of play.[^3] A live five-bot fleet
+was later measured holding **85.5 MB** across its five artifacts.[^10]
+
+**The constant matters, and the first telling of this page guessed it.**
+One whole-file digest of a 23 MB live artifact costs **113 ms**, not the
+seconds "65 MB every two seconds" implies.[^10] The old design was not
+slow per read; it was slow at SCALE, and it failed by crossing a
+threshold rather than by degrading:
+
+- Two summaries per bot, whole-file each, and the page's poll loop
+  awaited each bot **in turn**. At five bots that is ~1.1 s of work per
+  poll cycle.
+- The page polls every **1 s**.
+
+Once a poll cycle costs more than the poll interval, polls overlap and
+queue on a single-threaded event loop, and the page stops being slow
+and starts appearing to hang. Five bots is roughly where that line is
+crossed — which is exactly the fleet size at which the operator
+reported it.
 
 The cost was invisible for a year because the CLI (`make digest`) runs
-once, on a finished artifact.
+once, on a finished artifact, where 113 ms is free.
 
 ## What replaced it
 
@@ -84,6 +99,13 @@ asked for second finds nothing new to fold.[^8] The page also polls its
 bots **concurrently** now, so first paint costs the slowest bot rather
 than the sum.[^9]
 
+**Measured against a live five-bot fleet** (85.5 MB, World map): a full
+page poll -- `GET /bots` plus stats and hud for all five -- costs
+**100-120 ms**, and a poll that lands after the cache TTL (so it
+actually reads and folds) is no slower than one that hits the cache.
+The incremental read has taken the per-poll cost off the run's length
+entirely.[^10]
+
 [^1]: The pre-change `FleetTelemetry.stats` called `build_run_digest`
       (whole file) and `activity` called `load_event_records` (whole
       file) on every miss.
@@ -106,3 +128,10 @@ than the sum.[^9]
 [^9]: `poll` fans out with `Promise.all(names.map(pollBot))`
       (`service/fleet_page.py`); it previously awaited each bot in a
       `for` loop.
+[^10]: Measured 2026-09-02 against a live five-bot World fleet (Artax,
+      Arterial, Despair, Malignant, Yuppler; 20.1 / 18.7 / 17.3 / 10.4
+      / 19.0 MB). Whole-file cost timed by calling `build_run_digest`
+      directly on `runs/bot/artax/latest.events.jsonl` (23,130,276
+      bytes -> 113 ms) -- that path still backs the CLI, so it measures
+      the pre-change cost faithfully. Poll cost timed as eleven
+      sequential HTTP requests against the running manager.
