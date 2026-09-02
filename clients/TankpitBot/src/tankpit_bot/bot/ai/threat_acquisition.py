@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.humans import (
     DEFAULT_HUMAN_MIN_RANK,
     is_human_rank_protected,
 )
+from tankpit_bot.bot.ai.tactics import SWARM_MUSTER_QUORUM
 from tankpit_bot.bot.ai.threat_primitives import (
     _is_enemy,
     _threat_sort_key_for,
@@ -32,14 +33,6 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     has_known_position,
 )
-
-SWARM_MUSTER_QUORUM = 2
-"""War-ready fleet members (self included) a swarm bot needs standing
-before it will OPEN a human fight nobody is in yet. Joining a fight a
-sibling already holds needs no quorum — reinforcement beats
-book-keeping. Two is the smallest number that is not fighting alone,
-which is the serial trickle the doctrine exists to end (operator
-order 2026-09-01)."""
 
 
 def _doctrine_rejection_reason(

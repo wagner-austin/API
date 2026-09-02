@@ -37,6 +37,16 @@ def combat_radar_min(rank: int) -> int:
     return inventory_capacity(rank) - 5
 
 
+SWARM_MUSTER_QUORUM = 2
+"""War-ready fleet members (self included) a swarm bot needs standing
+before it will OPEN a human fight nobody is in yet. Joining a fight a
+sibling already holds needs no quorum — reinforcement beats
+book-keeping. Two is the smallest number that is not fighting alone,
+which is the serial trickle the doctrine exists to end (operator
+order 2026-09-01). Policy, so it lives here beside the wartime
+arithmetic both the acquisition gate and the readiness floor read."""
+
+
 def wartime_inventory_ready(dual: int, homing: int, radar: int, rank: int) -> bool:
     """Return True when an inventory clears the wartime readiness floor.
 

@@ -441,18 +441,35 @@ class TestWartimeReadinessFloor:
         assert human_war_is_live(ctx) is False
         assert hunt_entry_permitted(ctx) is False
 
-
     def test_war_joining_doctrines_only_get_the_wartime_floor(self) -> None:
-        """A duelist and a passive bot keep the full peacetime bar.
+        """Duelist, passive, AND a pre-muster swarm keep the peacetime bar.
 
-        Doctrine scope (2026-09-01): the relaxed bar exists to join a
-        war; a duelist that cannot claim the duel and a passive bot
-        would hunt practice bots understocked on it.
+        Doctrine scope (2026-09-01; the pre-muster hole closed by the
+        2026-09-02 double-check): the relaxed bar exists to join a
+        war. A duelist that cannot claim the duel, a passive bot, and
+        a swarm bot whose muster does not stand would all hunt
+        practice bots understocked on it.
         """
         from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 
-        for doctrine in ("duelist", "passive"):
+        for doctrine in ("duelist", "passive", "swarm"):
             ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine=doctrine)
             assert hunt_entry_permitted(ctx) is False, doctrine
-        swarm = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
-        assert hunt_entry_permitted(swarm) is True
+
+    def test_swarm_gets_the_floor_once_the_muster_stands(self) -> None:
+        """A war-ready sibling arms the swarm bot's wartime bar."""
+        from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
+        ctx.ws.fleet_war_ready_count = 1
+
+        assert hunt_entry_permitted(ctx) is True
+
+    def test_swarm_gets_the_floor_when_a_sibling_holds_the_war_human(self) -> None:
+        """Reinforcement needs no quorum: an engaged war human arms the bar."""
+        from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+
+        ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
+        ctx.ws.fleet_engaged_target_ids = {60: 99000}
+
+        assert hunt_entry_permitted(ctx) is True

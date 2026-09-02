@@ -9,7 +9,11 @@ is :mod:`tankpit_bot.bot.ai.mode_controller`.
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.tactics import combat_radar_min, wartime_inventory_ready
+from tankpit_bot.bot.ai.tactics import (
+    SWARM_MUSTER_QUORUM,
+    combat_radar_min,
+    wartime_inventory_ready,
+)
 from tankpit_bot.bot.ai.threat_primitives import human_combat_consented
 from tankpit_bot.bot.config import resolve_weapon_resume_slack
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
@@ -254,6 +258,25 @@ def human_war_is_live(ctx: DecideCtx) -> bool:
         human-classified and has consented (chat, shot us, or a
         sibling's shared consent).
     """
+    for _ in _live_consented_human_ids(ctx):
+        return True
+    return False
+
+
+def _live_consented_human_ids(ctx: DecideCtx) -> list[int]:
+    """Return the tank ids of alive, presence-fresh, consented enemy humans.
+
+    The single membership law behind :func:`human_war_is_live` and the
+    swarm joinability check — one loop, two consumers, so the war's
+    definition can never fork.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Tank ids of every enemy human the war is live against.
+    """
+    ids: list[int] = []
     for tank in ctx.filtered["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
@@ -264,8 +287,39 @@ def human_war_is_live(ctx: DecideCtx) -> bool:
         if not is_human_name(tank["name"]):
             continue
         if human_combat_consented(ctx.ws, tank["tank_id"]):
-            return True
-    return False
+            ids.append(tank["tank_id"])
+    return ids
+
+
+def _war_floor_applies(ctx: DecideCtx) -> bool:
+    """Return True when this bot's doctrine gets the wartime floor NOW.
+
+    The pre-muster hole (found by the 2026-09-02 double-check): a
+    swarm bot below the peacetime bar during a war it cannot join yet
+    (nobody engaged, no quorum) would hunt practice bots understocked
+    on the relaxed bar — the exact flaw the duelist/passive scope
+    already guards. So swarm gets the floor only when it could
+    actually JOIN: a war human is sibling-engaged (reinforce now), or
+    the war-ready quorum stands (strike now). Skirmish always
+    qualifies; duelist and passive never do.
+
+    Args:
+        ctx: Decision context. Caller has established the war is live.
+
+    Returns:
+        True when the relaxed bar serves a fight this bot may enter.
+    """
+    doctrine = ctx.config["doctrine"]
+    if doctrine == "skirmish":
+        return True
+    if doctrine != "swarm":
+        return False
+    if any(
+        human_id in ctx.ws.fleet_engaged_target_ids
+        for human_id in _live_consented_human_ids(ctx)
+    ):
+        return True
+    return 1 + ctx.ws.fleet_war_ready_count >= SWARM_MUSTER_QUORUM
 
 
 def hunt_entry_permitted(ctx: DecideCtx) -> bool:
@@ -308,17 +362,18 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
         return False
     rank = ctx.self_state["rank"]
     cap = inventory_capacity(rank)
-    if ctx.config["doctrine"] in ("skirmish", "swarm") and human_war_is_live(ctx):
+    if human_war_is_live(ctx) and _war_floor_applies(ctx):
         # The wartime floor (operator ruling 2026-09-01, verbatim:
         # "like 80% equipment and 50% radar?"): while a consented
         # human fight is live anywhere on the map, a bot at 80% of
         # its weapon caps and half its radar cap joining NOW is worth
         # more than a full one joining after the human has killed
-        # someone or left. Doctrine-scoped to the profiles that JOIN
-        # wars: a duelist that cannot claim the duel and a passive
-        # bot would hunt practice bots understocked on a bar meant
-        # for a fight they will never enter. The full bar below stays
-        # the peacetime law, and the fuel bar in should_enter_hunt is
+        # someone or left. Doctrine-scoped by _war_floor_applies to
+        # fights this bot may actually enter — a duelist that cannot
+        # claim the duel, a passive bot, or a pre-muster swarm bot
+        # would hunt practice bots understocked on a bar meant for a
+        # fight it will not join. The full bar below stays the
+        # peacetime law, and the fuel bar in should_enter_hunt is
         # untouched — fuel is health and tops up in a pickup or two.
         return wartime_inventory_ready(
             ctx.inventory["dual_shots"]["count"],
