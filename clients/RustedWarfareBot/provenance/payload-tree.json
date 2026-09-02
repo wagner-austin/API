@@ -1,5 +1,5 @@
 {
-  "git_commit": "ef557386e7ee7f43b6431fdfd9090b762624e3b4",
+  "git_commit": "f4f604da41da0fe87bb9e4025793dfabde4e0267",
   "carries": [
     "scripts",
     "doctrines",
@@ -178,6 +178,11 @@
       "path": "doctrines/flame-close.doctrine",
       "sha256": "b20deb9e32411bb4ab45b175d5f279b80cddd1a88bf92d7130471f62596478b7",
       "size_bytes": 723
+    },
+    {
+      "path": "doctrines/flame-close6.doctrine",
+      "sha256": "a332e04c15d5efc31c283d0d3369a02d4b4ac35970e864b32a217c68fe2471f7",
+      "size_bytes": 928
     },
     {
       "path": "doctrines/flame-creep.doctrine",
@@ -385,19 +390,29 @@
       "size_bytes": 857
     },
     {
+      "path": "doctrines/search/close0-flame4.doctrine",
+      "sha256": "72ba93710941638f6d3aa44eea7cd5c38883a5903c093e94c1aeac004b6b4d5c",
+      "size_bytes": 471
+    },
+    {
       "path": "doctrines/search/close0-raid0.doctrine",
       "sha256": "a595bee7400ad5d62e7ded8f917220d8b856561e4e7e71d02f0e6c5fd5e5210f",
       "size_bytes": 434
     },
     {
+      "path": "doctrines/search/close0-raid6.doctrine",
+      "sha256": "239666a8a0d066a4a55c9652eff7ee5a6397b97c1f62e9ec409348e3a06404a4",
+      "size_bytes": 470
+    },
+    {
       "path": "doctrines/search/close0.doctrine",
-      "sha256": "94ea2c3a3a0345a7774d9d2f51301fe9e88429cdfec16a5636c4644cf139f2e2",
-      "size_bytes": 428
+      "sha256": "326e77afc9e546685b0006df045b38aacf5de2fd019ceb643d452a4d209ce529",
+      "size_bytes": 464
     },
     {
       "path": "doctrines/search/close6-flame0.doctrine",
-      "sha256": "7ba909dacae27659036e8506ad5650dd792751d26d81ad54c5236905f69afbf6",
-      "size_bytes": 435
+      "sha256": "68f5920755962fc20ff88482214182871b036f49fa3de33c4aebbff652a013d5",
+      "size_bytes": 471
     },
     {
       "path": "doctrines/search/close6-medics1.doctrine",
@@ -406,8 +421,8 @@
     },
     {
       "path": "doctrines/search/close6.doctrine",
-      "sha256": "ff39f74ab844eb15cf63f019ec61cf740f80e223c0b892b07509353bf8254326",
-      "size_bytes": 428
+      "sha256": "a82551ee9a2676575a47623961f016c4e7c8e1d461c7117f339e8d044ab450ce",
+      "size_bytes": 464
     },
     {
       "path": "doctrines/search/decoys2-flame0.doctrine",
@@ -415,14 +430,24 @@
       "size_bytes": 436
     },
     {
+      "path": "doctrines/search/decoys2-raid6.doctrine",
+      "sha256": "2ba5f6435fef455a1d3bb3c22704e2746f459911b1905ae80713d2c8dab7893a",
+      "size_bytes": 471
+    },
+    {
       "path": "doctrines/search/decoys2.doctrine",
-      "sha256": "4fcb985aa92f70a1b0cf9bb74637dec8c0675e0a22054ec217dbbd04da330c2c",
-      "size_bytes": 429
+      "sha256": "c92d2692038b5c47c008b1b9c8bf91e9dc08fc885ca93356dcc16a6cfd0c4e66",
+      "size_bytes": 465
+    },
+    {
+      "path": "doctrines/search/flame0-raid0.doctrine",
+      "sha256": "cf4f2fe475df54aa288e6a619362c056ec9ad47e8456e825ed526f51034e3f13",
+      "size_bytes": 470
     },
     {
       "path": "doctrines/search/flame0.doctrine",
-      "sha256": "ec8fac8558e6e16db0d4a9910b91585a28373ecbab632902c7d770cfbe53a107",
-      "size_bytes": 428
+      "sha256": "6a52b389fe0c946fc59932568df53fbaef11678b111c7e864220e74294dfb46c",
+      "size_bytes": 464
     },
     {
       "path": "doctrines/search/flame4-tech0.doctrine",
@@ -431,8 +456,13 @@
     },
     {
       "path": "doctrines/search/flame4.doctrine",
-      "sha256": "ec717307925422335b60eadbfdbe0dfce39701b6474f12bd6c4c4ed85b621d48",
-      "size_bytes": 428
+      "sha256": "e335c3a18fbecd84d720a1cfc0e5f7e76468fafaa22a7adb77941d9563f90b31",
+      "size_bytes": 464
+    },
+    {
+      "path": "doctrines/search/medics1-raid6.doctrine",
+      "sha256": "e59d16cd5776f480000c04a6df8cd0ef352651a9583f66ea71339191e625b834",
+      "size_bytes": 471
     },
     {
       "path": "doctrines/search/medics1-tech2.doctrine",
@@ -441,28 +471,28 @@
     },
     {
       "path": "doctrines/search/medics1.doctrine",
-      "sha256": "ce73c3e1821c5d2c24e157561a7f5d37602897cd5d61108f63ce00c0fcb47c5f",
-      "size_bytes": 429
+      "sha256": "c2e20353868622aea910e7b7d59f9188a02de9a51e3c0235e20bfc34f969ee67",
+      "size_bytes": 465
     },
     {
       "path": "doctrines/search/raid0.doctrine",
-      "sha256": "f4a0865cc1a8e61b5b96df4c05ac164670f9d22fd2df29ec6651bfc532fa4f98",
-      "size_bytes": 427
+      "sha256": "03e3e0122979c5a89e9dba655c0a95b9091c54076dd25ee353d7aba1e80f2b82",
+      "size_bytes": 463
     },
     {
       "path": "doctrines/search/raid6.doctrine",
-      "sha256": "056b38e2cfbe56891ccfda2a2cef59a8777f83aad24a74a0c4db3363752d9832",
-      "size_bytes": 427
+      "sha256": "fb807a105b34341b9b2b83cef7d095a982392bb7c9243c59d2e245153d1b64df",
+      "size_bytes": 463
     },
     {
       "path": "doctrines/search/tech0.doctrine",
-      "sha256": "4a98f215053556a5a3f2fa1a981d6013f843d00a3d4e255a1bdae03068619400",
-      "size_bytes": 427
+      "sha256": "cca8effa501a1415808a68f38b0fba5a8b74c8dc032934f059c3c1459369bcc0",
+      "size_bytes": 463
     },
     {
       "path": "doctrines/search/tech2.doctrine",
-      "sha256": "d101aed97ede6d59e29556bf95cbf856df064e17d49b7e50ed53ebb5d02bd00b",
-      "size_bytes": 427
+      "sha256": "e4a5e098ada6650ca9c5fe04d0fddf493fe2557b802c4f7532f9ff1547bfec21",
+      "size_bytes": 463
     },
     {
       "path": "doctrines/striker.doctrine",
@@ -746,8 +776,8 @@
     },
     {
       "path": "scripts/pairs.py",
-      "sha256": "efac0e200d8f1714ec532624fdb11031a73175f7ccc71d347679e6d508b328e4",
-      "size_bytes": 5246
+      "sha256": "b7067eaa12ca69e67981008e1e2044795cc047e1b0d6a1f1ee1a5f4f7b453229",
+      "size_bytes": 7418
     },
     {
       "path": "scripts/planner_probe.py",
@@ -786,8 +816,8 @@
     },
     {
       "path": "scripts/search.py",
-      "sha256": "0879c6c254a323eeff4a1943fb781d387c94663d7d5160c0381e52abd69fa49a",
-      "size_bytes": 10786
+      "sha256": "98f028e26b15f7190dbd9ff608178f6ed2a33e032c6320e76d87d3a781664a6a",
+      "size_bytes": 14690
     },
     {
       "path": "scripts/stage_payload.py",
@@ -893,6 +923,11 @@
       "path": "src/rw_bot/harness/clone.py",
       "sha256": "70c5f68e97d54dd25878fe8b35388c25a467aec84d9c21a6312327ee59fb0f76",
       "size_bytes": 12377
+    },
+    {
+      "path": "src/rw_bot/harness/cluster_round.py",
+      "sha256": "f7aa6276d2fa2f8c16d9d7dcaf31eb975dd5fd47b1bf4a54c76a700340f478cd",
+      "size_bytes": 13138
     },
     {
       "path": "src/rw_bot/harness/fleet.py",
@@ -1420,6 +1455,11 @@
       "size_bytes": 3244
     },
     {
+      "path": "sweeps/close6vh.txt",
+      "sha256": "5d9ea77c98d1cfafef0a1c5be6087de7c01ca1453aae90af421d7a6cb5b726f1",
+      "size_bytes": 5444
+    },
+    {
       "path": "sweeps/comp-arms.txt",
       "sha256": "54409cb63d913a4cb20cabdd6d185939b30c18148d3939324c53368d7b6fcc6d",
       "size_bytes": 2247
@@ -1880,6 +1920,21 @@
       "size_bytes": 561
     },
     {
+      "path": "sweeps/search/probe-r0.txt",
+      "sha256": "787a60b782ff9d2222474ed223b7925b430bb17bd1a1d1426bc4f64352de1326",
+      "size_bytes": 19960
+    },
+    {
+      "path": "sweeps/search/vhsearch2-r0.txt",
+      "sha256": "34cdc4dc57c8f3db95085714253064335d180b6824a035e201ccd94d45db52e9",
+      "size_bytes": 7960
+    },
+    {
+      "path": "sweeps/search/vhsearch2-r1.txt",
+      "sha256": "411ba070b7e02f0aa910e70bc37749fbf6b93ec918b825208459c8e8405d7f0f",
+      "size_bytes": 8112
+    },
+    {
       "path": "sweeps/service-smoke.txt",
       "sha256": "fcb5d54c68c1e7c7113d93f5c8c1b9c19437d43bfce7f7a4990a2b1985081337",
       "size_bytes": 98
@@ -2085,8 +2140,8 @@
       "size_bytes": 70007
     }
   ],
-  "tree_sha256": "639852da758ccb0b593ad19dd1bc3cf3021882e01f3b6cd4430c706c851dfef3",
+  "tree_sha256": "a8cc6aecbd9a4b9d3c45d2d50cbd0ceabcbf03a53fb6d1ae0844c0c17d6996a1",
   "archive_name": "rw-payload.tar",
-  "archive_sha256": "805d3ed83be519c1d9d155b7e46b321c15bdea93a927217037cbf3c26c5466d8",
-  "archive_size_bytes": 2304000
+  "archive_sha256": "0915adc8bac9f507547f5c9b81c4869f36c0ec636876519e8ae01f95a738050b",
+  "archive_size_bytes": 2365440
 }
