@@ -263,6 +263,40 @@ def test_troops_are_team_id_ordered_and_reach_the_child_as_the_wire_id(
     assert spawner.envs[0]["TANKPIT_TROOP"] == "3"
 
 
+def test_doctrine_reaches_the_child_and_an_unknown_one_is_refused_at_spawn(
+    spawner: _FakeSpawner,
+) -> None:
+    """The doctrine rides TANKPIT_DOCTRINE, and a typo never spawns.
+
+    Validated at the manager as well as in the child's own resolver:
+    caught here it is a 409 the operator reads, caught in the child it
+    is a process that starts, raises and dies with no tank in the
+    world.
+    """
+    manager = FleetManager()
+
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=0, doctrine="duelist")
+    with pytest.raises(FleetError, match="not an engagement doctrine"):
+        manager.spawn(instance="bravo", account="", kills=0, seconds=0, doctrine="berserk")
+
+    assert spawner.envs[0]["TANKPIT_DOCTRINE"] == "duelist"
+    assert row["instance"] == "alpha"
+
+
+def test_spawn_without_a_doctrine_omits_the_selector(spawner: _FakeSpawner) -> None:
+    """An empty doctrine keeps the child's default rather than naming one.
+
+    The child resolves an unset TANKPIT_DOCTRINE to skirmish; setting
+    it here to that same word would look like an operator choice in
+    the trail when it was not.
+    """
+    manager = FleetManager()
+
+    manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+
+    assert "TANKPIT_DOCTRINE" not in spawner.envs[0]
+
+
 def test_spawn_without_a_troop_omits_the_selector(spawner: _FakeSpawner) -> None:
     """An empty color keeps the account's own tank for that map."""
     manager = FleetManager()

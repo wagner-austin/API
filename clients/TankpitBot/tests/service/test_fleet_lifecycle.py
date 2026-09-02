@@ -263,6 +263,7 @@ class TestAsyncMain:
             "/accounts",
             "/rooms",
             "/troops",
+            "/doctrines",
             "/tanks",
             "/bots",
             "/bots/{instance}/stats",

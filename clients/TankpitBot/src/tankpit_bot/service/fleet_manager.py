@@ -28,6 +28,7 @@ from tankpit_bot.service.fleet_bot import (
 from tankpit_bot.service.fleet_config import (
     configured_accounts,
     derive_instance,
+    resolve_doctrine,
     resolve_role,
     resolve_troop,
 )
@@ -105,6 +106,7 @@ class FleetManager:
         role: str = "",
         room: str = "",
         troop: str = "",
+        doctrine: str = "",
     ) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -120,7 +122,7 @@ class FleetManager:
                 default (Practice). Cross-room fleets stay safe: the
                 knowledge exchange merges same-room reports only
                 (2026-08-26).
-            role: Fleet role selector; empty means fighter â€” the full
+            role: Fleet role selector; empty means fighter — the full
                 doctrine is the primary configuration, a gatherer is
                 an explicit operator choice ([[fleet-coordination]]).
             troop: Tank color name; empty keeps the account's own
@@ -146,6 +148,7 @@ class FleetManager:
             raise FleetError("bounds must be non-negative")
         resolved_role = resolve_role(role)
         resolved_troop = resolve_troop(troop)
+        resolved_doctrine = resolve_doctrine(doctrine)
         if account:
             configured = configured_accounts()
             if account not in configured:
@@ -175,7 +178,14 @@ class FleetManager:
             )
         process = service_hooks.spawn_bot_process(
             _child_environment(
-                instance, kills, seconds, resolved_role, account, room, resolved_troop
+                instance=instance,
+                kills=kills,
+                seconds=seconds,
+                resolved_role=resolved_role,
+                account=account,
+                room=room,
+                troop=resolved_troop,
+                doctrine=resolved_doctrine,
             )
         )
         bot = _ManagedBot(
@@ -251,7 +261,7 @@ class FleetManager:
         """Request a graceful stop: write the instance's stop sentinel.
 
         The bot's tick loop polls the sentinel and exits at the next
-        boundary with a full teardown â€” scorecard, capture save, and
+        boundary with a full teardown — scorecard, capture save, and
         archive all happen, exactly as a bounded session ends.
 
         Args:
@@ -332,11 +342,11 @@ class FleetManager:
         ALL of them: account, bounds, role, room, and troop. The room was
         missing here from the day it was added to spawn (2026-08-26)
         until 2026-08-28, so a restart silently relocated the bot to
-        the default Practice room â€” the row said ``World``, the child
+        the default Practice room — the row said ``World``, the child
         joined Practice, and only the run log disagreed.
 
         The fleet never silently kills: restarting a LIVE instance is
-        refused â€” stop it first, let the teardown run, then restart.
+        refused — stop it first, let the teardown run, then restart.
 
         Args:
             instance: Registered instance name.
@@ -377,7 +387,7 @@ class FleetManager:
     def stats(self, instance: str) -> JSONObject:
         """Summarize a registered instance's latest run from its events.
 
-        The digest reduction (:mod:`fleet_telemetry`) â€” the same truth
+        The digest reduction (:mod:`fleet_telemetry`) — the same truth
         table ``make digest`` prints, reduced to the fields the control
         page shows, cached so 1 s page polling costs one events parse
         per cache window. Works on live runs and on crashed ones.
@@ -400,7 +410,7 @@ class FleetManager:
         """Return the live tail of a registered instance's run.
 
         Current bot state, tick, fuel, and the last few AI/WORLD/STATE
-        lines (:mod:`fleet_telemetry`) â€” what the bot is doing right
+        lines (:mod:`fleet_telemetry`) — what the bot is doing right
         now, for the control page's activity feed.
 
         Args:
@@ -427,7 +437,7 @@ class FleetManager:
             The removed instance's final report row.
 
         Raises:
-            FleetError: If the instance is unknown or still alive â€”
+            FleetError: If the instance is unknown or still alive —
                 the fleet never silently kills; stop it first.
         """
         bot = self._bots.get(instance)

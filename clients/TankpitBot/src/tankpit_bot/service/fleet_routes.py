@@ -24,6 +24,7 @@ from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.service.fleet_config import (
     configured_accounts,
+    engagement_doctrines,
     lobby_rooms,
     tank_registry,
     troop_colors,
@@ -33,6 +34,7 @@ from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_page import FLEET_PAGE_HTML
 from tankpit_bot.service.fleet_wire import (
     FleetSnapshotDict,
+    SpawnRequestDict,
     encode_fleet_bot,
     encode_fleet_snapshot,
 )
@@ -40,27 +42,31 @@ from tankpit_bot.service.fleet_wire import (
 log = get_logger(__name__)
 
 
-def parse_spawn_request(body: bytes) -> tuple[str, str, int, int, str, str, str]:
+def parse_spawn_request(body: bytes) -> SpawnRequestDict:
     """Parse the ``POST /bots`` body.
 
     Args:
         body: Raw request body.
 
     Returns:
-        ``(instance, account, kills, seconds, role, room, troop)``.
+        The parsed request. Every selector defaults to ``""`` and
+        every bound to ``0``, which each resolver reads as "keep the
+        default" rather than as a value.
 
     Raises:
         JSONTypeError: Malformed JSON or wrong field types.
     """
     data = narrow_json_to_dict(load_json_bytes(body))
-    instance = narrow_json_to_str(data.get("instance", ""))
-    account = narrow_json_to_str(data.get("account", ""))
-    kills = narrow_json_to_int(data.get("kills", 0))
-    seconds = narrow_json_to_int(data.get("seconds", 0))
-    role = narrow_json_to_str(data.get("role", ""))
-    room = narrow_json_to_str(data.get("room", ""))
-    troop = narrow_json_to_str(data.get("troop", ""))
-    return instance, account, kills, seconds, role, room, troop
+    return SpawnRequestDict(
+        instance=narrow_json_to_str(data.get("instance", "")),
+        account=narrow_json_to_str(data.get("account", "")),
+        kills=narrow_json_to_int(data.get("kills", 0)),
+        seconds=narrow_json_to_int(data.get("seconds", 0)),
+        role=narrow_json_to_str(data.get("role", "")),
+        room=narrow_json_to_str(data.get("room", "")),
+        troop=narrow_json_to_str(data.get("troop", "")),
+        doctrine=narrow_json_to_str(data.get("doctrine", "")),
+    )
 
 
 def _json_response(payload: JSONObject, status: int = 200) -> web.Response:
@@ -125,6 +131,12 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         names: list[JSONValue] = list(lobby_rooms())
         return _json_response({"rooms": names})
 
+    async def list_doctrines(request: web.Request) -> web.Response:
+        """``GET /doctrines`` — engagement doctrines, default first."""
+        _ = request
+        names: list[JSONValue] = list(engagement_doctrines())
+        return _json_response({"doctrines": names})
+
     async def list_troops(request: web.Request) -> web.Response:
         """``GET /troops`` — tank colors, in wire team-id order."""
         _ = request
@@ -140,6 +152,7 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
     app.router.add_get("/accounts", list_accounts)
     app.router.add_get("/rooms", list_rooms)
     app.router.add_get("/troops", list_troops)
+    app.router.add_get("/doctrines", list_doctrines)
     app.router.add_get("/tanks", list_tanks)
     app.router.add_get("/bots", list_bots)
 
@@ -218,17 +231,16 @@ def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
     async def spawn_bot(request: web.Request) -> web.Response:
         """``POST /bots`` — spawn one instance."""
         try:
-            instance, account, kills, seconds, role, room, troop = parse_spawn_request(
-                await request.read()
-            )
+            spawn_request = parse_spawn_request(await request.read())
             row = manager.spawn(
-                instance=instance,
-                account=account,
-                kills=kills,
-                seconds=seconds,
-                role=role,
-                room=room,
-                troop=troop,
+                instance=spawn_request["instance"],
+                account=spawn_request["account"],
+                kills=spawn_request["kills"],
+                seconds=spawn_request["seconds"],
+                role=spawn_request["role"],
+                room=spawn_request["room"],
+                troop=spawn_request["troop"],
+                doctrine=spawn_request["doctrine"],
             )
         except (JSONTypeError, ValueError) as error:
             log.warning("Fleet: rejected spawn request (400): %s", error)

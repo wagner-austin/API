@@ -42,6 +42,41 @@ class FleetSnapshotDict(TypedDict):
     bots: list[FleetBotDict]
 
 
+class SpawnRequestDict(TypedDict):
+    """One ``POST /bots`` body, after parsing.
+
+    A TypedDict rather than a tuple because six of its eight fields
+    are strings and four of those are adjacent selectors — role, room,
+    troop, doctrine. Positionally, transposing any two of them is
+    silent: the bot spawns, joins somewhere, and plays a colour nobody
+    asked for. Named fields make that a type error.
+
+    Attributes:
+        instance: Instance name, or ``""`` to derive it from the
+            account.
+        account: ``TANKPIT_ACCOUNT`` selector; ``""`` uses the
+            accounts.json default.
+        kills: Kill bound; ``0`` is unbounded.
+        seconds: Seconds bound; ``0`` is unbounded.
+        role: Fleet role selector; ``""`` means fighter.
+        room: ``TANKPIT_ROOM`` selector; ``""`` keeps the child's
+            default.
+        troop: Tank colour name; ``""`` keeps the account's own
+            last-played colour for that world.
+        doctrine: ``TANKPIT_DOCTRINE`` selector; ``""`` means
+            skirmish, which is the unset behaviour.
+    """
+
+    instance: str
+    account: str
+    kills: int
+    seconds: int
+    role: str
+    room: str
+    troop: str
+    doctrine: str
+
+
 def _require_role(data: JSONObject, key: str) -> FleetRole:
     """Read a required field as a fleet role.
 
@@ -173,6 +208,7 @@ def decode_fleet_snapshot(data: JSONObject) -> FleetSnapshotDict:
 
 __all__ = [
     "FleetSnapshotDict",
+    "SpawnRequestDict",
     "decode_fleet_bot",
     "decode_fleet_snapshot",
     "encode_fleet_bot",

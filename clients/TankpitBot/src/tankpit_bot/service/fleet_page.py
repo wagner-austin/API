@@ -152,6 +152,9 @@ __CARD_CSS__
   <div class="field wide"><label for="room">Room</label>
     <select id="room"><option value="">Practice</option></select>
     <div class="hint">the lobby's two rooms</div></div>
+  <div class="field"><label for="doctrine">Doctrine</label>
+    <select id="doctrine"></select>
+    <div class="hint">how it picks a fight</div></div>
   <div class="field tank"><label for="troop">Color</label>
     <select id="troop"></select>
     <div class="hint" id="troopinfo">own rank, fuel and stock</div></div>
@@ -433,6 +436,7 @@ document.getElementById("spawn").addEventListener("submit", async (event) => {
       role: document.getElementById("role").value,
       room: document.getElementById("room").value,
       troop: document.getElementById("troop").value,
+      doctrine: document.getElementById("doctrine").value,
       kills: Number(document.getElementById("kills").value) || 0,
       seconds: Number(document.getElementById("seconds").value) || 0,
     }),
@@ -450,6 +454,7 @@ Promise.all([
   fillSelect("account", "/accounts", "accounts"),
   fillSelect("room", "/rooms", "rooms"),
   fillSelect("troop", "/troops", "troops"),
+  fillSelect("doctrine", "/doctrines", "doctrines"),
   loadTanks(),
 ]).then(paintTroopInfo);
 poll();

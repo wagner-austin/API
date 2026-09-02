@@ -102,6 +102,16 @@ async def test_http_page_stats_and_restart(
     assert "tanks" in narrow_json_to_dict(load_json_str(await tanks.text()))
     assert "tanks.accounts" in body
 
+    # Doctrine is the fourth served vocabulary, same pattern as the
+    # rest: the page never asks a human to spell one.
+    assert '<select id="doctrine">' in body and '"/doctrines"' in body
+    listed_doctrines = await fleet_client.get("/doctrines")
+    assert listed_doctrines.status == 200
+    doctrines_payload = narrow_json_to_dict(load_json_str(await listed_doctrines.text()))
+    assert doctrines_payload == {
+        "doctrines": ["skirmish", "swarm", "duelist", "passive"]
+    }
+
     listed_troops = await fleet_client.get("/troops")
     assert listed_troops.status == 200
     troops_payload = narrow_json_to_dict(load_json_str(await listed_troops.text()))

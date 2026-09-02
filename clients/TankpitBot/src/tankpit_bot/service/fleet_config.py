@@ -20,7 +20,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
-from tankpit_bot.fleetshare.types import FLEET_ROLES, FleetRole
+from tankpit_bot.fleetshare.types import ENGAGEMENT_DOCTRINES, FLEET_ROLES, FleetRole
 from tankpit_bot.runtime_artifacts import TANK_REGISTRY_PATH
 from tankpit_bot.service.fleet_error import FleetError
 from tankpit_bot.types.constants import TROOP_COLOR_NAMES
@@ -93,6 +93,35 @@ def resolve_troop(troop: str) -> str:
     raise FleetError(f"troop {troop!r} is not a tank color (one of: {known_colors})")
 
 
+def resolve_doctrine(doctrine: str) -> str:
+    """Resolve a spawn request's doctrine selector.
+
+    Validated HERE as well as in the child's own resolver, because a
+    typo caught at spawn is an HTTP 409 the operator reads, while the
+    same typo caught in the child is a process that starts, logs a
+    ValueError and dies with no tank in the world.
+
+    Args:
+        doctrine: Doctrine name, or ``""`` to take the child's default
+            (skirmish, the unset behaviour).
+
+    Returns:
+        The validated doctrine name, or ``""``.
+
+    Raises:
+        FleetError: If the selector is not an engagement doctrine.
+    """
+    if doctrine == "":
+        return ""
+    for known in ENGAGEMENT_DOCTRINES:
+        if doctrine == known:
+            return known
+    known_doctrines = ", ".join(ENGAGEMENT_DOCTRINES)
+    raise FleetError(
+        f"doctrine {doctrine!r} is not an engagement doctrine (one of: {known_doctrines})"
+    )
+
+
 def configured_accounts() -> list[str]:
     """Return the configured account usernames.
 
@@ -144,6 +173,25 @@ def troop_colors() -> list[str]:
         Color names in team-id order.
     """
     return list(TROOP_COLOR_NAMES)
+
+
+def engagement_doctrines() -> list[str]:
+    """Return the engagement doctrines the control page offers.
+
+    A doctrine names how a bot picks and presses a fight, not what it
+    collects: ``skirmish`` is today's behaviour and the default,
+    ``swarm`` musters, ``duelist`` holds a single opponent, ``passive``
+    declines to open one. Landed 2026-09-02 alongside the doctrines
+    themselves, so the operator states it at spawn instead of setting
+    ``TANKPIT_DOCTRINE`` by hand.
+
+    Vocabulary order is the doctrine tuple's own, and the first entry
+    is what an unset environment resolves to.
+
+    Returns:
+        Doctrine names, the first being the default.
+    """
+    return list(ENGAGEMENT_DOCTRINES)
 
 
 def tank_registry() -> JSONObject:
@@ -201,7 +249,9 @@ __all__ = [
     "FLEET_PORT_DEFAULT",
     "configured_accounts",
     "derive_instance",
+    "engagement_doctrines",
     "lobby_rooms",
+    "resolve_doctrine",
     "resolve_fleet_port",
     "resolve_role",
     "resolve_troop",
