@@ -50,15 +50,26 @@ FrameDirection = Literal["received", "sent"]
 FRAME_DIRECTIONS: tuple[FrameDirection, ...] = ("received", "sent")
 
 
+# The two scan results carry a ``kind`` tag discriminating them. It is
+# explicit rather than inferred from which keys exist: mypy does not
+# narrow a TypedDict union on key presence (verified against 1.19.1),
+# so a consumer of :func:`analysis.scan.scan_archive` could not tell
+# the shapes apart without a cast — and an implicit discriminator would
+# break silently the first time a field is added to either shape.
+
+
 class SkippedSessionDict(TypedDict):
     """A capture session that carries no analysable frames.
 
     Attributes:
+        kind: Always ``"skipped"`` — the tag that lets a consumer
+            narrow a scan result without a cast.
         path: Filesystem path of the capture session file.
         reason: Why the session yielded nothing, from
             :data:`SESSION_SKIP_REASONS`.
     """
 
+    kind: Literal["skipped"]
     path: str
     reason: SessionSkipReason
 
@@ -97,11 +108,14 @@ class ScannedSessionDict(TypedDict):
     """A capture session that decoded, with its frames.
 
     Attributes:
+        kind: Always ``"scanned"`` — the tag that lets a consumer
+            narrow a scan result without a cast.
         path: Filesystem path of the capture session file.
         session_id: Identifier carried by the capture itself.
         frames: Every frame, both directions, in capture order.
     """
 
+    kind: Literal["scanned"]
     path: str
     session_id: str
     frames: list[DecodedFrameDict]
@@ -114,9 +128,10 @@ def encode_skipped_session(skipped: SkippedSessionDict) -> JSONObject:
         skipped: The skip record to encode.
 
     Returns:
-        JSON-serializable object with ``path`` and ``reason``.
+        JSON-serializable object with ``kind``, ``path`` and
+        ``reason``.
     """
-    return {"path": skipped["path"], "reason": skipped["reason"]}
+    return {"kind": skipped["kind"], "path": skipped["path"], "reason": skipped["reason"]}
 
 
 def decode_skipped_session(data: JSONObject) -> SkippedSessionDict:
@@ -129,11 +144,15 @@ def decode_skipped_session(data: JSONObject) -> SkippedSessionDict:
         The validated skip record.
 
     Raises:
-        JSONTypeError: If a field is missing, of the wrong type, or if
-            ``reason`` is outside :data:`SESSION_SKIP_REASONS`.
+        JSONTypeError: If a field is missing, of the wrong type, if
+            ``reason`` is outside :data:`SESSION_SKIP_REASONS`, or if
+            ``kind`` is not ``"skipped"``.
     """
+    kind = require_str(data, "kind")
+    if kind != "skipped":
+        raise JSONTypeError(f"Expected a skipped scan result, got kind {kind!r}")
     reason = require_session_skip_reason(require_str(data, "reason"))
-    return SkippedSessionDict(path=require_str(data, "path"), reason=reason)
+    return SkippedSessionDict(kind="skipped", path=require_str(data, "path"), reason=reason)
 
 
 def require_session_skip_reason(value: str) -> SessionSkipReason:

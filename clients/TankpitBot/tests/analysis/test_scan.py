@@ -281,9 +281,10 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
         _session_json(messages=[_received(_payload(body), timestamp_ms=99)]),
     )
     result = scan_session(path)
-    if "frames" not in result:
+    if result["kind"] != "scanned":
         raise AssertionError(f"expected a decoded session, got a skip: {result}")
     assert result == {
+        "kind": "scanned",
         "path": str(path),
         "session_id": "s-1",
         "frames": [
@@ -301,7 +302,7 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
 def test_scan_session_skips_a_magicless_capture(tmp_path: Path) -> None:
     """No magic is a typed value, not an exception and not a crash."""
     path = _write(tmp_path, "k.capture_session.json", _session_json(magic=None))
-    assert scan_session(path) == {"path": str(path), "reason": "no_magic"}
+    assert scan_session(path) == {"kind": "skipped", "path": str(path), "reason": "no_magic"}
 
 
 def test_scan_session_classifies_an_unframed_payload_as_a_typed_skip(tmp_path: Path) -> None:
@@ -321,7 +322,11 @@ def test_scan_session_classifies_an_unframed_payload_as_a_typed_skip(tmp_path: P
         "ws_url": "wss://tankpit.com/ws",
     }
     path = _write(tmp_path, "u.capture_session.json", _session_json(messages=[sent]))
-    assert scan_session(path) == {"path": str(path), "reason": "unframed_payload"}
+    assert scan_session(path) == {
+        "kind": "skipped",
+        "path": str(path),
+        "reason": "unframed_payload",
+    }
 
 
 def test_scan_archive_visits_every_session_in_name_order(tmp_path: Path) -> None:
@@ -334,6 +339,7 @@ def test_scan_archive_visits_every_session_in_name_order(tmp_path: Path) -> None
         "b.capture_session.json",
     ]
     assert results[0] == {
+        "kind": "skipped",
         "path": str(tmp_path / "a.capture_session.json"),
         "reason": "no_magic",
     }
@@ -363,7 +369,11 @@ def test_injected_hooks_replace_both_seams(tmp_path: Path) -> None:
     results = scan_archive(tmp_path)
     assert [p.name for p in seen] == ["injected.capture_session.json"]
     assert results == [
-        {"path": str(tmp_path / "injected.capture_session.json"), "reason": "no_magic"}
+        {
+            "kind": "skipped",
+            "path": str(tmp_path / "injected.capture_session.json"),
+            "reason": "no_magic",
+        }
     ]
 
 
@@ -380,7 +390,11 @@ def test_reset_hooks_restores_the_production_readers(tmp_path: Path) -> None:
     _test_hooks.reset_analysis_hooks()
     _write(tmp_path, "a.capture_session.json", _session_json(magic=None))
     assert scan_archive(tmp_path) == [
-        {"path": str(tmp_path / "a.capture_session.json"), "reason": "no_magic"}
+        {
+            "kind": "skipped",
+            "path": str(tmp_path / "a.capture_session.json"),
+            "reason": "no_magic",
+        }
     ]
 
 

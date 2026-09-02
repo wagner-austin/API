@@ -32,20 +32,24 @@ def test_skip_reason_vocabulary_is_exactly_the_documented_set() -> None:
 
 def test_skipped_session_round_trips() -> None:
     """Encode then decode returns an equal record."""
-    original = SkippedSessionDict(path="runs/bot/a.capture_session.json", reason="no_magic")
+    original = SkippedSessionDict(
+        kind="skipped", path="runs/bot/a.capture_session.json", reason="no_magic"
+    )
     assert decode_skipped_session(encode_skipped_session(original)) == original
 
 
-def test_skipped_session_encodes_both_fields() -> None:
-    """The wire form carries exactly path and reason."""
-    encoded = encode_skipped_session(SkippedSessionDict(path="p", reason="no_magic"))
-    assert encoded == {"path": "p", "reason": "no_magic"}
+def test_skipped_session_encodes_every_field() -> None:
+    """The wire form carries exactly kind, path and reason."""
+    encoded = encode_skipped_session(
+        SkippedSessionDict(kind="skipped", path="p", reason="no_magic")
+    )
+    assert encoded == {"kind": "skipped", "path": "p", "reason": "no_magic"}
 
 
 def test_decode_skipped_session_rejects_unknown_reason() -> None:
     """An invented reason names itself and the closed vocabulary."""
     with pytest.raises(JSONTypeError) as excinfo:
-        decode_skipped_session({"path": "p", "reason": "because"})
+        decode_skipped_session({"kind": "skipped", "path": "p", "reason": "because"})
     message = str(excinfo.value)
     assert "unknown session skip reason 'because'" in message
     assert "no_magic" in message
@@ -140,3 +144,15 @@ def test_require_frame_direction_narrows_and_rejects() -> None:
     message = str(excinfo.value)
     assert "unknown frame direction 'sideways'" in message
     assert "received" in message and "sent" in message
+
+
+def test_decode_skipped_session_rejects_a_scanned_tag() -> None:
+    """The tag is validated, so a decoded result cannot pose as a skip.
+
+    The discriminator exists to let consumers narrow without a cast; a
+    decoder that accepted the wrong tag would hand back a record whose
+    type is a lie.
+    """
+    with pytest.raises(JSONTypeError) as excinfo:
+        decode_skipped_session({"kind": "scanned", "path": "p", "reason": "no_magic"})
+    assert "got kind 'scanned'" in str(excinfo.value)

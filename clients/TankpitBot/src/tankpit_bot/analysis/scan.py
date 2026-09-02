@@ -147,13 +147,14 @@ def scan_session(path: Path) -> ScannedSessionDict | SkippedSessionDict:
     """
     session = load_capture_session(path)
     if session["magic"] is None:
-        return SkippedSessionDict(path=str(path), reason="no_magic")
+        return SkippedSessionDict(kind="skipped", path=str(path), reason="no_magic")
     try:
         frames = decode_session_frames(session)
     except FramingError as error:
         log.info("Skipping unframed capture %s: %s", path, error)
-        return SkippedSessionDict(path=str(path), reason="unframed_payload")
+        return SkippedSessionDict(kind="skipped", path=str(path), reason="unframed_payload")
     return ScannedSessionDict(
+        kind="scanned",
         path=str(path),
         session_id=session["session_id"],
         frames=frames,
