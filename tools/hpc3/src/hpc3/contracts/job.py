@@ -97,7 +97,15 @@ class JobSpec(TypedDict):
             the whole charge: billing tracks cores, not GPUs or memory.
         mem_gb: Host memory requested, in GiB.
         minutes: Wall-clock limit.
-        requeue: Whether Slurm should resubmit the job after a preemption.
+        requeue: Whether the script carries ``--requeue``. What that buys
+            depends on the partition's ``PreemptMode``: under ``REQUEUE``
+            Slurm resubmits a preempted job itself; under ``CANCEL`` the
+            flag is INERT for preemption -- measured on HPC3's free
+            partition 2026-09-02, when a wave took 22 array tasks carrying
+            ``#SBATCH --requeue`` straight to terminal PREEMPTED with
+            nothing left in the queue, and one ``hpc3-campaign`` converge
+            pass was the thing that actually resubmitted them. On a
+            CANCEL partition the campaign is the requeue.
         checkpoint_steps: Training steps between checkpoints; 0 means none.
         depends_on: Jobs that must finish before this one starts, or None for
             a job that waits on nothing. Emitted alongside

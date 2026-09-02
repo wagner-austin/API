@@ -3,7 +3,7 @@ title: Preemption cancels, checkpoints protect, campaigns converge
 tags: [submission, preemption, campaigns]
 related: [[sweeps-and-artifacts]], [[partitions-and-billing]], [[submission-rules]]
 sources: ["scontrol show partition free-gpu (2026-08-28)", contracts/job.py, core/inflight, README.md@4dc63f17]
-fact_checked: 2026-09-01
+fact_checked: 2026-09-02
 confidence: high
 ---
 
@@ -60,3 +60,16 @@ works and still records the chain in the ledger. It is the right tool for
 resuming *one* member deliberately, and the wrong tool for a preemption wave.
 Expect waves: the free partitions are free because other people's allocated
 work outranks yours.
+
+## Confirmed at array scale, and for the checkpoint-free case
+
+2026-09-02, the plain `free` partition (`PreemptMode=CANCEL`, `GraceTime=0`
+verified by `scontrol` the same hour): a wave took 22 of a 96-task array
+(`rusted.c0f4vh`) carrying `#SBATCH --requeue` straight to terminal
+`PREEMPTED` — nothing returned to the queue. One `hpc3-campaign` converge
+pass resubmitted exactly the 22 as a sparse array against the same member
+table and left the 49 running and 25 finished members alone. This is also
+the `checkpoint_steps: 0` case the deterministic-replay clause admits: the
+members are pinned-regime replays, so "resume" is replay-from-zero, and the
+campaign is the entire recovery mechanism — no checkpoint file exists to
+protect.
