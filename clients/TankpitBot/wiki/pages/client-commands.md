@@ -298,7 +298,7 @@ reverse-engineering.
       "id": "cmd-statistics",
       "code": "tankpit_bot.protocol.commands:CMD_STATISTICS",
       "value": 118,
-      "means": "'c' key - show statistics"
+      "means": "'c' key - show statistics; COSTS A TICK (operator, 2026-08-31), so it belongs at the session boundary, never on a poll -- the executor dispatches one command per tick, so a press displaces the shot or teleport that tick would have spent. The reply (0x56, decode_statistics) carries destroyed/deactivated/promo_points, which are CUMULATIVE totals rather than a rate, so polling buys nothing a single exit press does not."
     },
     {
       "id": "cmd-toggle-equipment",

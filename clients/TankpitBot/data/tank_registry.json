@@ -112,6 +112,27 @@
      "rank": "private"
     }
    }
+  },
+  "Malignant": {
+   "World": {
+    "blue": {
+     "rank": "recruit",
+     "leaderboard": 1098,
+     "kills": 0,
+     "deaths": 0,
+     "promo": 0,
+     "play_time_s": 4,
+     "fuel": 891,
+     "inventory": [
+      0,
+      7,
+      0,
+      0,
+      0
+     ],
+     "observed_ms": 1788307009970
+    }
+   }
   }
  }
 }
