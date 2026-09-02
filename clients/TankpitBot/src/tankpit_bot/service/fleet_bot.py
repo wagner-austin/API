@@ -52,6 +52,7 @@ class FleetBotDict(TypedDict):
 
 
 def _child_environment(
+    *,
     instance: str,
     kills: int,
     seconds: int,
@@ -59,18 +60,24 @@ def _child_environment(
     account: str,
     room: str,
     troop: str,
+    doctrine: str,
 ) -> dict[str, str]:
     """Build one child's spawn environment.
 
     ``TANKPIT_ROLE`` is always explicit: the child inherits the
     manager's whole environment, and a role lingering there must never
-    silently re-role the entire fleet. Empty account, room and troop
-    omit their selectors so the child keeps its defaults (accounts.json
-    default; the Practice room; the account's own tank color for that
-    map).
+    silently re-role the entire fleet. Empty account, room, troop and
+    doctrine omit their selectors so the child keeps its defaults
+    (accounts.json default; the Practice room; the account's own tank
+    color for that map; skirmish).
+
+    KEYWORD-ONLY on purpose: five of these are strings and four are
+    adjacent selectors, so a positional call that transposes two is
+    silent -- the bot spawns, joins somewhere, and fights under a
+    doctrine nobody chose.
 
     ``TANKPIT_TROOP`` goes over the wire as the team id, so the color
-    NAME the operator picked is converted here â€” the index into
+    NAME the operator picked is converted here — the index into
     :data:`~tankpit_bot.types.constants.TROOP_COLOR_NAMES` IS that id.
 
     Args:
@@ -81,6 +88,8 @@ def _child_environment(
         account: Account selector ("" = default).
         room: Room selector ("" = default).
         troop: Tank color name ("" = the account's default).
+        doctrine: Engagement doctrine ("" = skirmish, the unset
+            behaviour).
 
     Returns:
         Environment overrides for the spawned child.
@@ -97,6 +106,8 @@ def _child_environment(
         env["TANKPIT_ROOM"] = room
     if troop:
         env["TANKPIT_TROOP"] = str(TROOP_COLOR_NAMES.index(troop))
+    if doctrine:
+        env["TANKPIT_DOCTRINE"] = doctrine
     return env
 
 
