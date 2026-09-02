@@ -192,13 +192,36 @@ def test_the_fleet_bootstrap_is_valid_and_reaches_the_entry_point() -> None:
     compile(_FLEET_BOOTSTRAP, "<bootstrap>", "exec")
 
 
+def _kill_and_reap(pid: int) -> None:
+    """End a real spawned child, whichever fate it reached first.
+
+    A detached child can exit of its own accord before the kill lands
+    (flagged live 2026-09-02: one run lost the race and
+    ``psutil.Process`` raised ``NoSuchProcess`` in the cleanup). An
+    already-vanished pid IS the reaped state the cleanup wants — the
+    same OS-boundary law ``_real_process_identity`` documents in
+    ``service/_test_hooks/processes.py``: the exception is the OS's
+    only atomic answer, not a softened failure.
+
+    Args:
+        pid: The spawned child's process id.
+    """
+    try:
+        target = psutil.Process(pid)
+        target.kill()
+        target.wait(timeout=30)
+    except psutil.NoSuchProcess:
+        return
+
+
 def test_real_spawn_fleet_manager_launches_a_detached_child() -> None:
     """The production launcher starts a real manager, logged to a file.
 
     Killed immediately, exactly as the bot spawner's own test does:
     interpreter startup and this package's imports take far longer
-    than the kill lands, so the child never reaches the point of
-    binding a port or adopting anything.
+    than the kill USUALLY lands — but the child may also lose that
+    race and exit first, so the cleanup accepts either fate
+    (:func:`_kill_and_reap`).
 
     The log file is opened even for a child that dies instantly,
     because the stream the interpreter prints a fatal traceback to IS
@@ -209,7 +232,6 @@ def test_real_spawn_fleet_manager_launches_a_detached_child() -> None:
         assert process.pid > 0
         assert FLEET_LOG_PATH.exists()
     finally:
-        psutil.Process(process.pid).kill()
-        psutil.Process(process.pid).wait(timeout=30)
+        _kill_and_reap(process.pid)
     if process.is_running():
         raise AssertionError("fleet manager still running after kill + wait")
