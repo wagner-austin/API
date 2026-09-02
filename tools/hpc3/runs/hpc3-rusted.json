@@ -11,7 +11,7 @@
       "cpus": 4,
       "mem_gb": 2,
       "minutes": 100,
-      "requeue": false,
+      "requeue": true,
       "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/rusted/images/v4/rusted.sif",
@@ -20,7 +20,7 @@
       },
       "env_path": "/opt/env",
       "pinned_packages": {},
-      "deterministic": false,
+      "deterministic": true,
       "budget": {
         "self_imposed_gpu_hours": 0.0,
         "max_service_units": 0.0,

@@ -233,10 +233,13 @@ class TestRulePreemptibleRunsMustBeProtected:
             decode_job_spec(_spec(minutes=600))
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
-    def test_requeue_without_checkpoints_is_not_protection(self) -> None:
+    def test_requeue_without_checkpoints_is_not_protection_for_a_stochastic_run(self) -> None:
+        """Restarting a stochastic trainer from step zero is a DIFFERENT
+        run, so requeue alone protects nothing it produces."""
         with pytest.raises(AppError) as excinfo:
             decode_job_spec(_spec(minutes=600, requeue=True, checkpoint_steps=0))
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
+        assert "deterministic" in excinfo.value.message
 
     def test_checkpoints_without_requeue_is_not_protection(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -246,6 +249,24 @@ class TestRulePreemptibleRunsMustBeProtected:
     def test_both_together_admit_the_run(self) -> None:
         decoded = decode_job_spec(_spec(minutes=600, requeue=True, checkpoint_steps=50))
         assert decoded["minutes"] == 600
+
+    def test_requeue_with_deterministic_replay_admits_the_run(self) -> None:
+        """A deterministic workload replays identically from the start, so
+        the whole run is a checkpoint at step zero and requeue IS the
+        protection -- rusted's pinned-regime matches, replicated
+        seed-for-seed across independent submissions (2026-09-01), are the
+        workload this clause was measured against."""
+        decoded = decode_job_spec(
+            _spec(minutes=600, requeue=True, checkpoint_steps=0, deterministic=True)
+        )
+        assert decoded["minutes"] == 600
+        assert decoded["deterministic"] is True
+
+    def test_deterministic_without_requeue_is_not_protection(self) -> None:
+        """Replayability protects nothing if Slurm never resubmits."""
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(_spec(minutes=600, requeue=False, deterministic=True))
+        assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
 
     def test_a_short_run_needs_no_protection(self) -> None:
         decoded = decode_job_spec(_spec(minutes=PREEMPTION_PROTECTION_THRESHOLD_MINUTES))

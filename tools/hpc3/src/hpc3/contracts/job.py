@@ -390,7 +390,12 @@ def _check_partition_is_funded(
 
 
 def _check_preemption_protection(
-    cluster: ClusterFacts, partition: str, minutes: int, requeue: bool, checkpoint_steps: int
+    cluster: ClusterFacts,
+    partition: str,
+    minutes: int,
+    requeue: bool,
+    checkpoint_steps: int,
+    deterministic: bool,
 ) -> None:
     """Reject a long preemptible job that would lose everything if evicted.
 
@@ -400,25 +405,35 @@ def _check_preemption_protection(
         minutes: Requested wall clock.
         requeue: Whether Slurm should resubmit after preemption.
         checkpoint_steps: Steps between checkpoints; 0 means none.
+        deterministic: Whether the workload replays identically from the
+            start. For such a job requeue alone IS protection: a preempted
+            run resubmits, replays, and produces the same result -- the
+            whole run is a checkpoint at step zero. Rusted's pinned-regime
+            matches are the workload this clause was measured against
+            (replicated seed-for-seed across independent submissions,
+            2026-09-01); a stochastic trainer restarting from step zero is
+            not protected, which is what the checkpoint half still refuses.
 
     Raises:
         AppError: With ``PREEMPTIBLE_RUN_UNPROTECTED`` if the job is
             preemptible, longer than
-            :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES`, and lacks either
-            requeue or checkpointing. Requeue without checkpoints restarts
-            from step zero, which is not protection.
+            :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES`, and lacks
+            requeue paired with either checkpointing or deterministic
+            replay. Requeue without either restarts a stochastic run from
+            step zero as a DIFFERENT run, which is not protection.
     """
     if not partition_facts(cluster, partition)["preemptible"]:
         return
     if minutes <= PREEMPTION_PROTECTION_THRESHOLD_MINUTES:
         return
-    if requeue and checkpoint_steps > 0:
+    if requeue and (checkpoint_steps > 0 or deterministic):
         return
     raise AppError(
         Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED,
-        f"A {minutes}-minute job on preemptible {partition!r} needs both "
-        f"'requeue' and a positive 'checkpoint_steps'; got requeue={requeue}, "
-        f"checkpoint_steps={checkpoint_steps}. Preemption cancels the job.",
+        f"A {minutes}-minute job on preemptible {partition!r} needs 'requeue' "
+        "paired with a positive 'checkpoint_steps' or with 'deterministic' "
+        f"replay; got requeue={requeue}, checkpoint_steps={checkpoint_steps}, "
+        f"deterministic={deterministic}. Preemption cancels the job.",
     )
 
 
@@ -513,10 +528,13 @@ def decode_job_spec(
             f"Field 'checkpoint_steps' must not be negative, got {checkpoint_steps}"
         )
 
+    deterministic = require_bool(value, "deterministic")
     _check_partition_carries_gpu(cluster, partition, gpu)
     _check_partition_is_funded(cluster, partition, max_service_units)
     _check_time_limit(cluster, partition, minutes)
-    _check_preemption_protection(cluster, partition, minutes, requeue, checkpoint_steps)
+    _check_preemption_protection(
+        cluster, partition, minutes, requeue, checkpoint_steps, deterministic
+    )
 
     image = decode_image_reference(value.get("image"), "image")
     command = _require_nonempty_str(value, "command")
@@ -536,7 +554,7 @@ def decode_job_spec(
         image=image,
         env_path=_require_env_path(value, image),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
-        deterministic=require_bool(value, "deterministic"),
+        deterministic=deterministic,
         experiment=require_experiment(value, "experiment"),
         command=command,
         artifact=require_artifact_in_command(value, command),
