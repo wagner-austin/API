@@ -3,6 +3,7 @@ title: Fleet Coordination
 tags: [fleet, architecture, coordination]
 related:
   - "[[bot-behavior-contract]]"
+  - "[[fleet-forage-allocation]]"
   - "[[bot-service-architecture]]"
   - "[[tank-freshness-model]]"
 source_paths:

@@ -1,12 +1,13 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (21 pages)
+Codebase design decisions, patterns, and coding standards. (22 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
 [Tank Freshness Model](../pages/tank-freshness-model.md) -- three independent freshness timestamps + observation-based mutator; the architecture that makes the stale-position combat bug impossible to reintroduce
 [Bot Behavior Contract](../pages/bot-behavior-contract.md) -- MUST/MUST NOT/Verified-by table for every bot behavior; consult before proposing fixes; locks in anti-pattern prevention
 [Fleet Coordination](../pages/fleet-coordination.md) -- the shared knowledge layer: same-team bots exchanging beliefs via atomic knowledge.json files, focus-fire ranking, fighter/gatherer roles, color assignment
+[Fleet Forage Allocation](../pages/fleet-forage-allocation.md) -- the fleet coordinates fighting but not foraging: focus fire and the swarm muster are real peer-to-peer coordination, the container claim is advisory and loses a same-tick race (measured, median gap 0 s)
 [Fleet Manager Lifecycle](../pages/fleet-lifecycle.md) -- no orphans, no killed tanks: the drain that makes the manager exit last, adoption of bots a dead manager left running, identity as (pid, create_time), and the make up / make down pair
 [Fleet Live Reads](../pages/fleet-live-reads.md) -- following a growing events artifact instead of re-reading it: the resumable digest fold, the byte cursor with line-boundary and run-identity safety, and the 13.5 MB-per-poll cost it replaced
 [Self-Observing Bot Architecture](../pages/self-observing-architecture.md) -- fail-hard-on-state-entry philosophy, four-layer stack (Facts/Decisions/Ledger/Memory), the 15 blind spots the 20:47:31 deadlock exposed, phase roadmap
