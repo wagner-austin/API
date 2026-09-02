@@ -5205,3 +5205,21 @@ Four changes, one theme — the manager never knew what it was supervising.
 `ctypes` was ruled out empirically, not by preference: `disallow_any_expr` plus the `type: ignore` ban makes every ctypes call an error, and `os.kill(pid, 0)` KILLS on Windows. psutil (+ types-psutil) is the dependency that buys liveness and `(pid, create_time)` identity under strict typing.
 
 Splits forced by the 600-line ceiling and taken by role, not by size: `service/_test_hooks.py` → a package (`serving` / `processes` / `bots`), and `fleet_manager` → `fleet_config` (what may be asked for) + the registry (what is running), with `FleetError` in its own module to keep the two acyclic.
+
+## [2026-09-01] live run + diagnosis | A zero-extras recruit pays 105 fuel for 25 tiles, because the walk-and-scan forager is never asked
+
+Operator directive: run the new `Malignant` account into World and watch whether foraging engages at zero radar, "cuz it never seems to activate for new recruits". It does not, and the reason is ordering, not absence.
+
+**The cascade never reaches the forager.** `bot/ai/collect_mode.py` runs `plan_forage_frontier_hop` at line 153, above `plan_quad_sweep` (166), `plan_forage_search` (170) and `plan_block_harvest_leg` (227). A fresh tank in World spawns with ~130 stale blocks, so the hop wins every tick and the three walk-based branches below it are structurally unreachable. The hop's own docstring says it runs "when nothing believed collectible remains in reach" — but it sits above the branches that do the reaching.
+
+**Measured cycle** (`runs/bot/malignant/latest.log`): teleport −84..−109, scan-on-landing radar −10, walk/pickup −1..−6, fuel pickup +101..+108. Net ~break-even; the tank oscillated 890–1000 against a recruit cap of 1000 for the whole run and banked nothing. Self-sustaining, too: it refuels just enough to afford the next hop, so it never gets poor enough to fall through.
+
+**The economics are about EXTRAS, not rank** — [[radar-mechanics]] already measured every number needed, and nobody had put them against the hop. Extras>0: ~10 fuel reveals the whole 16×16 viewport (256 tiles). Extras=0 walking: ~15 fuel (walk 5 + radar 10) for 25 fresh tiles. Extras=0 hopping: ~105 fuel for the same 25. **A frontier hop buys a new viewport to STAND in, and that is only worth ~95 fuel if you can reveal the viewport you land in.** Rank only sets the free footprint (`2 + rank//3`), so a recruit is merely the tank most likely to have zero extras. Suggested fix handed to the AI-behaviour session: gate the hop on the ability to exploit the landing, rather than reorder the cascade.
+
+**Second operator flag, two deciders:** every radar press attributed as `scan_on_landing` ×10 and `desync_rescan` ×4 — the double press is a rescan firing from essentially the same position, re-revealing the same 5×5 for another 10 fuel.
+
+**A doc defect found on the way:** `bot/ai/forage.py:241` justifies its walk-first gate with "since radar is fuel-free and nothing else would stop it". Radar is NOT fuel-free — [[radar-mechanics]] measures ~10 fuel for free AND paid, and this run shows −10 per press with extras=0 (`WIRE: radar → SCANNING → 906→896 → IDLE`, the radar the only action in the window). The gate is right; its stated reason is false, and anyone pricing a scan from that comment will get it wrong.
+
+What the forager gets RIGHT, and why the operator's mental model matched it exactly: it derives the free footprint from rank via `free_radar_radius`, engages only at zero extras, and yields to reachable known stock. The design is sound. It just never runs.
+
+**Item 4 (the `decode_statistics` short branch) downgraded to a watch item by an archive cross-check nobody had run.** Every session emits both the wire decode and the independently-scraped DOM panel: across 264 archived runs carrying both, 260 agree exactly and 4 differ only by a field absent from June-era wire records. ZERO value disagreements, June→September, 0 to 1960 kills, recruit through captain. The named failure mode — wrong offsets writing plausible-but-wrong kills — has never materialised and would have been caught by this pairing. Whether the ≤12-byte branch is ever *exercised* remains unknown; the fresh-recruit run was degenerate for that question (all discriminating fields zero, and hours/seconds share offsets across both branches).
