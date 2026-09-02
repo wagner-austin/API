@@ -26,9 +26,13 @@ from typing_extensions import TypedDict
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import split_fresh_hop_sightings
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain, is_riding_ferry
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
-from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
+from tankpit_bot.bot.ai.reachability import (
+    find_attainable_landing_tile,
+    is_collection_reachable_in_viewport,
+)
 from tankpit_bot.bot.ai.resource_search import _viewport_walkable_fraction
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
@@ -137,28 +141,38 @@ def _live_fuel_beliefs(ctx: DecideCtx) -> list[ContainerStateDict]:
 
 def _is_walk_territory(
     ctx: DecideCtx,
+    terrain: TerrainMapProtocol,
     container: ContainerStateDict,
     sx: int,
     sy: int,
 ) -> bool:
-    """Return True when the container belongs to the walk economics.
+    """Return True when the walk-pickup lane can ACTUALLY serve this.
 
     Movement law (user 2026-07-30, flag s9-2/3): same-viewport
     destinations are WALKED -- an in-viewport larder teleport pays a
     map open + jump + displacement risk for ground a few walk ticks
-    serve. Off-viewport but within :data:`WALK_DOMINANT_RANGE` is
-    equally walk territory (a tank at its viewport edge two tiles
-    from off-frame stock). The larder is cross-viewport machinery.
+    serve. But ceding by GEOMETRY alone is the responsibility gap that
+    livelocked run bot-20260901-210631 for nine minutes
+    ([[flag-triage-20260902]]): a rock pocket left an in-viewport
+    container with no walk route, the walk lane declined it, this
+    predicate kept ceding it, and nobody served it. The cession is now
+    conditioned on the EXACT predicate the pickup dispatch uses
+    (:func:`~tankpit_bot.bot.ai.reachability.is_collection_reachable_in_viewport`
+    on the current surface) -- the walk lane owns only what it can
+    take. That generalizes the F5 water carve-out (2026-08-01,
+    "stranded in-viewport water fuel with nobody serving it"): a
+    floating container is unreachable by land routing, so it falls
+    out of walk territory here and its landing resolution falls
+    through to the ferry boarding tile, exactly as before.
 
-    A container FLOATING ON WATER is never walk territory from land
-    (F5 completion, 2026-08-01): the walk step's surface routing
-    cannot reach it at any distance, so ceding it to the walk
-    economics stranded in-viewport water fuel with nobody serving it
-    -- the larder keeps it and its landing resolution falls through
-    to the ferry boarding tile.
+    Off-viewport but within :data:`WALK_DOMINANT_RANGE` stays a
+    geometric refusal (a tank at its viewport edge two tiles from
+    off-frame stock): the s3 receipts price such ground below ANY
+    teleport, reachable or not.
 
     Args:
-        ctx: Decision context (viewport bounds).
+        ctx: Decision context (viewport bounds, surface).
+        terrain: Composed decision terrain (caller-narrowed non-None).
         container: Candidate fuel container.
         sx: Self X.
         sy: Self Y.
@@ -166,12 +180,16 @@ def _is_walk_territory(
     Returns:
         True when the walk step owns this container.
     """
-    terrain = ctx.terrain
-    if terrain is not None and not terrain.is_passable(container["x"], container["y"]):
-        return False
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     if left <= container["x"] <= right and top <= container["y"] <= bottom:
-        return True
+        return is_collection_reachable_in_viewport(
+            ctx.world,
+            SurfaceRouteTerrain(terrain, water=is_riding_ferry(ctx.world)),
+            sx,
+            sy,
+            container["x"],
+            container["y"],
+        )
     return abs(container["x"] - sx) + abs(container["y"] - sy) <= WALK_DOMINANT_RANGE
 
 
@@ -271,7 +289,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     candidates += stale
     for container in fresh_beliefs:
         candidates += 1
-        if _is_walk_territory(ctx, container, sx, sy):
+        if _is_walk_territory(ctx, terrain, container, sx, sy):
             too_close += 1
             continue
         landing, landing_kind = _resolve_larder_landing(ctx, terrain, container, sx, sy)

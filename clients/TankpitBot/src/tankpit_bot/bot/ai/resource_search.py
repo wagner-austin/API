@@ -32,7 +32,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.intent import clear_resource_target
+from tankpit_bot.bot.ai.intent import release_collect_plan
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.scoring_types import (
     BehaviorMode,
@@ -507,7 +507,13 @@ def make_resource_search_hop(
         target_x,
         target_y,
         reason,
-        clear_resource_target(base_state),
+        # The search hop RELOCATES: every serving lane declined any
+        # held plan this tick, and carrying the lock to a distant
+        # landing recreates the stale-plan shapes the intent layer
+        # exists to prevent. The drop is enumerated — before
+        # 2026-09-02 this site cleared the lock silently, invisible
+        # to churn analysis ([[flag-triage-20260902]]).
+        release_collect_plan(base_state, reason="relocated"),
         ctx.equip,
     )
 

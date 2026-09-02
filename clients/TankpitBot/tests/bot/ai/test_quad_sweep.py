@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.quad_sweep import (
     plan_quad_sweep,
     quadrant_bounds,
@@ -169,3 +170,19 @@ def test_zero_extras_never_qualify_a_quadrant() -> None:
     from tankpit_bot.bot.ai.quad_sweep import _quadrant_spend_worthwhile
 
     assert _quadrant_spend_worthwhile(961, 0) is False
+
+
+def test_a_held_resource_lock_gates_the_sweep_entirely() -> None:
+    """Known stock mid-pursuit preempts recon — the sweep's own doctrine.
+
+    The 2026-09-02 livelock's amplifier ([[flag-triage-20260902]]):
+    this exact fixture swept AND WIPED the held lock every other tick,
+    re-arming the harvest latch 136 times. The identical context with
+    a free slate opens with the NW steer
+    (``test_virgin_block_opens_with_a_steering_shift``), so the gate —
+    not the block economics — is what declines here.
+    """
+    ctx = make_sweep_ctx(now_ms=_NOW, scanned=False)
+    locked = set_resource_target(make_scanned_ai_state(), "fuel", 104, 100)
+
+    assert plan_quad_sweep(ctx, locked) is None

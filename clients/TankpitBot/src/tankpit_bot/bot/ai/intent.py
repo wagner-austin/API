@@ -70,6 +70,8 @@ PlanReleaseReason = Literal[
     "kind_invalid",
     "unservable",
     "claim_lost",
+    "relocated",
+    "progress_stalled",
 ]
 
 PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
@@ -83,6 +85,8 @@ PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
     "kind_invalid",
     "unservable",
     "claim_lost",
+    "relocated",
+    "progress_stalled",
 )
 """Closed vocabulary of plan-release reason codes.
 
@@ -100,6 +104,33 @@ analysis groups the ``plan_released`` events by this field.
 authoritative claim file in the same tick this plan latched, so the
 plan dies before its first command dispatches — one held beat paid
 instead of a whole doomed journey.
+``relocated`` is the cascade-bottom release (2026-09-02,
+[[flag-triage-20260902]]): every serving lane declined the held plan
+this tick and the resource-search hop is moving the tank elsewhere —
+before it, that site cleared the lock silently, invisible to churn
+analysis.
+``progress_stalled`` is the progress invariant
+(:data:`RESOURCE_LOCK_HOLD_BOUND_TICKS`) — the continuation held the
+plan that many consecutive ticks without one dispatch, which no
+legitimate transient produces.
+"""
+
+RESOURCE_LOCK_HOLD_BOUND_TICKS = 8
+"""Consecutive dispatch-less continuation holds that release a plan.
+
+The LAST-RESORT progress invariant, not a serving mechanism — the
+2026-09-02 livelock ([[flag-triage-20260902]], nine minutes at one
+tile) was closed by fact-based fixes (the walk-territory reachability
+law, the quad-sweep lock gate); this bound exists so the NEXT
+unforeseen hold-forever shape costs seconds and a measurable
+``plan_released``/``progress_stalled`` diagnostic instead of a
+session. Derivation: legitimate transient holds measure 2-3 ticks
+(run bot-20260730-032x receipts in ``collect_locks``: targets
+re-locked and served "2-3 ticks later"); 8 doubles the worst measured
+hold with margin, ~16 s at the 2 s action tick. A released target may
+be re-latched immediately — deliberately: nothing failed on the wire,
+so no move-failed mark is forged, and each retry cycle is bounded and
+diagnosed rather than silent.
 """
 
 PLAN_SERVE_REACH = 1
@@ -118,11 +149,18 @@ the s8-2 receipt paid.
 def clear_resource_target(ai_state: AIStateDict) -> AIStateDict:
     """Return AI state with any locked resource target cleared.
 
+    The lock's raw mutation, owned by this module alone: every other
+    release site goes through :func:`release_collect_plan` so the drop
+    is enumerated and diagnosed (guard rule ``restricted-symbol``,
+    2026-09-02 — the quad sweep clearing a held lock it never set was
+    the livelock's amplifier, [[flag-triage-20260902]]).
+
     Args:
         ai_state: Current AI state.
 
     Returns:
-        New AIStateDict with resource target fields zeroed.
+        New AIStateDict with resource target fields zeroed and the
+        hold counter reset.
     """
     return AIStateDict(
         **{
@@ -130,6 +168,7 @@ def clear_resource_target(ai_state: AIStateDict) -> AIStateDict:
             "resource_target_kind": "",
             "resource_target_x": 0,
             "resource_target_y": 0,
+            "resource_target_held_ticks": 0,
         },
     )
 
@@ -141,6 +180,10 @@ def set_resource_target(
     ty: int,
 ) -> AIStateDict:
     """Return AI state with a locked resource target set.
+
+    A fresh latch — and a continuation dispatch, which re-latches the
+    same target — resets the hold counter: progress was made, so the
+    :data:`RESOURCE_LOCK_HOLD_BOUND_TICKS` invariant starts over.
 
     Args:
         ai_state: Current AI state.
@@ -157,6 +200,30 @@ def set_resource_target(
             "resource_target_kind": kind,
             "resource_target_x": tx,
             "resource_target_y": ty,
+            "resource_target_held_ticks": 0,
+        },
+    )
+
+
+def hold_resource_target(ai_state: AIStateDict) -> AIStateDict:
+    """Return AI state with the held plan's stall counter advanced.
+
+    Called by the lock-continuation on every tick it holds the plan
+    without producing a dispatch. The counter is what
+    :data:`RESOURCE_LOCK_HOLD_BOUND_TICKS` reads; any latch or
+    dispatch resets it via :func:`set_resource_target`.
+
+    Args:
+        ai_state: AI state holding a plan.
+
+    Returns:
+        New AIStateDict with ``resource_target_held_ticks`` one
+        higher.
+    """
+    return AIStateDict(
+        **{
+            **ai_state,
+            "resource_target_held_ticks": ai_state["resource_target_held_ticks"] + 1,
         },
     )
 
@@ -354,6 +421,7 @@ __all__ = [
     "COLLECT_PLAN_KINDS",
     "PLAN_RELEASE_REASONS",
     "PLAN_SERVE_REACH",
+    "RESOURCE_LOCK_HOLD_BOUND_TICKS",
     "CollectPlanDict",
     "CollectPlanKind",
     "PlanReleaseReason",
@@ -361,6 +429,7 @@ __all__ = [
     "current_collect_plan",
     "decode_collect_plan",
     "encode_collect_plan",
+    "hold_resource_target",
     "plan_completes_here",
     "release_collect_plan",
     "set_resource_target",

@@ -35,7 +35,6 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     radar_spend_worthwhile,
 )
-from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.movement import plan_viewport_walk
 from tankpit_bot.bot.ai.scoring_types import BehaviorMode
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -293,6 +292,14 @@ def plan_forage_search(
             right,
             bottom,
         )
+        # Coverage decisions here (radar, frontier walk, sweep walk)
+        # PRESERVE any held resource lock: a coverage tick is not a
+        # pursuit, and a held lock survives non-pursuit ticks (the
+        # s11-5 law in ``block_harvest``). Until 2026-09-02 these
+        # three sites cleared the lock silently — the same violation
+        # class as the quad sweep's livelock amplifier
+        # ([[flag-triage-20260902]]); ``forage_frontier`` already
+        # preserved.
         return make_decision(
             make_radar_command(),
             behavior_mode,
@@ -300,7 +307,7 @@ def plan_forage_search(
             0,
             0,
             "forage_radar",
-            clear_resource_target(ai_state),
+            ai_state,
             ctx.equip,
         )
 
@@ -342,7 +349,7 @@ def plan_forage_search(
             frontier_x,
             frontier_y,
             "forage_frontier_walk",
-            clear_resource_target(ai_state),
+            ai_state,
             ctx.equip,
         )
     target_x, target_y = target
@@ -362,7 +369,7 @@ def plan_forage_search(
         target_x,
         target_y,
         "forage_sweep",
-        clear_resource_target(ai_state),
+        ai_state,
         ctx.equip,
     )
 

@@ -35,7 +35,6 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
 )
-from tankpit_bot.bot.ai.intent import clear_resource_target
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -134,16 +133,23 @@ def _quadrant_spend_worthwhile(uncovered: int, extras: int) -> bool:
 def _anchored_state(base_state: AIStateDict, sx: int, sy: int) -> AIStateDict:
     """Return the AI state latched to the sweep anchor tile.
 
+    The sweep only runs on a free slate (the lock gate in
+    :func:`plan_quad_sweep`), so there is never a resource target to
+    touch here. Until 2026-09-02 this helper CLEARED one anyway — the
+    amplifier of the nine-minute livelock ([[flag-triage-20260902]]):
+    the wiped lock re-armed the harvest latch every other tick, and
+    the two modules fought over the window 136 times. The raw clear
+    is now guard-restricted to the intent module.
+
     Args:
         base_state: Base AI state to rewrite.
         sx: Anchor X (the tank's current tile).
         sy: Anchor Y (the tank's current tile).
 
     Returns:
-        State with the anchor latched and any resource target cleared.
+        State with the anchor latched.
     """
-    cleared = clear_resource_target(base_state)
-    return AIStateDict(**{**cleared, "sweep_anchor_x": sx, "sweep_anchor_y": sy})
+    return AIStateDict(**{**base_state, "sweep_anchor_x": sx, "sweep_anchor_y": sy})
 
 
 def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict | None:
@@ -174,6 +180,15 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         currently worth an extra (sweep complete, mid-harvest, or
         extras exhausted).
     """
+    if base_state["resource_target_kind"] != "":
+        # The sweep's own doctrine, applied to itself: known stock
+        # preempts scanning STRUCTURALLY, and a held resource lock IS
+        # known stock mid-pursuit. Running anyway — and wiping the
+        # lock in ``_anchored_state`` — was the amplifier of the
+        # 2026-09-02 nine-minute livelock ([[flag-triage-20260902]]);
+        # the same rule already guards the harvest latch
+        # (``block_harvest``, flag s11-5).
+        return None
     extras = ctx.inventory["extra_radars"]["count"]
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         # Recon is an economy move, never a survival move: at or below

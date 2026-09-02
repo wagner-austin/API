@@ -118,6 +118,15 @@ Two COLLECT-cascade branches, both gated on fuel ABOVE the low
 threshold (recon and framing are economy moves — at the break the
 desperation ladder owns every tick):[^1]
 
+> **Lock gate (2026-09-02, [[flag-triage-20260902]]).** `plan_quad_sweep`
+> now declines outright while a resource lock is held — the doctrine's
+> own "known stock preempts scanning" applied to itself. Before the
+> gate, the sweep ran during held locks and its anchor latch CLEARED
+> the lock, re-arming the harvest latch every other tick: the
+> amplifier of the nine-minute Practice-room livelock (273 shifts,
+> tank frozen). The raw `clear_resource_target` is deleted from this
+> module and guard-restricted to `intent.py`.
+
 - **`plan_quad_sweep`** sits between lock continuation and the
   pickups (atomicity: pickups wait the ~8 ticks). Stateless quadrant
   math — the four windows derive from the tank tile by the anchor

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
@@ -352,3 +353,41 @@ class TestBarrenScanVeto:
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
+
+
+class TestSearchHopReleasesHeldLocks:
+    """The dot hop relocates, so a held plan is RELEASED, not erased.
+
+    Until 2026-09-02 this site cleared the lock with no diagnostic —
+    invisible to churn analysis ([[flag-triage-20260902]]). The drop
+    now flows through ``release_collect_plan`` with the enumerated
+    ``relocated`` reason; the observable contract is that the hop's
+    decision leaves no lock behind.
+    """
+
+    def test_the_hop_decision_carries_no_lock(self) -> None:
+        ws = WorldService()
+        ws.map_fuel_dots = ((150, 100),)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ws=ws,
+        )
+        locked = set_resource_target(ctx.ai_state, "fuel", 104, 100)
+
+        decision = make_resource_search_hop(
+            ctx, mode="COLLECT", score=500, reason="search_collect_local", ai_state=locked
+        )
+
+        if decision is None:
+            raise AssertionError("expected a search hop decision")
+        assert decision["command"]["cmd_type"] == "teleport"
+        updated = decision["updated_ai_state"]
+        assert updated["resource_target_kind"] == ""
+        assert updated["resource_target_held_ticks"] == 0

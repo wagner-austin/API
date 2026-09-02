@@ -265,8 +265,8 @@ in the bot is the 10-minute harvest veto.
 
 | # | Finding | Status |
 |---|---|---|
-| 1 | Cascade livelock v2 (lock cleared by peer) | **open** — needs lock ownership + a held-without-dispatch bound |
-| 2 | `walk_or_teleport` unreachable behind `frame_direction` | **open** |
+| 1 | Cascade livelock v2 (lock cleared by peer) | **fixed 2026-09-02** — quad sweep lock-gated and its raw clear deleted; forage coverage decisions preserve held locks; the search hop releases enumerated (`relocated`); the raw `clear_resource_target` is guard-restricted to `intent.py` (`restricted-symbols`); and `RESOURCE_LOCK_HOLD_BOUND_TICKS` releases any future hold-forever shape as `progress_stalled` |
+| 2 | `walk_or_teleport` unreachable behind `frame_direction` | **fixed 2026-09-02** (as its deeper statement) — the walk-territory RESPONSIBILITY GAP: larder and equipment-hop deferrals now ask the pickup dispatch's own reachability predicate, so walk-blocked near stock is teleport fair game; the exact pocket shape resolves in one tick (pinned in `tests/bot/ai/test_collect_pocket_serving.py`) |
 | 3 | Coverage staleness is clock-based, not event-based | **open** — wants event invalidation + per-room policy |
 | 4 | Landing radar fires on already-covered ground | **open** — suppression seam exists (`latching without radar`) |
 | 5 | Intra-viewport teleports (143) | **open** |

@@ -24,7 +24,12 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_nearest_equipment,
 )
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
-from tankpit_bot.bot.ai.intent import release_collect_plan, set_resource_target
+from tankpit_bot.bot.ai.intent import (
+    RESOURCE_LOCK_HOLD_BOUND_TICKS,
+    hold_resource_target,
+    release_collect_plan,
+    set_resource_target,
+)
 from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
@@ -82,6 +87,50 @@ def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -
     ):
         return False
     return find_ferry_boarding_tile(ctx.world, ctx.terrain, target_x, target_y) is None
+
+
+def _hold_or_stall(
+    base_state: AIStateDict,
+    kind: str,
+    target_x: int,
+    target_y: int,
+) -> AIStateDict:
+    """Hold the plan one more tick, or release it as progress-stalled.
+
+    The progress invariant behind the 2026-09-02 livelock
+    ([[flag-triage-20260902]]): a transient hold is legitimate for 2-3
+    ticks (in-flight actions, window misalignment), so a plan held
+    :data:`RESOURCE_LOCK_HOLD_BOUND_TICKS` consecutive ticks without
+    ONE dispatch is stuck in a shape no enumerated release names yet —
+    it is released with its own reason instead of spinning until some
+    unrelated clock rescues the tick.
+
+    Args:
+        base_state: AI state holding the plan.
+        kind: Lock kind, for the log line.
+        target_x: Locked target X.
+        target_y: Locked target Y.
+
+    Returns:
+        The advanced hold state, or the released state at the bound.
+    """
+    held = hold_resource_target(base_state)
+    if held["resource_target_held_ticks"] >= RESOURCE_LOCK_HOLD_BOUND_TICKS:
+        emit_ai(
+            "locked %s target at (%d,%d) held %d ticks without a dispatch - releasing",
+            kind,
+            target_x,
+            target_y,
+            held["resource_target_held_ticks"],
+        )
+        return release_collect_plan(held, reason="progress_stalled")
+    emit_ai(
+        "locked %s target at (%d,%d) not executable this tick - holding plan",
+        kind,
+        target_x,
+        target_y,
+    )
+    return held
 
 
 def continue_or_release_lock(
@@ -164,12 +213,7 @@ def _continue_or_release_equipment_lock(
                 target_y,
             )
             return None, release_collect_plan(base_state, reason="unservable")
-        emit_ai(
-            "locked equipment target at (%d,%d) not executable this tick - holding plan",
-            target_x,
-            target_y,
-        )
-        return None, base_state
+        return None, _hold_or_stall(base_state, "equipment", target_x, target_y)
     emit_ai("continue locked equipment target at (%d,%d)", target_x, target_y)
     decision = make_decision(
         locked_command,
@@ -233,12 +277,7 @@ def continue_or_release_fuel_lock(
                 target_y,
             )
             return None, release_collect_plan(base_state, reason="unservable")
-        emit_ai(
-            "locked fuel target at (%d,%d) not executable this tick - holding plan",
-            target_x,
-            target_y,
-        )
-        return None, base_state
+        return None, _hold_or_stall(base_state, "fuel", target_x, target_y)
     emit_ai(
         "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",
         target_x,

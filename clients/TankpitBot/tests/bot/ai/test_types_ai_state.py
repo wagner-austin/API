@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.bot.ai.types import (
+    AIStateDict,
     make_default_ai_config,
     make_initial_ai_state,
 )
@@ -192,3 +193,26 @@ class TestAIStateDetail:
         del encoded["live_teleports"]
         with pytest.raises(JSONTypeError):
             decode_ai_state(encoded)
+
+    def test_decode_missing_held_ticks_raises(self) -> None:
+        """Missing ``resource_target_held_ticks`` raises — no default.
+
+        The stall counter behind the 2026-09-02 progress invariant is
+        part of the lock; a record without it is corruption, not an
+        old version to soften for.
+        """
+
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["resource_target_held_ticks"]
+        with pytest.raises(JSONTypeError):
+            decode_ai_state(encoded)
+
+    def test_held_ticks_round_trip(self) -> None:
+        """A non-zero stall count survives encode -> decode exactly."""
+        original = make_initial_ai_state()
+        counted = AIStateDict(**{**original, "resource_target_held_ticks": 5})
+
+        encoded = encode_ai_state(counted)
+
+        assert decode_ai_state(encoded)["resource_target_held_ticks"] == 5

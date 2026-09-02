@@ -6,10 +6,12 @@ import pytest
 from platform_core.json_utils import JSONTypeError
 
 from tankpit_bot.bot.ai.intent import (
+    RESOURCE_LOCK_HOLD_BOUND_TICKS,
     CollectPlanDict,
     current_collect_plan,
     decode_collect_plan,
     encode_collect_plan,
+    hold_resource_target,
     plan_completes_here,
     release_collect_plan,
     set_resource_target,
@@ -247,3 +249,56 @@ class TestValidateCollectPlan:
         result = validate_collect_plan(state, _world_with_container(10, 20, True, 500))
 
         assert result is state
+
+
+class TestHoldProgressCounter:
+    """The stall counter behind RESOURCE_LOCK_HOLD_BOUND_TICKS."""
+
+    def test_a_fresh_latch_starts_at_zero(self) -> None:
+        """Latching a target resets the hold counter."""
+        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
+
+        assert state["resource_target_held_ticks"] == 0
+
+    def test_holding_advances_the_counter(self) -> None:
+        """Each dispatch-less continuation tick counts one hold."""
+        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
+
+        held_once = hold_resource_target(state)
+        held_twice = hold_resource_target(held_once)
+
+        assert held_once["resource_target_held_ticks"] == 1
+        assert held_twice["resource_target_held_ticks"] == 2
+
+    def test_relatching_after_holds_resets_the_counter(self) -> None:
+        """A continuation dispatch re-latches the target: progress, so zero.
+
+        The dispatch paths in ``collect_locks`` re-latch through
+        ``set_resource_target``; a held streak broken by one real
+        command starts the invariant over.
+        """
+        held = hold_resource_target(set_resource_target(make_initial_ai_state(), "fuel", 10, 20))
+
+        relatched = set_resource_target(held, "fuel", 10, 20)
+
+        assert relatched["resource_target_held_ticks"] == 0
+
+    def test_releasing_resets_the_counter(self) -> None:
+        """A released plan leaves no stall residue for the next latch."""
+        held = hold_resource_target(
+            hold_resource_target(set_resource_target(make_initial_ai_state(), "fuel", 10, 20))
+        )
+
+        released = release_collect_plan(held, reason="progress_stalled")
+
+        assert released["resource_target_kind"] == ""
+        assert released["resource_target_held_ticks"] == 0
+
+    def test_the_bound_exceeds_every_measured_legitimate_hold(self) -> None:
+        """The bound clears every measured legitimate hold with margin.
+
+        Legitimate transient holds measure 2-3 ticks (the 2026-07-30
+        receipts in ``collect_locks``); a bound below that would
+        release plans the executor was about to serve.
+        """
+        assert RESOURCE_LOCK_HOLD_BOUND_TICKS >= 6

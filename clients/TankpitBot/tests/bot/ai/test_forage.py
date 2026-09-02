@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.forage import plan_forage_search, select_forage_target
+from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
@@ -407,3 +408,27 @@ class TestFrontierWalk:
         )
 
         assert decision is None
+
+
+class TestForagePreservesHeldLocks:
+    """Coverage decisions carry a held resource lock through untouched.
+
+    Until 2026-09-02 the forage radar/walk decisions CLEARED any held
+    lock silently — the same violation class as the quad sweep's
+    livelock amplifier ([[flag-triage-20260902]]). A coverage tick is
+    not a pursuit; the s11-5 law says the lock survives it.
+    """
+
+    def test_the_forage_radar_carries_the_lock_through(self) -> None:
+        ctx = _ctx(radars=0)
+        locked = set_resource_target(ctx.ai_state, "fuel", 104, 100)
+
+        decision = plan_forage_search(ctx, locked, score=925, behavior_mode="COLLECT")
+
+        if decision is None:
+            raise AssertionError("expected a forage radar decision")
+        assert decision["behavior"]["reason_kind"] == "forage_radar"
+        updated = decision["updated_ai_state"]
+        assert updated["resource_target_kind"] == "fuel"
+        assert updated["resource_target_x"] == 104
+        assert updated["resource_target_y"] == 100

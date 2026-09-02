@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.collect_common import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
+from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain, is_riding_ferry
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.larder import WALK_DOMINANT_RANGE, select_fuel_larder_hop
@@ -24,7 +25,10 @@ from tankpit_bot.bot.ai.mode_gates import (
     hunt_entry_permitted,
     weapon_reserves_below_break,
 )
-from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
+from tankpit_bot.bot.ai.reachability import (
+    find_attainable_landing_tile,
+    is_collection_reachable_in_viewport,
+)
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
@@ -218,7 +222,16 @@ def hop_toward_equipment(
             no_landing += 1
             continue
         landing_x, landing_y = landing
-        if abs(landing_x - sx) + abs(landing_y - sy) <= WALK_DOMINANT_RANGE:
+        if abs(landing_x - sx) + abs(landing_y - sy) <= WALK_DOMINANT_RANGE and (
+            is_collection_reachable_in_viewport(
+                ctx.world,
+                SurfaceRouteTerrain(terrain, water=is_riding_ferry(ctx.world)),
+                sx,
+                sy,
+                container["x"],
+                container["y"],
+            )
+        ):
             # A teleport inside the walk-dominant range is never
             # travel. Distance 0 was s8-2 ([[flag-triage-20260729]]:
             # the escape landing re-derived a hop TO THE TILE THE
@@ -228,7 +241,13 @@ def hop_toward_equipment(
             # container ONE TILE away that the ordinary pickup served
             # four seconds later. Ground within walking reach belongs
             # to the pickup steps and the clearance shot, exactly as
-            # the larder's walk-territory rule already says for fuel.
+            # the larder's walk-territory rule already says for fuel
+            # -- but ONLY when the walk lane can actually take it
+            # (the same reachability predicate the pickup dispatch
+            # uses). Deferring by distance alone re-opened the
+            # 2026-07-30 flag-4 gap one gate lower and left rock-
+            # pocketed near stock with nobody serving it
+            # ([[flag-triage-20260902]]).
             own_ground += 1
             continue
         cost = teleport_cost(sx, sy, landing_x, landing_y)

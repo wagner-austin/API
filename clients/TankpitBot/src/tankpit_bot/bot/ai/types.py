@@ -191,6 +191,14 @@ class AIStateDict(TypedDict):
             teleports and viewport recentering.
         resource_target_x: X coordinate of the locked resource target.
         resource_target_y: Y coordinate of the locked resource target.
+        resource_target_held_ticks: Consecutive continuation ticks the
+            locked target was held WITHOUT producing a dispatch. The
+            lock-continuation increments it on every hold; latching or
+            clearing the lock resets it to 0. At
+            :data:`~tankpit_bot.bot.ai.intent.RESOURCE_LOCK_HOLD_BOUND_TICKS`
+            the continuation releases the plan (reason
+            ``progress_stalled``) — the last-resort progress invariant
+            behind the 2026-09-02 livelock ([[flag-triage-20260902]]).
         attempted_equipment_targets: Equipment targets that have been
             teleport-approached. {``"x,y"``: timestamp_ms}. Prevents
             repeated orbits around the same container.
@@ -331,6 +339,7 @@ class AIStateDict(TypedDict):
     resource_target_kind: str
     resource_target_x: int
     resource_target_y: int
+    resource_target_held_ticks: int
     attempted_equipment_targets: dict[str, int]
     last_landing_scan_viewport: str
     suppress_landing_scan: bool
@@ -432,6 +441,7 @@ def make_initial_ai_state(
         resource_target_kind="",
         resource_target_x=0,
         resource_target_y=0,
+        resource_target_held_ticks=0,
         attempted_equipment_targets={},
         last_landing_scan_viewport="",
         suppress_landing_scan=False,

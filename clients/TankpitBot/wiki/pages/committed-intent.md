@@ -88,10 +88,35 @@ no lane — walk, hop, or ride — can ever serve it, and no move-failed
 mark will ever arrive to invalidate the lock. Without it such a lock is
 held forever; run `bot-20260804-234008` held one for 11 minutes.[^4]
 
+**`claim_lost` (added 2026-09-02)** is the fleet arbitration release
+([[fleet-forage-allocation]]): a sibling won the container's
+authoritative claim file in the tick this plan latched.
+
+**`relocated` (added 2026-09-02)** is the cascade-bottom release
+([[flag-triage-20260902]]): the resource-search hop is moving the tank
+elsewhere after every serving lane declined the held plan. Before it,
+that site cleared the lock with no diagnostic.
+
+**`progress_stalled` (added 2026-09-02)** is the *progress invariant*:
+the continuation held the plan `RESOURCE_LOCK_HOLD_BOUND_TICKS` (8)
+consecutive ticks without one dispatch — a shape no other release
+names, and the last resort behind the nine-minute livelock. Legitimate
+transient holds measure 2-3 ticks, so the bound never fires on them.
+
+**Lock integrity (2026-09-02, after the livelock).** Only the intent
+module may touch the raw lock fields: `clear_resource_target` is
+guard-restricted to `intent.py` (`restricted-symbols` rule,
+`monorepo_guards`), every other drop flows through
+`release_collect_plan`, and the quad sweep — whose raw clear re-armed
+the harvest latch 136 times — now declines outright while a lock is
+held. Forage coverage decisions preserve a held lock (the s11-5 law:
+coverage is not pursuit).
+
 Churn query: count `diagnostic_kind=plan_released` per reason per
 run[^5]. High `superior_candidate` counts = lock thrash; `not_executable`
 clusters = the F6 passability family; anything at all during a fight
-window = ticks spent re-planning under fire.
+window = ticks spent re-planning under fire; any `progress_stalled` at
+all = a hold-forever shape worth a triage page.
 
 ## Wired-in continuity (phase 1)
 
