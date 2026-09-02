@@ -16,3 +16,25 @@ Notes: the first split commit (`ef1a857d`) went in while `make check` showed six
 ## [2026-09-01] page | node-local scratch, measured -- and a cross-project failure class named
 Pages written: node-local-scratch
 Notes: written from the rusted project's root-cause session, because the lesson outlives the project that paid for it. Ten campaign members across four batches "crashed at boot"; the engine log showed asset loading crawling against BeeGFS under ~60 concurrent boots until the project's own 60s liveness guard halted the process -- deterministic under concurrency, invisible in any single retry (uncontended boots are fast, so every resubmit succeeded and the class read as "transient"). The fact the page pins: Slurm provisions per-job $TMPDIR on node-local disk (measured 1.9 GB/s on hpc3-l18-04, probe job 55675199, removed with the job), and RCIC's docs state this nowhere findable. The rule: per-job disposable data references $TMPDIR unexpanded in the submitted command; the generated scripts' `set -u` makes a node without it fail loudly. The worked example is rusted's member_command, where the shared-filesystem clone helper was deleted rather than deprecated.
+
+## [2026-09-01] add | capture-source drift, found while adding one dependency for a qlora image
+Page written: capture-source-drift
+Hub updated: images-and-staging (6 -> 7)
+Notes: Written by opus-corpus-docmode-0901, NOT the session that owns the mi campaign.
+Coordinated on the board first; this file, hubs/images-and-staging.md and index.md were
+edited surgically because opus-hpc3-survey-0822 has uncommitted work in this tree.
+Model-Trainer's qlora strategy never applied quantization (the config was validated and
+discarded), so making it work needs bitsandbytes in the image. Preparing that surfaced
+the drift: /pub/wagnera3/envs/abl-pinned no longer carries cupy-cuda12x, while v31 --
+built from the spec that lists it -- does, verified by apptainer exec into the sealed
+image. A re-capture off that env would have emitted a spec without cupy and taken
+ordered_kernels' NVRTC path with it, with nothing in the build objecting. Capture also
+emits system_packages and smoke_commands empty by design and takes required_symbols
+only from --symbols, so a re-capture drops the abl spec's 29 smoke commands and 46
+symbol assertions unless they are re-supplied. The surgical spec edit is what
+cli/image_capture.py's own comment says every version bump has done since onboarding.
+
+## [2026-09-01] feature+page | sweeps become one sbatch call -- job arrays, measured first, parsers expanded everywhere
+Pages written: job-arrays
+Pages updated: unsupported-shapes (arrays moved to the left-the-list section), README table (row removed, held out by test_examples)
+Notes: The submission bottleneck was ours, not the cluster's: three SSH round trips per member (~13s each) while Slurm scheduled instantly -- rusted's 96-member waves spent ~18 minutes purely submitting. A sweep now renders into ONE script that IS the member table (case-dispatch on the array task id, no --array directive; the submitter's argument owns the selection, which is what lets a campaign resubmit its sparse gap against a byte-identical script). Identity was MEASURED before it was coded (probe 55678543, throttled): pending tasks aggregate into `N_[a-b%t]` in squeue AND `sacct -X` -- the sacct half was the surprise -- and a pending task id queried directly returns nothing. `contracts/array.py` owns the expansion; the in-flight artifact check and triage's unclaimed check both expand before matching, closing the double-submission race an unexpanded set would have waved through. Per-member job_submitted audit events are gone (telemetry of acts that no longer occur); sweep_submitted carries every task id plus the billing factor. Gate green at 100.00% statements+branches, 1297 tests.

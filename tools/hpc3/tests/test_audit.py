@@ -106,15 +106,29 @@ class TestJobSubmittedEvent:
 
 
 class TestSweepSubmittedEvent:
-    def test_it_records_the_member_ids(self, logged: list[LoggedEvent]) -> None:
-        audit.sweep_submitted(host="hpc3", project="abl", base_name="rung", job_ids=["1", "2", "3"])
+    def test_it_records_the_task_ids_and_the_billing_factor(
+        self, logged: list[LoggedEvent]
+    ) -> None:
+        """The factor lives here now: the array is one submission act, so
+        the per-member job events that used to carry it are gone, and the
+        sweep event is the one record of what the whole array bills at."""
+        audit.sweep_submitted(
+            host="hpc3",
+            project="abl",
+            base_name="rung",
+            job_ids=["7_0", "7_1", "7_2"],
+            partition="free-gpu",
+            cluster=cluster(),
+        )
         assert logged[0].event == audit.SWEEP_SUBMITTED
         assert logged[0].fields == {
             "host": "hpc3",
             "project": "abl",
             "base_name": "abl.rung",
             "members": 3,
-            "job_ids": "1,2,3",
+            "job_ids": "7_0,7_1,7_2",
+            "partition": "free-gpu",
+            "usage_factor": 0.0,
         }
 
 

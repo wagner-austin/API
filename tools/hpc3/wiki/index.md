@@ -1,14 +1,14 @@
 # hpc3 Wiki
 
-**Read this first.** 4 topic hubs, 19 content pages. This is the design record
+**Read this first.** 4 topic hubs, 20 content pages. This is the design record
 and incident narrative behind the rules the `hpc3` package enforces; the
 README next door is the command reference. Follow the hub link for your
 topic; each hub lists its pages with one-line descriptions.
 
 ## Hubs
 
-[Submission](hubs/submission.md) -- run/sweep/chain documents, campaign convergence, the rules that refuse, unsupported shapes (6 pages)
-[Images and staging](hubs/images-and-staging.md) -- identity over transport: images, pins, staged bytes, determinism, known answers (6 pages)
+[Submission](hubs/submission.md) -- run/sweep/chain documents, job arrays, campaign convergence, the rules that refuse, unsupported shapes (7 pages)
+[Images and staging](hubs/images-and-staging.md) -- identity over transport: images, pins, staged bytes, determinism, known answers, capture-source drift (7 pages)
 [Cluster facts](hubs/cluster-facts.md) -- partitions, billing, facts-are-code, node-local scratch, what a job looks like from the cluster (5 pages)
 [Operations](hubs/operations.md) -- triage, closures, budgets (4 pages)
 

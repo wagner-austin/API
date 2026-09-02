@@ -178,7 +178,7 @@ Neither says anything about a dependency, and the first says nothing at all.
 """
 
 
-def _dependency_hint(spec: JobSpec, output: str) -> str:
+def dependency_hint(spec: JobSpec, output: str) -> str:
     """Explain a refusal that is really about the job this one waits on.
 
     Args:
@@ -264,9 +264,9 @@ def preflight(
         raise AppError(
             Hpc3ErrorCode.PREFLIGHT_REJECTED,
             f"Slurm would refuse {spec['name']!r}: {output.strip()}"
-            + _dependency_hint(spec, output),
+            + dependency_hint(spec, output),
         )
     return parse_test_only(output, cluster)
 
 
-__all__ = ["check_env_path", "parse_test_only", "preflight"]
+__all__ = ["check_env_path", "dependency_hint", "parse_test_only", "preflight"]

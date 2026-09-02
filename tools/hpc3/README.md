@@ -257,13 +257,13 @@ below is not a missing flag but a shape the contract cannot express.
 | shape | status | what it blocks |
 | --- | --- | --- |
 | **Multi-node / MPI** | no `--nodes`, `--ntasks`, `srun` or `mpirun` anywhere | anything that does not fit one node |
-| **Job array** | a sweep is N separate `sbatch` calls | a wide sweep is N ledger rows and N scheduler entries where `--array` would be one; correct, but heavier on the scheduler and on `squeue` |
 | **Explicit `--qos`** | not emitted; the cluster auto-selects | `standard-hbm` on HPC3, which refuses the default QOS with `Invalid qos specification` |
 | **`--constraint` / `--exclusive`** | not emitted | node features cannot be selected beyond the GPU model |
 
 None of these are hard to add; they are absent because they were never built,
-not because they were judged wrong. The two shapes that LEFT this list — job
-dependencies and CPU-only — and the JVM-project caveat are in
+not because they were judged wrong. The three shapes that LEFT this list — job
+dependencies, CPU-only, and job arrays (a sweep IS one `--array` call now,
+[job arrays](wiki/pages/job-arrays.md)) — and the JVM-project caveat are in
 [unsupported shapes](wiki/pages/unsupported-shapes.md).
 
 ---

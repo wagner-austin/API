@@ -97,7 +97,7 @@ def job_comment(spec: JobSpec) -> str:
     )
 
 
-def _determinism_exports(spec: JobSpec) -> list[str]:
+def determinism_exports(spec: JobSpec) -> list[str]:
     """Build the environment lines a deterministic run needs before it starts.
 
     Args:
@@ -121,7 +121,7 @@ def _determinism_exports(spec: JobSpec) -> list[str]:
     ]
 
 
-def _image_digest_export(spec: JobSpec) -> list[str]:
+def image_digest_export(spec: JobSpec) -> list[str]:
     """Build the line that tells the payload which image it is running in.
 
     The image cannot compute its own digest from inside itself -- the digest
@@ -151,7 +151,7 @@ def _image_digest_export(spec: JobSpec) -> list[str]:
     return [f'export IMAGE_DIGEST="{image["sha256"]}"']
 
 
-def _runtime_module_lines(spec: JobSpec) -> list[str]:
+def runtime_module_lines(spec: JobSpec) -> list[str]:
     """Load whatever the job's runtime needs before anything uses it.
 
     ``apptainer`` is a module on HPC3 rather than on the default PATH --
@@ -171,7 +171,7 @@ def _runtime_module_lines(spec: JobSpec) -> list[str]:
     return [f"module load {APPTAINER_MODULE}"]
 
 
-def _payload_lines(spec: JobSpec) -> list[str]:
+def payload_lines(spec: JobSpec) -> list[str]:
     """Render the payload, wrapped in its runtime.
 
     A host run puts the environment's ``bin`` on PATH and executes the
@@ -215,7 +215,7 @@ def _payload_lines(spec: JobSpec) -> list[str]:
     return lines
 
 
-def _code_provenance_export(spec: JobSpec) -> str:
+def code_provenance_export(spec: JobSpec) -> str:
     """Build the line that tells the payload which code it is running.
 
     The trainer stamps ``GIT_COMMIT`` into every manifest it writes, and
@@ -330,16 +330,16 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
         # be forgotten by a payload that only remembers the torch half --
         # which fails loudly, because deterministic mode raises when the
         # variable is absent.
-        *_determinism_exports(spec),
+        *determinism_exports(spec),
         # Slurm increments SLURM_RESTART_COUNT each time it requeues a job,
         # so a preempted run re-enters here with a non-zero value. This
         # package cannot resume on the payload's behalf -- only the payload
         # knows what its checkpoint means -- so it surfaces the count and
         # leaves the decision where the knowledge is.
         'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
-        *_runtime_module_lines(spec),
-        *_image_digest_export(spec),
-        _code_provenance_export(spec),
+        *runtime_module_lines(spec),
+        *image_digest_export(spec),
+        code_provenance_export(spec),
         "",
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_JOB_ID:-none}"',
@@ -362,7 +362,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
         ),
         "date -Is",
         "",
-        *_payload_lines(spec),
+        *payload_lines(spec),
         "rc=$?",
         "",
         "date -Is",
@@ -375,7 +375,12 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
 __all__ = [
     "MINUTES_PER_DAY",
     "MINUTES_PER_HOUR",
+    "code_provenance_export",
+    "determinism_exports",
     "format_walltime",
+    "image_digest_export",
     "job_comment",
+    "payload_lines",
     "render_sbatch",
+    "runtime_module_lines",
 ]

@@ -1,14 +1,17 @@
-"""Submitting many jobs from one template.
+"""Submitting many jobs from one template, as one array call.
 
-A sweep is submitted member by member, in declaration order, and stops on the
-first failure. It does not roll back: the members already submitted are real
-jobs holding real nodes, and cancelling them because a later one failed would
-throw away work that is fine. The caller is told which member stopped the run
-and which ids are already live, so the remainder can be submitted separately
-once the cause is fixed.
+A sweep used to be submitted member by member -- three SSH round trips each,
+~13 seconds apiece, measured against a cluster that scheduled the jobs
+instantly (rusted ab48, 2026-09-01). It is now one call: the whole member
+table renders into one script, ``sbatch --array`` runs every document
+position, and the ledger records each task individually. The mechanics live
+in :mod:`hpc3.core.array_submit`; this module is the sweep-shaped door.
 
 The size check happens in the contract, before any of this runs, so a sweep
-that would pend against the QOS never reaches the cluster at all.
+that would pend against the QOS never reaches the cluster at all. Failure
+atomicity is now stronger than the old loop's, not weaker: the loop could
+die on member four leaving three live, while the array either submits as a
+whole or refuses as a whole -- and every refusal happens before ``sbatch``.
 """
 
 from __future__ import annotations
@@ -16,32 +19,8 @@ from __future__ import annotations
 import pathlib
 
 from hpc3.contracts.cluster import ClusterFacts
-from hpc3.contracts.layout import qualified_name
-from hpc3.contracts.sweep import SweepSpec, expand_sweep
-from hpc3.core import audit, submit
-
-
-class SubmittedMember:
-    """One member of a sweep, and the id it was given.
-
-    Attributes:
-        name: The member's QUALIFIED job name -- the same string ``squeue``
-            shows, so what the operator reads here is what they will search
-            for.
-        job_id: Id Slurm assigned.
-    """
-
-    __slots__ = ("job_id", "name")
-
-    def __init__(self, name: str, job_id: str) -> None:
-        """Record a submitted member.
-
-        Args:
-            name: The member's qualified job name.
-            job_id: Id Slurm assigned.
-        """
-        self.name = name
-        self.job_id = job_id
+from hpc3.contracts.sweep import SweepSpec
+from hpc3.core.array_submit import SubmittedMember, submit_array
 
 
 def submit_sweep(
@@ -55,54 +34,42 @@ def submit_sweep(
     cluster: ClusterFacts,
     charge_account: str,
 ) -> list[SubmittedMember]:
-    """Submit every member of a sweep.
+    """Submit every member of a sweep as one job array.
 
     Args:
         spec: A sweep already validated by
             :func:`~hpc3.contracts.sweep.decode_sweep_spec`, so its template
             satisfies every submission rule and its size fits the QOS.
         host: SSH destination.
-        script_dir: Absolute cluster directory to hold the batch scripts.
-        log_dir: Absolute cluster directory for the jobs' output.
-        ledger_path: Local append-only record. Each member is written as it
-            is submitted, so a sweep that dies on member four leaves three
-            findable jobs rather than three orphans.
+        script_dir: Absolute cluster directory to hold the batch script.
+        log_dir: Absolute cluster directory for the tasks' output.
+        ledger_path: Local append-only record, one entry per member.
         submitted_at: ISO-8601 timestamp for the records.
         cluster: The cluster whose measured limits each member is validated
             against.
+        charge_account: Slurm account to bill, or empty for none.
 
     Returns:
-        One record per member, in declaration order.
+        One record per member, in declaration order, each carrying its array
+        task id.
 
     Raises:
-        AppError: With ``REMOTE_COMMAND_FAILED`` on the first member that
-            could not be submitted. Members submitted before it stay running;
-            nothing is rolled back, because a live job that is fine should not
-            be cancelled for a later job's failure. They are already in the
-            ledger, so they remain findable.
+        AppError: Through :func:`~hpc3.core.array_submit.submit_array` --
+            the artifact-race refusal, the preflight codes, or
+            ``REMOTE_COMMAND_FAILED``. Nothing has been submitted when any
+            of them is raised.
     """
-    submitted: list[SubmittedMember] = []
-    for member_spec in expand_sweep(spec):
-        job_id = submit.submit(
-            member_spec,
-            host=host,
-            script_dir=script_dir,
-            log_dir=log_dir,
-            ledger_path=ledger_path,
-            submitted_at=submitted_at,
-            cluster=cluster,
-            charge_account=charge_account,
-        )
-        label = qualified_name(member_spec["project"], member_spec["name"])
-        submitted.append(SubmittedMember(label, job_id))
-
-    audit.sweep_submitted(
+    return submit_array(
+        spec,
+        tuple(range(len(spec["members"]))),
         host=host,
-        project=spec["base"]["project"],
-        base_name=spec["base"]["name"],
-        job_ids=[member.job_id for member in submitted],
+        script_dir=script_dir,
+        log_dir=log_dir,
+        ledger_path=ledger_path,
+        submitted_at=submitted_at,
+        cluster=cluster,
+        charge_account=charge_account,
     )
-    return submitted
 
 
 __all__ = ["SubmittedMember", "submit_sweep"]

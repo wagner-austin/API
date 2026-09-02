@@ -21,7 +21,7 @@ from platform_core.determinism_env import (
 
 from hpc3.contracts.job import JobSpec
 from hpc3.core.sbatch import (
-    _code_provenance_export,
+    code_provenance_export,
     format_walltime,
     job_comment,
     render_sbatch,
@@ -415,7 +415,7 @@ class TestCodeProvenance:
         successfully. Such a test could only be red forever or green for a
         reason unrelated to the artifact.
         """
-        line = _code_provenance_export(spec())
+        line = code_provenance_export(spec())
         assert "2>/dev/null" in line
         assert line.index("2>/dev/null") < line.index("|| echo ''")
         assert line.endswith("')\"")

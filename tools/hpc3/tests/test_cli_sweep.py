@@ -90,18 +90,16 @@ class TestSweepCli:
     ) -> None:
         _write(tmp_path / "s.json", _payload())
         _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", stdout="Submitted batch job 102\n")
-        fake_run.add("sbatch abl.rung-s2", stdout="Submitted batch job 103\n")
+        fake_run.add("sbatch", stdout="Submitted batch job 101\n")
 
         assert sweep_cli.main(_args(tmp_path)) == 0
         assert emitted[0].startswith("budget OK: projected 1.5 GPU-hours")
         assert emitted[1:4] == [
-            "submitted 101 abl.rung-s0",
-            "submitted 102 abl.rung-s1",
-            "submitted 103 abl.rung-s2",
+            "submitted 101_0 abl.rung-s0",
+            "submitted 101_1 abl.rung-s1",
+            "submitted 101_2 abl.rung-s2",
         ]
-        assert emitted[-1].endswith("--job 101,102,103")
+        assert emitted[-1].endswith("--job 101_0,101_1,101_2")
 
     def test_it_reports_where_every_members_log_landed(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
@@ -117,13 +115,11 @@ class TestSweepCli:
     ) -> None:
         _write(tmp_path / "s.json", _payload())
         _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", stdout="Submitted batch job 102\n")
-        fake_run.add("sbatch abl.rung-s2", stdout="Submitted batch job 103\n")
+        fake_run.add("sbatch", stdout="Submitted batch job 101\n")
 
         sweep_cli.main(_args(tmp_path))
         entries = read_ledger(tmp_path / "ledger.jsonl")
-        assert [e["job_id"] for e in entries] == ["101", "102", "103"]
+        assert [e["job_id"] for e in entries] == ["101_0", "101_1", "101_2"]
 
     def test_a_budget_overrun_stops_it_before_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -183,7 +179,7 @@ class TestSweepCli:
         with pytest.raises(SystemExit) as excinfo:
             sweep_cli.entrypoint()
         assert excinfo.value.code == 0
-        assert emitted[1] == "submitted 9 abl.rung-s0"
+        assert emitted[1] == "submitted 9_0 abl.rung-s0"
 
 
 class TestTriageCli:

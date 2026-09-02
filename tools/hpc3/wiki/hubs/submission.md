@@ -9,4 +9,5 @@ submission rules, and the shapes the contract deliberately cannot express.
 [Preemption cancels, checkpoints protect, campaigns converge](../pages/preemption-and-campaigns.md) -- PreemptMode=CANCEL measured, the resume-document race, artifact-keyed convergence
 [The submission rules, each with the failure it refuses](../pages/submission-rules.md) -- the eight resolve-time rules and the non-skippable preflight
 [Chains stop when a stage fails](../pages/chains.md) -- kill-on-invalid-dep, whole-pipeline budgeting, chain-vs-sweep
+[A sweep is one sbatch call, and the script is the member table](../pages/job-arrays.md) -- arrays as the sweep transport, sparse campaign resubmission, the measured pending-aggregate identity rules
 [What this package cannot submit](../pages/unsupported-shapes.md) -- multi-node, arrays, qos, constraints; the two shapes that left the list

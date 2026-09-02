@@ -26,7 +26,7 @@ from hpc3.contracts.dependency import AFTER_OK, Dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.core import audit, submit
-from hpc3.core.sweep import SubmittedMember
+from hpc3.core.array_submit import SubmittedMember
 
 
 def _waiting_on(previous: str) -> Dependency:

@@ -46,12 +46,13 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from hpc3.cli import _config, _fatal, _test_hooks
-from hpc3.contracts.layout import log_dir, script_dir
+from hpc3.contracts.layout import log_dir, qualified_name, script_dir
 from hpc3.contracts.run import resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
-from hpc3.core import ledger, submit
+from hpc3.core import ledger
+from hpc3.core.array_submit import submit_array
 from hpc3.core.budget import check_projection
 from hpc3.core.campaign import (
     existence_command,
@@ -140,9 +141,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_projection(budget, plan["missing"], cluster)
 
     root = workspace["root"]
-    for member in plan["missing"]:
-        job_id = submit.submit(
-            member,
+    if plan["missing"] != []:
+        # The gap goes up as ONE sparse array against the sweep's own member
+        # table: --array=3,17-19 selects document positions, and the script's
+        # task-to-member mapping is identical on every convergence pass
+        # because the table never varies with the selection.
+        index_of = {
+            qualified_name(member["project"], member["name"]): index
+            for index, member in enumerate(specs)
+        }
+        missing_indices = tuple(
+            sorted(
+                index_of[qualified_name(member["project"], member["name"])]
+                for member in plan["missing"]
+            )
+        )
+        for member_record in submit_array(
+            spec,
+            missing_indices,
             host=host,
             script_dir=script_dir(root, project),
             log_dir=log_dir(root, project),
@@ -150,8 +166,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             submitted_at=_test_hooks.now_iso(),
             cluster=cluster,
             charge_account=budget["charge_account"],
-        )
-        _test_hooks.emit(f"submitted {job_id} {project}.{member['name']}")
+        ):
+            _test_hooks.emit(f"submitted {member_record.job_id} {member_record.name}")
 
     _test_hooks.emit(
         f"{len(plan['done'])} done, {len(plan['in_flight'])} in flight, "

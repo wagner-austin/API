@@ -40,6 +40,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from hpc3.contracts.account import AccountJob
+from hpc3.contracts.array import expand_job_id
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.pending import PendingJob, is_blocked
@@ -196,6 +197,12 @@ def unclaimed_jobs(entries: Sequence[LedgerEntry], account: Sequence[AccountJob]
         record them, not to teach this function to look away.
     """
     recorded = {entry["job_id"] for entry in entries}
+    # An account row can stand for many ledger rows: squeue reports every
+    # still-pending task of a job array as one aggregate id --
+    # 55678543_[2-3%2], measured on probe job 55678543 -- while the ledger
+    # records each task individually. The row is claimed when EVERY task it
+    # stands for is; a partially-claimed aggregate is a genuine finding,
+    # because some task on the cluster has no ledger row behind it.
     return [
         Finding(
             job["job_id"],
@@ -205,7 +212,7 @@ def unclaimed_jobs(entries: Sequence[LedgerEntry], account: Sequence[AccountJob]
             "it was not submitted from this machine through hpc3",
         )
         for job in account
-        if job["job_id"] not in recorded
+        if any(task_id not in recorded for task_id in expand_job_id(job["job_id"]))
     ]
 
 

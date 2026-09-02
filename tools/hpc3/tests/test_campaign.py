@@ -294,7 +294,10 @@ class TestTheCommand:
 
         assert campaign_cli.main(self._document(tmp_path)) == 0
         assert emitted[0] == "done      abl.bases-tr"
-        assert emitted[1] == "submitted 55519937 abl.bases-az"
+        # _1, not _0: the sparse array selects by DOCUMENT position, and az
+        # is the document's second member -- the property that keeps the
+        # task-to-member mapping identical across convergence passes.
+        assert emitted[1] == "submitted 55519937_1 abl.bases-az"
         assert emitted[-1] == "1 done, 0 in flight, 1 submitted, 1 remaining"
 
     def test_only_the_missing_member_reaches_the_ledger(

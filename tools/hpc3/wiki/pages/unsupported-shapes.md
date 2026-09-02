@@ -21,9 +21,14 @@ already carries what the checks would need. They are absent because they were
 never built, not because they were judged wrong — recorded so the gap is a
 decision rather than a discovery.
 
-## Two things left this list
+## Three things left this list
 
 **Job dependencies** were on it and are not any more — see [[chains]].
+
+**Job arrays** were on it and are not any more — inverted, in fact: a sweep
+is now submitted AS one array call, and the member-by-member loop the row
+described no longer exists. The measured identity rules and the
+script-is-the-member-table design are in [[job-arrays]].
 
 **CPU-only** was on it and is not any more. `"gpu": null` on a CPU partition
 submits, so `cleargbm_rs`, SIRIUS and ZODIAC are reachable. One caveat worth

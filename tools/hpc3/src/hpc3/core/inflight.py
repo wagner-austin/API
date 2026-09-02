@@ -39,6 +39,7 @@ from collections.abc import Sequence
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.account import AccountJob
+from hpc3.contracts.array import expand_job_id
 from hpc3.contracts.ledger import LedgerEntry
 
 
@@ -63,7 +64,13 @@ def claimed_artifacts(
         "something live is writing this", and the refusal that follows names
         a real job either way.
     """
-    live = {job["job_id"] for job in account}
+    # Expanded, because the ledger records array TASK ids -- 55678543_2 --
+    # while squeue reports every still-pending task of an array as one
+    # aggregate row, 55678543_[2-3%2] (measured, probe job 55678543). An
+    # unexpanded set would read every pending member as not-live, and the
+    # refusal this module exists for would wave the double submission
+    # through while the first copy sat in the queue.
+    live = {task_id for job in account for task_id in expand_job_id(job["job_id"])}
     return {
         entry["artifact"]: entry["name"]
         for entry in entries

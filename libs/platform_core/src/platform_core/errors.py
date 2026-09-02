@@ -193,6 +193,13 @@ class Hpc3ErrorCode(ErrorCodeBase):
     SWEEP_EXCEEDS_CPU_CEILING = "SWEEP_EXCEEDS_CPU_CEILING"
     SWEEP_EXCEEDS_JOB_CEILING = "SWEEP_EXCEEDS_JOB_CEILING"
 
+    # Job arrays -- one sbatch call carrying a whole sweep. There is no
+    # members-diverge code, deliberately: the array renderer takes the sweep
+    # document itself, whose members share the template by construction, so
+    # divergence is unrepresentable rather than checked.
+    ARRAY_ID_UNPARSABLE = "ARRAY_ID_UNPARSABLE"
+    ARRAY_INDICES_EMPTY = "ARRAY_INDICES_EMPTY"
+
     # Concurrency -- two jobs that would write one file.
     ARTIFACT_ALREADY_IN_FLIGHT = "ARTIFACT_ALREADY_IN_FLIGHT"
 

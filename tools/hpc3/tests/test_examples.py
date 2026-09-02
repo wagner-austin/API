@@ -161,7 +161,7 @@ class TestTheReadmeIsAnExampleToo:
         """
         text = _README.read_text(encoding="utf-8")
         assert "## What this cannot submit" in text
-        for shape in ("Multi-node / MPI", "Job array", "Explicit `--qos`"):
+        for shape in ("Multi-node / MPI", "Explicit `--qos`"):
             assert shape in text
 
     def test_limits_that_were_lifted_are_not_still_listed_as_limits(self) -> None:
@@ -173,6 +173,9 @@ class TestTheReadmeIsAnExampleToo:
         table = section.split("None of these")[0]
         assert "CPU-only" not in table
         assert "Job dependency" not in table
+        # Lifted 2026-09-01: a sweep IS one array call now, and a row still
+        # claiming otherwise would send a reader around a limit that fell.
+        assert "Job array" not in table
 
 
 class TestExampleWorkspace:

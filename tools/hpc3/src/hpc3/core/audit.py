@@ -113,14 +113,30 @@ def image_build_submitted(
     )
 
 
-def sweep_submitted(*, host: str, project: str, base_name: str, job_ids: list[str]) -> None:
+def sweep_submitted(
+    *,
+    host: str,
+    project: str,
+    base_name: str,
+    job_ids: list[str],
+    partition: str,
+    cluster: ClusterFacts,
+) -> None:
     """Record a completed sweep.
+
+    Carries the billing factor itself, because a sweep is now ONE submission
+    act: the per-member ``job_submitted`` events that used to record the
+    factor described member-by-member submissions that no longer happen, and
+    telemetry of acts that did not occur would be a false trail. Every member
+    shares the template's partition, so one factor covers the array.
 
     Args:
         host: SSH destination the members went to.
         project: Body of work every member belongs to.
         base_name: Template name the members were derived from.
-        job_ids: Ids Slurm assigned, in member order.
+        job_ids: Task ids Slurm assigned, in member order.
+        partition: The partition the whole array went to.
+        cluster: The cluster it went to, for the measured billing factor.
     """
     _test_hooks.log_event(
         SWEEP_SUBMITTED,
@@ -130,6 +146,8 @@ def sweep_submitted(*, host: str, project: str, base_name: str, job_ids: list[st
             "base_name": qualified_name(project, base_name),
             "members": len(job_ids),
             "job_ids": ",".join(job_ids),
+            "partition": partition,
+            "usage_factor": partition_facts(cluster, partition)["usage_factor"],
         },
     )
 

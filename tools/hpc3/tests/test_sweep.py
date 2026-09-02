@@ -88,15 +88,22 @@ def _run(spec: SweepSpec, tmp_path: pathlib.Path) -> list[str]:
 
 
 class TestSubmitSweep:
-    def test_it_submits_every_member_and_returns_their_ids(
+    def test_the_whole_sweep_goes_up_as_one_array_call(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
-        _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", stdout="Submitted batch job 102\n")
-        fake_run.add("sbatch abl.rung-s2", stdout="Submitted batch job 103\n")
+        """One sbatch, every document position, task ids derived from it.
 
-        assert _run(_sweep(), tmp_path) == ["101", "102", "103"]
+        The member-by-member loop this replaced cost three SSH round trips
+        per member (~13s each, rusted ab48, 2026-09-01) against a cluster
+        that scheduled everything instantly."""
+        _healthy(fake_run)
+        fake_run.add("sbatch --array=", stdout="Submitted batch job 101\n")
+
+        assert _run(_sweep(), tmp_path) == ["101_0", "101_1", "101_2"]
+        submits = [
+            c for c in fake_run.commands() if "sbatch --array=" in c and "--test-only" not in c
+        ]
+        assert submits == ["cd /j && sbatch --array=0-2 abl.rung.sbatch"]
 
     def test_every_member_is_reported_by_the_name_squeue_will_show(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
@@ -116,21 +123,18 @@ class TestSubmitSweep:
         )
         assert [m.name for m in members] == ["abl.rung-s0", "abl.rung-s1", "abl.rung-s2"]
 
-    def test_each_member_gets_its_own_script(
+    def test_the_whole_sweep_lands_in_one_script(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
+        """One upload, and the script IS the member table."""
         _healthy(fake_run)
         fake_run.add("sbatch", stdout="Submitted batch job 1\n")
         _run(_sweep(), tmp_path)
 
         writes = [c for c in fake_run.commands() if c.startswith("cat >")]
-        assert writes == [
-            "cat > '/j/abl.rung-s0.sbatch'",
-            "cat > '/j/abl.rung-s1.sbatch'",
-            "cat > '/j/abl.rung-s2.sbatch'",
-        ]
+        assert writes == ["cat > '/j/abl.rung.sbatch'"]
 
-    def test_each_script_carries_that_members_command(
+    def test_the_script_carries_every_members_command_dispatched_by_index(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
         _healthy(fake_run)
@@ -138,38 +142,47 @@ class TestSubmitSweep:
         _run(_sweep(), tmp_path)
 
         payloads = [c.stdin_bytes for c in fake_run.calls if c.stdin_bytes is not None]
-        assert len(payloads) == 3
-        assert b"--seed 0" in payloads[0]
-        assert b"--seed 1" in payloads[1]
-        assert b"--seed 2" in payloads[2]
+        assert len(payloads) == 1
+        script = payloads[0].decode("utf-8")
+        assert 'case "${SLURM_ARRAY_TASK_ID}" in' in script
+        assert "--seed 0" in script
+        assert "--seed 1" in script
+        assert "--seed 2" in script
+        # The dispatch order is the document order, so a sparse --array on a
+        # later convergence pass selects the same members it always did.
+        assert script.index("--seed 0") < script.index("--seed 1") < script.index("--seed 2")
 
-    def test_a_failure_partway_leaves_earlier_members_findable(
+    def test_a_refused_submission_leaves_nothing_behind(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
     ) -> None:
-        """No rollback -- and the ones already running are in the ledger."""
+        """All-or-nothing, which is STRONGER than the old loop's no-rollback:
+        the loop could die on member four leaving three live, while the array
+        either submits whole or refuses whole -- so a refusal here means no
+        job, no ledger row, and no audit event to reconcile."""
         _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", returncode=1, stderr="Invalid account\n")
+        fake_run.add("sbatch --array=", returncode=1, stderr="Invalid account\n")
 
         with pytest.raises(AppError) as excinfo:
             _run(_sweep(), tmp_path)
 
         assert excinfo.value.code is Hpc3ErrorCode.REMOTE_COMMAND_FAILED
-        recorded = read_ledger(tmp_path / "ledger.jsonl")
-        assert [entry["job_id"] for entry in recorded] == ["101"]
+        assert not (tmp_path / "ledger.jsonl").exists()
         assert [e.event for e in logged if e.event == audit.SWEEP_SUBMITTED] == []
 
 
 class TestSweepLedger:
-    def test_every_member_is_recorded(self, tmp_path: pathlib.Path, fake_run: FakeRun) -> None:
+    def test_every_member_is_recorded_under_its_task_id(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """One submission act, one ledger row per member anyway: the task id
+        is what sacct and squeue will call each member, and the ledger is
+        where its per-member name durably lives."""
         _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", stdout="Submitted batch job 102\n")
-        fake_run.add("sbatch abl.rung-s2", stdout="Submitted batch job 103\n")
+        fake_run.add("sbatch", stdout="Submitted batch job 101\n")
         _run(_sweep(), tmp_path)
 
         recorded = read_ledger(tmp_path / "ledger.jsonl")
-        assert [entry["job_id"] for entry in recorded] == ["101", "102", "103"]
+        assert [entry["job_id"] for entry in recorded] == ["101_0", "101_1", "101_2"]
         assert [entry["name"] for entry in recorded] == [
             "abl.rung-s0",
             "abl.rung-s1",
@@ -180,28 +193,17 @@ class TestSweepLedger:
 
 
 class TestSweepAuditEvents:
-    def test_each_member_emits_a_job_event(
+    def test_one_submission_act_emits_one_sweep_event_and_no_job_events(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
     ) -> None:
+        """Per-member job events described member-by-member submissions that
+        no longer happen; telemetry of acts that did not occur would be a
+        false trail. The one event carries every task id."""
         _healthy(fake_run)
-        fake_run.add("sbatch", stdout="Submitted batch job 7\n")
+        fake_run.add("sbatch", stdout="Submitted batch job 101\n")
         _run(_sweep(), tmp_path)
 
-        jobs = [e for e in logged if e.event == audit.JOB_SUBMITTED]
-        assert len(jobs) == 3
-        assert jobs[0].fields["job_name"] == "abl.rung-s0"
-        assert jobs[0].fields["project"] == "abl"
-        assert jobs[0].fields["usage_factor"] == 0.0
-
-    def test_the_sweep_event_lands_once_after_every_member(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
-    ) -> None:
-        _healthy(fake_run)
-        fake_run.add("sbatch abl.rung-s0", stdout="Submitted batch job 101\n")
-        fake_run.add("sbatch abl.rung-s1", stdout="Submitted batch job 102\n")
-        fake_run.add("sbatch abl.rung-s2", stdout="Submitted batch job 103\n")
-        _run(_sweep(), tmp_path)
-
+        assert [e for e in logged if e.event == audit.JOB_SUBMITTED] == []
         sweeps = [e for e in logged if e.event == audit.SWEEP_SUBMITTED]
         assert len(sweeps) == 1
         assert sweeps[0].fields == {
@@ -209,15 +211,21 @@ class TestSweepAuditEvents:
             "project": "abl",
             "base_name": "abl.rung",
             "members": 3,
-            "job_ids": "101,102,103",
+            "job_ids": "101_0,101_1,101_2",
+            "partition": "free-gpu",
+            "usage_factor": 0.0,
         }
         assert logged[-1].event == audit.SWEEP_SUBMITTED
 
-    def test_every_member_records_the_factor_it_went_out_under(
+    def test_the_sweep_event_records_the_factor_the_array_went_out_under(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, logged: list[LoggedEvent]
     ) -> None:
+        """The billing factor moved from the retired per-member events onto
+        the sweep event; every member shares the template's partition, so one
+        factor covers the array."""
         _healthy(fake_run)
         fake_run.add("sbatch", stdout="Submitted batch job 1\n")
         _run(_sweep(count=2, partition="free-gpu32", gpu=gpus("L40S")), tmp_path)
-        jobs = [e for e in logged if e.event == audit.JOB_SUBMITTED]
-        assert [e.fields["usage_factor"] for e in jobs] == [0.0, 0.0]
+        sweeps = [e for e in logged if e.event == audit.SWEEP_SUBMITTED]
+        assert [e.fields["usage_factor"] for e in sweeps] == [0.0]
+        assert [e.fields["partition"] for e in sweeps] == ["free-gpu32"]
