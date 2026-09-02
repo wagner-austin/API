@@ -1,6 +1,6 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (22 pages)
+Codebase design decisions, patterns, and coding standards. (23 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
@@ -19,6 +19,7 @@ Codebase design decisions, patterns, and coding standards. (22 pages)
 [Committed Intent](../pages/committed-intent.md) -- plans that survive the tick boundary: `bot/ai/intent.py` as the single owner of collect-plan semantics (typed plan + completes-here + validity + reasoned release with `plan_released` events); phase 1 SHIPPED 2026-07-30 (s8-2 fix), phase 2 = hunt/clearance plans
 [Diagnostic HUD + Human Flag Channel](../pages/diagnostic-hud.md) -- the fixed-geometry fiesta-styled in-page HUD (2026-07-29 rebuild) and the click-to-flag channel that lands a human_flag diagnostic with an 8-tick lead-up snapshot; includes the flag-tracing triage recipe
 [Flag Triage 2026-07-29](../pages/flag-triage-20260729.md) -- first live flag session: 10 flags, 4 root causes (direction-blind top-off hop, 63% zero-yield hop churn, missing mine-shot clearance, mine-ring acquisition cloak), fix-status table
+[Flag Triage 2026-09-02](../pages/flag-triage-20260902.md) -- Practice-room flags: the 9-minute collect-cascade LIVELOCK (quad sweep clears the harvest lock), clocks standing in for observable facts, absolute break floor on a rank-variable capacity, the 15-constant clock inventory
 
 [Larder Plan](../pages/larder-plan.md) -- IMPLEMENTED and live-proven 2026-07-27: harvest radar-verified containers the bot already remembers as a COLLECT cascade priority; own-tile equipment pickup probe answered YES 3/3; the under-fire refuel now shares the same query
 
