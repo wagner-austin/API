@@ -62,7 +62,9 @@ MICRO: Final = 4
 #: K-slice width staged per iteration.
 K_SLICE: Final = 16
 
-#: Threads per block for the row-sum kernel: one thread per output column.
+#: Threads per block for the two one-thread-per-output-line kernels:
+#: ``ordered_rowsum`` (one thread per column) and ``ordered_lastdim_sum``
+#: (one thread per row). A launch width, never an arithmetic parameter.
 ROWSUM_BLOCK: Final = 128
 
 #: The CUDA source. A string on purpose -- see the module docstring.
@@ -79,6 +81,14 @@ extern "C" __global__ void ordered_gemm_nn(
     // strictly ascending with separate multiply and add -- the register
     // tiling changes how many elements a thread owns, never the order any
     // one element is summed in.
+    //
+    // blockIdx.z selects the batch slice: each z computes one independent
+    // n x k @ k x m product from densely packed operands. A 2-D launch uses
+    // grid.z == 1, where every offset below is zero and the arithmetic is
+    // untouched -- the seven-GPU record corpus still pins this kernel.
+    const float* xb = x + (size_t)blockIdx.z * n_rows * k_dim;
+    const float* wb = w + (size_t)blockIdx.z * k_dim * m_cols;
+    float* outb = out + (size_t)blockIdx.z * n_rows * m_cols;
     __shared__ float xs[64][16];
     __shared__ float ws[16][64];
     const int row0 = blockIdx.y * 64;
@@ -98,9 +108,9 @@ extern "C" __global__ void ordered_gemm_nn(
             const int r = s / 16;
             const int k = s % 16;
             xs[r][k] = (row0 + r < n_rows && k0 + k < k_dim)
-                ? x[(row0 + r) * k_dim + (k0 + k)] : 0.0f;
+                ? xb[(row0 + r) * k_dim + (k0 + k)] : 0.0f;
             ws[k][r] = (k0 + k < k_dim && col0 + r < m_cols)
-                ? w[(k0 + k) * m_cols + (col0 + r)] : 0.0f;
+                ? wb[(k0 + k) * m_cols + (col0 + r)] : 0.0f;
         }
         __syncthreads();
         const int k_stop = (k_dim - k0 < 16) ? (k_dim - k0) : 16;
@@ -125,7 +135,7 @@ extern "C" __global__ void ordered_gemm_nn(
             for (int j = 0; j < 4; ++j) {
                 const int col = col0 + threadIdx.x * 4 + j;
                 if (col < m_cols) {
-                    out[row * m_cols + col] = use_bias ? (bias[col] + acc[i][j]) : acc[i][j];
+                    outb[row * m_cols + col] = use_bias ? (bias[col] + acc[i][j]) : acc[i][j];
                 }
             }
         }
@@ -144,6 +154,24 @@ extern "C" __global__ void ordered_rowsum(
             acc = acc + grad[r * m_cols + col];
         }
         out[col] = acc;
+    }
+}
+
+extern "C" __global__ void ordered_lastdim_sum(
+    const float* __restrict__ rows,  // R x C, row-major, contiguous
+    float* __restrict__ out,         // R
+    const int n_rows, const int m_cols)
+{
+    // One thread per ROW, ascending column order -- the softmax
+    // denominator's reduction, owned the way ordered_rowsum owns the bias
+    // gradient's.
+    const int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < n_rows) {
+        float acc = 0.0f;
+        for (int c = 0; c < m_cols; ++c) {
+            acc = acc + rows[row * m_cols + c];
+        }
+        out[row] = acc;
     }
 }
 """
@@ -264,8 +292,8 @@ def _kernels() -> RawModuleProto:
     return _module
 
 
-def _require_f32_cuda_2d(tensor: torch.Tensor, name: str) -> torch.Tensor:
-    """Return a contiguous view of a 2-D float32 CUDA tensor, or refuse.
+def _require_f32_cuda(tensor: torch.Tensor, name: str, dims: int) -> torch.Tensor:
+    """Return a contiguous view of a float32 CUDA tensor of ``dims`` rank.
 
     Contiguity is imposed HERE, with torch's own deterministic copy, so the
     kernels can assume plain row-major layout. The backward pass hands in
@@ -274,21 +302,23 @@ def _require_f32_cuda_2d(tensor: torch.Tensor, name: str) -> torch.Tensor:
     Args:
         tensor: The operand.
         name: Its role, for the message.
+        dims: The rank the caller's kernel expects.
 
     Returns:
         ``tensor.contiguous()``.
 
     Raises:
-        ValueError: For a non-CUDA, non-float32 or non-2-D operand. Refused
-            rather than converted: a silently-widened or silently-moved
-            operand would be a different computation than the record claims.
+        ValueError: For a non-CUDA, non-float32 or wrong-rank operand.
+            Refused rather than converted: a silently-widened or
+            silently-moved operand would be a different computation than the
+            record claims.
     """
     if not tensor.is_cuda:
         raise ValueError(f"{name} must be a CUDA tensor; ordered kernels have no CPU path")
     if tensor.dtype != torch.float32:
         raise ValueError(f"{name} must be float32, got {tensor.dtype}")
-    if tensor.dim() != 2:
-        raise ValueError(f"{name} must be 2-D, got {tensor.dim()}-D")
+    if tensor.dim() != dims:
+        raise ValueError(f"{name} must be {dims}-D, got {tensor.dim()}-D")
     # Detached because torch refuses to export a grad-requiring tensor over
     # dlpack, and these kernels only READ memory -- autograd's bookkeeping
     # happens in the Functions above them, never here. Same storage, no copy.
@@ -341,8 +371,8 @@ def gemm(x: torch.Tensor, w: torch.Tensor, bias: torch.Tensor | None) -> torch.T
         ValueError: Propagated from the operand checks, or for a shape
             mismatch between the operands.
     """
-    x2 = _require_f32_cuda_2d(x, "x")
-    w2 = _require_f32_cuda_2d(w, "w")
+    x2 = _require_f32_cuda(x, "x", 2)
+    w2 = _require_f32_cuda(w, "w", 2)
     if x2.shape[1] != w2.shape[0]:
         raise ValueError(f"inner dimensions differ: x is {tuple(x2.shape)}, w {tuple(w2.shape)}")
     n_rows, k_dim = int(x2.shape[0]), int(x2.shape[1])
@@ -394,7 +424,7 @@ def rowsum(grad: torch.Tensor) -> torch.Tensor:
     Raises:
         ValueError: Propagated from the operand checks.
     """
-    g2 = _require_f32_cuda_2d(grad, "grad")
+    g2 = _require_f32_cuda(grad, "grad", 2)
     n_rows, m_cols = int(g2.shape[0]), int(g2.shape[1])
     out = torch.empty(m_cols, dtype=torch.float32, device=g2.device)
     surface = _surface()
@@ -404,6 +434,87 @@ def rowsum(grad: torch.Tensor) -> torch.Tensor:
         grid,
         (ROWSUM_BLOCK, 1, 1),
         (surface.from_dlpack(g2), surface.from_dlpack(out), n_rows, m_cols),
+    )
+    return out
+
+
+def gemm_batched(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Compute ``x[b] @ w[b]`` for every batch slice, each in fixed order.
+
+    The same kernel as :func:`gemm` -- ``blockIdx.z`` selects the slice, and
+    every output element is still one thread's strictly ascending k-chain --
+    so per slice this is bit-identical to :func:`gemm` on that slice, which
+    the suite asserts. Attention's two matmuls are the consumer: 12 heads of
+    a real GPT-2 are 12 slices of one launch instead of 12 launches.
+
+    Args:
+        x: ``[B, N, K]``, float32, CUDA; a strided view is fine and is
+            copied contiguous.
+        w: ``[B, K, M]``, float32, CUDA.
+
+    Returns:
+        ``[B, N, M]``, float32, on the same device.
+
+    Raises:
+        ValueError: Propagated from the operand checks, or for mismatched
+            batch or inner dimensions.
+    """
+    x3 = _require_f32_cuda(x, "x", 3)
+    w3 = _require_f32_cuda(w, "w", 3)
+    if x3.shape[0] != w3.shape[0]:
+        raise ValueError(f"batch sizes differ: x has {int(x3.shape[0])}, w {int(w3.shape[0])}")
+    if x3.shape[2] != w3.shape[1]:
+        raise ValueError(f"inner dimensions differ: x is {tuple(x3.shape)}, w {tuple(w3.shape)}")
+    batch, n_rows, k_dim = int(x3.shape[0]), int(x3.shape[1]), int(x3.shape[2])
+    m_cols = int(w3.shape[2])
+    bias_arg = torch.empty(0, dtype=torch.float32, device=x3.device)
+    out = torch.empty(batch, n_rows, m_cols, dtype=torch.float32, device=x3.device)
+    surface = _surface()
+    grid = ((m_cols + TILE - 1) // TILE, (n_rows + TILE - 1) // TILE, batch)
+    _launch(
+        "ordered_gemm_nn",
+        grid,
+        (THREADS, THREADS, 1),
+        (
+            surface.from_dlpack(x3),
+            surface.from_dlpack(w3),
+            surface.from_dlpack(bias_arg),
+            surface.from_dlpack(out),
+            n_rows,
+            k_dim,
+            m_cols,
+            0,
+        ),
+    )
+    return out
+
+
+def lastdim_sum(rows: torch.Tensor) -> torch.Tensor:
+    """Sum each row left to right, one thread per row.
+
+    The softmax denominator's reduction: where :func:`rowsum` folds N rows
+    into one (the bias gradient), this folds each row's C columns into one
+    scalar, in ascending column order.
+
+    Args:
+        rows: ``[R, C]``, float32, CUDA.
+
+    Returns:
+        ``[R]``.
+
+    Raises:
+        ValueError: Propagated from the operand checks.
+    """
+    r2 = _require_f32_cuda(rows, "rows", 2)
+    n_rows, m_cols = int(r2.shape[0]), int(r2.shape[1])
+    out = torch.empty(n_rows, dtype=torch.float32, device=r2.device)
+    surface = _surface()
+    grid = ((n_rows + ROWSUM_BLOCK - 1) // ROWSUM_BLOCK, 1, 1)
+    _launch(
+        "ordered_lastdim_sum",
+        grid,
+        (ROWSUM_BLOCK, 1, 1),
+        (surface.from_dlpack(r2), surface.from_dlpack(out), n_rows, m_cols),
     )
     return out
 
@@ -421,5 +532,7 @@ __all__ = [
     "RawKernelProto",
     "RawModuleProto",
     "gemm",
+    "gemm_batched",
+    "lastdim_sum",
     "rowsum",
 ]

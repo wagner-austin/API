@@ -16,7 +16,17 @@ from model_trainer.core.services.model.deterministic_gemm import (
     rank1_matmul,
 )
 
-from ordered_kernels.kernels import CUDA_SOURCE, K_SLICE, MICRO, THREADS, TILE, gemm, rowsum
+from ordered_kernels.kernels import (
+    CUDA_SOURCE,
+    K_SLICE,
+    MICRO,
+    THREADS,
+    TILE,
+    gemm,
+    gemm_batched,
+    lastdim_sum,
+    rowsum,
+)
 
 #: Shapes chosen to exercise every tiling regime: smaller than one tile,
 #: exact tile and K-slice multiples, ragged in each dimension, a K
@@ -106,6 +116,73 @@ class TestTheOracle:
         _, x, w = _operands(64, 1152, 384)
 
         assert torch.equal(gemm(x, w, None), gemm(x, w, None))
+
+
+class TestTheBatchedGemm:
+    """The batch dimension moves data, never arithmetic."""
+
+    def test_every_slice_equals_the_2d_kernel_on_that_slice(self) -> None:
+        # Includes the sm_75 residual's own shapes: 15 and 16 rows.
+        for batch, n, k, m in ((12, 15, 64, 15), (12, 16, 64, 16), (3, 7, 33, 19), (1, 24, 33, 8)):
+            torch.manual_seed(batch * 100 + n)
+            x = torch.randn(batch, n, k, device="cuda")
+            w = torch.randn(batch, k, m, device="cuda")
+
+            out = gemm_batched(x, w)
+
+            for b in range(batch):
+                assert torch.equal(out[b], gemm(x[b], w[b], None)), (batch, n, k, m, b)
+
+    def test_every_slice_is_rank1_bit_for_bit(self) -> None:
+        torch.manual_seed(77)
+        x = torch.randn(12, 16, 64, device="cuda")
+        w = torch.randn(12, 64, 16, device="cuda")
+
+        out = gemm_batched(x, w)
+
+        for b in range(12):
+            assert torch.equal(out[b], rank1_matmul(x[b], w[b])), b
+
+    def test_a_strided_view_is_the_same_bits_after_its_copy(self) -> None:
+        # Attention hands in transpose views; the contiguous copy must not
+        # change what is computed.
+        torch.manual_seed(78)
+        k = torch.randn(4, 16, 64, device="cuda")
+        x = torch.randn(4, 16, 64, device="cuda")
+
+        viewed = gemm_batched(x, k.transpose(-1, -2))
+        copied = gemm_batched(x, k.transpose(-1, -2).contiguous())
+
+        assert torch.equal(viewed, copied)
+
+    def test_a_2d_operand_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="3-D"):
+            gemm_batched(torch.randn(4, 4, device="cuda"), torch.randn(1, 4, 4, device="cuda"))
+
+    def test_mismatched_batches_are_refused(self) -> None:
+        with pytest.raises(ValueError, match="batch sizes differ"):
+            gemm_batched(torch.randn(2, 4, 5, device="cuda"), torch.randn(3, 5, 6, device="cuda"))
+
+    def test_mismatched_inner_dimensions_are_refused(self) -> None:
+        with pytest.raises(ValueError, match="inner dimensions differ"):
+            gemm_batched(torch.randn(2, 4, 5, device="cuda"), torch.randn(2, 6, 7, device="cuda"))
+
+
+class TestTheLastdimSum:
+    def test_it_is_the_ascending_longhand_bit_for_bit(self) -> None:
+        for rows, cols in ((7, 15), (180, 16), (64, 512)):
+            torch.manual_seed(rows * 10 + cols)
+            t = torch.randn(rows, cols, device="cuda")
+
+            acc = torch.zeros(rows, device="cuda")
+            for c in range(cols):
+                acc = acc + t[:, c]
+
+            assert torch.equal(lastdim_sum(t), acc), (rows, cols)
+
+    def test_a_1d_operand_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="2-D"):
+            lastdim_sum(torch.randn(8, device="cuda"))
 
 
 class TestTheRefusals:

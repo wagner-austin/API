@@ -1,0 +1,115 @@
+"""Causal attention with every reduction program-ordered.
+
+WHY THIS EXISTS. The GTX 1630 (sm_75) broke the fixed-order scoring identity
+on exactly three of 150 items -- all of them, and only them, at 15- and
+16-token sequences, below anything the probe tables sample -- while every
+operation the arms OWN agreed between the cards bit for bit. Attention was
+the leading suspect because it is the arithmetic no module swap reaches:
+under the math pin its matmuls and its softmax run whatever kernels the
+vendor selects for the shape. This module removes that freedom.
+
+WHAT IS OWNED, AND WHAT IS DELIBERATELY NOT. Attention holds exactly three
+reductions and they are all owned: the ``q @ k^T`` products and the
+``probs @ v`` products go through the batched fixed-order GEMM, and the
+softmax denominator goes through the fixed-order row sum. The row MAX is
+taken with torch: an fp32 max is exact whatever order it is computed in, so
+there is no rounding freedom to own. Everything else -- the scale multiply,
+the mask add, the subtract, ``exp``, the divide -- is elementwise, computed
+by torch: an elementwise op has no reduction order, and the stage digests
+measure whether that trust holds rather than assume it.
+
+WHAT THIS IS NOT. It is not a bit-reproduction of torch's math SDPA -- the
+whole point is DIFFERENT arithmetic for the same function. Correctness is
+asserted numerically against the math backend in the suite; cross-card
+bit-identity is what the records establish.
+"""
+
+from __future__ import annotations
+
+import math
+
+import torch
+
+from ordered_kernels.kernels import gemm_batched, lastdim_sum
+
+#: The additive causal term: finite scores keep their value, future
+#: positions become -inf, whose exp is exactly 0.0 in every rounding mode.
+CAUSAL_FILL: float = float("-inf")
+
+
+def causal_bias(length: int, device: torch.device) -> torch.Tensor:
+    """The additive causal mask for one ``[length, length]`` score matrix.
+
+    Args:
+        length: Sequence length.
+        device: Where the scores live.
+
+    Returns:
+        ``[length, length]`` float32: 0.0 at and below the diagonal,
+        ``-inf`` strictly above it.
+    """
+    zeros = torch.zeros(length, length, dtype=torch.float32, device=device)
+    return zeros.masked_fill(
+        torch.ones(length, length, dtype=torch.bool, device=device).triu(diagonal=1),
+        CAUSAL_FILL,
+    )
+
+
+def ordered_softmax(scores: torch.Tensor) -> torch.Tensor:
+    """Last-dim softmax whose denominator is summed in ascending order.
+
+    Args:
+        scores: ``[R, C]``, float32, CUDA. Rows holding ``-inf`` entries are
+            fine -- ``exp`` maps them to exactly 0.0 -- but every row must
+            hold at least one finite entry, which a causal row always does
+            (its diagonal).
+
+    Returns:
+        ``[R, C]``: each row's ``exp(x - max)`` divided by the owned sum.
+    """
+    row_max = scores.amax(dim=-1, keepdim=True)
+    exps = torch.exp(scores - row_max)
+    return exps / lastdim_sum(exps).unsqueeze(-1)
+
+
+def ordered_causal_attention(
+    query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+) -> torch.Tensor:
+    """Causal scaled-dot-product attention, every reduction owned.
+
+    Args:
+        query: ``[B, H, L, D]``, float32, CUDA; strided views are fine and
+            are copied contiguous inside the batched GEMM.
+        key: Same shape.
+        value: Same shape.
+
+    Returns:
+        ``[B, H, L, D]``.
+
+    Raises:
+        ValueError: For mismatched shapes, or propagated from the kernels'
+            operand checks.
+    """
+    if query.shape != key.shape or query.shape != value.shape:
+        raise ValueError(
+            f"q, k and v must share one shape; got {tuple(query.shape)}, "
+            f"{tuple(key.shape)}, {tuple(value.shape)}"
+        )
+    if query.dim() != 4:
+        raise ValueError(f"expected [batch, heads, length, dim], got {query.dim()}-D")
+    batch, heads, length, dim = (int(s) for s in query.shape)
+    folded = batch * heads
+    scores = gemm_batched(
+        query.reshape(folded, length, dim), key.transpose(-1, -2).reshape(folded, dim, length)
+    )
+    # For GPT-2's head dim of 64 the scale is 0.125 -- a power of two, so
+    # the multiply shifts exponents without rounding and its placement
+    # relative to the matmul cannot move a bit.
+    scores = scores * (1.0 / math.sqrt(float(dim)))
+    scores = scores + causal_bias(length, query.device)
+    probs = ordered_softmax(scores.reshape(folded * length, length))
+    out = gemm_batched(probs.reshape(folded, length, length), value.reshape(folded, length, dim))
+    return out.reshape(batch, heads, length, dim)
+
+
+__all__ = ["CAUSAL_FILL", "causal_bias", "ordered_causal_attention", "ordered_softmax"]
