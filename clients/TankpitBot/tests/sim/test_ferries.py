@@ -1,16 +1,38 @@
-"""Law 2c — autonomous ferry drift and its 0x4A wire pair."""
+"""Ferries are furniture until a rider walks them.
+
+Law, operator ruling 2026-09-02: "ferries only move when someone is
+riding them and moving them. they do not move if they are unattended.
+they do not move if you stand on them. someone may use them when you
+arent looking i suppose, and move them, but that requires a person."
+
+Standing on one is not enough — the rider has to WALK. That matches
+what the archive already said in [[ferry-mechanics]] since 2026-08-04
+("No ferry drift law exists in the archive": 148 moves across 312
+captures, 136 rider-attributed, the 12 residuals under-observed
+riders) and what live emits: 0.91 0x4A per session across 341
+sessions.
+
+The sim carried an autonomous drift law from 2026-08-06 until
+2026-09-02, moving all 33 seeded ferries every tick and emitting
+2,336-4,460 0x4A per session — roughly 3,600x live. It is deleted;
+carrying a ferry with its rider lives in ``movement`` and is
+untouched. The first test below is the pin: it fails the moment
+anything moves an unattended ferry again.
+"""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.protocol.types import BinaryMessage
-from tankpit_bot.sim.ferries import (
-    MAP_SPAN,
-    WIRE_TERRAIN_CLEARED,
-    WIRE_TERRAIN_FERRY,
-    drift_ferries,
-)
+from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimFerryDict, SimWorldDict, make_sim_tank, make_sim_world
+from tankpit_bot.sim.world_seed_mines import seed_ferries
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+_FIELD = "field01_r.gif"
 
 
 def _lake() -> InMemoryTerrainMap:
@@ -20,135 +42,73 @@ def _lake() -> InMemoryTerrainMap:
     )
 
 
+def _terrain_updates(messages: list[BinaryMessage]) -> list[list[tuple[int, int, int]]]:
+    """The ``updates`` payload of every 0x4A in a batch."""
+    return [m["updates"] for m in messages if m["msg_type"] == 0x4A]
+
+
+def _real_terrain() -> TerrainMapProtocol:
+    """Load the committed field01 terrain the seeder floats ferries on."""
+    return _test_hooks.load_terrain_map(Path(_FIELD))
+
+
 def _world_with_ferry(x: int, y: int) -> SimWorldDict:
-    """A world holding exactly one ferry and no tanks on it."""
-    world = make_sim_world("field01_r.gif")
+    """A world holding exactly one ferry, with the client well clear."""
+    world = make_sim_world(_FIELD)
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 90, 90, 1000)
     world["ferries"].append(SimFerryDict(x=x, y=y))
     return world
 
 
-def _terrain_updates(messages: list[BinaryMessage]) -> list[list[tuple[int, int, int]]]:
-    """The `updates` payload of every 0x4A in a batch."""
-    return [m["updates"] for m in messages if m["msg_type"] == 0x4A]
+def test_an_unattended_ferry_never_moves_and_never_says_anything() -> None:
+    """THE PIN. An idle ferry emits no 0x4A, tick after tick.
 
-
-def test_a_drifting_ferry_clears_its_old_tile_and_sets_its_new_one() -> None:
-    """The measured wire shape: one frame, two updates, 0 then 5.
-
-    All 205 archived ferry moves carry exactly this pair — the vacated
-    tile reverts to the wire's "nothing here" value so the static map
-    (water) shows through, and the occupied tile becomes terrain 5
-    ([[ferry-mechanics]]).
+    Deleting the autonomous drift law is only durable if re-adding it
+    breaks something, so this asserts the operator's ruling directly:
+    with nobody aboard, the ferry is furniture. Thirty ticks is far
+    past the old law's one-move-per-tick cadence, which would have
+    produced thirty 0x4A pairs here.
     """
     world = _world_with_ferry(100, 100)
-    messages: list[BinaryMessage] = []
+    server = SimServer(world, _lake(), client_id=9)
 
-    drift_ferries(world, _lake(), messages)
+    emitted: list[BinaryMessage] = []
+    for _ in range(30):
+        emitted.extend(server.advance_tick())
 
-    updates = _terrain_updates(messages)
-    assert len(updates) == 1
-    (from_x, from_y, from_value), (to_x, to_y, to_value) = updates[0]
-    assert (from_x, from_y, from_value) == (100, 100, WIRE_TERRAIN_CLEARED)
-    assert to_value == WIRE_TERRAIN_FERRY
-    assert max(abs(to_x - from_x), abs(to_y - from_y)) == 1
-    assert (world["ferries"][0]["x"], world["ferries"][0]["y"]) == (to_x, to_y)
-
-
-def test_drift_is_one_tile_per_tick() -> None:
-    """Each tick moves a ferry by exactly one tile, never further.
-
-    The chained archive steps land a median 2003 ms apart — one tick —
-    and the modal step is a single axial or diagonal tile.
-    """
-    world = _world_with_ferry(100, 100)
-    terrain = _lake()
-    previous = (100, 100)
-    for _ in range(6):
-        world["tick"] += 1
-        messages: list[BinaryMessage] = []
-        drift_ferries(world, terrain, messages)
-        current = (world["ferries"][0]["x"], world["ferries"][0]["y"])
-        assert max(abs(current[0] - previous[0]), abs(current[1] - previous[1])) == 1
-        previous = current
-
-
-def test_a_ridden_ferry_does_not_drift() -> None:
-    """The rider drives it; drifting too would double the step.
-
-    ``movement._update_ridden_ferry`` already carried the ferry with
-    its rider this tick.
-    """
-    world = _world_with_ferry(100, 100)
-    world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 1100)
-    messages: list[BinaryMessage] = []
-
-    drift_ferries(world, _lake(), messages)
-
-    assert messages == []
+    assert _terrain_updates(emitted) == []
     assert (world["ferries"][0]["x"], world["ferries"][0]["y"]) == (100, 100)
 
 
-def test_a_ferry_against_the_shore_idles() -> None:
-    """A heading onto non-water is not a move, and emits nothing.
+def test_a_ferry_under_a_standing_tank_still_does_not_move() -> None:
+    """Standing on one is not riding it — the rider must WALK.
 
-    This is where the long observed gaps come from: the archive's
-    terrain-update spacing runs to a p75 of 8005 ms, four ticks.
+    The operator's ruling is explicit that occupancy alone moves
+    nothing, and the deleted drift law had it backwards: it treated an
+    occupied tile as "ridden, skip" and drifted every OTHER ferry,
+    so a boarded ferry was the only still one on the map.
     """
     world = _world_with_ferry(100, 100)
-    landlocked = InMemoryTerrainMap(terrain_data={(100, 100): "W"})
-    messages: list[BinaryMessage] = []
+    world["tanks"][9]["x"] = 100
+    world["tanks"][9]["y"] = 100
+    server = SimServer(world, _lake(), client_id=9)
 
-    drift_ferries(world, landlocked, messages)
+    emitted: list[BinaryMessage] = []
+    for _ in range(10):
+        emitted.extend(server.advance_tick())
 
-    assert messages == []
+    assert _terrain_updates(emitted) == []
     assert (world["ferries"][0]["x"], world["ferries"][0]["y"]) == (100, 100)
-
-
-def test_a_ferry_never_drifts_onto_another_ferry() -> None:
-    """Two ferries do not stack: the blocked one idles this tick."""
-    world = _world_with_ferry(100, 100)
-    terrain = _lake()
-    messages: list[BinaryMessage] = []
-    drift_ferries(world, terrain, messages)
-    landed = (world["ferries"][0]["x"], world["ferries"][0]["y"])
-
-    crowded = _world_with_ferry(100, 100)
-    crowded["ferries"].append(SimFerryDict(x=landed[0], y=landed[1]))
-    crowded_messages: list[BinaryMessage] = []
-    drift_ferries(crowded, terrain, crowded_messages)
-
-    assert (crowded["ferries"][0]["x"], crowded["ferries"][0]["y"]) == (100, 100)
-    assert (100, 100) not in [(u[0][0], u[0][1]) for u in _terrain_updates(crowded_messages)]
-
-
-def test_a_heading_off_the_map_edge_is_not_a_move() -> None:
-    """Tile coordinates stop at 0 and 255; the edge is a shore."""
-    world = _world_with_ferry(0, 0)
-    edge = InMemoryTerrainMap(terrain_data={(x, y): "W" for x in range(0, 3) for y in range(0, 3)})
-    for tick in range(8):  # every heading in the cycle, from the corner
-        world["tick"] = tick
-        world["ferries"][0]["x"], world["ferries"][0]["y"] = 0, 0
-        messages: list[BinaryMessage] = []
-        drift_ferries(world, edge, messages)
-        assert 0 <= world["ferries"][0]["x"] < MAP_SPAN
-        assert 0 <= world["ferries"][0]["y"] < MAP_SPAN
 
 
 def test_the_room_floats_ferries_on_its_water() -> None:
     """Every scenario gets ferries, not just the one that named a tile.
 
-    The sim floated exactly one, at a hardcoded tile, in one scenario
-    — so every practice, atlas and ghost room had none and the 205
-    archived 0x4A drift frames had nothing to answer them
-    ([[session-state-deglobalisation]]).
+    Seeding is unaffected by the drift deletion: a room still has its
+    ferries as terrain the bot can board, they simply do not wander.
     """
-    from pathlib import Path
-
-    from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed_mines import seed_ferries
-
-    terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
-    world = make_sim_world("field01_r.gif")
+    terrain = _real_terrain()
+    world = make_sim_world(_FIELD)
 
     afloat = seed_ferries(world, terrain)
 
@@ -159,14 +119,9 @@ def test_the_room_floats_ferries_on_its_water() -> None:
 
 
 def test_seeded_ferries_never_stack() -> None:
-    """One ferry per tile, so a drift step always has somewhere to go."""
-    from pathlib import Path
-
-    from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed_mines import seed_ferries
-
-    world = make_sim_world("field01_r.gif")
-    seed_ferries(world, _test_hooks.load_terrain_map(Path("field01_r.gif")))
+    """One ferry per tile, so a rider always boards exactly one."""
+    world = make_sim_world(_FIELD)
+    seed_ferries(world, _real_terrain())
 
     tiles = [(ferry["x"], ferry["y"]) for ferry in world["ferries"]]
     assert len(set(tiles)) == len(tiles)
@@ -174,35 +129,9 @@ def test_seeded_ferries_never_stack() -> None:
 
 def test_a_scenarios_own_ferry_survives_the_seeding() -> None:
     """A world that placed its own keeps it — the ferry scenario does."""
-    from pathlib import Path
-
-    from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed_mines import seed_ferries
-
-    world = make_sim_world("field01_r.gif")
+    world = make_sim_world(_FIELD)
     world["ferries"].append(SimFerryDict(x=118, y=112))
 
-    seed_ferries(world, _test_hooks.load_terrain_map(Path("field01_r.gif")))
+    seed_ferries(world, _real_terrain())
 
     assert (118, 112) in [(ferry["x"], ferry["y"]) for ferry in world["ferries"]]
-
-
-def test_a_seeded_room_drifts_its_ferries_on_the_tick() -> None:
-    """Seeding and drift compose: the room's ferries move and say so."""
-    from pathlib import Path
-
-    from tankpit_bot import _test_hooks
-    from tankpit_bot.sim.world_seed_mines import seed_ferries
-
-    terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
-    world = make_sim_world("field01_r.gif")
-    seed_ferries(world, terrain)
-    messages: list[BinaryMessage] = []
-
-    drift_ferries(world, terrain, messages)
-
-    moves = _terrain_updates(messages)
-    assert moves != []
-    for update in moves:
-        (_, _, cleared), (_, _, occupied) = update
-        assert (cleared, occupied) == (WIRE_TERRAIN_CLEARED, WIRE_TERRAIN_FERRY)

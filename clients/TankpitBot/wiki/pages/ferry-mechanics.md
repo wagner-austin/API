@@ -147,7 +147,7 @@ shapes (`sim/emissions.py::emit_move`,
     first classifier pass wrongly read "all unridden" because it
     matched riders against the OLD tile only.
 
-## The sim drifts ferries anyway, at 3,600x live (measured 2026-09-02)
+## The sim's drift law, measured and deleted (2026-09-02)
 
 The no-drift result above is CANONICAL and live still agrees with it.
 `sim/ferries.py` nonetheless implements an autonomous drift law, added

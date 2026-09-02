@@ -36,7 +36,6 @@ from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.equipment import toggle_equipment_slot
-from tankpit_bot.sim.ferries import drift_ferries
 from tankpit_bot.sim.narrate import (
     narrate_block_action,
     narrate_chat,
@@ -495,11 +494,6 @@ class SimServer(SimServerMoveMixin):
                 # them if the landing is in view, and the sync
                 # loop resumes their tier-3 cadence either way.
                 reactivate_practice_bot(self.world, self.terrain, tank_id)
-        # Ferries drift on the tick (measured median gap 2003 ms) and
-        # BEFORE the viewport refresh below, so a ferry crossing the
-        # patch grid repaints it in the same batch that announced the
-        # move ([[ferry-mechanics]], [[session-state-deglobalisation]]).
-        drift_ferries(self.world, self.terrain, messages)
         # Room churn runs BEFORE the viewport diff, so a visitor who
         # lands inside the client's window is announced by the same
         # membership pass that announces any other arrival

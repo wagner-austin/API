@@ -5509,3 +5509,18 @@ Enforcement: new `restricted-symbols` guard rule in `monorepo_guards` (table-dri
 Gates: TankpitBot `make check` green — 6,744 tests, 100.00% statements AND branches, all guards including the new rule; `monorepo_guards` `make check` green — 646 tests, 100.00%. Zero pre-existing tests pinned the old clearing behavior, which is exactly how it survived three doctrine passes; fifteen new tests pin the new laws, including the pocket shape end-to-end through `decide_collect_mode`.
 
 Not touched, still open in the triage table: coverage staleness clocks (rows 3-5), the rank-relative break floor (row 6), the mine-pin latch (row 7), the ferry scout (row 8), the dead forks and undocumented constants (rows 9-10).
+
+---
+## [2026-09-02] lift | Autonomous ferry drift deleted: one invented rate was eight invented laws
+
+Operator ruling, verbatim: *"ferries only move when someone is riding them and moving them. they do not move if they are unattended. they do not move if you stand on them. someone may use them when you arent looking i suppose, and move them, but that requires a person."* That is sharper than [[ferry-mechanics]] had it — standing on a ferry is not riding it, the rider must WALK — and the deleted law had exactly that backwards: it treated an occupied tile as "ridden, skip" and drifted every other ferry, so a boarded ferry was the only still one on the map.
+
+**The measurement chain.** The response-shape differ reported 12 invented laws against a current sim baseline, 8 of them a known-good shape with a trailing 0x5A. Two fixes at that symptom failed (both recorded in `sim/server.py`). The rate was the cause: `drift_ferries` moved all 33 seeded ferries EVERY tick, at 33 x 79 ticks = 2,607 potential moves per session against 2,336 observed, while live emits 0.91 0x4A per session across 341 sessions. Roughly 3,600x.
+
+**Result:** `sim/ferries.py` deleted entirely — it existed only for drift; rider carriage lives in `movement._update_ridden_ferry` and is untouched. Sim 0x4A per session 3,246 -> **0.00** (live 0.91, which is rider-caused). Differ invented laws **12 -> 1**, the survivor being the queue-compression artifact already bucketed in [[capture-differ]].
+
+**Four wrong turns on the way here, all recorded rather than quietly dropped.** (1) "The sim over-emits 0x5A" — it emitted 0.47% of messages against live's 4.77%. (2) "It under-emits tenfold" — also wrong; both were denominator errors, since dividing by total messages mixes in the sim's higher status-sync density. Per triggering command it is live 0.962 per teleport vs sim 1.084. (3) Suppressing the end-of-tick refresh — wrong, because `build_update` returns a mutating DIFF and the second call carries the drift; suppressing it stopped the wrong-pond scenario discovering its ferry. (4) Briefly disbelieving the ferry root cause because `make_default_sim_world()` seeds zero ferries — the wrong function; `tankpit-sim-run` seeds 33, and the arithmetic then closed exactly.
+
+**Method note worth keeping.** The operator asked "ferries only move when a player moves them, right?" before any of this was measured, and was right. The answer had been on [[ferry-mechanics]] since 2026-08-04. I had read `sim/ferries.py`'s own docstring first and taken it as the law — a module's account of the mechanic it implements is not evidence for that mechanic. Grep the wiki first.
+
+Gate: 367 sim tests, guard exit 0, ruff and mypy strict clean over 1,212 files.
