@@ -3,9 +3,9 @@
 The client-side twin of Model-Trainer's ``kernel_arm_modules``: the same two
 wrapper shapes, the same original-parameters-by-reference discipline, the
 same materialise-then-swap walk -- built on that module's own exported
-Protocols so the two cannot drift apart in what they consider a Conv1D.
-It lives here rather than there because Model-Trainer's suite is CPU-only
-and these forwards exist only on CUDA.
+Protocols and class getters so the two cannot drift apart in what they
+consider a Conv1D. It lives here rather than there because Model-Trainer's
+suite is CPU-only and these forwards exist only on CUDA.
 """
 
 from __future__ import annotations
@@ -15,29 +15,11 @@ from model_trainer.core.services.model.kernel_arm_modules import (
     Conv1DProto,
     LinearProto,
     SwapTargetProto,
+    conv1d_class,
+    linear_class,
 )
 
 from ordered_kernels.api import ordered_addmm, ordered_matmul
-
-
-def _conv1d_class() -> type[Conv1DProto]:
-    """Return ``transformers.pytorch_utils.Conv1D``, typed for isinstance.
-
-    The same dynamic-import dance ``kernel_arm_modules`` performs; restated
-    here rather than imported because that module keeps its getters private,
-    and eight lines of the established pattern beat a cross-package private
-    import.
-    """
-    module = __import__("transformers.pytorch_utils", fromlist=["Conv1D"])
-    cls: type[Conv1DProto] = module.Conv1D
-    return cls
-
-
-def _linear_class() -> type[LinearProto]:
-    """Return ``torch.nn.Linear``, typed for isinstance."""
-    module = __import__("torch.nn", fromlist=["Linear"])
-    cls: type[LinearProto] = module.Linear
-    return cls
 
 
 class OrderedConv1D(torch.nn.Module):
@@ -88,15 +70,15 @@ def use_ordered_kernels(model: SwapTargetProto) -> int:
             ``kernel_arm_modules`` refuses one: where ``F.linear`` adds its
             bias has not been measured.
     """
-    conv1d_class = _conv1d_class()
-    linear_class = _linear_class()
+    conv1d = conv1d_class()
+    linear = linear_class()
     graph = [(path, module) for path, module in model.named_modules() if path]
     replaced = 0
     for path, module in graph:
-        if isinstance(module, conv1d_class):
+        if isinstance(module, conv1d):
             model.set_submodule(path, OrderedConv1D(module))
             replaced += 1
-        elif isinstance(module, linear_class):
+        elif isinstance(module, linear):
             if module.bias is not None:
                 raise ValueError(
                     f"{path} is a Linear with a bias; the ordered swap only replaces "

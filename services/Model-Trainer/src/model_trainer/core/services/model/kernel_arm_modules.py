@@ -153,8 +153,12 @@ class LinearProto(Protocol):
         ...
 
 
-def _linear_class() -> type[LinearProto]:
+def linear_class() -> type[LinearProto]:
     """Return ``torch.nn.Linear``, typed.
+
+    Public because every swap walk needs it: this module's arms and
+    ``ordered_kernels``' modules do the identical ``isinstance`` narrowing,
+    and one exported getter beats two restatements of the dynamic import.
 
     Returns:
         The class, for :func:`isinstance`.
@@ -204,8 +208,10 @@ def require_swappable(model: LMModelProto) -> SwapTargetProto:
     return model
 
 
-def _conv1d_class() -> type[Conv1DProto]:
+def conv1d_class() -> type[Conv1DProto]:
     """Return ``transformers.pytorch_utils.Conv1D``, typed.
+
+    Public for the reason :func:`linear_class` is.
 
     Returns:
         The class, for :func:`isinstance`.
@@ -343,16 +349,16 @@ def use_kernel_arm(model: SwapTargetProto, arm: str) -> int:
     if named == CUBLAS_ARM:
         return 0
 
-    conv1d_class = _conv1d_class()
-    linear_class = _linear_class()
+    conv1d = conv1d_class()
+    linear = linear_class()
     graph = [(path, module) for path, module in model.named_modules() if path]
 
     replaced = 0
     for path, module in graph:
-        if isinstance(module, conv1d_class):
+        if isinstance(module, conv1d):
             model.set_submodule(path, ArmConv1D(module, named))
             replaced += 1
-        elif isinstance(module, linear_class):
+        elif isinstance(module, linear):
             if module.bias is not None:
                 raise ValueError(
                     f"{path} is a Linear with a bias; this arm only replaces bias-free "
@@ -401,6 +407,8 @@ __all__ = [
     "LinearProto",
     "SwapTargetProto",
     "apply_kernel_arm_to_model",
+    "conv1d_class",
+    "linear_class",
     "require_swappable",
     "use_kernel_arm",
 ]

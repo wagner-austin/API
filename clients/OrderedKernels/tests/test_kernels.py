@@ -16,7 +16,7 @@ from model_trainer.core.services.model.deterministic_gemm import (
     rank1_matmul,
 )
 
-from ordered_kernels.kernels import K_SLICE, TILE, gemm, rowsum
+from ordered_kernels.kernels import CUDA_SOURCE, K_SLICE, MICRO, THREADS, TILE, gemm, rowsum
 
 #: Shapes chosen to exercise every tiling regime: smaller than one tile,
 #: exact tile and K-slice multiples, ragged in each dimension, a K
@@ -40,6 +40,39 @@ def _operands(n: int, k: int, m: int) -> tuple[torch.Tensor, torch.Tensor, torch
         torch.randn(n, k, device="cuda"),
         torch.randn(k, m, device="cuda"),
     )
+
+
+class TestTheLaunchContract:
+    """The Python constants and the CUDA source describe ONE geometry.
+
+    :func:`gemm` computes its grid from ``TILE`` and its block from
+    ``THREADS`` while the source hardcodes its tile literals, so a source
+    edit that skips the constants would mislaunch without any oracle test
+    noticing the cause. Pinning the literals to the constants makes every
+    constant load-bearing and turns that drift into a named failure.
+    ``ROWSUM_BLOCK`` needs no pin: the row-sum kernel reads ``blockDim.x``
+    and hardcodes nothing.
+    """
+
+    def test_the_tile_is_the_thread_grid_times_the_micro_patch(self) -> None:
+        assert TILE == THREADS * MICRO
+
+    def test_the_source_hardcodes_exactly_the_constants_geometry(self) -> None:
+        fragments = (
+            f"__shared__ float xs[{TILE}][{K_SLICE}];",
+            f"__shared__ float ws[{K_SLICE}][{TILE}];",
+            f"const int row0 = blockIdx.y * {TILE};",
+            f"const int col0 = blockIdx.x * {TILE};",
+            f"const int tid = threadIdx.y * {THREADS} + threadIdx.x;",
+            f"float acc[{MICRO}][{MICRO}];",
+            f"k0 += {K_SLICE}) {{",
+            f"s < {TILE} * {K_SLICE}; s += {THREADS * THREADS})",
+            f"(k_dim - k0 < {K_SLICE}) ? (k_dim - k0) : {K_SLICE};",
+            f"xs[threadIdx.y * {MICRO} + i][kk]",
+            f"ws[kk][threadIdx.x * {MICRO} + j]",
+        )
+        for fragment in fragments:
+            assert fragment in CUDA_SOURCE, fragment
 
 
 class TestTheOracle:
