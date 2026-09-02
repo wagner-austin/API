@@ -70,6 +70,7 @@ def _record(instance: str, pid: int, created_at: float) -> FleetProcessRecordDic
         role="fighter",
         room="World",
         troop="orange",
+        doctrine="skirmish",
         kills=12,
         seconds=600,
         started_ms=1_788_000_000_000,

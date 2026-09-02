@@ -65,6 +65,7 @@ def _adopt_one(record: FleetProcessRecordDict) -> _ManagedBot | None:
         role=record["role"],
         room=record["room"],
         troop=record["troop"],
+        doctrine=record["doctrine"],
         kills=record["kills"],
         seconds=record["seconds"],
         started_ms=record["started_ms"],

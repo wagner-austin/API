@@ -59,6 +59,11 @@ class FleetProcessRecordDict(TypedDict):
             the default Practice room).
         troop: Tank color name the child was spawned with (empty means
             the account's own default for that map).
+        doctrine: Engagement doctrine the child was spawned with
+            (empty means its own default, skirmish). Recorded so an
+            ADOPTED bot still reports what it is fighting under -- a
+            manager that inherits a bot and cannot say knows less
+            about it than the one that spawned it.
         kills: Kill bound the child was spawned with (0 unbounded).
         seconds: Seconds bound the child was spawned with (0 unbounded).
         started_ms: Wall-clock spawn time, so an adopted row reports
@@ -74,6 +79,7 @@ class FleetProcessRecordDict(TypedDict):
     role: FleetRole
     room: str
     troop: str
+    doctrine: str
     kills: int
     seconds: int
     started_ms: int
@@ -130,6 +136,7 @@ def encode_process_record(record: FleetProcessRecordDict) -> JSONObject:
         "role": record["role"],
         "room": record["room"],
         "troop": record["troop"],
+        "doctrine": record["doctrine"],
         "kills": record["kills"],
         "seconds": record["seconds"],
         "started_ms": record["started_ms"],
@@ -156,6 +163,7 @@ def decode_process_record(data: JSONObject) -> FleetProcessRecordDict:
         role=_require_role(data, "role"),
         room=require_str(data, "room"),
         troop=require_str(data, "troop"),
+        doctrine=require_str(data, "doctrine"),
         kills=require_int(data, "kills"),
         seconds=require_int(data, "seconds"),
         started_ms=require_int(data, "started_ms"),

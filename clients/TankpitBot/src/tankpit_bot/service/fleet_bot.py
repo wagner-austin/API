@@ -28,6 +28,11 @@ class FleetBotDict(TypedDict):
             the child was spawned with ([[fleet-coordination]]).
         room: ``TANKPIT_ROOM`` the child was spawned with (empty means
             the default Practice room).
+        doctrine: Engagement doctrine the child was spawned with
+            (empty means the child's own default, skirmish). Reported
+            so an operator can SEE what a running bot is fighting
+            under -- a selector with no readback is a setting you
+            cannot confirm took.
         troop: Tank color name the child was spawned with (empty means
             the account's own default for that map).
         pid: Child process id.
@@ -43,6 +48,7 @@ class FleetBotDict(TypedDict):
     role: FleetRole
     room: str
     troop: str
+    doctrine: str
     pid: int
     alive: bool
     returncode: int | None
@@ -122,6 +128,7 @@ class _ManagedBot:
         role: FleetRole,
         room: str,
         troop: str,
+        doctrine: str,
         kills: int,
         seconds: int,
         started_ms: int,
@@ -135,6 +142,7 @@ class _ManagedBot:
             role: Resolved fleet role the child received.
             room: Room selector the child received ("" = default).
             troop: Tank color name the child received ("" = default).
+            doctrine: Engagement doctrine the child received.
             kills: Kill bound the child received.
             seconds: Seconds bound the child received.
             started_ms: Wall-clock spawn time.
@@ -145,6 +153,7 @@ class _ManagedBot:
         self.role = role
         self.room = room
         self.troop = troop
+        self.doctrine = doctrine
         self.kills = kills
         self.seconds = seconds
         self.started_ms = started_ms
@@ -162,6 +171,7 @@ class _ManagedBot:
             role=self.role,
             room=self.room,
             troop=self.troop,
+            doctrine=self.doctrine,
             pid=self.process.pid,
             alive=self.process.is_running(),
             returncode=self.process.exit_code(),

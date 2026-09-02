@@ -31,6 +31,7 @@ def _bot(instance: str = "alpha", returncode: int | None = None) -> FleetBotDict
         role="gatherer",
         room="World",
         troop="orange",
+        doctrine="skirmish",
         pid=4312,
         alive=returncode is None,
         returncode=returncode,
@@ -118,7 +119,18 @@ def test_decoding_refuses_a_snapshot_whose_rows_are_not_objects() -> None:
 
 @pytest.mark.parametrize(
     "field",
-    ["instance", "account", "role", "room", "troop", "pid", "alive", "kills", "seconds"],
+    [
+        "instance",
+        "account",
+        "role",
+        "room",
+        "troop",
+        "doctrine",
+        "pid",
+        "alive",
+        "kills",
+        "seconds",
+    ],
 )
 def test_decoding_refuses_a_row_missing_any_field(field: str) -> None:
     """A partial row is corruption, not a default."""

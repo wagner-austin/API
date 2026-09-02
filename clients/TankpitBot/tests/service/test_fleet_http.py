@@ -108,9 +108,7 @@ async def test_http_page_stats_and_restart(
     listed_doctrines = await fleet_client.get("/doctrines")
     assert listed_doctrines.status == 200
     doctrines_payload = narrow_json_to_dict(load_json_str(await listed_doctrines.text()))
-    assert doctrines_payload == {
-        "doctrines": ["skirmish", "swarm", "duelist", "passive"]
-    }
+    assert doctrines_payload == {"doctrines": ["skirmish", "swarm", "duelist", "passive"]}
 
     listed_troops = await fleet_client.get("/troops")
     assert listed_troops.status == 200

@@ -131,12 +131,12 @@ __CARD_CSS__
 <div class="panel">
 <table>
   <thead><tr>
-    <th>name</th><th>account</th><th>role</th><th>room</th><th>color</th><th>status</th><th>limits</th>
+    <th>name</th><th>account</th><th>role</th><th>room</th><th>color</th><th>doctrine</th><th>status</th><th>limits</th>
     <th>kills</th><th>deaths</th><th>hit/miss</th><th>dmg +/-</th>
     <th>tp</th><th>0-radar</th><th>inv start&rarr;now</th>
     <th>rank</th><th>time</th><th>actions</th>
   </tr></thead>
-  <tbody id="rows"><tr><td colspan="17" class="empty">loading…</td></tr></tbody>
+  <tbody id="rows"><tr><td colspan="18" class="empty">loading…</td></tr></tbody>
 </table>
 </div>
 <form id="spawn">
@@ -268,6 +268,7 @@ function row(bot) {
     "<td>" + bot.role + "</td>" +
     "<td>" + (bot.room || "Practice") + "</td>" +
     "<td>" + (bot.troop || "default") + "</td>" +
+    "<td>" + (bot.doctrine || "skirmish") + "</td>" +
     "<td>" + status + "</td><td>" + limits + "</td>" +
     "<td>" + (s.available ? s.kills : "") + "</td>" +
     "<td>" + (s.available ? s.deaths : "") + "</td>" +
@@ -350,7 +351,7 @@ async function poll() {
   tbody.replaceChildren();
   if (!names.length) {
     tbody.innerHTML =
-      '<tr><td colspan="17" class="empty">no bots yet — launch one below</td></tr>';
+      '<tr><td colspan="18" class="empty">no bots yet — launch one below</td></tr>';
   }
   for (const name of names) tbody.appendChild(row(registry[name]));
   const running = names.filter((n) => registry[n].alive).length;

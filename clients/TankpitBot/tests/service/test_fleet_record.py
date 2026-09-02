@@ -36,6 +36,7 @@ def _record(instance: str = "alpha", pid: int = 4312) -> FleetProcessRecordDict:
         role="gatherer",
         room="World",
         troop="orange",
+        doctrine="skirmish",
         kills=30,
         seconds=2700,
         started_ms=1_788_000_000_000,
@@ -144,7 +145,18 @@ def test_decoding_refuses_a_role_that_is_not_a_fleet_role() -> None:
 
 @pytest.mark.parametrize(
     "field",
-    ["instance", "account", "role", "room", "troop", "kills", "seconds", "started_ms", "pid"],
+    [
+        "instance",
+        "account",
+        "role",
+        "room",
+        "troop",
+        "doctrine",
+        "kills",
+        "seconds",
+        "started_ms",
+        "pid",
+    ],
 )
 def test_decoding_refuses_a_record_missing_any_field(field: str) -> None:
     """Every field is required; a partial record is corruption."""
