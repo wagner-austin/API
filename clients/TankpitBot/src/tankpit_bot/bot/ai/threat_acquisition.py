@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.threat_primitives import (
     manhattan_distance,
 )
 from tankpit_bot.bot.ai.world_types import EnemyThreatDict
+from tankpit_bot.fleetshare.types import EngagementDoctrine
 from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import (
@@ -31,6 +32,94 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     has_known_position,
 )
+
+SWARM_MUSTER_QUORUM = 2
+"""War-ready fleet members (self included) a swarm bot needs standing
+before it will OPEN a human fight nobody is in yet. Joining a fight a
+sibling already holds needs no quorum — reinforcement beats
+book-keeping. Two is the smallest number that is not fighting alone,
+which is the serial trickle the doctrine exists to end (operator
+order 2026-09-01)."""
+
+
+def _doctrine_rejection_reason(
+    ws: WorldService,
+    doctrine: EngagementDoctrine,
+    tank: TankStateDict,
+) -> str | None:
+    """Return why the engagement doctrine bars this human, or ``None``.
+
+    Consulted only for consented human candidates — practice bots and
+    the consent gate itself are untouched by doctrine.
+
+    Args:
+        ws: The session's world service (fleet engagement + muster).
+        doctrine: This bot's engagement doctrine.
+        tank: The consented human candidate.
+
+    Returns:
+        ``"doctrine_passive"`` (never initiates), ``"duel_claimed"``
+        (a sibling already holds the duel), ``"awaiting_muster"``
+        (swarm, nobody engaged yet and the war-ready quorum is not
+        standing), or ``None`` when the doctrine permits.
+    """
+    if doctrine == "passive":
+        return "doctrine_passive"
+    sibling_engaged = tank["tank_id"] in ws.fleet_engaged_target_ids
+    if doctrine == "duelist":
+        return "duel_claimed" if sibling_engaged else None
+    if (
+        doctrine == "swarm"
+        and not sibling_engaged
+        and 1 + ws.fleet_war_ready_count < SWARM_MUSTER_QUORUM
+    ):
+        return "awaiting_muster"
+    return None
+
+
+def _human_rejection_reason(
+    ws: WorldService,
+    tank: TankStateDict,
+    *,
+    human_min_rank: int,
+    human_max_rank: int,
+    doctrine: EngagementDoctrine,
+) -> str | None:
+    """Return why the human-only gates bar this enemy, or ``None``.
+
+    Three gates in seniority order, all checked before the
+    affordability gate so the relay path (which accepts only
+    ``"unaffordable"`` rejections) can never travel toward a barred
+    human: the rank window (user ruling 2026-07-28: recruits below
+    the floor and high ranks above a respect ceiling are never
+    targeted), the consent contract (2026-07-30: no acquisition of a
+    human who has neither responded to the HELLO nor engaged first),
+    and the engagement doctrine (operator order 2026-09-01: timing
+    policy over WHEN a consented fight opens).
+
+    Args:
+        ws: The session's world service.
+        tank: Enemy tank under consideration.
+        human_min_rank: Lowest targetable human rank.
+        human_max_rank: Highest targetable human rank.
+        doctrine: This bot's engagement doctrine.
+
+    Returns:
+        The rejection reason, or ``None`` when every human gate
+        passes (practice bots pass trivially).
+    """
+    if is_human_rank_protected(
+        tank["name"],
+        tank["rank"],
+        min_rank=human_min_rank,
+        max_rank=human_max_rank,
+    ):
+        return "protected_human_rank"
+    if not is_human_name(tank["name"]):
+        return None
+    if not human_combat_consented(ws, tank["tank_id"]):
+        return "human_not_consented"
+    return _doctrine_rejection_reason(ws, doctrine, tank)
 
 
 def _acquisition_rejection_reason(
@@ -45,6 +134,7 @@ def _acquisition_rejection_reason(
     engagement_reserve_fuel: int,
     human_min_rank: int,
     human_max_rank: int,
+    doctrine: EngagementDoctrine,
 ) -> str | None:
     """Return why an enemy fails the acquisition gates, or ``None`` if viable.
 
@@ -67,25 +157,11 @@ def _acquisition_rejection_reason(
 
     if tank["liveness"] != "alive":
         return "not_alive"
-    if is_human_rank_protected(
-        tank["name"],
-        tank["rank"],
-        min_rank=human_min_rank,
-        max_rank=human_max_rank,
-    ):
-        # User ruling 2026-07-28: humans outside the configured rank
-        # window are never targeted (recruits below the floor; high
-        # ranks above a respect ceiling when one is set). Checked
-        # before the affordability gate so the relay path (which
-        # accepts only "unaffordable" rejections) can never travel
-        # toward one.
-        return "protected_human_rank"
-    if is_human_name(tank["name"]) and not human_combat_consented(ws, tank["tank_id"]):
-        # Human-consent contract (2026-07-30): no acquisition of a
-        # human who has neither responded to the HELLO nor engaged
-        # first. Placed before the affordability gate for the same
-        # relay-path reason as the rank window above.
-        return "human_not_consented"
+    human_rejection = _human_rejection_reason(
+        ws, tank, human_min_rank=human_min_rank, human_max_rank=human_max_rank, doctrine=doctrine
+    )
+    if human_rejection is not None:
+        return human_rejection
     if not has_known_position(tank):
         return "unsynced_position"
     if str(tank["tank_id"]) in killed:
@@ -121,6 +197,7 @@ def find_acquisition_target(
     priority_target_name: str = "",
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
+    doctrine: EngagementDoctrine = "skirmish",
 ) -> EnemyThreatDict | None:
     """Pick the highest-priority map-fresh enemy the bot can afford.
 
@@ -192,6 +269,7 @@ def find_acquisition_target(
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
+            doctrine,
         )
         candidate_log.append(
             {
@@ -238,6 +316,7 @@ def stale_human_exists(
     engagement_reserve_fuel: int,
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
+    doctrine: EngagementDoctrine = "skirmish",
 ) -> bool:
     """Return whether a pursuit-worthy human exists with STALE map data.
 
@@ -287,6 +366,7 @@ def stale_human_exists(
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
+            doctrine,
         )
         if rejected_reason == "stale_map_data":
             return True
@@ -307,6 +387,7 @@ def find_relay_travel_targets(
     priority_target_name: str = "",
     human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
     human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
+    doctrine: EngagementDoctrine = "skirmish",
 ) -> list[EnemyThreatDict]:
     """Rank every map-fresh enemy that fails ONLY the affordability gate.
 
@@ -364,6 +445,7 @@ def find_relay_travel_targets(
             engagement_reserve_fuel,
             human_min_rank,
             human_max_rank,
+            doctrine,
         )
         if rejected_reason != "unaffordable":
             continue

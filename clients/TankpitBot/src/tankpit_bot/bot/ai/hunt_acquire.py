@@ -428,6 +428,7 @@ def _decide_hunt_acquire_fresh(
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
+        doctrine=ctx.config["doctrine"],
     )
     if map_target is not None:
         return _acquire_map_target(ctx, ai_state, map_target)

@@ -340,10 +340,13 @@ def merge_fleet_reports(
     scanned_merged = 0
     engaged: dict[int, int] = {}
     consented: set[int] = set()
+    war_ready_count = 0
     forage_goals: dict[str, tuple[int, int]] = {}
     claimed: set[str] = set()
     for report in reports:
         consented.update(report["combat_consent_ids"])
+        if report["war_ready"]:
+            war_ready_count += 1
         if report["forage_goal_x"] >= 0 and report["forage_goal_y"] >= 0:
             forage_goals[report["instance"]] = (
                 report["forage_goal_x"],
@@ -378,6 +381,7 @@ def merge_fleet_reports(
     # awareness of who's collecting what").
     ws.fleet_forage_goals = forage_goals
     ws.fleet_claimed_containers = claimed
+    ws.fleet_war_ready_count = war_ready_count
     return FleetMergeSummaryDict(
         reports=len(reports),
         enemies=enemies_merged,

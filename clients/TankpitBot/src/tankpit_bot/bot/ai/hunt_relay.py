@@ -140,6 +140,7 @@ def relay_toward_unaffordable_enemy(
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
+        doctrine=ctx.config["doctrine"],
     )
     # EVERY candidate gets a dot search before any refuel fallback:
     # the nearest enemy can be dot-starved while a farther one has a
@@ -258,6 +259,7 @@ def stale_human_needs_map_refresh(ctx: DecideCtx) -> bool:
         ),
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
+        doctrine=ctx.config["doctrine"],
     )
 
 
@@ -301,6 +303,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
+        doctrine=ctx.config["doctrine"],
     )
     if targets and is_human_name(targets[0]["name"]):
         return targets[0]

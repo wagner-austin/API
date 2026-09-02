@@ -34,6 +34,7 @@ from tankpit_bot.bot.types import (
     make_radar_command,
     make_teleport_command,
 )
+from tankpit_bot.fleetshare.types import EngagementDoctrine
 from tests.bot.ai._mode_fixtures import (
     _make_ctx,
     _make_decision,
@@ -291,7 +292,6 @@ class TestGathererRoleGate:
         the fighters of its color; every yield-to-hunt gesture funnels
         through this predicate, so this single bar disables them all.
         """
-        from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
         from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict
 
@@ -335,6 +335,7 @@ class TestWartimeReadinessFloor:
         consented: bool = True,
         human_alive: bool = True,
         human_fresh: bool = True,
+        doctrine: EngagementDoctrine = "skirmish",
     ) -> DecideCtx:
         """A rank-2 ctx (caps 30) with one enemy human plus arm-coverage tanks."""
         from tankpit_bot.sniffer.world_service import WorldService
@@ -388,9 +389,9 @@ class TestWartimeReadinessFloor:
         inventory = make_inventory(default_count=30, dual_count=dual_count)
         inventory["homing_shots"]["count"] = dual_count
         inventory["extra_radars"]["count"] = radar_count
-        return DecideCtx(
-            world, self_state, make_scanned_ai_state(), inventory, 100000, None, "", ws=ws
-        )
+        state = make_scanned_ai_state()
+        state["config"]["doctrine"] = doctrine
+        return DecideCtx(world, self_state, state, inventory, 100000, None, "", ws=ws)
 
     def test_war_floor_admits_the_eighty_fifty_bot(self) -> None:
         """24/30 weapons and 15/30 radars clear the wartime bar."""
@@ -439,3 +440,19 @@ class TestWartimeReadinessFloor:
 
         assert human_war_is_live(ctx) is False
         assert hunt_entry_permitted(ctx) is False
+
+
+    def test_war_joining_doctrines_only_get_the_wartime_floor(self) -> None:
+        """A duelist and a passive bot keep the full peacetime bar.
+
+        Doctrine scope (2026-09-01): the relaxed bar exists to join a
+        war; a duelist that cannot claim the duel and a passive bot
+        would hunt practice bots understocked on it.
+        """
+        from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+
+        for doctrine in ("duelist", "passive"):
+            ctx = self._war_ctx(dual_count=24, radar_count=15, doctrine=doctrine)
+            assert hunt_entry_permitted(ctx) is False, doctrine
+        swarm = self._war_ctx(dual_count=24, radar_count=15, doctrine="swarm")
+        assert hunt_entry_permitted(swarm) is True

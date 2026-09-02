@@ -35,6 +35,36 @@ FLEET_ROLES: tuple[FleetRole, ...] = (
 )
 
 
+EngagementDoctrine = Literal[
+    "skirmish",
+    "swarm",
+    "duelist",
+    "passive",
+]
+"""How a bot times its human engagements (operator order 2026-09-01:
+"will we have pluggable strategies that we can swap in per bot or per
+group of bots at a whim?"). A doctrine is DATA selecting between
+existing tested gates — never loaded code.
+
+``skirmish`` is today's behavior: the wartime readiness floor and
+focus fire, each bot joining as soon as its own bars clear.
+``swarm`` adds the muster: engage a consented human immediately when
+a sibling is already fighting it, otherwise keep farming until the
+war-ready quorum stands and strike together — the serial trickle's
+fix. ``duelist`` engages only when NO sibling holds the human (first
+come duels, the rest keep farming). ``passive`` never initiates
+against humans; consent-based return fire is untouched.
+"""
+
+
+ENGAGEMENT_DOCTRINES: tuple[EngagementDoctrine, ...] = (
+    "skirmish",
+    "swarm",
+    "duelist",
+    "passive",
+)
+
+
 class FleetEnemySightingDict(TypedDict):
     """One enemy tank a reporting bot has a fresh positional belief for.
 
@@ -198,6 +228,12 @@ class FleetReportDict(TypedDict):
         engaged_target_id: The reporter's held combat lock (-1 for
             none) — the focus-fire signal teammates' acquisition
             prefers.
+        war_ready: True when the reporter clears the wartime
+            readiness floor AND runs a war-joining doctrine
+            (skirmish/swarm) — the swarm muster's quorum signal
+            (operator order 2026-09-01): a swarm bot strikes first
+            only when itself plus its war-ready siblings reach the
+            quorum, so the fleet hits together instead of trickling.
         written_ms: Wall-clock ms of the write. Receivers drop reports
             older than the freshness TTL, so a dead bot's last file
             ages out instead of steering the living.
@@ -219,6 +255,7 @@ class FleetReportDict(TypedDict):
     x: int
     y: int
     engaged_target_id: int
+    war_ready: bool
     forage_goal_x: int
     forage_goal_y: int
     collect_claim_x: int
@@ -233,6 +270,8 @@ class FleetReportDict(TypedDict):
 
 
 __all__ = [
+    "ENGAGEMENT_DOCTRINES",
+    "EngagementDoctrine",
     "FLEET_ROLES",
     "FleetContainerRemovalDict",
     "FleetContainerSightingDict",

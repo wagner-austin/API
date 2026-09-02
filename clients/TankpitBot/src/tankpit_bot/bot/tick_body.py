@@ -14,6 +14,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot import ai_strategy, executor, world_sync
 from tankpit_bot.bot.ai.scoring_types import render_reason
+from tankpit_bot.bot.ai.tactics import wartime_inventory_ready
 from tankpit_bot.bot.ai.types import (
     make_respawn_ai_state,
 )
@@ -270,11 +271,24 @@ def _exchange_fleet_knowledge(bot: Bot) -> None:
     now_ms = get_current_time_ms()
     instance = resolve_bot_instance()
     claimed = bot._ai_state["resource_target_kind"] != ""
+    self_state = bot.world.world_state["self_state"]
+    inventory = get_inventory_state(bot.world)
+    war_ready = (
+        bot._ai_state["config"]["doctrine"] in ("skirmish", "swarm")
+        and self_state is not None
+        and wartime_inventory_ready(
+            inventory["dual_shots"]["count"],
+            inventory["homing_shots"]["count"],
+            inventory["extra_radars"]["count"],
+            self_state["rank"],
+        )
+    )
     report = build_fleet_report(
         bot.world,
         instance=instance,
         role=bot._ai_state["config"]["role"],
         engaged_target_id=bot._ai_state["combat_target_id"],
+        war_ready=war_ready,
         forage_goal_x=bot._ai_state["forage_goal_x"],
         forage_goal_y=bot._ai_state["forage_goal_y"],
         collect_claim_x=bot._ai_state["resource_target_x"] if claimed else -1,

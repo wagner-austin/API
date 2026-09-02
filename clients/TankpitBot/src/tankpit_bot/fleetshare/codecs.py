@@ -19,6 +19,8 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.fleetshare.types import (
+    ENGAGEMENT_DOCTRINES,
+    EngagementDoctrine,
     FLEET_ROLES,
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
@@ -48,6 +50,26 @@ def require_fleet_role(data: JSONObject, key: str) -> FleetRole:
         if raw == role:
             return role
     raise JSONTypeError(f"{key} must be one of {FLEET_ROLES}, got {raw!r}")
+
+
+def require_engagement_doctrine(data: JSONObject, key: str) -> EngagementDoctrine:
+    """Decode a required engagement-doctrine field.
+
+    Args:
+        data: JSON object holding the field.
+        key: Field name.
+
+    Returns:
+        The validated doctrine.
+
+    Raises:
+        JSONTypeError: If the field is absent or not a known doctrine.
+    """
+    raw = require_str(data, key)
+    for doctrine in ENGAGEMENT_DOCTRINES:
+        if raw == doctrine:
+            return doctrine
+    raise JSONTypeError(f"{key} must be one of {ENGAGEMENT_DOCTRINES}, got {raw!r}")
 
 
 def encode_fleet_enemy_sighting(sighting: FleetEnemySightingDict) -> JSONObject:
@@ -282,6 +304,7 @@ def encode_fleet_report(report: FleetReportDict) -> JSONObject:
         "forage_goal_y": report["forage_goal_y"],
         "collect_claim_x": report["collect_claim_x"],
         "collect_claim_y": report["collect_claim_y"],
+        "war_ready": report["war_ready"],
         "combat_consent_ids": list(report["combat_consent_ids"]),
         "written_ms": report["written_ms"],
         "enemies": [encode_fleet_enemy_sighting(sighting) for sighting in report["enemies"]],
@@ -345,6 +368,7 @@ def decode_fleet_report(data: JSONValue) -> FleetReportDict:
         forage_goal_y=require_int(data, "forage_goal_y"),
         collect_claim_x=require_int(data, "collect_claim_x"),
         collect_claim_y=require_int(data, "collect_claim_y"),
+        war_ready=require_bool(data, "war_ready"),
         combat_consent_ids=_require_int_list(data, "combat_consent_ids"),
         written_ms=require_int(data, "written_ms"),
         enemies=[decode_fleet_enemy_sighting(entry) for entry in require_list(data, "enemies")],
@@ -370,5 +394,6 @@ __all__ = [
     "encode_fleet_mine_sighting",
     "encode_fleet_report",
     "encode_fleet_scanned_tile",
+    "require_engagement_doctrine",
     "require_fleet_role",
 ]

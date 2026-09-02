@@ -235,6 +235,7 @@ def build_fleet_report(
     instance: str,
     role: FleetRole,
     engaged_target_id: int,
+    war_ready: bool,
     forage_goal_x: int,
     forage_goal_y: int,
     collect_claim_x: int,
@@ -249,6 +250,10 @@ def build_fleet_report(
             namespace).
         role: This bot's fleet role.
         engaged_target_id: The held combat lock (-1 for none).
+        war_ready: Whether this bot clears the wartime readiness
+            floor under a war-joining doctrine — the swarm muster's
+            quorum signal; computed by the caller, which holds the
+            doctrine and inventory.
         forage_goal_x: The latched forage-frontier goal X (-1 none).
         forage_goal_y: The latched forage-frontier goal Y (-1 none).
         collect_claim_x: The held collect-plan container X (-1 none).
@@ -278,6 +283,7 @@ def build_fleet_report(
         x=self_state["x"],
         y=self_state["y"],
         engaged_target_id=engaged_target_id,
+        war_ready=war_ready,
         forage_goal_x=forage_goal_x,
         forage_goal_y=forage_goal_y,
         collect_claim_x=collect_claim_x,

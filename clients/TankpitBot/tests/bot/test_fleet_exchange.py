@@ -69,6 +69,7 @@ def test_exchange_publishes_and_merges_a_sibling(
         role="fighter",
         x=90,
         y=90,
+        war_ready=False,
         engaged_target_id=506,
         forage_goal_x=-1,
         forage_goal_y=-1,

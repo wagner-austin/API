@@ -32,6 +32,7 @@ def _report() -> FleetReportDict:
         role="gatherer",
         x=100,
         y=120,
+        war_ready=True,
         engaged_target_id=506,
         forage_goal_x=120,
         forage_goal_y=104,

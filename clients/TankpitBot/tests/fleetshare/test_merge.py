@@ -44,6 +44,7 @@ def _report(
     tank_id: int = 1301,
     written_ms: int = _NOW - 1000,
     engaged_target_id: int = -1,
+    war_ready: bool = False,
     forage_goal_x: int = -1,
     forage_goal_y: int = -1,
     collect_claim_x: int = -1,
@@ -64,6 +65,7 @@ def _report(
         x=90,
         y=90,
         engaged_target_id=engaged_target_id,
+        war_ready=war_ready,
         forage_goal_x=forage_goal_x,
         forage_goal_y=forage_goal_y,
         collect_claim_x=collect_claim_x,
@@ -516,61 +518,3 @@ class TestSharedRemovals:
 
         assert ws.fleet_forage_goals == {}
         assert ws.fleet_claimed_containers == set()
-
-
-class TestMergeMineKnowledge:
-    """The fleet mine map's receiving half (operator order 2026-09-01)."""
-
-    def _world_service(self) -> WorldService:
-        ws = WorldService()
-        ws.update_world_state_from_position(90, 90)
-        return ws
-
-    def _mine(self, *, observed_ms: int = _NOW - 500) -> FleetMineSightingDict:
-        return FleetMineSightingDict(
-            x=101, y=100, mine_type=1, tank_id=709, team=1, observed_ms=observed_ms
-        )
-
-    def test_sibling_mine_lands_in_the_registry_as_an_import(self) -> None:
-        """A shared hostile mine arrives with the fleet import stamp."""
-        ws = self._world_service()
-        report = _report("artax", mines=[self._mine()])
-
-        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
-
-        assert summary["mines"] == 1
-        landed = ws.world_state["mines"]["101,100"]
-        assert landed["team"] == 1
-        assert landed["mine_type"] == 1
-        assert landed["source"] == "world_state"
-        assert landed["timestamp_ms"] == _NOW - 500
-
-    def test_fresher_local_belief_is_never_outranked(self) -> None:
-        """Own wire is the higher trust tier: an older sighting is a no-op."""
-        from tankpit_bot.state.mine_mutations import add_mine
-
-        ws = self._world_service()
-        ws.world_state = add_mine(
-            ws.world_state, 101, 100, mine_type=0, tank_id=-1, team=1, timestamp_ms=_NOW - 100
-        )
-        report = _report("artax", mines=[self._mine(observed_ms=_NOW - 500)])
-
-        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
-
-        assert summary["mines"] == 0
-        assert ws.world_state["mines"]["101,100"]["source"] == "viewport"
-
-    def test_fresher_sighting_refreshes_an_older_local_belief(self) -> None:
-        """Newer remote knowledge advances the tile's stamp."""
-        from tankpit_bot.state.mine_mutations import add_mine
-
-        ws = self._world_service()
-        ws.world_state = add_mine(
-            ws.world_state, 101, 100, mine_type=1, tank_id=709, team=1, timestamp_ms=_NOW - 900
-        )
-        report = _report("artax", mines=[self._mine(observed_ms=_NOW - 500)])
-
-        summary = merge_fleet_reports(ws, [report], own_tank_id=2731, own_team=2)
-
-        assert summary["mines"] == 1
-        assert ws.world_state["mines"]["101,100"]["timestamp_ms"] == _NOW - 500

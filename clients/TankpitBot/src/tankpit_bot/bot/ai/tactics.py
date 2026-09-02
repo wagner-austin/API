@@ -37,6 +37,30 @@ def combat_radar_min(rank: int) -> int:
     return inventory_capacity(rank) - 5
 
 
+def wartime_inventory_ready(dual: int, homing: int, radar: int, rank: int) -> bool:
+    """Return True when an inventory clears the wartime readiness floor.
+
+    The 80%/50% wartime bar (operator ruling 2026-09-01, verbatim:
+    "like 80% equipment and 50% radar?"), extracted here as pure
+    arithmetic because two layers consult it: the HUNT-entry gate
+    while a war is live, and the fleetshare report's ``war_ready``
+    row that feeds the swarm doctrine's muster quorum.
+
+    Args:
+        dual: Dual-shot count.
+        homing: Homing-shot count.
+        radar: Extra-radar count.
+        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
+
+    Returns:
+        True when both weapons are at 80% of the rank cap and radars
+        at half of it.
+    """
+    cap = inventory_capacity(rank)
+    war_weapon_floor = (cap * 4) // 5
+    return dual >= war_weapon_floor and homing >= war_weapon_floor and radar >= cap // 2
+
+
 def _is_within_observable_viewport(world: WorldStateDict, x: int, y: int) -> bool:
     """Return True when a coordinate lies inside the current visible viewport.
 

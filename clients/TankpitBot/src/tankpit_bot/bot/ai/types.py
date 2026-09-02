@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing_extensions import TypedDict
 
-from tankpit_bot.fleetshare.types import FleetRole
+from tankpit_bot.fleetshare.types import EngagementDoctrine, FleetRole
 from tankpit_bot.types.modes import (
     AIMode,
     AIModeState,
@@ -93,6 +93,13 @@ class AIConfigDict(TypedDict):
             value (200) let the bot start fights it could not finish:
             run 2026-07-01 20:45 burned 505 fuel on the approach and
             hit the fuel-low interrupt 8 shots into the kill.
+        role: This bot's :data:`~tankpit_bot.fleetshare.types.FleetRole`.
+            Wired from ``TANKPIT_ROLE``.
+        doctrine: This bot's
+            :data:`~tankpit_bot.fleetshare.types.EngagementDoctrine` —
+            how it times human engagements (operator order
+            2026-09-01). Wired from ``TANKPIT_DOCTRINE``; default
+            ``"skirmish"`` is the pre-doctrine behavior.
     """
 
     fuel_low_threshold: int
@@ -112,6 +119,7 @@ class AIConfigDict(TypedDict):
     human_target_min_rank: int
     human_target_max_rank: int
     role: FleetRole
+    doctrine: EngagementDoctrine
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -138,6 +146,7 @@ def make_default_ai_config() -> AIConfigDict:
         human_target_min_rank=1,
         human_target_max_rank=8,
         role="fighter",
+        doctrine="skirmish",
     )
 
 

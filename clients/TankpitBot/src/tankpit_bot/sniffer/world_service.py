@@ -264,6 +264,12 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # FLEET has proof consented to combat. Replaced wholesale per
         # merge, like the engaged ids above.
         self.fleet_consented_tank_ids: set[int] = set()
+        # How many same-team siblings currently report themselves
+        # war-ready (past the wartime readiness floor under a
+        # war-joining doctrine). The swarm muster's quorum input
+        # (operator order 2026-09-01); wholesale-replaced per
+        # exchange like every fleet_* field.
+        self.fleet_war_ready_count: int = 0
         # ContainerPickup de-duplication. The server broadcasts each
         # 0x43 pickup TWICE within ~200 ms (one to the picker, one to
         # the world view) -- empirical 43.9% duplicate rate across 13
