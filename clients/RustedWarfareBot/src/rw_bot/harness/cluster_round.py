@@ -261,13 +261,20 @@ class ClusterRound:
     def _in_queue(self, batch: str) -> int:
         """Count this batch's jobs still queued or running.
 
+        End-anchored on the QUALIFIED name, because an array's tasks all
+        carry the sweep's own name -- ``rusted.vhsearch2-r0``, no member
+        suffix. The first drain matched ``<batch>-`` expecting per-member
+        names, saw zero rows while 136 tasks ran, and burned every
+        convergence pass in seconds (vhsearch2-r0, 2026-09-02). The anchor
+        also keeps ``-r1`` from counting ``-r10``.
+
         Args:
             batch: The round's batch name.
 
         Returns:
             How many jobs the cluster still holds.
         """
-        lines = self._remote(f'squeue --me -h -o "%j" | grep -c "{batch}-" || echo 0')
+        lines = self._remote(f'squeue --me -h -o "%j" | grep -c "\\.{batch}$" || echo 0')
         return int(lines[-1].strip())
 
     def run(self, batch: str, job_lines: Sequence[str]) -> None:

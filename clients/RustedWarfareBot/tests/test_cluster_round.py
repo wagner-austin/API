@@ -57,6 +57,11 @@ class _Cluster:
         if 'grep -c "\\.txt$"' in joined:
             return 0, (str(self.filed.pop(0)),)
         if 'squeue --me -h -o "%j"' in joined:
+            # The drain must match the array's QUALIFIED name end-anchored:
+            # tasks carry the sweep's own name with no member suffix, and
+            # the first drain's `<batch>-` pattern saw zero rows while 136
+            # tasks ran (vhsearch2-r0, 2026-09-02).
+            assert "\\.probe-r0$" in joined
             return 0, (str(self.queued.pop(0)),)
         return 0, ()
 
