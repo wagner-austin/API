@@ -237,16 +237,33 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
     Arrival (within :data:`_ARRIVE_TILES`) tombstones the goal for
     :data:`FRONTIER_VISIT_TTL_MS` and the next call picks fresh.
 
+    Requires EXTRAS. A hop buys a new viewport to stand in, and that
+    is only worth its teleport if the tank can reveal the viewport it
+    lands in. With an extra, one ~10-fuel press reveals the whole
+    16x16; at zero extras the free radar reveals a
+    ``(2r+1)x(2r+1)`` footprint -- 25 tiles at ranks 0-2 -- and the
+    hop has bought 25 tiles for ~105 fuel where walking five tiles and
+    scanning buys the same 25 for ~15 ([[radar-mechanics]]). Measured
+    on a fresh recruit 2026-09-01 (``runs/bot/malignant``): 22 hops,
+    zero walk-forages, teleport -84..-109 against pickups of
+    +101..+108, fuel oscillating 890-1000 against a 1000 cap for the
+    whole session and banking nothing -- self-sustaining, because it
+    always refuelled just enough to afford the next hop. Declining
+    here lets the cascade reach ``plan_forage_search``, which walks
+    between free scans and is already rank-aware.
+
     Args:
         ctx: Decision context.
         base_state: Base AI state to rewrite for the produced command.
 
     Returns:
         A walk or teleport decision toward the goal, or None when
-        equipment is not needed, terrain is not yet loaded, or no
-        reachable stale block remains.
+        equipment is not needed, no extra radar is stocked, terrain is
+        not yet loaded, or no reachable stale block remains.
     """
     if not _equipment_deficient(ctx):
+        return None
+    if ctx.inventory["extra_radars"]["count"] <= 0:
         return None
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         # Restocking is a healthy-fuel activity: critical-fuel ticks

@@ -100,6 +100,43 @@ def test_fully_covered_field_declines() -> None:
     assert plan_forage_frontier_hop(ctx, ctx.base) is None
 
 
+def test_zero_extras_declines_so_the_walk_forager_can_run() -> None:
+    """A hop is only worth its teleport if the landing can be revealed.
+
+    With an extra, one ~10-fuel press reveals the whole 16x16 viewport.
+    At zero extras the free radar reveals 25 tiles, so the hop has paid
+    ~105 fuel for what walking five tiles and scanning buys for ~15
+    ([[radar-mechanics]]). Measured on a fresh recruit 2026-09-01: 22
+    hops, zero walk-forages, fuel oscillating 890-1000 against a 1000
+    cap all session and banking nothing. Declining here is what lets
+    the cascade reach ``plan_forage_search``.
+    """
+    inventory = _deficient_inventory()
+    inventory["extra_radars"]["count"] = 0
+    ctx = _frontier_ctx(inventory=inventory)
+
+    assert plan_forage_frontier_hop(ctx, ctx.base) is None
+
+
+def test_one_extra_is_enough_to_justify_the_hop() -> None:
+    """The gate is on ABILITY to exploit the landing, not on a hoard.
+
+    A single extra reveals the whole landing viewport, which is the
+    entire premise of travelling to it — so the bar is one, not a
+    reserve. Pinned separately so a future stock threshold cannot be
+    slipped in here unnoticed.
+    """
+    inventory = _deficient_inventory()
+    inventory["extra_radars"]["count"] = 1
+    ctx = _frontier_ctx(inventory=inventory)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("one extra should justify the hop")
+    assert decision["behavior"]["reason_kind"] == "forage_frontier_hop"
+
+
 def test_targets_the_nearest_stale_block() -> None:
     """The nearest block with no live coverage wins."""
     ctx = _frontier_ctx(stale_blocks=((8, 6), (4, 6)))
