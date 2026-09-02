@@ -1,4 +1,4 @@
-"""Tests for the rule that keeps all 41 guard shims byte-identical."""
+"""Tests for the rule that keeps all 43 guard shims byte-identical."""
 
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ class TestGuardShimRule:
         regenerated."""
         repo_root = Path(__file__).resolve().parents[3]
         shims = sorted(repo_root.glob("*/*/scripts/guard.py"))
-        assert len(shims) == 41
+        assert len(shims) == 43
         assert GuardShimRule().run(shims) == []
 
 

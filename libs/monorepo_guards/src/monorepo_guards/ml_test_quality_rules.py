@@ -63,10 +63,26 @@ class _MLPatternVisitor(ast.NodeVisitor):
             return node.value.id.lower() in self._HTTP_CLIENT_NAMES
         return False
 
+    def _is_gradient_formula_call(self, node: ast.Attribute) -> bool:
+        """A ``backward`` reached through a CLASS is a gradient formula.
+
+        ``cls.backward(ctx, grad)`` and ``OwnedMatmul.backward(ctx, grad)``
+        invoke an ``autograd.Function``'s static gradient arithmetic
+        directly -- a unit test of a formula, with nothing trained and no
+        loss anywhere. ``loss.backward()`` and ``tensor.backward()`` keep
+        their lowercase receivers and keep flagging.
+        """
+        if isinstance(node.value, ast.Name):
+            return node.value.id == "cls" or node.value.id[:1].isupper()
+        return False
+
     def visit_Call(self, node: ast.Call) -> None:
         if isinstance(node.func, ast.Attribute):
             # Skip HTTP client calls for train detection
             if node.func.attr == "train" and self._is_http_client_call(node.func):
+                self.generic_visit(node)
+                return
+            if node.func.attr == "backward" and self._is_gradient_formula_call(node.func):
                 self.generic_visit(node)
                 return
             flag = self._ATTR_FLAGS.get(node.func.attr)
@@ -75,6 +91,37 @@ class _MLPatternVisitor(ast.NodeVisitor):
         elif isinstance(node.func, ast.Name) and node.func.id == "model":
             self.has_forward_call = True
         self.generic_visit(node)
+
+    def _is_pytest_raises(self, item: ast.withitem) -> bool:
+        expr = item.context_expr
+        if not isinstance(expr, ast.Call) or not isinstance(expr.func, ast.Attribute):
+            return False
+        return (
+            expr.func.attr == "raises"
+            and isinstance(expr.func.value, ast.Name)
+            and expr.func.value.id == "pytest"
+        )
+
+    def visit_With(self, node: ast.With) -> None:
+        self._visit_with(node)
+
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+        self._visit_with(node)
+
+    def _visit_with(self, node: ast.With | ast.AsyncWith) -> None:
+        """Calls under ``pytest.raises`` are refusal drives, not ML work.
+
+        A forward, backward or train call that MUST raise produces no
+        tensor, so demanding a value check of its output demands a check of
+        something that never exists. Flags set outside the block keep their
+        value; flags this block would set are put back.
+        """
+        if not any(self._is_pytest_raises(item) for item in node.items):
+            self.generic_visit(node)
+            return
+        saved = (self.has_backward, self.has_train_call, self.has_forward_call)
+        self.generic_visit(node)
+        self.has_backward, self.has_train_call, self.has_forward_call = saved
 
     def visit_Compare(self, node: ast.Compare) -> None:
         """Detect loss comparisons like loss_after < loss_before."""

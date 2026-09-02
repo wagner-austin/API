@@ -346,3 +346,177 @@ def test_train():
 
         # Should still flag as no loss check since subscript is not a Name node
         assert any(v.kind == "ml-train-no-loss-check" for v in violations)
+
+
+class TestGradientFormulaCalls:
+    """A backward reached through a CLASS is a formula call, not training."""
+
+    def test_a_cls_backward_call_is_not_training(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_autograd.py"
+        code = """
+def test_the_gradient_formula():
+    cls = _matmul_class()
+    grad_x, grad_w = cls.backward(ctx, grad_out)
+    assert torch.equal(grad_x, expected)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations] == []
+
+    def test_a_pascal_case_backward_call_is_not_training(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_autograd.py"
+        code = """
+def test_the_gradient_formula():
+    grads = OwnedMatmul.backward(ctx, grad_out)
+    assert torch.equal(grads[0], expected)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations] == []
+
+    def test_a_lowercase_tensor_backward_still_flags(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_train.py"
+        code = """
+def test_train():
+    loss.backward()
+    assert True
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-train-no-loss-check" for v in violations)
+
+    def test_a_chained_backward_still_flags(self, tmp_path: Path) -> None:
+        # The receiver is an Attribute, not a Name -- outside the formula
+        # carve-out, so the conservative side keeps flagging.
+        test_file = tmp_path / "tests" / "test_train.py"
+        code = """
+def test_train():
+    outputs.loss.backward()
+    assert True
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-train-no-loss-check" for v in violations)
+
+
+class TestPytestRaisesSuppression:
+    """A call that must raise produces no tensor to value-check."""
+
+    def test_a_forward_only_inside_raises_is_not_flagged(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_every_unowned_path_is_refused():
+    with pytest.raises(ValueError, match="refused"):
+        wrapper.forward(hidden, attention_mask=mask)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations] == []
+
+    def test_a_train_call_inside_raises_is_not_flagged(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_training_is_refused():
+    with pytest.raises(ValueError, match="eval-only"):
+        trainer.train()
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations] == []
+
+    def test_a_forward_outside_raises_still_flags(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_mixed():
+    out = module.forward(x)
+    with pytest.raises(ValueError):
+        module.forward(bad)
+    assert out.shape == (1, 4)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-forward-shape-only" for v in violations)
+
+    def test_a_flag_set_before_the_raises_block_survives_it(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_backward_then_refusal():
+    loss.backward()
+    with pytest.raises(ValueError):
+        helper.forward(bad)
+    assert True
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-train-no-loss-check" for v in violations)
+
+    def test_a_plain_with_block_does_not_suppress(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_under_no_grad():
+    with torch.no_grad():
+        out = module.forward(x)
+    assert out.shape == (1, 4)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-forward-shape-only" for v in violations)
+
+    def test_non_call_and_bare_call_contexts_do_not_suppress(self, tmp_path: Path) -> None:
+        # A bare name context and a plain-function context are neither of
+        # them pytest.raises; the forward inside still counts.
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+def test_under_locks():
+    with lock:
+        with open(path) as handle:
+            out = module.forward(x)
+    assert out.shape == (1, 4)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert any(v.kind == "ml-forward-shape-only" for v in violations)
+
+    def test_an_async_with_raises_block_suppresses_too(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "tests" / "test_refusals.py"
+        code = """
+async def test_async_refusal():
+    async with pytest.raises(ValueError):
+        await runner.forward(bad)
+"""
+        _write(test_file, code)
+
+        rule = MLTestQualityRule()
+        violations = rule.run([test_file])
+
+        assert [v.kind for v in violations] == []

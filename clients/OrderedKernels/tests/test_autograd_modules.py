@@ -133,12 +133,9 @@ class TestTheGradients:
         cls = _matmul_class()
 
         out = cls.forward(ctx, x.detach(), w.detach())
-        # Bound to a name that says what this is: a direct call of the
-        # gradient FORMULA, not a training step. (The ml-train guard keys on
-        # calls literally named `backward`; its predicate, not this test, is
-        # what conflates the two.)
-        gradient_formula = cls.backward
-        grad_x, grad_w = gradient_formula(ctx, grad_out)
+        # A direct call of the gradient FORMULA, not a training step; the
+        # ml-train guard reads class-receiver backward calls as exactly that.
+        grad_x, grad_w = cls.backward(ctx, grad_out)
 
         assert torch.equal(out, rank1_matmul(x.detach(), w.detach()))
         assert torch.equal(grad_x, rank1_matmul(grad_out, w.detach().t()))
@@ -150,8 +147,7 @@ class TestTheGradients:
         cls = _addmm_class()
 
         out = cls.forward(ctx, bias.detach(), x.detach(), w.detach())
-        gradient_formula = cls.backward
-        grad_bias, grad_x, grad_w = gradient_formula(ctx, grad_out)
+        grad_bias, grad_x, grad_w = cls.backward(ctx, grad_out)
 
         assert torch.equal(out, rank1_addmm(bias.detach(), x.detach(), w.detach()))
         assert torch.equal(grad_bias, accumulate_rows(grad_out))

@@ -23,7 +23,7 @@ python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
 numpy = "^2.3.5"
 sentencepiece = "^0.2.1"
-shap = "^0.50"
+shap = "^0.51"
 torch = {version = "^2.5", source = "pytorch-cuda"}
 wandb = { version = "^0.18", optional = true }
 typing-extensions = "^4.12.0"
