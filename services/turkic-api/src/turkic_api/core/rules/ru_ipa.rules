@@ -12,6 +12,31 @@
 # word here is a citation form and the file is grapheme-driven like its
 # siblings.
 #
+# Corroborated by the variety-matched description: Timberlake, A. (2004)
+# A Reference Grammar of Russian, Cambridge University Press
+# (ISBN 978-0-521-77292-1). Its mutable consonants -- those that can be
+# either palatalised or not -- are ‹б в г д з к л м н п р с т ф х› (p. 18),
+# which is exactly the $Cpair set below. The immutable ones are ‹ч щ›,
+# intrinsically palatalised, and ‹ш ж ц›, intrinsically not (p. 18), which
+# is why those five take no ʲ from this file. And "[ɨ] occurs after a hard
+# consonant only if the consonant is unpaired or the word is a borrowing"
+# (p. 35), which is the и rule in section 4. Pinned in
+# test_russian_timberlake_words.py.
+#
+# The two symbol choices the Illustration leaves open are settled against
+# Hamann, S. (2004) 'Retroflex fricatives in Slavic languages', Journal of
+# the International Phonetic Association 34(1): 53-67
+# (https://doi.org/10.1017/S0025100304001604), the study the Illustration
+# itself cites for the retroflex reading. Hamann argues Russian ‹ш ж› are
+# phonetically retroflex /ʂ ʐ/ (p. 61), and Epitran writes them that way.
+# This file keeps the Illustration's own phoneme chart, /ʃ ʒ/ (p. 222),
+# because the file is phonemic and retroflexion is a fact about
+# realisation. For ‹щ› Hamann is direct evidence for what is written here:
+# palatalising a retroflex changes its major place of articulation, so the
+# palatalised sound "is not a retroflex but a palatoalveolar", written
+# [ʃː(ʲ)] with the palatalisation redundant (p. 64). That is ʃʲː, not the
+# alveolo-palatal ɕː the Illustration offers as an alternative (p. 223).
+#
 # In scope, because the Illustration makes them contrastive (p. 222):
 #   - the palatalised/non-palatalised opposition, written ʲ on the consonant
 #   - ж ш ц as unpaired hard, ч щ as unpaired soft

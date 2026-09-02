@@ -69,7 +69,7 @@ disagreeing on a fresh Windows clone.
 | `ug_ipa.rules` | `9112bdccddbffa65de7987a7d0bb5044c8f05c5d8c4fa75040f6c2b20fd84f02` | upstream |
 | `uz_ipa.rules` | `b0d81023d3e10df2fe5ae7e5f264a4e9ca5fa9e3f4ccd5bd66a6d637d9ce127f` | upstream |
 | `uzc_ipa.rules` | `79a5e49e065641ece6081d8b487d49cc86a4abbd54ac9c3b75f69d0b804088e3` | upstream |
-| `ru_ipa.rules` | `2820e70ef3d8bc499cd62bdea005223ae73047db76727e9b85a4b2320c74fbbc` | upstream |
+| `ru_ipa.rules` | `cb3dc53052df60329e7d20ee3b631ae001e333bae86fe5bf6ed802e0ee29bcd8` | upstream |
 
 `tests/test_rule_vendoring.py` asserts every hash in this table, so the table
 cannot drift from the files it describes. `tests/test_rule_provenance.py`
