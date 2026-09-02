@@ -28,6 +28,7 @@ from tankpit_bot.service.fleet_bot import (
 from tankpit_bot.service.fleet_config import (
     configured_accounts,
     derive_instance,
+    resolve_doctrine,
     resolve_role,
     resolve_troop,
 )
@@ -105,6 +106,7 @@ class FleetManager:
         role: str = "",
         room: str = "",
         troop: str = "",
+        doctrine: str = "",
     ) -> FleetBotDict:
         """Spawn one bot child process under an instance namespace.
 
@@ -146,6 +148,7 @@ class FleetManager:
             raise FleetError("bounds must be non-negative")
         resolved_role = resolve_role(role)
         resolved_troop = resolve_troop(troop)
+        resolved_doctrine = resolve_doctrine(doctrine)
         if account:
             configured = configured_accounts()
             if account not in configured:
@@ -161,7 +164,7 @@ class FleetManager:
             if (
                 resolved_account
                 and other_account == resolved_account
-                and other.process.poll() is None
+                and other.process.is_running()
             ):
                 raise FleetError(
                     f"account {resolved_account or 'default'!r} already has a live bot "
@@ -169,13 +172,20 @@ class FleetManager:
                     "a second login on the same account"
                 )
         existing = self._bots.get(instance)
-        if existing is not None and existing.process.poll() is None:
+        if existing is not None and existing.process.is_running():
             raise FleetError(
                 f"instance {instance!r} is already running (pid {existing.process.pid})"
             )
         process = service_hooks.spawn_bot_process(
             _child_environment(
-                instance, kills, seconds, resolved_role, account, room, resolved_troop
+                instance=instance,
+                kills=kills,
+                seconds=seconds,
+                resolved_role=resolved_role,
+                account=account,
+                room=room,
+                troop=resolved_troop,
+                doctrine=resolved_doctrine,
             )
         )
         bot = _ManagedBot(
@@ -288,7 +298,7 @@ class FleetManager:
         Returns:
             Instance names in sorted order.
         """
-        return sorted(name for name, bot in self._bots.items() if bot.process.poll() is None)
+        return sorted(name for name, bot in self._bots.items() if bot.process.is_running())
 
     def draining(self) -> bool:
         """Report whether a shutdown drain has been requested.
@@ -350,7 +360,7 @@ class FleetManager:
         bot = self._bots.get(instance)
         if bot is None:
             raise FleetError(f"unknown instance {instance!r}")
-        if bot.process.poll() is None:
+        if bot.process.is_running():
             raise FleetError(f"instance {instance!r} is still running; stop it first")
         return self.spawn(
             instance=instance,
@@ -433,7 +443,7 @@ class FleetManager:
         bot = self._bots.get(instance)
         if bot is None:
             raise FleetError(f"unknown instance {instance!r}")
-        if bot.process.poll() is None:
+        if bot.process.is_running():
             raise FleetError(f"instance {instance!r} is still running; stop it first")
         del self._bots[instance]
         forget_process_record(instance)

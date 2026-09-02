@@ -13,6 +13,7 @@ import subprocess
 import sys
 from collections.abc import Generator
 
+import psutil
 import pytest
 
 from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH
@@ -110,7 +111,8 @@ def test_a_live_process_is_adopted_and_reports_itself_running(
     adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
 
     assert adopted.pid == sleeper.pid
-    assert adopted.poll() is None
+    assert adopted.is_running() is True
+    assert adopted.exit_code() is None
 
 
 def test_an_adopted_process_reports_its_exit_code_after_it_dies(
@@ -127,9 +129,35 @@ def test_an_adopted_process_reports_its_exit_code_after_it_dies(
     expected = sleeper.wait(timeout=30)
 
     # The adopted handle agrees with the parent's own handle, and keeps
-    # agreeing: the exit code is not a one-shot reading.
-    assert adopted.poll() == expected
-    assert adopted.poll() == expected
+    # agreeing: neither answer is a one-shot reading.
+    assert adopted.is_running() is False
+    assert adopted.exit_code() == expected
+    assert adopted.is_running() is False
+    assert adopted.exit_code() == expected
+
+
+def test_liveness_never_depends_on_recovering_an_exit_code(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """A bot that has ended reads as not-running even with no code.
+
+    The first live drain wedged on exactly this: the manager read a
+    bot that had already landed as still running and waited forever,
+    because "alive" was derived from "no exit code yet". The two
+    questions are asked separately now, and this pins that a missing
+    code can never masquerade as a running tank.
+    """
+    adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
+    assert adopted.is_running() is True
+
+    psutil.Process(sleeper.pid).kill()
+    psutil.Process(sleeper.pid).wait(timeout=30)
+
+    assert adopted.is_running() is False
+    # Whatever the code turns out to be -- recoverable or not -- it is
+    # never allowed to change the liveness answer.
+    _ = adopted.exit_code()
+    assert adopted.is_running() is False
 
 
 def test_a_pid_that_is_not_running_cannot_be_adopted() -> None:
@@ -181,7 +209,7 @@ def test_real_spawn_fleet_manager_launches_a_detached_child() -> None:
         assert process.pid > 0
         assert FLEET_LOG_PATH.exists()
     finally:
-        process.kill()
-        process.wait(timeout=30)
-    if process.poll() is None:
+        psutil.Process(process.pid).kill()
+        psutil.Process(process.pid).wait(timeout=30)
+    if process.is_running():
         raise AssertionError("fleet manager still running after kill + wait")

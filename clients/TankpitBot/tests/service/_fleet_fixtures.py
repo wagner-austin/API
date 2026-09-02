@@ -41,13 +41,31 @@ def _is_record(path: Path) -> bool:
 
 
 class _FakeProcess:
-    """Controllable child-process double."""
+    """Controllable child-process double.
+
+    ``returncode`` stays the single knob a test turns; the split
+    surface is derived from it, which is the honest shape for a
+    process this double pretends to have forked.
+    """
 
     def __init__(self, pid: int) -> None:
         self.pid = pid
         self.returncode: int | None = None
 
-    def poll(self) -> int | None:
+    def is_running(self) -> bool:
+        """Return whether the double is still running.
+
+        Returns:
+            True until a test sets ``returncode``.
+        """
+        return self.returncode is None
+
+    def exit_code(self) -> int | None:
+        """Return the double's exit code.
+
+        Returns:
+            Whatever a test set, or None while running.
+        """
         return self.returncode
 
 

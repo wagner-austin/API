@@ -20,15 +20,35 @@ from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH, bot_run_dir
 
 
 class SpawnedProcessProtocol(Protocol):
-    """The child-process surface the fleet manager consumes."""
+    """The child-process surface the fleet manager consumes.
+
+    Liveness and exit code are asked for SEPARATELY, and that split is
+    load-bearing rather than tidy. Deriving "alive" from "no exit code
+    yet" is only sound when the two always agree, and for an adopted
+    process they do not: the OS can be sure a process has ended while
+    being unable to say what code it ended with. A registry that read
+    the missing code as "still running" would wait on a bot that had
+    already landed -- which is exactly what wedged the first live drain
+    (2026-09-01, [[fleet-lifecycle]]).
+    """
 
     @property
     def pid(self) -> int:
         """The child's process id."""
         ...
 
-    def poll(self) -> int | None:
-        """Return the exit code, or None while the child runs."""
+    def is_running(self) -> bool:
+        """Return whether the child is still running."""
+        ...
+
+    def exit_code(self) -> int | None:
+        """Return the exit code, or None when there is not one to give.
+
+        ``None`` means "no exit code available", NEVER "still
+        running" -- ask :meth:`is_running` for that. A child still
+        running has no code yet; an adopted child whose exit nobody
+        held a handle for has none to recover.
+        """
         ...
 
 
@@ -147,7 +167,7 @@ _CHILD_BOOTSTRAP = (
 # first live fleet spawn died on "unrecognized arguments" without it.
 
 
-def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[bytes]:
+def _real_spawn_bot_process(env_overrides: dict[str, str]) -> SpawnedProcessProtocol:
     """Spawn one ``tankpit-bot`` child with instance environment.
 
     The child runs the existing bot entry point in its own process;
@@ -186,11 +206,57 @@ def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[b
     # Append, not truncate: a restart must not erase the traceback
     # that explains why the previous run of this instance died.
     with console.open("a", encoding="utf-8") as stream:
-        return subprocess.Popen(
-            [sys.executable, "-c", _CHILD_BOOTSTRAP, *pairs],
-            stdout=stream,
-            stderr=subprocess.STDOUT,
+        return _PopenProcess(
+            subprocess.Popen(
+                [sys.executable, "-c", _CHILD_BOOTSTRAP, *pairs],
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+            )
         )
+
+
+class _PopenProcess:
+    """A child this manager forked, behind the registry's surface.
+
+    :class:`subprocess.Popen` answers both questions with one ``poll``,
+    where ``None`` genuinely does mean "still running" -- it holds the
+    handle, so it always learns the code. The split surface still has
+    to be spelled out, because the registry must not care which kind
+    of process it is holding.
+    """
+
+    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+        """Bind to a freshly spawned child.
+
+        Args:
+            process: The Popen handle for the child.
+        """
+        self._process = process
+
+    @property
+    def pid(self) -> int:
+        """The child's process id.
+
+        Returns:
+            The process id.
+        """
+        return self._process.pid
+
+    def is_running(self) -> bool:
+        """Return whether the child is still running.
+
+        Returns:
+            True while the child runs.
+        """
+        return self._process.poll() is None
+
+    def exit_code(self) -> int | None:
+        """Return the child's exit code once it has one.
+
+        Returns:
+            The exit code, or ``None`` while it runs.
+        """
+        return self._process.poll()
 
 
 class _AdoptedProcess:
@@ -224,22 +290,39 @@ class _AdoptedProcess:
         """
         return self._process.pid
 
-    def poll(self) -> int | None:
-        """Return the exit code, or None while the bot runs.
+    def is_running(self) -> bool:
+        """Return whether the adopted process is still running.
 
-        ``is_running`` is checked first so the exit code is only ever
-        asked for once there is one -- psutil raises
-        :class:`psutil.TimeoutExpired` from ``wait`` on a live
-        process, and this class has no business using that as control
-        flow. ``is_running`` also re-checks identity, so a recycled
-        pid reads as "gone", not as a running bot.
+        ``wait(timeout=0)`` is the authority, not ``is_running()``.
+        psutil's ``is_running`` reports a process as running whenever
+        it can still resolve the pid to a matching identity, and the
+        first live drain proved that is not the same question: the bot
+        had exited, the pid was gone from the process list, and the
+        manager still read it as alive and waited forever.
+        ``wait``'s contract IS "has it ended", and it expresses "not
+        yet" as an exception -- so the exception is the answer here,
+        not control flow smuggled in as one.
 
         Returns:
-            The exit code once the process has ended, else ``None``.
+            True while the process runs.
         """
-        if self._process.is_running():
+        try:
+            self._process.wait(timeout=0)
+        except psutil.TimeoutExpired:
+            return True
+        return False
+
+    def exit_code(self) -> int | None:
+        """Return the adopted process's exit code, if there is one.
+
+        Returns:
+            The exit code, or ``None`` while it runs or when psutil
+            cannot recover a code for a process it did not start.
+        """
+        try:
+            return self._process.wait(timeout=0)
+        except psutil.TimeoutExpired:
             return None
-        return self._process.wait(timeout=0)
 
 
 def _real_process_identity(pid: int) -> float | None:
@@ -299,7 +382,7 @@ def _real_sleep_seconds(seconds: float) -> None:
     time.sleep(seconds)
 
 
-def _real_spawn_fleet_manager() -> subprocess.Popen[bytes]:
+def _real_spawn_fleet_manager() -> SpawnedProcessProtocol:
     """Launch the fleet manager detached, logging to a file.
 
     Detached rather than a child of the shell that ran ``make up``:
@@ -320,12 +403,14 @@ def _real_spawn_fleet_manager() -> subprocess.Popen[bytes]:
     # Append, not truncate: a relaunch must not erase the record of
     # why the previous manager stopped.
     with FLEET_LOG_PATH.open("a", encoding="utf-8") as stream:
-        return subprocess.Popen(
-            [sys.executable, "-c", _FLEET_BOOTSTRAP],
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            creationflags=subprocess.DETACHED_PROCESS,
-            close_fds=True,
+        return _PopenProcess(
+            subprocess.Popen(
+                [sys.executable, "-c", _FLEET_BOOTSTRAP],
+                stdout=stream,
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.DETACHED_PROCESS,
+                close_fds=True,
+            )
         )
 
 

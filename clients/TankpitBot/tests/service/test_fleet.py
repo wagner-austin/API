@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import psutil
 import pytest
 
 from tankpit_bot import _test_hooks as top_hooks
@@ -509,13 +510,18 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
     """
     console = bot_run_dir("covspawn") / "console.log"
     process = _real_spawn_bot_process({"TANKPIT_BOT_INSTANCE": "covspawn"})
+    # Killed through the pid, because the registry's surface is
+    # deliberately read-only: it can ask whether a bot is running,
+    # never end one. Stopping is the sentinel's job.
+    handle = psutil.Process(process.pid)
     try:
         assert process.pid > 0
         assert console.exists()
     finally:
-        process.kill()
-        process.wait(timeout=30)
+        handle.kill()
+        handle.wait(timeout=30)
         console.unlink()
         console.parent.rmdir()
-    if process.poll() is None:
-        raise AssertionError("child still running after kill + wait")
+
+    assert process.is_running() is False
+    assert process.exit_code() == handle.wait(timeout=30)
