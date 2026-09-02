@@ -89,7 +89,7 @@ class TestBuildFleetReport:
                 instance="artax",
                 role="fighter",
                 war_ready=False,
-            engaged_target_id=-1,
+                engaged_target_id=-1,
                 forage_goal_x=-1,
                 forage_goal_y=-1,
                 collect_claim_x=-1,

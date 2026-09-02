@@ -326,6 +326,27 @@ class FakeFileSystem:
         """
         self._files[str(path)] = content
 
+    def create_text_exclusive(self, path: Path, content: str) -> bool:
+        """Create a fake file only if no file is at the path.
+
+        The in-memory check-and-insert is atomic within one process,
+        matching the real hook's O_CREAT|O_EXCL contract: exactly one
+        creator wins, and the loser's content never lands.
+
+        Args:
+            path: File path that must not already exist.
+            content: File content.
+
+        Returns:
+            True when this call created the file; False when a file
+            was already there.
+        """
+        key = str(path)
+        if key in self._files:
+            return False
+        self._files[key] = content
+        return True
+
     def read_text(self, path: Path) -> str:
         """Read text from fake file.
 
@@ -465,6 +486,8 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     original_path_exists = _test_hooks.path_exists
     original_glob_paths = _test_hooks.glob_paths
     original_replace_text = _test_hooks.replace_text
+    original_remove_file = _test_hooks.remove_file
+    original_create_text_exclusive = _test_hooks.create_text_exclusive
 
     # Create a 1000-character fake static key for testing
     # This matches the expected format of the real key
@@ -477,6 +500,8 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     _test_hooks.path_exists = fs.path_exists
     _test_hooks.glob_paths = fs.glob_paths
     _test_hooks.replace_text = fs.replace_text
+    _test_hooks.remove_file = fs.remove
+    _test_hooks.create_text_exclusive = fs.create_text_exclusive
 
     # Pre-populate the static key file
     fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
@@ -489,6 +514,8 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     _test_hooks.path_exists = original_path_exists
     _test_hooks.glob_paths = original_glob_paths
     _test_hooks.replace_text = original_replace_text
+    _test_hooks.remove_file = original_remove_file
+    _test_hooks.create_text_exclusive = original_create_text_exclusive
 
 
 def make_fake_get_env(env_vars: dict[str, str]) -> Callable[[str], str | None]:

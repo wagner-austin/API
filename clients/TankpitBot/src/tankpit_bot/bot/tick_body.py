@@ -21,6 +21,7 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.states import make_initial_state_data
+from tankpit_bot.bot.tick_claims import _arbitrate_collect_claim
 from tankpit_bot.bot.tick_combat_feedback import (
     _get_combat_feedback,
     _has_pending_shot_feedback,
@@ -167,6 +168,13 @@ def _tick_once(bot: Bot) -> None:
         combat_feedback,
         ws=bot.world,
     )
+
+    # 6b. Claim arbitration: the decision's collect plan must hold the
+    # container's authoritative claim file before its command may
+    # dispatch — the exclusive-create mutex that closes the same-tick
+    # selection race the advisory claim rows cannot
+    # ([[fleet-forage-allocation]], measured median gap 0 s).
+    decision = _arbitrate_collect_claim(bot.world, decision, self_state["tank_id"], now)
 
     bot._self_alignment.maybe_emit(self_state, snapshot)
     bot._entity_alignment.maybe_emit(

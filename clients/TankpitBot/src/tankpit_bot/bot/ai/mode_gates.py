@@ -315,8 +315,7 @@ def _war_floor_applies(ctx: DecideCtx) -> bool:
     if doctrine != "swarm":
         return False
     if any(
-        human_id in ctx.ws.fleet_engaged_target_ids
-        for human_id in _live_consented_human_ids(ctx)
+        human_id in ctx.ws.fleet_engaged_target_ids for human_id in _live_consented_human_ids(ctx)
     ):
         return True
     return 1 + ctx.ws.fleet_war_ready_count >= SWARM_MUSTER_QUORUM

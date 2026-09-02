@@ -185,6 +185,33 @@ def test_real_replace_text_drops_the_beat_under_reader_contention(tmp_path: Path
     assert list(tmp_path.glob("*.tmp")) == []
 
 
+def test_real_create_text_exclusive_first_writer_wins(tmp_path: Path) -> None:
+    """The creation race has exactly one winner and keeps its content.
+
+    The mutex law of the fleet's authoritative container claim
+    ([[fleet-forage-allocation]]): the existence check and the
+    creation are one atomic operation, so the second creator is
+    refused and the first creator's content survives.
+    """
+    from tankpit_bot._test_hooks import _real_create_text_exclusive
+
+    target = tmp_path / "6" / "100_136.claim"
+
+    assert _real_create_text_exclusive(target, "winner") is True
+    assert _real_create_text_exclusive(target, "loser") is False
+    assert target.read_text(encoding="utf-8") == "winner"
+
+
+def test_real_create_text_exclusive_creates_parent_directories(tmp_path: Path) -> None:
+    """A fresh claims namespace is created on the first acquisition."""
+    from tankpit_bot._test_hooks import _real_create_text_exclusive
+
+    target = tmp_path / "_claims" / "6" / "1_2.claim"
+
+    assert _real_create_text_exclusive(target, "first") is True
+    assert target.read_text(encoding="utf-8") == "first"
+
+
 def test_real_file_marker_reports_identity_and_size(tmp_path: Path) -> None:
     """The marker grows with the file and keeps the same identity."""
     target = tmp_path / "latest.events.jsonl"

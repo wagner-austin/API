@@ -271,8 +271,8 @@ class FleetReportDict(TypedDict):
 
 __all__ = [
     "ENGAGEMENT_DOCTRINES",
-    "EngagementDoctrine",
     "FLEET_ROLES",
+    "EngagementDoctrine",
     "FleetContainerRemovalDict",
     "FleetContainerSightingDict",
     "FleetEnemySightingDict",

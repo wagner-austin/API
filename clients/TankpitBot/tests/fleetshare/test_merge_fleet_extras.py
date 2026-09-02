@@ -12,6 +12,7 @@ from tankpit_bot.fleetshare.types import FleetMineSightingDict
 from tankpit_bot.sniffer.world_service import WorldService
 from tests.fleetshare.test_merge import _NOW, _report
 
+
 class TestMergeMineKnowledge:
     """The fleet mine map's receiving half (operator order 2026-09-01)."""
 

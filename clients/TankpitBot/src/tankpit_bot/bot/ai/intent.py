@@ -69,6 +69,7 @@ PlanReleaseReason = Literal[
     "target_not_pursuable",
     "kind_invalid",
     "unservable",
+    "claim_lost",
 ]
 
 PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
@@ -81,6 +82,7 @@ PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
     "target_not_pursuable",
     "kind_invalid",
     "unservable",
+    "claim_lost",
 )
 """Closed vocabulary of plan-release reason codes.
 
@@ -93,6 +95,11 @@ mark will ever arrive (run bot-20260804-234008 held such a lock for
 11 minutes). The vocabulary is closed on purpose: a new release site
 means a new documented reason here, not an invented string — churn
 analysis groups the ``plan_released`` events by this field.
+``claim_lost`` is the fleet arbitration release (2026-09-02,
+[[fleet-forage-allocation]]): a sibling won the container's
+authoritative claim file in the same tick this plan latched, so the
+plan dies before its first command dispatches — one held beat paid
+instead of a whole doomed journey.
 """
 
 PLAN_SERVE_REACH = 1

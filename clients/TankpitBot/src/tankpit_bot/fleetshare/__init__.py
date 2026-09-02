@@ -5,6 +5,12 @@ See [[fleet-coordination]] and the module docstrings of
 :mod:`tankpit_bot.fleetshare.merge` (the read half).
 """
 
+from tankpit_bot.fleetshare.claims import (
+    CLAIM_TTL_MS,
+    ContainerClaimDict,
+    acquire_container_claim,
+    release_container_claim,
+)
 from tankpit_bot.fleetshare.merge import (
     FLEET_REPORT_TTL_MS,
     FleetMergeSummaryDict,
@@ -27,18 +33,22 @@ from tankpit_bot.fleetshare.types import (
 )
 
 __all__ = [
+    "CLAIM_TTL_MS",
     "ENEMY_SIGHTING_TTL_MS",
     "FLEET_REPORT_FILENAME",
     "FLEET_REPORT_TTL_MS",
     "FLEET_ROLES",
+    "ContainerClaimDict",
     "FleetContainerSightingDict",
     "FleetEnemySightingDict",
     "FleetMergeSummaryDict",
     "FleetReportDict",
     "FleetRole",
+    "acquire_container_claim",
     "build_fleet_report",
     "merge_fleet_reports",
     "read_team_reports",
+    "release_container_claim",
     "resolve_fleet_role",
     "write_fleet_report",
 ]

@@ -20,8 +20,8 @@ from platform_core.json_utils import (
 
 from tankpit_bot.fleetshare.types import (
     ENGAGEMENT_DOCTRINES,
-    EngagementDoctrine,
     FLEET_ROLES,
+    EngagementDoctrine,
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,

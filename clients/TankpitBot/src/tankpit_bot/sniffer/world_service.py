@@ -259,6 +259,14 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # wholesale each merge pass, like the engaged ids above.
         self.fleet_forage_goals: dict[str, tuple[int, int]] = {}
         self.fleet_claimed_containers: set[str] = set()
+        # The container tile whose AUTHORITATIVE claim file this
+        # session owns (-1,-1 for none) — the exclusive-create mutex
+        # of [[fleet-forage-allocation]], reconciled against the held
+        # collect plan by the tick loop's claim arbitration. Session
+        # bookkeeping like the fields above: the advisory rows steer
+        # planning, this pair records what the filesystem granted.
+        self.held_claim_x: int = -1
+        self.held_claim_y: int = -1
         # Consent evidence inherited from same-color siblings
         # ([[fleet-coordination]], operator ruling 2026-08-26): ids the
         # FLEET has proof consented to combat. Replaced wholesale per

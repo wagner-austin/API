@@ -163,6 +163,33 @@ class ReadBytesFromProtocol(Protocol):
         ...
 
 
+class CreateTextExclusiveProtocol(Protocol):
+    """Protocol for atomically creating a file that must not exist."""
+
+    def __call__(self, path: Path, content: str) -> bool:
+        """Create ``path`` with ``content`` only if no file is there.
+
+        The existence check and the creation are ONE atomic filesystem
+        operation (``O_CREAT | O_EXCL``), so when several processes
+        race to create the same path exactly one wins — the mutex
+        primitive the fleet's authoritative container claim is built
+        on ([[fleet-forage-allocation]]). Only the CREATION is atomic:
+        a concurrent reader can observe the file after the exclusive
+        open and before the content lands, so protocols built on this
+        primitive must treat existence as the lock and content as
+        metadata.
+
+        Args:
+            path: File path that must not already exist.
+            content: Text content to write into the new file.
+
+        Returns:
+            True when this call created the file; False when a file
+            was already there.
+        """
+        ...
+
+
 class ReplaceTextProtocol(Protocol):
     """Protocol for atomically replacing a file's text content."""
 
@@ -211,6 +238,27 @@ def _real_replace_text(path: Path, content: str) -> None:
             path,
         )
         staging.unlink(missing_ok=True)
+
+
+def _real_create_text_exclusive(path: Path, content: str) -> bool:
+    """Real implementation using ``os.open`` with ``O_CREAT | O_EXCL``.
+
+    Args:
+        path: File path that must not already exist.
+        content: Text content to write into the new file.
+
+    Returns:
+        True when this call created the file; False when a file was
+        already there.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    return True
 
 
 def _real_write_text(path: Path, content: str) -> None:
@@ -333,6 +381,7 @@ def _real_glob_paths(directory: Path, pattern: str) -> list[Path]:
     return sorted(directory.glob(pattern))
 
 
+create_text_exclusive: CreateTextExclusiveProtocol = _real_create_text_exclusive
 replace_text: ReplaceTextProtocol = _real_replace_text
 write_text: WriteTextProtocol = _real_write_text
 write_bytes: WriteBytesProtocol = _real_write_bytes
@@ -347,6 +396,7 @@ read_bytes_from: ReadBytesFromProtocol = _real_read_bytes_from
 
 __all__ = [
     "AppendTextProtocol",
+    "CreateTextExclusiveProtocol",
     "GlobPathsProtocol",
     "PathExistsProtocol",
     "ReadTextProtocol",
@@ -355,6 +405,7 @@ __all__ = [
     "WriteBytesProtocol",
     "WriteTextProtocol",
     "append_text",
+    "create_text_exclusive",
     "glob_paths",
     "path_exists",
     "read_text",

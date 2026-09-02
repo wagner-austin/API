@@ -7,12 +7,16 @@ related:
   - "[[bot-behavior-contract]]"
 source_paths:
   - "src/tankpit_bot/bot/tick_body.py"
+  - "src/tankpit_bot/bot/tick_claims.py"
+  - "src/tankpit_bot/fleetshare/claims.py"
   - "src/tankpit_bot/fleetshare/merge.py"
   - "src/tankpit_bot/bot/ai/context.py"
   - "src/tankpit_bot/bot/ai/tactics.py"
   - "src/tankpit_bot/fleetshare/types.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/tick_body.py": "90fc05b09f5caa8d3d49749b7de7ddce4c52a5e0"
+  "src/tankpit_bot/bot/tick_body.py": "9d5ed612951d0e5776cba3931951c98bd4ba53ab"
+  "src/tankpit_bot/bot/tick_claims.py": "4a6b8547c772523c4e4018126bdcd48a77e9206f"
+  "src/tankpit_bot/fleetshare/claims.py": "6a79a9c81f7b28736fb18a361c8514978d14a144"
   "src/tankpit_bot/fleetshare/merge.py": "66896035cacc1f2bfbcba9003b832c772b3bc55d"
   "src/tankpit_bot/bot/ai/context.py": "a0da4949ce6873cb68c78d075b83a35acddb9ad0"
   "src/tankpit_bot/bot/ai/tactics.py": "397b1fcec5a2b1109fea71cc90c1cd4dbd957bb4"
@@ -42,7 +46,7 @@ across them is not.
 |---|---|---|
 | Enemies | sightings, freshness law, own-wire-outranks-remote | **yes** — focus fire via `engaged_target_id`[^1] |
 | Combat timing | `war_ready` rows | **yes** — the swarm muster's quorum[^2] |
-| Containers | atlas, tombstones, shared coverage | **no** — an advisory claim only[^3] |
+| Containers | atlas, tombstones, shared coverage | **yes since 2026-09-02** — advisory claim to steer planning, exclusive-create file mutex to arbitrate commitment[^3][^5] |
 
 So the fleet already performs positive, peer-to-peer coordination —
 for fighting. The swarm muster is a genuine dispatch-like behaviour
@@ -79,15 +83,36 @@ The claim is not the wrong idea; it is an **advisory,
 eventually-consistent** claim being asked to do an authoritative one's
 job.
 
-## What would close it
+## What closed it (2026-09-02)
 
 **An authoritative claim needs no broker**, because the filesystem is
 already an arbiter: exclusive create (`O_CREAT|O_EXCL`) is atomic, so
-first-writer-wins on `claims/<room>/<x>_<y>` is a true mutex. It
-survives divergent knowledge (a bot claims only what it can see), needs
-an mtime TTL to reap a crashed bot's claims, and preserves the
+first-writer-wins on one file per container tile is a true mutex. It
+survives divergent knowledge (a bot claims only what it can see),
+reaps a crashed bot's claims by a staleness horizon, and preserves the
 single-tank rule — a solo bot creates claims nobody contends and
 behaves identically.
+
+Built exactly so:[^5] `fleetshare/claims.py` owns the protocol —
+claim files at `runs/bot/_claims/<room>/<x>_<y>.claim` (the leading
+underscore cannot collide with an instance directory by the instance
+name grammar), a typed `ContainerClaimDict` body, and three laws:
+existence is the lock while content is metadata (creation is atomic,
+the content write is not, so an unreadable claim denies for one beat
+and never a journey); the holder refreshes every full tick and a
+stamp older than `CLAIM_TTL_MS` (30 s — sized to ride out the
+measured 8 s receipt stalls that skip refresh ticks) is reaped by any
+contender, the reap race itself re-arbitrated by the retry create;
+and only the owner deletes. `bot/tick_claims.py` reconciles the claim
+with the committed plan BETWEEN decide and execute: a plan that just
+latched pays one exclusive create, and when a sibling won it the same
+tick, the plan dies right there — `plan_released` reason
+`claim_lost`, a hold command instead of the doomed dispatch, and the
+tile stamped into the advisory claimed set so the very next
+derivation plans around it. A session with no selected room passes
+through unclaimed (the same scope law as `build_fleet_report`'s
+pre-join return — no room, no fleet channel, nobody to contend
+with), which is also what keeps the sim seam byte-identical.
 
 **Deterministic assignment is the weaker option here**, recorded so it
 is not re-proposed: it requires every bot to compute from the same
@@ -124,3 +149,13 @@ thing peer-to-peer sensing has not been asked to carry.
       measures CONVERGENCE only; wasted travel is not measured by any
       diagnostic currently emitted, and would need the collect plan's
       origin rather than its dispatch.
+[^5]: `fleetshare/claims.py` (protocol: `acquire_container_claim` /
+      `release_container_claim`, `CLAIM_TTL_MS`), `bot/tick_claims.py`
+      (`_arbitrate_collect_claim`, wired in `bot/tick_body.py` step
+      6b), `_test_hooks/fs.py` (`create_text_exclusive`, the
+      O_CREAT|O_EXCL primitive). Events: `container_claim_acquired`
+      on transition, `container_claim_denied` on loss, `plan_released`
+      reason `claim_lost`. Every protocol arm is pinned in
+      `tests/fleetshare/test_claims.py` and
+      `tests/bot/test_tick_claims.py`; the real first-writer-wins
+      primitive in `tests/test_test_hooks.py`.
