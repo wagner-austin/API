@@ -6,32 +6,85 @@
 # Source-Container: Journal of the International Phonetic Association 45(2): 221-228
 # Source-Id: https://doi.org/10.1017/S0025100314000395
 #
-# Simplified: no vowel reduction and no allophonic detail, working at the level
-# the Kazakh and Kyrgyz rules do so that the languages stay comparable. Russian
-# is in this set as the contact language the Turkic corpora borrow from, not as
-# a Turkic language.
+# Phonemic, in the St Petersburg School framework the Illustration writes its
+# broad transcriptions in (p. 221). Russian is in this set as the contact
+# language the Turkic corpora borrow from, not as a Turkic language, so a
+# word here is a citation form and the file is grapheme-driven like its
+# siblings.
+#
+# In scope, because the Illustration makes them contrastive (p. 222):
+#   - the palatalised/non-palatalised opposition, written ʲ on the consonant
+#   - ж ш ц as unpaired hard, ч щ as unpaired soft
+#   - и as ɨ after the unpaired hard consonants (pp. 224-225)
+#   - iotation of е ё ю я, and the two signs
+#
+# Out of scope, because orthography does not determine them without stress
+# or lexical knowledge. Each is stated by the source at the page given:
+#   - vowel reduction, and the /e o/ that cannot appear unstressed (p. 225)
+#   - final devoicing and regressive voicing assimilation (p. 223)
+#   - assimilation of palatalisation, and cluster simplification (p. 223)
+#   - loanwords keeping a hard consonant before /e/ (p. 223), which is
+#     lexical: Гёте is /ˈɡʲote/, not the /ˈɡʲotʲe/ the orthography implies
 
 # ---------------------------------------------------------------------------
-# 1. IOTATED VOWELS
+# Macros (IPA, not Cyrillic)
 #
-# These represent [j]+vowel word-initially/after vowels, or palatalize preceding C.
-# For simplicity, we map to j+vowel sequences (phonemic level).
+# A left context is matched against text that has already been transliterated,
+# so a rule looking leftwards names the IPA symbol rather than the Cyrillic
+# letter. uzc_ipa.rules records the same constraint.
+# ---------------------------------------------------------------------------
 
-Е > je ;  е > je ;
-Ё > jo ;  ё > jo ;
-Ю > ju ;  ю > ju ;
-Я > ja ;  я > ja ;
+$Cpair = [b v ɡ d z k l m n p r s t f x] ;
+$Vout  = [a e i o u ɨ] ;
+
+# ---------------------------------------------------------------------------
+# 1. THE TWO SIGNS BEFORE A VOWEL
+#
+# Matched on the input, before either sign is rewritten, because ъ is deleted
+# and its consonant would then look pairable and wrongly take ʲ. After ь the
+# consonant is soft AND a /j/ is present: статья /statʲja/.
+# ---------------------------------------------------------------------------
+
+Ъе > je ;   ЪЕ > je ;   ъЕ > je ;   ъе > je ;
+Ъё > jo ;   ЪЁ > jo ;   ъЁ > jo ;   ъё > jo ;
+Ъю > ju ;   ЪЮ > ju ;   ъЮ > ju ;   ъю > ju ;
+Ъя > ja ;   ЪЯ > ja ;   ъЯ > ja ;   ъя > ja ;
+Ъи > ji ;   ЪИ > ji ;   ъИ > ji ;   ъи > ji ;
+
+Ье > ʲje ;  ЬЕ > ʲje ;  ьЕ > ʲje ;  ье > ʲje ;
+Ьё > ʲjo ;  ЬЁ > ʲjo ;  ьЁ > ʲjo ;  ьё > ʲjo ;
+Ью > ʲju ;  ЬЮ > ʲju ;  ьЮ > ʲju ;  ью > ʲju ;
+Ья > ʲja ;  ЬЯ > ʲja ;  ьЯ > ʲja ;  ья > ʲja ;
+Ьи > ʲji ;  ЬИ > ʲji ;  ьИ > ʲji ;  ьи > ʲji ;
+
+# ---------------------------------------------------------------------------
+# 1b. ‹ц› BEFORE A VOWEL LETTER
+#
+# ц is unpaired hard, so it takes no ʲ and inserts no j. Written as input
+# digraphs rather than as a left context on the vowel, because /t͡s/ is three
+# characters wide and golden_sweep.py's probe coverage rests on every context
+# being exactly one element wide. A digraph is a two-character source
+# pattern, which that property already admits.
+#
+# These precede the bare ‹ц› rule below, since ICU takes the first rule that
+# matches rather than the longest.
+# ---------------------------------------------------------------------------
+
+Це > t͡se ;  ЦЕ > t͡se ;  цЕ > t͡se ;  це > t͡se ;
+Цё > t͡so ;  ЦЁ > t͡so ;  цЁ > t͡so ;  цё > t͡so ;
+Цю > t͡su ;  ЦЮ > t͡su ;  цЮ > t͡su ;  цю > t͡su ;
+Ця > t͡sa ;  ЦЯ > t͡sa ;  цЯ > t͡sa ;  ця > t͡sa ;
+Ци > t͡sɨ ;  ЦИ > t͡sɨ ;  цИ > t͡sɨ ;  ци > t͡sɨ ;
 
 # ---------------------------------------------------------------------------
 # 2. CONSONANTS
-#
-# Basic consonant mappings (hard/non-palatalized by default).
+# ---------------------------------------------------------------------------
 
 Б > b ;  б > b ;
 В > v ;  в > v ;
 Г > ɡ ;  г > ɡ ;
 Д > d ;  д > d ;
-Ж > ʒ ;  ж > ʒ ;       # always hard, no palatalized counterpart
+Ж > ʒ ;  ж > ʒ ;       # unpaired hard
 З > z ;  з > z ;
 Й > j ;  й > j ;
 К > k ;  к > k ;
@@ -45,31 +98,74 @@
 Ф > f ;  ф > f ;
 Х > x ;  х > x ;
 
-# Affricates and palatalized-only consonants
-Ц > t͡s ;  ц > t͡s ;     # always hard, no palatalized counterpart
-Ч > t͡ʃʲ ; ч > t͡ʃʲ ;   # always palatalized
-Ш > ʃ ;  ш > ʃ ;       # always hard, no palatalized counterpart
-Щ > ʃʲː ; щ > ʃʲː ;   # always palatalized, long
+Ц > t͡s ;  ц > t͡s ;     # unpaired hard
+Ч > t͡ʃʲ ; ч > t͡ʃʲ ;    # unpaired soft
+Ш > ʃ ;  ш > ʃ ;       # unpaired hard
+Щ > ʃʲː ; щ > ʃʲː ;    # unpaired soft, long
 
 # ---------------------------------------------------------------------------
-# 3. VOWELS
+# 3. IOTATED VOWELS
+#
+# ц was taken above, as a digraph, because /t͡s/ ends in the same s that
+# $Cpair contains and the general rule would otherwise palatalise it and turn
+# солнце into solnt͡sʲe. The other unpaired consonants end in ʒ, ʃ, ʲ or ː and
+# fall through to the default on their own.
+#
+# The contextual rules precede the anchored one because ICU's rule-masking
+# check does not model the ^ anchor: it reads an anchored rule as having no
+# left context at all, so an earlier ^ rule looks general enough to hide
+# every contextual rule for the same letter and the file will not compile.
+# ---------------------------------------------------------------------------
+
+$Cpair { Е > ʲe ;  $Cpair { е > ʲe ;
+$Cpair { Ё > ʲo ;  $Cpair { ё > ʲo ;
+$Cpair { Ю > ʲu ;  $Cpair { ю > ʲu ;
+$Cpair { Я > ʲa ;  $Cpair { я > ʲa ;
+
+$Vout { Е > je ;  $Vout { е > je ;
+$Vout { Ё > jo ;  $Vout { ё > jo ;
+$Vout { Ю > ju ;  $Vout { ю > ju ;
+$Vout { Я > ja ;  $Vout { я > ja ;
+
+^ Е > je ;  ^ е > je ;
+^ Ё > jo ;  ^ ё > jo ;
+^ Ю > ju ;  ^ ю > ju ;
+^ Я > ja ;  ^ я > ja ;
+
+Е > e ;  е > e ;
+Ё > o ;  ё > o ;
+Ю > u ;  ю > u ;
+Я > a ;  я > a ;
+
+# ---------------------------------------------------------------------------
+# 4. И
+#
+# ɨ after the unpaired hard consonants, ʲi after a pairable one. Only
+# palatalised consonants and /j/ occur before [i] (p. 222).
+# ---------------------------------------------------------------------------
+
+ʒ { И > ɨ ;  ʒ { и > ɨ ;
+ʃ { И > ɨ ;  ʃ { и > ɨ ;
+
+$Cpair { И > ʲi ;  $Cpair { и > ʲi ;
+
+И > i ;  и > i ;
+
+# ---------------------------------------------------------------------------
+# 5. REMAINING VOWELS
+# ---------------------------------------------------------------------------
 
 А > a ;  а > a ;
-Э > e ;  э > e ;       # "hard" e (after hard consonants, word-initial)
-И > i ;  и > i ;
+Э > e ;  э > e ;       # "hard" e: after hard consonants, word-initial
 О > o ;  о > o ;
 У > u ;  у > u ;
-Ы > ɨ ;  ы > ɨ ;       # close central unrounded vowel
+Ы > ɨ ;  ы > ɨ ;
 
 # ---------------------------------------------------------------------------
-# 4. SPECIAL CHARACTERS
+# 6. SIGNS NOT BEFORE A VOWEL
+# ---------------------------------------------------------------------------
 
-# Soft sign - palatalizes preceding consonant
 Ь > ʲ ;  ь > ʲ ;
-
-# Hard sign - silent, blocks palatalization
-Ъ >  ;  ъ >  ;
-
-# ---------------------------------------------------------------------------
+Ъ >  ;   ъ >  ;
 
 :: NFC ;

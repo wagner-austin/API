@@ -35,10 +35,19 @@ hash below will not match the wheel until the next release.
 
 ## Files
 
-Twelve files are vendored. `ru_ipa.rules` is the one exception: it originated
-here and has no upstream counterpart, because Russian is in this set as the
-contact language the Turkic corpora borrow from rather than as a Turkic
-language.
+All thirteen files are vendored. `ru_ipa.rules` used to be the exception:
+it originated here and had no upstream counterpart, because Russian is in
+this set as the contact language the Turkic corpora borrow from rather than
+as a Turkic language. It moved upstream on 2026-09-02 and is now vendored
+like the rest, so this directory no longer holds any rule of its own.
+
+Moving it was not a copy. The version that lived here cited no source and
+mapped every iotated vowel to a j-sequence unconditionally, so ‹северный›
+came out with /sj/ where the Illustration it now cites prints /sʲ/.
+Palatalisation is contrastive in Russian, which made that a wrong phoneme
+rather than a coarse one. The upstream file marks it, states which
+processes it leaves out and why, and is checked keyword by keyword against
+the Illustration's own charts by `test_russian_ipa_letters.py` there.
 
 Hashes are SHA-256 over each file's content **with CRLF normalised to LF**.
 `.gitattributes` marks `*.rules` as `text`, so git stores LF and checks out
@@ -60,7 +69,7 @@ disagreeing on a fresh Windows clone.
 | `ug_ipa.rules` | `9112bdccddbffa65de7987a7d0bb5044c8f05c5d8c4fa75040f6c2b20fd84f02` | upstream |
 | `uz_ipa.rules` | `b0d81023d3e10df2fe5ae7e5f264a4e9ca5fa9e3f4ccd5bd66a6d637d9ce127f` | upstream |
 | `uzc_ipa.rules` | `79a5e49e065641ece6081d8b487d49cc86a4abbd54ac9c3b75f69d0b804088e3` | upstream |
-| `ru_ipa.rules` | `4e8634b638620109511a25aa5332d070b49286b3e76da8466733d75e938f46bc` | this service |
+| `ru_ipa.rules` | `2820e70ef3d8bc499cd62bdea005223ae73047db76727e9b85a4b2320c74fbbc` | upstream |
 
 `tests/test_rule_vendoring.py` asserts every hash in this table, so the table
 cannot drift from the files it describes. `tests/test_rule_provenance.py`

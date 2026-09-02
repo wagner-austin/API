@@ -12,7 +12,7 @@ those digests were measured.
 
 Two layers, for two different failure modes:
 
-* The **digests** cover 61,692 probes per commit and will catch any
+* The **digests** cover 61,796 probes per commit and will catch any
   divergence at all, but say nothing about what diverged.
 * The **spot checks** are hand-picked and name the semantics they protect,
   so a digest failure has somewhere to look. Each one is a case where a
@@ -137,6 +137,14 @@ SPOT_CHECKS: Final[dict[str, dict[str, str]]] = {
         "ы": "ɨ",
         "объект": "objekt",
         "ж": "ʒ",
+        # Palatalisation, which the file was rewritten to mark rather than
+        # spell as a glide, and the three contexts that decide it: a
+        # pairable consonant takes ʲ, ц stays hard, and the soft sign keeps
+        # both the ʲ and the /j/.
+        "северный": "sʲevʲernɨj",
+        "солнце": "solnt͡se",
+        "статья": "statʲja",
+        "жил": "ʒɨl",
     },
     "az_ipa.rules": {"ə": "æ", "c": "d͡ʒ", "ç": "t͡ʃ", "q": "ɡ", "x": "x", "ğ": "ɣ"},
     # The hamza carrier is the only rule in any vendored file whose match

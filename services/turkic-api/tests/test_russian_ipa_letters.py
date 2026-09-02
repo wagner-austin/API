@@ -92,9 +92,12 @@ WORD_TESTS = {
     "сад": "sad",  # 'garden'
     "кот": "kot",  # 'tomcat'
     "год": "ɡod",  # 'year'
-    # Palatalized examples
+    # Palatalized examples. ‹я› after a pairable consonant palatalises it
+    # and inserts no glide, which is what the Illustration prints: /ˈrʲat/,
+    # p. 222. The earlier expectation here was 'rjad', carried over from a
+    # rule file that mapped every iotated vowel to a j-sequence.
     "рад": "rad",  # '(am) glad'
-    "ряд": "rjad",  # 'row' (р + я = rʲ + a, but we map я → ja)
+    "ряд": "rʲad",  # 'row'
     # Affricates
     "царь": "t͡sarʲ",  # 'tzar'
     "шар": "ʃar",  # 'ball'
