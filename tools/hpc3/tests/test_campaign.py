@@ -31,7 +31,8 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from hpc3.cli import campaign as campaign_cli
 from hpc3.contracts.job import JobSpec
 from hpc3.core.campaign import (
-    existence_command,
+    EXISTENCE_CHUNK,
+    existence_commands,
     finished_artifacts,
     parse_existence,
     plan_campaign,
@@ -105,20 +106,34 @@ class TestEveryMemberMustDeclareAnArtifact:
 
 
 class TestAskingWhichArtifactsExist:
-    def test_one_command_covers_every_member(self) -> None:
+    def test_a_small_campaign_fits_one_command(self) -> None:
         """Thirty members over SSH is otherwise thirty round trips, each able
         to fail halfway and leave the plan built from two moments."""
-        command = existence_command([_TR, _AZ])
-        assert command.count("PRESENT|") == 1
-        assert _TR in command
-        assert _AZ in command
+        commands = existence_commands([_TR, _AZ])
+        assert len(commands) == 1
+        assert commands[0].count("PRESENT|") == 1
+        assert _TR in commands[0]
+        assert _AZ in commands[0]
+
+    def test_a_wide_campaign_chunks_below_the_argument_limit(self) -> None:
+        """A 136-member search round packed one ~10 KB command, past
+        cmd.exe's 8191-character limit on the Windows submitter -- the
+        command reached bash truncated and died mid-loop (vhsearch2-r0).
+        Order is preserved across chunks, and every path appears once."""
+        artifacts = [f"/pub/wagnera3/rusted/runs/sweeps/wide/arm-s{i}.txt" for i in range(136)]
+        commands = existence_commands(artifacts)
+        assert len(commands) == 3
+        assert all(len(command) < 4500 for command in commands)
+        joined = "\n".join(commands)
+        assert all(artifact in joined for artifact in artifacts)
+        assert joined.index(artifacts[0]) < joined.index(artifacts[EXISTENCE_CHUNK])
 
     def test_a_path_carrying_a_space_is_quoted(self) -> None:
-        assert "'/pub/a b.pt'" in existence_command(["/pub/a b.pt"])
+        assert "'/pub/a b.pt'" in existence_commands(["/pub/a b.pt"])[0]
 
     def test_no_artifacts_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least one artifact"):
-            existence_command([])
+            existence_commands([])
 
     def test_present_lines_are_read(self) -> None:
         assert parse_existence(f"PRESENT|{_TR}\nABSENT|{_AZ}\n") == {_TR}

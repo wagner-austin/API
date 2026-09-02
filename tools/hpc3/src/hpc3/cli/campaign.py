@@ -55,7 +55,7 @@ from hpc3.core import ledger
 from hpc3.core.array_submit import submit_array
 from hpc3.core.budget import check_projection
 from hpc3.core.campaign import (
-    existence_command,
+    existence_commands,
     finished_artifacts,
     parse_existence,
     plan_campaign,
@@ -104,7 +104,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     host = workspace["host"]
     recorded = ledger.read(pathlib.Path(workspace["ledger"]), cluster)
-    present = parse_existence(run_remote(host, existence_command(artifacts)))
+    present: set[str] = set()
+    for probe in existence_commands(artifacts):
+        present |= parse_existence(run_remote(host, probe))
     claimed = claimed_artifacts(recorded, parse_account_output(run_remote(host, account_command())))
 
     # Asked of accounting, not read from the closure file. Closures are
