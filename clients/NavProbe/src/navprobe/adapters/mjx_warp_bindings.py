@@ -46,6 +46,38 @@ class HostArrayProtocol(Protocol):
         ...
 
 
+class ScalarHostArrayProtocol(Protocol):
+    """A host-side array holding counters rather than per-world rows."""
+
+    def tolist(self) -> list[int]:
+        """Copy the array to Python integers.
+
+        Returns:
+            The counters, in the vendor's own order.
+        """
+        ...
+
+
+class ScalarArrayProtocol(Protocol):
+    """A device-resident counter array.
+
+    Declared apart from :class:`DeviceArrayProtocol` because the shapes
+    genuinely differ: ``qpos`` is one row per world and ``tolist`` gives
+    ``list[list[float]]``, while ``nacon`` is a flat counter and gives
+    ``list[int]``. Forcing one protocol to cover both would mean declaring a
+    shape the vendor does not have, and the first caller to index it would be
+    typechecked against a lie.
+    """
+
+    def numpy(self) -> ScalarHostArrayProtocol:
+        """Copy the counters back to the host.
+
+        Returns:
+            The host-side copy.
+        """
+        ...
+
+
 class DeviceArrayProtocol(Protocol):
     """A device-resident array of one row per parallel world."""
 
@@ -129,9 +161,16 @@ class MjWarpDataProtocol(Protocol):
 
     Attributes:
         qpos: Generalised positions, one row per world.
+        nacon: Count of active contacts across the batch. Carried because a
+            determinism verdict that compares repetitions to each other cannot
+            tell "reproducible" from "reproducibly inert": a mode that stops
+            generating contacts produces identical rollouts and scores as
+            deterministic. This is the cheapest witness that the scene was
+            still interacting when the verdict was taken.
     """
 
     qpos: DeviceArrayProtocol
+    nacon: ScalarArrayProtocol
 
 
 class RenderContextProtocol(Protocol):
@@ -317,6 +356,8 @@ __all__ = [
     "PutModelProtocol",
     "RenderContextProtocol",
     "RenderProtocol",
+    "ScalarArrayProtocol",
+    "ScalarHostArrayProtocol",
     "StepProtocol",
     "load_mjwarp",
     "load_numpy",

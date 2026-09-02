@@ -44,6 +44,7 @@ class TestHookSurface:
             "disable_power_throttling",
             "init_warp",
             "load_state_factory",
+            "load_witness_factory",
             "monotonic",
             "opt_out_of_power_throttling",
             "win32_process_information_setter",
@@ -248,3 +249,13 @@ class TestWarpConformance:
         would fail here.
         """
         assert _test_hooks.load_state_factory() is MjWarpStateSimulatorFactory
+
+    def test_the_witness_loader_returns_the_same_adapter(self) -> None:
+        """Both loaders point at one class; only the declared type differs.
+
+        The two hooks exist to hand out different *surfaces* of the same
+        adapter -- the vendor-agnostic one and the one carrying the liveness
+        witness -- not different implementations. Asserting identity is what
+        stops them drifting into two adapters that could disagree.
+        """
+        assert _test_hooks.load_witness_factory() is MjWarpStateSimulatorFactory

@@ -38,6 +38,11 @@ from navprobe.adapters.mujoco_bindings import MjModelProtocol, load_mujoco
 #: perturbing it moves the body without producing an invalid quaternion.
 PERTURBED_COORDINATE = 0
 
+#: Index of the contact counter within ``Data.nacon``. MuJoCo-Warp declares it
+#: as a one-element array shared by the whole batch rather than one entry per
+#: world, so there is exactly one position to read and it is never per-world.
+CONTACT_COUNT_INDEX = 0
+
 
 class MjWarpStateAdapterError(NavProbeError):
     """MuJoCo-Warp's solver could not be driven as the probe requires.
@@ -133,6 +138,29 @@ class MjWarpStateSimulator:
         """
         self._mjwarp.step(m=self._model, d=self._data)
         return [value for world in self._data.qpos.numpy().tolist() for value in world]
+
+    def contact_count(self) -> int:
+        """Report how many contacts the last step produced across the batch.
+
+        A liveness witness, not an observation. It is deliberately NOT part of
+        :class:`navprobe.rollout.SimulatorProtocol`: a contact is a MuJoCo
+        notion, and the rollout layer is vendor-agnostic on purpose. It lives
+        here, on the vendor boundary, because this is the only layer entitled
+        to know what a contact is.
+
+        It exists because a determinism verdict compares repetitions against
+        each other and never against the physics. A mode that silently stops
+        generating contacts produces identical rollouts and scores
+        ``deterministic: true`` -- measured on 2026-08-30, where every geometry
+        pair routing to MuJoCo-Warp's convex narrowphase returned zero contacts
+        under ``RUN_TO_RUN`` while reproducing bit for bit. Reading this beside
+        the verdict is what separates "reproducible" from "reproducibly inert".
+
+        Returns:
+            The active contact count reported by the last :meth:`advance`, or
+            by construction if no step has been taken yet.
+        """
+        return self._data.nacon.numpy().tolist()[CONTACT_COUNT_INDEX]
 
     def _build_data(self, seed: int) -> MjWarpDataProtocol:
         """Allocate state and perturb each world's initial position.

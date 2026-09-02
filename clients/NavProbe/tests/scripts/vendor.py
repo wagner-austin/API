@@ -25,6 +25,7 @@ from scripts._test_hooks import (
 )
 
 from navprobe.experiment import SimulatorFactoryProtocol
+from navprobe.rollout import SimulatorProtocol
 from tests.factories import DriftingSimulatorFactory, LinearSimulatorFactory
 
 
@@ -161,6 +162,136 @@ class RecordingFactoryConstructor:
         if self._deterministic:
             return LinearSimulatorFactory(world_count=world_count)
         return DriftingSimulatorFactory(world_count=world_count, diverge_at_step=3)
+
+
+class WitnessSimulator:
+    """A real simulator with a contact count bolted on.
+
+    The contact count is configured rather than simulated, and that is the
+    point: the case worth testing is a simulator whose rollouts agree
+    perfectly while reporting ZERO contacts, because that is the shape the
+    convex-narrowphase failure takes and the one a verdict alone calls a pass.
+    A simulator that derived its contacts from its own motion could not be
+    asked to produce it.
+
+    Args:
+        inner: The simulator whose rollout behaviour is being wrapped.
+        contacts_per_step: What :meth:`contact_count` reports after each step.
+    """
+
+    def __init__(self, inner: SimulatorProtocol, contacts_per_step: int) -> None:
+        self._inner = inner
+        self._contacts_per_step = contacts_per_step
+
+    @property
+    def world_count(self) -> int:
+        """Number of parallel worlds the wrapped simulator carries.
+
+        Returns:
+            The inner simulator's world count.
+        """
+        return self._inner.world_count
+
+    def reset(self, seed: int) -> None:
+        """Reset the wrapped simulator.
+
+        Args:
+            seed: The seed to pin.
+        """
+        self._inner.reset(seed)
+
+    def advance(self) -> Sequence[float]:
+        """Advance the wrapped simulator one step.
+
+        Returns:
+            The inner simulator's observation.
+        """
+        return self._inner.advance()
+
+    def contact_count(self) -> int:
+        """Report the configured contact count.
+
+        Returns:
+            Contacts for the step just taken.
+        """
+        return self._contacts_per_step
+
+
+class WitnessSimulatorFactory:
+    """Builds witness-capable simulators over a real factory.
+
+    Args:
+        inner: The factory producing the simulators to wrap.
+        contacts_per_step: What each built simulator reports per step.
+    """
+
+    def __init__(self, inner: SimulatorFactoryProtocol, contacts_per_step: int) -> None:
+        self._inner = inner
+        self._contacts_per_step = contacts_per_step
+
+    def __call__(self) -> WitnessSimulator:
+        """Construct one simulator.
+
+        Returns:
+            A freshly wrapped simulator.
+        """
+        return WitnessSimulator(self._inner(), self._contacts_per_step)
+
+
+class RecordingWitnessFactoryConstructor:
+    """Builds witness-capable factories, recording the arguments it was given.
+
+    The witness twin of :class:`RecordingFactoryConstructor`. It exists rather
+    than widening that one because the two hooks are deliberately separate: a
+    sweep that only needs the vendor-agnostic surface should not be handed a
+    capability its scenes may not have.
+
+    Args:
+        runtime: The runtime whose scope depth is sampled on each call.
+        deterministic: Whether the factories built produce agreeing simulators.
+        contacts_per_step: Contacts each built simulator reports. Zero models a
+            scene that has stopped interacting.
+    """
+
+    def __init__(
+        self, runtime: FakeWarpRuntime, deterministic: bool, contacts_per_step: int
+    ) -> None:
+        self._runtime = runtime
+        self._deterministic = deterministic
+        self._contacts_per_step = contacts_per_step
+        self.calls: list[tuple[str, int, float, int]] = []
+        self.linesearch_block_dims: list[int | None] = []
+
+    def __call__(
+        self,
+        model_xml: str,
+        world_count: int,
+        perturbation: float,
+        constraint_capacity: int,
+        linesearch_block_dim: int | None = None,
+    ) -> WitnessSimulatorFactory:
+        """Build a witness-capable factory for one scene.
+
+        Args:
+            model_xml: The scene's MJCF document.
+            world_count: Parallel worlds each simulator carries.
+            perturbation: Half-width of the seed-driven offset range.
+            constraint_capacity: Constraint allocation bound.
+            linesearch_block_dim: Block size pinned on the line-search kernel,
+                or ``None`` for the vendor default.
+
+        Returns:
+            A factory producing witness-capable simulators.
+        """
+        self.calls.append((model_xml, world_count, perturbation, constraint_capacity))
+        self.linesearch_block_dims.append(linesearch_block_dim)
+        self._runtime.work_inside_scope.append(f"construct:{self._runtime.scope_depth}")
+        inner: SimulatorFactoryProtocol = (
+            LinearSimulatorFactory(world_count=world_count)
+            if self._deterministic
+            else DriftingSimulatorFactory(world_count=world_count, diverge_at_step=3)
+        )
+        return WitnessSimulatorFactory(inner, self._contacts_per_step)
 
 
 class RecordingWriter:

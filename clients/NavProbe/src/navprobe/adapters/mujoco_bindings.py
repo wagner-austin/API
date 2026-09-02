@@ -31,6 +31,56 @@ class MjModelProtocol(Protocol):
     nq: int
 
 
+class MjDataProtocol(Protocol):
+    """Simulation state for one compiled model.
+
+    Declared for one field. This package's adapters drive their solvers through
+    the vendor backends, not through MuJoCo's own stepper -- what MuJoCo itself
+    is needed for is the question "does this scene start in contact at all",
+    which no amount of reading the MJCF answers.
+
+    That question is not academic. A scene whose bodies never touch produces
+    zero contacts in EVERY determinism mode, which is indistinguishable at a
+    glance from a mode that dropped them -- and two such scenes were built by
+    hand during the 2026-08-30 collision-pair work before a control caught
+    them. ``ncon`` is what turns "I calculated that these overlap" into "MuJoCo
+    agrees they do".
+
+    Attributes:
+        ncon: Contacts MuJoCo found in the current state.
+    """
+
+    ncon: int
+
+
+class MjDataLoaderProtocol(Protocol):
+    """The ``MjData`` class object, used only as a loader."""
+
+    def __call__(self, model: MjModelProtocol) -> MjDataProtocol:
+        """Allocate state for a compiled model.
+
+        Args:
+            model: The compiled model.
+
+        Returns:
+            Freshly allocated state.
+        """
+        ...
+
+
+class ForwardProtocol(Protocol):
+    """``mujoco.mj_forward``."""
+
+    def __call__(self, m: MjModelProtocol, d: MjDataProtocol) -> None:
+        """Populate derived state, including the contact list.
+
+        Args:
+            m: The compiled model.
+            d: The state to populate in place.
+        """
+        ...
+
+
 class MjModelLoaderProtocol(Protocol):
     """The ``MjModel`` class object, used only as a loader."""
 
@@ -56,9 +106,13 @@ class MujocoModuleProtocol(Protocol):
 
     Attributes:
         MjModel: The model class, used to compile MJCF.
+        MjData: The state class, used to allocate state.
+        mj_forward: Populates derived state, including contacts.
     """
 
     MjModel: MjModelLoaderProtocol
+    MjData: MjDataLoaderProtocol
+    mj_forward: ForwardProtocol
 
 
 def load_mujoco() -> MujocoModuleProtocol:
@@ -67,12 +121,17 @@ def load_mujoco() -> MujocoModuleProtocol:
     Returns:
         The module, typed by the annotation rather than by the import.
     """
-    module: MujocoModuleProtocol = __import__(MUJOCO_MODULE, fromlist=["MjModel"])
+    module: MujocoModuleProtocol = __import__(
+        MUJOCO_MODULE, fromlist=["MjModel", "MjData", "mj_forward"]
+    )
     return module
 
 
 __all__ = [
     "MUJOCO_MODULE",
+    "ForwardProtocol",
+    "MjDataLoaderProtocol",
+    "MjDataProtocol",
     "MjModelLoaderProtocol",
     "MjModelProtocol",
     "MujocoModuleProtocol",

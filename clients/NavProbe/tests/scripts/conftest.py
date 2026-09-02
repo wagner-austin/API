@@ -19,6 +19,7 @@ from tests.scripts.vendor import (
     FakeWarpRuntime,
     RecordingFactoryConstructor,
     RecordingOptOut,
+    RecordingWitnessFactoryConstructor,
     RecordingWriter,
     SteppingClock,
 )
@@ -128,6 +129,113 @@ def drifting_harness() -> Generator[Harness, None, None]:
     (
         _test_hooks.init_warp,
         _test_hooks.load_state_factory,
+        _test_hooks.write_out,
+        _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
+    ) = saved
+
+
+#: Contacts a healthy witness scene reports per step.
+LIVE_CONTACTS_PER_STEP = 2
+
+
+class WitnessHarness:
+    """Everything a witness-script test needs to drive one run.
+
+    Args:
+        runtime: The Warp stand-in the script was given.
+        init_warp: The initialiser, recording the configuration asked for.
+        construct: The witness factory constructor, recording its arguments.
+        writer: Everything the script wrote.
+        opt_out: Records that power throttling was opted out of.
+    """
+
+    def __init__(
+        self,
+        runtime: FakeWarpRuntime,
+        init_warp: FakeInitWarp,
+        construct: RecordingWitnessFactoryConstructor,
+        writer: RecordingWriter,
+        opt_out: RecordingOptOut,
+    ) -> None:
+        self.runtime = runtime
+        self.init_warp = init_warp
+        self.construct = construct
+        self.writer = writer
+        self.opt_out = opt_out
+
+
+def install_witness(deterministic: bool, contacts_per_step: int) -> WitnessHarness:
+    """Rebind every script hook to a witness-capable fake and return them.
+
+    Args:
+        deterministic: Whether the simulators built produce agreeing rollouts.
+        contacts_per_step: Contacts each simulator reports. Zero models a scene
+            that has stopped interacting.
+
+    Returns:
+        The installed harness.
+    """
+    runtime = FakeWarpRuntime(DEVICES)
+    init_warp = FakeInitWarp(runtime)
+    construct = RecordingWitnessFactoryConstructor(runtime, deterministic, contacts_per_step)
+    writer = RecordingWriter()
+    opt_out = RecordingOptOut()
+    _test_hooks.opt_out_of_power_throttling = opt_out
+    _test_hooks.init_warp = init_warp
+    _test_hooks.load_witness_factory = lambda: construct
+    _test_hooks.write_out = writer
+    _test_hooks.monotonic = SteppingClock(CLOCK_STEP)
+    return WitnessHarness(runtime, init_warp, construct, writer, opt_out)
+
+
+@pytest.fixture()
+def witness_harness() -> Generator[WitnessHarness, None, None]:
+    """Install fakes for a scene that reproduces AND keeps interacting.
+
+    Yields:
+        The installed harness.
+    """
+    saved = (
+        _test_hooks.init_warp,
+        _test_hooks.load_witness_factory,
+        _test_hooks.write_out,
+        _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
+    )
+    yield install_witness(deterministic=True, contacts_per_step=LIVE_CONTACTS_PER_STEP)
+    (
+        _test_hooks.init_warp,
+        _test_hooks.load_witness_factory,
+        _test_hooks.write_out,
+        _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
+    ) = saved
+
+
+@pytest.fixture()
+def inert_harness() -> Generator[WitnessHarness, None, None]:
+    """Install fakes for a scene that reproduces perfectly while doing nothing.
+
+    The case the witness exists for. Rollouts agree bit for bit and the verdict
+    is ``deterministic: true``, yet no contact is ever generated -- which is
+    exactly what MuJoCo-Warp's convex narrowphase does under a deterministic
+    mode. A script that reported only the verdict would call this a pass.
+
+    Yields:
+        The installed harness.
+    """
+    saved = (
+        _test_hooks.init_warp,
+        _test_hooks.load_witness_factory,
+        _test_hooks.write_out,
+        _test_hooks.monotonic,
+        _test_hooks.opt_out_of_power_throttling,
+    )
+    yield install_witness(deterministic=True, contacts_per_step=0)
+    (
+        _test_hooks.init_warp,
+        _test_hooks.load_witness_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
         _test_hooks.opt_out_of_power_throttling,

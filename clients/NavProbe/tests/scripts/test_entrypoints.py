@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from scripts.apply_tactile_alias_patch import _LAUNCH_OLD, _MAX_OLD, _SIG_OLD
 
-from tests.scripts.conftest import Harness
+from tests.scripts.conftest import Harness, WitnessHarness
 
 #: The directory the scripts live in.
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
@@ -56,6 +56,15 @@ class TestSweepEntryPoints:
     def test_det_compile_test_exits_zero(self, harness: Harness) -> None:
         """A mode that compiles exits clean through the entry point."""
         assert _run("det_compile_test.py", ["RUN_TO_RUN", "cache"]) == 0
+
+    def test_collision_pair_probe_exits_zero(self, witness_harness: WitnessHarness) -> None:
+        """A completed pair sweep exits clean through the entry point.
+
+        Driven by the witness harness rather than the shared one: this script
+        loads its factory through ``load_witness_factory``, which the plain
+        harness does not install.
+        """
+        assert _run("collision_pair_probe.py", ["RUN_TO_RUN", "cache", "4096"]) == 0
 
 
 class TestPatchEntryPoint:

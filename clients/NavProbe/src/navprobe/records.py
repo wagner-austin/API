@@ -238,6 +238,34 @@ class SweepEntry(TypedDict):
     trial: TrialRecord
 
 
+class ContactWitnessEntry(TypedDict):
+    """One collision pair's determinism verdict with a liveness witness beside it.
+
+    The witness is the point. A verdict compares repetitions against each other
+    and never against the physics, so a mode that silently stops generating
+    contacts produces identical rollouts and scores ``deterministic: true``.
+    Measured 2026-08-30: every pair MuJoCo-Warp dispatches to its convex
+    narrowphase does exactly that. Carrying the contact counts in the same row
+    as the verdict is what makes that case legible instead of invisible.
+
+    Attributes:
+        pair: The collision pair measured, from
+            :data:`navprobe.collision_pairs.COLLISION_PAIRS`.
+        trial: The verdict for that pair.
+        contact_total: Contacts summed over every step of the witness rollout.
+            Zero on a pair that starts in contact means the scene went inert.
+        zero_contact_steps: How many steps reported no contact at all. Carried
+            beside the total because a pair that lands late and rests is a
+            different story from one that never touches, and the total alone
+            cannot tell them apart.
+    """
+
+    pair: str
+    trial: TrialRecord
+    contact_total: int
+    zero_contact_steps: int
+
+
 class DeviceRunConditions(TypedDict):
     """The conditions any device-scoped measurement run was taken under.
 
@@ -290,6 +318,29 @@ class SweepRunRecord(DeviceRunConditions):
     perturbation: float
     constraint_capacity: int
     entries: tuple[SweepEntry, ...]
+
+
+class ContactWitnessRunRecord(DeviceRunConditions):
+    """A collision-pair sweep together with the conditions it ran under.
+
+    The record the convex-narrowphase finding is stated from: which pairs kept
+    their contacts under which Warp mode, on which card, at which record bound.
+    Without the conditions the verdicts are uncomparable, and without the
+    witness the verdicts are indistinguishable from a scene that stopped
+    interacting.
+
+    Attributes:
+        world_count: Parallel worlds each simulator carried.
+        perturbation: Half-width of the seed-driven initial offset range.
+        constraint_capacity: Upper bound on constraints, contacts and Jacobian
+            non-zeros the allocation reserved.
+        entries: One entry per pair, in sweep order.
+    """
+
+    world_count: int
+    perturbation: float
+    constraint_capacity: int
+    entries: tuple[ContactWitnessEntry, ...]
 
 
 class ScalingRungRecord(TypedDict):
@@ -358,6 +409,8 @@ class CompileGateRecord(DeviceRunConditions):
 __all__ = [
     "ComparisonRecord",
     "CompileGateRecord",
+    "ContactWitnessEntry",
+    "ContactWitnessRunRecord",
     "DeviceRunConditions",
     "DispersionRecord",
     "RunRecord",

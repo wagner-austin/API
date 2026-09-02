@@ -193,6 +193,58 @@ class TestObservation:
         assert left.advance() != right.advance()
 
 
+class TestContactWitness:
+    """The liveness witness carried beside a determinism verdict.
+
+    A verdict compares repetitions against each other and never against the
+    physics, so a mode that silently stops generating contacts reproduces bit
+    for bit and scores ``deterministic: true``. That is not hypothetical: on
+    2026-08-30 every geometry pair routing to MuJoCo-Warp's convex narrowphase
+    did exactly that under ``RUN_TO_RUN``. These tests pin the witness that
+    tells the two apart.
+    """
+
+    def test_a_resting_row_reports_one_floor_contact_per_body_per_world(self) -> None:
+        """The count is the scene's, not an arbitrary positive number.
+
+        Four spheres that touch only the floor, in two worlds, settle to
+        exactly eight contacts. Pinning the number rather than asserting it is
+        positive is what makes this fail loudly if a vendor bump changes what
+        counts as a contact.
+        """
+        simulator = _factory(body_count=4, spacing=0.070)()
+        simulator.reset(7)
+        for _ in range(40):
+            simulator.advance()
+        assert simulator.contact_count() == 4 * WORLD_COUNT
+
+    def test_the_witness_scales_with_the_body_count(self) -> None:
+        """Twice the bodies resting on the floor is twice the contacts."""
+        simulator = _factory(body_count=8, spacing=0.070)()
+        simulator.reset(7)
+        for _ in range(40):
+            simulator.advance()
+        assert simulator.contact_count() == 8 * WORLD_COUNT
+
+    def test_the_witness_distinguishes_falling_from_resting(self) -> None:
+        """It reads zero while the bodies are in flight and rises on landing.
+
+        This is the whole point of the witness rather than a property of it.
+        The scene drops its spheres from a height, so an early reading of zero
+        is CORRECT -- nothing is touching yet -- and a late reading of zero
+        would mean the scene had gone inert. A verdict taken at either moment
+        looks identical without this number beside it.
+        """
+        simulator = _factory(body_count=4, spacing=0.070)()
+        simulator.reset(7)
+        assert simulator.contact_count() == 0
+        simulator.advance()
+        assert simulator.contact_count() == 0
+        for _ in range(39):
+            simulator.advance()
+        assert simulator.contact_count() == 4 * WORLD_COUNT
+
+
 class TestSeparatedRowReproduces:
     """A row whose bodies touch only the floor reproduces on any device.
 

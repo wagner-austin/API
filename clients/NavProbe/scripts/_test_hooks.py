@@ -57,7 +57,14 @@ from ctypes import wintypes
 from typing import Protocol
 
 from navprobe import NavProbeError
-from navprobe.experiment import SimulatorFactoryProtocol
+from scripts._factory_protocols import (
+    LoadStateFactoryProtocol,
+    LoadWitnessFactoryProtocol,
+    StateFactoryConstructorProtocol,
+    WitnessFactoryConstructorProtocol,
+    WitnessFactoryProtocol,
+    WitnessSimulatorProtocol,
+)
 
 #: Vendor modules, named here so the import sites read as one word.
 WARP_MODULE = "warp"
@@ -238,51 +245,6 @@ class InitWarpProtocol(Protocol):
 
         Returns:
             The initialised module.
-        """
-        ...
-
-
-class StateFactoryConstructorProtocol(Protocol):
-    """Construct a MuJoCo-Warp state simulator factory for one scene."""
-
-    def __call__(
-        self,
-        model_xml: str,
-        world_count: int,
-        perturbation: float,
-        constraint_capacity: int,
-        linesearch_block_dim: int | None = None,
-    ) -> SimulatorFactoryProtocol:
-        """Build the factory.
-
-        Args:
-            model_xml: The compiled scene's MJCF document.
-            world_count: Parallel worlds each simulator carries.
-            perturbation: Half-width of the seed-driven initial offset range.
-            constraint_capacity: Upper bound on constraints, contacts and
-                Jacobian non-zeros the allocation reserves.
-            linesearch_block_dim: CUDA block size to pin the iterative
-                line-search kernel to, or ``None`` for the vendor default.
-                Optional so the sweeps that predate the block-size finding call
-                this unchanged; declared because leaving it out would mean a
-                script could not pin the one setting that decides whether a
-                coupled-body scene reproduces.
-
-        Returns:
-            A factory producing freshly constructed simulators for that scene.
-        """
-        ...
-
-
-class LoadStateFactoryProtocol(Protocol):
-    """Load the MuJoCo-Warp state adapter, after Warp is initialised."""
-
-    def __call__(self) -> StateFactoryConstructorProtocol:
-        """Return the adapter's factory constructor.
-
-        Returns:
-            The constructor, typed by this declaration rather than by the
-            import it comes from.
         """
         ...
 
@@ -516,6 +478,26 @@ def _load_state_factory_impl() -> StateFactoryConstructorProtocol:
     return constructor
 
 
+def _load_witness_factory_impl() -> WitnessFactoryConstructorProtocol:
+    """Production implementation of :class:`LoadWitnessFactoryProtocol`.
+
+    The same adapter class :func:`_load_state_factory_impl` returns, bound to a
+    wider declaration. Two hooks rather than one because they answer different
+    questions: a sweep needs only the vendor-agnostic surface, and giving it
+    the witness would let a script depend on a capability its scenes may not
+    have. Imported inside the function for the reason stated there --
+    ``mujoco_warp`` lowers kernels at import and must not precede the
+    determinism configuration.
+
+    Returns:
+        The adapter's factory constructor, typed with its witness.
+    """
+    from navprobe.adapters.mjx_warp_state import MjWarpStateSimulatorFactory
+
+    constructor: WitnessFactoryConstructorProtocol = MjWarpStateSimulatorFactory
+    return constructor
+
+
 def _write_out_impl(text: str) -> None:
     """Production implementation of :class:`WriteOutProtocol`.
 
@@ -528,6 +510,7 @@ def _write_out_impl(text: str) -> None:
 
 init_warp: InitWarpProtocol = _init_warp_impl
 load_state_factory: LoadStateFactoryProtocol = _load_state_factory_impl
+load_witness_factory: LoadWitnessFactoryProtocol = _load_witness_factory_impl
 opt_out_of_power_throttling: OptOutOfPowerThrottlingProtocol = _opt_out_of_power_throttling_impl
 write_out: WriteOutProtocol = _write_out_impl
 monotonic: MonotonicProtocol = time.perf_counter
@@ -543,6 +526,7 @@ __all__ = [
     "GetDeviceProtocol",
     "InitWarpProtocol",
     "LoadStateFactoryProtocol",
+    "LoadWitnessFactoryProtocol",
     "MonotonicProtocol",
     "OptOutOfPowerThrottlingProtocol",
     "PowerThrottlingError",
@@ -556,10 +540,14 @@ __all__ = [
     "WarpInitProtocol",
     "WarpModuleProtocol",
     "WarpRuntimeProtocol",
+    "WitnessFactoryConstructorProtocol",
+    "WitnessFactoryProtocol",
+    "WitnessSimulatorProtocol",
     "WriteOutProtocol",
     "disable_power_throttling",
     "init_warp",
     "load_state_factory",
+    "load_witness_factory",
     "monotonic",
     "opt_out_of_power_throttling",
     "win32_process_information_setter",
