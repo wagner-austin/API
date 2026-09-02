@@ -1,17 +1,26 @@
 """The doctrine search driver: propose, panel, halve, repeat, report.
 
 The executable half of :mod:`rw_bot.harness.search`. Each round writes
-the surviving candidates' doctrine files, submits one interleaved batch
-through the queue (every candidate arm paired against one shared control
-on the same fresh seeds), waits for the fleet to play it, scores every
-arm by paired margin delta, and keeps the top half for a bigger round.
+the surviving candidates' doctrine files, plays one interleaved batch
+(every candidate arm paired against one shared control on the same fresh
+seeds), scores every arm by paired margin delta, and keeps the top half
+for a bigger round.
+
+WHO PLAYS THE ROUND IS A SEAM. The driver hands each round's job lines to
+a :class:`RoundRunner` and reads scorecards back from
+``runs/sweeps/<batch>/`` -- everything between those two points is the
+runner's. :class:`QueueRunner` plays through the workstation fleet's
+match-service queue; :class:`~rw_bot.harness.cluster_round.ClusterRound`
+plays through HPC3, where a round of a hundred matches costs nothing and
+finishes in the wall-clock of its slowest member.
 
 The search proposes; the bar disposes: the final report ranks survivors
 for graduation to an ordinary full panel judged on wins against the +4
 bar and then fresh-tree replication (laws six and nine). Nothing here
 adopts anything.
 
-Run as ``python -m scripts.search <dsn> <name> [rng-seed]``. The knob
+Run as ``python -m scripts.search <where> <name> [rng-seed]`` with
+``<where>`` either a queue DSN or ``hpc3:<workspace.json>``. The knob
 space and round schedule are code, not flags, so a search's definition
 is versioned beside its laws.
 """
@@ -21,8 +30,10 @@ from __future__ import annotations
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Protocol
 
 from rw_bot.harness import _test_hooks as host_hooks
+from rw_bot.harness.cluster_round import ClusterRound
 from rw_bot.harness.margin import batch_margins
 from rw_bot.harness.search import (
     Candidate,
@@ -79,6 +90,27 @@ SAMPLES = 10000
 
 #: Seconds between polls of a running round.
 POLL_SECONDS = 120.0
+
+#: The explicit route marker for cluster-played rounds. A prefix rather
+#: than sniffing the argument's shape: a DSN and a workspace path can both
+#: look like anything, and a guessed backend is a submission to the wrong
+#: machine.
+CLUSTER_PREFIX = "hpc3:"
+
+#: The cluster identity a cluster-played search runs against, matching the
+#: workspace the ``hpc3:`` argument names. Code, not flags, like the knob
+#: space: a search's definition is versioned beside its laws.
+CLUSTER_HOST = "hpc3"
+CLUSTER_ROOT = "/pub/wagnera3/rusted"
+
+#: Where cluster rounds keep their frozen trees and campaign documents --
+#: run artifacts beside the sweeps, never repository content.
+CLUSTER_SCRATCH = Path("runs/search-staging")
+
+#: Where a cluster round's job file is written: inside the repository's
+#: ``sweeps`` tree, because the payload freeze copies that directory and
+#: the members must read the same file the driver wrote.
+CLUSTER_JOBS_DIR = Path("sweeps/search")
 
 EXIT_OK = 0
 EXIT_BAD_USAGE = 2
@@ -140,6 +172,24 @@ def write_variants(survivors: Sequence[Candidate], variant_dir: Path) -> None:
         variant = apply_moves(base, moves)
         path = variant_dir / f"{candidate_label(moves)}.doctrine"
         path.write_text("".join(f"{line}\n" for line in format_doctrine(variant)), encoding="utf-8")
+
+
+class RoundRunner(Protocol):
+    """Plays one round's jobs and files scorecards under the sweeps root.
+
+    The driver's whole contract with whoever plays: hand over the batch
+    name and the job lines, and when ``run`` returns, one scorecard per
+    job sits in ``runs/sweeps/<batch>/`` for the margin scorer to read.
+    """
+
+    def run(self, batch: str, job_lines: Sequence[str]) -> None:
+        """Play one round to completion.
+
+        Args:
+            batch: The round's batch name.
+            job_lines: The round's job file content, comments included.
+        """
+        ...
 
 
 def patient_connect(dsn: str) -> Connection:
@@ -207,8 +257,47 @@ def wait_for_batch(dsn: str, batch: str) -> None:
         _test_hooks.sleep(POLL_SECONDS)
 
 
+class QueueRunner:
+    """Plays a round through the workstation fleet's match-service queue.
+
+    The original round transport, lifted whole when the cluster runner
+    arrived: submit to the queue, then wait for the fleet to drain it,
+    outlasting database outages and naming an unclaimed round loudly.
+
+    Attributes:
+        dsn: The queue database.
+    """
+
+    def __init__(self, dsn: str) -> None:
+        """Bind the runner to its queue.
+
+        Args:
+            dsn: The queue database.
+        """
+        self.dsn = dsn
+
+    def run(self, batch: str, job_lines: Sequence[str]) -> None:
+        """Submit the round and wait for the fleet to play it.
+
+        Args:
+            batch: The round's batch name.
+            job_lines: The round's job file content.
+
+        Raises:
+            MatchServiceError: Through the queue, on unreadable rows.
+            SweepError: When a job line cannot be parsed back.
+        """
+        jobs = parse_jobs(job_lines)
+        config = batch_config(batch, LOCKSTEP, MAP_PATH, DIFFICULTY, PIN_DELTA, FAST_FORWARD)
+        conn = patient_connect(self.dsn)
+        bootstrap(conn)
+        submit(conn, batch, config, jobs)
+        conn.close()
+        wait_for_batch(self.dsn, batch)
+
+
 def run_search(
-    dsn: str,
+    runner: RoundRunner,
     name: str,
     rng_seed: int,
     sweeps_root: Path = SWEEP_ROOT,
@@ -217,7 +306,7 @@ def run_search(
     """Run every round and return the ranked report.
 
     Args:
-        dsn: The queue database.
+        runner: Who plays each round -- the queue or the cluster.
         name: The search's name; round batches file as ``<name>-r<i>``.
         rng_seed: Reproducibility anchor for pair sampling and seeds.
         sweeps_root: Where batch artifacts land, injectable for tests.
@@ -248,14 +337,9 @@ def run_search(
         batch = f"{name}-r{round_index}"
         write_variants(survivors, variant_dir)
         seeds = round_seeds(rng_seed, round_index, pairs)
-        jobs = parse_jobs(round_job_lines(survivors, seeds, variant_dir))
-        config = batch_config(batch, LOCKSTEP, MAP_PATH, DIFFICULTY, PIN_DELTA, FAST_FORWARD)
-        conn = patient_connect(dsn)
-        bootstrap(conn)
-        queued = submit(conn, batch, config, jobs)
-        conn.close()
-        note(f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {queued} queued")
-        wait_for_batch(dsn, batch)
+        lines_out = round_job_lines(survivors, seeds, variant_dir)
+        note(f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {len(lines_out)} jobs")
+        runner.run(batch, lines_out)
         margins = batch_margins(sweeps_root / batch)
         scores: dict[Candidate, float] = {}
         for moves in survivors:
@@ -280,8 +364,10 @@ def main(
     """Run one search from the command line.
 
     Args:
-        argv: ``<dsn> <name> [rng-seed]``. ``None`` reads
-            ``sys.argv[1:]``.
+        argv: ``<where> <name> [rng-seed]``, with ``<where>`` a queue DSN
+            or ``hpc3:<workspace.json>`` to play the rounds on the cluster.
+            The prefix routes explicitly; nothing is sniffed. ``None``
+            reads ``sys.argv[1:]``.
         sweeps_root: Where batch artifacts land, injectable for tests.
         variant_dir: Where variant doctrines land, injectable for tests.
 
@@ -290,11 +376,28 @@ def main(
     """
     args = list(argv) if argv is not None else sys.argv[1:]
     if len(args) not in (2, 3):
-        sys.stdout.write("usage: search <dsn> <name> [rng-seed]\n")
+        sys.stdout.write("usage: search <dsn|hpc3:workspace.json> <name> [rng-seed]\n")
         return EXIT_BAD_USAGE
     rng_seed = int(args[2]) if len(args) == 3 else 0
+    where = args[0]
+    runner: RoundRunner
+    if where.startswith(CLUSTER_PREFIX):
+        runner = ClusterRound(
+            config=where[len(CLUSTER_PREFIX) :],
+            host=CLUSTER_HOST,
+            cluster_root=CLUSTER_ROOT,
+            map_path=MAP_PATH,
+            difficulty=DIFFICULTY,
+            fast_forward=FAST_FORWARD,
+            scratch=CLUSTER_SCRATCH,
+            sweeps_root=sweeps_root,
+            jobs_dir=CLUSTER_JOBS_DIR,
+            poll_seconds=POLL_SECONDS,
+        )
+    else:
+        runner = QueueRunner(where)
     # The report streams as it happens; the return value is for callers.
-    run_search(args[0], args[1], rng_seed, sweeps_root, variant_dir)
+    run_search(runner, args[1], rng_seed, sweeps_root, variant_dir)
     return EXIT_OK
 
 

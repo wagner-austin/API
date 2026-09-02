@@ -17,6 +17,13 @@
 # this line is here for intent, not effect.
 runs/
 
+# The doctrine search's per-round artifacts: candidate doctrines and job
+# files, written by the driver each round and frozen into that round's
+# payload. Run products, not authored content — a committed round would
+# read as a hand-designed arm.
+doctrines/search/
+sweeps/search/
+
 # Wiki source archive is the OPPOSITE: every artifact a wiki page
 # cites lives here and MUST be versioned, or citations break on a
 # fresh clone and source-path-exists fails wholesale. The root

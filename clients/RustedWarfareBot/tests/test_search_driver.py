@@ -12,7 +12,15 @@ from pathlib import Path
 
 import pytest
 from psycopg import OperationalError
-from scripts.search import EXIT_BAD_USAGE, EXIT_OK, SCHEDULE, SPACE, main, run_search
+from scripts.search import (
+    EXIT_BAD_USAGE,
+    EXIT_OK,
+    SCHEDULE,
+    SPACE,
+    QueueRunner,
+    main,
+    run_search,
+)
 
 from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
@@ -64,7 +72,7 @@ def test_the_search_halves_toward_the_scripted_winner(tmp_path: Path) -> None:
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            "dsn://demo",
+            QueueRunner("dsn://demo"),
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -156,7 +164,7 @@ def test_a_round_nobody_claims_is_named_loudly_once(
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            "dsn://demo",
+            QueueRunner("dsn://demo"),
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -195,7 +203,7 @@ def test_a_database_outage_is_outlasted_not_fatal(
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            "dsn://demo",
+            QueueRunner("dsn://demo"),
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -224,7 +232,7 @@ def test_a_non_database_error_still_propagates(tmp_path: Path) -> None:
     try:
         with pytest.raises(ValueError):
             run_search(
-                "dsn://demo",
+                QueueRunner("dsn://demo"),
                 "probe",
                 rng_seed=3,
                 sweeps_root=tmp_path / "sweeps",
