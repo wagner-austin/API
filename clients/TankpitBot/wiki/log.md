@@ -5432,3 +5432,16 @@ Wiki: [[make-targets]] and [[fleet-lifecycle]] operator-surface tables rewritten
 **Methodological limit, stated because the numbers invite the wrong reading:** 764 sim windows against 73,053 live. At that ratio the "missing law" side is dominated by sampling — most of its 208 rows are shapes a small sim sample has not produced yet, not laws the sim lacks. The INVENTED side is sound at any sample size, because a shape the sim emitted is one it emits. Read invented first; missing needs a baseline nearer live's size before it means anything.
 
 Gate: 91 tests over the analysis and script lanes; `response_shapes.py`, `response_shapes_types.py` and `scripts/analyze_response_shapes.py` all at 100.00% statement and branch; guard exit 0; mypy strict clean over 1,211 files.
+
+## [2026-09-02] audit + code | "Does this cover the ENTIRE fleet system?" — no, and one miss was fatal: the runtime data files never crossed the container boundary
+
+Operator: "and this covers the entire fleet system right?" Swept every file a host session reads from its working directory or module tree, against what the container actually gets. Four gaps, one fatal:
+
+1. **The static XOR key — FATAL.** `DEFAULT_STATIC_KEY_PATH` used the same four-parents-up module-relative resolution that broke accounts: in site-packages that lands nowhere, so no container session could decode a single wire byte. Worse, `key_discovery` WRITES the file when absent — into an unwritable site-packages as the non-root user. This also convicts the single-bot image as never live-verified. Fixed with the same law as accounts: `static_key_file_path()` honors `TANKPIT_XOR_KEY_FILE`; the image bakes the tracked key at `/app/xor_static_key.txt` (it versions with the code) and sets the env at image level, so both container shapes get it. The constant is gone — all 24 consumer files (5 src, 19 test) moved to the resolver, no alias left behind.
+2. **The 44 field terrain GIFs.** Found relative to CWD (`field05_r.gif`); absent in the container, every terrain map load would fail — bots blind to rock/water. Baked into `/app` (tracked, versioned with code, and /app IS the container's CWD).
+3. **`data/tank_registry.json`.** CWD-relative, WRITTEN at runtime (measured colour ranks). Mounted read-write: host runs and container runs share one ledger.
+4. **`.env`.** The manager's `load_dotenv` found nothing at /app. Mounted read-only; compose's explicit environment stays senior because dotenv never overrides real env vars.
+
+The migration itself bit once, instructively: the mechanical rename hit argument-position commas with the import-style form (`write_text(static_key_file_path, ...)` — a function object as a path), and 32 tests caught it within one run. The distinction between "sed the imports" and "sed the calls" is exactly what the test suite is for.
+
+The three-arm resolver is pinned in test_codec; every migrated suite green (1,074 + 2,100 + service/login). The bake-vs-mount rule now stated in the Dockerfile: tracked-and-versioned data bakes, mutable operator state mounts.

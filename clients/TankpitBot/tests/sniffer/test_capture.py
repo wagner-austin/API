@@ -100,11 +100,11 @@ class TestBuildMessageStatsEdgeCases:
 
     def test_build_message_stats_with_messages(self, fake_fs: FakeFileSystem) -> None:
         """Test build_message_stats processes messages correctly."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.types import CapturedMessage, CaptureSession
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
 
@@ -148,11 +148,11 @@ class TestBuildMessageStatsEdgeCases:
 
     def test_build_message_stats_unknown_message_type(self, fake_fs: FakeFileSystem) -> None:
         """Test build_message_stats tracks unknown message types."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.types import CapturedMessage, CaptureSession
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
 
@@ -194,11 +194,11 @@ class TestBuildMessageStatsEdgeCases:
 
     def test_build_message_stats_sent_messages_ignored(self, fake_fs: FakeFileSystem) -> None:
         """Test build_message_stats ignores sent messages."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.types import CapturedMessage, CaptureSession
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
 

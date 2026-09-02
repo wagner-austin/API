@@ -23,7 +23,7 @@ from tankpit_bot.capture.xor import (
     XorStaticKeyUnavailableError,
     reset_static_key_cache,
 )
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
+from tankpit_bot.protocol.codec import build_xor_table, static_key_file_path
 from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT, TYPE_COMBAT
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.types import CapturedMessage, CaptureSession
@@ -166,7 +166,7 @@ class TestAnalyzeShotViewportCorrelation:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        fake_fs._files[str(static_key_file_path())] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
@@ -259,7 +259,7 @@ class TestAnalyzeShotViewportCorrelation:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        fake_fs._files[str(static_key_file_path())] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
@@ -311,7 +311,7 @@ class TestAnalyzeShotViewportCorrelation:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        fake_fs._files[str(static_key_file_path())] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
@@ -347,7 +347,7 @@ class TestAnalyzeShotViewportCorrelation:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        fake_fs._files[str(static_key_file_path())] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:
@@ -396,7 +396,7 @@ class TestAnalyzeShotViewportCorrelation:
         old_exists = core_hooks.path_exists
         old_read = core_hooks.read_text
         fake_fs = FakeFileSystem()
-        fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        fake_fs._files[str(static_key_file_path())] = static_key
         core_hooks.path_exists = fake_fs.path_exists
         core_hooks.read_text = fake_fs.read_text
         try:

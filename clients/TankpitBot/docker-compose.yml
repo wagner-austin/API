@@ -49,6 +49,14 @@ services:
     volumes:
       - ./runs:/app/runs
       - ./accounts.json:/app/accounts.json:ro
+      # Measured operator STATE, read-write: the bot writes newly
+      # measured colour ranks back to the registry at runtime, and
+      # host runs and container runs must share one ledger.
+      - ./data:/app/data
+      # Operator config overrides (TANKPIT_URL etc.). load_dotenv
+      # never overrides real env vars, so the environment block above
+      # stays senior.
+      - ./.env:/app/.env:ro
     # N Chromiums, not one: the single-bot 1gb floor scaled up.
     shm_size: "2gb"
     # docker stop must be a DRAIN, not a kill: SIGTERM starts the

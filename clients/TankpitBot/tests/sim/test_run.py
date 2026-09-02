@@ -17,7 +17,7 @@ from platform_core.json_utils import (
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+from tankpit_bot.protocol.codec import static_key_file_path
 from tankpit_bot.sim.run import (
     main,
     run_sim_session,
@@ -128,7 +128,7 @@ def test_boot_refuses_missing_terrain_and_missing_key(fake_fs: FakeFileSystem) -
     with pytest.raises(RuntimeError, match="terrain GIF"):
         run_sim_session(1, opponent=False, stamp="20260722-000006")
     _install_fake_terrain(fake_fs)
-    fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+    fake_fs.remove(static_key_file_path())
     # The static KEY is cached process-wide (only the session TABLE is
     # per-session), so removing the file is not enough on its own —
     # the earlier boot already read it ([[session-state-deglobalisation]]).

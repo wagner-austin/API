@@ -13,7 +13,7 @@ from scripts.analyze_viewport_entities import main
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
+from tankpit_bot.protocol.codec import build_xor_table, static_key_file_path
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame
 
@@ -104,7 +104,7 @@ class TestAnalyzeViewportEntitiesScript:
             "tank_names": {},
         }
         _fake_fs._files[str(Path("capture_session.json"))] = dump_json_str(session)
-        _fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        _fake_fs._files[str(static_key_file_path())] = static_key
 
         old_argv = sys.argv
         sys.argv = ["analyze_viewport_entities"]
@@ -191,7 +191,7 @@ class TestAnalyzeViewportEntitiesScript:
             "tank_names": {},
         }
         _fake_fs._files[str(Path("capture_session.json"))] = dump_json_str(session)
-        _fake_fs._files[str(DEFAULT_STATIC_KEY_PATH)] = static_key
+        _fake_fs._files[str(static_key_file_path())] = static_key
 
         old_argv = sys.argv
         sys.argv = ["analyze_viewport_entities"]

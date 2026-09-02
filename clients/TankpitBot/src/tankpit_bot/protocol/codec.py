@@ -16,8 +16,31 @@ from pathlib import Path
 
 from tankpit_bot import _test_hooks
 
-# Default path to static XOR key file (relative to project root)
-DEFAULT_STATIC_KEY_PATH = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
+# The static XOR key lives in the project root — of a SOURCE CHECKOUT.
+# Four parents up from an installed module is site-packages, which is
+# why the container names the file by env instead (same law as the
+# accounts pool, [[fleet-lifecycle]] container notes).
+_CHECKOUT_STATIC_KEY_PATH = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
+
+
+def static_key_file_path() -> Path:
+    """Resolve where the static XOR key lives.
+
+    ``TANKPIT_XOR_KEY_FILE`` names the file explicitly — the fleet
+    image bakes the tracked key at ``/app/xor_static_key.txt`` and
+    sets this in its environment, because the checkout-relative
+    default resolves into site-packages once the package is
+    pip-installed. Unset, the source checkout's project root is the
+    location it always was. Without this file no session can decode
+    a single wire byte, so the resolution must never be guessed.
+
+    Returns:
+        The static key path.
+    """
+    override = _test_hooks.get_env("TANKPIT_XOR_KEY_FILE")
+    if override is None or override == "":
+        return _CHECKOUT_STATIC_KEY_PATH
+    return Path(override)
 
 
 class CodecError(Exception):
@@ -227,7 +250,6 @@ def create_codec(static_key_path: Path, magic: str) -> ProtocolCodec:
 
 
 __all__ = [
-    "DEFAULT_STATIC_KEY_PATH",
     "CodecError",
     "InvalidKeyError",
     "ProtocolCodec",
@@ -235,5 +257,6 @@ __all__ = [
     "create_codec",
     "extract_magic_from_auth_payload",
     "load_static_key",
+    "static_key_file_path",
     "xor_bytes",
 ]

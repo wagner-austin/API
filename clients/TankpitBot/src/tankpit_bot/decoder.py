@@ -21,7 +21,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, ProtocolCodec, load_static_key
+from tankpit_bot.protocol.codec import ProtocolCodec, load_static_key, static_key_file_path
 from tankpit_bot.protocol.framing import decode_frame_header
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
@@ -340,7 +340,7 @@ def load_and_decode_session(
         FileNotFoundError: If files don't exist.
     """
     if static_key_path is None:
-        static_key_path = DEFAULT_STATIC_KEY_PATH
+        static_key_path = static_key_file_path()
 
     # Load session
     session_text = _test_hooks.read_text(session_path)

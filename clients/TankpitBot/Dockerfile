@@ -118,6 +118,19 @@ RUN playwright install --with-deps chromium \
 
 WORKDIR /app
 
+# The tracked runtime data a checkout serves from its project root,
+# baked because it VERSIONS WITH THE CODE: the static XOR key (without
+# which no session decodes a single wire byte — the checkout-relative
+# default resolves into site-packages once installed, so the ENV below
+# names the baked copy) and the 44 field terrain GIFs (found relative
+# to the working directory, which is exactly what /app is). Mutable
+# state — accounts.json, data/tank_registry.json, .env, runs/ — is
+# NEVER baked; the fleet service mounts it (see docker-compose.yml).
+ARG APP_DIR=clients/TankpitBot
+COPY ${APP_DIR}/xor_static_key.txt /app/
+COPY ${APP_DIR}/field*.gif /app/
+ENV TANKPIT_XOR_KEY_FILE=/app/xor_static_key.txt
+
 # Session output. Declared so `runs/` survives the container and a
 # capture can be read from the host afterwards — the event log is the
 # artifact a session exists to produce.

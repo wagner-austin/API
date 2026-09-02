@@ -42,9 +42,9 @@ def _install_fake_fs(fs: FakeFileSystem) -> None:
         fs: The fake file system to install.
     """
     from tankpit_bot.capture.xor import reset_static_key_cache
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
-    fs.write_text(DEFAULT_STATIC_KEY_PATH, "Y" + "A" * 999)
+    fs.write_text(static_key_file_path(), "Y" + "A" * 999)
     reset_static_key_cache()
     _test_hooks.write_text = fs.write_text
     _test_hooks.read_text = fs.read_text

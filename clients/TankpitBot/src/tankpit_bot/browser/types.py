@@ -48,7 +48,7 @@ TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x2B, 0x2D, 0x3D, 0x25, 0x2A, 0x
 # The static-key path is NOT redeclared here. It was a private copy of
 # the same __file__-relative expression that protocol/codec.py owns, so
 # a move of either file silently pointed the two at different places.
-# Consumers import DEFAULT_STATIC_KEY_PATH from its owner directly —
+# Consumers import static_key_file_path from its owner directly —
 # no alias in between ([[session-state-deglobalisation]]).
 
 # Expected length of the static XOR key.

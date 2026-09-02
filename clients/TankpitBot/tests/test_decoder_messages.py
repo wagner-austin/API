@@ -161,10 +161,10 @@ def test_session_decoder_skips_unknown_prefix() -> None:
 
 def test_load_and_decode_session_default_static_key(fake_fs: FakeFileSystem) -> None:
     """Test load_and_decode_session with default static_key_path."""
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     # Create static key at the default path
-    fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCD")
+    fake_fs.write_text(static_key_file_path(), "ABCD")
 
     # Create session JSON
     body = bytes([ord("!"), 0x30, 0x42])
@@ -201,10 +201,10 @@ def test_main_with_commands(
 ) -> None:
     """Test main() prints command summary."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     # Create static key
-    fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDE")
+    fake_fs.write_text(static_key_file_path(), "ABCDE")
 
     # Create session with commands
     body = bytes([ord("!"), 0x30, 0x42, 0xAB])
@@ -244,10 +244,10 @@ def test_main_no_commands(
 ) -> None:
     """Test main() with empty session."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     # Create static key
-    fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCD")
+    fake_fs.write_text(static_key_file_path(), "ABCD")
 
     # Create session with no messages
     session_json = """{
@@ -277,12 +277,12 @@ def test_main_with_custom_output_path(
 ) -> None:
     """Test main() reads TANKPIT_OUTPUT env var."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     fake_env.set("TANKPIT_OUTPUT", "custom_session.json")
 
     # Create static key
-    fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCD")
+    fake_fs.write_text(static_key_file_path(), "ABCD")
 
     # Create session
     session_json = """{
@@ -312,10 +312,10 @@ def test_main_multiple_command_types(
 ) -> None:
     """Test main() groups commands by type_byte and cmd_byte."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     # Create static key
-    fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEFGH")
+    fake_fs.write_text(static_key_file_path(), "ABCDEFGH")
 
     # Create session with multiple command types
     body1 = bytes([ord("!"), 0x30, 0x42, 0xAB])

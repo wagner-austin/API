@@ -16,10 +16,10 @@ import re
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.protocol.codec import (
-    DEFAULT_STATIC_KEY_PATH,
     CodecError,
     build_xor_table,
     load_static_key,
+    static_key_file_path,
 )
 
 #: Process-wide cache of the static key. Unlike a session's table this
@@ -59,12 +59,12 @@ def require_static_key() -> str:
     """
     global _static_key_cache
     if _static_key_cache is None:
-        if not _test_hooks.path_exists(DEFAULT_STATIC_KEY_PATH):
+        if not _test_hooks.path_exists(static_key_file_path()):
             raise XorStaticKeyUnavailableError(
                 "static XOR key unavailable (xor_static_key.txt missing); "
                 "cannot build a session XOR table"
             )
-        _static_key_cache = load_static_key(DEFAULT_STATIC_KEY_PATH)
+        _static_key_cache = load_static_key(static_key_file_path())
     return _static_key_cache
 
 

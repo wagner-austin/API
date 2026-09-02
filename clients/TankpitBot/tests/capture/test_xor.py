@@ -144,10 +144,10 @@ class TestBuildSessionXorTable:
 
     def test_returns_the_table_for_the_given_magic(self, fake_fs: FakeFileSystem) -> None:
         """The result equals the static key combined with that magic."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         static_key = "ABCDEF"
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
         reset_static_key_cache()
 
         assert build_session_xor_table("testmagic") == build_xor_table(static_key, "testmagic")
@@ -159,9 +159,9 @@ class TestBuildSessionXorTable:
         second build overwrote the first, so the first session's frames
         decoded against the wrong key.
         """
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()
 
         first = build_session_xor_table("alpha1")
@@ -172,9 +172,9 @@ class TestBuildSessionXorTable:
 
     def test_raises_when_the_static_key_is_missing(self, fake_fs: FakeFileSystem) -> None:
         """A missing key raises rather than yielding a silent identity decode."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
-        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+        fake_fs.remove(static_key_file_path())
         reset_static_key_cache()
 
         with pytest.raises(XorStaticKeyUnavailableError, match=r"xor_static_key\.txt missing"):
@@ -186,25 +186,25 @@ class TestBuildSessionXorTable:
         The KEY is process-wide (the same key builds every session's
         table); only the TABLE is session state.
         """
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()
         first = build_session_xor_table("testmagic")
 
-        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+        fake_fs.remove(static_key_file_path())
 
         assert build_session_xor_table("testmagic") == first
 
     def test_resetting_the_cache_re_reads_the_key(self, fake_fs: FakeFileSystem) -> None:
         """After a reset the next build sees the file's current contents."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF")
+        fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()
         first = build_session_xor_table("testmagic")
 
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "UVWXYZ")
+        fake_fs.write_text(static_key_file_path(), "UVWXYZ")
         reset_static_key_cache()
 
         assert build_session_xor_table("testmagic") == build_xor_table("UVWXYZ", "testmagic")

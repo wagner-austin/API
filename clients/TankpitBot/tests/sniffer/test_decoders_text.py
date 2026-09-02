@@ -341,11 +341,11 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_move(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes MOVE command."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         # Build XOR table the same way decode_command does
         magic_bytes = magic.encode("utf-8")
@@ -366,11 +366,11 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_shoot(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes SHOOT command."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic_bytes = magic.encode("utf-8")
         xor_table = bytes(
@@ -390,11 +390,11 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_pickup(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes PICKUP command."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic_bytes = magic.encode("utf-8")
         xor_table = bytes(
@@ -414,11 +414,11 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_teleport(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes TELEPORT command."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic_bytes = magic.encode("utf-8")
         xor_table = bytes(

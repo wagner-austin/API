@@ -215,11 +215,11 @@ class TestSnifferCoverageBranches:
 
     def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message logs result when message decodes."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.sniffer import decoders
 
         ws = WorldService()
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        fake_fs.write_text(static_key_file_path(), "ABCDEF" + "A" * 994)
         reset_static_key_cache()
 
         # Create a valid message payload (simple text message)
@@ -233,11 +233,11 @@ class TestSnifferCoverageBranches:
 
     def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message handles binary messages."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.sniffer import decoders
 
         ws = WorldService()
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        fake_fs.write_text(static_key_file_path(), "ABCDEF" + "A" * 994)
         reset_static_key_cache()
         xor_table = build_session_xor_table("testmagic")
 

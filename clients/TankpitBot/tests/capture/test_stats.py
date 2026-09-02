@@ -37,10 +37,10 @@ class TestBuildMessageStats:
 
     def test_skips_messages_with_invalid_signature(self, fake_fs: FakeFileSystem) -> None:
         """Test skips messages that can't be decoded."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         # Create an invalid payload (no dot in first 3 bytes)
         payload = base64.b64encode(b"ABCDEFGH").decode()
@@ -71,10 +71,10 @@ class TestBuildMessageStats:
 
     def test_tracks_unknown_message_types(self, fake_fs: FakeFileSystem) -> None:
         """Test tracks unknown message types in unknown dict."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
 
@@ -124,10 +124,10 @@ class TestBuildMessageStats:
         Container PlayerListShort was removed 2026-06-20 after corpus
         proof of zero production fires.
         """
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
         magic_bytes = magic.encode("utf-8")
@@ -163,10 +163,10 @@ class TestBuildMessageStats:
 
     def test_unknown_samples_limited_to_3(self, fake_fs: FakeFileSystem) -> None:
         """Test unknown samples are limited to 3 per length key."""
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         magic = "testmagic123"
 

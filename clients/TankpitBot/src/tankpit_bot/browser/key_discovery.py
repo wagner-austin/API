@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.types import STATIC_KEY_LENGTH
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+from tankpit_bot.protocol.codec import static_key_file_path
 
 
 def load_static_key() -> str:
@@ -27,7 +27,7 @@ def load_static_key() -> str:
         FileNotFoundError: If key file does not exist.
         ValueError: If key is not exactly 1000 characters.
     """
-    content = _test_hooks.read_text(DEFAULT_STATIC_KEY_PATH)
+    content = _test_hooks.read_text(static_key_file_path())
     key = content.strip()
     if len(key) != STATIC_KEY_LENGTH:
         raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
@@ -45,7 +45,7 @@ def save_static_key(key: str) -> None:
     """
     if len(key) != STATIC_KEY_LENGTH:
         raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
-    _test_hooks.write_text(DEFAULT_STATIC_KEY_PATH, key + "\n")
+    _test_hooks.write_text(static_key_file_path(), key + "\n")
 
 
 __all__ = [

@@ -275,12 +275,12 @@ class TestWebSocketSnifferMethods:
     def test_on_message_captured_sent_mine_status(self, fake_fs: FakeFileSystem) -> None:
         """Test _on_message_captured logs mine status for sent messages."""
         from tankpit_bot.capture.trackers.mine import MineTracker
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.types import CapturedMessage
 
         ws = WorldService()
         static_key = "ABCDEF" + "A" * 994
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        fake_fs.write_text(static_key_file_path(), static_key)
 
         # Create sniffer with minimal init
         sniffer = object.__new__(WebSocketSniffer)
@@ -331,7 +331,7 @@ class TestWebSocketSnifferMethods:
         in world state.
         """
         from tankpit_bot.capture.xor import build_session_xor_table
-        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.protocol.codec import static_key_file_path
         from tankpit_bot.protocol.encoders.movement import encode_movement
         from tankpit_bot.protocol.framing import encode_frame
         from tankpit_bot.protocol.types import MovementDict
@@ -339,7 +339,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.types import CapturedMessage
 
         ws = WorldService()
-        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEF" + "A" * 994)
+        fake_fs.write_text(static_key_file_path(), "ABCDEF" + "A" * 994)
         xor_table = build_session_xor_table("testmagic")
 
         # 0x47 for a non-self tank moves whichever registry tank is

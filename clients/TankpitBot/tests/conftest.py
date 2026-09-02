@@ -478,7 +478,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     Yields:
         FakeFileSystem instance.
     """
-    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import static_key_file_path
 
     original_write_text = _test_hooks.write_text
     original_read_text = _test_hooks.read_text
@@ -504,7 +504,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     _test_hooks.create_text_exclusive = fs.create_text_exclusive
 
     # Pre-populate the static key file
-    fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
+    fs.write_text(static_key_file_path(), fake_static_key)
 
     yield fs
 

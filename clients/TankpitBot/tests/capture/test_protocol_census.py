@@ -17,7 +17,7 @@ from tankpit_bot.capture.protocol_census import (
     encode_protocol_census,
     format_protocol_census,
 )
-from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH, build_xor_table
+from tankpit_bot.protocol.codec import build_xor_table, static_key_file_path
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 from tests.conftest import FakeFileSystem
@@ -64,7 +64,7 @@ class TestAnalyzeProtocolCensus:
         magic = "protocol-magic"
         static_key = "K" * 64
         xor_table = build_xor_table(static_key, magic)
-        static_key_path = DEFAULT_STATIC_KEY_PATH
+        static_key_path = static_key_file_path()
         _fake_fs._files[str(static_key_path)] = static_key
 
         messages = [
@@ -114,7 +114,7 @@ class TestAnalyzeProtocolCensus:
         magic = "sample-magic"
         static_key = "S" * 64
         xor_table = build_xor_table(static_key, magic)
-        static_key_path = DEFAULT_STATIC_KEY_PATH
+        static_key_path = static_key_file_path()
         _fake_fs._files[str(static_key_path)] = static_key
         decoded_data = bytes([0x99, 0x88])
         payload = encode_wire_frame(0x21, decoded_data, xor_table)
@@ -292,7 +292,7 @@ def test_analyze_protocol_census_counts_framing_errors(
     """Counts payloads with invalid frame headers separately."""
     magic = "framing-magic"
     static_key = "F" * 64
-    static_key_path = DEFAULT_STATIC_KEY_PATH
+    static_key_path = static_key_file_path()
     _fake_fs._files[str(static_key_path)] = static_key
 
     bad_payload = base64.b64encode(b"\x05\x00\x2e\x01").decode("ascii")
@@ -329,7 +329,7 @@ def test_analyze_protocol_census_skips_sent_messages(
 ) -> None:
     """Ignores sent messages in the census."""
     static_key = "G" * 64
-    static_key_path = DEFAULT_STATIC_KEY_PATH
+    static_key_path = static_key_file_path()
     _fake_fs._files[str(static_key_path)] = static_key
     session = _make_session(
         [
