@@ -508,10 +508,19 @@ class SimServer(SimServerMoveMixin):
         self.session.viewport.emit_transitions(messages)
         # Dynamic-layer refresh is EVENT-driven, never walk-driven:
         # the client's window is static between teleports (autoscroll
-        # OFF, [[viewport-shift-protocol]] — 16+ probed walks drew
+        # OFF, [[viewport-shift-protocol]] -- 16+ probed walks drew
         # zero 0x5A), but a ferry or block moving inside the patch
         # grid repaints it (the 2026-07-20 block captures show 0x5A
         # after block operations). An empty patch is not sent.
+        #
+        # This is NOT a duplicate of a repainting command's own 0x5A,
+        # which is what it looks like from the response-shape differ.
+        # ``build_update`` returns a DIFF against
+        # ``_patched_dynamic_tiles`` and MUTATES it, so a second call
+        # in the same tick carries what changed AFTER the first -- the
+        # ferry drift and room churn just above. Suppressing it costs
+        # the client that information: tried 2026-09-01, and the
+        # wrong-pond ferry scenario stopped discovering its ferry.
         refresh = self.session.viewport.build_update()
         if refresh["entities"]:
             messages.append(refresh)

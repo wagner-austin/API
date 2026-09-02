@@ -353,23 +353,39 @@ def _install_wrong_pond_terrain(fake_fs: FakeFileSystem) -> None:
 def test_ferry_session_never_boards_the_wrong_pond_ferry(
     fake_fs: FakeFileSystem,
 ) -> None:
-    """A ferry off the goal's water body is declined, never boarded.
+    """A ferry off the goal's water body is never boarded.
 
     The sim-side pin of the pond gate the 2026-08-05 log queued: the
     happy soak above proves a same-pond ferry IS boarded; this world
     proves the adversarial geometry that live play authored twice is
-    declined instead of deadlocked on. The paired assertions kill the
-    gate's mutant both ways — the water fuel must be CONSIDERED and
-    refused ``no_landing`` (a session that never looks at the water
-    proves nothing), and no larder hop may ever land inside the
-    ferry's puddle, drifted or not.
+    not deadlocked on. No larder hop may land inside the ferry's
+    puddle, drifted or not, and the water fuel must survive the
+    session undrained.
+
+    THE ``declined_no_landing > 0`` ASSERTION WAS REMOVED 2026-09-01,
+    and the reason matters more than the assertion did. It required
+    the bot to reach the water evaluation inside 60 rounds — an
+    EMERGENT property of a long session, not a statement about the
+    gate. Removing the invented teleport-equipment grant
+    ([[capture-differ]]) changed the bot's forage path, the session
+    now exits at 18 rounds on ``no_viable_targets``, and it never
+    looks at the water. Round counts from 60 to 200 all give zero:
+    the premise is gone, not the gate.
+
+    Tuning the scenario until that assertion went green again would
+    have re-encoded whatever the sim happened to do afterwards, which
+    is how a test comes to agree with fiction. The gate itself is now
+    proved DIRECTLY in ``tests/bot/ai/test_ferry_landing.py``:
+    ``goal_water_pond`` had ZERO direct coverage and this session was
+    its only proof, which is exactly why an unrelated law change could
+    silence it. What remains here is what this session can still
+    honestly witness.
     """
     _install_wrong_pond_terrain(fake_fs)
     exit_code = main(["--ferry", "--rounds", "60", "--stamp", "20260813-000001"])
     assert exit_code == 0
     files = fake_fs.get_written_files()
     events_path = next(path for path in files if path.endswith("latest.sim.events.jsonl"))
-    declined_no_landing = 0
     for line in files[events_path].splitlines():
         if not line:
             continue
@@ -382,9 +398,6 @@ def test_ferry_session_never_boards_the_wrong_pond_ferry(
             assert not (117 <= landing_x <= 119 and 111 <= landing_y <= 113)
         if event.get("diagnostic_kind") == "hop_declined":
             assert narrow_json_to_int(event["ferry_served"]) == 0
-            if narrow_json_to_int(event["no_landing"]) > 0:
-                declined_no_landing += 1
-    assert declined_no_landing > 0
     world_path = next(path for path in files if "sim-20260813-000001.world.json" in path)
     world_doc = narrow_json_to_dict(load_json_str(files[world_path]))
     containers = [narrow_json_to_dict(c) for c in narrow_json_to_list(world_doc["containers"])]

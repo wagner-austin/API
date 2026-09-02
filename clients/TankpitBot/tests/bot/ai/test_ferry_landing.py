@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
+from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile, goal_water_pond
 from tankpit_bot.state.types import TerrainTileDict, make_empty_world_state, make_terrain_tile
 from tankpit_bot.types.constants import TERRAIN_FERRY
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -42,3 +42,58 @@ def test_pond_at_the_map_edge_still_serves_the_goal() -> None:
     terrain = InMemoryTerrainMap(terrain_data=water)
 
     assert find_ferry_boarding_tile(world, terrain, 0, 0) == (2, 0)
+
+
+def _two_ponds() -> InMemoryTerrainMap:
+    """Two water bodies on one row, split by a single land ridge.
+
+    field01's own geometry in miniature: the wiki records a container
+    pond of 4,456 tiles that does NOT contain the ferry tile at
+    (112,15), because one land ridge at (111,15) separates the two
+    bodies ([[ferry-mechanics]]). A ferry in the far pond is
+    unreachable however near it looks by distance.
+    """
+    water = {(x, 10): InMemoryTerrainMap.WATER for x in (10, 11, 12)}
+    water.update({(x, 10): InMemoryTerrainMap.WATER for x in (14, 15)})
+    return InMemoryTerrainMap(terrain_data=water)
+
+
+def test_a_land_ridge_splits_the_pond_and_excludes_the_far_water() -> None:
+    """The gate: distance does not make a ferry reachable, connectivity does.
+
+    Proved DIRECTLY here rather than as an emergent property of a
+    60-round session. The session test that used to be this law's only
+    proof broke when an unrelated law changed, because its assertion
+    depends on the bot reaching the decision at all — which is how a
+    scenario ends up encoding whatever the sim did at the time.
+    """
+    pond = goal_water_pond(_two_ponds(), 10, 10)
+
+    assert pond == {(10, 10), (11, 10), (12, 10)}
+    assert (14, 10) not in pond
+    assert (15, 10) not in pond
+
+
+def test_a_goal_on_land_has_no_pond_at_all() -> None:
+    """A container that is not afloat yields an empty set, not a guess."""
+    assert goal_water_pond(_two_ponds(), 13, 10) == set()
+
+
+def test_a_live_ferry_tile_conducts_the_pond() -> None:
+    """A ferry renders OVER its lake, so it must not split the body.
+
+    Treating the ferry as a wall would both cut the pond in two and
+    exclude the very boarding tile the search is validating.
+    """
+    tiles = {(x, 10): InMemoryTerrainMap.WATER for x in (10, 11, 13, 14)}
+    tiles[(12, 10)] = "~"
+    pond = goal_water_pond(InMemoryTerrainMap(terrain_data=tiles), 10, 10)
+
+    assert (12, 10) in pond
+    assert (14, 10) in pond
+
+
+def test_the_flood_stops_at_the_map_edge() -> None:
+    """Coordinates run 0-255; the fill never walks off the field."""
+    edge = {(0, 0): InMemoryTerrainMap.WATER, (1, 0): InMemoryTerrainMap.WATER}
+    assert goal_water_pond(InMemoryTerrainMap(terrain_data=edge), 0, 0) == {(0, 0), (1, 0)}
