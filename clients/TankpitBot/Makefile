@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down image up-docker down-docker analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -50,9 +50,9 @@ help:
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
-	@Write-Host "  make fleet                       AI-operated fleet manager (spawn/list/stop bots over HTTP)"
-	@Write-Host "  make up                          start the fleet manager detached (adopts bots already running)"
-	@Write-Host "  make down                        drain every bot, then stop the manager"
+	@Write-Host "  make up                          THE fleet command: newest release -> image -> container; page on 27300"
+	@Write-Host "  make down                        drain every bot to the lobby, then stop the container"
+	@Write-Host "  make dev                         fleet manager on the HOT TREE, foreground (development only)"
 	@Write-Host "  make analyze                     issue report + run audit + cross-session stats"
 	@Write-Host "  make digest                      compact per-run truth table (works on crashed runs)"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
@@ -318,72 +318,45 @@ service: install
 release:
 	@Write-Host ""
 	@Write-Host "==> release (frozen runnable snapshot for the fleet)" -ForegroundColor Cyan
-	$$sha = (git rev-parse --short HEAD).Trim(); $$ver = (Select-String -Path pyproject.toml -Pattern 'version = .(\d+\.\d+\.\d+).').Matches[0].Groups[1].Value; $$dest = "C:\Users\Test\PROJECTS\tankpit-releases\v$$ver-$$sha"; if (Test-Path $$dest) { Write-Host "[release] $$dest already exists; nothing to do" -ForegroundColor Yellow } else { New-Item -ItemType Directory -Force $$dest | Out-Null; git -C ..\.. archive --format=zip HEAD clients/TankpitBot libs/platform_core libs/monorepo_guards -o "$$dest\snapshot.zip"; Expand-Archive "$$dest\snapshot.zip" -DestinationPath $$dest; Remove-Item "$$dest\snapshot.zip";Copy-Item accounts.json "$$dest\clients\TankpitBot\"; Copy-Item .env "$$dest\clients\TankpitBot\"; if (Test-Path data/tank_registry.json) { New-Item -ItemType Directory -Force "$$dest/clients/TankpitBot/data" | Out-Null; Copy-Item data/tank_registry.json "$$dest/clients/TankpitBot/data/" }; New-Item -ItemType Directory -Force "$$dest\clients\TankpitBot\runs" | Out-Null; Push-Location "$$dest\clients\TankpitBot"; poetry install --only main; Pop-Location; Write-Host "[release] built $$dest" -ForegroundColor Green; Write-Host "[release] activate: restart the fleet manager from that folder (kill the 27300 listener, then run 'poetry run tankpit-fleet' there, detached)" -ForegroundColor DarkGray }
+	$$sha = (git rev-parse --short HEAD).Trim(); $$ver = (Select-String -Path pyproject.toml -Pattern 'version = .(\d+\.\d+\.\d+).').Matches[0].Groups[1].Value; $$dest = "C:\Users\Test\PROJECTS\tankpit-releases\v$$ver-$$sha"; if (Test-Path $$dest) { Write-Host "[release] $$dest already exists; nothing to do" -ForegroundColor Yellow } else { New-Item -ItemType Directory -Force $$dest | Out-Null; git -C ..\.. archive --format=zip HEAD clients/TankpitBot libs/platform_core libs/monorepo_guards -o "$$dest\snapshot.zip"; Expand-Archive "$$dest\snapshot.zip" -DestinationPath $$dest; Remove-Item "$$dest\snapshot.zip";Copy-Item accounts.json "$$dest\clients\TankpitBot\"; Copy-Item .env "$$dest\clients\TankpitBot\"; if (Test-Path data/tank_registry.json) { New-Item -ItemType Directory -Force "$$dest/clients/TankpitBot/data" | Out-Null; Copy-Item data/tank_registry.json "$$dest/clients/TankpitBot/data/" }; New-Item -ItemType Directory -Force "$$dest\clients\TankpitBot\runs" | Out-Null; Push-Location "$$dest\clients\TankpitBot"; poetry install --only main; Pop-Location; Write-Host "[release] built $$dest" -ForegroundColor Green; Write-Host "[release] activate: 'make down' then 'make up' -- up builds this release's image on first run" -ForegroundColor DarkGray }
 
-# ``make fleet`` runs the manager FROM THE NEWEST RELEASE SNAPSHOT,
-# not this working tree: live sessions import code at spawn time, so
-# a fleet on the hot tree crashes when the tree is operated on
-# (2026-08-28: a deleted runtime-read file killed a live session; a
-# mid-surgery import shipped a half-built planner). The operator's
-# one command stays ``make fleet`` -- the folder hop is this
-# target's job. ``make release`` first if none exists;
-# ``make fleet-dev`` deliberately runs the hot tree.
-fleet:
-	@Write-Host ""
-	@Write-Host "==> fleet (AI-operated fleet manager, newest release)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[fleet] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Running from $$($$rel.Name); listens on 127.0.0.1:27300; Ctrl+C to stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet; Pop-Location
-
-fleet-dev: install
-	@Write-Host ""
-	@Write-Host "==> fleet-dev (HOT TREE -- live sessions can break under mid-surgery edits)" -ForegroundColor Yellow
-	poetry run tankpit-fleet
-
-# ``make up`` / ``make down`` are the lifecycle pair. ``up`` launches
-# the manager from the newest release into its own window and waits
-# until it answers, adopting any bots still running from a previous
-# manager. ``down`` drains: every bot is asked to stop, tears down,
-# and quits to the lobby, and the manager exits after the last one
-# lands. Neither ever kills a tank -- that is what would cost its
-# rank -- so ``down`` waits as long as the teardowns take. Interrupting
-# ``make down`` is safe: the manager owns the drain, not the command.
+# THE fleet lifecycle is ONE pair (operator order 2026-09-02: "one
+# single command we use to start this ish"): ``make up`` runs the
+# fleet CONTAINER from the newest release — it resolves the release,
+# builds its image if that exact tag does not exist yet
+# (tankpit-fleet:v<ver>-<sha>, built FROM the snapshot so the tag
+# carries the ladder's sha and a hot-tree build can never masquerade
+# as a release), then composes it up with the release's own runs/ and
+# accounts.json mounted. ``make down`` is a DRAIN, never a kill:
+# docker stop's SIGTERM enters drain_on_interrupt, every bot quits to
+# the lobby, and the container exits after the last one lands
+# (stop_grace_period 10m — interrupting the wait is safe, the manager
+# owns the drain). ``make dev`` is the only other way to run a
+# manager: hot tree, foreground, for development — live sessions on
+# the hot tree can break under mid-surgery edits, which is the whole
+# reason ``up`` runs the frozen snapshot.
+#
+# The retired host-mode targets (fleet / fleet-dev / up-docker /
+# down-docker / image, 2026-09-02): one system, not two. TRANSITION
+# NOTE: a container manager cannot adopt HOST bot processes — drain
+# any pre-container host fleet (poetry run tankpit-fleet-down from
+# its release folder) before the first containerized ``make up``, or
+# its spawn records on the shared runs/ volume will read as dead.
 up:
 	@Write-Host ""
-	@Write-Host "==> up (fleet manager, newest release, detached)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Starting from $$($$rel.Name); 'make down' to stop it." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-up; $$code = $$LASTEXITCODE; Pop-Location; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
+	@Write-Host "==> up (the fleet: newest release, containerized)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; $$tag = "tankpit-fleet:$$($$rel.Name)"; docker image inspect $$tag 2>&1 | Out-Null; if ($$LASTEXITCODE -ne 0) { Write-Host "  Image $$tag not built yet; building from the snapshot (first run takes minutes)" -ForegroundColor DarkGray; docker build -f (Join-Path $$rel.FullName "clients/TankpitBot/Dockerfile") -t $$tag $$rel.FullName; if ($$LASTEXITCODE -ne 0) { Write-Host "[up] image build failed" -ForegroundColor Red; exit 1 } }; $$env:FLEET_IMAGE = $$tag; Write-Host "  Image $$tag; 'make down' to drain and stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; Pop-Location; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
 
 down:
 	@Write-Host ""
-	@Write-Host "==> down (drain every bot, then stop the manager)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the manager exits; this waits for them." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-down; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
+	@Write-Host "==> down (drain every bot, then stop the container)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose stop fleet; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
 
-# Containerized fleet (operator order 2026-09-02, board task 2dd367b6).
-# ``image`` builds FROM THE NEWEST RELEASE SNAPSHOT so the tag carries
-# the ladder's sha discipline (tankpit-fleet:v0.1.0-<sha>); the release
-# tree has the same monorepo layout the Dockerfile expects, so the
-# snapshot IS the build context. ``up-docker`` resolves the same newest
-# release and refuses to build implicitly (--no-build), so a hot-tree
-# image can never masquerade as a release. ``down-docker`` is a DRAIN:
-# docker stop's SIGTERM enters drain_on_interrupt and the container
-# exits after the last bot quits to the lobby (stop_grace_period 10m).
-image:
+dev: install
 	@Write-Host ""
-	@Write-Host "==> image (fleet container from the newest release snapshot)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[image] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Building tankpit-fleet:$$($$rel.Name) from $$($$rel.FullName)" -ForegroundColor DarkGray; docker build -f (Join-Path $$rel.FullName "clients/TankpitBot/Dockerfile") -t "tankpit-fleet:$$($$rel.Name)" $$rel.FullName; exit $$LASTEXITCODE
-
-# Both docker lifecycle targets hop into the NEWEST RELEASE folder
-# before compose runs, exactly like ``up``/``down`` do: the volume
-# mounts (./runs, ./accounts.json) must resolve to the release's own
-# copies, so the container's artifacts, spawn records and account
-# pool ride the same ladder its code does -- never the hot tree's.
-up-docker:
-	@Write-Host ""
-	@Write-Host "==> up-docker (fleet container, newest release image)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up-docker] no release found -- run 'make release' then 'make image' first" -ForegroundColor Red; exit 1 }; $$env:FLEET_IMAGE = "tankpit-fleet:$$($$rel.Name)"; Write-Host "  Image $$env:FLEET_IMAGE; 'make down-docker' to drain and stop." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; Pop-Location; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
-
-down-docker:
-	@Write-Host ""
-	@Write-Host "==> down-docker (drain every bot, then stop the container)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down-docker] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); docker compose stop fleet; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
+	@Write-Host "==> dev (fleet manager, HOT TREE, foreground -- Ctrl+C drains)" -ForegroundColor Yellow
+	@Write-Host "  Live sessions can break under mid-surgery edits; use 'make up' to operate." -ForegroundColor DarkGray
+	poetry run tankpit-fleet
 
 run: install
 	@Write-Host ""
@@ -474,6 +447,11 @@ decode:
 	@Write-Host ""
 	@Write-Host "==> decode" -ForegroundColor Cyan
 	poetry run python -m scripts.decode
+
+analyze-response-shapes:
+	@Write-Host ""
+	@Write-Host "==> analyze response shapes (live archive vs sim)" -ForegroundColor Cyan
+	poetry run python -m scripts.analyze_response_shapes
 
 analyze-recipient-policy:
 	@Write-Host ""

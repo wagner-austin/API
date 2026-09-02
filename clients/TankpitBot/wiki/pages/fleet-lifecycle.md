@@ -102,9 +102,19 @@ this work.
 
 | Command | Effect |
 |---|---|
-| `make up` | Start the manager detached, adopting anything still running. Idempotent: a manager already listening is reported and left alone. |
-| `make down` | Drain every bot, then wait for the manager to exit. |
-| `make fleet` | Run the manager in the foreground, as before. |
+| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era): resolve the newest release, build its image if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, and compose the fleet CONTAINER up with the release's own `runs/` and `accounts.json` mounted. Prints the fleet page URL. |
+| `make down` | Drain: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). |
+| `make dev` | The only other manager: hot tree, foreground, development only — Ctrl+C drains. |
+
+Retired the same day, one system not two: `make fleet` (foreground
+release manager), `make fleet-dev`, and the short-lived
+`image`/`up-docker`/`down-docker` trio. The detached HOST lifecycle
+(`tankpit-fleet-up`/`-down` entry points, the adoption of host
+processes below) remains in code but is no longer on the operator
+surface; a container manager cannot adopt HOST processes, so any
+pre-container host fleet must be drained (`poetry run
+tankpit-fleet-down` from its release folder) before the first
+containerized `make up`.
 
 A detached manager has no terminal, so its console goes to
 `runs/fleet/manager.log` — the same reasoning that sends each bot's
