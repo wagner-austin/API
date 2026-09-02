@@ -13,3 +13,4 @@ Wire protocol format, message types, and client data structures. Everything lear
 [Viewport Shift Protocol](../pages/viewport-shift-protocol.md) -- the three shift triggers (teleport, Rb scope pans the bot NOW SENDS, Ia autoscroll), the measured Rb anchor law, and the 22-event corpus proof
 [Capture Differ](../pages/capture-differ.md) -- the sim-fidelity pipeline: longitudinal container atlas, --from-atlas world seeding, and the response-shape differ that mechanically finds sim law gaps (5 found+closed 2026-08-01)
 [Server Push Gating](../pages/server-push-gating.md) -- play-to-receive: periodic push (0x2E/0x3F/0x47) flows only to acting clients; queries/keep-alives never count; seven-run proof (2026-07-24)
+[Wire Recipient Policy](../pages/recipient-policy.md) -- who receives each message: the broadcast/per-recipient rulings mined from 341 sessions, and the 0x74 join-burst finding (2026-09-01)

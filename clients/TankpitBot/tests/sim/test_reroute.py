@@ -74,15 +74,30 @@ def test_viewport_exit_emits_tank_remove_and_reentry_restates_position() -> None
     assert server._viewport.removed_at == {}
 
 
-def test_handshake_scopes_positions_to_the_viewport() -> None:
-    """A far tank joins with identity only — its position stays dark."""
+def test_handshake_positions_are_self_only_even_inside_the_viewport() -> None:
+    """Every other tank joins with identity only — near ones included.
+
+    The join burst's position scope is SELF, not the viewport. Measured
+    2026-09-01 across the archive ([[recipient-policy]]): the identity
+    run is a pure 0x21 sequence in 340 of 340 sessions. That is not
+    sampling — with ~36 tanks on a 256x256 map a 16x16 window should
+    hold one about 13% of the time, so zero of 340 is the law. Other
+    tanks' positions arrive from the in-play membership diff
+    (``test_reroute_clock_starts_on_a_living_exit`` above), never from
+    the burst.
+
+    Tank 11 sits at (15, 10), INSIDE the client's window and in
+    ``visible``; tank 12 is far outside. Neither gets a 0x3D.
+    """
     world = _arena()
     world["tanks"][12] = make_sim_tank(12, 1, 1, 40, 40, 500)
-    burst = _server(world).handshake()
+    server = _server(world)
+    burst = server.handshake()
     identities = [m["tank_id"] for m in burst if m["msg_type"] == 0x21]
     positions = [m["tank_id"] for m in burst if m["msg_type"] == 0x3D]
     assert identities == [9, 11, 12]
-    assert positions == [9, 11]
+    assert positions == [9]
+    assert server._viewport.visible == {11}
 
 
 def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:

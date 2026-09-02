@@ -27,6 +27,7 @@ from tankpit_bot.sim.world import SimContainerDict, make_sim_tank, make_sim_worl
 from tankpit_bot.sniffer.decoders import process_received_message
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.types import SelfStateDict
+from tankpit_bot.state.types.tank import has_known_position
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 _MAGIC = "simmagic"
@@ -89,7 +90,25 @@ def _deliver(ws: WorldService, messages: list[BinaryMessage], table: bytes) -> N
 
 
 def test_handshake_reaches_production_world_state() -> None:
-    """The join burst establishes self-state and the enemy registry."""
+    """The join burst establishes self-state and a position-less roster.
+
+    Self-state is complete from the burst — including fuel, which
+    arrives on the burst's own 0x2E status sync, not a 0x44
+    ([[recipient-policy]]).
+
+    The enemy is REGISTERED by its 0x21 identity and carries NO
+    position. That is the login-roster law, measured twice by
+    independent methods: the 2026-08-04 first-sight probe (3 captures,
+    113 tanks, every one 0x21-first, 9-46 s to its first position) and
+    the 2026-09-01 burst sweep (identity run pure 0x21 in 340 of 340
+    sessions). The ``(0, 0)`` phantom is the normal opening state of
+    every tank, which is what ``has_known_position`` exists to answer
+    ([[tank-freshness-model]]).
+
+    Before the burst was corrected the sim shipped positions the real
+    server never sends, so this path — the one production actually
+    walks on every join — was never exercised in sim.
+    """
     ws = WorldService()
     server, _table = _boot(ws)
     world = ws.world_state
@@ -97,7 +116,10 @@ def test_handshake_reaches_production_world_state() -> None:
     assert (self_state["x"], self_state["y"]) == (100, 100)
     assert self_state["fuel"] == 800
     enemy = world["tanks"][str(_ENEMY)]
-    assert (enemy["x"], enemy["y"]) == (107, 100)
+    assert enemy["team"] == 1
+    assert not has_known_position(enemy)
+    assert (enemy["x"], enemy["y"]) == (0, 0)
+    assert server.world["tanks"][_ENEMY]["x"] == 107
     assert server.world["tick"] == 0
 
 

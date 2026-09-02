@@ -106,7 +106,7 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     server.world["tanks"][12]["alive"] = False
     burst = server.handshake()
     kinds = _kinds(burst)
-    assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x44, 0x49, 0x21, 0x3D, 0x3F]
+    assert kinds == [0x21, 0x3E, 0x5A, 0x3D, 0x2E, 0x21, 0x49, 0x49, 0x74, 0x3F]
     own = burst[0]
     assert own["msg_type"] == 0x21
     assert own["tank_id"] == 9
@@ -118,6 +118,51 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     assert viewport["msg_type"] == 0x5A
     assert (viewport["viewport_left"], viewport["viewport_top"]) == (2, 2)
     assert viewport["entities"] == []
+    own_position = burst[3]
+    assert own_position["msg_type"] == 0x3D
+    assert own_position["tank_id"] == 9
+    own_sync = burst[4]
+    assert own_sync["msg_type"] == 0x2E
+    assert own_sync["tank_id"] == 9
+    assert own_sync["fuel"] == server.world["tanks"][9]["fuel"]
+    # Enemy 11 sits at (15, 10), INSIDE the client's [2, 18) window —
+    # and still gets no position statement. The identity run is pure
+    # 0x21 in 340 of 340 archived sessions ([[recipient-policy]]).
+    assert burst[5]["msg_type"] == 0x21
+    assert burst[5]["tank_id"] == 11
+    assert 11 in server._viewport.visible
+
+
+def test_handshake_tail_is_the_measured_inventory_pair_toggle_sync() -> None:
+    """The burst tail: 0x49 twice, then 0x74, then 0x3F — and no 0x44.
+
+    Measured 2026-09-01 over the archive ([[recipient-policy]]): the
+    inventory arrives TWICE and sits AFTER the identity run, the 0x74
+    equipment-enabled state follows it in 340 of 340 sessions, and no
+    0x44 rides the burst at all — 293 of 340 sessions carry none in
+    their first 90 received messages, because the burst's own 0x2E
+    already carries fuel ([[decode-coverage]]).
+    """
+    server = _server()
+    client = server.world["tanks"][9]
+    client["counts"] = [1, 2, 3, 4, 5]
+    client["enabled"] = [False, True, False, True, True]
+    burst = server.handshake()
+
+    assert _kinds(burst)[-4:] == [0x49, 0x49, 0x74, 0x3F]
+    first, second = burst[-4], burst[-3]
+    assert first["msg_type"] == 0x49
+    assert second["msg_type"] == 0x49
+    assert first["counts"] == [1, 2, 3, 4, 5]
+    assert first["counts"] == second["counts"]
+    assert first["enabled"] == second["enabled"]
+    assert first["show"] is True
+
+    toggle = burst[-2]
+    assert toggle["msg_type"] == 0x74
+    assert toggle["enabled"] == [False, True, False, True, True]
+
+    assert 0x44 not in _kinds(burst)
 
 
 def test_a_walk_draws_a_sync_and_a_standstill_does_not() -> None:
