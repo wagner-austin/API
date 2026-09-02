@@ -5475,3 +5475,25 @@ Resolution live: drained the host manager (`poetry run tankpit-fleet-down`, inst
 Hardening, all three arms tested against the real port: `make up` now (1) refuses to start behind a non-Docker listener on 27300, naming the process/pid and the drain command — proven with a planted host listener, exit 2; (2) after composing, probes `/bots` up to 10 s and force-recreates once on a stale proxy; the green URL prints only after a real response — proven by clean run. `make down` names any non-Docker survivor on the port after the container stops — proven quiet on a free port. [[fleet-lifecycle]] gains the port-arbitration section.
 
 End state: containerized fleet up from tankpit-fleet:v0.1.0-bc45e3e1, page answering with an empty fleet, ready for spawns.
+
+---
+## [2026-09-02] crack | The trailing 0x5A was never a viewport bug: the sim drifts ferries 3,600x too often, and this wiki said so all along
+
+Chasing the response-shape differ's one systematic divergence produced two wrong diagnoses of mine before the right one, and the right one was already on [[ferry-mechanics]].
+
+**Wrong twice, recorded so the reasoning is auditable.** First: "the sim over-emits 0x5A." Measured 0.47% of messages against live's 4.77% — the opposite. Second: "the sim under-emits tenfold." Both were denominator errors; dividing by total messages mixed in the sim's much higher status-sync density. Normalised per TRIGGERING command, live emits 0.962 0x5A per teleport and the sim 1.084 — no tenfold anything, and a small excess instead.
+
+**Two attempted fixes at the symptom, both failed, both recorded in `sim/server.py` so nobody retries them.** (1) Suppressing the end-of-tick refresh when a command already emitted a 0x5A: WRONG, because `build_update` returns a DIFF against `_patched_dynamic_tiles` and mutates it, so the second call carries what changed AFTER the first — the ferry drift and churn. Suppressing it cost the client that information and the wrong-pond ferry scenario stopped discovering its ferry. (2) Deferring the refresh to the head of the next batch, on the measured law that a 0x5A LEADS its window (11,542 of 12,164 live windows, against exactly ONE trailing): WRONG, because live's 94.9%-first is a command's OWN recenter leading its OWN response, not a prior tick's patch — deferring bleeds a patch across a tick boundary and attaches it to an unrelated command, which `test_enemy_block_actions_stay_per_recipient` caught immediately.
+
+**The actual root cause, and it is enormous:**
+
+    0x4A per session    LIVE (341 sessions)  0.91
+                        SIM  (7 sessions)    3,246
+
+The sim emits ~3,600x the real server's terrain traffic. `drift_ferries` picks a heading for every ferry every tick; live ferries move about once a session. Constant drift repaints the patch grid nearly every tick, so the end-of-tick refresh fires nearly every tick and lands at the tail of whatever window is open. ONE invented rate, EIGHT invented-law rows in the differ.
+
+**The contradiction was already in the tree.** [[ferry-mechanics]] has said "No ferry drift law exists in the archive" since 2026-08-04 (148 moves across 312 captures, 136 rider-attributed). `sim/ferries.py` implemented autonomous drift on 2026-08-06 from a second sweep that reached the opposite conclusion and never updated this page. Live at 0.91/session is the 2026-08-04 number. The 08-06 work's real contributions stand — a move is one 0x4A with two updates, moves land on tick boundaries — but the RATE is invented on the same footing its own docstring already disclaims the DIRECTION.
+
+**Method note.** The user asked "ferries only move when a player moves them, right?" before any of this was measured, and was right. The answer was in the wiki the whole time; I had read the sim's docstring first and taken it as the law. Grep the wiki before trusting a module's own account of the mechanic it implements.
+
+OPEN, deliberately: delete autonomous drift (rider-only) or rate-limit it. Not decided unilaterally — it removes a law another session authored on evidence.

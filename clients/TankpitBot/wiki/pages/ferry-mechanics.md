@@ -147,6 +147,52 @@ shapes (`sim/emissions.py::emit_move`,
     first classifier pass wrongly read "all unridden" because it
     matched riders against the OLD tile only.
 
+## The sim drifts ferries anyway, at 3,600x live (measured 2026-09-02)
+
+The no-drift result above is CANONICAL and live still agrees with it.
+`sim/ferries.py` nonetheless implements an autonomous drift law, added
+2026-08-06 from a second sweep (205 terrain updates, 407 sessions,
+chained per ferry by tile identity) that reached the opposite
+conclusion and never updated this page. The two have sat in
+contradiction since.[^12]
+
+Live arbitrates, and not narrowly:
+
+| | 0x4A per session |
+|---|---|
+| LIVE (341 archived sessions) | **0.91** |
+| SIM (7 sessions, current build) | **3,246** |
+
+The sim emits roughly **3,600x** the real server's terrain traffic.
+0.91/session is the no-drift number — 148 moves across 312 captures is
+0.47, and this page's own falsification test ("if a future session
+parks beside an unridden ferry for minutes and its 0x4A stays silent")
+is answered far more strongly by an archive that is silent at scale.
+
+What 2026-08-06 legitimately established stands: a move is ONE 0x4A
+carrying exactly two updates (vacated to 0, occupied to 5), and moves
+land on tick boundaries. What it did not establish is that ferries move
+EVERY tick. Its docstring already disclaims the direction as "a
+property of the chosen sequence, not a measured law"; the RATE is
+invented on the same footing, and `_DRIFT_HEADINGS` cycling per ferry
+per tick is what produces the flood.
+
+**Downstream cost, and why this surfaced at all.** Constant drift
+repaints the client's patch grid nearly every tick, so the sim's
+end-of-tick viewport refresh fires nearly every tick and lands at the
+TAIL of whatever command window is open. That is the entire "trailing
+0x5A" family the response-shape differ reported as eight separate
+invented laws ([[capture-differ]]) — one invented rate, eight
+symptoms. Two attempted fixes at the symptom (suppressing the refresh,
+deferring it to the next batch) both failed and are recorded in
+`sim/server.py` so they are not retried: the refresh is NOT a
+duplicate, and deferring it bleeds a patch across a tick boundary onto
+an unrelated command.
+
+OPEN: whether to delete autonomous drift (rider-only, matching this
+page) or rate-limit it. Not decided unilaterally — it removes a law a
+different session authored on evidence.
+
 ## Autoscroll riding doctrine (user ruling 2026-08-01, OPEN)
 
 User, verbatim: "tbh when i use ferries i use auto scroll on so i
@@ -189,3 +235,4 @@ The "marooned one-tile island" from run 131003 was actually the tank standing ON
 [^2]: `src/tankpit_bot/types/constants.py:25-26` — `TERRAIN_FERRY = 5`, `TERRAIN_FERRY_ROCK = 7`; the ASCII glyph is `ASCII_FERRY = "~"` at `:47`. **Corrected 2026-08-05:** this footnote previously pointed at `state/terrain.py`, which does not define them (the module at `src/tankpit_bot/state/types/terrain.py` is a different file, and `src/tankpit_bot/terrain.py` is a third). **Moved 2026-08-07:** the module is now `types/constants.py`, not `state/types/constants.py` — it was never state, and while it sat under `state/` it made `physics` and `state` mutually dependent ([[package-layering]]). The three line numbers are unchanged; only the package moved.
 [^3]: `runs/bot/bot-20260612-131003.log:7130-7160` (run 131003, 2026-06-12 13:19:08-13:19:10). The bot teleported toward a fuel dot at (131,182) for 81 fuel (`WORLD: Fuel: 168 -> 87 (-81)`) and the server placed it at **(132,180)**, whose rendered viewport row 180 reads `W W W W @ W # #` — water on both sides, rock below, i.e. the one-tile island. **Corrected 2026-08-05:** this footnote previously gave the tank's position as (131,182); that is the fuel container's tile and the teleport TARGET, rendered `F` on row 182 of the same dump. The tank was never there. "Marooned" is the bot's own state name for the condition (`src/tankpit_bot/bot/ai/collect_hops.py:365`), not a string in this log.
 [^ferrylaw]: The three-question split a ferry surface forces — passability, landing legality, landing attainability — is `is_landing_legal` at `src/tankpit_bot/bot/ai/ferry.py:163` and `:308`, beside `is_landing_attainable` at `:189` and `:326`; see [[terrain-composition]] for the full table. The 2026-08-03 unfinished-command receipts are `runs/bot/bot-20260803-180918.capture_session.json` and its `.events.jsonl`. All paths verified present 2026-08-07.
+[^12]: Live vs sim 0x4A rate, 2026-09-02, `analysis.scan` over `runs/bot` + `runs/sniff` (341 sessions) against a sim baseline generated the same day. The sim figure is from 7 fresh sessions on the current build; the ratio is not sensitive to that sample size at three orders of magnitude.
