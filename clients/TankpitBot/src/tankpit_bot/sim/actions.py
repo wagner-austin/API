@@ -15,7 +15,7 @@ from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import damage_tier, free_radar_radius
-from tankpit_bot.physics.costs import teleport_cost
+from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
 from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.physics.supervisor import teleport_refusal
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
@@ -167,8 +167,15 @@ def process_radar(
     5x5 around the tank clipped to the viewport). The scan reveals
     containers (fuel by volume, equipment as the wire's
     ``0xFFFF -> -1`` cache marker) and mines in the covered tiles and
-    reports whether any living enemy sits inside them. The 10-fuel
-    cost is billed by the caller.
+    reports whether any living enemy sits inside them, and bills the
+    flat 10-fuel scan cost.
+
+    The cost is billed HERE, at the end, rather than by the caller.
+    Every world effect of an action belongs to the one function that
+    resolves it: with the debit outside, the caller had to mutate the
+    world to finish the job, which is what kept the wire emitters
+    impure and made fanning them out per connection charge the fuel
+    once per observer ([[physics-module-roadmap]]).
 
     Args:
         world: Simulated world (mutated: extra-radar consumption).
@@ -238,6 +245,7 @@ def process_radar(
         other["alive"] and other["team"] != tank["team"] and inside(other["x"], other["y"])
         for other in world["tanks"].values()
     )
+    tank["fuel"] = max(0, tank["fuel"] - RADAR_COST)
     return RadarOutcomeDict(
         tank_id=tank_id,
         containers=containers,
@@ -307,8 +315,12 @@ def process_mine_press(
     A 3x3 placement centered on the placer: rock/water/tank tiles are
     skipped, tiles holding an enemy mine trade 1:1 (the enemy mine
     detonates, nothing is placed there), and clear tiles receive the
-    placer's mine. The flat 10-fuel press cost is billed by the
-    caller. Mines are not inventory — nothing is consumed.
+    placer's mine. Mines are not inventory — nothing is consumed.
+
+    The flat 10-fuel press cost is billed HERE, at the end, rather
+    than by the caller, for the reason given on
+    :func:`process_radar`: every world effect of an action belongs to
+    the function that resolves it, so the wire emitters can stay pure.
 
     Args:
         world: Simulated world (mutated).
@@ -343,6 +355,7 @@ def process_mine_press(
                 continue
             place_mine(world, x, y, tank["team"])
             outcome["placed"].append((x, y))
+    tank["fuel"] = max(0, tank["fuel"] - MINE_PRESS_COST)
     return outcome
 
 

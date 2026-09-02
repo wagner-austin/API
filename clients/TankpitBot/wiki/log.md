@@ -5339,3 +5339,20 @@ Operator, twice, watching the live five-bot World fleet: "multiple bots go for t
 **Recorded so it is not re-proposed:** deterministic assignment is the WEAKER option here. It needs every bot to compute from the same inputs, and they cannot — each container set is one viewport plus merged sightings under a share horizon, so divergent views produce divergent "identical" answers, failing silently and asymmetrically. An exclusive-create claim file is a true mutex with no broker, survives divergent knowledge, and preserves the single-tank rule.
 
 **A correction inside the measurement, because the mistake is easy to repeat.** A first pass read `remaining_volume: 0` as "arrived at an empty container" and produced a 55%-wasted-trips figure. The field is the fuel REMAINING AFTER the pickup (`container/decoders/events.py:85`), so zero means the pickup drained it — that was a 55% clean-drain rate, a success measure reported as its opposite. Convergence is measured here; wasted travel is not measured by any diagnostic currently emitted.
+
+---
+## [2026-09-01] lift | Resolve and narrate split apart — the emitters are pure, and the observer is a parameter
+
+The change N>1 was actually blocked on ([[physics-module-roadmap]]). `sim/emissions.py` did two jobs per function: mutate the world through a law module, then append the messages the single client should see. That is indistinguishable from correct with one connection and wrong with two — calling such a function once per observer applies every mutation once per observer, so a radar scan would cost N x 10 fuel and one mine press would place N mines.
+
+**The debits moved to where the effect belongs.** `process_radar` and `process_mine_press` carried docstrings reading "the cost is billed by the caller" — a documented split-brain that forced the emitter to mutate. Each now bills its own cost at the end of its body, so the resolver owns every world effect of an action and the narrator owns none.
+
+**`emissions.py` is deleted**, replaced by `sim/narrate/` — `movement.py` (move, teleport, fuel pickup), `resources.py` (radar, mine, equipment, toggle) and `world.py` (block, chat). Every function there is pure: it takes a resolved outcome plus the `observer_id` being narrated for and RETURNS the messages that connection receives. The old module was at 569 lines against a 600 cap and could not have absorbed the change.
+
+Two resolvers were missing and are now written rather than implied: `equipment.toggle_equipment_slot` (the flip lived inside the emitter) and `sim/fuel_pickup.py`, which snapshots the pickup choreography's facts. The pickup was the one emission that read MUTABLE world state while narrating — the container's remaining volume and the tank's fuel, at emission time — so its narration depended on WHEN it ran rather than on what happened.
+
+**The observer gating is now tested, which it never was.** `tests/sim/test_narrate.py` resolves each action once and narrates it TWICE, for the actor and for a real bystander tank. That is the property the split exists to create, and no existing test could have caught its absence: a narrator ignoring `observer_id` passes every single-client test in the suite. Three families were silently unconditional before and are now correctly private — radar results, the equipment toggle, and the equipment grant.
+
+Scope honesty: this does NOT make the sim multi-client. It removes the reason it could not be. The session registry, the `advance_tick` fan-out, per-connection command intake and mid-session join all remain, and they are small now that narration is pure.
+
+Gate: 372 sim tests; `narrate/*`, `fuel_pickup.py`, `equipment.py` and `actions.py` all at 100.00% statement and branch; guard 0 violations; ruff and mypy strict clean over 1,202 files. The join burst still diffs exactly against the archive shape.

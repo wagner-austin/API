@@ -10,13 +10,13 @@ the move on the transition tile.
 from __future__ import annotations
 
 from tankpit_bot.bot.tick_body import _tick_once
-from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.movement import (
     _execute_walk,
     ferry_at,
     process_move,
     tile_surface,
 )
+from tankpit_bot.sim.narrate import narrate_move
 from tankpit_bot.sim.world import (
     SimContainerDict,
     SimFerryDict,
@@ -107,15 +107,13 @@ def test_overshoot_disembark_closes_with_cant_go() -> None:
     refused".
     """
     from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_GO
-    from tankpit_bot.sim.emissions import emit_move
 
     world = _world(13, 10)
     outcome = process_move(world, _channel_map(), 9, 25, 10)
     assert outcome["kind"] == "moved"
     assert outcome["stop_reason"] == "transition"
     assert outcome["dest_reached"] is False
-    messages: list[BinaryMessage] = []
-    emit_move(world, 9, outcome, messages)
+    messages = narrate_move(world, outcome, 9)
     assert messages[0]["msg_type"] == 0x47
     closes = [m for m in messages if m["msg_type"] == 0x52]
     assert [m["error_code"] for m in closes] == [SUPERVISOR_ERROR_CANT_GO]
@@ -123,14 +121,11 @@ def test_overshoot_disembark_closes_with_cant_go() -> None:
 
 def test_transition_stop_on_the_clicked_tile_closes_silently() -> None:
     """Boarding the ferry tile the click named is a FINISHED command."""
-    from tankpit_bot.sim.emissions import emit_move
-
     world = _world(10, 10)
     outcome = process_move(world, _channel_map(), 9, 13, 10)
     assert outcome["stop_reason"] == "transition"
     assert outcome["dest_reached"] is True
-    messages: list[BinaryMessage] = []
-    emit_move(world, 9, outcome, messages)
+    messages = narrate_move(world, outcome, 9)
     assert messages[0]["msg_type"] == 0x47
     assert [m for m in messages if m["msg_type"] == 0x52] == []
 
@@ -140,7 +135,6 @@ def test_mine_walk_over_arrest_closes_silently() -> None:
 
     Archive 2026-07-29/30: 18 detonations, zero paired code-1s.
     """
-    from tankpit_bot.sim.emissions import emit_move
     from tankpit_bot.sim.world import place_mine
 
     world = _world(10, 10)
@@ -149,8 +143,7 @@ def test_mine_walk_over_arrest_closes_silently() -> None:
     assert outcome["kind"] == "moved"
     assert outcome["stop_reason"] == "mine"
     assert outcome["dest_reached"] is False
-    messages: list[BinaryMessage] = []
-    emit_move(world, 9, outcome, messages)
+    messages = narrate_move(world, outcome, 9)
     assert messages[0]["msg_type"] == 0x47
     assert any(m["msg_type"] == 0x45 for m in messages)
     assert [m for m in messages if m["msg_type"] == 0x52] == []

@@ -17,15 +17,18 @@ from tankpit_bot.protocol.types import (
     SupervisorDict,
     SyncDict,
 )
+from tankpit_bot.sim.actions import process_teleport
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.commands import ClientCommandDict
-from tankpit_bot.sim.emissions import (
-    emit_equipment_pickup,
-    emit_fuel_pickup_close,
-    emit_move,
-    emit_teleport,
-)
+from tankpit_bot.sim.equipment import resolve_equipment_pickup
+from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
 from tankpit_bot.sim.movement import process_move
+from tankpit_bot.sim.narrate import (
+    narrate_equipment_pickup,
+    narrate_fuel_pickup,
+    narrate_move,
+    narrate_teleport,
+)
 from tankpit_bot.sim.world import SimWorldDict
 
 
@@ -111,28 +114,26 @@ class SimServerMoveMixin:
         if outcome["kind"] == "moved":
             moved.add(tank_id)
         choreographed = kind == "pickup_fuel" and outcome["kind"] == "moved"
-        emit_move(
-            self.world,
-            self.session.client_id,
-            outcome,
-            messages,
-            include_pickups=not choreographed,
+        messages.extend(
+            narrate_move(
+                self.world,
+                outcome,
+                self.session.client_id,
+                include_pickups=not choreographed,
+            )
         )
         if choreographed:
-            emit_fuel_pickup_close(
+            pickup = resolve_fuel_pickup(
                 self.world,
-                self.session.client_id,
                 tank_id,
                 command["x"],
                 command["y"],
                 volume_before=fuel_before,
                 walked=outcome["path"] != "",
-                messages=messages,
             )
+            messages.extend(narrate_fuel_pickup(pickup, self.session.client_id))
         if outcome["kind"] == "moved":
-            emit_equipment_pickup(
-                self.world, self.session.client_id, tank_id, kind, messages, ammo_changed
-            )
+            self._resolve_arrival_equipment(tank_id, kind, messages)
             if tank_id == self.session.client_id and outcome["path"] != "":
                 # The 0x3F Sync trails a walk that actually relocated
                 # the client — an own-tile click resolves as a "moved"
@@ -186,20 +187,41 @@ class SimServerMoveMixin:
                     )
                 )
             return
-        landing: list[BinaryMessage] = []
-        if emit_teleport(
-            self.world, self.terrain, self.session.client_id, tank_id, command, landing
-        ):
-            moved.add(tank_id)
-            if tank_id == self.session.client_id:
-                self.session.viewport.recenter()
-                messages.append(self.session.viewport.build_update())
+        hop = process_teleport(self.world, self.terrain, tank_id, command["x"], command["y"])
+        landing = narrate_teleport(self.world, hop, self.session.client_id)
+        if hop["kind"] != "landed":
             messages.extend(landing)
-            emit_equipment_pickup(
-                self.world, self.session.client_id, tank_id, "teleport", messages, ammo_changed
-            )
-        else:
-            messages.extend(landing)
+            return
+        moved.add(tank_id)
+        if tank_id == self.session.client_id:
+            self.session.viewport.recenter()
+            messages.append(self.session.viewport.build_update())
+        messages.extend(landing)
+        self._resolve_arrival_equipment(tank_id, "teleport", messages)
+
+    def _resolve_arrival_equipment(
+        self,
+        tank_id: int,
+        kind: str,
+        messages: list[BinaryMessage],
+    ) -> None:
+        """Resolve an equipment container under an arriving tank.
+
+        Both arrival paths — a walk and a teleport landing — resolve
+        the same way, so the resolve-then-narrate pair lives here once
+        rather than at each call site.
+
+        Args:
+            tank_id: The arriving tank.
+            kind: The command kind that caused the arrival.
+            messages: This tick's outgoing batch (appended).
+        """
+        grant = resolve_equipment_pickup(self.world, tank_id)
+        if grant is None:
+            return
+        messages.extend(
+            narrate_equipment_pickup(self.world, grant, tank_id, kind, self.session.client_id)
+        )
 
     def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
         """Validate a pickup click's destination before any movement.

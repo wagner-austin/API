@@ -29,19 +29,21 @@ from tankpit_bot.protocol.types import (
     InventoryDict,
     SyncDict,
 )
-from tankpit_bot.sim.actions import build_map_data
+from tankpit_bot.sim.actions import build_map_data, process_mine_press, process_radar
+from tankpit_bot.sim.blocks import process_block_press
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
-from tankpit_bot.sim.emissions import (
-    emit_block_action,
-    emit_chat,
-    emit_equipment_toggle,
-    emit_mine_press,
-    emit_radar,
-)
+from tankpit_bot.sim.equipment import toggle_equipment_slot
 from tankpit_bot.sim.ferries import drift_ferries
+from tankpit_bot.sim.narrate import (
+    narrate_block_action,
+    narrate_chat,
+    narrate_equipment_toggle,
+    narrate_mine_press,
+    narrate_radar,
+)
 from tankpit_bot.sim.server_move import SimServerMoveMixin
 from tankpit_bot.sim.visitors import RoomChurn
 from tankpit_bot.sim.wire_statements import (
@@ -334,14 +336,9 @@ class SimServer(SimServerMoveMixin):
             self._process_teleport_command(tank_id, command, messages, ammo_changed, moved)
             return
         if kind == "radar":
-            emit_radar(
-                self.world,
-                self.session.client_id,
-                self.session.viewport.window,
-                tank_id,
-                messages,
-                ammo_changed,
-            )
+            window = self.session.viewport.window if tank_id == self.session.client_id else None
+            outcome = process_radar(self.world, tank_id, window)
+            messages.extend(narrate_radar(self.world, outcome, self.session.client_id))
             return
         self._process_stateless_command(tank_id, command, messages)
 
@@ -360,16 +357,18 @@ class SimServer(SimServerMoveMixin):
         """
         kind = command["kind"]
         if kind == "mine":
-            emit_mine_press(self.world, self.terrain, self.session.client_id, tank_id, messages)
+            press = process_mine_press(self.world, self.terrain, tank_id)
+            messages.extend(narrate_mine_press(press, self.session.client_id))
             return
         if kind == "toggle_equipment":
-            emit_equipment_toggle(self.world, tank_id, command["slot"], messages)
+            toggle_equipment_slot(self.world, tank_id, command["slot"])
+            messages.extend(narrate_equipment_toggle(self.world, tank_id, self.session.client_id))
             return
         if kind == "block":
             self._process_block_command(tank_id, command, messages)
             return
         if kind == "chat":
-            emit_chat(tank_id, command, messages)
+            messages.extend(narrate_chat(tank_id, command))
             return
         if kind == "scope":
             self._process_scope_command(tank_id, command, messages)
@@ -405,9 +404,9 @@ class SimServer(SimServerMoveMixin):
             command: The queued block command.
             messages: This tick's outgoing batch (appended).
         """
-        landed = emit_block_action(
-            self.world, self.terrain, self.session.client_id, tank_id, command, messages
-        )
+        outcome = process_block_press(self.world, self.terrain, tank_id, command["x"], command["y"])
+        messages.extend(narrate_block_action(self.world, outcome, tank_id, self.session.client_id))
+        landed = outcome["kind"] not in ("out_of_reach", "refused")
         if landed and tank_id == self.session.client_id:
             messages.append(self.session.viewport.build_update())
 

@@ -13,6 +13,8 @@ from __future__ import annotations
 from tankpit_bot.container.types import ContainerPickupDict
 from tankpit_bot.protocol.types import BinaryMessage, FuelGainDict
 from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
+from tankpit_bot.sim.narrate import narrate_fuel_pickup
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimContainerDict, SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -213,20 +215,10 @@ def test_choreography_defaults_to_remaining_zero_for_a_vanished_record() -> None
     record at validation, so this is the function's defensive
     contract: no record -> remaining 0, the empty close.
     """
-    from tankpit_bot.sim.emissions import emit_fuel_pickup_close
-
     server = _server()
-    messages: list[BinaryMessage] = []
-    emit_fuel_pickup_close(
-        server.world,
-        9,
-        9,
-        12,
-        10,
-        volume_before=0,
-        walked=False,
-        messages=messages,
-    )
+    outcome = resolve_fuel_pickup(server.world, 9, 12, 10, volume_before=0, walked=False)
+    assert outcome["remaining"] == 0
+    messages = narrate_fuel_pickup(outcome, 9)
     assert _kinds(messages) == [0x44, "container_pickup", 0x52]
     assert _remainings(messages) == [0]
     assert _closes(messages) == [(4, 0)]

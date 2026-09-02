@@ -132,6 +132,28 @@ def _grant(tank: SimTankDict) -> list[int]:
     return gained
 
 
+def toggle_equipment_slot(world: SimWorldDict, tank_id: int, slot: int) -> None:
+    """Flip one equipment slot for a tank.
+
+    The toggle is free and server-authoritative. An out-of-range press
+    changes nothing — the real UI has no such button, so a slot outside
+    1-5 is the client's problem and is ignored exactly as live rather
+    than refused.
+
+    This is the resolve half of the toggle: it owns the world effect so
+    the 0x74 answer can be narrated purely
+    (:func:`tankpit_bot.sim.narrate.resources.narrate_equipment_toggle`).
+
+    Args:
+        world: Simulated world (mutated when the slot is in range).
+        tank_id: The toggling tank.
+        slot: Equipment slot, 1-5.
+    """
+    tank = world["tanks"][tank_id]
+    if 1 <= slot <= len(tank["enabled"]):
+        tank["enabled"][slot - 1] = not tank["enabled"][slot - 1]
+
+
 __all__ = [
     "MERCY_BUNDLE",
     "MERCY_BUNDLE_ROLLS",
@@ -143,4 +165,5 @@ __all__ = [
     "EquipmentGrantDict",
     "kill_grants_mercy",
     "resolve_equipment_pickup",
+    "toggle_equipment_slot",
 ]
