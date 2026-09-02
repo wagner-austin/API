@@ -9,10 +9,15 @@ measurement ([[policy-determinism]]).
 
 Usage::
 
-    python -m scripts.pairs <batch_a> <batch_b>
+    python -m scripts.pairs <batch_a>[:<label>] <batch_b>[:<label>]
 
 Both batches must live under ``runs/sweeps/`` and share seeds; seeds only
 one side played are reported and excluded rather than silently dropped.
+The optional ``:label`` narrows a side to one arm's scorecards, which is
+how an INTERLEAVED batch -- both arms on the same seeds in one directory,
+the close48 shape -- compares against itself::
+
+    python -m scripts.pairs close48:control close48:close
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Sequence
+from math import comb
 from pathlib import Path
 from typing import TypedDict
 
@@ -55,17 +61,35 @@ class Pair(TypedDict):
     right: str
 
 
-def read_grades(batch: Path) -> dict[int, str]:
-    """Read one batch's per-seed grades off its scorecards.
+def parse_selector(text: str) -> tuple[str, str | None]:
+    """Split one side's selector into its batch and optional label.
+
+    Args:
+        text: ``"close48"`` or ``"close48:control"``.
+
+    Returns:
+        The batch name, and the label or ``None`` when the side takes every
+        scorecard in the directory.
+    """
+    batch, colon, label = text.partition(":")
+    return batch, label if colon == ":" else None
+
+
+def read_grades(batch: Path, label: str | None) -> dict[int, str]:
+    """Read one side's per-seed grades off its scorecards.
 
     Args:
         batch: The batch directory under ``runs/sweeps``.
+        label: The one arm to read, or ``None`` for every scorecard. The
+            narrowing is what lets two arms interleaved in one directory be
+            compared: their filenames differ only in this prefix.
 
     Returns:
         Grade by seed, for every scorecard carrying a verdict.
     """
+    pattern = "*-s*.txt" if label is None else f"{label}-s*.txt"
     grades: dict[int, str] = {}
-    for card in sorted(batch.glob("*-s*.txt")):
+    for card in sorted(batch.glob(pattern)):
         seed_match = _SEED.search(card.name)
         verdict_match = _VERDICT.search(card.read_text(encoding="utf-8"))
         if seed_match is None or verdict_match is None:
@@ -105,15 +129,33 @@ def format_pairs(
     Returns:
         The lines, without newline terminators.
     """
-    flips_to_b = [p for p in pairs if p["left"] == "L" and p["right"] == "W"]
-    flips_to_a = [p for p in pairs if p["left"] == "W" and p["right"] == "L"]
+    # Generalised from the original L->W / W->L counting: at a rung where
+    # nothing loses -- Hard reads only W and S -- the L-only tally reported
+    # zero flips while wins moved, which under-reported the one thing the
+    # comparison exists to measure. A flip is now any move across the W
+    # boundary, in either direction.
+    flips_to_b = [p for p in pairs if p["left"] != "W" and p["right"] == "W"]
+    flips_to_a = [p for p in pairs if p["left"] == "W" and p["right"] != "W"]
     moved = [p for p in pairs if p["left"] != p["right"]]
+    discordant = len(flips_to_b) + len(flips_to_a)
+    if discordant == 0:
+        p_line = "p      1.000 (0 discordant pairs)"
+    else:
+        heavier = max(len(flips_to_b), len(flips_to_a))
+        tail: int = sum(comb(discordant, i) for i in range(heavier, discordant + 1))
+        # A shift, not `2**discordant`: int ** int types as Any in the stubs
+        # (the sign of the exponent decides int-vs-float), and this module
+        # forbids Any-typed expressions.
+        ratio: float = (2 * tail) / float(1 << discordant)
+        two_sided: float = ratio if ratio < 1.0 else 1.0
+        p_line = f"p      {two_sided:.3f} two-sided binomial on {discordant} discordant"
     lines = [
         f"paired {len(pairs)} seed(s): {name_a} (left) vs {name_b} (right)",
         f"wins   {sum(1 for p in pairs if p['left'] == 'W')}"
         f" -> {sum(1 for p in pairs if p['right'] == 'W')}",
-        f"flips  {len(flips_to_b)} L->W against {len(flips_to_a)} W->L"
+        f"flips  {len(flips_to_b)} to-W against {len(flips_to_a)} from-W"
         f" (net {len(flips_to_b) - len(flips_to_a):+d} for {name_b})",
+        p_line,
     ]
     if only_a or only_b:
         lines.append(f"unpaired  {only_a} only in {name_a}, {only_b} only in {name_b}")
@@ -136,10 +178,12 @@ def main(argv: Sequence[str] | None = None, root: Path = RUNS_ROOT) -> int:
     """
     args = list(argv) if argv is not None else sys.argv[1:]
     if len(args) != 2:
-        sys.stdout.write("usage: pairs <batch_a> <batch_b>\n")
+        sys.stdout.write("usage: pairs <batch_a>[:<label>] <batch_b>[:<label>]\n")
         return EXIT_BAD_USAGE
-    grades_a = read_grades(root / args[0])
-    grades_b = read_grades(root / args[1])
+    batch_a, label_a = parse_selector(args[0])
+    batch_b, label_b = parse_selector(args[1])
+    grades_a = read_grades(root / batch_a, label_a)
+    grades_b = read_grades(root / batch_b, label_b)
     if not grades_a or not grades_b:
         sys.stdout.write(
             f"no scorecards: {args[0]} has {len(grades_a)}, {args[1]} has {len(grades_b)}\n"
