@@ -27,7 +27,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH
 from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.fleet import FLEET_HOST
+from tankpit_bot.service.fleet import FLEET_HOST_DEFAULT
 from tankpit_bot.service.fleet_config import resolve_fleet_port
 from tankpit_bot.service.fleet_wire import FleetSnapshotDict, decode_fleet_snapshot
 
@@ -65,14 +65,14 @@ def _request(port: int, method: str, path: str) -> str | None:
             misconfiguration to surface, never something to retry
             around.
     """
-    conn = HTTPConnection(FLEET_HOST, port, timeout=REQUEST_TIMEOUT_S)
+    conn = HTTPConnection(FLEET_HOST_DEFAULT, port, timeout=REQUEST_TIMEOUT_S)
     try:
         conn.request(method, path)
         response = conn.getresponse()
         body = response.read().decode("utf-8", errors="replace")
         if response.status >= 300:
             raise RuntimeError(
-                f"fleet manager on {FLEET_HOST}:{port} answered "
+                f"fleet manager on {FLEET_HOST_DEFAULT}:{port} answered "
                 f"{method} {path} with {response.status}: {body.strip()}"
             )
         return body
@@ -139,7 +139,7 @@ def up(*, startup_timeout_s: float = STARTUP_TIMEOUT_S) -> int:
     if running is not None:
         log.info(
             "Fleet already up on http://%s:%d (boot %s, %d bot(s) running)",
-            FLEET_HOST,
+            FLEET_HOST_DEFAULT,
             port,
             running["boot"],
             len(_live_names(running)),
@@ -157,7 +157,7 @@ def up(*, startup_timeout_s: float = STARTUP_TIMEOUT_S) -> int:
             adopted = _live_names(started)
             log.info(
                 "Fleet up on http://%s:%d (boot %s)%s",
-                FLEET_HOST,
+                FLEET_HOST_DEFAULT,
                 port,
                 started["boot"],
                 f"; adopted {len(adopted)} running bot(s): {', '.join(adopted)}" if adopted else "",
@@ -165,7 +165,7 @@ def up(*, startup_timeout_s: float = STARTUP_TIMEOUT_S) -> int:
             return 0
     log.error(
         "Fleet manager did not answer on %s:%d within %.0f s; %s holds its output",
-        FLEET_HOST,
+        FLEET_HOST_DEFAULT,
         port,
         startup_timeout_s,
         FLEET_LOG_PATH,
@@ -184,7 +184,7 @@ def down() -> int:
     port = resolve_fleet_port()
     snapshot = fleet_snapshot(port)
     if snapshot is None:
-        log.info("No fleet manager listening on %s:%d; nothing to stop.", FLEET_HOST, port)
+        log.info("No fleet manager listening on %s:%d; nothing to stop.", FLEET_HOST_DEFAULT, port)
         return 0
 
     live = _live_names(snapshot)

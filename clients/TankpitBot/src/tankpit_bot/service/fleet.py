@@ -47,7 +47,28 @@ log = get_logger(__name__)
 
 #: Loopback only: the fleet spawns processes and hands out control of
 #: live accounts, so it is never exposed off the machine.
-FLEET_HOST = "127.0.0.1"
+FLEET_HOST_DEFAULT = "127.0.0.1"
+
+
+def resolve_fleet_host() -> str:
+    """Resolve the fleet manager's bind address from the environment.
+
+    ``TANKPIT_FLEET_HOST`` exists for the fleet CONTAINER, where the
+    process must bind ``0.0.0.0`` to be reachable through the
+    published port — the loopback-only security property moves to the
+    docker port mapping (``127.0.0.1:27300:27300``), which is the
+    container boundary's equivalent of the default here. On a host
+    run, leave it unset.
+
+    Returns:
+        ``TANKPIT_FLEET_HOST`` when set, else
+        :data:`FLEET_HOST_DEFAULT`.
+    """
+    raw = core_hooks.get_env("TANKPIT_FLEET_HOST")
+    if raw is None or raw == "":
+        return FLEET_HOST_DEFAULT
+    return raw
+
 
 #: How often the drain monitor re-checks whether the last bot is gone.
 FLEET_DRAIN_POLL_SECONDS = 1.0
@@ -135,10 +156,11 @@ async def _async_main() -> None:
     manager = FleetManager()
     manager.adopt()
     stop_event = asyncio.Event()
-    site = await service_hooks.build_site(make_fleet_app(manager), FLEET_HOST, port)
+    host = resolve_fleet_host()
+    site = await service_hooks.build_site(make_fleet_app(manager), host, port)
     drain_monitor = asyncio.create_task(exit_when_drained(manager, stop_event))
     core_hooks.install_signal_handlers(drain_on_interrupt(manager))
-    log.info("tankpit-fleet listening on %s:%d", FLEET_HOST, port)
+    log.info("tankpit-fleet listening on %s:%d", host, port)
     try:
         await run_until_stopped(site, stop_event, name="Fleet manager")
     finally:
@@ -164,9 +186,10 @@ def main() -> None:
 
 __all__ = [
     "FLEET_DRAIN_POLL_SECONDS",
-    "FLEET_HOST",
+    "FLEET_HOST_DEFAULT",
     "drain_on_interrupt",
     "exit_when_drained",
     "log",
     "main",
+    "resolve_fleet_host",
 ]

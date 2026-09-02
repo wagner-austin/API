@@ -17,8 +17,10 @@ from platform_core.json_utils import (
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.accounts import (
+    _CHECKOUT_ACCOUNTS_PATH,
     Account,
     AccountNotFoundError,
+    accounts_file_path,
     decode_account,
     decode_account_list,
     encode_account,
@@ -291,6 +293,44 @@ def _swap_env(
         return env_vars.get(key)
 
     return fake_get_env, original
+
+
+class TestAccountsFilePath:
+    """Tests for the pool location's env override."""
+
+    def test_unset_resolves_the_checkout_root(self) -> None:
+        """Without the override the path is the source checkout's root."""
+        fake, original = _swap_env({})
+        _test_hooks.get_env = fake
+        try:
+            resolved = accounts_file_path()
+        finally:
+            _test_hooks.get_env = original
+
+        assert resolved.name == "accounts.json"
+        assert resolved == _CHECKOUT_ACCOUNTS_PATH
+
+    def test_empty_override_resolves_the_checkout_root(self) -> None:
+        """An empty string is unset, not a path."""
+        fake, original = _swap_env({"TANKPIT_ACCOUNTS_FILE": ""})
+        _test_hooks.get_env = fake
+        try:
+            resolved = accounts_file_path()
+        finally:
+            _test_hooks.get_env = original
+
+        assert resolved == _CHECKOUT_ACCOUNTS_PATH
+
+    def test_override_names_the_pool_exactly(self) -> None:
+        """The container's mounted pool path wins verbatim."""
+        fake, original = _swap_env({"TANKPIT_ACCOUNTS_FILE": "/app/accounts.json"})
+        _test_hooks.get_env = fake
+        try:
+            resolved = accounts_file_path()
+        finally:
+            _test_hooks.get_env = original
+
+        assert resolved == Path("/app/accounts.json")
 
 
 class TestResolveAccount:

@@ -21,11 +21,12 @@ from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol, _real_serve_fleet
 from tankpit_bot.service.fleet import (
-    FLEET_HOST,
+    FLEET_HOST_DEFAULT,
     _async_main,
     drain_on_interrupt,
     exit_when_drained,
     main,
+    resolve_fleet_host,
 )
 from tankpit_bot.service.fleet_manager import FleetManager
 from tests.conftest import FakeEnv
@@ -255,7 +256,7 @@ class TestAsyncMain:
 
         assert len(served) == 1
         app, host, port = served[0]
-        assert (host, port) == (FLEET_HOST, 27311)
+        assert (host, port) == (FLEET_HOST_DEFAULT, 27311)
         assert len(handlers) == 1
         canonical = {resource.canonical for resource in app.router.resources()}
         assert canonical == {
@@ -357,3 +358,16 @@ class TestMain:
         service_hooks.serve_fleet = interrupted
 
         main()
+
+
+def test_fleet_host_resolves_from_the_environment(fake_env: FakeEnv) -> None:
+    """The container's 0.0.0.0 bind is an explicit env choice.
+
+    Unset and empty both keep the loopback default — off the
+    container, nothing should ever widen the bind by accident.
+    """
+    assert resolve_fleet_host() == FLEET_HOST_DEFAULT
+    fake_env.set("TANKPIT_FLEET_HOST", "")
+    assert resolve_fleet_host() == FLEET_HOST_DEFAULT
+    fake_env.set("TANKPIT_FLEET_HOST", "0.0.0.0")
+    assert resolve_fleet_host() == "0.0.0.0"

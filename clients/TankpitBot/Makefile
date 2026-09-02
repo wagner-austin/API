@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service fleet up down image up-docker down-docker analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -349,12 +349,37 @@ fleet-dev: install
 up:
 	@Write-Host ""
 	@Write-Host "==> up (fleet manager, newest release, detached)" -ForegroundColor Cyan
-	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Starting from $$($$rel.Name); 'make down' to stop it." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-up; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Starting from $$($$rel.Name); 'make down' to stop it." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-up; $$code = $$LASTEXITCODE; Pop-Location; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
 
 down:
 	@Write-Host ""
 	@Write-Host "==> down (drain every bot, then stop the manager)" -ForegroundColor Cyan
 	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[down] no release found -- nothing was ever started from one" -ForegroundColor Red; exit 1 }; Write-Host "  Bots quit to the lobby before the manager exits; this waits for them." -ForegroundColor DarkGray; Push-Location (Join-Path $$rel.FullName "clients/TankpitBot"); poetry run tankpit-fleet-down; $$code = $$LASTEXITCODE; Pop-Location; exit $$code
+
+# Containerized fleet (operator order 2026-09-02, board task 2dd367b6).
+# ``image`` builds FROM THE NEWEST RELEASE SNAPSHOT so the tag carries
+# the ladder's sha discipline (tankpit-fleet:v0.1.0-<sha>); the release
+# tree has the same monorepo layout the Dockerfile expects, so the
+# snapshot IS the build context. ``up-docker`` resolves the same newest
+# release and refuses to build implicitly (--no-build), so a hot-tree
+# image can never masquerade as a release. ``down-docker`` is a DRAIN:
+# docker stop's SIGTERM enters drain_on_interrupt and the container
+# exits after the last bot quits to the lobby (stop_grace_period 10m).
+image:
+	@Write-Host ""
+	@Write-Host "==> image (fleet container from the newest release snapshot)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[image] no release found -- run 'make release' first" -ForegroundColor Red; exit 1 }; Write-Host "  Building tankpit-fleet:$$($$rel.Name) from $$($$rel.FullName)" -ForegroundColor DarkGray; docker build -f (Join-Path $$rel.FullName "clients/TankpitBot/Dockerfile") -t "tankpit-fleet:$$($$rel.Name)" $$rel.FullName; exit $$LASTEXITCODE
+
+up-docker:
+	@Write-Host ""
+	@Write-Host "==> up-docker (fleet container, newest release image)" -ForegroundColor Cyan
+	$$rel = Get-ChildItem "C:/Users/Test/PROJECTS/tankpit-releases" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($$null -eq $$rel) { Write-Host "[up-docker] no release found -- run 'make release' then 'make image' first" -ForegroundColor Red; exit 1 }; $$env:FLEET_IMAGE = "tankpit-fleet:$$($$rel.Name)"; Write-Host "  Image $$env:FLEET_IMAGE; 'make down-docker' to drain and stop." -ForegroundColor DarkGray; docker compose up -d --no-build fleet; $$code = $$LASTEXITCODE; if ($$code -eq 0) { Write-Host "  Fleet page: http://127.0.0.1:27300/" -ForegroundColor Green }; exit $$code
+
+down-docker:
+	@Write-Host ""
+	@Write-Host "==> down-docker (drain every bot, then stop the container)" -ForegroundColor Cyan
+	@Write-Host "  Bots quit to the lobby before the container exits; this waits for them (up to 10m)." -ForegroundColor DarkGray
+	docker compose stop fleet
 
 run: install
 	@Write-Host ""

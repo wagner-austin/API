@@ -28,8 +28,29 @@ from tankpit_bot import _test_hooks
 
 log = get_logger(__name__)
 
-# accounts.json lives next to .env in the project root
-_ACCOUNTS_PATH = Path(__file__).resolve().parent.parent.parent.parent / "accounts.json"
+# accounts.json lives next to .env in the project root — of a SOURCE
+# CHECKOUT. Four parents up from an installed module is site-packages,
+# which is why the container overrides by env instead.
+_CHECKOUT_ACCOUNTS_PATH = Path(__file__).resolve().parent.parent.parent.parent / "accounts.json"
+
+
+def accounts_file_path() -> Path:
+    """Resolve where the account pool lives.
+
+    ``TANKPIT_ACCOUNTS_FILE`` names the file explicitly — the fleet
+    container mounts the pool read-only at a fixed path, because the
+    checkout-relative default resolves into site-packages once the
+    package is pip-installed (the limitation the single-bot image
+    documented until this override existed). Unset, the source
+    checkout's project root is the location it always was.
+
+    Returns:
+        The account pool path.
+    """
+    override = _test_hooks.get_env("TANKPIT_ACCOUNTS_FILE")
+    if override is None or override == "":
+        return _CHECKOUT_ACCOUNTS_PATH
+    return Path(override)
 
 
 class AccountNotFoundError(Exception):
@@ -201,7 +222,7 @@ def resolve_account(path: Path | None = None) -> Account | None:
         return Account(username=env_user, password=env_pass)
 
     # 2. Load accounts.json
-    accounts_path = path or _ACCOUNTS_PATH
+    accounts_path = path or accounts_file_path()
     selector = _test_hooks.get_env("TANKPIT_ACCOUNT")
 
     if not _test_hooks.path_exists(accounts_path):
@@ -225,6 +246,7 @@ def resolve_account(path: Path | None = None) -> Account | None:
 __all__ = [
     "Account",
     "AccountNotFoundError",
+    "accounts_file_path",
     "decode_account",
     "decode_account_list",
     "encode_account",

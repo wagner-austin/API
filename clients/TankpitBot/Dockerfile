@@ -20,15 +20,18 @@
 # the first is `TANKPIT_USERNAME` + `TANKPIT_PASSWORD`, so a
 # single-account run needs no `accounts.json` at all.
 #
-# That is not merely tidier — the file path does not survive
-# installation. `_ACCOUNTS_PATH` is computed as four parents up from the
-# module, which is the package root in a source checkout and
-# `/usr/local/lib/python3.11/` once pip has installed the wheel into
-# site-packages. So resolution steps 2 and 3 (TANKPIT_ACCOUNT selection,
-# and first-account default) DO NOT WORK in this image, and multi-account
-# fleet mode is out of scope for it until that path is env-overridable.
-# Stated rather than papered over with a mount at the computed path,
-# which would work by coincidence and break on the next Python minor.
+# That is not merely tidier — the checkout-relative accounts path does
+# not survive installation (four parents up from the installed module is
+# site-packages). FLEET MODE therefore names the pool explicitly:
+# `TANKPIT_ACCOUNTS_FILE` points at a read-only mount (see the `fleet`
+# service in docker-compose.yml), which is the env-overridable path this
+# header once recorded as the missing piece. The pool is never baked;
+# single-account runs still need no file at all.
+#
+# The same image serves both shapes: CMD is the single bounded bot;
+# the fleet service overrides the command to `tankpit-fleet`, whose
+# spawner forks `sys.executable -c` children — no poetry, no shell,
+# so it works inside the installed image unchanged.
 
 ARG PYTHON_VERSION=3.11.9-slim-bookworm
 ARG APP_DIR=clients/TankpitBot
@@ -123,9 +126,16 @@ VOLUME ["/app/runs"]
 
 USER app
 
+# The fleet manager's control page, when the fleet service runs this
+# image with `command: tankpit-fleet`. Documentation only — publishing
+# is compose's decision.
+EXPOSE 27300
+
 # A bounded session, not a daemon. The bot is driven by
 # TANKPIT_BOT_SESSION_SECONDS and exits; `docker run` inherits that
-# lifetime rather than needing a stop signal.
+# lifetime rather than needing a stop signal. (The fleet override runs
+# until drained instead; its children ignore this default because the
+# manager states each child's environment explicitly.)
 ENV TANKPIT_BOT_SESSION_SECONDS=30
 
 CMD ["tankpit-bot"]

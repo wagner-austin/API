@@ -1,16 +1,66 @@
-# Run a bounded TankpitBot session in a container.
+# Run TankpitBot in containers.
 #
+# Single bounded session:
 #     cp .env.example .env      # then set TANKPIT_USERNAME / TANKPIT_PASSWORD
 #     docker compose run --rm bot
 #
+# The FLEET (manager + N bot processes in ONE container — the spawner
+# forks `sys.executable -c` children, so it works unchanged inside):
+#     make image                # build from the newest release snapshot
+#     make up-docker            # start; fleet page http://127.0.0.1:27300/
+#     make down-docker          # graceful drain (docker stop -> SIGTERM ->
+#                               # drain_on_interrupt; every bot quits to
+#                               # the lobby before the manager exits)
+#
 # The capture lands in ./runs on the host, because the event log is what
-# the session exists to produce.
+# the session exists to produce — and for the fleet the shared ./runs
+# mount IS the coordination fabric: knowledge.json exchange, claim
+# files, stop sentinels, spawn records for adoption all ride it, so a
+# replacement fleet container adopts exactly like a replacement host
+# manager does.
 #
 # Context is the REPO ROOT (`../..`), not this directory: pyproject.toml
 # takes monorepo-guards and platform-core as `../../libs/` path
-# dependencies, which a context rooted here cannot reach.
+# dependencies, which a context rooted here cannot reach. `make image`
+# builds with the newest RELEASE SNAPSHOT as the context instead, so
+# the image tag carries the same sha discipline as the `make fleet`
+# ladder; FLEET_IMAGE selects that tag here.
 
 services:
+  fleet:
+    build:
+      context: ../..
+      dockerfile: clients/TankpitBot/Dockerfile
+    image: ${FLEET_IMAGE:-tankpit-fleet:local}
+    command: tankpit-fleet
+    environment:
+      TANKPIT_HEADLESS: "true"
+      # Bind wide INSIDE the container so the published port reaches
+      # the process; the loopback-only security property moves to the
+      # port mapping below, which is the container boundary's
+      # equivalent of the host default.
+      TANKPIT_FLEET_HOST: "0.0.0.0"
+      # The pool rides a read-only mount, never the image: the
+      # checkout-relative default resolves into site-packages once the
+      # package is pip-installed, so the path is named explicitly.
+      TANKPIT_ACCOUNTS_FILE: /app/accounts.json
+    ports:
+      - "127.0.0.1:27300:27300"
+    volumes:
+      - ./runs:/app/runs
+      - ./accounts.json:/app/accounts.json:ro
+    # N Chromiums, not one: the single-bot 1gb floor scaled up.
+    shm_size: "2gb"
+    # docker stop must be a DRAIN, not a kill: SIGTERM starts the
+    # teardown-to-lobby for every bot and the manager exits after the
+    # last one lands. Killing a tank mid-game is how rank gets lost,
+    # so the grace period is sized to the slowest teardown observed,
+    # with margin — interrupting the wait is safe, the manager owns
+    # the drain.
+    stop_grace_period: 10m
+    restart: "no"
+
+
   bot:
     build:
       context: ../..

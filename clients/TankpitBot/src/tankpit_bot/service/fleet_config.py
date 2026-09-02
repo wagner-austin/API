@@ -19,7 +19,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
+from tankpit_bot.browser.accounts import accounts_file_path, load_accounts
 from tankpit_bot.fleetshare.types import ENGAGEMENT_DOCTRINES, FLEET_ROLES, FleetRole
 from tankpit_bot.runtime_artifacts import TANK_REGISTRY_PATH
 from tankpit_bot.service.fleet_error import FleetError
@@ -177,9 +177,10 @@ def configured_accounts() -> list[str]:
         Usernames in file order (the first is the default), empty
         when no accounts file exists.
     """
-    if not top_hooks.path_exists(_ACCOUNTS_PATH):
+    pool = accounts_file_path()
+    if not top_hooks.path_exists(pool):
         return []
-    return [account["username"] for account in load_accounts(_ACCOUNTS_PATH)]
+    return [account["username"] for account in load_accounts(pool)]
 
 
 def lobby_rooms() -> list[str]:
