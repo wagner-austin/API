@@ -55,7 +55,12 @@ def _consented_human_world() -> tuple[WorldService, WorldStateDict, SelfStateDic
     return ws, world, self_state
 
 
-def _acquire(ws: WorldService, world: WorldStateDict, self_state: SelfStateDict, doctrine: EngagementDoctrine) -> int:
+def _acquire(
+    ws: WorldService,
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    doctrine: EngagementDoctrine,
+) -> int:
     """Run acquisition under the doctrine; -1 when nothing acquired."""
     result = find_acquisition_target(
         ws,

@@ -103,6 +103,7 @@ class TestAIState:
             human_target_min_rank=config["human_target_min_rank"],
             human_target_max_rank=config["human_target_max_rank"],
             role=config["role"],
+            doctrine=config["doctrine"],
         )
         state = make_initial_ai_state(custom)
         assert state["config"]["fuel_low_threshold"] == 400

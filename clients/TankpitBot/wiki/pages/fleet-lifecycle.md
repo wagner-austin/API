@@ -79,6 +79,16 @@ real corruption rather than a torn write. Adoption **raises** on one
 instead of skipping it: starting a manager on top of a damaged record
 would mean silently forgetting a tank that may still be playing.[^5]
 
+**Liveness is asked directly, never inferred from the exit code.** The
+registry's process surface splits `is_running()` from `exit_code()`,
+and `alive` is the authoritative one. Deriving one from the other is
+sound only while they always agree, and for an adopted process they do
+not: the OS can be certain a process ended while being unable to say
+what code it ended with. The first live drain proved the cost --
+a bot that had already landed read as running, and the manager waited
+on it forever ([[fleet-live-reads]] records the same lesson about
+measurement).[^9]
+
 ## Boot identity: the page re-syncs itself
 
 `GET /bots` carries the manager's `boot` id.[^7] A control page that
@@ -124,3 +134,8 @@ child console to a file.[^8]
       (`service/fleet_wire.py`) and compared in the page's poll loop
       (`service/fleet_page.py`).
 [^8]: `FLEET_LOG_PATH` (`src/tankpit_bot/runtime_artifacts.py`).
+[^9]: `SpawnedProcessProtocol`, `_AdoptedProcess` and `_PopenProcess`
+      in `service/_test_hooks/processes.py`; the property is pinned by
+      `test_liveness_never_depends_on_recovering_an_exit_code`
+      (`tests/service/test_fleet_process_hooks.py`). Diagnosed live
+      2026-09-01, see `wiki/log.md`.

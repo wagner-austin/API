@@ -10,9 +10,11 @@ from tankpit_bot.fleetshare.codecs import (
     decode_fleet_enemy_sighting,
     decode_fleet_report,
     encode_fleet_report,
+    require_engagement_doctrine,
     require_fleet_role,
 )
 from tankpit_bot.fleetshare.types import (
+    ENGAGEMENT_DOCTRINES,
     FleetContainerRemovalDict,
     FleetContainerSightingDict,
     FleetEnemySightingDict,
@@ -122,6 +124,23 @@ def test_require_fleet_role_rejects_unknown() -> None:
     """An unknown role raises with the valid set named."""
     with pytest.raises(JSONTypeError, match="role must be one of"):
         require_fleet_role({"role": "medic"}, "role")
+
+
+def test_require_engagement_doctrine_accepts_every_known_doctrine() -> None:
+    """Each doctrine in the vocabulary validates as itself."""
+    for doctrine in ENGAGEMENT_DOCTRINES:
+        assert require_engagement_doctrine({"doctrine": doctrine}, "doctrine") == doctrine
+
+
+def test_require_engagement_doctrine_rejects_unknown() -> None:
+    """A doctrine outside the vocabulary raises rather than defaulting.
+
+    A config that silently fell back to skirmish would have a bot
+    fighting under a doctrine nobody chose, which is the whole reason
+    the selector is validated instead of passed through.
+    """
+    with pytest.raises(JSONTypeError, match="doctrine must be one of"):
+        require_engagement_doctrine({"doctrine": "banzai"}, "doctrine")
 
 
 def test_decode_scanned_tile_rejects_non_object() -> None:

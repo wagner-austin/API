@@ -5234,3 +5234,17 @@ Operator order (verbatim: "will we have pluggable strategies that we can swap in
 The muster's signal: `war_ready` rides the fleetshare report (computed by the tick from `wartime_inventory_ready` — the 80/50 arithmetic extracted into `tactics.py` so the gate and the report share one law — AND a war-joining doctrine), merged into `ws.fleet_war_ready_count` wholesale per exchange. Per-group switching is the fleet page's dropdown + the control-verb channel (division of labor posted; the page session owns both). `test_merge.py` crossed the ceiling and split (`test_merge_fleet_extras.py`).
 
 Note: `make lint` currently reds on the OTHER session's untracked `diagnostics/feature_rows.py` (a comment containing the banned phrase) — theirs to reword; every file of this ship is guard/mypy/ruff clean.
+
+## [2026-09-01] corrected | The first live drain wedged: an adopted bot's liveness was a guess about its exit code
+
+The lifecycle work above shipped green -- 6,562 tests, 100% coverage -- and then failed the first time it met a real tank. Worth recording precisely, because the suite could not have caught it and the reasoning that produced it looked sound.
+
+**What happened.** `make up`, spawn Artax into Practice, kill the manager, `make up` again (it adopted the bot correctly, original `started_ms` and all), then `make down`. The bot tore down properly: its process was gone and its stop sentinel cleaned up. The manager still reported `alive: true` for it and waited forever, taking `make down` with it. The indefinite drain, chosen deliberately, turned a wrong reading into a permanent hang.
+
+**The cause was the model, not the library.** `SpawnedProcessProtocol` exposed a single `poll()` and the registry derived *alive* from *no exit code yet*. That derivation holds only while the two answers always agree, and for an ADOPTED process they do not: the OS can be certain a process has ended while being unable to say what code it ended with. One unrecoverable exit code therefore reads as a running tank, forever.
+
+Liveness and exit code are now asked separately -- `is_running()` and `exit_code()` -- with `alive` authoritative and `None` from `exit_code()` meaning "no code to give", never "still running". `_AdoptedProcess` answers liveness through psutil's `wait(timeout=0)`, whose contract IS "has it ended" and which expresses "not yet" as an exception; `is_running()` was the thing that lied. Freshly spawned children go through a `_PopenProcess` adapter so the registry never branches on which kind of process it holds.
+
+**Why the probe missed it.** The measurement that justified `is_running()` tested a child of the probe process, reaped through its own `Popen` handle -- the one shape in which the two questions cannot disagree. A probe that only exercises the easy case is a probe that confirms what you already believed. The regression test now pins the property itself: after an adopted process ends, liveness reads false whether or not a code can be recovered.
+
+**Re-verified live on the fix.** up -> spawn (pid 23220) -> kill the manager (bot survives, the exact orphan) -> up adopts it with its original start time -> `make down` drains it in 40 s, bot and manager both gone, no orphans.

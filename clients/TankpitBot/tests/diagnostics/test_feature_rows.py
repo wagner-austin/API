@@ -115,6 +115,49 @@ def test_a_tick_becomes_one_row_carrying_its_action_and_its_counts(tmp_path: Pat
     }
 
 
+def test_every_counted_diagnostic_kind_folds_into_its_own_column(
+    tmp_path: Path,
+) -> None:
+    """Each counted kind lands in its own column, none in another's.
+
+    The fold spells the six kinds out as a branch rather than indexing
+    the row by a variable, so nothing but a test per kind proves the
+    branch goes where its name says.
+    """
+    source = _write_session(
+        tmp_path / "s.events.jsonl",
+        [
+            _event("2026-09-01T00:00:01", diagnostic_kind="hop_declined", tick_n=3),
+            _event("2026-09-01T00:00:01", diagnostic_kind="radar_dispatch", tick_n=3),
+            _event(
+                "2026-09-01T00:00:01",
+                diagnostic_kind="container_pickup_dispatched",
+                tick_n=3,
+            ),
+            _event("2026-09-01T00:00:01", diagnostic_kind="plan_released", tick_n=3),
+            _event("2026-09-01T00:00:01", diagnostic_kind="command_error", tick_n=3),
+            _event(
+                "2026-09-01T00:00:01",
+                diagnostic_kind="fleet_knowledge_merged",
+                tick_n=3,
+            ),
+            # A kind the table does not count must leave every column
+            # alone rather than falling into the last branch.
+            _event("2026-09-01T00:00:01", diagnostic_kind="liveness_stall", tick_n=3),
+        ],
+    )
+
+    rows = build_feature_rows(source)
+
+    assert len(rows) == 1
+    assert rows[0]["hop_declined"] == 1
+    assert rows[0]["radar_dispatch"] == 1
+    assert rows[0]["container_pickup_dispatched"] == 1
+    assert rows[0]["plan_released"] == 1
+    assert rows[0]["command_error"] == 1
+    assert rows[0]["fleet_knowledge_merged"] == 1
+
+
 def test_rows_are_tick_ordered_regardless_of_file_order(tmp_path: Path) -> None:
     """Ticks sort ascending even when the artifact interleaves them."""
     source = _write_session(
