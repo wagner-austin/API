@@ -22,7 +22,13 @@ from tankpit_bot.fleetshare.role import resolve_engagement_doctrine, resolve_fle
 DEFAULT_TARGET_URL = "https://tankpit.com/"
 """Canonical tankpit URL used when ``TANKPIT_URL`` is unset or empty."""
 
-_PREFER_ACCOUNT_TRUE_VALUES: tuple[str, ...] = ("true", "1", "yes")
+_TRUTHY_VALUES: tuple[str, ...] = ("true", "1", "yes")
+"""Accepted spellings of "yes" for every boolean env var read here.
+
+Shared rather than duplicated per setting: two copies drift, and an
+operator who learns that ``TANKPIT_PREFER_ACCOUNT=yes`` works is
+entitled to have ``TANKPIT_HEADLESS=yes`` work the same way.
+"""
 
 
 def resolve_target_url() -> str:
@@ -49,7 +55,34 @@ def resolve_prefer_account() -> bool:
     raw = _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT")
     if raw is None:
         return False
-    return raw.lower() in _PREFER_ACCOUNT_TRUE_VALUES
+    return raw.lower() in _TRUTHY_VALUES
+
+
+def resolve_headless() -> bool:
+    """Return True when ``TANKPIT_HEADLESS`` asks for a windowless browser.
+
+    **Defaults to False, deliberately.** On a desktop the operator runs
+    the fleet headed in order to watch the tanks play, and that is the
+    point of running it there; a default of headless would take the
+    window away from the machine whose whole job is showing it.
+
+    A container is the case that needs the other answer. There is no X
+    server in one, so a headed launch dies immediately with "Missing X
+    server or $DISPLAY" and the child exits 1 about five seconds after
+    spawn. ``docker-compose.yml`` has set ``TANKPIT_HEADLESS: "true"``
+    all along; until this resolver existed nothing on the bot path read
+    it, so the flag looked like the answer while being inert, and every
+    containerized fleet bot died on launch.
+
+    Returns:
+        True when the env var value (case-insensitive) matches any of
+        ``"true"``, ``"1"``, or ``"yes"``; False otherwise, including
+        when the env var is unset.
+    """
+    raw = _test_hooks.get_env("TANKPIT_HEADLESS")
+    if raw is None:
+        return False
+    return raw.lower() in _TRUTHY_VALUES
 
 
 def resolve_human_rank_window() -> tuple[int, int]:
@@ -126,6 +159,7 @@ def resolve_priority_target() -> str:
 __all__ = [
     "DEFAULT_TARGET_URL",
     "env_ai_config",
+    "resolve_headless",
     "resolve_human_rank_window",
     "resolve_prefer_account",
     "resolve_priority_target",

@@ -110,6 +110,52 @@ def _make_recording_bot_factory(
     return builder
 
 
+class _CapturingBotFactoryBuilder:
+    """Builder that records the launch arguments it was handed.
+
+    :func:`_make_recording_bot_factory` deliberately discards them, which
+    is right for tests about wiring the buses. This one keeps them, so a
+    test can assert what the service actually decided to launch with --
+    the question no test asked while ``headless`` was a hardcoded
+    ``False`` and every containerized bot died on browser launch.
+    """
+
+    def __init__(self, recording_bot: _RecordingBot) -> None:
+        """Bind the builder to the bot its factories return.
+
+        Args:
+            recording_bot: Bot the produced factory hands back per call.
+        """
+        self._recording_bot = recording_bot
+        self.calls: list[tuple[str, bool, bool]] = []
+
+    def __call__(
+        self, target_url: str, *, headless: bool, prefer_account: bool
+    ) -> BotFactoryProtocol:
+        """Record one builder invocation and return a factory.
+
+        Args:
+            target_url: URL the service resolved.
+            headless: Whether the service asked for a windowless browser.
+            prefer_account: Whether the service asked for account login.
+
+        Returns:
+            A factory yielding the bound recording bot.
+        """
+        self.calls.append((target_url, headless, prefer_account))
+
+        def factory(
+            *,
+            mode_bridge: ModeBridgeProtocol,
+            status_bus: StatusBusProtocol,
+            frame_bus: FrameBusProtocol,
+        ) -> RunnableBotProtocol:
+            _ = (mode_bridge, status_bus, frame_bus)
+            return self._recording_bot
+
+        return factory
+
+
 class _IdleProbeRunner:
     """``is_running`` stub whose answer the test flips at will."""
 

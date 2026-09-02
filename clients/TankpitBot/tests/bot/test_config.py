@@ -13,6 +13,7 @@ import pytest
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.config import (
     DEFAULT_TARGET_URL,
+    resolve_headless,
     resolve_prefer_account,
     resolve_target_url,
     resolve_weapon_resume_slack,
@@ -155,6 +156,71 @@ class TestResolvePreferAccount:
         """Anything else stays on the guest login path."""
         _test_hooks.get_env = FakeEnv({"TANKPIT_PREFER_ACCOUNT": "false"})
         assert resolve_prefer_account() is False
+
+
+class TestResolveHeadless:
+    """``resolve_headless`` env override contract.
+
+    The default is the load-bearing case. Until this resolver existed the
+    bot path passed ``headless=False`` as a literal, so a containerized
+    fleet child launched a headed Chromium against a machine with no X
+    server and exited 1 about five seconds after spawn -- while
+    ``docker-compose.yml`` had set ``TANKPIT_HEADLESS: "true"`` all along
+    and nothing read it.
+    """
+
+    def test_missing_env_keeps_the_window(self) -> None:
+        """Unset means headed: a desktop run exists to be watched."""
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_headless() is False
+
+    def test_true_string_returns_true(self) -> None:
+        """``"true"`` selects a windowless browser."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "true"})
+        assert resolve_headless() is True
+
+    def test_one_string_returns_true(self) -> None:
+        """``"1"`` selects a windowless browser."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "1"})
+        assert resolve_headless() is True
+
+    def test_yes_string_returns_true(self) -> None:
+        """``"yes"`` selects a windowless browser."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "yes"})
+        assert resolve_headless() is True
+
+    def test_case_insensitive(self) -> None:
+        """The comparison is case-insensitive."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "TRUE"})
+        assert resolve_headless() is True
+
+    def test_other_string_keeps_the_window(self) -> None:
+        """Anything else stays headed rather than guessing."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "false"})
+        assert resolve_headless() is False
+
+    def test_empty_string_keeps_the_window(self) -> None:
+        """An empty value is not a request for headless."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": ""})
+        assert resolve_headless() is False
+
+    def test_the_value_compose_actually_sets_is_honoured(self) -> None:
+        """The literal string in docker-compose.yml resolves to headless.
+
+        Asserted verbatim because the compose value and the resolver are
+        the two halves that have to agree, and for the life of the
+        container image they did not.
+        """
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "true"})
+        assert resolve_headless() is True
+
+    def test_both_booleans_accept_the_same_spellings(self) -> None:
+        """One shared truthy set, so the two flags cannot drift apart."""
+        for value in ("true", "1", "yes", "YES"):
+            _test_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": value})
+            headless = resolve_headless()
+            _test_hooks.get_env = FakeEnv({"TANKPIT_PREFER_ACCOUNT": value})
+            assert headless is resolve_prefer_account()
 
 
 class TestWeaponResumeSlack:

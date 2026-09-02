@@ -21,6 +21,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.config import (
+    resolve_headless,
     resolve_prefer_account,
     resolve_target_url,
 )
@@ -138,7 +139,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
     runner = SessionRunner(
         bot_factory=service_hooks.build_bot_factory(
             resolve_target_url(),
-            headless=False,
+            headless=resolve_headless(),
             prefer_account=resolve_prefer_account(),
         ),
         mode_bridge=mode_bridge,

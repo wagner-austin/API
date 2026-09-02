@@ -62,7 +62,11 @@ def resolve_session_kills(env_value: str | None) -> int:
 def main() -> None:
     """Entry point for tankpit-bot command."""
     from tankpit_bot.bot.base import Bot
-    from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
+    from tankpit_bot.bot.config import (
+        resolve_headless,
+        resolve_prefer_account,
+        resolve_target_url,
+    )
     from tankpit_bot.bot.tick_loop import (
         request_interrupt,
         reset_interrupt_flag,
@@ -104,7 +108,7 @@ def main() -> None:
 
     bot = Bot(
         resolve_target_url(),
-        headless=False,
+        headless=resolve_headless(),
         prefer_account=resolve_prefer_account(),
     )
     bot.run(

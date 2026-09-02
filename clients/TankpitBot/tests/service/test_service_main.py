@@ -43,6 +43,7 @@ from tankpit_bot.service.service_main import (
 from tests.conftest import FakeEnv
 from tests.service._service_main_harness import (
     _CancellingSite,
+    _CapturingBotFactoryBuilder,
     _make_recording_bot_factory,
     _RecordingBot,
 )
@@ -210,6 +211,64 @@ class TestAsyncMain:
             await _async_main()
 
         assert len(captured_app) == 1
+
+
+class TestHeadlessWiring:
+    """The service must launch with the headless setting it resolved.
+
+    A correct resolver that nothing calls is the shape of the original
+    defect: ``prefer_account`` was resolved properly in the very same
+    constructor call where ``headless`` was a literal ``False``, so a
+    unit test of the resolver alone stayed green while every
+    containerized bot exited 1 on "Missing X server or $DISPLAY". These
+    assert the value that actually reaches the launch.
+    """
+
+    async def test_headless_env_reaches_the_bot_factory(
+        self,
+        restore_service_hooks: None,
+    ) -> None:
+        """``TANKPIT_HEADLESS=true`` launches a windowless browser."""
+        _ = restore_service_hooks
+        top_hooks.get_env = FakeEnv({"TANKPIT_HEADLESS": "true"})
+        builder = _CapturingBotFactoryBuilder(_RecordingBot())
+        service_hooks.build_bot_factory = builder
+
+        async def cancelling_build_site(
+            app: web.Application, host: str, port: int
+        ) -> SiteRunnerProtocol:
+            _ = (app, host, port)
+            return _CancellingSite()
+
+        service_hooks.build_site = cancelling_build_site
+
+        with pytest.raises(asyncio.CancelledError):
+            await _async_main()
+
+        assert [headless for _url, headless, _prefer in builder.calls] == [True]
+
+    async def test_the_default_launch_keeps_the_window(
+        self,
+        restore_service_hooks: None,
+    ) -> None:
+        """Unset env launches headed, so a desktop run stays watchable."""
+        _ = restore_service_hooks
+        top_hooks.get_env = FakeEnv({})
+        builder = _CapturingBotFactoryBuilder(_RecordingBot())
+        service_hooks.build_bot_factory = builder
+
+        async def cancelling_build_site(
+            app: web.Application, host: str, port: int
+        ) -> SiteRunnerProtocol:
+            _ = (app, host, port)
+            return _CancellingSite()
+
+        service_hooks.build_site = cancelling_build_site
+
+        with pytest.raises(asyncio.CancelledError):
+            await _async_main()
+
+        assert [headless for _url, headless, _prefer in builder.calls] == [False]
 
 
 class TestMain:
