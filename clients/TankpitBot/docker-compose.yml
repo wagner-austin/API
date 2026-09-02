@@ -1,0 +1,42 @@
+# Run a bounded TankpitBot session in a container.
+#
+#     cp .env.example .env      # then set TANKPIT_USERNAME / TANKPIT_PASSWORD
+#     docker compose run --rm bot
+#
+# The capture lands in ./runs on the host, because the event log is what
+# the session exists to produce.
+#
+# Context is the REPO ROOT (`../..`), not this directory: pyproject.toml
+# takes monorepo-guards and platform-core as `../../libs/` path
+# dependencies, which a context rooted here cannot reach.
+
+services:
+  bot:
+    build:
+      context: ../..
+      dockerfile: clients/TankpitBot/Dockerfile
+    image: tankpit-bot:local
+    # Credentials by env, never baked and never mounted. This is the
+    # FIRST branch of browser/accounts.py's resolution order, and the
+    # only one that survives pip-installing the package — the other two
+    # read a path computed relative to the module, which lands in
+    # site-packages once installed. See the Dockerfile header.
+    env_file:
+      - .env
+    environment:
+      # No display in a container. The repo default is `false` because a
+      # workstation run wants to watch the browser; here a visible
+      # browser is not a preference, it is a crash.
+      TANKPIT_HEADLESS: "true"
+      TANKPIT_BOT_SESSION_SECONDS: "${SESSION_SECONDS:-30}"
+    volumes:
+      - ./runs:/app/runs
+    # Chromium wants more than the default 64MB of shared memory and
+    # renders blank pages without it. The documented alternative,
+    # --disable-dev-shm-usage, moves the same traffic onto disk and is
+    # slower; raising the limit is the cheaper fix for a short session.
+    shm_size: "1gb"
+    # A bounded session that exits on its own, so no restart policy:
+    # `restart: unless-stopped` would relaunch the bot forever, which is
+    # both wrong for a demo and a way to hammer a third-party server.
+    restart: "no"
