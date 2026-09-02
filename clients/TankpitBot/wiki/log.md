@@ -5370,3 +5370,18 @@ Operator order off the dispatch-layer discussion (relayed with the fleet-lifecyc
 Gate: `make lint` green repo-wide (including the recipient-policy weak assertions cleared — see the collision note in the board thread: the sim session and I fixed the same file simultaneously, their landed half had an unterminated string, merged surgically, 4/4 pass), 100% statement+branch on both new modules, 2,100+ consuming tests green, sim/replay byte-identical.
 
 Held claims release with the plan; a crashed bot's claim frees in 30 s; a clean shutdown's claim likewise ages out rather than being torn down at teardown — one mechanism, documented, no second path.
+
+---
+## [2026-09-01] crack + fix | The teleport equipment grant was an invented law, and its own test was pinning it
+
+Chasing the conformance-replay question turned up an open row in [[capture-differ]] older than the question: the sim granted equipment on a teleport landing, flagged 2026-08-03 as a SUSPECTED INVENTED LAW needing "one byte-mined live equipment-hop landing window before changing the sim."
+
+**The archive supplied 10,619 of them, and not one carries a 0x67.** Two window sweeps, method as capture-differ stage 3: teleport windows containing an EquipmentGain, 0 of 10,619; and of the archive's 5,409 total gains, 5,205 (96.2%) follow an explicit `pickup_equipment` against exactly 1 following a teleport. That 1 is attribution noise of the most-recent-command heuristic, which also credits 11 gains to `shoot` and 2 to `map_open`.
+
+**The law: a landing auto-picks FUEL ONLY; equipment needs the explicit command.** This is not "the bot rarely lands on equipment" — landings demonstrably DO auto-pick fuel (the duplicate-record law, 31% of 7,176 live teleports), so an equipment auto-pick would have surfaced. Removed from `sim/server_move.py`.
+
+**How it survived: `test_teleport_landing_collects_equipment` PINNED the invention.** The sim and its test agreed with each other about a server neither had asked, which is precisely why a divergence-zero soak stayed green over it. The test now pins the measured PAIRING — fuel yes, equipment no — in one assertion, because the pairing is the finding and either half alone is re-breakable.
+
+**Correction to my own reading, recorded because it changed the plan.** I reported the differ script as "gone" and proposed rebuilding it from the wiki's prose. Wrong on both counts: `scripts/wiki_rules.py` exempts a vanished `source_paths` entry that carries a `source_git_blobs` pin, precisely so a retired one-shot script does not orphan its page — the pin IS the provenance, and the retirement it was written for was the analysis_scripts one. `analysis_scripts/diff_server_laws.py` recovers byte-exact from `git cat-file blob 7bb83c8dd8aee438f9ad0e3da1f00dc01ef2829b`, 285 lines, and its shape alphabet and window law are readable rather than inferred. There is no guard gap; I had misread the mechanism as a hole.
+
+Gate: 179 tests over the sim and analysis lanes, mypy strict clean over 95 files, guard exit 0. Not the full gate — another session's uncommitted collect-claim work in `bot/tick_body.py` has the seam suites red, and `browser/accounts.py` + `service/fleet_config.py` are mypy-red on their in-flight edits too.

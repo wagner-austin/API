@@ -98,8 +98,37 @@ baseline ``sim-lift*``, 2026-08-03):[^4]
 
 | Shape (sim-only) | n | Bucket |
 |---|---|---|
-| teleport ``5A+3Dself+landed+67+49+pickup`` | 13 | SUSPECTED INVENTED LAW — the sim grants equipment on teleport landing, but live's dominant explicit-pickup shape is own-tile ``67+49+pickup``, suggesting the real server auto-picks only FUEL on landing and equipment needs the explicit command. Needs one byte-mined live equipment-hop landing window before changing the sim. |
+| teleport ``5A+3Dself+landed+67+49+pickup`` | 13 | **INVENTED LAW — CONFIRMED AND REMOVED 2026-09-01.** The row asked for one byte-mined live equipment-hop landing window; the archive supplied 10,619. See below. |
 | shoot ``53self+landed`` | 8 | ARTIFACT — sim queue compression resolves a queued teleport inside the shot's window |
+
+### The teleport equipment grant: an invented law, settled 2026-09-01
+
+The suspected-invented-law row above is closed, against it. Two
+archive-wide window sweeps, method as Stage 3 (pair each SENT command
+with the received messages before the next SENT command):
+
+| Question | Answer |
+|---|---|
+| Teleport windows carrying a 0x67 EquipmentGain | **0 of 10,619** |
+| Total 0x67 gains in the archive | 5,409 |
+| Gains whose most recent sent command was `pickup_equipment` | **5,205 (96.2%)** |
+| Gains whose most recent sent command was `teleport` | 1 |
+
+**The law: a teleport landing auto-picks FUEL ONLY. Equipment requires
+the explicit `pickup_equipment` command.** The single teleport-adjacent
+gain is attribution noise of the "most recent sent command" heuristic,
+which also credits 11 gains to `shoot` and 2 to `map_open`; against
+10,619 teleports drawing zero it carries no weight.
+
+This is not "the bot rarely lands on equipment". Landings demonstrably
+DO auto-pick fuel — the duplicate-record law measures it in 31% of
+7,176 live teleports — so an equipment auto-pick would have surfaced.
+
+The sim granted it anyway, and `test_teleport_landing_collects_equipment`
+PINNED the invention. That is how it survived a divergence-zero soak:
+the sim and its test agreed with each other about a server neither had
+asked. Removed from `sim/server_move.py`; the test now pins the
+measured pairing (fuel yes, equipment no) instead.
 
 ## Stage 4 — ghost replay (2026-08-01)
 

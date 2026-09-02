@@ -25,6 +25,7 @@ from tankpit_bot.sim.equipment import (
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.sim.world import (
+    SimContainerDict,
     SimEquipmentDict,
     SimWorldDict,
     make_sim_tank,
@@ -160,19 +161,37 @@ def test_incidental_arrival_at_full_inventory_is_silent() -> None:
     assert len(server.world["equipment"]) == 1
 
 
-def test_teleport_landing_collects_equipment() -> None:
-    """A hop onto an equipment tile grants on arrival."""
+def test_teleport_landing_takes_fuel_but_never_equipment() -> None:
+    """A landing auto-picks FUEL ONLY; equipment needs the command.
+
+    Measured 2026-09-01 over the whole archive, closing the
+    suspected-invented-law row in [[capture-differ]]: across **10,619
+    teleport windows NOT ONE** carries a 0x67 EquipmentGain, while
+    5,205 of the archive's 5,409 gains follow an explicit
+    ``pickup_equipment``. The sim granted equipment on arrival, and
+    this test used to pin that invention — which is how it survived.
+
+    The fuel half is asserted in the same test on purpose: it is the
+    law that must NOT regress when the equipment half is removed, and
+    the finding is the PAIRING, not either half alone.
+    """
     world = _arena([25, 25, 25, 12, 25])
     world["equipment"][0] = SimEquipmentDict(x=30, y=30)
+    world["containers"].append(SimContainerDict(x=30, y=30, volume=400, dotted=True))
+    world["tanks"][9]["fuel"] = 900
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     hop = ClientCommandDict(
         kind="teleport", command=116, x=30, y=30, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(9, hop)
     messages = server.advance_tick()
-    gains = [m for m in messages if m["msg_type"] == 0x67]
-    assert [g["gained"] for g in gains] == [[0, 0, 0, WEAPON_STACK, 0]]
-    assert server.world["equipment"] == []
+
+    assert [m for m in messages if m["msg_type"] == 0x67] == []
+    assert server.world["equipment"] == [SimEquipmentDict(x=30, y=30)]
+    assert server.world["tanks"][9]["counts"][3] == 12
+
+    records = [m for m in messages if m["msg_type"] == "container_pickup"]
+    assert records != []
 
 
 def test_radar_reveals_equipment_with_the_wire_marker() -> None:

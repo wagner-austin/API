@@ -197,7 +197,14 @@ class SimServerMoveMixin:
             self.session.viewport.recenter()
             messages.append(self.session.viewport.build_update())
         messages.extend(landing)
-        self._resolve_arrival_equipment(tank_id, "teleport", messages)
+        # A landing auto-picks FUEL ONLY. Equipment needs the explicit
+        # pickup command, and the sim granting it here was an invented
+        # law: across the archive's 10,619 teleport windows NOT ONE
+        # carries a 0x67 EquipmentGain, while 5,205 of the 5,409 gains
+        # follow an explicit pickup_equipment ([[capture-differ]], the
+        # suspected-invented-law row, settled 2026-09-01). The fuel
+        # auto-pick is unaffected — it rides ``process_teleport``'s own
+        # ``pickups`` and the duplicate-record law that narrates them.
 
     def _resolve_arrival_equipment(
         self,
