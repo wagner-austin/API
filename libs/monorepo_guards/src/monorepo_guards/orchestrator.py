@@ -33,6 +33,7 @@ from monorepo_guards.redis_rules import RedisRule
 from monorepo_guards.request_context_rules import RequestContextRule
 from monorepo_guards.restricted_symbol_rules import RestrictedSymbolRule
 from monorepo_guards.run_fingerprint_rules import RunFingerprintLiteralRule
+from monorepo_guards.run_record_rules import RunRecordRule
 from monorepo_guards.rust_rules import (
     RustCargoLintRule,
     RustCoverageRule,
@@ -84,6 +85,7 @@ def _run_with_config(config: GuardConfig) -> int:
         CapabilityDerivationRule(),
         FakeRedisRule(),
         RunFingerprintLiteralRule(),
+        RunRecordRule(),
         CorpusFormatLiteralRule(),
         FileSizeRule(),
         GuardShimRule(),
