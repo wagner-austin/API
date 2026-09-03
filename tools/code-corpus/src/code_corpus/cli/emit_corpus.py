@@ -21,7 +21,12 @@ from code_corpus.cli import _test_hooks
 from code_corpus.contracts.corpus import RepoPin, encode_code_corpus_manifest
 from code_corpus.core import _test_hooks as core_hooks
 from code_corpus.core.emit import build_manifest, dedup_files, jsonl_text, split_holdout, to_record
-from code_corpus.core.select import SelectedFile, repo_pin, select_files
+from code_corpus.core.select import (
+    SelectedFile,
+    repo_pin,
+    require_reproducible_pins,
+    select_files,
+)
 
 DEFAULT_HOLDOUT_FRACTION = 0.1
 DEFAULT_SEED = 0
@@ -327,8 +332,9 @@ def main(argv: Sequence[str]) -> int:
 
     Raises:
         ValueError: If an argument is invalid, a language is unknown, a
-            tracked source file is not valid UTF-8, or the selection or
-            split comes up empty.
+            tracked source file is not valid UTF-8, the selection or split
+            comes up empty, or any contributing repository has uncommitted
+            changes.
         subprocess.CalledProcessError: If a repository cannot be pinned.
     """
     args = parse_args(argv)
@@ -343,6 +349,10 @@ def main(argv: Sequence[str]) -> int:
         combined.extend(outcome.files)
         excluded_generated += outcome.excluded_generated
         excluded_empty += outcome.excluded_empty
+
+    # Before anything is written: an emission no commit can reproduce is not
+    # worth the disk it lands on, and the condition cannot be repaired later.
+    require_reproducible_pins(pins)
 
     kept, excluded_duplicate = dedup_files(combined)
     train, holdout = split_holdout(kept, fraction=args.holdout_fraction, seed=args.seed)

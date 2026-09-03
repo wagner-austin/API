@@ -233,17 +233,51 @@ class TestEmitEndToEnd:
         second_holdout = tmp_path / "two" / "corpus.holdout.jsonl"
         assert first_holdout.read_bytes() == second_holdout.read_bytes()
 
-    def test_pins_a_dirty_working_tree_as_dirty(
+    def test_refuses_a_dirty_working_tree_and_writes_nothing(
         self, tmp_path: pathlib.Path, emitted: list[str]
     ) -> None:
-        repo1, head1, repo2, _ = _build_repos(tmp_path)
+        """Against a REAL git repository, not the faked seam.
+
+        This asserted the opposite until 2026-09-03: it checked that a dirty
+        tree was recorded as dirty and let the emission proceed. It WAS
+        recorded, and it was ignored -- code-corpus-v1 shipped with both
+        repositories dirty, and was trained on, evaluated and reported.
+
+        Nothing is written, which is the half that matters: a corpus on disk
+        gets used, and a manifest saying it is unreproducible stops nobody.
+
+        Args:
+            tmp_path: Temporary directory holding two real repositories.
+            emitted: Captured summary lines.
+        """
+        repo1, _, repo2, _ = _build_repos(tmp_path)
         (repo1 / "scratch.py").write_bytes(b"SCRATCH = True\n")
         out = tmp_path / "corpus.jsonl"
+
+        with pytest.raises(ValueError, match="refusing to emit: api has uncommitted changes"):
+            _ = _run(repo1, repo2, out)
+
+        assert not out.exists()
+        assert not (tmp_path / "corpus.jsonl.manifest.json").exists()
+
+    def test_a_clean_pair_of_repositories_still_emits(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        """The refusal must not have closed the ordinary path.
+
+        Args:
+            tmp_path: Temporary directory holding two real repositories.
+            emitted: Captured summary lines.
+        """
+        repo1, head1, repo2, _ = _build_repos(tmp_path)
+        out = tmp_path / "corpus.jsonl"
+
         assert _run(repo1, repo2, out) == 0
+
         manifest = decode_code_corpus_manifest(
             load_json_str((tmp_path / "corpus.jsonl.manifest.json").read_text(encoding="utf-8"))
         )
-        assert manifest["repos"][0] == RepoPin(name="api", commit=head1, dirty=True)
+        assert manifest["repos"][0] == RepoPin(name="api", commit=head1, dirty=False)
 
     def test_refuses_to_emit_an_empty_corpus(self, tmp_path: pathlib.Path) -> None:
         repo = tmp_path / "repo"

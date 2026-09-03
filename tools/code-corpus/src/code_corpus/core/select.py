@@ -195,6 +195,43 @@ def repo_pin(name: str, repo_root: pathlib.Path) -> RepoPin:
     return RepoPin(name=name, commit=git_head(repo_root), dirty=git_dirty(repo_root))
 
 
+def require_reproducible_pins(pins: Sequence[RepoPin]) -> None:
+    """Refuse an emission no commit can reproduce.
+
+    RECORDING THE CONDITION WAS NOT ENOUGH, and this function exists because
+    of that. ``repo_pin`` has always written ``dirty`` into the manifest, and
+    its docstring has always said a dirty emission "cannot be reproduced from
+    the recorded commit alone". code-corpus-v1 was emitted with BOTH
+    repositories dirty, trained on, evaluated, and reported -- and the flag
+    sat in the manifest the whole time saying so. A fact nobody reads is not
+    a check.
+
+    The cost is not theoretical. A corpus emitted from a dirty tree is
+    identified by a commit that does not describe it, so no later reader can
+    rebuild the inputs a number was produced from; the number stops being
+    evidence and becomes an anecdote. That cannot be repaired afterwards --
+    the tree has moved on -- which is why this refuses at emission rather
+    than warning.
+
+    Args:
+        pins: The pinned state of every contributing repository.
+
+    Raises:
+        ValueError: If any repository has tracked or untracked changes,
+            naming each one, because a caller with two repositories needs to
+            know which to clean.
+    """
+    dirty = [pin["name"] for pin in pins if pin["dirty"]]
+    if dirty == []:
+        return
+    raise ValueError(
+        f"refusing to emit: {', '.join(dirty)} has uncommitted changes. A corpus emitted "
+        "from a dirty tree is identified by a commit that does not describe it, so nothing "
+        "produced from it can be reproduced -- and that cannot be fixed after the fact. "
+        "Commit or stash, or emit from a clean checkout (git worktree add)."
+    )
+
+
 def decode_source_text(repo: str, path: str, raw: bytes) -> str:
     """Decode a source file's bytes into normalized text.
 
@@ -301,6 +338,7 @@ __all__ = [
     "git_dirty",
     "git_head",
     "repo_pin",
+    "require_reproducible_pins",
     "select_files",
     "tracked_files",
 ]

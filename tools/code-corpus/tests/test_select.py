@@ -23,6 +23,7 @@ from code_corpus.core.select import (
     git_dirty,
     git_head,
     repo_pin,
+    require_reproducible_pins,
     select_files,
     tracked_files,
 )
@@ -139,3 +140,58 @@ class TestSelectFiles:
         core_hooks.run_git = _FakeGit(ls="")
         with pytest.raises(ValueError, match="unknown language 'go'; known languages: python"):
             select_files("api", pathlib.Path("repo"), ["go"])
+
+
+class TestRefusingAnUnreproducibleEmission:
+    """A corpus whose commit does not describe it is not evidence.
+
+    The condition was ALREADY recorded and already ignored: code-corpus-v1
+    was emitted with both repositories dirty, then trained on, evaluated and
+    reported, with ``dirty: true`` sitting in its manifest the whole time.
+    Recording a fact nobody reads is not a check, which is why this refuses.
+    """
+
+    def test_a_clean_set_of_pins_is_admitted(self) -> None:
+        """The ordinary case must stay silent."""
+        pins = [
+            RepoPin(name="api", commit="a" * 40, dirty=False),
+            RepoPin(name="mcp", commit="b" * 40, dirty=False),
+        ]
+
+        require_reproducible_pins(pins)
+
+    def test_one_dirty_repository_is_refused(self) -> None:
+        """Refused at emission, because it cannot be repaired afterwards."""
+        pins = [RepoPin(name="api", commit="a" * 40, dirty=True)]
+
+        with pytest.raises(ValueError, match="refusing to emit: api has uncommitted changes"):
+            require_reproducible_pins(pins)
+
+    def test_every_dirty_repository_is_named(self) -> None:
+        """A caller with two repositories needs to know which to clean.
+
+        Naming only the first would send someone to clean one tree and hit
+        the same refusal again on the next run.
+
+        The clean repository is called ``tidyrepo`` rather than ``clean``
+        because the refusal's own text contains the word "clean" -- the first
+        version of this test asserted the absence of a substring the message
+        legitimately carries, and failed for a reason that had nothing to do
+        with the behaviour.
+        """
+        pins = [
+            RepoPin(name="api", commit="a" * 40, dirty=True),
+            RepoPin(name="tidyrepo", commit="b" * 40, dirty=False),
+            RepoPin(name="mcp", commit="c" * 40, dirty=True),
+        ]
+
+        with pytest.raises(ValueError) as excinfo:
+            require_reproducible_pins(pins)
+
+        assert "api, mcp" in str(excinfo.value)
+        assert "tidyrepo" not in str(excinfo.value)
+
+    def test_the_refusal_says_how_to_proceed(self) -> None:
+        """A refusal that names no way forward is one people work around."""
+        with pytest.raises(ValueError, match="git worktree add"):
+            require_reproducible_pins([RepoPin(name="api", commit="a" * 40, dirty=True)])
