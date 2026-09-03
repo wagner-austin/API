@@ -34,9 +34,12 @@ zero-billing ruling stands.
    `python -m scripts.evolve hpc3:<workspace> <name> <rng>`
 4. **Bespoke batches** (factorials, transfer panels): write the sweep
    file with `used_seeds`/`seed_block`/`fresh_seeds` (never inline seed
-   picking), then `scripts.stage_payload` -> `hpc3.cli.stage` -> extract
-   -> `scripts.campaign_doc` -> `hpc3.cli.campaign` twice (the second
-   pass must print `0 submitted` -- that is the idempotency proof).
+   picking), commit it, then
+   `python -m scripts.batch hpc3:<workspace> <batch> sweeps/<batch>.txt <difficulty>`
+   -- the whole freeze/stage/converge-until-full/pull chain in one
+   command (the batch name must equal the file's stem, enforced). Judge
+   with `scripts.pairs` / `scripts.margin` per the experiment's own
+   questions.
 
 ## The operating posture (learned the hard way, all measured)
 
