@@ -111,13 +111,22 @@ hurry.
 
 ## Status against the research index
 
-TankpitBot is **not** a registered hpc3 project, and this closes only
-step 3 of four.[^5] Steps 1 and 2 (a `tools/hpc3/runs/` entry and a
-`RESEARCH.md` section) remain open, deliberately: the bot drives
-Playwright against live tankpit.com and is not cluster work. The
-cluster-shaped payloads are the headless `sim/` tree and offline
-modelling over these rows — and the second probably belongs to the
-already-registered `cleargbm` rather than to a sixth project.
+This page closed step 3 of four.[^5] **All four are closed now**:
+TankpitBot was registered as the `tankpit` project on 2026-09-02, ships
+an image, and has run on the cluster
+([[sim-world-parameterization]], [[packaged-data-assets]]).
+
+What is registered is the **headless sim**, not the bot. The bot drives
+Playwright against live tankpit.com and is not cluster work; `sim/`
+needs no browser and no network, which is what made it the
+cluster-shaped payload. Offline modelling over these rows is still
+better served by the already-registered `cleargbm` than by a project of
+its own.
+
+**The record's own limit is unchanged by any of that.** It still
+describes the derivation and identifies the live run only by a digest,
+because an events artifact carries no build stamp. Registration did not
+make the 539 archived runs attributable, and nothing will.
 
 [^1]: `src/tankpit_bot/diagnostics/feature_rows.py`, `write_feature_rows` before 2026-09-02 — the body was joined and written with no sidecar. Shipped in commit `3c961bef`.
 [^2]: `docs/RESEARCH.md`, the `cleargbm` entry: "The 3,068 rows written before that state `"fingerprint": null` explicitly."
