@@ -147,8 +147,15 @@ def test_liveness_never_depends_on_recovering_an_exit_code(
     adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
     assert adopted.is_running() is True
 
-    psutil.Process(sleeper.pid).kill()
-    psutil.Process(sleeper.pid).wait(timeout=30)
+    # ONE handle, resolved while the process is still alive. Looking the
+    # pid up a second time after the kill is a race the test loses at
+    # random: the child can be fully reaped between the two calls, and
+    # ``psutil.Process`` on a gone pid raises NoSuchProcess — a red build
+    # describing nothing about the code under test. An existing handle
+    # waits on an already-exited process without complaint.
+    victim = psutil.Process(sleeper.pid)
+    victim.kill()
+    victim.wait(timeout=30)
 
     assert adopted.is_running() is False
     # Whatever the code turns out to be -- recoverable or not -- it is

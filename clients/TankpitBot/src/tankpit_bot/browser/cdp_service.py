@@ -105,10 +105,33 @@ class CDPService:
                         val = a.get("value", a.get("description", "?"))
                         texts.append(str(val) if val is not None else "?")
                 text = " ".join(texts)
-                if "WS" in text or "Hook" in text or "WebSocket" in text:
+                # Errors and warnings are kept whatever they say. The
+                # substring filter below is a NOISE control for the
+                # game's chatty info logging, and it used to apply to
+                # every level — so a page-side "TypeError" reached this
+                # handler and was dropped for not containing "WS". The
+                # bot drives a page it could not see the failures of.
+                if msg_type in ("error", "warning"):
+                    log.warning("[Console %s] %s", msg_type, text)
+                elif "WS" in text or "Hook" in text or "WebSocket" in text:
                     log.info("[Console %s] %s", msg_type, text)
 
+        def on_exception(params: JSONObject) -> None:
+            """Report an uncaught page exception.
+
+            Nothing subscribed to this before, so an exception in the
+            game's own render loop was invisible: rAF does not
+            reschedule after a throw, so one uncaught error freezes the
+            canvas permanently while the WebSocket keeps updating game
+            state. The bot plays on, the picture does not — which is
+            exactly the symptom this listener exists to name.
+            """
+            details = params.get("exceptionDetails", {})
+            if isinstance(details, dict):
+                log.warning("[Page exception] %s", details.get("text", "?"))
+
         cdp.on("Runtime.consoleAPICalled", on_console)
+        cdp.on("Runtime.exceptionThrown", on_exception)
 
     def send_bytes(self, cdp: CDPSessionProtocol, data: bytes, label: str) -> str:
         """Send raw bytes via the captured WebSocket.

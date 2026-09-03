@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 import pytest
@@ -387,6 +388,68 @@ class TestConsoleListener:
         handler({"type": "log", "args": [{"description": "Hook fired"}]})
         handler({"type": "log", "args": [{"value": None}]})
         handler({"type": "log", "args": ["raw_string_arg"]})
+
+    def test_page_errors_survive_the_noise_filter(self, caplog: pytest.LogCaptureFixture) -> None:
+        """An error is kept whatever it says; chatty logs are still filtered.
+
+        The substring filter is noise control for the game's own info
+        logging, and it used to apply at every level — so a page-side
+        ``TypeError`` was dropped for not containing "WS". The bot drove
+        a page whose failures it could not see, which is why a frozen
+        canvas had no explanation anywhere in the run log.
+        """
+        session = BrowserSession("https://example.com", headless=True)
+        registered: dict[str, Callable[[JSONObject], None]] = {}
+
+        class _CapturingCDP(FakeCDPSession):
+            def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+                registered[event] = handler
+
+        session._setup_console_listener(_CapturingCDP())
+        handler = registered.get("Runtime.consoleAPICalled")
+        if handler is None:
+            raise AssertionError("expected Runtime.consoleAPICalled handler")
+
+        with caplog.at_level(logging.WARNING):
+            handler({"type": "error", "args": [{"value": "TypeError: x is not a function"}]})
+            handler({"type": "warning", "args": [{"value": "deprecated thing"}]})
+            handler({"type": "log", "args": [{"value": "chatty game info"}]})
+
+        kept = [record.message for record in caplog.records]
+        assert any("TypeError: x is not a function" in message for message in kept)
+        assert any("deprecated thing" in message for message in kept)
+        assert not any("chatty game info" in message for message in kept)
+
+    def test_uncaught_page_exceptions_are_reported(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Nothing listened to ``Runtime.exceptionThrown`` at all.
+
+        rAF does not reschedule after a throw, so one uncaught error in
+        the game's render loop freezes the canvas permanently while the
+        WebSocket keeps updating game state — the bot plays on and the
+        picture does not. That failure had no listener, so it left no
+        trace in the run log.
+        """
+        session = BrowserSession("https://example.com", headless=True)
+        registered: dict[str, Callable[[JSONObject], None]] = {}
+
+        class _CapturingCDP(FakeCDPSession):
+            def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+                registered[event] = handler
+
+        session._setup_console_listener(_CapturingCDP())
+        handler = registered.get("Runtime.exceptionThrown")
+        if handler is None:
+            raise AssertionError("expected Runtime.exceptionThrown handler")
+
+        with caplog.at_level(logging.WARNING):
+            handler({"exceptionDetails": {"text": "Uncaught TypeError: draw failed"}})
+            handler({"exceptionDetails": {}})
+            handler({"exceptionDetails": "not an object"})
+
+        kept = [record.message for record in caplog.records]
+        assert any("Uncaught TypeError: draw failed" in message for message in kept)
+        # A malformed event still reports rather than vanishing.
+        assert sum("[Page exception]" in message for message in kept) == 2
 
 
 class TestGetArgv:
