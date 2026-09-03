@@ -37,11 +37,6 @@ class TestCommandService:
         self.svc.cdp = _FakeCDP()
         self.svc.xor_table = b"\x00" * 256
 
-    def test_enter_game(self) -> None:
-        assert self.svc.enter_game() is True
-        assert len(self._sent) == 1
-        assert self._sent[0][0] == "enter_game"
-
     def test_quit_game_sends_plain_unencoded_frame(self) -> None:
         """Graceful quit sends the plain q-key frame, never XOR-encoded."""
         assert self.svc.quit_game() is True
@@ -126,9 +121,6 @@ class TestCommandServiceNoCDP:
             return ""
 
         self.svc = CommandService(send_ws_bytes=_send)
-
-    def test_enter_game_no_cdp(self) -> None:
-        assert self.svc.enter_game() is False
 
     def test_move_no_cdp(self) -> None:
         assert self.svc.move(50, 60) is False

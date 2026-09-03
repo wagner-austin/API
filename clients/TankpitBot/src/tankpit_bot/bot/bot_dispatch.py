@@ -63,17 +63,6 @@ class DispatchMixin(CompletionsMixin):
             self.world.last_wire_command_name = cmd_name
         return sent
 
-    def enter_game(self) -> bool:
-        """Send CMD_ENTER_GAME to activate the tank in the game world.
-
-        Returns:
-            True if command was sent.
-        """
-        from tankpit_bot.protocol.command_builders import build_query_command
-        from tankpit_bot.protocol.commands import CMD_ENTER_GAME
-
-        return self._send_bytes(build_query_command(CMD_ENTER_GAME), "enter_game")
-
     def move_to(self, x: int, y: int) -> bool:
         """Send move command and transition to MOVING state.
 

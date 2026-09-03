@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.protocol.commands import CMD_KEEPALIVE, CMD_RADAR
+from tankpit_bot.protocol.commands import (
+    CMD_ENTER_GAME,
+    CMD_INVENTORY,
+    CMD_KEEPALIVE,
+    CMD_RADAR,
+)
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_CANT_GO,
@@ -234,3 +239,27 @@ def test_a_heartbeat_never_disturbs_the_command_it_rides_beside() -> None:
     with_beats = server.advance_tick()
 
     assert _kinds(with_beats) == _kinds(without)
+
+
+def test_another_tanks_join_and_inventory_questions_are_not_this_client_s_answers() -> None:
+    """Both connection queries are PER-RECIPIENT, like every other answer.
+
+    A join burst describes the tank that joined and an inventory
+    describes the tank that asked, so neither can be narrated to a
+    connection that did not ask. The sim models one stored window and
+    one inventory — the client's — so answering a foreign tank's
+    question here would put ANOTHER tank's private state on this
+    connection's wire.
+
+    The two branches this pins were the last uncovered lines in the
+    queries router: nothing had ever asked these questions on behalf
+    of a tank that is not the client.
+    """
+    server = _server()
+    quiet = server.advance_tick()
+
+    server.queue_command(11, decode_client_command(bytes([_TYPE, CMD_ENTER_GAME])))
+    server.queue_command(11, decode_client_command(bytes([_TYPE, CMD_INVENTORY])))
+    foreign = server.advance_tick()
+
+    assert _kinds(foreign) == _kinds(quiet)

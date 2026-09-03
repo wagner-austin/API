@@ -13,6 +13,8 @@ from typing import Literal, TypedDict
 from tankpit_bot.protocol.chat import CMD_CHAT
 from tankpit_bot.protocol.commands import (
     CMD_BLOCK,
+    CMD_ENTER_GAME,
+    CMD_INVENTORY,
     CMD_KEEPALIVE,
     CMD_MAP_OPEN,
     CMD_MAP_TELEPORT,
@@ -43,6 +45,8 @@ ClientCommandKind = Literal[
     "scope",
     "statistics",
     "keepalive",
+    "enter_game",
+    "inventory",
     "other",
 ]
 
@@ -68,6 +72,12 @@ _BARE_KINDS: dict[int, ClientCommandKind] = {
     # table rather than in ``other`` because the server has a LAW for
     # it (silence), and a sim that cannot name it cannot obey that law.
     CMD_KEEPALIVE: "keepalive",
+    # The two commands a REAL client sends that ours does not. Both
+    # were unmapped until 2026-09-03 and both therefore decoded to
+    # ``other``, the one kind the server refuses -- the keep-alive's
+    # crash was not the only one waiting ([[client-commands]]).
+    CMD_ENTER_GAME: "enter_game",
+    CMD_INVENTORY: "inventory",
 }
 
 

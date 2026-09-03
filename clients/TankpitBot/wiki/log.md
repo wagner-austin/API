@@ -5970,3 +5970,44 @@ stands in. Pins: in-ring richness beats distance, cross-ring distance
 beats richness, fuel-poor ground yields its ring to unread neutral,
 and the thousand-reobservation dwell test. Fleet-merging the ledger
 is noted as a future fleetshare candidate, not built.
+
+---
+## [2026-09-03] lift | Two more commands a real client sends, and the one I refused to model
+
+The keep-alive was not the only crash waiting. Crossing every command byte in the sniff archive against our decoder found THREE that decode to `other` — the one kind `queue_command` refuses — so each would kill a hosted server on arrival. No probe: `runs/sniff/` is real-client traffic, so "what does a real client send" was already answered on disk.
+
+| byte | constant | sends | live answer |
+|---|---|---:|---|
+| 0x3F | **CMD_ENTER_GAME** | 343 | **343/343 answered** — `49 49 5A 3Dself`, the join burst |
+| 0x69 | **CMD_INVENTORY** | 4 | answered `49` |
+| 0x44 | *none* | 7 | answered, but four distinct payloads |
+
+Two already had constants we had simply never wired into the decoder.
+
+### The join burst is an ANSWER, not a push
+
+343 of 343 `CMD_ENTER_GAME` sends are answered with the burst tail. The sim emitted that burst unprompted at connect — and the reason is the same reason the keep-alive hid: **our bot never sends this command.** `enter_game()` sat in TWO production classes with zero callers while the bot joined through the lobby's `join_room`. Dead code kept alive by its own tests, which is exactly the pattern the fuel-pickup codecs had; both methods and their four tests are deleted.
+
+### The one I would not model
+
+0x44 is real, observed seven times, type 6 (combat), shoot-shaped — coordinates plus a two-byte tail. Four distinct payloads across seven sends supports no law. It IS answered every time, so silence would be as wrong as a guess. `CMD_UNMODELLED_COMBAT` names the byte so the sim can refuse it BY NAME.
+
+That refusal message also stopped lying. It read "sim step b handles move/shoot only; got X (laws 4-8 land in build step d)" — true in July 2026, stale ever since, and absurd once the server handled fifteen kinds. It now names the command and its byte and says plainly that the sim refuses rather than inventing a response.
+
+### Two splits the branch counter forced, and both were right
+
+Naming the commands took `_process_stateless_command` past the branch ceiling. The boundary it exposed was already there: four of the fifteen commands change nothing and are addressed to the CONNECTION — "let me in", "what am I carrying", "how have I done", and the keep-alive — and their replies are a function of one connection's own state. `sim/server_queries.py` now owns them.
+
+`handshake()` moved there too, and that is the better home rather than a relocation: the join burst IS the answer to "let me in". My first cut declared it in the mixin as a `NotImplementedError` stub, which coverage caught as an unexecuted line — the stub was the design telling me it was in the wrong place.
+
+Cost of doing the extraction carelessly: my first slice cut at the wrong `block` branch and duplicated three cases into the router. Ruff and the tests caught it immediately, but the lesson is that index-based slicing of source is a bad way to move code, and I reached for it twice today.
+
+### Coverage caught a law nobody had pinned
+
+The last two uncovered branches were the `tank_id != client_id` paths of both new queries: nothing had ever asked these questions on behalf of a tank that is not the client. Both are per-recipient — a join burst describes the tank that joined, an inventory describes the tank that asked — so a foreign tank's question must draw nothing on this connection. Pinned.
+
+### Still unmodelled, and named as such
+
+Five constants defined and never once sent in 342 sessions: `CMD_PING`, `CMD_TOP10`, `CMD_ACTIVE_FORCES`, `CMD_ACTIVE_PLAYERS`, `CMD_NEAREST_ENEMY`. Real client capabilities nobody in the corpus used.
+
+Gate: make check green — 6,907 tests, 100.00% statements AND branches. Two `service/` tests flaked en route (a Windows file lock on a spawned child's console.log, and an adopted-process exit race); both are the fleet session's, both pass on re-run, and neither is mine.

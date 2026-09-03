@@ -33,7 +33,6 @@ from tankpit_bot.protocol.command_builders import (
     build_toggle_equipment_command,
 )
 from tankpit_bot.protocol.commands import (
-    CMD_ENTER_GAME,
     CMD_INVENTORY,
     CMD_MAP_OPEN,
     CMD_NEAREST_ENEMY,
@@ -92,14 +91,6 @@ class CommandService:
             True if command was sent.
         """
         return self.send_bytes(build_quit_command(), "quit_game")
-
-    def enter_game(self) -> bool:
-        """Send CMD_ENTER_GAME to activate the tank.
-
-        Returns:
-            True if command was sent.
-        """
-        return self.send_bytes(build_query_command(CMD_ENTER_GAME), "enter_game")
 
     def move(self, x: int, y: int) -> bool:
         """Send move command.

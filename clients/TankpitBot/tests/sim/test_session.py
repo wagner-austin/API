@@ -18,8 +18,17 @@ from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.browser.page_client_snapshot import decode_page_client_snapshot
 from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.protocol.command_builders import build_query_command
-from tankpit_bot.protocol.commands import CMD_KEEPALIVE, CMD_MAP_OPEN, COMMAND_PREFIX, TYPE_QUERY
+from tankpit_bot.protocol.commands import (
+    CMD_ENTER_GAME,
+    CMD_INVENTORY,
+    CMD_KEEPALIVE,
+    CMD_MAP_OPEN,
+    CMD_UNMODELLED_COMBAT,
+    COMMAND_PREFIX,
+    TYPE_QUERY,
+)
 from tankpit_bot.protocol.types import DeactivationDict
+from tankpit_bot.sim.commands import SimError
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.wire.helpers import EncodeError
 from tests.sim.seam import SEAM_CLIENT_ID, SEAM_ENEMY_ID, boot_seam
@@ -231,3 +240,60 @@ def test_a_heartbeat_leaves_the_next_real_command_untouched() -> None:
     link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
 
     assert [message["msg_type"] for message in server.advance_tick()] == expected
+
+
+def test_enter_game_is_answered_with_the_join_burst() -> None:
+    """THE JOIN BURST IS AN ANSWER, NOT A PUSH.
+
+    343 archived sends, every one answered, self-caused tokens
+    ``49 49 5A 3Dself`` per send — the tail of the burst
+    ``handshake`` builds. The sim pushed that burst unprompted at
+    connect because OUR bot never sends this command: ``enter_game()``
+    sat in two production classes with zero callers while the bot
+    joined through the lobby instead ([[client-commands]]).
+
+    Like the keep-alive, this decoded to ``other`` and so killed the
+    server on arrival — the second of three such commands found in the
+    same sweep.
+    """
+    _bot, server, link, table = boot_seam()
+
+    link.send_page_frame(_query_frame(table, CMD_ENTER_GAME))
+    burst = server.advance_tick()
+
+    assert link.sent_commands[-1] == "enter_game"
+    kinds = [message["msg_type"] for message in burst]
+    assert kinds[:2] == [0x21, 0x3E]
+    assert kinds.count(0x49) >= 2
+    assert 0x5A in kinds
+
+
+def test_an_inventory_request_is_answered_with_a_snapshot() -> None:
+    """The 'i' key draws a 0x49.
+
+    Four archived sends, every one answered with an inventory —
+    thin, but the command's own name and its answer agree.
+    """
+    _bot, server, link, table = boot_seam()
+
+    link.send_page_frame(_query_frame(table, CMD_INVENTORY))
+    answered = server.advance_tick()
+
+    assert link.sent_commands[-1] == "inventory"
+    snapshots = [m for m in answered if m["msg_type"] == 0x49]
+    assert len(snapshots) == 1
+    assert snapshots[0]["show"] is True
+
+
+def test_a_command_with_no_measured_law_is_refused_by_name() -> None:
+    """0x44 is real, observed seven times, and NOT modelled.
+
+    Its payloads vary every send and the sim has no law for it, so it
+    refuses rather than inventing a response — and the refusal names
+    the command and its byte instead of the build phase the old
+    message described.
+    """
+    _bot, _server, link, table = boot_seam()
+
+    with pytest.raises(SimError, match="no modelled law"):
+        link.send_page_frame(_query_frame(table, CMD_UNMODELLED_COMBAT))

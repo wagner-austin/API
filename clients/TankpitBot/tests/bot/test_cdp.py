@@ -74,26 +74,6 @@ class TestBotWithCDP:
         assert type(xor_table) is bytes
         assert len(xor_table) == 1000
 
-    def test_enter_game_sends_query_command(self, fake_env: FakeEnv) -> None:
-        """Test enter_game sends CMD_ENTER_GAME (type=2, cmd=0x3f)."""
-        from tankpit_bot.bot.base import Bot
-        from tests.fakes import FakeCDPSession
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        fake_cdp = FakeCDPSession()
-        bot._cdp = fake_cdp
-        result = bot.enter_game()
-        assert result is True
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
-
-    def test_enter_game_no_cdp_returns_false(self, fake_env: FakeEnv) -> None:
-        """Test enter_game returns False when CDP session not available."""
-        from tankpit_bot.bot.base import Bot
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.enter_game()
-        assert result is False
-
     def test_move_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.move_to succeeds with CDP session."""
         from tankpit_bot.bot.base import Bot

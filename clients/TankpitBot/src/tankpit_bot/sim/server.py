@@ -25,9 +25,7 @@ from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.types import (
     BinaryMessage,
-    EquipmentToggleDict,
     InventoryDict,
-    SyncDict,
 )
 from tankpit_bot.sim.actions import build_map_data, process_mine_press, process_radar
 from tankpit_bot.sim.blocks import process_block_press
@@ -44,13 +42,12 @@ from tankpit_bot.sim.narrate import (
 )
 from tankpit_bot.sim.server_combat import SimServerCombatMixin
 from tankpit_bot.sim.server_move import SimServerMoveMixin
+from tankpit_bot.sim.server_queries import SimServerQueriesMixin
 from tankpit_bot.sim.visitors import RoomChurn
 from tankpit_bot.sim.wire_statements import (
-    full_status_statement,
     identity_statement,
     position_statement,
     queued_tank_id,
-    statistics_statement,
     status_sync,
 )
 from tankpit_bot.sim.world import SimWorldDict
@@ -71,12 +68,14 @@ _SUPPORTED_KINDS = frozenset(
         "scope",
         "statistics",
         "keepalive",
+        "enter_game",
+        "inventory",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
 
 
-class SimServer(SimServerCombatMixin, SimServerMoveMixin):
+class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin):
     """The fake server: one world, one command queue, one client.
 
     The server owns FIELD state directly — the world, its terrain, the
@@ -120,100 +119,6 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin):
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_announcements: list[BinaryMessage] = []
         self._churn = RoomChurn()
-
-    def handshake(self) -> list[BinaryMessage]:
-        """Build the session-start burst the client receives on join.
-
-        Mirrors the real server's join choreography (and the scenario
-        harness's ``place_self``). The whole burst was re-measured
-        2026-09-01 across 341 archived sessions and is INVARIANT in
-        every one of the 340 that carry it ([[recipient-policy]])::
-
-            0x21  0x3E  0x5A  0x3D  0x2E  |  0x21 xN  |  0x49 x2  0x74  0x3F
-
-        The client's OWN identity (0x21) leads — the archive convention
-        the audit validators rely on is that the first TankInfo of a
-        session names the player's own tank (``validate.wire_timeline``)
-        — then its FULL status (0x3E), the viewport patch (0x5A), own
-        position (0x3D) and own status sync (0x2E); then a PURE run of
-        identities, one per other living tank; then the tail.
-
-        Four corrections landed with that measurement, each of which
-        the single-client sim had no way to falsify:
-
-        * **No join-time 0x44.** 293 of 340 sessions carry no 0x44 in
-          their first 90 received messages at all, and the rest carry
-          it 11-36 messages past the sync — it answers fuel events, not
-          joining. The burst's 0x2E already carries fuel
-          ([[decode-coverage]]), which is why the real server needs no
-          0x44 here. The sim emitted one and no 0x2E.
-        * **The identity run is pure 0x21.** 340/340. With ~36 tanks on
-          a 256x256 map a 16x16 window should hold one about 13% of the
-          time, so zero of 340 is the law, not sampling: other tanks'
-          positions arrive from the in-play membership diff, never from
-          the burst. The sim rode a 0x3D on every visible tank.
-        * **The inventory arrives TWICE**, not once.
-        * **The 0x49 pair sits at the TAIL**, after the identity run —
-          the sim had a single 0x49 in the self block, before it.
-
-        The 0x74 equipment-enabled state closes the tail: 324 of 341
-        sessions receive exactly one, 340/340 of them immediately after
-        the 0x49 pair and immediately before the 0x3F. It is a JOIN
-        message carrying the tank's persisted enabled flags, not an
-        answer to a toggle ([[recipient-policy]]). The sim had none.
-
-        285 of the 286 archived CMD_ENTER_GAME sends draw exactly one
-        0x3F, and the median session carries exactly one sync in total
-        — joining IS the common case
-        ([[session-state-deglobalisation]]).
-
-        Returns:
-            The decoded messages of the join burst, in order.
-        """
-        client = self.world["tanks"][self.session.client_id]
-        inventory = InventoryDict(
-            msg_type=0x49,
-            show=True,
-            alternate=False,
-            counts=list(client["counts"]),
-            enabled=list(client["enabled"]),
-        )
-        messages: list[BinaryMessage] = [
-            identity_statement(
-                self.world, self.session.client_id, self.session.awards.decoration_state
-            ),
-            full_status_statement(
-                self.world, self.session.client_id, self.session.awards.decoration_state
-            ),
-            self.session.viewport.build_update(),
-            position_statement(self.world, self.session.client_id),
-            status_sync(
-                self.session.client_id, self.world, True, self.session.progression.promo_state
-            ),
-        ]
-        # The identity run is PURE 0x21 — no position statements ride
-        # it. Measured 340/340 (2026-09-01, [[recipient-policy]]): with
-        # ~36 tanks on a 256x256 map a 16x16 window should hold one
-        # about 13% of the time, so zero of 340 is not sampling, it is
-        # the law. Other tanks' positions arrive from the in-play
-        # membership diff, never from the join burst.
-        for tank_id in sorted(self.world["tanks"]):
-            tank = self.world["tanks"][tank_id]
-            if tank_id == self.session.client_id or not tank["alive"]:
-                continue
-            messages.append(identity_statement(self.world, tank_id))
-        # The burst TAIL, measured 340/340: the inventory arrives
-        # TWICE, then the equipment-enabled state, then the sync — and
-        # the pair sits AFTER the identity run, not in the self block
-        # ([[recipient-policy]]). 285 of the 286 archived CMD_ENTER_GAME
-        # sends draw exactly one 0x3F, and the median session carries
-        # exactly one sync in total — joining IS the common case
-        # ([[session-state-deglobalisation]]).
-        messages.append(inventory)
-        messages.append(inventory)
-        messages.append(EquipmentToggleDict(msg_type=0x74, enabled=list(client["enabled"])))
-        messages.append(SyncDict(msg_type=0x3F))
-        return messages
 
     def announce_tank(self, tank_id: int) -> None:
         """Queue a mid-session 0x21 identity broadcast (an activation).
@@ -285,9 +190,19 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin):
                 dead harness-driven tanks.
         """
         if command["kind"] not in _SUPPORTED_KINDS:
+            # The message names the gap rather than the build phase.
+            # It used to read "sim step b handles move/shoot only ...
+            # (laws 4-8 land in build step d)" — true in July 2026,
+            # stale ever since, and actively misleading once the
+            # server handled fifteen kinds. A refusal here is the sim
+            # saying it has no MEASURED law for the command, which is
+            # the correct answer for a fidelity harness and the wrong
+            # one for a hosted server; that tension is real and
+            # recorded, not resolved by guessing ([[client-commands]]).
             raise SimError(
-                f"sim step b handles move/shoot only; got {command['kind']!r} "
-                "(laws 4-8 land in build step d)"
+                f"no modelled law for client command {command['kind']!r} "
+                f"(byte 0x{command['command']:02X}); the sim refuses rather "
+                "than inventing a response"
             )
         tank = self.world["tanks"].get(tank_id)
         if tank is None:
@@ -346,12 +261,18 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin):
     ) -> None:
         """Route one queued command with no ammo or movement effect.
 
+        Connection-scoped questions are answered first and elsewhere
+        (:class:`SimServerQueriesMixin`); what reaches the chain below
+        acts on the world. ``map_open`` is the fallthrough.
+
         Args:
             tank_id: The commanding tank.
             command: The queued command.
             messages: This tick's outgoing batch (appended).
         """
         kind = command["kind"]
+        if self._answer_connection_query(tank_id, kind, messages):
+            return
         if kind == "mine":
             press = process_mine_press(self.world, self.terrain, tank_id)
             messages.extend(narrate_mine_press(press, self.session.client_id))
@@ -368,36 +289,6 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin):
             return
         if kind == "scope":
             self._process_scope_command(tank_id, command, messages)
-            return
-        if kind == "keepalive":
-            # THE HEARTBEAT DRAWS SILENCE. Measured over 11,871
-            # archived sends (2026-09-02): the real server answers
-            # none of them — 9,746 windows are wholly silent and every
-            # self-caused token in the rest belongs to another command
-            # whose answer arrived late. So this is not "ignored", it
-            # is answered CORRECTLY, and the branch is explicit rather
-            # than a fallthrough so nobody later reads the silence as
-            # an oversight and invents a reply.
-            #
-            # Before this branch existed a heartbeat did not reach the
-            # router at all: ``queue_command`` raised ``SimError`` on
-            # any kind outside ``_SUPPORTED_KINDS``, so the first
-            # heartbeat from a REAL client — one every 2 s, forever —
-            # took the server down. Our own bot never sends one, which
-            # is exactly why a sim built against our bot never met it
-            # ([[client-commands]]).
-            return
-        if kind == "statistics":
-            # Per-connection, like every other answer: the statistics
-            # of the tank that asked, and only to that tank.
-            if tank_id == self.session.client_id:
-                messages.append(
-                    statistics_statement(
-                        self.world["tick"],
-                        self.combat.destroyed_by(self.session.client_id),
-                        self.combat.deactivations_of(self.session.client_id),
-                    )
-                )
             return
         messages.append(build_map_data(self.world))
 

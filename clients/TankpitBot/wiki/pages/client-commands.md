@@ -55,7 +55,7 @@ These are sent during active gameplay. Each starts with a length byte, then the 
 |------|------|-------|-------|-------------|-------------|
 | 0x6C | `l` | 2 | Nb | **Open map** (CORRECTED 2026-07-24 — was listed as radar) | `[2, 'l']` |
 | 0x66 | `f` | 2 | Mb | **Radar scan** (CORRECTED 2026-07-24 — was listed as map) | `[2, 'f']` |
-| 0x69 | `i` | 2 | Yb | **Request inventory** | `[2, 'i']` |
+| 0x69 | `i` | 2 | Yb | **Request inventory**. Answered with a 0x49 in all 4 archived sends (2026-09-03). Unmapped in the sim's decoder until then, so it decoded to `other` and crashed the server. | `[2, 'i']` |
 | 0x76 | `v` | 2 | bc | **Request statistics** | `[2, 'v']` |
 | 0x2A | `*` | 2 | Zb | **Active forces** | `[2, '*']` |
 | 0x2F | `/` | 2 | ac | **Active players** | `[2, '/']` |
@@ -88,10 +88,34 @@ map programmatically and never key-closed it).[^3]
 
 | Code | Char | Bytes | Class | Description | Byte Layout |
 |------|------|-------|-------|-------------|-------------|
-| 0x3F | `?` | 2 | Jb | **Heartbeat/ping** (sent on game join) | `[2, '?']` |
+| 0x3F | `?` | 2 | Jb | **Enter game** (`CMD_ENTER_GAME`). 343 archived sends, **every one answered**, self-caused tokens `49 49 5A 3Dself` per send — the join burst. **The burst is an ANSWER, not a push**: the sim emitted it unprompted at connect because our bot never sends this command (it joins through the lobby's `join_room`). Unmapped until 2026-09-03, so it crashed the server. | `[2, '?']` |
 | 0x2E | `.` | 2 | Kb | **Ping** (latency check, sent via F6 key) | `[2, '.']` |
 | 0x21 | `!` | 2 | dc | **Keep-alive**. Cadence REFINED 2026-09-03 from 11,871 archived sends: p10 1,999 ms, **median 2,006 ms**, p90 30,070 ms — the "every 30s idle" figure is the idle TAIL; the common case is one per 2-second tick. The server never answers it: 9,746 windows wholly silent, and every self-caused token in the other 2,125 belongs to another command whose answer arrived late. **Our bot never sends one**, which is why the sim had no law for it until 2026-09-03 and a real client's first keep-alive crashed the server ([[capture-differ]]). | `[2, '!']` |
 | 0x72 | `r` | 3 | cc | **Hotkey action** (equipment toggle) | `[3, 'r', key_code]` — codes 49-53 (ASCII '1'-'5') toggle slots in inventory order: 1 armor, 2 dual, 3 missile, 4 homing, 5 radar (user contract + JS trace 2026-07-24; the server holds the enabled state — a scan with extras disabled consumes nothing) |
+
+### Observed but NOT modelled
+
+| Code | Bytes | Sends | Why not |
+|------|-------|------:|---------|
+| 0x44 | 6, type 6 | 7 | Payloads differ every send (`06446400aaae`, `06442003ae2f`, `06442601ae31`, `06449001b236`). Type 6 is combat and the shape is shoot-like — coordinates plus a two-byte tail — but seven samples with four distinct payloads support no law. Every one IS answered (tokens `pickup`, `64`, `47self`), so silence would be as wrong as a guess. `CMD_UNMODELLED_COMBAT` names the byte; the sim REFUSES it by name rather than inventing a response.
+
+**Constants defined and never once sent** in 342 archived sessions:
+`CMD_PING` (0x2E), `CMD_TOP10` (0x31), `CMD_ACTIVE_FORCES` (0x2A),
+`CMD_ACTIVE_PLAYERS` (0x2F), `CMD_NEAREST_ENEMY` (0x68). They are
+real client capabilities; nobody in the corpus used them.
+
+### The crash class, and why the archive found it
+
+Three commands a real browser sends decoded to `other`, the one kind
+`queue_command` refuses — so each would kill a hosted server on
+arrival. All three were found in ONE sweep of the sniff archive
+(2026-09-03), not by probing: `runs/sniff/` is real-client traffic,
+so "what does a real client send" was already answered on disk.
+
+The shared cause is that **our bot is the only client that does not
+send them.** A sim validated against our own bot cannot see a command
+our bot never emits, however long it soaks. That is a property of the
+corpus, not of the sim.
 
 ## Connection/Settings Commands (va subclasses)
 
@@ -293,6 +317,12 @@ reverse-engineering.
       "code": "tankpit_bot.protocol.commands:CMD_SHOOT",
       "value": 115,
       "means": "spacebar - fire at a target position"
+    },
+    {
+      "id": "cmd-unmodelled-combat",
+      "code": "tankpit_bot.protocol.commands:CMD_UNMODELLED_COMBAT",
+      "value": 68,
+      "means": "0x44 -- observed live and deliberately NOT modelled. Seven archived sends, type 6 (combat), four DISTINCT payloads (06446400aaae, 06442003ae2f, 06442601ae31, 06449001b236) whose shape is shoot-like: coordinates plus a two-byte tail. Every send IS answered (self-caused tokens pickup, 64, 47self), so silence would be as wrong as a guess, and seven samples across four payloads support no law. The constant exists so the sim can REFUSE the byte by name instead of by build phase; modelling it needs either more archive or a live probe."
     },
     {
       "id": "cmd-keepalive",

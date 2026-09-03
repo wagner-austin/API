@@ -40,6 +40,7 @@ CMD_STATISTICS = 118  # 0x76 - 'c' key - Show statistics
 CMD_PING = 46  # 0x2e - 'F6' key - Ping server, returns latency in ms
 
 CMD_KEEPALIVE = 33  # 0x21 - client keep-alive, JS class dc ([[client-commands]])
+CMD_UNMODELLED_COMBAT = 68  # 0x44 - observed live, type 6, NO law ([[client-commands]])
 
 # XOR-encoded commands (type=4, start with '!') - Movement
 CMD_MOVE = 112  # 0x70 - Mouse click - Tank movement (click to move)
@@ -150,6 +151,7 @@ __all__ = [
     "CMD_STATISTICS",
     "CMD_TOGGLE_EQUIPMENT",
     "CMD_TOP10",
+    "CMD_UNMODELLED_COMBAT",
     "COMMAND_PREFIX",
     "PLAIN_AUTOSCROLL_OFF",
     "PLAIN_AUTOSCROLL_ON",
