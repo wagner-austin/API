@@ -16,11 +16,12 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
+from platform_core.config import config_test_hooks
 from platform_core.json_utils import dump_json_str
 
 from code_style_eval.cli import _test_hooks
 from code_style_eval.contracts.outcomes import ItemOutcome, encode_item_outcome
-from code_style_eval.core.checks import score_item
+from code_style_eval.core.checks import checker_environment, score_item
 from code_style_eval.core.prompts import EvalPrompt, build_prompts
 
 _HOLDOUT_FLAG = "--holdout"
@@ -246,6 +247,15 @@ def score_arm(arguments: Arguments, prompts: Sequence[EvalPrompt]) -> list[ItemO
     Returns:
         One outcome per scored item, in prompt order.
     """
+    # Built ONCE. Rebuilding per item would glob the repository once per
+    # item for an answer that cannot change during a sweep.
+    #
+    # The parent environment comes from platform_core's hook rather than
+    # from os.environ, which the env guard bans outside that module. The
+    # hook exists for this exact case: subprocess REPLACES the environment
+    # when given one, so a caller adding a single variable has to start
+    # from the parent's.
+    env = checker_environment(arguments.check_cwd, config_test_hooks.get_environment())
     outcomes: list[ItemOutcome] = []
     for prompt in prompts:
         target = generated_path(arguments.generated_dir, prompt["item_id"])
@@ -259,6 +269,7 @@ def score_arm(arguments: Arguments, prompts: Sequence[EvalPrompt]) -> list[ItemO
                 target=target,
                 root=item_root(arguments.generated_dir, prompt["item_id"]),
                 cwd=arguments.check_cwd,
+                env=env,
             )
         )
     return outcomes

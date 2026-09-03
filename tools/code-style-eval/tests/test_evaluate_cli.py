@@ -29,6 +29,26 @@ from tests.conftest import _Recorder, _write_generation
 _SOURCE = "".join(f"line{i}" + chr(10) for i in range(10))
 
 
+def _check_cwd(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Build a directory shaped like a package inside the monorepo.
+
+    The checkers are invoked from a package at ``<repo>/<category>/<package>``,
+    and the instrument reads the repository root from that shape to find every
+    package source root for MYPYPATH. A bare temporary directory is not that
+    shape, and is refused rather than silently yielding an empty path list.
+
+    Args:
+        tmp_path: The test's directory, standing in for a repository root.
+
+    Returns:
+        The package directory to pass as --check-cwd.
+    """
+    (tmp_path / "libs").mkdir(exist_ok=True)
+    package = tmp_path / "tools" / "pkg"
+    package.mkdir(parents=True, exist_ok=True)
+    return package
+
+
 class TestParsingArguments:
     """Every required flag is required, and the optional ones default."""
 
@@ -210,7 +230,7 @@ class TestTheSweep:
                 "--prompt-lines",
                 "3",
                 "--check-cwd",
-                str(tmp_path),
+                str(_check_cwd(tmp_path)),
             ]
         )
 
@@ -250,7 +270,7 @@ class TestTheSweep:
                 "--prompt-lines",
                 "3",
                 "--check-cwd",
-                str(tmp_path),
+                str(_check_cwd(tmp_path)),
             ]
         )
 
@@ -281,7 +301,7 @@ class TestTheSweep:
                 "--prompt-lines",
                 "3",
                 "--check-cwd",
-                str(tmp_path),
+                str(_check_cwd(tmp_path)),
             ]
         )
 
@@ -345,7 +365,7 @@ class TestTheEntryPoint:
             "--prompt-lines",
             "3",
             "--check-cwd",
-            str(tmp_path),
+            str(_check_cwd(tmp_path)),
         ]
 
         with pytest.raises(SystemExit) as raised:

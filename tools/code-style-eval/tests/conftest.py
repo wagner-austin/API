@@ -13,6 +13,7 @@ reorders.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Mapping
 
 import pytest
 
@@ -48,18 +49,23 @@ class _Recorder:
         """
         self.results = results
         self.calls: list[tuple[str, ...]] = []
+        self.environments: list[Mapping[str, str]] = []
 
-    def __call__(self, command: tuple[str, ...], cwd: pathlib.Path) -> _Finished:
+    def __call__(
+        self, command: tuple[str, ...], cwd: pathlib.Path, env: Mapping[str, str]
+    ) -> _Finished:
         """Record a call and return its scripted result.
 
         Args:
             command: The composed argv.
             cwd: Directory the checker would run in.
+            env: Environment the checker would run under.
 
         Returns:
             The scripted result.
         """
         self.calls.append(command)
+        self.environments.append(env)
         for name, finished in self.results.items():
             if name in command:
                 return finished

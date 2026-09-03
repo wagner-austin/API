@@ -15,6 +15,8 @@ model writes Python that is not this repo's Python".
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from code_style_eval.contracts.outcomes import (
@@ -60,6 +62,62 @@ def checker_command(checker: str, interpreter: str, target: Path, root: Path) ->
     raise ValueError(f"unknown checker '{checker}'; known checkers: {CHECKERS}")
 
 
+def package_source_roots(check_cwd: Path) -> tuple[Path, ...]:
+    """Locate every package source root in the monorepo.
+
+    Scoring puts each generated file alone in its own throwaway tree, which is
+    what the guards need -- they are scoped to a tree -- and is exactly what
+    starves mypy. In the real repository a file sits inside its package, so
+    ``from clubbot.cogs import ...`` resolves against that package's ``src``.
+    Alone in a sandbox it resolves against nothing, and mypy reports a missing
+    stub: a verdict about the sandbox rather than about the generated code.
+
+    Handing mypy every package's ``src`` restores what the file would have
+    seen. It does NOT rescue third-party imports such as numpy or torch, which
+    are absent from the scoring environment rather than merely unfound; those
+    remain a stated limit of the instrument.
+
+    The layout convention is the monorepo's own, the one
+    ``monorepo_guards.shim`` relies on: a package sits at
+    ``<repo>/<category>/<package>``, so the repository is two levels above the
+    package the checkers are invoked from.
+
+    Args:
+        check_cwd: The package the checkers are invoked from.
+
+    Returns:
+        Every existing ``<repo>/<category>/<package>/src`` directory, sorted.
+
+    Raises:
+        RuntimeError: If the resolved repository root holds no ``libs``
+            directory, meaning the package is not where the layout says it is.
+            Raising beats searching: a silently empty path list would put mypy
+            back to reporting missing stubs, and the sweep would record that
+            as a typing verdict.
+    """
+    repo = check_cwd.resolve().parents[1]
+    if not (repo / "libs").is_dir():
+        raise RuntimeError(
+            f"{check_cwd} is not <repo>/<category>/<package>: expected a libs directory in {repo}"
+        )
+    return tuple(sorted(path for path in repo.glob("*/*/src") if path.is_dir()))
+
+
+def checker_environment(check_cwd: Path, base: Mapping[str, str]) -> dict[str, str]:
+    """Build the environment the checkers run under.
+
+    Args:
+        check_cwd: The package the checkers are invoked from.
+        base: The environment to extend, normally the current process's.
+
+    Returns:
+        The environment, with ``MYPYPATH`` naming every package source root.
+    """
+    environment = dict(base)
+    environment["MYPYPATH"] = os.pathsep.join(str(path) for path in package_source_roots(check_cwd))
+    return environment
+
+
 def _first_line(text: str) -> str:
     """Return the first line of some output that carries a finding.
 
@@ -92,7 +150,14 @@ def _first_line(text: str) -> str:
     return lines[0] if lines else ""
 
 
-def run_check(checker: str, interpreter: str, target: Path, root: Path, cwd: Path) -> CheckOutcome:
+def run_check(
+    checker: str,
+    interpreter: str,
+    target: Path,
+    root: Path,
+    cwd: Path,
+    env: Mapping[str, str],
+) -> CheckOutcome:
     """Run one checker over one item and record its verdict.
 
     Args:
@@ -103,6 +168,8 @@ def run_check(checker: str, interpreter: str, target: Path, root: Path, cwd: Pat
         cwd: Directory to run the checker in. It is the package through whose
             ``scripts/guard.py`` the guards are invoked, NOT the tree they
             check -- ``--root`` decides that.
+        env: Environment for the checker, carrying the MYPYPATH that lets a
+            sandboxed file resolve the imports its package would have.
 
     Returns:
         The outcome.
@@ -111,7 +178,7 @@ def run_check(checker: str, interpreter: str, target: Path, root: Path, cwd: Pat
         ValueError: If the checker is not one of :data:`CHECKERS`.
     """
     command = checker_command(checker, interpreter, target, root)
-    finished = Hooks.run_checker(command, cwd)
+    finished = Hooks.run_checker(command, cwd, env)
     # stderr FIRST. The guards write a rule-count summary to stdout and the
     # violations themselves to stderr, so reading stdout first gave every
     # guard failure the same detail -- the constant banner line "Guard rule
@@ -129,7 +196,14 @@ def run_check(checker: str, interpreter: str, target: Path, root: Path, cwd: Pat
 
 
 def score_item(
-    *, item_id: str, arm: str, interpreter: str, target: Path, root: Path, cwd: Path
+    *,
+    item_id: str,
+    arm: str,
+    interpreter: str,
+    target: Path,
+    root: Path,
+    cwd: Path,
+    env: Mapping[str, str],
 ) -> ItemOutcome:
     """Run every checker over one generated file.
 
@@ -144,11 +218,12 @@ def score_item(
         target: The generated file.
         root: The item's own guard root.
         cwd: Directory the checkers are invoked from.
+        env: Environment for the checkers.
 
     Returns:
         The item's outcome across every checker.
     """
-    checks = tuple(run_check(checker, interpreter, target, root, cwd) for checker in CHECKERS)
+    checks = tuple(run_check(checker, interpreter, target, root, cwd, env) for checker in CHECKERS)
     return ItemOutcome(
         item_id=item_id,
         arm=arm,
@@ -157,4 +232,10 @@ def score_item(
     )
 
 
-__all__ = ["checker_command", "run_check", "score_item"]
+__all__ = [
+    "checker_command",
+    "checker_environment",
+    "package_source_roots",
+    "run_check",
+    "score_item",
+]

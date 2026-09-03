@@ -21,6 +21,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.run_record import encode_run_record, run_record_sidecar
 
 from code_style_eval.cli import _test_hooks
 from code_style_eval.contracts.outcomes import (
@@ -29,6 +30,7 @@ from code_style_eval.contracts.outcomes import (
     decode_item_outcome,
     encode_comparison_report,
 )
+from code_style_eval.core.provenance import comparison_run_record
 from code_style_eval.core.scoring import (
     exact_mcnemar_p,
     mid_p_mcnemar_p,
@@ -40,8 +42,9 @@ from code_style_eval.core.scoring import (
 _BASELINE_FLAG = "--baseline"
 _CANDIDATE_FLAG = "--candidate"
 _OUT_FLAG = "--out"
+_LABEL_FLAG = "--label"
 
-_FLAGS: tuple[str, ...] = (_BASELINE_FLAG, _CANDIDATE_FLAG, _OUT_FLAG)
+_FLAGS: tuple[str, ...] = (_BASELINE_FLAG, _CANDIDATE_FLAG, _OUT_FLAG, _LABEL_FLAG)
 
 
 def read_outcomes(path: pathlib.Path) -> dict[str, ItemOutcome]:
@@ -153,14 +156,16 @@ def render(report: ComparisonReport) -> list[str]:
     ]
 
 
-def parse_arguments(tokens: Sequence[str]) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+def parse_arguments(
+    tokens: Sequence[str],
+) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, str]:
     """Parse the command line.
 
     Args:
         tokens: Arguments excluding the program name.
 
     Returns:
-        A tuple of (baseline path, candidate path, output path).
+        A tuple of (baseline path, candidate path, output path, label).
 
     Raises:
         ValueError: If a flag is unknown, missing, or has no value.
@@ -182,6 +187,7 @@ def parse_arguments(tokens: Sequence[str]) -> tuple[pathlib.Path, pathlib.Path, 
         pathlib.Path(values[_BASELINE_FLAG]),
         pathlib.Path(values[_CANDIDATE_FLAG]),
         pathlib.Path(values[_OUT_FLAG]),
+        values[_LABEL_FLAG],
     )
 
 
@@ -196,7 +202,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         Exit code 0 when the report was written.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    baseline_path, candidate_path, out_path = parse_arguments(tokens)
+    baseline_path, candidate_path, out_path, label = parse_arguments(tokens)
 
     baseline = read_outcomes(baseline_path)
     candidate = read_outcomes(candidate_path)
@@ -212,8 +218,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         dump_json_str(encode_comparison_report(report), compact=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    # The record is written beside the comparison, never instead of it, and
+    # covers the inputs the comparison was computed from. Without it the
+    # rates and p-values above name no models, no decoding settings and no
+    # machine, which makes them unciteable the moment the run is over.
+    sidecar = run_record_sidecar(out_path)
+    sidecar.write_text(
+        dump_json_str(
+            encode_run_record(
+                comparison_run_record(report, label, [baseline_path, candidate_path])
+            ),
+            compact=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
     for line in render(report):
         _test_hooks.emit(line)
+    _test_hooks.emit(f"run record               {sidecar}")
     return 0
 
 

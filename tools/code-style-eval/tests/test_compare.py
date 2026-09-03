@@ -13,6 +13,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.run_record import decode_run_record, run_record_sidecar
 
 from code_style_eval.cli import _test_hooks as cli_hooks
 from code_style_eval.cli.compare import (
@@ -32,6 +33,7 @@ from code_style_eval.contracts.outcomes import (
     encode_comparison_report,
     encode_item_outcome,
 )
+from code_style_eval.core.provenance import payload_digest
 
 
 def _outcome(item_id: str, arm: str, *, passed: bool) -> ItemOutcome:
@@ -219,23 +221,42 @@ class TestParsingArguments:
     def test_a_full_command_line_parses(self, tmp_path: pathlib.Path) -> None:
         """Paths come back in order."""
         parsed = parse_arguments(
-            ["--baseline", "b.jsonl", "--candidate", "c.jsonl", "--out", "r.json"]
+            [
+                "--baseline",
+                "b.jsonl",
+                "--candidate",
+                "c.jsonl",
+                "--out",
+                "r.json",
+                "--label",
+                "sweep-v3",
+            ]
         )
 
         assert parsed == (
             pathlib.Path("b.jsonl"),
             pathlib.Path("c.jsonl"),
             pathlib.Path("r.json"),
+            "sweep-v3",
         )
 
-    @pytest.mark.parametrize("missing", ["--baseline", "--candidate", "--out"])
+    @pytest.mark.parametrize("missing", ["--baseline", "--candidate", "--out", "--label"])
     def test_each_flag_is_required(self, missing: str) -> None:
-        """Parametrised so a fourth flag cannot be added untested.
+        """Parametrised so a fifth flag cannot be added untested.
 
         Args:
             missing: The flag to drop.
         """
-        tokens = ["--baseline", "b", "--candidate", "c", "--out", "r"]
+        tokens = [
+            "--baseline",
+            "b",
+            "--candidate",
+            "c",
+            "--out",
+            "r",
+            "--label",
+            "s",
+        ]
         index = tokens.index(missing)
         del tokens[index : index + 2]
 
@@ -270,7 +291,18 @@ class TestTheComparison:
         emitted: list[str] = []
         cli_hooks.emit = emitted.append
 
-        code = main(["--baseline", str(base), "--candidate", str(cand), "--out", str(out)])
+        code = main(
+            [
+                "--baseline",
+                str(base),
+                "--candidate",
+                str(cand),
+                "--out",
+                str(out),
+                "--label",
+                "sweep-test",
+            ]
+        )
 
         assert code == 0
         report = decode_comparison_report(
@@ -280,6 +312,15 @@ class TestTheComparison:
         assert report["candidate_arm"] == "cand"
         assert report["net_improvement"] == 1
         assert any("net items fixed" in line for line in emitted)
+
+        # The record lands BESIDE the comparison, covering the files it was
+        # computed from. Without it the rates above name no models, no
+        # decoding settings and no machine.
+        sidecar = run_record_sidecar(out)
+        recorded = decode_run_record(load_json_str(sidecar.read_text(encoding="utf-8")))
+        assert recorded["label"] == "sweep-test"
+        assert recorded["payload_digest"] == payload_digest([base, cand])
+        assert {o["name"] for o in recorded["observations"]} >= {"mid_p", "shared_items"}
 
 
 def _make_argv() -> Generator[list[str], None, None]:
@@ -320,6 +361,8 @@ class TestTheEntryPoint:
             str(cand),
             "--out",
             str(out),
+            "--label",
+            "sweep-entry",
         ]
 
         with pytest.raises(SystemExit) as raised:

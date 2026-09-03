@@ -10,9 +10,16 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from platform_core.config import config_test_hooks
 
 from code_style_eval.core import _test_hooks as core_hooks
-from code_style_eval.core.checks import checker_command, run_check, score_item
+from code_style_eval.core.checks import (
+    checker_command,
+    checker_environment,
+    package_source_roots,
+    run_check,
+    score_item,
+)
 from tests.conftest import _Finished, _Recorder
 
 
@@ -56,6 +63,76 @@ class TestComposingCheckerCommands:
             _ = checker_command("pylint", "py", pathlib.Path("a.py"), pathlib.Path("root"))
 
 
+class TestResolvingImportsForASandboxedFile:
+    """A file alone in a throwaway tree can still find its own package.
+
+    The per-item isolation the guards need is exactly what starves mypy: in
+    the real repository a generated file would sit inside its package and
+    resolve its imports against that package's ``src``.
+    """
+
+    def _package(self, repo: pathlib.Path, category: str, name: str) -> pathlib.Path:
+        """Create one package with a source root.
+
+        Args:
+            repo: Repository root.
+            category: Category directory, e.g. ``libs``.
+            name: Package directory name.
+
+        Returns:
+            The package's ``src`` directory.
+        """
+        source = repo / category / name / "src"
+        source.mkdir(parents=True)
+        return source
+
+    def test_every_package_source_root_is_found(self, tmp_path: pathlib.Path) -> None:
+        """Missing one means the imports it holds report as missing stubs."""
+        (tmp_path / "libs").mkdir()
+        first = self._package(tmp_path, "libs", "platform_core")
+        second = self._package(tmp_path, "clients", "DiscordBot")
+        caller = tmp_path / "tools" / "code-style-eval"
+        caller.mkdir(parents=True)
+
+        assert package_source_roots(caller) == tuple(sorted((second, first)))
+
+    def test_a_directory_without_a_source_root_is_not_offered(self, tmp_path: pathlib.Path) -> None:
+        """A path that does not exist on disk would only pad MYPYPATH."""
+        (tmp_path / "libs").mkdir()
+        (tmp_path / "libs" / "no_src").mkdir()
+        caller = tmp_path / "tools" / "code-style-eval"
+        caller.mkdir(parents=True)
+
+        assert package_source_roots(caller) == ()
+
+    def test_a_package_outside_the_layout_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """Silently returning nothing would look like a typing verdict.
+
+        With an empty MYPYPATH every import reports a missing stub, and the
+        sweep would record that as the generated code failing to type-check
+        rather than as the instrument being pointed at the wrong tree.
+        """
+        caller = tmp_path / "tools" / "code-style-eval"
+        caller.mkdir(parents=True)
+
+        with pytest.raises(RuntimeError, match="expected a libs directory"):
+            _ = package_source_roots(caller)
+
+    def test_the_environment_carries_the_roots_and_keeps_the_rest(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """MYPYPATH is added; the inherited environment is not discarded."""
+        (tmp_path / "libs").mkdir()
+        source = self._package(tmp_path, "libs", "platform_core")
+        caller = tmp_path / "tools" / "code-style-eval"
+        caller.mkdir(parents=True)
+
+        environment = checker_environment(caller, {"PATH": "/usr/bin"})
+
+        assert environment["MYPYPATH"] == str(source)
+        assert environment["PATH"] == "/usr/bin"
+
+
 class TestRunningOneCheck:
     """A checker's exit status is the verdict."""
 
@@ -64,7 +141,7 @@ class TestRunningOneCheck:
         core_hooks.Hooks.run_checker = _Recorder({"ruff": _Finished(0, "all good")})
 
         outcome = run_check(
-            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["passed"] is True
@@ -78,7 +155,7 @@ class TestRunningOneCheck:
         )
 
         outcome = run_check(
-            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["passed"] is False
@@ -90,7 +167,7 @@ class TestRunningOneCheck:
         core_hooks.Hooks.run_checker = _Recorder({"mypy": _Finished(2, "", "internal error")})
 
         outcome = run_check(
-            "mypy", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "mypy", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["exit_code"] == 2
@@ -117,7 +194,7 @@ class TestRunningOneCheck:
         )
 
         outcome = run_check(
-            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["detail"] == "a.py:8: kind=any-usage text="
@@ -129,7 +206,7 @@ class TestRunningOneCheck:
         )
 
         outcome = run_check(
-            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["detail"] == "Guard checks failed:"
@@ -139,7 +216,7 @@ class TestRunningOneCheck:
         core_hooks.Hooks.run_checker = _Recorder({"scripts.guard": _Finished(2, "", "")})
 
         outcome = run_check(
-            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "guards", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["passed"] is False
@@ -150,7 +227,7 @@ class TestRunningOneCheck:
         core_hooks.Hooks.run_checker = _Recorder({"ruff": _Finished(3, "", "")})
 
         outcome = run_check(
-            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path(".")
+            "ruff", "py", pathlib.Path("a.py"), pathlib.Path("root"), pathlib.Path("."), {}
         )
 
         assert outcome["passed"] is False
@@ -172,6 +249,7 @@ class TestScoringOneItem:
             target=pathlib.Path("a.py"),
             root=pathlib.Path("root"),
             cwd=pathlib.Path("."),
+            env={},
         )
 
         assert len(recorder.calls) == 3
@@ -189,6 +267,7 @@ class TestScoringOneItem:
             target=pathlib.Path("a.py"),
             root=pathlib.Path("root"),
             cwd=pathlib.Path("."),
+            env={},
         )
 
         assert outcome["all_passed"] is True
@@ -221,6 +300,7 @@ class TestTheProductionRunner:
             return core_hooks.Hooks.run_checker(
                 ("python", "-m", "ruff", "check", "--select", "F401", str(target)),
                 tmp_path,
+                config_test_hooks.get_environment(),
             ).returncode
 
         # Asserted as a PAIR rather than on output text: the exit statuses
@@ -228,6 +308,40 @@ class TestTheProductionRunner:
         # property the instrument depends on and is stable across versions.
         assert _ruff(offender) == 1
         assert _ruff(clean) == 0
+
+    def test_output_that_the_locale_codec_cannot_decode_still_arrives(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A real process writing byte 0x81, which cp1252 cannot map.
+
+        This is the byte that ended a real sweep. Under ``text=True`` the
+        decode happens on subprocess's reader thread, so the failure does not
+        surface as an exception here: the thread dies, ``communicate``
+        returns None for that stream, and the caller holds a ``stdout`` that
+        the protocol in this package promises is a ``str``.
+
+        Asserted against the exact decoded text rather than against a type or
+        a truthiness, so it pins WHAT arrives: 0x81 is not valid UTF-8, and
+        ``errors="replace"`` renders it as U+FFFD. A None would fail this,
+        and so would a silent switch back to the locale codec.
+
+        Args:
+            tmp_path: Directory to run the process in.
+        """
+        finished = core_hooks.Hooks.run_checker(
+            (
+                "python",
+                "-c",
+                "import sys; sys.stdout.buffer.write(bytes([0x81])); "
+                "sys.stderr.buffer.write(bytes([0x81]))",
+            ),
+            tmp_path,
+            config_test_hooks.get_environment(),
+        )
+
+        assert finished.stdout == "�"
+        assert finished.stderr == "�"
+        assert finished.returncode == 0
 
 
 class TestResettingTheHookContainer:
