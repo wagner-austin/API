@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "251eaefbb98b73d9de26901f44990cbb011d63bd",
+  "git_commit": "80221ea1056e08aacd3f5ee01e6c599e166970be",
   "system_packages": [],
   "extra_index_urls": [
     "https://pypi.org/simple"
