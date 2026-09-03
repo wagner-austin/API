@@ -150,6 +150,70 @@ def test_a_panel_of_zero_pairs_is_refused(tmp_path: Path) -> None:
     assert caught.value.code == "RW-PANEL-002"
 
 
+def test_a_relaunch_reuses_the_batchs_own_seeds(tmp_path: Path) -> None:
+    """The kill-resume property: a swept driver relaunched with the same
+    request must replay the SAME seeds so the cluster's converge dedupes,
+    never abandon in-flight matches for a fresh block."""
+    jobs_dir = tmp_path / "sweeps"
+    jobs_dir.mkdir()
+    sweeps_root = tmp_path / "runs"
+    arm_verdicts = {10001: "won", 12501: "wiped"}
+
+    first = _Cluster(sweeps_root, arm_verdicts)
+    run_panel(
+        first,
+        "probe",
+        "doctrines/a.doctrine",
+        "cand",
+        "doctrines/b.doctrine",
+        2,
+        sweeps_root=sweeps_root,
+        jobs_dir=jobs_dir,
+    )
+    # The runner wrote nothing to jobs_dir (a scripted stand-in), so
+    # simulate what the real ClusterRound leaves behind: the job file.
+    (jobs_dir / "probe.txt").write_text(
+        "".join(f"{line}\n" for line in first.job_lines), encoding="utf-8"
+    )
+
+    second = _Cluster(sweeps_root, arm_verdicts)
+    run_panel(
+        second,
+        "probe",
+        "doctrines/a.doctrine",
+        "cand",
+        "doctrines/b.doctrine",
+        2,
+        sweeps_root=sweeps_root,
+        jobs_dir=jobs_dir,
+    )
+    jobs_first = [line for line in first.job_lines if not line.startswith("#")]
+    jobs_second = [line for line in second.job_lines if not line.startswith("#")]
+    assert jobs_second == jobs_first
+
+
+def test_a_relaunch_with_a_different_request_is_refused(tmp_path: Path) -> None:
+    jobs_dir = tmp_path / "sweeps"
+    jobs_dir.mkdir()
+    (jobs_dir / "probe.txt").write_text(
+        "control|10001|doctrines/a.doctrine|10000\ncand|10001|doctrines/b.doctrine|10000\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(PanelError) as caught:
+        run_panel(
+            _Cluster(tmp_path / "runs", {}),
+            "probe",
+            "doctrines/a.doctrine",
+            "cand",
+            "doctrines/b.doctrine",
+            48,
+            sweeps_root=tmp_path / "runs",
+            jobs_dir=jobs_dir,
+        )
+    assert caught.value.code == "RW-PANEL-003"
+    assert "1 'cand' seed(s) but 48 pairs" in caught.value.message
+
+
 def test_used_seeds_count_generated_search_rounds_too(tmp_path: Path) -> None:
     """sweeps/search is gitignored but its seeds are just as consumed."""
     jobs_dir = tmp_path / "sweeps"

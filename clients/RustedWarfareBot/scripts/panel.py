@@ -76,7 +76,8 @@ class PanelError(RwBotError):
     Args:
         code: ``RW-PANEL-001`` when the next seed block would cross into
             the search's namespace, ``RW-PANEL-002`` when fewer than one
-            pair is asked for.
+            pair is asked for, ``RW-PANEL-003`` when a relaunch's request
+            does not match the batch's existing job file.
         message: Human-readable description of the refusal.
     """
 
@@ -195,16 +196,39 @@ def run_panel(
 
     Raises:
         PanelError: ``RW-PANEL-002`` when fewer than one pair is asked
-            for, or through :func:`seed_block` on namespace exhaustion.
+            for, ``RW-PANEL-003`` when a relaunch's pair count does not
+            match the batch's existing job file, or through
+            :func:`seed_block` on namespace exhaustion.
         SweepError: Through :func:`used_seeds` or :func:`fresh_seeds`.
         ClusterRoundError: Through the runner, on a round that cannot
             deliver its scorecards.
     """
     if pairs < 1:
         raise PanelError("RW-PANEL-002", f"a panel needs at least one pair, got {pairs}")
-    used = used_seeds(jobs_dir)
-    start, stop = seed_block(used)
-    seeds = fresh_seeds(used, pairs, start, stop)
+    own_file = jobs_dir / f"{batch}.txt"
+    if own_file.exists():
+        # RELAUNCH, not a new panel: the batch's own job file already
+        # names its seeds, and picking fresh ones would abandon every
+        # match the first invocation submitted. Reusing the file makes a
+        # relaunch idempotent the same way the search's rounds are -- the
+        # converge inside the runner dedupes against the cluster.
+        # Discovered before it bit: the session harness sweeps long-lived
+        # local drivers (2026-09-03), so a panel MUST survive a mid-drain
+        # kill plus relaunch.
+        recorded = parse_jobs(own_file.read_text(encoding="utf-8").splitlines())
+        seeds = tuple(job["seed"] for job in recorded if job["label"] == arm_label)
+        if len(seeds) != pairs:
+            raise PanelError(
+                "RW-PANEL-003",
+                f"{own_file.as_posix()} exists with {len(seeds)} {arm_label!r} "
+                f"seed(s) but {pairs} pairs were asked for; a relaunch must "
+                "repeat the original request exactly, and a different panel "
+                "needs a different batch name",
+            )
+    else:
+        used = used_seeds(jobs_dir)
+        start, stop = seed_block(used)
+        seeds = fresh_seeds(used, pairs, start, stop)
     lines_out = panel_job_lines(batch, control_doctrine, arm_label, arm_doctrine, seeds)
     host_hooks.write_line(
         f"# panel {batch}: {pairs} pairs, seeds {seeds[0]}-{seeds[-1]}, control vs {arm_label}"
