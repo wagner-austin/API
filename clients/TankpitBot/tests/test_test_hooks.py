@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.resources import data_directory
 
 
 def test_default_get_env_returns_none_for_missing() -> None:
@@ -125,7 +126,7 @@ def test_real_get_sync_playwright_returns_callable() -> None:
 
 def test_real_load_terrain_map_returns_terrain_map() -> None:
     """Test _real_load_terrain_map loads a TerrainMap from GIF."""
-    gif_path = Path(__file__).parent.parent / "field42-r.gif"
+    gif_path = data_directory() / "field42_r.gif"
     result = _test_hooks._real_load_terrain_map(gif_path)
 
     # Verify it implements TerrainMapProtocol by calling methods

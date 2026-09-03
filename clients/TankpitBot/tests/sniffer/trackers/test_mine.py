@@ -132,7 +132,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_message_mine_command_sent(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message handles sent mine drop command."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -159,7 +159,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_message_mine_placed(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message decodes mine placed message."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -183,7 +183,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_message_mine_detonation(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message decodes mine detonation message."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -207,7 +207,7 @@ class TestMineTrackerEdgeCases:
 
     def test_parse_mine_placed_short(self, fake_fs: FakeFileSystem) -> None:
         """Test _parse_mine_placed handles short decoded."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEF" + "A" * 994
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -218,7 +218,7 @@ class TestMineTrackerEdgeCases:
 
     def test_parse_mine_placed_without_readable_positions(self, fake_fs: FakeFileSystem) -> None:
         """Test _parse_mine_placed reports count when positions are truncated."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEF" + "A" * 994
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -229,7 +229,7 @@ class TestMineTrackerEdgeCases:
 
     def test_parse_mine_detonation_short(self, fake_fs: FakeFileSystem) -> None:
         """Test _parse_mine_detonation handles short decoded."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEF" + "A" * 994
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -240,7 +240,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_message_returns_none_for_wrong_body(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message returns None for body not starting with 0x2E."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -257,7 +257,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_message_unknown_decoded_sig(self, fake_fs: FakeFileSystem) -> None:
         """Test process_message returns None for unknown decoded signature."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -279,7 +279,7 @@ class TestMineTrackerEdgeCases:
 
     def test_process_mine_command_wrong_type_or_id(self, fake_fs: FakeFileSystem) -> None:
         """Test _process_mine_command returns None for wrong cmd_type or cmd_id."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -304,7 +304,7 @@ class TestMineTrackerEdgeCases:
 
     def test_parse_mine_detonation_no_readable_positions(self, fake_fs: FakeFileSystem) -> None:
         """Test _parse_mine_detonation when positions can't be read."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -332,7 +332,7 @@ class TestMineTrackerEdgeCases:
         self, fake_fs: FakeFileSystem
     ) -> None:
         """Test tunneled 0x2E subtype 0x45 is not misclassified as mine detonation."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
         fake_fs.write_text(static_key_file_path(), static_key)

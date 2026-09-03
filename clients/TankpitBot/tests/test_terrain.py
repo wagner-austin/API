@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot._pillow import load_pillow_image_module
+from tankpit_bot.resources import data_directory
 from tankpit_bot.terrain import TerrainMap, format_viewport
 
 _IMAGE = load_pillow_image_module()
@@ -171,15 +172,15 @@ def test_gif_compression_variants_grouped_with_ground(tmp_path: Path) -> None:
 
 def test_real_field01_terrain_detection() -> None:
     """Real field01_r.gif classifies ground, rock, and water correctly."""
-    terrain = TerrainMap(Path("field01_r.gif"))
+    terrain = TerrainMap(data_directory() / "field01_r.gif")
     assert terrain.get_terrain(131, 110) == TerrainMap.GROUND
     assert terrain.get_terrain(125, 126) == TerrainMap.WATER
     assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
 
 
 def test_real_field42_terrain_detection() -> None:
-    """Real field42-r.gif classifies ground, rock, and water correctly."""
-    terrain = TerrainMap(Path("field42-r.gif"))
+    """Real field42_r.gif classifies ground, rock, and water correctly."""
+    terrain = TerrainMap(data_directory() / "field42_r.gif")
     assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
     assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
     assert terrain.is_passable(128, 128) is True

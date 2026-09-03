@@ -144,7 +144,7 @@ class TestBuildSessionXorTable:
 
     def test_returns_the_table_for_the_given_magic(self, fake_fs: FakeFileSystem) -> None:
         """The result equals the static key combined with that magic."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         static_key = "ABCDEF"
         fake_fs.write_text(static_key_file_path(), static_key)
@@ -159,7 +159,7 @@ class TestBuildSessionXorTable:
         second build overwrote the first, so the first session's frames
         decoded against the wrong key.
         """
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()
@@ -172,7 +172,7 @@ class TestBuildSessionXorTable:
 
     def test_raises_when_the_static_key_is_missing(self, fake_fs: FakeFileSystem) -> None:
         """A missing key raises rather than yielding a silent identity decode."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         fake_fs.remove(static_key_file_path())
         reset_static_key_cache()
@@ -186,7 +186,7 @@ class TestBuildSessionXorTable:
         The KEY is process-wide (the same key builds every session's
         table); only the TABLE is session state.
         """
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()
@@ -198,7 +198,7 @@ class TestBuildSessionXorTable:
 
     def test_resetting_the_cache_re_reads_the_key(self, fake_fs: FakeFileSystem) -> None:
         """After a reset the next build sees the file's current contents."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         fake_fs.write_text(static_key_file_path(), "ABCDEF")
         reset_static_key_cache()

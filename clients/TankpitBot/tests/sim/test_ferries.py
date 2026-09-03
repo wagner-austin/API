@@ -22,11 +22,10 @@ anything moves an unattended ferry again.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.protocol.types import BinaryMessage
+from tankpit_bot.resources import data_directory
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimFerryDict, SimWorldDict, make_sim_tank, make_sim_world
 from tankpit_bot.sim.world_seed_mines import seed_ferries
@@ -49,7 +48,7 @@ def _terrain_updates(messages: list[BinaryMessage]) -> list[list[tuple[int, int,
 
 def _real_terrain() -> TerrainMapProtocol:
     """Load the committed field01 terrain the seeder floats ferries on."""
-    return _test_hooks.load_terrain_map(Path(_FIELD))
+    return _test_hooks.load_terrain_map(data_directory() / _FIELD)
 
 
 def _world_with_ferry(x: int, y: int) -> SimWorldDict:

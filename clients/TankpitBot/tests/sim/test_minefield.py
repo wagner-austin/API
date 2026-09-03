@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from tankpit_bot import _test_hooks
+from tankpit_bot.resources import data_directory
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tankpit_bot.sim.world_seed_mines import (
     MINE_DENSITY,
@@ -198,7 +197,7 @@ def test_the_real_field_gets_a_minefield_the_walk_can_afford() -> None:
     """
     from tankpit_bot.sim.movement import process_move
 
-    terrain = _test_hooks.load_terrain_map(Path("field01_r.gif"))
+    terrain = _test_hooks.load_terrain_map(data_directory() / "field01_r.gif")
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 1100)
     laid = seed_minefield(world, terrain)

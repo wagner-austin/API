@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.types import STATIC_KEY_LENGTH
-from tankpit_bot.protocol.codec import static_key_file_path
+from tankpit_bot.resources import static_key_file_path
 
 
 def load_static_key() -> str:

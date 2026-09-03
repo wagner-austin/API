@@ -14,7 +14,6 @@ from tankpit_bot.protocol.codec import (
     create_codec,
     extract_magic_from_auth_payload,
     load_static_key,
-    static_key_file_path,
     xor_bytes,
 )
 from tests.conftest import FakeFileSystem
@@ -311,50 +310,6 @@ def test_invalid_key_error_is_codec_error() -> None:
     assert issubclass(InvalidKeyError, CodecError)
     err = InvalidKeyError("bad key")
     assert str(err) == "bad key"
-
-
-# =============================================================================
-# Default Path Tests
-# =============================================================================
-
-
-def test_default_static_key_path_has_expected_name() -> None:
-    """Test static_key_file_path() has expected file name."""
-    assert static_key_file_path().name == "xor_static_key.txt"
-
-
-def test_default_static_key_path_is_path_type() -> None:
-    """Test static_key_file_path() is a Path."""
-    # Verify by calling a Path method - this will fail if not a Path
-    assert static_key_file_path().suffix == ".txt"
-
-
-def test_static_key_path_env_override_names_the_file_exactly() -> None:
-    """The container's baked key path wins verbatim; empty is unset."""
-    from tankpit_bot import _test_hooks
-
-    checkout_default = static_key_file_path()
-    original = _test_hooks.get_env
-
-    def fake_env(key: str) -> str | None:
-        return {"TANKPIT_XOR_KEY_FILE": "/app/xor_static_key.txt"}.get(key)
-
-    def empty_env(key: str) -> str | None:
-        return {"TANKPIT_XOR_KEY_FILE": ""}.get(key)
-
-    _test_hooks.get_env = fake_env
-    try:
-        overridden = static_key_file_path()
-    finally:
-        _test_hooks.get_env = original
-    assert overridden == Path("/app/xor_static_key.txt")
-
-    _test_hooks.get_env = empty_env
-    try:
-        emptied = static_key_file_path()
-    finally:
-        _test_hooks.get_env = original
-    assert emptied == checkout_default
 
 
 # =============================================================================

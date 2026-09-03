@@ -17,7 +17,7 @@ from platform_core.json_utils import (
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.capture.xor import XorStaticKeyUnavailableError, reset_static_key_cache
-from tankpit_bot.protocol.codec import static_key_file_path
+from tankpit_bot.resources import BundledAssetMissingError, data_directory, static_key_file_path
 from tankpit_bot.sim.run import (
     main,
     run_sim_session,
@@ -52,7 +52,7 @@ def _install_fake_terrain(fake_fs: FakeFileSystem) -> None:
     Args:
         fake_fs: The installed fake file system.
     """
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
 
     def load_fake_terrain(gif_path: Path) -> TerrainMapProtocol:
         """Return an open in-memory terrain for any requested field."""
@@ -69,7 +69,7 @@ def test_default_scenario_seeds_are_passable_on_the_real_field() -> None:
     and drowned six containers — this pin keeps the default honest
     against the actual GIF (a git-tracked repo asset).
     """
-    terrain = _test_hooks.load_terrain_map(Path(SIM_FIELD))
+    terrain = _test_hooks.load_terrain_map(data_directory() / SIM_FIELD)
     _require_seeds_passable(make_default_sim_world(), terrain)
 
 
@@ -130,8 +130,14 @@ def test_run_records_a_production_session_exit(fake_fs: FakeFileSystem) -> None:
 
 
 def test_boot_refuses_missing_terrain_and_missing_key(fake_fs: FakeFileSystem) -> None:
-    """Both boot preconditions fail loudly, never best-effort."""
-    with pytest.raises(RuntimeError, match="terrain GIF"):
+    """Both boot preconditions fail loudly, never best-effort.
+
+    The terrain refusal is :class:`BundledAssetMissingError` because the
+    scenario names an asset the distribution is supposed to carry, so its
+    absence is a broken install rather than an unknown room
+    ([[packaged-data-assets]]).
+    """
+    with pytest.raises(BundledAssetMissingError, match=r"field01_r\.gif"):
         run_sim_session(1, archive_dir=_SIM_ARCHIVE, opponent=False, stamp="20260722-000006")
     _install_fake_terrain(fake_fs)
     fake_fs.remove(static_key_file_path())
@@ -177,7 +183,7 @@ def test_the_larder_world_seeds_on_passable_ground() -> None:
     The 2026-07-22 lesson: the naive region is coastal and drowned six
     containers. This runs the same validator the session runs.
     """
-    terrain = _test_hooks.load_terrain_map(Path(SIM_FIELD))
+    terrain = _test_hooks.load_terrain_map(data_directory() / SIM_FIELD)
     _require_seeds_passable(make_larder_sim_world(), terrain)
 
 
@@ -312,7 +318,7 @@ def test_ferry_scenario_seeds_are_legal_on_the_real_field() -> None:
     ferry, the ferry floats, and every land seed is genuinely open —
     all verified against the git-tracked GIF.
     """
-    terrain = _test_hooks.load_terrain_map(Path(SIM_FIELD))
+    terrain = _test_hooks.load_terrain_map(data_directory() / SIM_FIELD)
     _require_seeds_passable(make_ferry_sim_world(), terrain)
 
 
@@ -350,7 +356,7 @@ def _install_lake_terrain(fake_fs: FakeFileSystem) -> None:
     Args:
         fake_fs: The installed fake file system.
     """
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
     lake = {(x, y): "W" for x in range(111, 131) for y in range(105, 121)}
 
     def load_lake_terrain(gif_path: Path) -> TerrainMapProtocol:
@@ -415,7 +421,7 @@ def _install_wrong_pond_terrain(fake_fs: FakeFileSystem) -> None:
     Args:
         fake_fs: The installed fake file system.
     """
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
     goal_pond = {(x, y) for x in range(110, 115) for y in range(110, 115)}
     ferry_puddle = {(x, y) for x in range(117, 120) for y in range(111, 114)}
     deep_pond = {(x, y) for x in range(119, 122) for y in range(115, 118)}

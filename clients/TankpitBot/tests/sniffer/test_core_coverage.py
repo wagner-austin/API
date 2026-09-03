@@ -215,7 +215,7 @@ class TestSnifferCoverageBranches:
 
     def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message logs result when message decodes."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
         from tankpit_bot.sniffer import decoders
 
         ws = WorldService()
@@ -233,7 +233,7 @@ class TestSnifferCoverageBranches:
 
     def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
         """Test process_received_message handles binary messages."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
         from tankpit_bot.sniffer import decoders
 
         ws = WorldService()

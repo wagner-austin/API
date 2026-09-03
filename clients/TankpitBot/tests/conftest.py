@@ -494,7 +494,7 @@ def fake_fs() -> Generator[FakeFileSystem, None, None]:
     Yields:
         FakeFileSystem instance.
     """
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     original_write_text = _test_hooks.write_text
     original_read_text = _test_hooks.read_text

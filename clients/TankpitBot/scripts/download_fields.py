@@ -1,8 +1,10 @@
 """Download field minimap GIFs from tankpit.com.
 
 Fetches ``fieldXX.gif`` for all known field numbers and saves them as
-``fieldXX_r.gif`` in the project root, matching the naming convention
-that ``_find_field_gif`` in ``sniffer.world_state`` expects.
+``fieldXX_r.gif`` into the package's own data directory, which is where
+:mod:`tankpit_bot.resources` reads them from and what the wheel ships
+([[packaged-data-assets]]). Downloading anywhere else would produce files
+the installed package cannot see.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import sys
 from pathlib import Path
 
 from scripts import _test_hooks
+from tankpit_bot.resources import data_directory
 
 # The client JS builds field-image URLs as "/images/maps/field" + id
 # (verified against the live tp-*.js bundle 2026-07-19). The former
@@ -18,11 +21,6 @@ from scripts import _test_hooks
 # from it would overwrite every terrain map with HTML.
 _BASE_URL = "https://tankpit.com/images/maps"
 _FIELD_RANGE = range(1, 51)
-
-
-def _project_root() -> Path:
-    """Return the project root directory."""
-    return Path(__file__).resolve().parents[1]
 
 
 def download_field_gifs(
@@ -34,12 +32,15 @@ def download_field_gifs(
 
     Args:
         base_url: Base URL for tankpit.com.
-        output_dir: Directory to save GIF files.
+        output_dir: Directory to save GIF files. Defaults to the package's
+            own data directory, so a download lands exactly where
+            :mod:`tankpit_bot.resources` reads from and ships with the
+            wheel ([[packaged-data-assets]]).
 
     Returns:
         List of paths to successfully downloaded files.
     """
-    resolved_dir = output_dir if output_dir is not None else _project_root()
+    resolved_dir = output_dir if output_dir is not None else data_directory()
     downloaded: list[Path] = []
 
     for field_num in _FIELD_RANGE:

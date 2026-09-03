@@ -19,8 +19,8 @@ from tankpit_bot.protocol.codec import (
     CodecError,
     build_xor_table,
     load_static_key,
-    static_key_file_path,
 )
+from tankpit_bot.resources import static_key_file_path
 
 #: Process-wide cache of the static key. Unlike a session's table this
 #: is NOT session state: the same key builds every session's table, so

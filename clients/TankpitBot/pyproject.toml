@@ -11,7 +11,11 @@ packages = [
   { include = "tankpit_bot", from = "src" },
 ]
 readme = "README.md"
-include = ["src/tankpit_bot/py.typed"]
+include = [
+  "src/tankpit_bot/py.typed",
+  "src/tankpit_bot/data/*.gif",
+  "src/tankpit_bot/data/xor_static_key.txt",
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

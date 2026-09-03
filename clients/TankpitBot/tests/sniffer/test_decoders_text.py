@@ -341,7 +341,7 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_move(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes MOVE command."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
@@ -366,7 +366,7 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_shoot(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes SHOOT command."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
@@ -390,7 +390,7 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_pickup(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes PICKUP command."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
@@ -414,7 +414,7 @@ class TestDecodeCommandMovementBranches:
 
     def test_decode_command_teleport(self, fake_fs: FakeFileSystem) -> None:
         """Test decode_command decodes TELEPORT command."""
-        from tankpit_bot.protocol.codec import static_key_file_path
+        from tankpit_bot.resources import static_key_file_path
 
         magic = "testmagic123"
         static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974

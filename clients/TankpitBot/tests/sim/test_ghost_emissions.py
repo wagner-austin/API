@@ -10,6 +10,7 @@ from platform_core.json_utils import (
     narrow_json_to_list,
 )
 
+from tankpit_bot.resources import data_directory
 from tankpit_bot.sim.ghost import (
     GhostTracker,
     compile_ghost_spec,
@@ -93,7 +94,7 @@ def test_ghost_atlas_composition_underlays_the_mined_room(fake_fs: FakeFileSyste
         "61,60": {**entry, "last_v": 0},
     }
     fake_fs.write_text(DEFAULT_ATLAS_PATH, dump_json_str({"1|field01.gif": atlas_tiles}))
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
     # The ghost replay drives the production collect cascade, whose
     # atlas hop reads the committed hotspot data; the sim world has
     # no mined atlas, so it reads empty.

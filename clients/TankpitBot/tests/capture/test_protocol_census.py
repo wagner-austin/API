@@ -17,7 +17,8 @@ from tankpit_bot.capture.protocol_census import (
     encode_protocol_census,
     format_protocol_census,
 )
-from tankpit_bot.protocol.codec import build_xor_table, static_key_file_path
+from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.resources import static_key_file_path
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 from tests.conftest import FakeFileSystem

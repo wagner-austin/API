@@ -161,7 +161,7 @@ def test_session_decoder_skips_unknown_prefix() -> None:
 
 def test_load_and_decode_session_default_static_key(fake_fs: FakeFileSystem) -> None:
     """Test load_and_decode_session with default static_key_path."""
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     # Create static key at the default path
     fake_fs.write_text(static_key_file_path(), "ABCD")
@@ -201,7 +201,7 @@ def test_main_with_commands(
 ) -> None:
     """Test main() prints command summary."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     # Create static key
     fake_fs.write_text(static_key_file_path(), "ABCDE")
@@ -244,7 +244,7 @@ def test_main_no_commands(
 ) -> None:
     """Test main() with empty session."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     # Create static key
     fake_fs.write_text(static_key_file_path(), "ABCD")
@@ -277,7 +277,7 @@ def test_main_with_custom_output_path(
 ) -> None:
     """Test main() reads TANKPIT_OUTPUT env var."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     fake_env.set("TANKPIT_OUTPUT", "custom_session.json")
 
@@ -312,7 +312,7 @@ def test_main_multiple_command_types(
 ) -> None:
     """Test main() groups commands by type_byte and cmd_byte."""
     from tankpit_bot.decoder import main
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     # Create static key
     fake_fs.write_text(static_key_file_path(), "ABCDEFGH")

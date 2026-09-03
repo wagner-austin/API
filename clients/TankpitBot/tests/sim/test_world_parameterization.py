@@ -27,6 +27,7 @@ from platform_core.json_utils import (
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
+from tankpit_bot.resources import data_directory
 from tankpit_bot.runtime_artifacts import build_probe_run_artifacts
 from tankpit_bot.sim.cli_args import (
     ARRAY_TASK_ENV_VAR,
@@ -56,7 +57,7 @@ def _install_fake_terrain(fake_fs: FakeFileSystem) -> None:
     Args:
         fake_fs: The installed fake file system.
     """
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
 
     def load_fake_terrain(gif_path: Path) -> TerrainMapProtocol:
         """Return an open in-memory terrain for any requested field."""

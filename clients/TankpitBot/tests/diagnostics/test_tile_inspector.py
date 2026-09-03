@@ -22,8 +22,9 @@ from tankpit_bot.diagnostics.tile_inspector import (
     main,
     render_tile_inspection,
 )
+from tankpit_bot.resources import data_directory
 
-_FIELD01_GIF = Path(__file__).resolve().parents[2] / "field01_r.gif"
+_FIELD01_GIF = data_directory() / "field01_r.gif"
 
 
 def test_inspect_tile_marks_passable_ground_at_known_open_spawn() -> None:

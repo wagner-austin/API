@@ -25,7 +25,8 @@ from tankpit_bot.capture.xor import (
     XorStaticKeyUnavailableError,
     reset_static_key_cache,
 )
-from tankpit_bot.protocol.codec import build_xor_table, static_key_file_path
+from tankpit_bot.protocol.codec import build_xor_table
+from tankpit_bot.resources import static_key_file_path
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeFileSystem
 from tests.wire_builders import encode_wire_frame

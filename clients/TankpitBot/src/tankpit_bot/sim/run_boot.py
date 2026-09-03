@@ -18,6 +18,7 @@ from tankpit_bot.browser.room_join import join_room
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.commands import CMD_MINE
 from tankpit_bot.protocol.naming import is_practice_bot_name
+from tankpit_bot.resources import require_asset
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.ghost import (
@@ -212,10 +213,7 @@ def _boot(
             scenario seed sits on impassable ground — a sim run needs
             both right, loudly.
     """
-    gif_path = Path(world["field"])
-    if not _test_hooks.path_exists(gif_path):
-        raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")
-    terrain = _test_hooks.load_terrain_map(gif_path)
+    terrain = _test_hooks.load_terrain_map(require_asset(world["field"]))
     driver: PracticeRoomDriver | None = None
     roster_ids: frozenset[int] = frozenset()
     if practice:

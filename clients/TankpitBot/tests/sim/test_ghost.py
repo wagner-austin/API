@@ -23,6 +23,7 @@ from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.protocol.types import (
     ChatMessageDict,
 )
+from tankpit_bot.resources import data_directory
 from tankpit_bot.sim.commands import SimError
 from tankpit_bot.sim.ghost import (
     GhostTracker,
@@ -176,7 +177,7 @@ def test_ghost_session_replays_the_recording_end_to_end(fake_fs: FakeFileSystem)
     from tankpit_bot.sim.scenarios import SIM_FIELD
 
     capture_text = _fight_capture()
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
     # The ghost replay drives the production collect cascade, whose
     # atlas hop reads the committed hotspot data; the sim world has
     # no mined atlas, so it reads empty.

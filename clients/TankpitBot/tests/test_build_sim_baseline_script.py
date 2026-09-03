@@ -36,6 +36,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.analysis import _test_hooks as analysis_hooks
 from tankpit_bot.protocol.command_builders import build_teleport_command
+from tankpit_bot.resources import data_directory
 from tankpit_bot.sim.scenarios import SIM_FIELD
 from tests.analysis._capture_fixtures import (
     OWN_TANK,
@@ -72,7 +73,7 @@ def _sim_world(fake_fs: FakeFileSystem) -> Generator[FakeFileSystem, None, None]
         The installed fake file system, holding whatever the sessions
         wrote.
     """
-    fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
+    fake_fs.write_text(data_directory() / SIM_FIELD, "fake-gif-bytes")
     real_terrain = _test_hooks.load_terrain_map
 
     def load_fake_terrain(gif_path: Path) -> TerrainMapProtocol:

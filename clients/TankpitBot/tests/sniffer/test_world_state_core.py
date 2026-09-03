@@ -418,35 +418,6 @@ class TestRoomTracking:
         assert result is fake_terrain
         assert svc.terrain_map is fake_terrain
 
-    def test_load_terrain_tries_underscore_and_hyphen_suffix(self) -> None:
-        """Test _find_field_gif tries both _r and -r suffixes."""
-        # Only the -r variant exists
-        ws = WorldService()
-        _test_hooks.path_exists = lambda path: str(path) == "field42-r.gif"
-
-        result = ws._find_field_gif("field42.gif")
-        if result is None:
-            raise AssertionError("expected Path, got None")
-        assert str(result) == "field42-r.gif"
-
-    def test_find_field_gif_underscore_variant(self) -> None:
-        """Test _find_field_gif finds _r variant."""
-        ws = WorldService()
-        _test_hooks.path_exists = lambda path: str(path) == "field01_r.gif"
-
-        result = ws._find_field_gif("field01.gif")
-        if result is None:
-            raise AssertionError("expected Path, got None")
-        assert str(result) == "field01_r.gif"
-
-    def test_find_field_gif_returns_none_when_missing(self) -> None:
-        """Test _find_field_gif returns None when no file found."""
-        ws = WorldService()
-        _test_hooks.path_exists = lambda path: False
-
-        result = ws._find_field_gif("field99.gif")
-        assert result is None
-
     def test_load_terrain_returns_none_without_selected_room(self) -> None:
         """Test terrain loader requires an explicit selected room."""
         ws = WorldService()

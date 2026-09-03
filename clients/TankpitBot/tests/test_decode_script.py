@@ -103,7 +103,7 @@ def _fake_fs() -> Generator[FakeFileSystem, None, None]:
     old_exists = _test_hooks.path_exists
     old_write = _test_hooks.write_text
 
-    from tankpit_bot.protocol.codec import static_key_file_path
+    from tankpit_bot.resources import static_key_file_path
 
     fake_static_key = "Y" + "A" * 999
     fs = FakeFileSystem()

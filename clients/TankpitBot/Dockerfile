@@ -118,18 +118,17 @@ RUN playwright install --with-deps chromium \
 
 WORKDIR /app
 
-# The tracked runtime data a checkout serves from its project root,
-# baked because it VERSIONS WITH THE CODE: the static XOR key (without
-# which no session decodes a single wire byte — the checkout-relative
-# default resolves into site-packages once installed, so the ENV below
-# names the baked copy) and the 44 field terrain GIFs (found relative
-# to the working directory, which is exactly what /app is). Mutable
-# state — accounts.json, data/tank_registry.json, .env, runs/ — is
-# NEVER baked; the fleet service mounts it (see docker-compose.yml).
-ARG APP_DIR=clients/TankpitBot
-COPY ${APP_DIR}/xor_static_key.txt /app/
-COPY ${APP_DIR}/field*.gif /app/
-ENV TANKPIT_XOR_KEY_FILE=/app/xor_static_key.txt
+# The static XOR key and the field terrain GIFs are NOT copied here.
+# They ship inside the wheel as ``tankpit_bot.data`` and are addressed
+# through ``tankpit_bot.resources``, so installing the package installs
+# its data ([[packaged-data-assets]]). This image used to copy both in
+# and name the key with TANKPIT_XOR_KEY_FILE, because the old
+# checkout-relative lookup resolved into site-packages once installed
+# and the GIFs were found relative to the working directory. Neither
+# workaround is needed now, and neither is kept.
+#
+# Mutable state — accounts.json, data/tank_registry.json, .env, runs/ —
+# is still NEVER baked; the fleet service mounts it (docker-compose.yml).
 
 # Session output. Declared so `runs/` survives the container and a
 # capture can be read from the host afterwards — the event log is the
