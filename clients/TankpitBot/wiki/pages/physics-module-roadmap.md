@@ -1253,10 +1253,31 @@ ceiling and put both routers in the shape the whole emission side now
 follows: **resolve once against the world, book what the field must
 remember, narrate for one connection.**
 
+### The window check was welded to the single session (2026-09-02)
+
+Both command routers refused a click that left the acting tank's own
+viewport by testing `tank_id == self.session.client_id`. That
+comparison does not mean "this tank's own window" — it means "the one
+window we happen to have". Correct with one connection, silently
+wrong with two, and the shoot router had just inherited the same
+shape from the move router.
+
+`sim/server_sessions.py` answers it once: `session_for(tank_id)` and
+`click_leaves_own_window(tank_id, x, y)`, mixed into both. The
+nullable return is the point — a tank the sim drives itself (a roster
+bot, the scripted opponent, a ghost) has NO connection and therefore
+no window, which is a different fact from "a connection seeing
+nothing", and the server is not entitled to invent a viewport to
+refuse a tank nobody is watching through.
+
+When the registry lands, `session_for` becomes a dict lookup and
+nothing at either call site changes. That is the whole reason to have
+drawn it before the registry rather than after.
+
 Multi-client items still open: the session registry, the
-`advance_tick` fan-out, per-connection command intake, mid-session
-join, and the per-connection window check at
-`server_move.py:89`. None of them is blocked on purity any more.
+`advance_tick` fan-out, per-connection command intake, and
+mid-session join. None of them is blocked on purity, and the window
+check no longer has to be remembered.
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 

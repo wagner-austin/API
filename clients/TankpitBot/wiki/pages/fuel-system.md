@@ -99,6 +99,19 @@ new absolute fuel LEADS the batch):
 | no transfer, walked (arrived to find it empty / full-tank walk-up) | ``0x47 + record x2 + close by stockedness`` |
 | no transfer, no walk (own-tile / adjacent click) | ``0x44 (no-gain form: is_free=False, flag=43, unchanged fuel) + record x1 + close, reset_action=0`` |
 
+**The close's two OTHER fields, swept 2026-09-02.** Every 0x52 in
+this family carries ``close_map=0``; ``reset_action`` follows the
+CODE, not the walk — code 4 splits ``(1, 0)`` x610 against
+``(0, 0)`` x71 on whether the tank walked, while **code 5 is
+``(0, 0)`` in all 2,537 archived windows, walked or not.** The table
+above has said "code 5, reset_action=0" since it was written; the SIM
+keyed both codes on the walk and emitted code 5 with
+``reset_action=1`` for months. Nothing could catch it, because the
+response-shape differ reduced a 0x52 to its code and discarded the
+fields — it now carries them, and found this on the first run
+([[capture-differ]]). Prose and code drifted apart with no mechanism
+watching the gap.
+
 Key laws inside it: the container records come in IDENTICAL
 duplicates (twice, three times in the clamp case with the 0x44
 between records 2 and 3) — not progressive drain steps; the same

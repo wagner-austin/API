@@ -49,6 +49,13 @@ work below).[^1]
 - **Teleport while towing is refused**: three attempts each drew an
   immediate `0x52 error_code=0, reset_action=1` ("You can't do
   this"). A block press out of reach draws `0x52 code=1`.
+  **`close_map=1` too, and the whole archive corroborates the count**
+  (field sweep 2026-09-02): code 0 carries `(reset_action=0,
+  close_map=1)` in 83 of its 86 archived frames, and the ONLY three
+  exceptions are `(1, 1)` — all in teleport windows. Those are these
+  three. The towing refusal is therefore code 0's one measured
+  variant, not a transcription slip, and the sim emits it as such
+  ([[capture-differ]]).
 - **Cost: free.** Stationary same-tile pickup/re-drop pairs produced
   zero fuel delta; all session deltas decompose into normal 1/tile
   walking while towing. Same-tile immediate re-place works, including
