@@ -1,0 +1,31 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "tankpit": {
+      "partition": "free",
+      "gpu": null,
+      "cpus": 2,
+      "mem_gb": 2,
+      "minutes": 60,
+      "requeue": true,
+      "checkpoint_steps": 0,
+      "image": null,
+      "env_path": "/pub/wagnera3/envs/tankpit",
+      "pinned_packages": {
+        "platform-core": "0.1.0",
+        "tankpit-bot": "0.1.0"
+      },
+      "deterministic": true,
+      "budget": {
+        "self_imposed_gpu_hours": 0.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../../clients/TankpitBot"
+    }
+  }
+}

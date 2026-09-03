@@ -257,6 +257,101 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 
 ---
 
+### `tankpit` — TankpitBot, the sim as a measurable opponent
+
+- **Repo:** this one, `clients/TankpitBot`
+- **Runs:** `tankpit-sim-run` — the production `Bot` playing a timed session
+  against `sim/server.py` on real field terrain, no browser and no network
+- **Produces:** `runs/sim/sim-<stamp>.capture_session.json` and
+  `.world.json`, plus the probe event stream; `tankpit-feature-rows` reshapes
+  an events artifact into one tick-indexed row per decision
+- **Compares:** sessions across doctrines and world parameters — the bot's
+  own policy against itself, which is what the tick corpus is a design matrix
+  for.
+- **Provenance:** `RunRecord` since 2026-09-02, on the feature-row
+  derivation. **Its honest limit is stated rather than papered over:** the
+  record describes the DERIVATION and identifies the live run only by a
+  digest of its events artifact, because an events record carries no build
+  stamp, commit or version — nothing recorded what produced the 539 archived
+  runs and no fingerprint written now can claim it. Stamping the build at
+  emission time is filed separately.
+- **Sizing, measured 2026-09-02 rather than guessed:** a 150-round practice
+  session ran 144 s wall and peaked at 26 MiB of Python allocation on the
+  workstation. Declared 2 CPUs, 2 GB, 60 minutes on `free` — the wall clock
+  is roughly twenty times the measured session so a slower node and a longer
+  soak both fit, while staying far under the partition's 72-hour cap.
+- **`deterministic: true` is a measurement, not an assumption.** Two
+  independent sessions with the same named layout and population seed
+  produced a byte-identical `world.json`
+  (`0bc360232d812984b403783c631e2f01…`, 60 rounds, 2026-09-02), and the same
+  digest again from two SEPARATE PROCESS invocations. That is what lets the
+  project declare `checkpoint_steps: 0` honestly under the
+  `requeue AND (checkpoints OR deterministic)` clause.
+
+  **The evidence ladder, stated so nobody reads it as more than it is:**
+  same-process replay ✓, cross-process on one host ✓, **cross-node on the
+  cluster ✗ — not measured.** `rusted` is the standing warning here: its
+  panel found cross-invocation replay "achievable on this runtime and does
+  not always happen", with two members bit-exact across nodes 40 minutes
+  apart while their counterparts moved (`9ae66117`), and it declared
+  `deterministic: false` until that was resolved. The mechanism differs —
+  that was a JVM game engine, this is pure integer Python with a tick-paced
+  clock and no wall-time input to outcomes — which is why the flag is `true`
+  here rather than deferred. It is a mechanism argument plus a same-host
+  measurement, NOT cluster evidence, and the first cluster runs should
+  re-measure it before anything is subtracted across nodes.
+
+  Note also that `free` is `PreemptMode=CANCEL`, so `requeue` is inert on it;
+  the flag's live consequence here is the comparability axis, not restart
+  behaviour.
+- **The stamp is no longer an input to the world.** It selected the practice
+  layout AND the container-population seed until 2026-09-02, so an array
+  whose tasks stamp themselves varied the room and the larder along with
+  whatever it meant to vary — that cost a retracted saturation table.
+  `--layout` and `--population-seed` now state the world, and omitting
+  either under `--sweep` or a set `SLURM_ARRAY_TASK_ID` is refused rather
+  than defaulted.
+- **Registered but NOT YET RUNNABLE, and this is the honest state rather
+  than an oversight.** `/pub/wagnera3/envs/tankpit` does not exist. The
+  monorepo IS staged at `/pub/wagnera3/api` (at commit `80221ea`, behind this
+  tree), the cluster's system Python is 3.9 where this package needs 3.11,
+  and there is no Poetry on the login node. `hpc3-preflight` reports the
+  missing environment, which is the correct refusal; nothing has been
+  submitted. The remaining work is provisioning, not registration.
+- **It needs an image, and the first registration said otherwise. That was
+  wrong.** The reasoning offered was that four of the five projects above run
+  from a directory environment and this payload is "pure Python". That is a
+  popularity argument, and it ignored the one project most like this one:
+  `rusted` is ALSO CPU-only on `free` with `requeue` and `deterministic`, and
+  it carries an image.
+
+  An image answers both of this project's actual blockers, which a directory
+  environment does not:
+  - **The interpreter.** The cluster's system Python is 3.9 and this package
+    needs 3.11. An image bundles its own (`python:3.11.16-slim-bookworm` is
+    what `abl` builds on).
+  - **The code.** With a directory environment the payload is read from the
+    staged checkout at `/pub/wagnera3/api`, which is mutable and currently
+    sits at `80221ea`, behind this tree. An image bakes first-party code as
+    wheels and records `git_commit` in the image, so there is no second copy
+    to drift — and `image_digest` becomes a real axis of the run fingerprint
+    instead of `NO_VALUE`.
+
+  The directory-environment hazard is documented rather than theoretical:
+  "it can be edited in place while `pinned_packages` is edited to match --
+  which is exactly what happened on 2026-08-28, in under an hour, with every
+  check still passing."
+- **The image is NOT built, so `image` is `null` and that is a stated gap
+  rather than a decision.** `ImageSpec` requires a real `sha256`; declaring a
+  placeholder would be a fabricated digest, which is worse than an absent
+  one. Building it has a chicken-and-egg the four-command flow does not
+  address for a NEW project: `hpc3-image-capture` probes an existing
+  environment over SSH at `env_path`, so a project with no environment has
+  nothing to capture. A bootstrap environment on the cluster has to exist
+  first, and only then can the image that replaces it be captured and built.
+
+---
+
 ## Not registered anywhere
 
 Real research, producing numbers that get compared, reachable by no tool.
