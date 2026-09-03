@@ -331,42 +331,64 @@ concrete things, in descending value: **bucket the rows by cause**
 (the single highest-value corpus fix), and **depth on the one
 scenario that sustains**.
 
-### Depth is not a lever at all: the sim's vocabulary SATURATES
+### Depth is not a lever: the sim's vocabulary SATURATES
 
-Measured directly, `practice` at increasing depth (each a separate
-run; the sim is deterministic, so a longer run's prefix is the shorter
-run byte-for-byte):
+**The first version of this section was measured wrong and its
+numbers are retracted.** It varied session depth and the run STAMP
+together, and `select_practice_layout` picks the practice world from
+`crc32(stamp)` — so every row played a different world and none of it
+said anything about depth. The retracted series reported a
+non-monotonic window count (a 3,200-round run producing 684 windows
+against a 1,600-round run's 1,598) and a shape count still climbing at
+6,400. Both were the confound.
+
+Re-measured with the stamp HELD CONSTANT, so depth is the only thing
+that varies:
 
 | rounds | windows | distinct shapes |
 |---:|---:|---:|
-| 200 | 202 | 13 |
-| 400 | 398 | 15 |
-| 800 | 774 | 16 |
-| 1,600 | 1,598 | 15 |
-| 3,200 | 684 | 16 |
+| 200 | 202 | 11 |
+| 400 | 396 | **15** |
+| 800 | 782 | **15** |
+| 1,600 | 1,542 | **15** |
+| 3,200 | 3,106 | **15** |
+| 6,400 | 6,286 | **15** |
 
-**Eight times the windows, no new shapes.** The ±1 is a
-session-boundary artifact — the final window of a run closes at
-session end and can carry a truncated shape the next depth does not
-produce — not a real decrease.
+**Sixteen times the windows, zero new shapes.** Two controls ran in
+the same pass and both hold: replaying 800 rounds at the same stamp
+reproduced the session identically, and **3,106 of 3,106** windows of
+the 3,200-round run match the 6,400-round run's prefix exactly — a
+longer run IS the shorter run plus more, with nothing carried between
+sessions in the process.
 
-That is a stronger and more useful result than the round budget it
-was meant to size. The sim's response-shape vocabulary is COMPLETE at
-roughly 200 rounds of the sustaining scenario, so "the sim never
-produces this shape" is already a safe claim for any command the
-corpus actually sends. What is missing is not volume: it is BRANCH
-COVERAGE. The bot never stands on what it collects, never runs a
-radar with no extra to spend, never sends a plain `move`.
+So the sim's response-shape vocabulary is COMPLETE at ~400 rounds of
+the sustaining scenario, and "the sim never produces this shape" is a
+safe claim for any command the corpus sends. What is missing is not
+volume: it is BRANCH COVERAGE. The bot never stands on what it
+collects, never runs a radar with no extra to spend, never sends a
+plain `move`.
 
-Two side observations from the same sweep, recorded rather than
-chased: four of five scenarios end in 11–79 rounds through the
-production bot's own exit path (`no_viable_targets`,
-`no_productive_collect`), which is fine — their job is breadth, and
-they deliver it early. And windows per round COLLAPSES past 1,600
-(3,200 rounds produced 684 windows against 1,600 rounds' 1,598), so
-the bot goes quiet late in a long sim session. Cause not
-investigated; noted because anyone sizing a soak by round count will
-hit it.
+**Retracted with the old numbers:** the claim that "windows per round
+collapses past 1,600 rounds, so the bot goes quiet late in a long
+session". At a fixed stamp the window count tracks the round count all
+the way to 6,400. There was no such effect.
+
+### The stamp is an INPUT to the practice world, not a label
+
+`select_practice_layout(stamp)` returns
+`PRACTICE_LAYOUTS[crc32(stamp) % len(PRACTICE_LAYOUTS)]`. The stamp is
+also the artifact filename, so **naming a run changes what it plays** —
+and only for the practice scenario, which is why three default-scenario
+captures with different stamps compared byte-identical earlier the same
+day and made "the sim is deterministic" look unconditional.
+
+It is deterministic given identical inputs INCLUDING the stamp. The
+variety is deliberate and useful, but it is undeclared at the API
+level and it welds two knobs together: there is no way to ask for the
+same world at a different depth, or a different world at the same
+depth, without also moving the other. Any sweep — especially a
+cluster array where each task stamps itself — is choosing worlds by
+accident unless it states the layout explicitly.
 
 ## How to re-run
 

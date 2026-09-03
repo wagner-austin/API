@@ -5607,3 +5607,27 @@ Side observation, recorded not chased: windows per round collapses past 1,600 ro
 So the rule binds at serialization boundaries, where it is mandatory and mechanically unavoidable, and adds only dead weight elsewhere. Recorded on [[coding-standards]] with the enforcement chain named. The `fuel_pickup` pair I wrote 2026-09-01 under the literal reading is deleted along with the round-trip test that was its only caller; `analysis/response_shapes_types.py` keeps its full codecs, because a diff really is written to an artifact and read back.
 
 Gate: make check green -- 6,775 tests, 100.00% statements AND branches over 33,471 / 9,594, guard exit 0, mypy strict over 1,218 files.
+
+---
+## [2026-09-02] lift | Retracting a measurement I published the same day: the stamp picks the world
+
+The depth-saturation table in the previous entry was **confounded and its numbers are withdrawn.** I varied session depth and the run STAMP together, and `select_practice_layout` returns `PRACTICE_LAYOUTS[crc32(stamp) % len(PRACTICE_LAYOUTS)]` — so every row of that series played a DIFFERENT world. It said nothing about depth.
+
+It looked like a result because it was self-consistent enough: a monotone-ish shape count and one dramatic anomaly (3,200 rounds producing 684 windows against 1,600 rounds' 1,598) that I wrote up as "the bot goes quiet late in a long sim session, cause not investigated." There was no such effect. That was a different layout.
+
+**Re-measured with the stamp held constant:**
+
+| rounds | 200 | 400 | 800 | 1,600 | 3,200 | 6,400 |
+|---|---:|---:|---:|---:|---:|---:|
+| windows | 202 | 396 | 782 | 1,542 | 3,106 | 6,286 |
+| shapes | 11 | **15** | **15** | **15** | **15** | **15** |
+
+Sixteen times the windows, zero new shapes. Two controls in the same pass: 800 rounds replayed at the same stamp reproduced identically, and **3,106/3,106** windows of the 3,200-round run match the 6,400-round prefix exactly. So the conclusion I published — the vocabulary saturates, the gap is branch coverage not volume — was RIGHT, and the evidence I published for it was worthless. Being right by luck is not a result.
+
+**The finding underneath, which is the durable one:** the stamp is an INPUT to the practice world, not a label. Naming a run changes what it plays. It is deterministic given identical inputs INCLUDING the stamp — which is why three default-scenario captures with different stamps compared byte-identical earlier the same day and made "the sim is byte-deterministic" look unconditional. The default scenario is stamp-independent; practice is not. I generalized from the one case where it does not matter.
+
+That matters beyond this measurement. Any sweep whose tasks stamp themselves — a cluster array above all — is choosing worlds by accident. The variety is wanted; choosing it by side effect of the artifact filename is not.
+
+**Method note.** Three errors in one chain, and only the third was a code fact: (1) I published a conclusion on a partial series before the last data point landed; (2) when the last point contradicted it I reached for "cross-session state leak in the process" and wrote a probe that would have CONFIRMED that false story, because it varied the stamp too; (3) the actual cause was one line I had not read. The probe I nearly ran is the same failure mode this log keeps recording — a check that cannot observe its own failure — except this time the check was designed to observe the wrong thing.
+
+Also flagged, unfixed: `configure_probe_runtime_logging` writes `runs/probe/latest.sim.log` and `latest.sim.events.jsonl` at FIXED paths alongside the stamped archives. Concurrent sessions on one machine clobber them. Harmless locally, wrong on a cluster array where N tasks share a node.
