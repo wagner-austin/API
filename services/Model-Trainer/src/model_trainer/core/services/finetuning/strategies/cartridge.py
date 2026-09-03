@@ -12,15 +12,20 @@ its artifact store on a third-party experiment-tracking service and supports
 two model classes; nothing here needs either, and the training loop, the
 checkpointing and the measurement harness this plugs into already exist.
 
-WHAT COMPOSES AND WHAT DOES NOT. Two cartridges concatenate -- they are
-attention context, and context concatenates by construction -- which is the
-property that distinguishes this from summing steering vectors in the residual
-stream, where trait expression degrades measurably as vectors accumulate.
-Composition is not implemented here; this is the object it would compose.
+WHAT COMPOSES, AND WHAT IT COSTS. Two cartridges concatenate rather than being
+summed, which is what distinguishes them from steering vectors in the residual
+stream. ``cartridge_slots.compose`` does the joining. Measured on the tiny rung:
+a composed pair retains about a quarter of what each was worth alone, and most
+of that loss is DILUTION -- doubling the prefix with content-free padding costs
+nearly as much as adding a real second cartridge. See
+``tests/test_cartridge_composition.py`` for the arms and the attribution.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+import torch
 from platform_core.errors import (
     AppError,
     ModelTrainerErrorCode,
@@ -134,6 +139,31 @@ def require_cache_capable(model: LMModelProto) -> CacheCapableLMProto:
     )
 
 
+def probe_cache_layers(model: CacheCapableLMProto) -> Sequence[torch.Tensor]:
+    """Ask a model for its per-layer cached key tensors.
+
+    A one-token forward with caching on, under ``no_grad`` and on the model's
+    own device: this measures a shape and must neither build a graph nor move
+    anything. No labels, because a loss would be computed and discarded.
+
+    Not a hook. The only thing it touches is the model, which every caller
+    already supplies and every test already fakes -- routing it through an
+    injection point would add a seam nothing needs and hide a five-line
+    measurement behind a protocol.
+
+    Args:
+        model: The model to measure.
+
+    Returns:
+        One cached key tensor per attention layer, layer zero first.
+    """
+    device = next(iter(model.named_parameters()))[1].detach().device
+    probe = torch.zeros((1, 1), dtype=torch.long, device=device)
+    with torch.no_grad():
+        out = model(input_ids=probe, use_cache=True)
+    return [pair[0] for pair in out.past_key_values]
+
+
 def measure_geometry(model: LMModelProto, *, num_slots: int) -> CartridgeGeometry:
     """Measure the shape a cartridge for this model must be cut to.
 
@@ -148,7 +178,7 @@ def measure_geometry(model: LMModelProto, *, num_slots: int) -> CartridgeGeometr
         AppError: With ``CARTRIDGE_MODEL_REPORTS_NO_CACHE`` if the model
             cannot be run against a cache, or returns none when it is.
     """
-    layers = Hooks.probe_cache_layers(require_cache_capable(model))
+    layers = probe_cache_layers(require_cache_capable(model))
     return discover_geometry(layers, num_slots=num_slots)
 
 
@@ -299,4 +329,5 @@ __all__ = [
     "CartridgeStrategy",
     "create_cartridge_strategy",
     "measure_geometry",
+    "probe_cache_layers",
 ]

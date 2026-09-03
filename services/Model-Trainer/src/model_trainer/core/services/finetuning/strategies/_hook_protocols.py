@@ -19,14 +19,8 @@ from typing import Literal, Protocol
 
 import torch
 
-from model_trainer.core.contracts.cartridge import CartridgeGeometry
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots
-from model_trainer.core.types import (
-    CacheCapableLMProto,
-    ForwardOutProto,
-    KVCacheProto,
-    LMModelProto,
-)
+from model_trainer.core.types import KVCacheProto, LMModelProto
 
 # ============================================================================
 # Protocols for dynamic PEFT imports
@@ -348,21 +342,6 @@ class _DynamicCacheClassProto(Protocol):
         ...
 
 
-class CacheLayerProbe(Protocol):
-    """Protocol for measuring a model's per-layer cached key tensors."""
-
-    def __call__(self, model: CacheCapableLMProto) -> Sequence[torch.Tensor]:
-        """Return one cached key tensor per attention layer.
-
-        Args:
-            model: The model to measure.
-
-        Returns:
-            The layer-zero-first key tensors, whose shapes carry the geometry.
-        """
-        ...
-
-
 class PrefixCacheBuilder(Protocol):
     """Protocol for assembling per-layer blocks into a cache object."""
 
@@ -374,33 +353,6 @@ class PrefixCacheBuilder(Protocol):
 
         Returns:
             A cache ready to pass as ``past_key_values``.
-        """
-        ...
-
-
-class PrefixForward(Protocol):
-    """Protocol for running a base model with a prefix cache installed."""
-
-    def __call__(
-        self,
-        model: CacheCapableLMProto,
-        *,
-        input_ids: torch.Tensor,
-        labels: torch.Tensor,
-        past_key_values: KVCacheProto,
-        attention_mask: torch.Tensor,
-    ) -> ForwardOutProto:
-        """Run one forward pass in front of a prefix.
-
-        Args:
-            model: The frozen base model.
-            input_ids: Token ids.
-            labels: Targets for the input's own positions.
-            past_key_values: The prefix.
-            attention_mask: Ones over the prefix and the input together.
-
-        Returns:
-            The model's output, whose loss carries gradients into the prefix.
         """
         ...
 
@@ -426,24 +378,6 @@ class CartridgeLoader(Protocol):
 
         Args:
             cartridge_dir: Directory previously written by the saver.
-
-        Returns:
-            The rebuilt slots.
-        """
-        ...
-
-
-class CartridgeStateReader(Protocol):
-    """Protocol for rebuilding slots from an in-memory state dict."""
-
-    def __call__(
-        self, state: dict[str, torch.Tensor], geometry: CartridgeGeometry
-    ) -> CartridgeSlots:
-        """Rebuild slots from named tensors.
-
-        Args:
-            state: The tensors, by name.
-            geometry: The shape they must match.
 
         Returns:
             The rebuilt slots.

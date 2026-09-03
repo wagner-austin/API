@@ -25,16 +25,13 @@ from platform_core.json_utils import dump_json_str, load_json_str
 from model_trainer.core.contracts.cartridge import (
     CARTRIDGE_MANIFEST_NAME,
     CARTRIDGE_WEIGHTS_NAME,
-    CartridgeGeometry,
     decode_cartridge_geometry,
     encode_cartridge_geometry,
 )
 from model_trainer.core.services.finetuning.strategies._hook_protocols import (
     AdapterWeightsReloader,
-    CacheLayerProbe,
     CartridgeLoader,
     CartridgeSaver,
-    CartridgeStateReader,
     FullModelLoader,
     GradientCheckpointEnabler,
     KbitTrainingPreparer,
@@ -42,7 +39,6 @@ from model_trainer.core.services.finetuning.strategies._hook_protocols import (
     PeftModelLoader,
     PeftModelSaver,
     PrefixCacheBuilder,
-    PrefixForward,
     _AutoModelClassProto,
     _DynamicCacheClassProto,
     _GetPeftModelFn,
@@ -58,31 +54,9 @@ from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     slots_from_state,
 )
 from model_trainer.core.types import (
-    CacheCapableLMProto,
-    ForwardOutProto,
     KVCacheProto,
     LMModelProto,
 )
-
-
-def _default_probe_cache_layers(model: CacheCapableLMProto) -> Sequence[torch.Tensor]:
-    """Production implementation - runs a one-token cached forward.
-
-    Under ``no_grad`` and on the model's own device, because this measures a
-    shape and must neither build a graph nor move the model. No labels, since
-    a loss would be computed and discarded.
-
-    Args:
-        model: The model to measure.
-
-    Returns:
-        One cached key tensor per attention layer.
-    """
-    device = next(iter(model.named_parameters()))[1].detach().device
-    probe = torch.zeros((1, 1), dtype=torch.long, device=device)
-    with torch.no_grad():
-        out = model(input_ids=probe, use_cache=True)
-    return [pair[0] for pair in out.past_key_values]
 
 
 def _default_build_prefix_cache(
@@ -108,39 +82,6 @@ def _default_build_prefix_cache(
     for layer, (keys, values) in enumerate(blocks):
         _ = cache.update(keys, values, layer)
     return cache
-
-
-def _default_forward_with_prefix(
-    model: CacheCapableLMProto,
-    *,
-    input_ids: torch.Tensor,
-    labels: torch.Tensor,
-    past_key_values: KVCacheProto,
-    attention_mask: torch.Tensor,
-) -> ForwardOutProto:
-    """Production implementation - one forward pass in front of a prefix.
-
-    ``use_cache=False`` so the run does not accumulate its own keys on top of
-    the prefix, which would make the cache grow by the sequence length on
-    every step.
-
-    Args:
-        model: The frozen base model.
-        input_ids: Token ids.
-        labels: Targets for the input's own positions.
-        past_key_values: The prefix.
-        attention_mask: Ones over the prefix and the input together.
-
-    Returns:
-        The model's output.
-    """
-    return model(
-        input_ids=input_ids,
-        labels=labels,
-        past_key_values=past_key_values,
-        attention_mask=attention_mask,
-        use_cache=False,
-    )
 
 
 def _default_save_cartridge(slots: CartridgeSlots, out_dir: str) -> None:
@@ -185,21 +126,6 @@ def _default_load_cartridge(cartridge_dir: str) -> CartridgeSlots:
     geometry = decode_cartridge_geometry(load_json_str(manifest.read_text(encoding="utf-8")))
     loaded: dict[str, torch.Tensor] = torch.load(weights, weights_only=True)
     return slots_from_state(loaded, geometry)
-
-
-def _default_slots_from_state(
-    state: dict[str, torch.Tensor], geometry: CartridgeGeometry
-) -> CartridgeSlots:
-    """Production implementation - rebuilds slots from named tensors.
-
-    Args:
-        state: The tensors, by name.
-        geometry: The shape they must match.
-
-    Returns:
-        The rebuilt slots.
-    """
-    return slots_from_state(state, geometry)
 
 
 def _default_create_peft_model(
@@ -350,12 +276,9 @@ class Hooks:
     and call reset() afterwards, which puts the real implementation back.
     """
 
-    probe_cache_layers: CacheLayerProbe = _default_probe_cache_layers
     build_prefix_cache: PrefixCacheBuilder = _default_build_prefix_cache
-    forward_with_prefix: PrefixForward = _default_forward_with_prefix
     save_cartridge: CartridgeSaver = _default_save_cartridge
     load_cartridge: CartridgeLoader = _default_load_cartridge
-    slots_from_state: CartridgeStateReader = _default_slots_from_state
     create_peft_model: PeftModelCreator = _default_create_peft_model
     save_peft_model: PeftModelSaver = _default_save_peft_model
     load_peft_model: PeftModelLoader = _default_load_peft_model
@@ -378,12 +301,9 @@ class Hooks:
 
 def reset_hooks() -> None:
     """Restore every hook to the production implementation it is bound to."""
-    Hooks.probe_cache_layers = _default_probe_cache_layers
     Hooks.build_prefix_cache = _default_build_prefix_cache
-    Hooks.forward_with_prefix = _default_forward_with_prefix
     Hooks.save_cartridge = _default_save_cartridge
     Hooks.load_cartridge = _default_load_cartridge
-    Hooks.slots_from_state = _default_slots_from_state
     Hooks.create_peft_model = _default_create_peft_model
     Hooks.save_peft_model = _default_save_peft_model
     Hooks.load_peft_model = _default_load_peft_model

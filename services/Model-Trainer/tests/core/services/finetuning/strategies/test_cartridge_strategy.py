@@ -10,7 +10,7 @@ own behaviour is covered in ``test_cartridge_model``.
 from __future__ import annotations
 
 import tempfile
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from pathlib import Path
 
 import pytest
@@ -36,7 +36,7 @@ from model_trainer.core.services.finetuning.strategies.cartridge_slots import in
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.services.training.base_trainer_core import _get_optimizer_for_config
-from model_trainer.core.types import CacheCapableLMProto, TracedLMModelProto
+from model_trainer.core.types import KVCacheProto, TracedLMModelProto
 from tests.core.services.finetuning.testing import FakeCacheCapableModel, FakeModel
 
 #: The tiny rung's own shape: two layers, two heads, 128 wide.
@@ -505,28 +505,41 @@ class TestAgainstARealTransformer:
 
 
 class TestTheHookSurface:
-    """The injection points, asserted as a set so a new one cannot appear silently."""
+    """The injection points, asserted as a set so a new one cannot appear silently.
 
-    def test_every_cartridge_hook_is_installed(self) -> None:
-        """Doubles as a drift guard on the DI surface."""
+    THREE, not six. The cartridge work started with six and three of them were
+    injection points onto things that were already injectable: two called the
+    MODEL, which every caller supplies and every fake here replaces directly,
+    and one forwarded to a public pure function. A hook that nothing can
+    usefully replace is indirection with a protocol attached, so they were
+    removed rather than left as surface nobody uses.
+
+    What remains are the three real boundaries: the dynamic ``transformers``
+    import that builds a cache, and the two that touch the filesystem.
+    """
+
+    def test_the_cartridge_hooks_are_exactly_the_three_boundaries(self) -> None:
+        """Pinned as an equality over the cartridge names, not a subset.
+
+        A subset check passes when a hook is added, which is the drift this
+        exists to catch: the next unnecessary injection point should fail here
+        and have to justify itself.
+        """
         declared = {name for name in dir(Hooks) if not name.startswith("_")}
-        assert {
-            "probe_cache_layers",
+        assert {name for name in declared if "cartridge" in name or "prefix" in name} == {
             "build_prefix_cache",
-            "forward_with_prefix",
             "save_cartridge",
             "load_cartridge",
-            "slots_from_state",
-        }.issubset(declared)
+        }
 
-    def test_reset_restores_every_cartridge_hook(self) -> None:
+    def test_reset_restores_a_swapped_hook(self) -> None:
         """A test that swapped one must not leak it into the next."""
 
-        def _fake_probe(model: CacheCapableLMProto) -> list[torch.Tensor]:
-            _ = model
-            return []
+        def _fake_builder(blocks: Sequence[tuple[torch.Tensor, torch.Tensor]]) -> KVCacheProto:
+            _ = blocks
+            raise NotImplementedError("never called")
 
-        original = Hooks.probe_cache_layers
-        Hooks.probe_cache_layers = _fake_probe
+        original = Hooks.build_prefix_cache
+        Hooks.build_prefix_cache = _fake_builder
         reset_hooks()
-        assert Hooks.probe_cache_layers is original
+        assert Hooks.build_prefix_cache is original

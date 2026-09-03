@@ -30,7 +30,10 @@ from platform_core.errors import (
 
 from model_trainer.core.contracts.cartridge import CartridgeGeometry
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
-from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots
+from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
+    CartridgeSlots,
+    slots_from_state,
+)
 from model_trainer.core.types import (
     CacheCapableLMProto,
     ConfigLike,
@@ -127,15 +130,18 @@ class CartridgeModel:
             self.slots.layer_blocks(layer, batch_size=batch_size)
             for layer in range(self.geometry["num_layers"])
         ]
-        cache = Hooks.build_prefix_cache(blocks)
         attended = int(input_ids.shape[1]) + self.geometry["num_slots"]
-        mask = torch.ones((batch_size, attended), dtype=torch.long, device=input_ids.device)
-        return Hooks.forward_with_prefix(
-            self._base,
+        return self._base(
             input_ids=input_ids,
             labels=labels,
-            past_key_values=cache,
-            attention_mask=mask,
+            past_key_values=Hooks.build_prefix_cache(blocks),
+            attention_mask=torch.ones(
+                (batch_size, attended), dtype=torch.long, device=input_ids.device
+            ),
+            # False so the run does not accumulate its own keys on top of the
+            # prefix, which would grow the cache by the sequence length on
+            # every step of every epoch.
+            use_cache=False,
         )
 
     def train(self) -> None:
@@ -201,7 +207,7 @@ class CartridgeModel:
                 ``CARTRIDGE_GEOMETRY_MISMATCH`` if the tensors do not match
                 this model's geometry.
         """
-        self.slots = Hooks.slots_from_state(state_dict, self.geometry)
+        self.slots = slots_from_state(state_dict, self.geometry)
         return CartridgeLoadResult()
 
     def save_pretrained(self, out_dir: str) -> None:
