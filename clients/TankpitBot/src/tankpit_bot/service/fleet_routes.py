@@ -22,8 +22,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.runtime_artifacts import bot_run_dir
-from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.constants import child_video_url
+from tankpit_bot.service.demo_routes import add_demo_routes
 from tankpit_bot.service.fleet_config import (
     configured_accounts,
     engagement_doctrines,
@@ -40,6 +39,7 @@ from tankpit_bot.service.fleet_wire import (
     encode_fleet_bot,
     encode_fleet_snapshot,
 )
+from tankpit_bot.service.video_relay import relay_child_video
 
 log = get_logger(__name__)
 
@@ -229,36 +229,12 @@ def _add_video_routes(app: web.Application, manager: FleetManager) -> None:
     async def bot_video(request: web.Request) -> web.StreamResponse:
         """``GET /bots/{instance}/video`` — relay one child's MJPEG stream.
 
-        The child serves its own video on a port inside this container.
-        Nothing outside can dial that port and nothing should: exposing
-        one per bot would publish the fleet's internal surface to show a
-        picture. The manager already answers on the one published port,
-        so it relays bytes rather than handing out addresses.
-
-        The upstream ``Content-Type`` is passed through untouched
-        because it carries the multipart boundary the child generated,
-        and a caller given a different token cannot split the frames.
-
-        The stream is released on BOTH exits. A viewer closing a tab
-        mid-frame is the ordinary case here, not an exceptional one, and
-        an upstream left open would hold a connection against the child
-        for as long as this manager lives.
+        Any REGISTERED instance: this is the operator surface, and an
+        operator who may stop a bot may watch it. The public demo route
+        narrows the same relay to demo slots
+        (:mod:`tankpit_bot.service.demo_routes`).
         """
-        instance = request.match_info["instance"]
-        try:
-            port = manager.live_service_port(instance)
-        except FleetError as error:
-            log.warning("Fleet: refused video (404): %s", error)
-            return web.Response(status=404, text=str(error))
-        stream = await service_hooks.open_child_video(child_video_url(port))
-        response = web.StreamResponse(status=200, headers={"Content-Type": stream.content_type})
-        await response.prepare(request)
-        try:
-            async for chunk in stream.chunks():
-                await response.write(chunk)
-        finally:
-            await stream.close()
-        return response
+        return await relay_child_video(request, manager, request.match_info["instance"])
 
     app.router.add_get("/bots/{instance}/video", bot_video)
 
@@ -372,6 +348,7 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
     _add_video_routes(app, manager)
     _add_lifecycle_routes(app, manager)
     _add_shutdown_route(app, manager)
+    add_demo_routes(app, manager)
     return app
 
 

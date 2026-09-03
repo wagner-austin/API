@@ -275,6 +275,13 @@ class TestAsyncMain:
             "/bots/{instance}/restart",
             "/bots/{instance}",
             "/shutdown",
+            # The public demo surface. Three routes and no more: it is
+            # the part of this service a stranger reaches, so a fourth
+            # appearing here should have to be argued for in a diff
+            # rather than arriving as a side effect.
+            "/demo/fleet",
+            "/demo/spawn",
+            "/demo/video/{slot}",
         }
 
     async def test_the_drain_monitor_is_cancelled_when_serving_ends(

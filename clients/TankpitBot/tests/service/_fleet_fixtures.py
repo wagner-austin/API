@@ -252,12 +252,26 @@ class FakeRecordStore:
         ) = originals
 
 
-def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
-    """Install fake account config carrying ``artax`` and ``second``.
+def _with_account_pool(*usernames: str) -> tuple[PathExistsProtocol, ReadTextProtocol]:
+    """Install fake account config carrying exactly ``usernames``.
+
+    The SIZE of the pool is a behavioural input, not decoration: the
+    game refuses a second login on one account, so how many accounts
+    exist decides how many bots can be in play at once, and the public
+    demo's capacity is derived from it directly. A test about running
+    out of accounts and a test about running out of demo slots need
+    pools on either side of that ceiling, which is why this takes the
+    names rather than owning a fixed pair.
+
+    Args:
+        usernames: Account usernames, in file order (the first is the
+            configured default). No names at all is a legal pool and
+            means a machine that cannot log in.
 
     Returns:
         The original ``(path_exists, read_text)`` hooks to restore.
     """
+    pool = ", ".join(f'{{"username": "{name}", "password": "p"}}' for name in usernames)
 
     def fake_exists(path: Path) -> bool:
         _ = path
@@ -265,12 +279,25 @@ def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
 
     def fake_read(path: Path) -> str:
         _ = path
-        return '[{"username": "artax", "password": "a"}, {"username": "second", "password": "b"}]'
+        return f"[{pool}]"
 
     originals = (top_hooks.path_exists, top_hooks.read_text)
     top_hooks.path_exists = fake_exists
     top_hooks.read_text = fake_read
     return originals
+
+
+def _with_configured_accounts() -> tuple[PathExistsProtocol, ReadTextProtocol]:
+    """Install fake account config carrying ``artax`` and ``second``.
+
+    Two accounts is what most fleet suites want: enough to prove the
+    manager tells them apart, few enough to hit the refusal on a third
+    bot without spawning a crowd.
+
+    Returns:
+        The original ``(path_exists, read_text)`` hooks to restore.
+    """
+    return _with_account_pool("artax", "second")
 
 
 def _restore_account_hooks(originals: tuple[PathExistsProtocol, ReadTextProtocol]) -> None:

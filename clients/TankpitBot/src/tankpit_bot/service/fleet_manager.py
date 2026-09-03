@@ -181,28 +181,21 @@ class FleetManager:
         resolved_role = resolve_role(role)
         resolved_troop = resolve_troop(troop)
         resolved_doctrine = resolve_doctrine(doctrine)
-        if account:
-            configured = configured_accounts()
-            if account not in configured:
-                known = ", ".join(configured) or "none configured"
-                raise FleetError(
-                    f"account {account!r} is not in accounts.json (accounts are "
-                    f"config, not free text; configured: {known})"
-                )
         configured = configured_accounts()
+        if account and account not in configured:
+            known = ", ".join(configured) or "none configured"
+            raise FleetError(
+                f"account {account!r} is not in accounts.json (accounts are "
+                f"config, not free text; configured: {known})"
+            )
         resolved_account = account or (configured[0] if configured else "")
-        for other in self._bots.values():
-            other_account = other.account or (configured[0] if configured else "")
-            if (
-                resolved_account
-                and other_account == resolved_account
-                and other.process.is_running()
-            ):
-                raise FleetError(
-                    f"account {resolved_account or 'default'!r} already has a live bot "
-                    f"({other.instance!r}, pid {other.process.pid}) - the game refuses "
-                    "a second login on the same account"
-                )
+        conflict = self.live_accounts().get(resolved_account)
+        if conflict is not None:
+            raise FleetError(
+                f"account {resolved_account!r} already has a live bot "
+                f"({conflict['instance']!r}, pid {conflict['pid']}) - the game refuses "
+                "a second login on the same account"
+            )
         existing = self._bots.get(instance)
         if existing is not None and existing.process.is_running():
             raise FleetError(
@@ -330,6 +323,35 @@ class FleetManager:
         sentinel = bot_run_dir(bot.instance) / "STOP"
         top_hooks.write_text(sentinel, "")
         log.info("Fleet: stop requested for %r (sentinel %s)", bot.instance, sentinel)
+
+    def live_accounts(self) -> dict[str, FleetBotDict]:
+        """Map every account holding a live bot to that bot's report row.
+
+        The game refuses a second login on one account, so an account
+        with a live tank is spoken for. Two callers need that fact and
+        must not disagree about it: :meth:`spawn` REFUSES a request for
+        a taken account, and the public demo surface PICKS an untaken
+        one rather than asking. Resolving an empty selector to the
+        configured default therefore happens here, once — when spawn
+        and the demo each resolved it themselves, a demo bot could pick
+        the default account under its own name and be refused by the
+        spawn it had just decided was safe.
+
+        Returns:
+            Resolved username -> the report row of the live bot holding
+            it. An account nothing is running under is absent. Empty
+            when nothing is live, and also when no accounts are
+            configured at all: an unresolvable selector names no
+            account and so reserves none.
+        """
+        configured = configured_accounts()
+        default = configured[0] if configured else ""
+        held: dict[str, FleetBotDict] = {}
+        for bot in self._bots.values():
+            resolved = bot.account or default
+            if resolved and bot.process.is_running():
+                held[resolved] = bot.report()
+        return held
 
     def live_instances(self) -> list[str]:
         """Return the instances whose processes are still running.
