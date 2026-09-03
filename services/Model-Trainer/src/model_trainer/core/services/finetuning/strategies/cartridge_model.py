@@ -91,6 +91,24 @@ class CartridgeModel:
         """
         return self.slots.geometry
 
+    @property
+    def base(self) -> CacheCapableLMProto:
+        """Return the frozen model this prefix sits in front of.
+
+        Exposed because scoring the same tokens WITHOUT the prefix is the
+        control arm every claim about a cartridge needs, and the only model
+        that is the right control is this one -- same weights, same device,
+        same dtype. A measurement that loaded its own copy of the base would
+        be comparing against a different object and calling the difference an
+        effect of the cartridge.
+
+        Returns:
+            The base model, frozen. It is returned for READING: its
+            parameters have ``requires_grad`` cleared and nothing here
+            restores them.
+        """
+        return self._base
+
     def forward(self, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
         """Run the base model with the trained prefix in front of the input.
 
