@@ -9,7 +9,7 @@ related:
 source_paths:
   - "src/tankpit_bot/bot/ai/forage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/forage.py": "03dc9bf7ca014a106c157085ede4e74ef2da7a55"
+  "src/tankpit_bot/bot/ai/forage.py": "3b435823e9116c9628c65b15fc762a3cee24bca4"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture]
