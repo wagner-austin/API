@@ -27,6 +27,25 @@ These submit through `hpc3-submit` / `hpc3-sweep` / `hpc3-chain`, and every
 submission lands in `tools/hpc3/runs/ledger.jsonl` (machine-local, deliberately
 untracked — it is state, not configuration).
 
+What each project declares is RENDERED from the workspace documents below, not
+retyped here. Every hand-written restatement of these numbers in this file has
+been wrong at least once — see the `rusted` entry's correction — so the table
+is generated and `hpc3-research-index` fails when it drifts.
+
+<!-- generated: hpc3-projects. Do not edit by hand. -->
+
+Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index --write`.
+
+| project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | ckpt steps |
+|---|---|---|---|---|---|---|---|---|
+| `cleargbm` | free | cpu | 4 | 16 | 60 | none | yes | 0 |
+| `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
+| `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
+| `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
+| `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | 27344 |
+
+<!-- /generated: hpc3-projects -->
+
 ### `mi` — Model-Trainer probes and benchmarks
 
 - **Repo:** this one, `services/Model-Trainer`
