@@ -14,8 +14,8 @@
       "requeue": true,
       "checkpoint_steps": 0,
       "image": {
-        "path": "/pub/wagnera3/tankpit/images/v1/tankpit.sif",
-        "sha256": "b838e0242ecceb0da5e1310352d29a089e65e0100aed7982045403ee3425aa8a",
+        "path": "/pub/wagnera3/tankpit/images/v2/tankpit.sif",
+        "sha256": "0cfdd5592a1ab0df1cbe121ae567eb5d75a42f53c619f7c80fdbefaa8144a0e6",
         "binds": [
           "/pub/wagnera3"
         ]

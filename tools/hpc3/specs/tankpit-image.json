@@ -1,0 +1,64 @@
+{
+  "base_image": "python:3.11.16-slim-bookworm",
+  "env_prefix": "/opt/env",
+  "git_commit": "bccf5afab601906c367c32961ddeb31d5dde53a2",
+  "system_packages": [],
+  "extra_index_urls": [
+    "https://pypi.org/simple"
+  ],
+  "requirements": [
+    "aiohappyeyeballs==2.7.1",
+    "aiohttp==3.14.1",
+    "aiosignal==1.4.0",
+    "annotated-doc==0.0.5",
+    "annotated-types==0.8.0",
+    "anyio==4.14.2",
+    "attrs==26.1.0",
+    "certifi==2026.7.22",
+    "fastapi==0.124.4",
+    "frozenlist==1.8.0",
+    "greenlet==3.5.5",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.19",
+    "markdown-it-py==4.2.0",
+    "mdurl==0.1.2",
+    "multidict==6.7.1",
+    "pillow==11.3.0",
+    "playwright==1.57.0",
+    "propcache==0.5.2",
+    "psutil==7.2.2",
+    "pydantic-core==2.46.5",
+    "pydantic==2.13.5",
+    "pyee==13.0.1",
+    "pygments==2.21.0",
+    "python-dotenv==1.2.1",
+    "rich==14.2.0",
+    "starlette==0.50.0",
+    "typing-extensions==4.15.0",
+    "typing-inspection==0.4.4",
+    "websockets==15.0.1",
+    "yarl==1.24.5"
+  ],
+  "wheels": [
+    "monorepo_guards-0.1.0-py3-none-any.whl",
+    "platform_core-0.1.0-py3-none-any.whl",
+    "tankpit_bot-0.1.0-py3-none-any.whl"
+  ],
+  "expected_versions": {
+    "platform-core": "0.1.0",
+    "tankpit-bot": "0.1.0"
+  },
+  "required_symbols": [
+    {
+      "module": "tankpit_bot.sim.run",
+      "attribute": "run_sim_session"
+    }
+  ],
+  "smoke_commands": [],
+  "labels": {
+    "org.corvis.env-source": "/pub/wagnera3/envs/tankpit"
+  },
+  "project": "tankpit"
+}
