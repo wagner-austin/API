@@ -1,6 +1,7 @@
 ---
 title: What this package cannot submit, as decisions rather than discoveries
 tags: [submission, scope]
+hubs: [submission]
 related: ["[[chains]]", "[[submission-rules]]", "[[facts-are-code]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"

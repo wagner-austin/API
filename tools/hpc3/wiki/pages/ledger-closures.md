@@ -1,6 +1,7 @@
 ---
 title: Closures, or why the unaccounted check does not rot
 tags: [operations, ledger, triage]
+hubs: [operations]
 related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"

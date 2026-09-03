@@ -1,6 +1,7 @@
 ---
 title: Cluster facts are code, never configuration
 tags: [cluster-facts, architecture]
+hubs: [cluster-facts]
 related: ["[[partitions-and-billing]]", "[[unsupported-shapes]]"]
 source_paths:
   - "src/hpc3/clusters/hpc3.py"

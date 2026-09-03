@@ -1,6 +1,7 @@
 ---
 title: What the cluster sees, and why the comment is live-only
 tags: [cluster-facts, identity, ledger]
+hubs: [cluster-facts, operations]
 related: ["[[ledger-closures]]", "[[run-documents]]"]
 source_paths:
   - "src/hpc3/contracts/layout.py"

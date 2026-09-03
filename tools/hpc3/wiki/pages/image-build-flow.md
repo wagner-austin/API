@@ -1,6 +1,7 @@
 ---
 title: The image build flow, and why a GPU project must declare an image
 tags: [images, identity, gpu]
+hubs: [images-and-staging]
 related: ["[[image-ledger-lessons]]", "[[environment-pins]]", "[[known-answers]]"]
 source_paths:
   - "src/hpc3/contracts/image_spec.py"

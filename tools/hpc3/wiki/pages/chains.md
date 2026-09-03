@@ -1,6 +1,7 @@
 ---
 title: Chains stop when a stage fails, because Slurm queues the corpse forever
 tags: [submission, chains, dependencies]
+hubs: [submission]
 related: ["[[run-documents]]", "[[triage-conditions]]", "[[budget-model]]"]
 source_paths:
   - "src/hpc3/cli/chain.py"

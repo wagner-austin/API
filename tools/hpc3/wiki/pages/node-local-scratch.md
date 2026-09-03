@@ -1,6 +1,7 @@
 ---
 title: Small-file boots belong on the node's own scratch, never on BeeGFS
 tags: [cluster-facts, storage, performance]
+hubs: [cluster-facts]
 related: ["[[partitions-and-billing]]", "[[preemption-and-campaigns]]", "[[facts-are-code]]"]
 source_paths:
   - "src/hpc3/core/sbatch.py"

@@ -1,6 +1,7 @@
 ---
 title: Determinism is declared, split between launcher and payload, and recorded
 tags: [identity, determinism]
+hubs: [images-and-staging]
 related: ["[[known-answers]]", "[[run-documents]]"]
 source_paths:
   - "README.md"

@@ -1,6 +1,7 @@
 ---
 title: Billing follows the job's QOS, and free is not a setting
 tags: [cluster-facts, billing, partitions]
+hubs: [cluster-facts]
 related: ["[[facts-are-code]]", "[[submission-rules]]", "[[budget-model]]"]
 source_paths:
   - "src/hpc3/clusters/hpc3.py"

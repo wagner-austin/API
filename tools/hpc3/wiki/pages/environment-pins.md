@@ -1,6 +1,7 @@
 ---
 title: The environment is the pinned one, proven by its own interpreter
 tags: [identity, environments]
+hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[submission-rules]]", "[[unsupported-shapes]]"]
 source_paths:
   - "src/hpc3/contracts/pins.py"

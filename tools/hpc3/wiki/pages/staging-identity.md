@@ -1,6 +1,7 @@
 ---
 title: Staged bytes are held to a record written by a different act
 tags: [identity, staging]
+hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[known-answers]]"]
 source_paths:
   - "src/hpc3/contracts/stage.py"

@@ -1,6 +1,7 @@
 ---
 title: An image that still builds is not an image that still computes
 tags: [identity, images, known-answers]
+hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[determinism-posture]]", "[[staging-identity]]"]
 source_paths:
   - "src/hpc3/core/image_selfcheck.py"

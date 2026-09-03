@@ -1,6 +1,7 @@
 ---
 title: Sweeps, and why every member declares its artifact
 tags: [submission, sweeps, identity]
+hubs: [submission]
 related: ["[[preemption-and-campaigns]]", "[[run-documents]]", "[[submission-rules]]"]
 source_paths:
   - "src/hpc3/contracts/sweep.py"

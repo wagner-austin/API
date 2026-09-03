@@ -1,6 +1,7 @@
 ---
 title: The five triage conditions that look like health
 tags: [operations, triage, ledger]
+hubs: [operations]
 related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"

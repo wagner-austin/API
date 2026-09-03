@@ -1,6 +1,7 @@
 ---
 title: The submission rules, each with the failure it refuses
 tags: [submission, guards]
+hubs: [submission]
 related: ["[[budget-model]]", "[[preemption-and-campaigns]]", "[[partitions-and-billing]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"

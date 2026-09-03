@@ -1,6 +1,7 @@
 ---
 title: A sweep is one sbatch call, and the script is the member table
 tags: [submission, arrays, identity]
+hubs: [submission]
 related: ["[[sweeps-and-artifacts]]", "[[preemption-and-campaigns]]", "[[job-identity-on-cluster]]", "[[node-local-scratch]]"]
 source_paths:
   - "src/hpc3/core/array_sbatch.py"

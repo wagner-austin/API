@@ -1,6 +1,7 @@
 ---
 title: The budget is per project, because nothing else says stop
 tags: [operations, budget, submission]
+hubs: [operations]
 related: ["[[submission-rules]]", "[[partitions-and-billing]]", "[[triage-conditions]]"]
 source_paths:
   - "src/hpc3/contracts/budget.py"

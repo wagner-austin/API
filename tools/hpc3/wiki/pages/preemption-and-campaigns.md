@@ -1,6 +1,7 @@
 ---
 title: Preemption cancels, checkpoints protect, campaigns converge
 tags: [submission, preemption, campaigns]
+hubs: [cluster-facts, submission]
 related: ["[[sweeps-and-artifacts]]", "[[partitions-and-billing]]", "[[submission-rules]]"]
 source_paths:
   - "src/hpc3/contracts/job.py"

@@ -1,6 +1,7 @@
 ---
 title: Twenty-one unledgered image builds, and how the path that made them was closed
 tags: [images, ledger, incidents]
+hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[triage-conditions]]", "[[ledger-closures]]"]
 source_paths:
   - "src/hpc3/cli/image_build.py"
@@ -42,7 +43,7 @@ from a declared `--project`, the submitter derives it by the same rule, and
 the two cannot disagree. A build that would break the ledger cannot be
 rendered.
 
-## Why --project and --name are stated, not read from the script
+## Why --project and --name are stated rather than parsed out of the script
 
 The ledger's name is the qualified `<project>.<name>` and **the project half
 is the part a script cannot tell you**: v22 was rendered `img.abl-sif-v22`,

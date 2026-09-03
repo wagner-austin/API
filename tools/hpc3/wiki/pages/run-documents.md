@@ -1,6 +1,7 @@
 ---
 title: Run documents say what is specific to this run
 tags: [submission, contracts]
+hubs: [submission]
 related: ["[[sweeps-and-artifacts]]", "[[submission-rules]]"]
 source_paths:
   - "src/hpc3/contracts/run.py"
