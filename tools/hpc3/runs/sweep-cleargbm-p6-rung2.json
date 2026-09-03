@@ -13,242 +13,242 @@
   "members": [
     {
       "suffix": "w-lr03-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr03-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr03-b255-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr05-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr05-b255-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "w-lr10-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset weather_tmax --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/w-lr10-b255-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr03-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.03 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr03-b255-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr05-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.05 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr05-b255-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b64-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b64-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b64-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b64-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 64 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b64-d8-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b255-d6-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d6-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d6-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b255-d6-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d6-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 6 --num-leaves 31 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d6-m20.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b255-d8-m5",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d8-m5.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 5 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d8-m5.json\"",
       "artifact": null
     },
     {
       "suffix": "v-lr10-b255-d8-m20",
-      "command": "cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d8-m20.json",
+      "command": "bash -c \"cd /pub/wagnera3/api/libs/covenant_ml && python -m scripts.benchmark_cleargbm_regression --dataset voc_match_quality --external-dir ../../services/covenant-radar-api/data/external --learning-rate 0.1 --max-bins 255 --max-depth 8 --num-leaves 63 --min-samples-leaf 20 --out /pub/wagnera3/cleargbm/rung2/v-lr10-b255-d8-m20.json\"",
       "artifact": null
     }
   ]

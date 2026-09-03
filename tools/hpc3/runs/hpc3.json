@@ -13,7 +13,14 @@
       "minutes": 60,
       "requeue": false,
       "checkpoint_steps": 0,
-      "env_path": "/pub/wagnera3/envs/cleargbm",
+      "image": {
+        "path": "/pub/wagnera3/images/cleargbm-v1/cleargbm-v1.sif",
+        "sha256": "0a525f532a9e5e610913fc14e5fbcd248b7883c28063fe94d84981a2040cb980",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": {
         "numpy": "2.3.5",
         "lightgbm": "4.6.0",

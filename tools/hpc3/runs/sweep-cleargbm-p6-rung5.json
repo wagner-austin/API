@@ -12,42 +12,42 @@
   "members": [
     {
       "suffix": "taiwan-cleargbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 100 -f ratios_only --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d taiwan -n 100 -f ratios_only --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "taiwan-lightgbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d taiwan -n 100 -f ratios_only --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d taiwan -n 100 -f ratios_only --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "us-cleargbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 40 -f full --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d us -n 40 -f full --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "us-lightgbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d us -n 40 -f full --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d us -n 40 -f full --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "polish-cleargbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 100 -f none --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d polish -n 100 -f none --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "polish-lightgbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d polish -n 100 -f none --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d polish -n 100 -f none --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "kaggle-give-me-credit-cleargbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 100 -f log_only --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b cleargbm -d kaggle_give_me_credit -n 100 -f log_only --device cpu --no-save-model\"",
       "artifact": null
     },
     {
       "suffix": "kaggle-give-me-credit-lightgbm",
-      "command": "cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d kaggle_give_me_credit -n 100 -f log_only --device cpu --no-save-model",
+      "command": "bash -c \"cd /pub/wagnera3/api/services/covenant-radar-api && APP__DATA_ROOT=data python -m scripts.optimize -b lightgbm -d kaggle_give_me_credit -n 100 -f log_only --device cpu --no-save-model\"",
       "artifact": null
     }
   ]
