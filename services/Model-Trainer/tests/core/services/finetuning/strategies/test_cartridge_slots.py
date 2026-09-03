@@ -15,6 +15,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 from model_trainer.core.contracts.cartridge import CartridgeGeometry
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     CartridgeSlots,
+    compose,
     discover_geometry,
     initialise_slots,
     require_matching_geometry,
@@ -337,3 +338,107 @@ class TestHoldingPrebuiltBlocks:
         named = slots.named_parameters()
         assert torch.equal(named[0][1].detach(), torch.ones(1, 4, 3, 8))
         assert torch.equal(named[1][1].detach(), torch.zeros(1, 4, 3, 8))
+
+
+class TestComposition:
+    """Joining two cartridges into one prefix.
+
+    The mechanical half. Whether a composed cartridge still WORKS is measured
+    against a real model in ``test_cartridge_composition``.
+    """
+
+    def test_the_slot_counts_add(self) -> None:
+        """Two contexts laid end to end occupy both their positions."""
+        joined = compose(
+            initialise_slots(make_geometry(num_slots=3), seed=1),
+            initialise_slots(make_geometry(num_slots=5), seed=2),
+        )
+        assert joined.geometry["num_slots"] == 8
+
+    def test_the_model_dimensions_are_unchanged(self) -> None:
+        """Composition lengthens the prefix; it does not reshape the model."""
+        joined = compose(
+            initialise_slots(make_geometry(num_slots=3), seed=1),
+            initialise_slots(make_geometry(num_slots=5), seed=2),
+        )
+        assert (
+            joined.geometry["num_layers"],
+            joined.geometry["num_kv_heads"],
+            joined.geometry["head_dim"],
+        ) == (2, 4, 8)
+
+    def test_every_block_has_the_joined_shape(self) -> None:
+        """The concatenation is on the SLOT axis, which is the one that grows.
+
+        Joining on the head axis would produce blocks of the right total size
+        describing a model with twice the heads, and attention would read them
+        without complaint, so the axis is asserted through the shape.
+        """
+        joined = compose(
+            initialise_slots(make_geometry(num_slots=3), seed=1),
+            initialise_slots(make_geometry(num_slots=5), seed=2),
+        )
+        assert all(
+            tuple(tensor.detach().shape) == (1, 4, 8, 8) for _, tensor in joined.named_parameters()
+        )
+
+    def test_the_first_cartridge_occupies_the_leading_slots(self) -> None:
+        """Order is the caller's and is preserved, block by block."""
+        first = initialise_slots(make_geometry(num_slots=3), seed=1)
+        second = initialise_slots(make_geometry(num_slots=5), seed=2)
+        joined = compose(first, second)
+        for index, (_, tensor) in enumerate(joined.named_parameters()):
+            original = first.named_parameters()[index][1].detach()
+            assert torch.equal(tensor.detach()[:, :, :3, :], original)
+
+    def test_the_second_cartridge_occupies_the_trailing_slots(self) -> None:
+        """The other half of the same claim."""
+        first = initialise_slots(make_geometry(num_slots=3), seed=1)
+        second = initialise_slots(make_geometry(num_slots=5), seed=2)
+        joined = compose(first, second)
+        for index, (_, tensor) in enumerate(joined.named_parameters()):
+            original = second.named_parameters()[index][1].detach()
+            assert torch.equal(tensor.detach()[:, :, 3:, :], original)
+
+    def test_the_inputs_are_left_usable(self) -> None:
+        """Composing must not consume its operands.
+
+        A caller composing A with B still holds A, and may compose it with C
+        next. Sharing storage would make the second composition see whatever
+        the first did.
+        """
+        first = initialise_slots(make_geometry(num_slots=3), seed=1)
+        before = first.named_parameters()[0][1].detach().clone()
+        joined = compose(first, initialise_slots(make_geometry(num_slots=5), seed=2))
+        joined.named_parameters()[0][1].detach().fill_(7.0)
+        assert torch.equal(first.named_parameters()[0][1].detach(), before)
+
+    def test_the_result_is_trainable(self) -> None:
+        """A composed cartridge can be trained further, so its blocks are leaves."""
+        joined = compose(
+            initialise_slots(make_geometry(num_slots=3), seed=1),
+            initialise_slots(make_geometry(num_slots=5), seed=2),
+        )
+        assert all(tensor.requires_grad for _, tensor in joined.named_parameters())
+
+    def test_composing_is_not_commutative(self) -> None:
+        """Slots sit at positions, so order changes the object.
+
+        Asserted rather than left ambiguous: nothing here sorts the operands,
+        and a caller who assumed otherwise would get a different prefix than
+        they expected without any error.
+        """
+        first = initialise_slots(make_geometry(num_slots=3), seed=1)
+        second = initialise_slots(make_geometry(num_slots=5), seed=2)
+        forward = compose(first, second).named_parameters()[0][1].detach()
+        backward = compose(second, first).named_parameters()[0][1].detach()
+        assert not torch.equal(forward, backward)
+
+    def test_cartridges_for_differently_shaped_models_cannot_be_joined(self) -> None:
+        """Two prefixes for different models cannot occupy one cache."""
+        with pytest.raises(AppError) as excinfo:
+            compose(
+                initialise_slots(make_geometry(num_layers=2), seed=1),
+                initialise_slots(make_geometry(num_layers=3), seed=2),
+            )
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_MISMATCH

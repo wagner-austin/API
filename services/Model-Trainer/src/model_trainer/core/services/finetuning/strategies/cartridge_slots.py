@@ -30,6 +30,13 @@ from model_trainer.core.types import NamedParameter, ParameterLike
 #: symmetric and the cartridge collapses to a single learned position.
 _INIT_STD = 0.02
 
+#: Axis the slots live on in a ``(batch, kv_heads, slots, head_dim)`` block.
+#:
+#: Named because two operations index it and a wrong axis is silent: joining on
+#: the head axis would produce a block of the right total size describing a
+#: model with twice the heads, and attention would read it without complaint.
+_SLOT_AXIS = 2
+
 
 def discover_geometry(layers: Sequence[torch.Tensor], *, num_slots: int) -> CartridgeGeometry:
     """Read a cartridge's shape off a model's own cached keys.
@@ -334,6 +341,77 @@ def slots_from_state(
     )
 
 
+def compose(first: CartridgeSlots, second: CartridgeSlots) -> CartridgeSlots:
+    """Join two cartridges into one prefix, laid end to end.
+
+    WHY THIS IS CONCATENATION AND NOT ADDITION, which is the whole reason a
+    cartridge is a different kind of object from a steering vector. A steering
+    vector is a direction added into the residual stream, so combining two
+    means summing them, and the sum is a third direction that is neither --
+    measured as a 15.7 to 40.1 point loss of trait expression at two vectors
+    (Subbiah et al. 2026). A cartridge is attention CONTEXT. Two contexts
+    combine the way two documents in a prompt combine: both are present, at
+    their own positions, and attention decides what to read. Nothing is
+    averaged and nothing is displaced.
+
+    The cost is the honest one: the prefix gets longer. Composition buys
+    retention and pays attention cost, where summing buys constant cost and
+    pays in interference.
+
+    Order is preserved and is the caller's. Concatenating in the other order
+    produces a different object with the same content, because the slots sit
+    at different positions; the composition is not claimed to be commutative
+    and nothing here sorts it.
+
+    Args:
+        first: The cartridge whose slots come first.
+        second: The cartridge whose slots follow.
+
+    Returns:
+        A cartridge holding both, with the summed slot count. Its blocks are
+        new tensors: the inputs are unchanged and remain independently usable.
+
+    Raises:
+        AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if the two were cut for
+            differently shaped models. Two prefixes for different models
+            cannot occupy one cache.
+    """
+    require_matching_geometry(first.geometry, second.geometry)
+    layers = range(first.geometry["num_layers"])
+    joined = CartridgeGeometry(
+        num_layers=first.geometry["num_layers"],
+        num_kv_heads=first.geometry["num_kv_heads"],
+        head_dim=first.geometry["head_dim"],
+        num_slots=first.geometry["num_slots"] + second.geometry["num_slots"],
+    )
+    return CartridgeSlots(
+        geometry=joined,
+        keys=[_join_blocks(first, second, layer, is_key=True) for layer in layers],
+        values=[_join_blocks(first, second, layer, is_key=False) for layer in layers],
+    )
+
+
+def _join_blocks(
+    first: CartridgeSlots, second: CartridgeSlots, layer: int, *, is_key: bool
+) -> torch.Tensor:
+    """Concatenate one layer's blocks along the slot axis.
+
+    Args:
+        first: The cartridge whose slots come first.
+        second: The cartridge whose slots follow.
+        layer: Zero-based layer index.
+        is_key: Whether to join the key blocks rather than the value blocks.
+
+    Returns:
+        The joined block, a leaf tensor with gradients enabled so a composed
+        cartridge can itself be trained further.
+    """
+    index = 2 * layer + (0 if is_key else 1)
+    left = first.named_parameters()[index][1].detach()
+    right = second.named_parameters()[index][1].detach()
+    return torch.cat([left, right], dim=_SLOT_AXIS).requires_grad_(True)
+
+
 def require_matching_geometry(
     saved: CartridgeGeometry,
     model_shape: CartridgeGeometry,
@@ -374,6 +452,7 @@ def require_matching_geometry(
 
 __all__ = [
     "CartridgeSlots",
+    "compose",
     "discover_geometry",
     "initialise_slots",
     "require_matching_geometry",
