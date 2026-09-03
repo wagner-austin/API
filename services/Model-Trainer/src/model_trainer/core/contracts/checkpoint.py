@@ -48,10 +48,10 @@ from model_trainer.core.contracts.queue_encoding_configs import (
 from .dataset import require_corpus_format
 from .model import ModelTrainConfig
 from .queue_encoding import (
-    _narrow_finetuning_strategy,
     _narrow_model_family,
     _narrow_optimizer,
 )
+from .strategy_names import require_strategy_name
 
 #: Version stamp written into every checkpoint. A decoder that meets a
 #: different version refuses to resume rather than guessing at field
@@ -294,7 +294,7 @@ def decode_model_train_config(obj: JSONObject) -> ModelTrainConfig:
         "test_split_ratio": require_float(obj, "test_split_ratio"),
         "finetune_lr_cap": require_float(obj, "finetune_lr_cap"),
         "loss_mask_prefix_separator": optional_str(obj, "loss_mask_prefix_separator"),
-        "finetuning_strategy": _narrow_finetuning_strategy(require_str(obj, "finetuning_strategy")),
+        "finetuning_strategy": require_strategy_name(require_str(obj, "finetuning_strategy")),
         "hub_model_id": optional_str(obj, "hub_model_id"),
         "lora": _decode_optional_lora(obj),
         "quantization": _decode_optional_quantization(obj),

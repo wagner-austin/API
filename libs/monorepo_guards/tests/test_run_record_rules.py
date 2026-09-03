@@ -27,9 +27,7 @@ def _write(root: pathlib.Path, relative: str, body: str) -> pathlib.Path:
 class TestAPackageThatOnlyFingerprints:
     """The failure both covenant_ml and Model-Trainer actually had."""
 
-    def test_capturing_without_recording_is_a_violation(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_capturing_without_recording_is_a_violation(self, tmp_path: pathlib.Path) -> None:
         """A fingerprint in a private shape cannot reach compare_run_records.
 
         Args:
@@ -69,9 +67,7 @@ class TestAPackageThatOnlyFingerprints:
 class TestAPackageThatDoesBoth:
     """Capture and record legitimately live in different modules."""
 
-    def test_recording_in_a_sibling_module_satisfies_the_rule(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_recording_in_a_sibling_module_satisfies_the_rule(self, tmp_path: pathlib.Path) -> None:
         """covenant_ml captures in provenance.py and records in run_records.py.
 
         A file-scoped rule would force those together or fire on every
@@ -118,9 +114,7 @@ class TestAPackageThatDoesBoth:
 class TestWhatIsNotSweptUp:
     """A rule that fires on correct code gets suppressed rather than fixed."""
 
-    def test_a_package_that_fingerprints_nothing_is_ignored(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_a_package_that_fingerprints_nothing_is_ignored(self, tmp_path: pathlib.Path) -> None:
         """Most packages are not research surfaces.
 
         Args:
@@ -146,9 +140,7 @@ class TestWhatIsNotSweptUp:
 
         assert RunRecordRule().run([path]) == []
 
-    def test_two_offending_packages_are_reported_separately(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_two_offending_packages_are_reported_separately(self, tmp_path: pathlib.Path) -> None:
         """One violation per package, so a fix can be attributed.
 
         Args:
@@ -202,6 +194,54 @@ class TestWhatIsNotSweptUp:
             tmp_path,
             "libs/thing/src/thing/provenance.py",
             "from platform_core.comparability import RunFingerprint\n\nrun_record = 1\n",
+        )
+
+        assert [v.kind for v in RunRecordRule().run([path])] == ["run-record-missing"]
+
+
+class TestPathAndImportShapesTheHelpersMustSurvive:
+    """Two shapes the helpers handle that no other test produced.
+
+    Both were written into the helpers deliberately and neither was reachable
+    from the cases above, so the branches sat uncovered while the rule read as
+    fully tested. They are exercised through ``run`` rather than by calling the
+    private helpers, so what is asserted is the rule's behaviour.
+    """
+
+    def test_a_path_whose_first_segment_is_the_marker_falls_back_to_the_parent(self) -> None:
+        """``src/platform_core/a.py`` has no package name to the LEFT of ``src``.
+
+        ``_package_of`` looks one segment left of the first layout marker it
+        finds, which does not exist when the marker IS the first segment. It
+        then keeps looking for a later marker and finally falls back to the
+        file's own parent directory rather than indexing past the start of the
+        path.
+
+        The fallback is asserted through its consequence: naming the parent
+        ``platform_core`` puts the file in a defining package, which the rule
+        skips BEFORE it would read the file off disk. So this passes only if
+        the fallback produced that name -- had it produced anything else the
+        rule would try to open a path that does not exist and raise.
+        """
+        relative = pathlib.Path("src/platform_core/provenance.py")
+
+        assert RunRecordRule().run([relative]) == []
+
+    def test_a_relative_import_carries_no_module_name(self, tmp_path: pathlib.Path) -> None:
+        """``from . import x`` is an ImportFrom whose ``module`` is None.
+
+        The rule reads the final component of a dotted module name to catch
+        ``import platform_core.run_record``. A relative import has no module
+        name to read, and must be skipped rather than crash -- the file's
+        imported names are still collected from the aliases.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(
+            tmp_path,
+            "libs/thing/src/thing/provenance.py",
+            "from . import sibling\nfrom platform_core.comparability import RunFingerprint\n",
         )
 
         assert [v.kind for v in RunRecordRule().run([path])] == ["run-record-missing"]

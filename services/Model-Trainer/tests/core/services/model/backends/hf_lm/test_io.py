@@ -7,6 +7,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 
 from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
@@ -25,7 +26,6 @@ from model_trainer.core.services.model.backends.hf_lm.io import (
     _encode_metadata,
     _get_model_max_seq_len,
     _require_strategy_name,
-    _validate_strategy_name,
     load_prepared_hf_lm_from_handle,
     save_prepared_hf_lm,
 )
@@ -73,30 +73,6 @@ def _reset_all_hooks() -> Generator[None, None, None]:
     reset_ft_hooks()
 
 
-class TestValidateStrategyName:
-    """Tests for _validate_strategy_name function."""
-
-    def test_validates_full(self) -> None:
-        """Test validation of 'full' strategy."""
-        result = _validate_strategy_name("full")
-        assert result == "full"
-
-    def test_validates_lora(self) -> None:
-        """Test validation of 'lora' strategy."""
-        result = _validate_strategy_name("lora")
-        assert result == "lora"
-
-    def test_validates_qlora(self) -> None:
-        """Test validation of 'qlora' strategy."""
-        result = _validate_strategy_name("qlora")
-        assert result == "qlora"
-
-    def test_raises_for_invalid_strategy(self) -> None:
-        """Test that ValueError is raised for invalid strategy."""
-        with pytest.raises(ValueError, match="Invalid strategy name 'invalid'"):
-            _validate_strategy_name("invalid")
-
-
 class TestRequireStrategyName:
     """Tests for _require_strategy_name function."""
 
@@ -124,10 +100,23 @@ class TestRequireStrategyName:
         with pytest.raises(JSONTypeError, match="Missing required field"):
             _require_strategy_name(obj, "strategy_name")
 
-    def test_raises_for_invalid_value(self) -> None:
-        """Test that JSONTypeError is raised for invalid strategy value."""
+    def test_a_wellformed_string_naming_no_strategy_is_a_value_fault(self) -> None:
+        """The shape is fine, so the failure is about the value, not the file.
+
+        Distinct from the missing-field case above, which stays a
+        ``JSONTypeError``: that one says the metadata is malformed, this one
+        says the metadata is well-formed and names something that does not
+        exist.
+        """
         obj: JSONObject = {"strategy_name": "invalid"}
-        with pytest.raises(JSONTypeError, match="must be one of"):
+        with pytest.raises(AppError) as excinfo:
+            _require_strategy_name(obj, "strategy_name")
+        assert excinfo.value.code is ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN
+
+    def test_a_non_string_field_is_a_shape_fault(self) -> None:
+        """A number where a name belongs never reaches the value check."""
+        obj: JSONObject = {"strategy_name": 3}
+        with pytest.raises(JSONTypeError):
             _require_strategy_name(obj, "strategy_name")
 
 
@@ -305,7 +294,12 @@ class TestSavePreparedHFLM:
             save_prepared_hf_lm(prepared, tmpdir)
 
     def test_raises_for_invalid_strategy_name(self) -> None:
-        """Test that ValueError is raised for invalid strategy_name."""
+        """A prepared model carrying an undeclared strategy name cannot be saved.
+
+        ``PreparedLMModel.strategy_name`` is a bare ``str`` because it is
+        reconstructed from disk, so this is the point where an unknown name is
+        caught, with the same code every other entry point raises.
+        """
         from model_trainer.core.services.model.backends.hf_lm.prepare import (
             HFTokenizerEncoder,
         )
@@ -324,11 +318,10 @@ class TestSavePreparedHFLM:
             quantization=None,
         )
 
-        with (
-            tempfile.TemporaryDirectory() as tmpdir,
-            pytest.raises(ValueError, match="Invalid strategy name"),
-        ):
-            save_prepared_hf_lm(prepared, tmpdir)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(AppError) as excinfo:
+                save_prepared_hf_lm(prepared, tmpdir)
+            assert excinfo.value.code is ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN
 
     def test_saves_prepared_model_with_full_strategy(self) -> None:
         """Test successful save of prepared model with full strategy."""

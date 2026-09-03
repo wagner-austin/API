@@ -29,6 +29,7 @@ from model_trainer.api.validators.runs_config import (
     _validate_hf_lm_cross_fields,
 )
 from model_trainer.core.contracts.dataset import CORPUS_FORMATS, as_corpus_format
+from model_trainer.core.contracts.strategy_names import STRATEGY_NAMES, StrategyName
 
 from ..schemas.runs import (
     BaselineClozeRequest,
@@ -49,7 +50,10 @@ _DEVICES: frozenset[str] = frozenset({"cpu", "cuda", "auto"})
 _PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
-_FINETUNING_STRATEGIES: frozenset[str] = frozenset({"full", "lora", "qlora"})
+#: Derived from the StrategyName Literal rather than restated, for the same
+#: reason as _CORPUS_FORMATS below: a restated copy lets the HTTP layer accept
+#: a strategy the registry has never heard of.
+_FINETUNING_STRATEGIES: frozenset[str] = frozenset(STRATEGY_NAMES)
 #: Derived from the CorpusFormat Literal rather than restated, so the HTTP
 #: layer cannot accept a format the decoder rejects, or vice versa.
 _CORPUS_FORMATS: frozenset[str] = frozenset(CORPUS_FORMATS)
@@ -93,7 +97,7 @@ class _HfLmFields:
     """Container for decoded HF LM backend fields."""
 
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora"]
+    finetuning_strategy: StrategyName
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
     gguf_export: GgufExportConfigRequest | None
@@ -101,7 +105,7 @@ class _HfLmFields:
     def __init__(
         self,
         hub_model_id: str | None,
-        finetuning_strategy: Literal["full", "lora", "qlora"],
+        finetuning_strategy: StrategyName,
         lora: LoraConfigRequest | None,
         quantization: QuantizationConfigRequest | None,
         gguf_export: GgufExportConfigRequest | None,

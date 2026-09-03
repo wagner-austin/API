@@ -150,6 +150,9 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CLOZE_ITEM_UNSCOREABLE = "CLOZE_ITEM_UNSCOREABLE"
     CLOZE_FINGERPRINT_MISSING = "CLOZE_FINGERPRINT_MISSING"
 
+    # Fine-tuning strategy selection
+    STRATEGY_NAME_UNKNOWN = "STRATEGY_NAME_UNKNOWN"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one
@@ -482,6 +485,9 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # server stored a number it cannot say the configuration of. That is a
     # fault in what was written, not a thing the caller asked for wrongly.
     ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING: 500,
+    # The caller chose a name no strategy answers to, so the request is the
+    # thing that is wrong.
+    ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN: 400,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

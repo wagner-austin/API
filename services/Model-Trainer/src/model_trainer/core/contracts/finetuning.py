@@ -8,16 +8,14 @@ Strict typing: no Any, cast, type: ignore, .pyi, or stubs.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 from model_trainer.core.contracts.model import (
     LoraConfig,
     ModelTrainConfig,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.types import LMModelProto
-
-# Strategy name as a literal type for strict typing
-StrategyName = Literal["full", "lora", "qlora"]
 
 
 class StrategyCapabilities(TypedDict):

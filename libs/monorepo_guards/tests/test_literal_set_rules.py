@@ -1,17 +1,27 @@
-"""Tests for the corpus-format literal-drift rule.
+"""Tests for the literal-set drift rule, over both sets it is registered for.
 
 The motivating case is ``_flags_a_literal_left_behind_by_a_widened_tuple``:
-that is what the source looks like the moment after a third format is added to
-``CORPUS_FORMATS`` and one of the dozen inline ``Literal`` annotations is not
+that is what the source looks like the moment after a third member is added to
+the declaring tuple and one of the dozen inline ``Literal`` annotations is not
 updated with it. mypy accepts that state, because the annotations are
 independent of each other and of the tuple.
+
+Most cases below drive the ``corpus_format`` instance, because that is the set
+the AST handling was written against. ``TestTheStrategyNameSet`` at the end
+drives the second registration, so the parameterisation is covered by a set
+with a different declaring module, tuple name and field name -- not merely
+asserted to exist.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from monorepo_guards.corpus_format_rules import CorpusFormatLiteralRule
+from monorepo_guards.literal_set_rules import (
+    CORPUS_FORMAT_SET,
+    STRATEGY_NAME_SET,
+    LiteralSetRule,
+)
 
 _DECLARING = "core/contracts/dataset.py"
 
@@ -60,7 +70,7 @@ class TestDrift:
             '    corpus_format: Literal["lines", "documents"]\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, stale])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, stale])
 
         kinds = [v.kind for v in violations]
         assert kinds == ["corpus-format-literal-drift"]
@@ -75,7 +85,7 @@ class TestDrift:
             'def read(corpus_format: Literal["lines"]) -> None:\n    return None\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, stale])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, stale])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -89,7 +99,7 @@ class TestDrift:
             '    return "lines"\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, stale])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, stale])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -101,7 +111,7 @@ class TestDrift:
             'from typing import Literal\n\n\nclass P:\n    corpus_format: Literal["lines"]\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, stale])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, stale])
 
         assert "names lines" in violations[0].line
         assert "documents, fim, lines" in violations[0].line
@@ -119,7 +129,7 @@ class TestAgreement:
             '    corpus_format: Literal["lines", "documents"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, matching]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, matching]) == []
 
     def test_member_order_does_not_matter(self, tmp_path: Path) -> None:
         """The comparison is over sets, so reordering is not drift."""
@@ -130,7 +140,7 @@ class TestAgreement:
             '    corpus_format: Literal["documents", "lines"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, reordered]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, reordered]) == []
 
     def test_a_single_member_literal_subscript_is_read(self, tmp_path: Path) -> None:
         """``Literal["lines"]`` has no ast.Tuple slice, and must still parse.
@@ -144,7 +154,7 @@ class TestAgreement:
             'from typing import Literal\n\n\nclass P:\n    corpus_format: Literal["lines"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, single]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, single]) == []
 
     def test_a_qualified_literal_is_read(self, tmp_path: Path) -> None:
         """``typing.Literal[...]`` is an Attribute base, not a Name."""
@@ -155,7 +165,7 @@ class TestAgreement:
             '    corpus_format: typing.Literal["lines", "documents"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, qualified]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, qualified]) == []
 
     def test_a_non_literal_annotation_is_ignored(self, tmp_path: Path) -> None:
         """The manifest carries the format as a plain ``str`` by convention."""
@@ -165,7 +175,7 @@ class TestAgreement:
             "class M:\n    corpus_format: str\n",
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, plain]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, plain]) == []
 
     def test_a_subscripted_non_literal_annotation_is_ignored(self, tmp_path: Path) -> None:
         """``Sequence[...]`` subscripts too, and names no format."""
@@ -176,7 +186,7 @@ class TestAgreement:
             "    corpus_format: Sequence[str]\n",
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, sequence]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, sequence]) == []
 
     def test_a_non_string_literal_is_ignored(self, tmp_path: Path) -> None:
         """A Literal of ints names no corpus format."""
@@ -186,7 +196,7 @@ class TestAgreement:
             "from typing import Literal\n\n\nclass P:\n    corpus_format: Literal[1, 2]\n",
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, numeric]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, numeric]) == []
 
     def test_an_unrelated_field_is_ignored(self, tmp_path: Path) -> None:
         """Only annotations on the format's own name are compared."""
@@ -196,7 +206,7 @@ class TestAgreement:
             'from typing import Literal\n\n\nclass P:\n    optimizer: Literal["adamw", "sgd"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, other]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, other]) == []
 
     def test_an_attribute_target_is_compared(self, tmp_path: Path) -> None:
         """``self.corpus_format: Literal[...]`` is an ast.Attribute target."""
@@ -207,7 +217,7 @@ class TestAgreement:
             '        self.corpus_format: Literal["lines"] = "lines"\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, attribute])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, attribute])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -220,7 +230,7 @@ class TestAgreement:
             'async def read(corpus_format: Literal["lines"]) -> None:\n    return None\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, asynchronous])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, asynchronous])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -233,7 +243,7 @@ class TestAgreement:
             'def read(*, corpus_format: Literal["lines"]) -> None:\n    return None\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, kwonly])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, kwonly])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -246,7 +256,7 @@ class TestAgreement:
             'def read(corpus_format: Literal["lines"], /) -> None:\n    return None\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring, posonly])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, posonly])
 
         assert [v.kind for v in violations] == ["corpus-format-literal-drift"]
 
@@ -258,7 +268,7 @@ class TestAgreement:
             "def read(corpus_format) -> None:\n    return None\n",
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, bare]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, bare]) == []
 
     def test_a_return_on_an_unrelated_function_is_ignored(self, tmp_path: Path) -> None:
         """Only a function whose name says it yields a format is compared."""
@@ -269,7 +279,7 @@ class TestAgreement:
             'def pick_optimizer() -> Literal["adamw"]:\n    return "adamw"\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, unrelated]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, unrelated]) == []
 
     def test_a_subscript_target_is_ignored(self, tmp_path: Path) -> None:
         """``registry["corpus_format"]: X`` names no field of that name."""
@@ -280,7 +290,7 @@ class TestAgreement:
             'registry["corpus_format"]: Literal["lines"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, subscript]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, subscript]) == []
 
     def test_a_subscript_whose_base_is_not_a_name_is_ignored(self, tmp_path: Path) -> None:
         """A computed annotation base is not the typing Literal."""
@@ -291,7 +301,7 @@ class TestAgreement:
             '    corpus_format: factory()["lines"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([declaring, computed]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([declaring, computed]) == []
 
 
 class TestTheRuleKnowsWhenItIsInert:
@@ -304,7 +314,7 @@ class TestTheRuleKnowsWhenItIsInert:
             'from typing import Literal\n\n\nclass P:\n    corpus_format: Literal["anything"]\n',
         )
 
-        assert CorpusFormatLiteralRule().run([elsewhere]) == []
+        assert LiteralSetRule(CORPUS_FORMAT_SET).run([elsewhere]) == []
 
     def test_a_tuple_that_is_no_longer_a_tuple_is_reported(self, tmp_path: Path) -> None:
         """Rebinding the name to a call would make the rule read nothing."""
@@ -314,7 +324,7 @@ class TestTheRuleKnowsWhenItIsInert:
             'tuple[Literal["lines"], ...] = tuple(["lines"])\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring])
 
         assert [v.kind for v in violations] == ["corpus-format-tuple-missing"]
 
@@ -326,7 +336,7 @@ class TestTheRuleKnowsWhenItIsInert:
             'tuple[Literal["lines"], ...] = (LINES,)\n',
         )
 
-        violations = CorpusFormatLiteralRule().run([declaring])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring])
 
         assert [v.kind for v in violations] == ["corpus-format-tuple-missing"]
 
@@ -334,7 +344,7 @@ class TestTheRuleKnowsWhenItIsInert:
         """The name could be deleted outright by a careless rename."""
         declaring = _write(tmp_path / _DECLARING, "OTHER: int = 1\n")
 
-        violations = CorpusFormatLiteralRule().run([declaring])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring])
 
         assert [v.kind for v in violations] == ["corpus-format-tuple-missing"]
 
@@ -342,6 +352,101 @@ class TestTheRuleKnowsWhenItIsInert:
         """The rule reads the annotated declaration, which is the real one."""
         declaring = _write(tmp_path / _DECLARING, 'CORPUS_FORMATS = ("lines", "documents")\n')
 
-        violations = CorpusFormatLiteralRule().run([declaring])
+        violations = LiteralSetRule(CORPUS_FORMAT_SET).run([declaring])
 
         assert [v.kind for v in violations] == ["corpus-format-tuple-missing"]
+
+
+class TestTheStrategyNameSet:
+    """The second registration, driven end to end rather than assumed.
+
+    A parameterised rule whose only exercised configuration is the one it was
+    extracted from is a rule that has not been shown to be parameterised. These
+    use the strategy set's own declaring module, tuple name and field name.
+    """
+
+    _STRATEGY_DECLARING = "core/contracts/strategy_names.py"
+
+    def _strategy_declaring(self, tmp_path: Path, members: str) -> Path:
+        """Write a stand-in module binding STRATEGY_NAMES.
+
+        Args:
+            tmp_path: Directory to write into.
+            members: The tuple's contents, as source.
+
+        Returns:
+            The path written.
+        """
+        return _write(
+            tmp_path / self._STRATEGY_DECLARING,
+            f'from typing import Literal\n\nSTRATEGY_NAMES: tuple[Literal["full", "lora", '
+            f'"qlora"], ...] = ({members})\n',
+        )
+
+    def test_it_flags_a_finetuning_strategy_literal_left_behind(self, tmp_path: Path) -> None:
+        """Exactly the state that existed before the names were collapsed.
+
+        A fourth strategy is declared and one of the nine inline annotations
+        still names three. Before this registration, that type-checked.
+        """
+        declaring = self._strategy_declaring(tmp_path, '"full", "lora", "qlora", "cartridge"')
+        stale = _write(
+            tmp_path / "contracts" / "queue.py",
+            "from typing import Literal\n\n\nclass P:\n"
+            '    finetuning_strategy: Literal["full", "lora", "qlora"]\n',
+        )
+
+        violations = LiteralSetRule(STRATEGY_NAME_SET).run([declaring, stale])
+
+        assert [v.kind for v in violations] == ["strategy-name-literal-drift"]
+        assert "cartridge, full, lora, qlora" in violations[0].line
+
+    def test_the_shared_name_is_not_flagged(self, tmp_path: Path) -> None:
+        """The state the repository is in now: the field names the shared type.
+
+        ``StrategyName`` is not a ``Literal`` subscript, so there is nothing to
+        compare and nothing to drift. This is what the collapse bought.
+        """
+        declaring = self._strategy_declaring(tmp_path, '"full", "lora", "qlora"')
+        shared = _write(
+            tmp_path / "contracts" / "queue.py",
+            "class P:\n    finetuning_strategy: StrategyName\n",
+        )
+
+        assert LiteralSetRule(STRATEGY_NAME_SET).run([declaring, shared]) == []
+
+    def test_a_corpus_format_literal_is_not_this_rules_business(self, tmp_path: Path) -> None:
+        """Each instance watches only its own field names.
+
+        Without this, two registrations over the same files would each report
+        the other's drift under its own kind.
+        """
+        declaring = self._strategy_declaring(tmp_path, '"full", "lora", "qlora"')
+        other = _write(
+            tmp_path / "q.py",
+            'from typing import Literal\n\n\nclass P:\n    corpus_format: Literal["lines"]\n',
+        )
+
+        assert LiteralSetRule(STRATEGY_NAME_SET).run([declaring, other]) == []
+
+    def test_it_is_inert_in_packages_that_do_not_declare_the_tuple(self, tmp_path: Path) -> None:
+        """Forty of the forty-one packages never see the declaring module."""
+        elsewhere = _write(
+            tmp_path / "q.py",
+            'from typing import Literal\n\n\nclass P:\n    finetuning_strategy: Literal["full"]\n',
+        )
+
+        assert LiteralSetRule(STRATEGY_NAME_SET).run([elsewhere]) == []
+
+    def test_its_rule_name_is_derived_from_its_subject(self, tmp_path: Path) -> None:
+        """Two instances must not share a name, or reports become ambiguous."""
+        assert LiteralSetRule(STRATEGY_NAME_SET).name == "strategy-name-literal"
+        assert LiteralSetRule(CORPUS_FORMAT_SET).name == "corpus-format-literal"
+
+    def test_a_missing_strategy_tuple_is_reported_under_its_own_kind(self, tmp_path: Path) -> None:
+        """A rule silently checking nothing is the failure this catches."""
+        declaring = _write(tmp_path / self._STRATEGY_DECLARING, "OTHER: int = 1\n")
+
+        violations = LiteralSetRule(STRATEGY_NAME_SET).run([declaring])
+
+        assert [v.kind for v in violations] == ["strategy-name-tuple-missing"]

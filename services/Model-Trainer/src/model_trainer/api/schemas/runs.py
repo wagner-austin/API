@@ -6,6 +6,7 @@ from platform_core.comparability import RunFingerprint
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.cloze import ClozeItemOutcome
+from model_trainer.core.contracts.strategy_names import StrategyName
 
 
 class LoraConfigRequest(TypedDict, total=True):
@@ -114,7 +115,7 @@ class TrainRequest(TypedDict, total=True):
     loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora"]
+    finetuning_strategy: StrategyName
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
     gguf_export: GgufExportConfigRequest | None

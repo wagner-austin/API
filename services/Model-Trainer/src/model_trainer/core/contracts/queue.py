@@ -9,6 +9,7 @@ from model_trainer.core.contracts.model import (
     LoraConfig,
     QuantizationConfig,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName
 
 
 class TrainRequestPayload(TypedDict):
@@ -56,7 +57,7 @@ class TrainRequestPayload(TypedDict):
     loss_mask_prefix_separator: str | None
     # HuggingFace LM backend fields
     hub_model_id: str | None
-    finetuning_strategy: Literal["full", "lora", "qlora"]
+    finetuning_strategy: StrategyName
     lora: LoraConfig | None
     quantization: QuantizationConfig | None
     gguf_export: GgufExportConfig | None

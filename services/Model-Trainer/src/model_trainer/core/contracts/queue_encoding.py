@@ -37,6 +37,7 @@ from model_trainer.core.contracts.queue_encoding_configs import (
     encode_lora_config,
     encode_quantization_config,
 )
+from model_trainer.core.contracts.strategy_names import require_strategy_name
 
 from .queue import (
     BaselineClozeJobPayload,
@@ -199,29 +200,6 @@ def _narrow_precision(raw: str) -> Literal["fp32", "fp16", "bf16", "auto"]:
     raise JSONTypeError(f"Field 'precision' must be 'fp32', 'fp16', 'bf16', or 'auto', got '{raw}'")
 
 
-def _narrow_finetuning_strategy(raw: str) -> Literal["full", "lora", "qlora"]:
-    """Narrow finetuning strategy string to Literal type with validation.
-
-    Args:
-        raw: Raw finetuning strategy string.
-
-    Returns:
-        Narrowed Literal type.
-
-    Raises:
-        JSONTypeError: If value is not a valid finetuning strategy.
-    """
-    if raw == "full":
-        return "full"
-    if raw == "lora":
-        return "lora"
-    if raw == "qlora":
-        return "qlora"
-    raise JSONTypeError(
-        f"Field 'finetuning_strategy' must be 'full', 'lora', or 'qlora', got '{raw}'"
-    )
-
-
 def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
     """Decode JSONObject to TrainRequestPayload with full validation.
 
@@ -275,7 +253,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         )
     corpus_format = require_corpus_format(obj, "corpus_format")
     hub_model_id = optional_str(obj, "hub_model_id")
-    finetuning_strategy = _narrow_finetuning_strategy(require_str(obj, "finetuning_strategy"))
+    finetuning_strategy = require_strategy_name(require_str(obj, "finetuning_strategy"))
 
     # Decode nested configs via helper functions
     lora = _decode_optional_lora(obj)

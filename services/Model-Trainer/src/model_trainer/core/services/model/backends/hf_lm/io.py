@@ -19,12 +19,12 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from model_trainer.core.contracts.finetuning import StrategyName
 from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
 from model_trainer.core.contracts.queue_encoding_configs import (
     _decode_optional_quantization,
     encode_quantization_config,
 )
+from model_trainer.core.contracts.strategy_names import StrategyName, require_strategy_name
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.finetuning import default_registry
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
@@ -54,32 +54,6 @@ class HFLMMetadata(TypedDict):
     quantization: QuantizationConfig | None
 
 
-# Valid strategy names as a set for validation
-_VALID_STRATEGY_NAMES: frozenset[str] = frozenset(["full", "lora", "qlora"])
-
-
-def _validate_strategy_name(value: str) -> StrategyName:
-    """Validate a string is a valid strategy name.
-
-    Args:
-        value: String to validate.
-
-    Returns:
-        Validated StrategyName.
-
-    Raises:
-        ValueError: If value is not a valid strategy name.
-    """
-    if value == "full":
-        return "full"
-    if value == "lora":
-        return "lora"
-    if value == "qlora":
-        return "qlora"
-    valid = ", ".join(sorted(_VALID_STRATEGY_NAMES))
-    raise ValueError(f"Invalid strategy name '{value}', must be one of [{valid}]")
-
-
 def _encode_metadata(metadata: HFLMMetadata) -> JSONObject:
     """Encode HFLMMetadata to JSON-serializable dict.
 
@@ -104,30 +78,27 @@ def _encode_metadata(metadata: HFLMMetadata) -> JSONObject:
 
 
 def _require_strategy_name(obj: JSONObject, key: str) -> StrategyName:
-    """Extract and validate strategy name from JSON object.
+    """Read a strategy name out of a saved metadata object.
+
+    Splits the two failures rather than merging them. A missing or non-string
+    field is a SHAPE fault in the file and stays a ``JSONTypeError`` from
+    ``require_str``; a well-formed string naming no strategy is a VALUE fault
+    and carries ``STRATEGY_NAME_UNKNOWN``, the same code the request path
+    raises for the same mistake.
 
     Args:
         obj: JSON object to extract from.
         key: Key to extract.
 
     Returns:
-        Validated StrategyName.
+        The strategy name, typed.
 
     Raises:
-        JSONTypeError: If field is missing or not a valid strategy name.
+        JSONTypeError: If the field is missing or is not a string.
+        AppError: With ``STRATEGY_NAME_UNKNOWN`` if the string names no
+            declared strategy.
     """
-    from platform_core.json_utils import JSONTypeError
-
-    value = require_str(obj, key)
-    # Explicit conditionals to narrow str to StrategyName literal type
-    if value == "full":
-        return "full"
-    if value == "lora":
-        return "lora"
-    if value == "qlora":
-        return "qlora"
-    valid = ", ".join(sorted(_VALID_STRATEGY_NAMES))
-    raise JSONTypeError(f"Field '{key}' must be one of [{valid}], got '{value}'")
+    return require_strategy_name(require_str(obj, key))
 
 
 def _decode_metadata(data: JSONObject) -> HFLMMetadata:
@@ -187,8 +158,7 @@ def save_prepared_hf_lm(
     if hub_model_id is None:
         raise ValueError("PreparedLMModel.hub_model_id is required for hf_lm save")
 
-    # Validate and narrow strategy_name to StrategyName literal type
-    strategy_name = _validate_strategy_name(strategy_name_raw)
+    strategy_name = require_strategy_name(strategy_name_raw)
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)

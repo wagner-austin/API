@@ -13,6 +13,8 @@ from platform_core.validators import (
     validate_required_literal,
 )
 
+from model_trainer.core.contracts.strategy_names import StrategyName, require_strategy_name
+
 from ..schemas.runs import (
     GgufExportConfigRequest,
     LoraConfigRequest,
@@ -120,21 +122,28 @@ def _narrow_model_family(
 
 def _narrow_finetuning_strategy(
     raw: str | None,
-) -> Literal["full", "lora", "qlora"]:
-    """Narrow finetuning strategy string to Literal type.
+) -> StrategyName:
+    """Narrow a requested finetuning strategy to its declared name.
+
+    An absent field means ``full``, which is the documented default for a
+    request that does not ask for adapters. A PRESENT field naming no declared
+    strategy is refused rather than defaulted: this used to return ``full`` for
+    any unrecognised string, so a typo in the strategy name silently trained
+    every parameter of the model instead of the adapter the caller asked for.
 
     Args:
-        raw: Raw finetuning strategy string from request.
+        raw: Raw finetuning strategy string from request, or None if unset.
 
     Returns:
-        Narrowed Literal type for finetuning strategy.
+        The strategy name, typed.
+
+    Raises:
+        AppError: With ``STRATEGY_NAME_UNKNOWN`` if a value is present and
+            names no declared strategy.
     """
-    val = raw if raw is not None else "full"
-    if val == "lora":
-        return "lora"
-    if val == "qlora":
-        return "qlora"
-    return "full"
+    if raw is None:
+        return "full"
+    return require_strategy_name(raw)
 
 
 def _narrow_lora_bias(raw: str) -> Literal["none", "all", "lora_only"]:
@@ -461,7 +470,7 @@ def _decode_optional_gguf_export(d: dict[str, JSONValue]) -> GgufExportConfigReq
 def _validate_hf_lm_cross_fields(
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
     hub_model_id: str | None,
-    finetuning_strategy: Literal["full", "lora", "qlora"],
+    finetuning_strategy: StrategyName,
     lora: LoraConfigRequest | None,
     quantization: QuantizationConfigRequest | None,
     gguf_export: GgufExportConfigRequest | None,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from model_trainer.core.contracts.queue import TrainJobPayload, TrainRequestPayload
@@ -207,11 +208,18 @@ class TestTrainRequestPayloadEncoding:
             assert decoded["finetuning_strategy"] == strategy
 
     def test_decode_invalid_finetuning_strategy(self) -> None:
-        """Test that invalid finetuning strategy raises JSONTypeError."""
+        """A queued payload naming no declared strategy carries its own code.
+
+        Not a ``JSONTypeError``: the payload's shape is correct and its value
+        is not, and the queue path now reports that with the same
+        ``STRATEGY_NAME_UNKNOWN`` the request path uses, so one code covers
+        the mistake wherever it enters.
+        """
         encoded = encode_train_request_payload(self._make_minimal_payload())
         encoded["finetuning_strategy"] = "freeze"
-        with pytest.raises(JSONTypeError, match=r"finetuning_strategy.*must be"):
+        with pytest.raises(AppError) as excinfo:
             decode_train_request_payload(encoded)
+        assert excinfo.value.code is ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN
 
     def test_decode_data_pin_memory_bool(self) -> None:
         """Test decoding data_pin_memory as bool."""

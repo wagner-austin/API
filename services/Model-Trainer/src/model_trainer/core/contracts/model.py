@@ -7,6 +7,7 @@ from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.types import LMModelProto
@@ -157,7 +158,7 @@ class ModelTrainConfig(TypedDict):
     # every token is a target.
     loss_mask_prefix_separator: str | None
     # Pluggable fine-tuning strategy (like covenant_ml backends)
-    finetuning_strategy: Literal["full", "lora", "qlora"]
+    finetuning_strategy: StrategyName
     # Strategy-specific configuration (None = not used by current strategy)
     hub_model_id: str | None  # HuggingFace model ID for pretrained loading
     lora: LoraConfig | None  # Config for lora/qlora strategies
