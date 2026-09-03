@@ -48,8 +48,15 @@ untracked — it is state, not configuration).
   `services/covenant-radar-api/models/optimization_history.jsonl`
 - **Provenance:** partial, in two different ways.
   - The six `benchmark_cleargbm_*` entry points pin BLAS threads and build a
-    `RunFingerprint` as of 2026-08-27, but the record shape is
-    `BenchmarkManifest`, not `RunRecord`.
+    `RunFingerprint` as of 2026-08-27. **This entry said until 2026-09-03
+    that the record shape was `BenchmarkManifest` and not `RunRecord`. That
+    is wrong.** `benchmarking/provenance.py` has carried
+    `benchmark_run_record`, `benchmark_observations` and `benchmark_label`
+    since the fingerprint landed, and writes both: the manifest holds the
+    per-seed detail, the record holds the claim, and neither contains the
+    other. A session acting on the old sentence rewrote a module that already
+    existed before reading the file; the duplicate was reverted in
+    `5e53cf13`.
   - `optimization_history.jsonl` carries a `RunFingerprint` as of 2026-08-28
     — host, packages and image digest — where before it recorded
     `best_val_auc` and `duration_seconds` and nothing about what produced
