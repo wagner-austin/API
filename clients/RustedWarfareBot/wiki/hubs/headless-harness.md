@@ -20,3 +20,4 @@ Run artifacts are archived under `runs/` and are the primary sources this wiki c
 [Run Lifecycle: Why Ad-Hoc Jobs Stopped Being Enough](../pages/harness-run-lifecycle.md) -- the failure modes of detached shell jobs at concurrency, and the requirements that produced the match service
 
 [The Doctrine Search: Screening With a Confirmatory Backstop](../pages/harness-doctrine-search.md) -- the dense margin, successive halving over knob combinations, what the method is and is not, and the corners it cuts, named
+[Population Search — The Parameterization Design](../pages/harness-population-search.md) -- the "learn by 10,000 matches" answer: a genome (composition simplex + knobs + lifted constants) compiling to ordinary doctrine files, CMA-ES over the existing array machinery; design only, unbuilt
