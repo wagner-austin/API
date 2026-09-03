@@ -9,8 +9,8 @@ source_paths:
   - README.md
 source_git_blobs:
   "monorepo-guards.toml": 496d1d68863cdea918fb7a0f94153179d711805e
-  "libs/monorepo_guards": e2a1c8af86163f22fe189caa5c8a195b21a48a11
-  "README.md": 84d4506bb73716438a79e40e4a0fe09dba2851e4
+  "libs/monorepo_guards": 2fbb8917fd3e0dd9b42b04cc9dab9a2a15329426
+  "README.md": a5bbc13914ac4cd4428f57ad76b987502990bfe7
 fact_checked: "2026-08-14"
 confidence: high
 hubs: [infrastructure]

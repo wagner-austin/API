@@ -10,6 +10,11 @@ source_paths:
   - libs/cleargbm_rs/src/losses/multiclass.rs
   - libs/cleargbm/src/cleargbm/ensemble_multiclass.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p4_multiclass.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/train_multiclass.rs": 4f018cc0bf8c73f7ad6420e5458121c89619c6b6
+  "libs/cleargbm_rs/src/losses/multiclass.rs": 873d9528cc19002c22d953b4be6219e32b66505c
+  "libs/cleargbm/src/cleargbm/ensemble_multiclass.py": 77a0f7074a9631bee999ddea6be06d787a6f8b4f
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p4_multiclass.md": 95d251a138924c672d178232f29f3b84869825a5
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

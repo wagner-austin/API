@@ -9,6 +9,10 @@ source_paths:
   - libs/cleargbm_rs/src/training/train.rs
   - libs/cleargbm_rs/src/training/labels.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p2_sample_weights.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
+  "libs/cleargbm_rs/src/training/labels.rs": d9a4f02e3bb4f2dd84edcee07a3768e47f4da207
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p2_sample_weights.md": 2a0adbc0e5fca512ef2d7307dc6bd63806004258
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

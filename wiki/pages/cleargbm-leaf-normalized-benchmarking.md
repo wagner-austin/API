@@ -10,8 +10,8 @@ source_paths:
   - libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py
   - libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/benchmarking": 3bfdf67a0d9c5510b8c41515ebd7514d4a4faaf3
-  "libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py": ce22a0c0a3ad39c64cd2d5370143e3d6f8f1d506
+  "libs/covenant_ml/src/covenant_ml/benchmarking": 70813993496e1dddd7360982c6d05e5cee94bcf7
+  "libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py": 58fa5db3637af9d401501549432d7ec6047c3866
   "libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json": e3e661369727af7b1d94feed04e06aff4374376e
 fact_checked: "2026-08-14"
 confidence: high

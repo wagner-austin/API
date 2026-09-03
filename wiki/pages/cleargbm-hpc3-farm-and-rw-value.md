@@ -13,6 +13,15 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
+source_git_blobs:
+  "tools/hpc3/runs/hpc3.json": 472076c61e75506c84445e50da676b88112be155
+  "tools/hpc3/runs/sweep-cleargbm-p6-rung1.json": f65a308e0f8be1b6cab87c5a80d53c1ef42ca2b4
+  "libs/covenant_ml/scripts/derive_rw_value.py": ea009dd9bbe34ff6786df7b9af24e9e4a51469e1
+  "libs/covenant_ml/scripts/build_metab_corpus.py": 3b7eb28d5db3e72dded3d3092fc96e590416e2f7
+  "libs/covenant_ml/scripts/build_voc_corpus.py": fbc511ae75148199c2ed706d154a2d67bb4ee8a3
+  "libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py": f490a898b0b7b7b37312aab6e90d82febff69408
+  "libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py": c7eead0886cb87eb9d5a7de355add58db819aa3a
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md": a8aaf35a888cfda68e7331b0132fe09a19eb06e4
 fact_checked: "2026-08-24"
 confidence: high
 hubs: [libs]

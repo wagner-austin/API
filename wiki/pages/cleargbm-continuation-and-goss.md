@@ -10,6 +10,11 @@ source_paths:
   - libs/cleargbm_rs/src/training/goss.rs
   - libs/cleargbm_rs/src/training/single_score_rounds.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p5_continuation_goss.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/continue_training.rs": 4be58ac4fa08bac251058925688003eac0a984ec
+  "libs/cleargbm_rs/src/training/goss.rs": f2ad49e26863678fe99e7e689ba9e0b356fb24ff
+  "libs/cleargbm_rs/src/training/single_score_rounds.rs": 7fb0f35e74dd69934978bdd4ea51f640ba47bc50
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p5_continuation_goss.md": 747f42be1be3da957738a6e9a90edb4178ea634c
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

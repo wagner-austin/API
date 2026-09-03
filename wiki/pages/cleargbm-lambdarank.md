@@ -10,6 +10,11 @@ source_paths:
   - libs/cleargbm_rs/src/training/train_ranking.rs
   - libs/cleargbm/src/cleargbm/ensemble_ranking.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p4_lambdarank.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/losses/lambdarank.rs": 0d748557c43f8cf0784332ff812d547b7e443bb9
+  "libs/cleargbm_rs/src/training/train_ranking.rs": ef7664f8b3e5b5cfb7940527b3447fa72ae9ab32
+  "libs/cleargbm/src/cleargbm/ensemble_ranking.py": ee59f97a1749819f2476ba54c1f9186a7b974e73
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p4_lambdarank.md": 764d03102a74b9db3e755deeca8c3133a56b6dea
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

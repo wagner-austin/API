@@ -10,7 +10,7 @@ source_paths:
   - services/data-bank-api/docker-compose.yml
   - services/covenant-radar-api/docs/configuration.md
 source_git_blobs:
-  "README.md": 84d4506bb73716438a79e40e4a0fe09dba2851e4
+  "README.md": a5bbc13914ac4cd4428f57ad76b987502990bfe7
   "docker-compose.yml": 3e57145cb052407cedd701354dc58c44d56b22d6
   "services/data-bank-api/README.md": 49db4ef01f97328ac723f8e7015127091228e778
   "services/data-bank-api/docker-compose.yml": 6ee313dc9ea01b0457cb348dc262c961383ac778

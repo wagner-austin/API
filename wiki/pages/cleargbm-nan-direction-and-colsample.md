@@ -10,6 +10,10 @@ source_paths:
   - libs/cleargbm_rs/src/tree/feature_subsample.rs
   - libs/cleargbm_rs/src/training/tests/train_nan_tests.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p3_colsample_nan.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/tree/feature_subsample.rs": a8206fd50aaff22d73b5df7671c65c4c387e4f9d
+  "libs/cleargbm_rs/src/training/tests/train_nan_tests.rs": c7b4a1f8584580354c14990d5b33965b60eeb45b
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p3_colsample_nan.md": c876dfab8595a8b0959dd994ec60e53ceb8d78f0
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

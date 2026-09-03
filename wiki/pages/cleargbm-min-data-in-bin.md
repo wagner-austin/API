@@ -10,6 +10,11 @@ source_paths:
   - libs/cleargbm_rs/src/training/config_rules.rs
   - services/covenant-radar-api/scripts/cv_external.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_min_data_in_bin.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/binning/edges.rs": be806fdfb21bf1461b0ff1db9be7ace47e57fef0
+  "libs/cleargbm_rs/src/training/config_rules.rs": a5020894551ab7042b5d6f40789469560e052cae
+  "services/covenant-radar-api/scripts/cv_external.py": 4dbecf61f6e6da09f323e455dfaf513cc84528e0
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_min_data_in_bin.md": c65dfbd8a00299d9f70659a3f1720f598f7649c1
 fact_checked: "2026-08-25"
 confidence: high
 hubs: [libs]

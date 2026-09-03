@@ -14,10 +14,12 @@ source_paths:
   - libs/cleargbm_rs/src/training/config.rs
 source_git_blobs:
   "libs/cleargbm/docs/EXPERIMENT_2026-08-17_growth_policy_xgb_instrument.md": 570404c5fe5b67cd737dd3cddc41a29a614544e2
-  "libs/cleargbm_rs/src/tree/builder.rs": 8f518f965e4615c42267996ec73c087b838be84c
-  "libs/cleargbm_rs/src/tree/leafwise.rs": 0e540b746f0db6468f0cb6522ce43781b9a8c244
-  "libs/cleargbm_rs/src/tree/mod.rs": f2c7332be3dae4cc20b758b4c11a561626ec4401
-  "libs/cleargbm_rs/src/training/config.rs": 85fb08e891055d724122b6ff42e8d0af346e4639
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-19_growth_variants.md": a4ab0fe8475eebcd0341fb7c98f2e326f360455b
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-21_four_arm.md": 1d24d3d79278c7fc7fb966f7a8d74acc2f3eb872
+  "libs/cleargbm_rs/src/tree/builder.rs": 8fefb405a694475e8297a81923291f879afbcb3d
+  "libs/cleargbm_rs/src/tree/leafwise.rs": 461a0dd54136cd13dc05c69dabaeb596b9b4df42
+  "libs/cleargbm_rs/src/tree/mod.rs": 0c07a2ea41471621586eac989c5a6f3bbcf59341
+  "libs/cleargbm_rs/src/training/config.rs": 76f92362e480ce0c1d95bb36addb83bb680cae01
 fact_checked: "2026-08-21"
 confidence: high
 hubs: [libs]

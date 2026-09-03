@@ -11,6 +11,12 @@ source_paths:
   - libs/cleargbm_rs/src/losses/squared_error.rs
   - libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p1_objective_regression.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/labels.rs": d9a4f02e3bb4f2dd84edcee07a3768e47f4da207
+  "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
+  "libs/cleargbm_rs/src/losses/squared_error.rs": c641a0d7a662b729b2ff5accfceaea3627c0427b
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py": 906b7e0bfffbb5b337078588644e88760b70170d
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p1_objective_regression.md": 957460c1e7c3df106a7b2604d89791cf95a1e304
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

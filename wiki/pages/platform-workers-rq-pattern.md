@@ -7,7 +7,7 @@ source_paths:
   - libs/platform_workers
   - libs/platform_workers/README.md
 source_git_blobs:
-  "libs/platform_workers": b731d11049525ea3ae686819d63572969544cfb7
+  "libs/platform_workers": 4ad1fa0bf0c31aa80e153e1f0fdc66d9ee93c630
   "libs/platform_workers/README.md": 2738a93b4df60fa12e22e87feea8857f4e51b74b
 fact_checked: "2026-08-14"
 confidence: high

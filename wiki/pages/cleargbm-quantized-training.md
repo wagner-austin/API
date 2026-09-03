@@ -10,6 +10,11 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/quantized.rs
   - libs/cleargbm_rs/src/split/threshold_quantized.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p5_quantized.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/quantize.rs": da0d862dbaf210de455fb9c40ba46e3917005134
+  "libs/cleargbm_rs/src/histogram/quantized.rs": fe42baef930bcfa52a9cc7d8ea04bc73b8042352
+  "libs/cleargbm_rs/src/split/threshold_quantized.rs": b65cde8156b822ec64fa3d63a4a61c487a3dba1f
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p5_quantized.md": bb2f9e95f1c53bf31f70e2e111cbe226eb6f984e
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

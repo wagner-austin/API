@@ -12,6 +12,13 @@ source_paths:
   - libs/cleargbm_rs/src/training/train.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
+source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": 6f29219931d6bb9d551b5bb779732244686d2dcf
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/config_resolution.py": 01a6e7afb76b784ec6a5a724ee7fae40d5288279
+  "libs/covenant_ml/src/covenant_ml/optimizer/objectives/cleargbm_objective.py": 01eff0e2bcda1d7fad9e16bdc23ad0b2e38ba90d
+  "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md": 318c52bf116884209a5b5d294329d909f0109837
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": eeac3932d433742870ccadf0286d691348b3cc11
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

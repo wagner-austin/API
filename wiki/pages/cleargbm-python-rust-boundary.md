@@ -12,12 +12,12 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py
   - libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py
 source_git_blobs:
-  "libs/cleargbm/src/cleargbm/ensemble.py": c60640610f62458f20e017392104ba5a219a6b11
-  "libs/cleargbm/src/cleargbm/_rust.py": 81518f4dcaaf19ba0cf5489b035007fca0827f31
+  "libs/cleargbm/src/cleargbm/ensemble.py": d855968ef0fd5be83716ae0a331765004dee690f
+  "libs/cleargbm/src/cleargbm/_rust.py": 5f8ba08dec7197ffe2a203a44385d3337f0b47db
   "libs/cleargbm_rs/pyproject.toml": 5bec3822ae55b087008685b145496bf90bd8cbac
   "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": c5d516ca7e4e2ac762be4f878ea1bec428419fe1
-  "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py": 41f5204c6327c7b2d3daf47e044ae426b5ac2d7c
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": 6f29219931d6bb9d551b5bb779732244686d2dcf
+  "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py": b1b17fa189ff6fae7a1af1527e186aff840802e5
 fact_checked: "2026-08-17"
 confidence: high
 hubs: [libs]

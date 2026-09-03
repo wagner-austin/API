@@ -9,6 +9,10 @@ source_paths:
   - libs/cleargbm_rs/src/split/categorical.rs
   - libs/cleargbm_rs/src/binning/categorical.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p3_categorical_splits.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/split/categorical.rs": d8dbb80a66c730cc6f77fe02009d47892f53a423
+  "libs/cleargbm_rs/src/binning/categorical.rs": 06ca5aa38121cfa53988f182d7c4c65f5405597a
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-23_p3_categorical_splits.md": 7b0fdb3f3d54616e915df1d865cdcc6146829e0c
 fact_checked: "2026-08-23"
 confidence: high
 hubs: [libs]

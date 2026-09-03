@@ -8,6 +8,10 @@ source_paths:
   - libs/cleargbm_rs/src/binning/edges.rs
   - tools/hpc3/runs/sweep-cleargbm-p6-rung2.json
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/binning/edges.rs": be806fdfb21bf1461b0ff1db9be7ace47e57fef0
+  "tools/hpc3/runs/sweep-cleargbm-p6-rung2.json": 5c66991f2efd3634f79cb1f5bf4e527fd1899b86
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md": 36471731297364d6294fb7e65ad9e40c4b2237e2
 fact_checked: "2026-08-25"
 confidence: high
 hubs: [libs]

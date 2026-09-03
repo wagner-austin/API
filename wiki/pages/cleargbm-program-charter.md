@@ -8,6 +8,9 @@ related:
 source_paths:
   - libs/cleargbm_rs/src/training/train.rs
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": eeac3932d433742870ccadf0286d691348b3cc11
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

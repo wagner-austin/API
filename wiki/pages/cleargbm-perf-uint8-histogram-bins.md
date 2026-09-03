@@ -12,12 +12,12 @@ source_paths:
   - libs/cleargbm_rs/src/training/config.rs
   - libs/cleargbm_rs/src/types/mod.rs
 source_git_blobs:
-  "libs/cleargbm_rs/src/binning/feature_bins.rs": 46d3455d66a7f6b667f4b12aa883272951872ca5
+  "libs/cleargbm_rs/src/binning/feature_bins.rs": 75cdd19ed161603d031e2bef9e5edf51373094e5
   "libs/cleargbm_rs/src/binning/assignment.rs": 78796752a4a5d2d81c73f95735f18703e6f30878
-  "libs/cleargbm_rs/src/binning/edges.rs": 0abcb089e821c3c97cba3d81a8e94be4e6bef406
-  "libs/cleargbm_rs/src/histogram/mod.rs": 930b2ce059cd5314ca5650a74cd44e31f8cfa8c8
-  "libs/cleargbm_rs/src/training/config.rs": b0b59d60edc871f4808c72dc582eaac15087f39b
-  "libs/cleargbm_rs/src/types/mod.rs": b12e123111b6150ce710ed1cc6c03d2478d79922
+  "libs/cleargbm_rs/src/binning/edges.rs": be806fdfb21bf1461b0ff1db9be7ace47e57fef0
+  "libs/cleargbm_rs/src/histogram/mod.rs": c5f91b51728ff6113c38acdf9b894591fb7ea27c
+  "libs/cleargbm_rs/src/training/config.rs": 76f92362e480ce0c1d95bb36addb83bb680cae01
+  "libs/cleargbm_rs/src/types/mod.rs": 0b4b29b916c245cdcfed4641a4d8254ebb58eae6
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [libs]
