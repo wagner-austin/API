@@ -13,7 +13,21 @@ table was recorded below. The digests therefore certify ICU agreement
 without ICU being present: reproducing a digest means reproducing, output
 for output, what ICU produced on the day it was measured.
 
-Verified on 2026-08-15 against PyICU 78.3, rules vendored from
+Re-verified on 2026-09-03 against PyICU 77.1 after ``ru_ipa`` gained the
+``$Cunpaired`` rules, which stop a soft sign palatalising a consonant that
+has no palatalisation to take: 61,796 probes, 0 mismatches, and only
+``ru_ipa``'s digest moved.
+
+**That run used an OLDER PyICU than the one the digests were frozen under**
+(77.1 against 78.3), which is a variable rather than a neutral detail. The
+twelve unchanged files reproduced their 78.3 digests byte for byte under
+77.1, so the two ICU versions agree on every construct those files use, and
+the version difference did not perturb the measurement. That is evidence
+rather than proof for the one file that changed, since no 78.3 reading of
+the new rules exists to compare against; a future re-measure on 78.3 would
+close it.
+
+Originally verified on 2026-08-15 against PyICU 78.3, rules vendored from
 turkic-transliteration ``503d807``. Three sweeps have been run:
 
 * The frozen sweep below — 61,796 probes across 13 rule files, 0
@@ -76,7 +90,7 @@ SWEEP_DIGESTS: Final[dict[str, str]] = {
     "kk_lat.rules": "2cdfaf1c5e9b1b49c3ec79beccf86e2355f7b2e1e130baf2f8f0a50e6fcfe34f",
     "ky_ipa.rules": "1ad2eec828d726897e15673c29b03f709fa036eaa5132939b35df1c697ec549f",
     "ky_lat.rules": "3828c33ade262585900eba926325bf6c77d4e820468ebbf0b768455a856a7bb3",
-    "ru_ipa.rules": "74b041a943a13fd61b5984e2593039b2c23d01725d74b369b24d07a745f414db",
+    "ru_ipa.rules": "8d08f51c2c3cb85d26edf4c6149a73c24200cedd1b1275f6afc37467b7d917e4",
     "tr_ipa.rules": "49304f19db2cd3572a026d5ba3a3a6a6616004de26865ad7efe931356e271522",
     "tr_lat.rules": "cde1a9ba53a597dc4aac52b98bd21ef15c4a9908a5ca40631d32eeaa31c8b31d",
     "ug_ipa.rules": "ef379d45c3018d63ced79c77e0f27120245e34fc06ea3e67fae411bbe96b554a",

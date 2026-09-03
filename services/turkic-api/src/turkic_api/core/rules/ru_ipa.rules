@@ -71,6 +71,18 @@
 $Cpair = [b v ɡ d z k l m n p r s t f x] ;
 $Vout  = [a e i o u ɨ] ;
 
+# The output tails of the unpaired consonants: ж → ʒ, ш → ʃ, ч → t͡ʃʲ, щ → ʃʲː.
+# A ‹ь› after any of them is orthographic (it marks noun class) and adds no
+# palatalisation, because those consonants have none to add -- ж ш are
+# intrinsically hard and ч щ are already soft (Timberlake p. 18).
+#
+# ‹ц› is absent from this set on purpose. Its output /t͡s/ ends in the same s
+# that $Cpair contains, so listing s here would strip the ʲ from рысь → rɨsʲ,
+# which is a real and common word. ‹ць› does not occur in Russian orthography
+# at all -- it is a Ukrainian sequence -- so no rule is written for it rather
+# than a rule being written for a string the language cannot produce.
+$Cunpaired = [ʒ ʃ ʲ ː] ;
+
 # ---------------------------------------------------------------------------
 # 1. THE TWO SIGNS BEFORE A VOWEL
 #
@@ -84,6 +96,15 @@ $Vout  = [a e i o u ɨ] ;
 Ъю > ju ;   ЪЮ > ju ;   ъЮ > ju ;   ъю > ju ;
 Ъя > ja ;   ЪЯ > ja ;   ъЯ > ja ;   ъя > ja ;
 Ъи > ji ;   ЪИ > ji ;   ъИ > ji ;   ъи > ji ;
+
+# After an unpaired consonant the separating ь still inserts the /j/ -- чья is
+# /t͡ʃʲja/ -- but contributes no second ʲ. These precede the general rules
+# below, since ICU takes the first rule that matches.
+$Cunpaired { Ье > je ;  $Cunpaired { ЬЕ > je ;  $Cunpaired { ьЕ > je ;  $Cunpaired { ье > je ;
+$Cunpaired { Ьё > jo ;  $Cunpaired { ЬЁ > jo ;  $Cunpaired { ьЁ > jo ;  $Cunpaired { ьё > jo ;
+$Cunpaired { Ью > ju ;  $Cunpaired { ЬЮ > ju ;  $Cunpaired { ьЮ > ju ;  $Cunpaired { ью > ju ;
+$Cunpaired { Ья > ja ;  $Cunpaired { ЬЯ > ja ;  $Cunpaired { ьЯ > ja ;  $Cunpaired { ья > ja ;
+$Cunpaired { Ьи > ji ;  $Cunpaired { ЬИ > ji ;  $Cunpaired { ьИ > ji ;  $Cunpaired { ьи > ji ;
 
 Ье > ʲje ;  ЬЕ > ʲje ;  ьЕ > ʲje ;  ье > ʲje ;
 Ьё > ʲjo ;  ЬЁ > ʲjo ;  ьЁ > ʲjo ;  ьё > ʲjo ;
@@ -199,6 +220,7 @@ $Cpair { И > ʲi ;  $Cpair { и > ʲi ;
 # 6. SIGNS NOT BEFORE A VOWEL
 # ---------------------------------------------------------------------------
 
+$Cunpaired { Ь >  ;  $Cunpaired { ь >  ;   # рожь roʒ, мышь mɨʃ, ночь not͡ʃʲ
 Ь > ʲ ;  ь > ʲ ;
 Ъ >  ;   ъ >  ;
 
