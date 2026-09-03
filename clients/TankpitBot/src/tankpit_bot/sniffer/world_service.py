@@ -57,10 +57,6 @@ WEAPON_BYTE_TO_ITEM: dict[int, ItemType] = {
     3: "homing_shots",
 }
 
-_FAILED_MOVE_TTL_MS = 30000
-_FAILED_SCAN_VIEWPORT_TTL_MS = 30000
-_RADAR_CACHE_REFRESH_WINDOW_MS = 2000
-
 
 def _make_empty_inventory() -> InventoryState:
     """Create an empty inventory state with all items at zero.
