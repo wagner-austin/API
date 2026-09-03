@@ -381,7 +381,25 @@ and INVARIANT in each:
 | 3 | shot at a teammate | 45 | **(1, 0)**, 45/45 |
 
 Implemented as `physics.supervisor.shot_refusal`, beside the fuel,
-equipment and teleport refusal laws. The sweep also showed code 0 is
+equipment and teleport refusal laws, and claim-bound (added
+2026-09-03 by the fleet-lifecycle session — the symbol shipped without
+its machine claim and the reverse-coverage gate was red repo-wide;
+``law`` kind because the keyword-only boolean inputs are not
+int-probeable):
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "shot-refusal",
+      "code": "tankpit_bot.physics.supervisor:shot_refusal",
+      "law": "A shoot command draws exactly two archive-measured refusals, tested in precondition order: aim outside the client's viewport -> code 0 (47/47 windows, reset_action=0 close_map=1); an id-targeted shot at the shooter's own team -> code 3 (45/45 windows, reset_action=1 close_map=0). No refusal -> None. Code 8 is deliberately not modelled: zero archive shot windows carry it."
+    }
+  ]
+}
+```
+
+The sweep also showed code 0 is
 `(0, 1)` for EVERY command that draws it (83 of 86 archive-wide) —
 the sim's move-family code-0 used `(1, 0)`, a field-level divergence
 the differ is structurally blind to because it tokenizes a 0x52 to

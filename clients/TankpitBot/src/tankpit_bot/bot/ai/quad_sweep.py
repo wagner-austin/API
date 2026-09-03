@@ -29,11 +29,13 @@ from typing import Literal
 from tankpit_bot.bot.ai.block_harvest import MAP_LAST_ORIGIN, WINDOW_LAST
 from tankpit_bot.bot.ai.collect_common import COLLECT_SCORE
 from tankpit_bot.bot.ai.context import (
+    DecideCtx,
+    make_decision,
+)
+from tankpit_bot.bot.ai.radar_economics import (
     RADAR_RESERVE_EXTRAS,
     RADAR_RESERVE_REVEAL_FLOOR_TILES,
     RADAR_SPEND_REVEAL_FLOOR_TILES,
-    DecideCtx,
-    make_decision,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -190,7 +192,7 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
         # (``block_harvest``, flag s11-5).
         return None
     extras = ctx.inventory["extra_radars"]["count"]
-    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
+    if ctx.fuel <= ctx.fuel_low_floor:
         # Recon is an economy move, never a survival move: at or below
         # the fuel-low break every tick belongs to fuel acquisition
         # (visible pickups, the dot hop, the walk rescue) -- an

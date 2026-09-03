@@ -125,9 +125,10 @@ def test_return_fire_carries_the_refill_as_its_secondary() -> None:
 
 def test_fuel_at_the_low_break_leaves_the_escape_doctrine_in_charge() -> None:
     """At the fuel-low bar survival stays senior: no return fire."""
-    ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}, fuel=200)
+    # The rank-scaled floor at the rank-2 fixture: 171.
+    ctx = _ctx(tanks={str(_ATTACKER_ID): _attacker(103, 100)}, fuel=171)
 
-    assert ctx.fuel <= ctx.config["fuel_low_threshold"]
+    assert ctx.fuel <= ctx.fuel_low_floor
     assert collect_return_fire(ctx, ctx.base) is None
 
 

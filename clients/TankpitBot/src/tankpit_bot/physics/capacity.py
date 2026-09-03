@@ -128,10 +128,49 @@ def inventory_capacity(rank: int) -> int:
     return 20 + 5 * rank
 
 
+RESERVE_REFERENCE_RANK = 4
+"""The rank the fuel-reserve config values are tuned at.
+
+``make_default_ai_config``'s reserves were hand-tuned against a
+lieutenant (capacity 1400) and said so in its docstring while being
+applied verbatim to every rank — at private (capacity 1100) the
+flat break floor plus the conservative hits-to-kill bound consumed
+the whole tank, and run bot-20260901-210631 broke off a winnable
+fight at literally full fuel ([[flag-triage-20260902]] row 6,
+21:43:44: fuel 1100/1100, projected 360 < floor 408). Scaling by
+capacity preserves the tuning exactly at this rank and shrinks it
+proportionally below."""
+
+
+def rank_scaled_reserve(reference: int, rank: int) -> int:
+    """Scale a reference-rank fuel reserve to a tank's true rank.
+
+    ``reference * capacity(rank) // capacity(REFERENCE_RANK)`` —
+    integer-exact at the reference rank, proportional elsewhere. Fuel
+    is the life pool and every reserve is a fraction of life, not an
+    absolute: a private's whole tank is 79% of a lieutenant's, so a
+    floor tuned at lieutenant overprices every fight below it
+    (the [[flag-triage-20260902]] row 6 full-tank break) and
+    underprices none above.
+
+    Args:
+        reference: Reserve value as tuned at
+            :data:`RESERVE_REFERENCE_RANK`.
+        rank: The tank's true rank, ``0`` (recruit) through ``8``
+            (general).
+
+    Returns:
+        The reserve scaled to the rank's fuel capacity.
+    """
+    return reference * fuel_capacity(rank) // fuel_capacity(RESERVE_REFERENCE_RANK)
+
+
 __all__ = [
     "DEPOSIT_FLOOR",
+    "RESERVE_REFERENCE_RANK",
     "damage_tier",
     "free_radar_radius",
     "fuel_capacity",
     "inventory_capacity",
+    "rank_scaled_reserve",
 ]

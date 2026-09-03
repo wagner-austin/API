@@ -192,7 +192,7 @@ def decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
             pursuit["x"],
             pursuit["y"],
         )
-        engagement_floor = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        engagement_floor = ctx.engagement_budget + ctx.fuel_low_floor
         if ctx.fuel < return_cost + engagement_floor:
             if is_human_name(pursuit["name"]):
                 # Unlimited-distance human pursuit (user ruling
@@ -422,9 +422,7 @@ def _decide_hunt_acquire_fresh(
         ctx.terrain,
         ctx.timestamp_ms,
         ctx.config["map_intel_horizon_ms"],
-        engagement_reserve_fuel=(
-            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
-        ),
+        engagement_reserve_fuel=(ctx.engagement_budget + ctx.fuel_low_floor),
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],

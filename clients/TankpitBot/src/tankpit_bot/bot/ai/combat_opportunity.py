@@ -293,7 +293,7 @@ def collect_return_fire(ctx: DecideCtx, base_state: AIStateDict) -> TickDecision
         # moving a tile, then the killing blow). Escaping IS the
         # survival doctrine; no divert outranks it.
         return None
-    if ctx.fuel <= ctx.config["fuel_low_threshold"] or weapon_reserves_below_break(ctx):
+    if ctx.fuel <= ctx.fuel_low_floor or weapon_reserves_below_break(ctx):
         return None
     if not recent_attacker_ids(ctx):
         return None

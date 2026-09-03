@@ -346,7 +346,10 @@ class TestFindCombatPickup:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=200,
+            # At/below the rank-2 pin bar (fuel_low_floor 171 + press
+            # cost 10): the mine pin stays out and the SHOOT with its
+            # secondary pickup is the decision under test.
+            fuel=180,
             containers={
                 "101,100": make_container_state(
                     x=101,
@@ -511,7 +514,10 @@ class TestFindCombatPickup:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=200,
+            # At/below the rank-2 pin bar (fuel_low_floor 171 + press
+            # cost 10): the mine pin stays out and the SHOOT with its
+            # secondary pickup is the decision under test.
+            fuel=180,
             tanks={
                 "50": make_tank_state(
                     tank_id=50,

@@ -21,7 +21,6 @@ from tankpit_bot.bot.ai.combat_break import INCOMING_RATE_WINDOW_MS
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
-    radar_spend_worthwhile,
 )
 from tankpit_bot.bot.ai.intent import (
     current_collect_plan,
@@ -32,6 +31,9 @@ from tankpit_bot.bot.ai.maroon_walk import (
     walk_for_fuel_last_resort,
 )
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
+from tankpit_bot.bot.ai.radar_economics import (
+    radar_spend_worthwhile,
+)
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
@@ -101,7 +103,7 @@ def exhausted_collect_outcome(
     Raises:
         SessionExitError: When the session has no productive action.
     """
-    if ctx.fuel > ctx.config["fuel_low_threshold"]:
+    if ctx.fuel > ctx.fuel_low_floor:
         if ctx.config["role"] == "gatherer":
             # A gatherer CANNOT hunt by role, not by shortage
             # ([[fleet-coordination]]) -- an exhausted cascade is

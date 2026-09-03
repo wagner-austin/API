@@ -58,7 +58,7 @@ def mine_pin_decision(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDi
     )
     if reach > MINE_PIN_REACH_TILES:
         return None
-    if ctx.fuel <= ctx.config["fuel_low_threshold"] + MINE_PRESS_COST:
+    if ctx.fuel <= ctx.fuel_low_floor + MINE_PRESS_COST:
         # Fuel is health: below the survival floor the 10-fuel press
         # and its tick both belong to the escape doctrine.
         return None

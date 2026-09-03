@@ -204,7 +204,7 @@ def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
     if self_state is None:
         return None
 
-    fuel_low = self_state["fuel"] < ctx.config["fuel_low_threshold"]
+    fuel_low = self_state["fuel"] < ctx.fuel_low_floor
     for want_fuel in [True, False] if fuel_low else [False, True]:
         container = find_adjacent_container(
             ctx.world,

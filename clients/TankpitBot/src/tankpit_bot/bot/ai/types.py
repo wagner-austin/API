@@ -27,8 +27,16 @@ class AIConfigDict(TypedDict):
             (The historical ``fuel_critical_threshold`` was collapsed
             into this single value 2026-06-22; the two-tier "polite low
             vs. emergency critical" distinction was dead because both
-            thresholds had drifted to the same number.)
-        hunt_min_fuel: Operating reserve for search/recovery teleport hops.
+            thresholds had drifted to the same number.) Like the two
+            reserves below, this is the RANK-4 REFERENCE tuning: every
+            decision reads it rank-scaled through
+            ``DecideCtx.fuel_low_floor``
+            (:func:`~tankpit_bot.physics.capacity.rank_scaled_reserve`,
+            [[flag-triage-20260902]] row 6 -- a flat lieutenant-tuned
+            floor broke a private off a winnable fight at full tank).
+        hunt_min_fuel: Operating reserve for search/recovery teleport
+            hops. Rank-4 reference; read via
+            ``DecideCtx.hunt_reserve_floor``.
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
         shot_feedback_timeout_ms: Milliseconds to wait before treating a shot as a miss.
@@ -62,9 +70,10 @@ class AIConfigDict(TypedDict):
         engagement_fuel_budget: Estimated fuel a typical kill consumes
             once adjacent (shot sequence + per-tick position cost; the
             approach teleport is priced separately per candidate in
-            ``find_acquisition_target``). Starting a new engagement
-            requires ``fuel >= fuel_low_threshold +
-            engagement_fuel_budget``, and acquiring a map-known enemy
+            ``find_acquisition_target``). Rank-4 reference; read via
+            ``DecideCtx.engagement_budget``. Starting a new engagement
+            requires ``fuel >= fuel_low_floor +
+            engagement_budget``, and acquiring a map-known enemy
             additionally requires the candidate's exact teleport cost
             on top -- the bot never picks a fight it cannot pay for
             (user contract 2026-07-02). Mid-engagement
@@ -126,7 +135,12 @@ def make_default_ai_config() -> AIConfigDict:
     """Create AIConfigDict with sensible defaults.
 
     Returns:
-        AIConfigDict with default values suitable for lieutenant rank.
+        AIConfigDict defaults. The three fuel reserves are the RANK-4
+        (lieutenant, capacity 1400) reference tuning; every decision
+        reads them scaled to the tank's true capacity
+        (:func:`~tankpit_bot.physics.capacity.rank_scaled_reserve`),
+        so the numbers here stay exact at lieutenant and shrink or
+        grow proportionally elsewhere.
     """
     return AIConfigDict(
         fuel_low_threshold=200,

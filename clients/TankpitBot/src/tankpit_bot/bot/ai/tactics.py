@@ -6,13 +6,7 @@ the map for enemy discovery, and what equipment should be active.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.types import AIConfigDict
 from tankpit_bot.physics.capacity import inventory_capacity
-from tankpit_bot.state.types import (
-    ContainerStateDict,
-    WorldStateDict,
-)
-from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
 def combat_radar_min(rank: int) -> int:
@@ -71,75 +65,6 @@ def wartime_inventory_ready(dual: int, homing: int, radar: int, rank: int) -> bo
     return dual >= war_weapon_floor and homing >= war_weapon_floor and radar >= cap // 2
 
 
-def _is_within_observable_viewport(world: WorldStateDict, x: int, y: int) -> bool:
-    """Return True when a coordinate lies inside the current visible viewport.
-
-    Args:
-        world: Current world state.
-        x: Absolute X coordinate.
-        y: Absolute Y coordinate.
-
-    Returns:
-        True if the coordinate lies inside the observable viewport bounds.
-    """
-    left, top, right, bottom = viewport_visible_bounds(world["viewport"])
-    return left <= x <= right and top <= y <= bottom
-
-
-def _is_visible_fuel_container(world: WorldStateDict, container: ContainerStateDict) -> bool:
-    """Return True when a fuel container is currently visible in the viewport.
-
-    Args:
-        world: Current world state.
-        container: Container candidate.
-
-    Returns:
-        True if the container is fuel, non-empty, and inside the observable frame.
-    """
-    return (
-        container["is_fuel"]
-        and container["volume"] > 0
-        and _is_within_observable_viewport(world, container["x"], container["y"])
-    )
-
-
-def should_proactive_radar(
-    fuel: int,
-    world: WorldStateDict,
-    last_scan_ms: int,
-    now: int,
-    config: AIConfigDict,
-) -> bool:
-    """Check if a proactive radar scan is needed for fuel discovery.
-
-    Triggers when fuel is low (<=fuel_low_threshold), no containers are
-    visible, and the scan cooldown has elapsed. One radar per viewport
-    is enough — collect everything before scanning again.
-
-    Args:
-        fuel: Current fuel level.
-        world: Current world state.
-        last_scan_ms: Timestamp of last radar scan.
-        now: Current timestamp in milliseconds.
-        config: AI configuration.
-
-    Returns:
-        True if a proactive radar scan should be performed.
-    """
-    # Respect scan cooldown first (cheap check)
-    if now - last_scan_ms < config["scan_cooldown_ms"]:
-        return False
-
-    # Don't radar when FUEL containers are already visible — collect them first.
-    # Equipment containers don't count — we need fuel, not equipment.
-    for container in world["containers"].values():
-        if _is_visible_fuel_container(world, container):
-            return False
-
-    # Only radar when fuel is low
-    return fuel <= config["fuel_low_threshold"]
-
-
 def compute_desired_equipment(
     mode: str,
     fuel: int,
@@ -178,5 +103,4 @@ def compute_desired_equipment(
 __all__ = [
     "combat_radar_min",
     "compute_desired_equipment",
-    "should_proactive_radar",
 ]

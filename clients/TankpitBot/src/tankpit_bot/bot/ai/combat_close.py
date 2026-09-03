@@ -252,7 +252,7 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
     # if we die... we should fuel before chasing"). Refuel-for-hunt
     # keeps the lock and prefers in-viewport walk pickups, then the
     # larder, so the detour is usually one container away.
-    engagement_reserve = ctx.config["fuel_low_threshold"] + ctx.config["engagement_fuel_budget"]
+    engagement_reserve = ctx.fuel_low_floor + ctx.engagement_budget
     if not can_afford_teleport(
         ctx,
         landing_x,

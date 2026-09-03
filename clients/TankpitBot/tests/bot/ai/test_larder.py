@@ -165,9 +165,11 @@ def test_reserve_gates_the_transaction_not_the_transit() -> None:
 
 def test_reserve_blocked_hop_is_declined() -> None:
     """A hop still below reserve after its own pickup never wins."""
+    # Rank-2 reserve is 171 (rank-scaled): cost 120 to (120,100), so
+    # 180 + 105 - 120 = 165 < 171 keeps the F16 net-of-gain gate hot.
     containers = {"120,100": make_container(120, 100, 105, is_fuel=True)}
     selection = select_fuel_larder_hop(
-        _ctx(fuel=210, containers=containers),
+        _ctx(fuel=180, containers=containers),
     )
     assert selection["container"] is None
     assert selection["reserve_blocked"] == 1
@@ -272,8 +274,10 @@ def test_desperation_fuel_is_reserve_blocked_not_dreg_gated() -> None:
     containers = {
         "110,100": make_container(110, 100, 90, is_fuel=True),
     }
+    # 130 + 90 - 60 = 160 < 171 (the rank-2 scaled reserve): the
+    # reserve gate fires before the dreg floor ever sees the sliver.
     selection = select_fuel_larder_hop(
-        _ctx(fuel=150, containers=containers),
+        _ctx(fuel=130, containers=containers),
     )
     assert selection["container"] is None
     assert selection["reserve_blocked"] == 1

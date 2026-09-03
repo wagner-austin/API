@@ -22,7 +22,6 @@ from tankpit_bot.bot.ai.combat_target import (
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
-    radar_spend_worthwhile,
 )
 from tankpit_bot.bot.ai.hunt_acquire import decide_hunt_acquire, search_for_enemies
 from tankpit_bot.bot.ai.hunt_lock import (
@@ -33,6 +32,9 @@ from tankpit_bot.bot.ai.hunt_lock import (
     release_break_latch,
     resume_locked_target_off_viewport,
     visible_threats,
+)
+from tankpit_bot.bot.ai.radar_economics import (
+    radar_spend_worthwhile,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict

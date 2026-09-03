@@ -295,3 +295,26 @@ def test_a_stale_id_is_not_treated_as_an_ally() -> None:
 
     assert len(_shots(dead_target)) == 1
     assert len(_shots(unknown_target)) == 1
+
+
+def test_an_npcs_refused_shot_emits_no_supervisor_receipt() -> None:
+    """Refusal receipts belong to the CLIENT alone.
+
+    The 0x52 close is the server answering the player's own click; a
+    server bot whose shot fails the same laws simply does not fire —
+    nothing in 341 archived sessions shows an NPC drawing a
+    supervisor message. Pins the non-client arm of the refusal
+    branch, which shipped uncovered (fleet-lifecycle session,
+    2026-09-03, while clearing the repo gate).
+    """
+    server = _server()
+    # Two NPCs on one team: 12 aims at its own teammate 13.
+    server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
+    server.world["tanks"][13] = make_sim_tank(13, 0, 1, 14, 10, 500)
+
+    server.queue_command(12, _id_shot(14, 10, 13))
+    messages = server.advance_tick()
+
+    assert _shots(messages) == []
+    assert [m for m in messages if m["msg_type"] == 0x52] == []
+    assert server.world["tanks"][13]["fuel"] == 500

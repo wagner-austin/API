@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from tankpit_bot.physics.capacity import (
     DEPOSIT_FLOOR,
+    RESERVE_REFERENCE_RANK,
     free_radar_radius,
     fuel_capacity,
     inventory_capacity,
+    rank_scaled_reserve,
 )
 
 
@@ -190,3 +192,28 @@ class TestInventoryCapacity:
     def test_general_cap_is_60(self) -> None:
         """Rank 8 (general) caps each slot at 60."""
         assert inventory_capacity(8) == 60
+
+
+class TestRankScaledReserve:
+    """The reserve scaler behind [[flag-triage-20260902]] row 6."""
+
+    def test_exact_at_the_reference_rank(self) -> None:
+        """The lieutenant tuning survives the scaling untouched."""
+        assert rank_scaled_reserve(200, RESERVE_REFERENCE_RANK) == 200
+        assert rank_scaled_reserve(100, RESERVE_REFERENCE_RANK) == 100
+        assert rank_scaled_reserve(450, RESERVE_REFERENCE_RANK) == 450
+
+    def test_scales_down_with_capacity_below_the_reference(self) -> None:
+        """A private's reserves are 11/14 of a lieutenant's."""
+        assert rank_scaled_reserve(200, 1) == 157
+        assert rank_scaled_reserve(100, 1) == 78
+        assert rank_scaled_reserve(450, 1) == 353
+
+    def test_scales_up_with_capacity_above_the_reference(self) -> None:
+        """A general's reserves grow with the tank they protect."""
+        assert rank_scaled_reserve(200, 8) == 257
+        assert rank_scaled_reserve(450, 8) == 578
+
+    def test_recruit_floor_is_proportional_to_the_smallest_tank(self) -> None:
+        """Rank 0: capacity 1000 scales the reference by 5/7."""
+        assert rank_scaled_reserve(200, 0) == 142

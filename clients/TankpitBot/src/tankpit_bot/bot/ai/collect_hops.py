@@ -202,7 +202,7 @@ def hop_toward_equipment(
     # bot-20260730-000038 ticks 121-126 dot-hopped away from three
     # identified containers and paid a return trip for them later
     # ([[flag-triage-20260729]]).
-    landing_reserve = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    landing_reserve = ctx.engagement_budget + ctx.fuel_low_floor
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     no_landing = 0
     reserve_blocked = 0

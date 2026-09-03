@@ -27,7 +27,6 @@ from tankpit_bot.bot.ai.scoring_types import (
 )
 from tankpit_bot.bot.ai.tactics import (
     compute_desired_equipment,
-    should_proactive_radar,
 )
 from tankpit_bot.bot.ai.threat_primitives import (
     find_closest_threat,
@@ -95,6 +94,5 @@ __all__ = [
     "make_initial_ai_state",
     "make_path_step",
     "manhattan_distance",
-    "should_proactive_radar",
     "threats_in_range",
 ]

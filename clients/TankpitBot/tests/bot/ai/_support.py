@@ -232,6 +232,7 @@ def make_world(
     *,
     self_x: int = 100,
     self_y: int = 100,
+    rank: int = 2,
     fuel: int = 800,
     containers: dict[str, ContainerStateDict] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
@@ -243,6 +244,8 @@ def make_world(
     Args:
         self_x: Controlled tank X coordinate.
         self_y: Controlled tank Y coordinate.
+        rank: Controlled tank rank (default 2 — the historical fixture
+            rank; the rank-scaled reserves read 171/85/385 here).
         fuel: Current fuel amount.
         containers: Optional visible containers.
         tanks: Optional visible tanks.
@@ -263,7 +266,7 @@ def make_world(
         x=self_x,
         y=self_y,
         team=1,
-        rank=2,
+        rank=rank,
         fuel=fuel,
         leaderboard_position=5,
     )

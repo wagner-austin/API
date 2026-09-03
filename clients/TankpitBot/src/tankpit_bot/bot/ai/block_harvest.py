@@ -286,7 +286,7 @@ def plan_block_harvest_leg(ctx: DecideCtx, base_state: AIStateDict) -> TickDecis
         qualifying block container remains (harvest done -- the
         cascade proceeds to larder and the exit hop).
     """
-    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
+    if ctx.fuel <= ctx.fuel_low_floor:
         # Same rule as the sweep: at or below the fuel-low break the
         # desperation ladder (dot hop, walk-for-fuel rescue) owns the
         # tick -- its distance caps and cost ranking exist precisely

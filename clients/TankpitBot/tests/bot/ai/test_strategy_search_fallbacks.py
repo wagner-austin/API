@@ -74,7 +74,9 @@ class TestEquipmentSearchHopFallback:
         """
         ws = self.ws
         ws.map_fuel_dots = ((250, 100),)
-        world, self_state = _make_world(fuel=150, scanned=True)
+        # 140 <= the rank-0 scaled floor (142): the marooned walk rung
+        # owns the tick exactly as the doctrine says.
+        world, self_state = _make_world(fuel=140, scanned=True)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -372,7 +374,9 @@ class TestFuelSearchFallbacks:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
         ws = self.ws
         ws.map_fuel_dots = ((120, 100),)
-        world, self_state = _make_world(fuel=150, scanned=True, block_scanned=False)
+        # 140 sits at/below the rank-0 scaled fuel-low floor (142), so
+        # the sweep stays out and the search hop owns the tick.
+        world, self_state = _make_world(fuel=140, scanned=True, block_scanned=False)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 

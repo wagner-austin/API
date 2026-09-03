@@ -150,9 +150,7 @@ def assess_engagement_break(
     hits_to_kill = estimate_hits_to_kill(ctx, target)
     projected = ctx.fuel - hits_to_kill * (_OWN_COST_PER_SHOT_TICK + rate_per_tick)
     escape_floor = (
-        ctx.config["fuel_low_threshold"]
-        + ctx.config["hunt_min_fuel"]
-        + _ESCAPE_LATENCY_TICKS * rate_per_tick
+        ctx.fuel_low_floor + ctx.hunt_reserve_floor + _ESCAPE_LATENCY_TICKS * rate_per_tick
     )
     human_band_holds = (
         is_human_name(target["name"]) and ctx.fuel >= fuel_capacity(ctx.self_state["rank"]) // 2

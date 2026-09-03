@@ -46,7 +46,7 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
     Returns:
         True when fuel or equipment reserves require collection.
     """
-    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
+    if ctx.fuel <= ctx.fuel_low_floor:
         return True
     if weapon_reserves_below_break(ctx):
         return True
@@ -159,17 +159,18 @@ def human_fight_resume_fuel_floor(ctx: DecideCtx) -> int:
         ctx: Decision context.
 
     Returns:
-        ``min(capacity, max(fuel_low + hunt_min + engagement_budget,
-        capacity // 2 + hunt_min))`` -- 750 at defaults for a private.
+        ``min(capacity, max(fuel_low_floor + hunt_reserve_floor +
+        engagement_budget, capacity // 2 + hunt_reserve_floor))`` with
+        the rank-scaled reserves ([[flag-triage-20260902]] row 6) --
+        628 at defaults for a private, 685 at the rank-2 fixture, 800
+        at the reference lieutenant.
     """
     capacity = fuel_capacity(ctx.self_state["rank"])
     return min(
         capacity,
         max(
-            ctx.config["fuel_low_threshold"]
-            + ctx.config["hunt_min_fuel"]
-            + ctx.config["engagement_fuel_budget"],
-            capacity // 2 + ctx.config["hunt_min_fuel"],
+            ctx.fuel_low_floor + ctx.hunt_reserve_floor + ctx.engagement_budget,
+            capacity // 2 + ctx.hunt_reserve_floor,
         ),
     )
 

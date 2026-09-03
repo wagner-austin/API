@@ -126,16 +126,25 @@ def test_full_human_fight_loop_break_partial_restock_reengage_cap_kill() -> None
         assert held["updated_ai_state"]["combat_target_id"] == YUPPLER_ID
         assert held["updated_ai_state"]["break_escape_until_fuel"] == 0
 
-    # --- Phase 3: one more hit crosses the band; the break fires ---
+    # --- Phase 3: two more hits cross the band; the break fires ---
+    # Two, not one, since the rank-scaled reserves (row 6,
+    # [[flag-triage-20260902]]): the smaller floor keeps the 470-fuel
+    # fight fundable below capacity, so the projection latch — not the
+    # human resume branch — would own it. The hotter window pushes the
+    # projection past capacity and exercises the branch this scenario
+    # exists to pin.
     scenario.advance_clock()
     _confirmed_hit(scenario, 470)
+    scenario.advance_clock()
+    _confirmed_hit(scenario, 380)
     broke = scenario.decide()
 
     assert broke["behavior"]["mode"] == "COLLECT"
     assert broke["updated_ai_state"]["combat_target_id"] == YUPPLER_ID
-    # The human latch is the RESUME floor, not capacity: refuel to
-    # ~750 and get back in, never a full-tank rebuild.
-    assert broke["updated_ai_state"]["break_escape_until_fuel"] == 750
+    # The human latch is the RESUME floor, not capacity: refuel to the
+    # rank-scaled floor (capacity//2 + hunt reserve = 550 + 78 = 628
+    # for this private) and get back in, never a full-tank rebuild.
+    assert broke["updated_ai_state"]["break_escape_until_fuel"] == 628
 
     # --- Phase 4: fuel recovers past the floor; re-engage in person ---
     scenario.advance_clock()

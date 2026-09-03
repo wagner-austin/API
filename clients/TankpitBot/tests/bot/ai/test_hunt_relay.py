@@ -227,7 +227,10 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     in the registry exercises the relay's non-enemy filter.
     """
     ws = WorldService()
-    ws.map_fuel_dots = ((170, 100), (130, 100))
+    # (160,100): cost 360 stays inside the rank-2 scaled engagement
+    # budget (385); the pre-scaling far dot at 170 (cost 420) would
+    # now be priced out before the nearest-the-enemy ranking runs.
+    ws.map_fuel_dots = ((160, 100), (130, 100))
     ws.map_data_ingested_ms = 99500  # data heard 500 ms ago: the snapshot is honestly fresh
     tanks: dict[str, TankStateDict] = {
         "60": make_map_known_enemy(),
@@ -269,7 +272,7 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["command"]["target_x"] == 170
+    assert decision["command"]["target_x"] == 160
     assert decision["command"]["target_y"] == 100
 
 

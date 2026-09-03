@@ -268,7 +268,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     deficit = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     viewport = ctx.world["viewport"]
-    reserve = ctx.config["fuel_low_threshold"]
+    reserve = ctx.fuel_low_floor
     candidates = 0
     too_close = 0
     no_landing = 0

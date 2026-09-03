@@ -62,9 +62,11 @@ def _locked_ctx(
 # (min(combat_radar_min 25, 2 x radar_break 5)).
 
 
-def test_resume_fuel_floor_is_750_at_rank_two_defaults() -> None:
+def test_resume_fuel_floor_is_685_at_rank_two_defaults() -> None:
     ctx = _locked_ctx(fuel=800, inventory=_inventory(duals=15, homings=15, radars=10))
-    assert human_fight_resume_fuel_floor(ctx) == 750
+    # max(fuel_low + hunt + budget, capacity//2 + hunt) with the
+    # rank-scaled reserves at rank 2: max(171+85+385, 600+85) = 685.
+    assert human_fight_resume_fuel_floor(ctx) == 685
 
 
 def test_partial_bar_exits_collect_during_a_held_human_fight() -> None:
@@ -96,7 +98,7 @@ def test_partial_bar_holds_below_the_radar_floor() -> None:
 
 
 def test_partial_bar_holds_below_the_resume_fuel_floor() -> None:
-    ctx = _locked_ctx(fuel=749, inventory=_inventory(duals=15, homings=15, radars=10))
+    ctx = _locked_ctx(fuel=684, inventory=_inventory(duals=15, homings=15, radars=10))
 
     assert human_fight_resume_permitted(ctx) is False
 

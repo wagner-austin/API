@@ -42,9 +42,9 @@ def _threat(*, damage_state: int, rank: int = 1, name: str = "red-7") -> EnemyTh
     )
 
 
-def _ctx(*, fuel: int, inventory: InventoryState | None = None) -> DecideCtx:
+def _ctx(*, fuel: int, rank: int = 2, inventory: InventoryState | None = None) -> DecideCtx:
     ws = WorldService()
-    world, self_state = make_world(fuel=fuel)
+    world, self_state = make_world(fuel=fuel, rank=rank)
     return DecideCtx(
         world,
         self_state,
@@ -55,6 +55,48 @@ def _ctx(*, fuel: int, inventory: InventoryState | None = None) -> DecideCtx:
         "",
         ws=ws,
     )
+
+
+def test_a_private_at_full_tank_holds_the_flag_one_fight() -> None:
+    """The measured 2026-09-01 full-tank break no longer fires.
+
+    Run bot-20260901-210631 21:43:44 ([[flag-triage-20260902]] row 6):
+    fuel 1100/1100 at PRIVATE, incoming 270 fuel over 6 hits in the
+    window (rate 54), hits_to_kill 10 — projected 360 against the flat
+    lieutenant-tuned floor 408 broke a winnable fight at literally
+    full fuel. The rank-scaled floor is 157 + 78 + 108 = 343, and the
+    projection clears it: the fight is finished, not fled.
+    """
+    assessment = assess_engagement_break(
+        _ctx(fuel=1100, rank=1),
+        _threat(damage_state=2, rank=1),
+        6,
+        270,
+    )
+
+    assert assessment["incoming_rate_per_tick"] == 54
+    assert assessment["hits_to_kill"] == 10
+    assert assessment["projected_fuel_at_kill"] == 1100 - 10 * 74
+    assert assessment["escape_floor"] == 157 + 78 + 108
+    assert assessment["break_engagement"] is False
+
+
+def test_the_same_fight_at_the_reference_rank_still_breaks() -> None:
+    """The scaling is the difference, not a loosened law.
+
+    Identical inputs at rank 4 keep the exact pre-2026-09-03 floor
+    (200 + 100 + 108 = 408 > 360): a lieutenant judging this fight by
+    its own capacity still walks away, exactly as tuned.
+    """
+    assessment = assess_engagement_break(
+        _ctx(fuel=1100, rank=4),
+        _threat(damage_state=2, rank=1),
+        6,
+        270,
+    )
+
+    assert assessment["escape_floor"] == 200 + 100 + 108
+    assert assessment["break_engagement"] is True
 
 
 def test_hits_to_kill_scales_with_the_quartile() -> None:
@@ -76,7 +118,10 @@ def test_full_health_target_under_sustained_fire_breaks() -> None:
     assert assessment["incoming_rate_per_tick"] == 100
     assert assessment["hits_to_kill"] == 13
     assert assessment["projected_fuel_at_kill"] == 1100 - 13 * 120
-    assert assessment["escape_floor"] == 200 + 100 + 200
+    # Rank-scaled reserves (row 6): the rank-2 fixture reads the
+    # rank-4 reference tuning at capacity 1200/1400 — 171 + 85 —
+    # plus the 2-tick escape-latency exposure at rate 100.
+    assert assessment["escape_floor"] == 171 + 85 + 200
     assert assessment["break_engagement"] is True
 
 
@@ -489,7 +534,8 @@ def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
     assert decision["updated_ai_state"]["combat_target_id"] == 50
     # The resume floor at defaults: max(200 + 100 + 450, 1200 // 2 +
     # 100) = 750 — one good container away, then back in the fight.
-    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 750
+    # capacity//2 + rank-scaled hunt reserve at rank 2: 600 + 85.
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 685
 
 
 def test_human_fight_above_half_capacity_keeps_fighting() -> None:

@@ -74,9 +74,9 @@ def _pick_relay_dot(
         if ctx.terrain is not None and not ctx.terrain.is_passable(dot_x, dot_y):
             continue
         cost = teleport_cost(sx, sy, dot_x, dot_y)
-        if cost > ctx.config["engagement_fuel_budget"]:
+        if cost > ctx.engagement_budget:
             continue
-        if cost + ctx.config["fuel_low_threshold"] > ctx.fuel:
+        if cost + ctx.fuel_low_floor > ctx.fuel:
             continue
         if (
             best is None
@@ -134,9 +134,7 @@ def relay_toward_unaffordable_enemy(
         ctx.terrain,
         ctx.timestamp_ms,
         ctx.config["map_intel_horizon_ms"],
-        engagement_reserve_fuel=(
-            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
-        ),
+        engagement_reserve_fuel=(ctx.engagement_budget + ctx.fuel_low_floor),
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
@@ -254,9 +252,7 @@ def stale_human_needs_map_refresh(ctx: DecideCtx) -> bool:
         ctx.terrain,
         ctx.timestamp_ms,
         ctx.config["map_intel_horizon_ms"],
-        engagement_reserve_fuel=(
-            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
-        ),
+        engagement_reserve_fuel=(ctx.engagement_budget + ctx.fuel_low_floor),
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
         doctrine=ctx.config["doctrine"],
@@ -297,9 +293,7 @@ def human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
         ctx.terrain,
         ctx.timestamp_ms,
         ctx.config["map_intel_horizon_ms"],
-        engagement_reserve_fuel=(
-            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
-        ),
+        engagement_reserve_fuel=(ctx.engagement_budget + ctx.fuel_low_floor),
         priority_target_name=ctx.config["priority_target_name"],
         human_min_rank=ctx.config["human_target_min_rank"],
         human_max_rank=ctx.config["human_target_max_rank"],
@@ -350,7 +344,7 @@ def _refuel_toward_engagement(
         travel["x"],
         travel["y"],
     )
-    needed = engage_cost + ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    needed = engage_cost + ctx.engagement_budget + ctx.fuel_low_floor
     emit_ai(
         "no progress dot toward %s (id=%d) -- refueling in place "
         "(fuel=%d, engagement needs ~%d, capacity=%d)",

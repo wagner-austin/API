@@ -290,7 +290,7 @@ def _first_walkworthy_fuel(
         ``(container, command)`` for the best walk-worthy executable
         fuel target, or ``None`` when none qualifies.
     """
-    fuel_critical = ctx.fuel <= ctx.config["fuel_low_threshold"]
+    fuel_critical = ctx.fuel <= ctx.fuel_low_floor
     cap = fuel_capacity(ctx.self_state["rank"])
     for container in find_fuel_candidates(
         ctx.filtered,

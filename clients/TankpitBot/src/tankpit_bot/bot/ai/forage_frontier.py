@@ -141,7 +141,7 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
     """
     covered = _covered_blocks(ctx)
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    budget = ctx.fuel - ctx.config["fuel_low_threshold"]
+    budget = ctx.fuel - ctx.fuel_low_floor
     hostile = ctx.ws.hostile_landing_keys(ctx.timestamp_ms)
     claimed_blocks = {
         (gx // BLOCK_TILES, gy // BLOCK_TILES) for gx, gy in ctx.ws.fleet_forage_goals.values()
@@ -263,7 +263,7 @@ def plan_forage_frontier_hop(ctx: DecideCtx, base_state: AIStateDict) -> TickDec
         return None
     if ctx.inventory["extra_radars"]["count"] <= 0:
         return None
-    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
+    if ctx.fuel <= ctx.fuel_low_floor:
         # Restocking is a healthy-fuel activity: critical-fuel ticks
         # belong to the survival ladder (desperation hop, walk for
         # fuel), which runs in the exhausted outcome BELOW this rung.

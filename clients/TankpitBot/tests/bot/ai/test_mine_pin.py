@@ -97,8 +97,8 @@ def test_beyond_pressing_reach_the_tick_stays_a_shot() -> None:
 
 def test_survival_floor_bars_the_press() -> None:
     """At the fuel-low break plus the press cost, the tick is not spent."""
-    floor = make_scanned_ai_state()["config"]["fuel_low_threshold"]
-    ctx = _ctx(102, 100, fuel=floor + 10)
+    probe = _ctx(102, 100, fuel=800)
+    ctx = _ctx(102, 100, fuel=probe.fuel_low_floor + 10)
     target = _enemy_threat(x=102, y=100, name="red-1")
 
     assert mine_pin_decision(ctx, target) is None

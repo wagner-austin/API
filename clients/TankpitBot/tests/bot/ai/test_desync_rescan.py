@@ -171,7 +171,7 @@ class TestRadarSpendEconomics:
         tank fires; the same sliver at a far corner declines -- the
         scan-walk-scan doctrine walks there first.
         """
-        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+        from tankpit_bot.bot.ai.radar_economics import radar_spend_worthwhile
 
         ws = WorldService()
         world, self_state = make_world(scanned=True)
@@ -218,7 +218,7 @@ class TestRadarSpendEconomics:
         "dead in the water" restocking through the built-in radius-2
         scan, so the final paid sweep waits for a near-full reveal.
         """
-        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+        from tankpit_bot.bot.ai.radar_economics import radar_spend_worthwhile
 
         ws = WorldService()
         world, self_state = make_world(scanned=True)
@@ -255,7 +255,7 @@ class TestRadarSpendEconomics:
 
     def test_last_extra_spends_on_a_near_full_reveal(self) -> None:
         """A fully uncovered viewport is worth the final extra radar."""
-        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+        from tankpit_bot.bot.ai.radar_economics import radar_spend_worthwhile
 
         ws = WorldService()
         world, self_state = make_world(scanned=False)

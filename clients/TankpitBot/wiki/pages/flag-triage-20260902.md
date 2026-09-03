@@ -270,11 +270,45 @@ in the bot is the 10-minute harvest veto.
 | 3 | Coverage staleness is clock-based, not event-based | **fixed 2026-09-03** — the SETTLED-KNOWLEDGE LAW: a scan stamp is valid while recent OR while it postdates the last FOREIGN HUMAN sighting (`state/knowledge_floors.py`, `ws.knowledge_floor_ms`, watermark swept from the tank registry with self + fleet siblings excluded via the merge's new `fleet_sibling_tank_ids`). No foreign human ever seen → knowledge is permanent; one present → exactly the old TTL; one departed → pre-departure scans age out once. Fact-based, room-agnostic, zero config plumbing |
 | 4 | Landing radar fires on already-covered ground | **fixed 2026-09-03** — structural: the landing radar was already gated by `radar_spend_worthwhile`, whose uncovered-count now reads the settled floor, so landings on ever-scanned settled ground skip the spend. Combat-landing scans deliberately untouched (they reveal MINES, which are dynamic) |
 | 5 | Intra-viewport teleports (143) | **fixed 2026-09-03** (as row 3's symptom) — lane attribution showed 139 of the measured teleports were `forage_frontier_hop` chasing clock-rotted blocks; with block coverage and visit tombstones on the settled floor the churn source is gone. The hop lanes' own contribution (~14) was already closed by the 2026-09-02 walk-territory law |
-| 6 | Break floor absolute, not rank-relative | **open** |
+| 6 | Break floor absolute, not rank-relative | **fixed 2026-09-03** — the three fuel reserves are now the RANK-4 REFERENCE tuning, read rank-scaled through `DecideCtx.fuel_low_floor` / `hunt_reserve_floor` / `engagement_budget` (`physics.capacity.rank_scaled_reserve`, integer-exact at lieutenant, claim-bound below). The measured 21:43:44 full-tank break FLIPS: floor 408→343 vs projection 360, the private holds and finishes; the identical fight at the reference rank still breaks, exactly as tuned. RESIDUAL, now row 11 |
 | 7 | Mine pin single-slot latch | **open** |
 | 8 | Ferry scout has no negative memory (1/31) | **open** — NOT fixed by the settled law (an earlier board note overclaimed this): the scout's precheck compares against the current window only, and per-goal look history is a separate design |
 | 9 | Three dead forked constants in `world_service.py` | **open** — deletion |
 | 10 | Six undocumented `*_MS` constants | **open** |
+| 11 | Incoming rate is not attributed per attacker | **open** — a pair's combined rate prices a one-on-one duel; the unavoidable-break bar at private only moves 36→40 with row 6 because the dominant term is `hits_to_kill x pair_rate` vs capacity. Needs per-shooter windows in the damage book |
+
+## Machine-checked claims (row 6)
+
+The rank-scaled reserve law, bound by the `physics_claims` guard the
+same way every wire law is — the scaler is exact at the reference
+lieutenant and proportional elsewhere:
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "reserve-reference-rank",
+      "code": "tankpit_bot.physics.capacity:RESERVE_REFERENCE_RANK",
+      "value": 4
+    },
+    {
+      "id": "rank-scaled-reserve",
+      "code": "tankpit_bot.physics.capacity:rank_scaled_reserve",
+      "formula": "reference * fuel_capacity(rank) // fuel_capacity(4)",
+      "probes": [
+        {"args": [200, 4], "expect": 200},
+        {"args": [100, 4], "expect": 100},
+        {"args": [450, 4], "expect": 450},
+        {"args": [200, 1], "expect": 157},
+        {"args": [100, 1], "expect": 78},
+        {"args": [450, 1], "expect": 353},
+        {"args": [200, 0], "expect": 142},
+        {"args": [450, 8], "expect": 578}
+      ]
+    }
+  ]
+}
+```
 
 ## The pattern worth carrying forward
 
