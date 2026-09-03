@@ -40,10 +40,7 @@ from tankpit_bot.analysis.recipient_policy_types import (
 )
 from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.analysis.types import ScannedSessionDict
-from tankpit_bot.protocol.commands import (
-    build_block_command,
-    build_teleport_command,
-)
+from tankpit_bot.protocol.command_builders import build_block_command, build_teleport_command
 from tankpit_bot.protocol.framing import encode_frame
 from tests.analysis._capture_fixtures import (
     FOREIGN_TANK,

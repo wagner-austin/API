@@ -12,10 +12,8 @@ from platform_core.json_utils import (
     JSONObject,
 )
 
-from tankpit_bot.protocol.commands import (
-    CMD_ENTER_GAME,
-    build_query_command,
-)
+from tankpit_bot.protocol.command_builders import build_query_command
+from tankpit_bot.protocol.commands import CMD_ENTER_GAME
 from tests.fakes.payloads import (
     _decode_injected_websocket_body,
     _extract_enter_room_id,

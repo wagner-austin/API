@@ -35,7 +35,7 @@ from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.analysis import _test_hooks as analysis_hooks
-from tankpit_bot.protocol.commands import build_teleport_command
+from tankpit_bot.protocol.command_builders import build_teleport_command
 from tankpit_bot.sim.scenarios import SIM_FIELD
 from tests.analysis._capture_fixtures import (
     OWN_TANK,

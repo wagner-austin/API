@@ -210,7 +210,7 @@ def test_the_production_graceful_quit_reaches_the_lobby() -> None:
     plain un-XOR'd ``-`` it sends at teardown so the server records a
     deliberate lobby exit instead of a socket drop.
     """
-    from tankpit_bot.protocol.commands import build_quit_command
+    from tankpit_bot.protocol.command_builders import build_quit_command
 
     link = _link()
     link.open_lobby()

@@ -33,7 +33,7 @@ class TestBotWithCDP:
         """Test Bot._send_bytes XOR encodes '!' commands when table is set."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol.codec import build_xor_table
-        from tankpit_bot.protocol.commands import build_move_command
+        from tankpit_bot.protocol.command_builders import build_move_command
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)

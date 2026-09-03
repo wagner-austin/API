@@ -69,7 +69,8 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_ENTER_GAME, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_ENTER_GAME
 
         return self._send_bytes(build_query_command(CMD_ENTER_GAME), "enter_game")
 
@@ -184,7 +185,7 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent, False if CDP unavailable.
         """
-        from tankpit_bot.protocol.commands import build_shoot_command
+        from tankpit_bot.protocol.command_builders import build_shoot_command
 
         if not self._send_bytes(
             build_shoot_command(x, y, target_id), f"shoot({x},{y},id={target_id})"
@@ -231,7 +232,8 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_MINE, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_MINE
 
         emit_diagnostic(diagnostic_kind="mine_drop_dispatch")
         return self._send_bytes(build_query_command(CMD_MINE), "mine_drop")
@@ -250,7 +252,8 @@ class DispatchMixin(CompletionsMixin):
             uses_extra=uses_extra,
             extra_radar_count=inventory["extra_radars"]["count"],
         )
-        from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_RADAR
 
         if not self._send_bytes(build_query_command(CMD_RADAR), "radar"):
             return False
@@ -267,7 +270,8 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
@@ -320,7 +324,7 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent, False if CDP unavailable.
         """
-        from tankpit_bot.protocol.commands import build_scope_command
+        from tankpit_bot.protocol.command_builders import build_scope_command
 
         self.world.check_and_clear_viewport_update_processed()
         if not self._send_bytes(build_scope_command(direction), f"scope({direction})"):
@@ -348,7 +352,8 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_INVENTORY, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_INVENTORY
 
         return self._send_bytes(build_query_command(CMD_INVENTORY), "inventory")
 
@@ -365,7 +370,7 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import build_toggle_equipment_command
+        from tankpit_bot.protocol.command_builders import build_toggle_equipment_command
 
         if slot < 1 or slot > 5:
             log.warning("Invalid equipment slot: %d (must be 1-5)", slot)
@@ -472,7 +477,8 @@ class DispatchMixin(CompletionsMixin):
         Returns:
             True if the command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_MAP_OPEN
 
         self.world.check_and_clear_map_data_processed()
         if self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open"):

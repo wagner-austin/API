@@ -66,7 +66,7 @@ class TestBotCommandEncoding:
         """Test encode_move_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_move_command
         from tankpit_bot.bot.types import make_move_command
-        from tankpit_bot.protocol.commands import build_move_command
+        from tankpit_bot.protocol.command_builders import build_move_command
 
         cmd = make_move_command(100, 150)
         result = encode_move_command(cmd)
@@ -77,7 +77,7 @@ class TestBotCommandEncoding:
         """Test encode_shoot_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_shoot_command
         from tankpit_bot.bot.types import make_shoot_command
-        from tankpit_bot.protocol.commands import build_shoot_command
+        from tankpit_bot.protocol.command_builders import build_shoot_command
 
         cmd = make_shoot_command(50, 75)
         result = encode_shoot_command(cmd)
@@ -88,7 +88,8 @@ class TestBotCommandEncoding:
         """Test encode_radar_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_radar_command
         from tankpit_bot.bot.types import make_radar_command
-        from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_RADAR
 
         cmd = make_radar_command()
         result = encode_radar_command(cmd)
@@ -99,7 +100,7 @@ class TestBotCommandEncoding:
         """Test encode_pickup_fuel_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_pickup_fuel_command
         from tankpit_bot.bot.types import make_pickup_fuel_command
-        from tankpit_bot.protocol.commands import build_pickup_fuel_command
+        from tankpit_bot.protocol.command_builders import build_pickup_fuel_command
 
         cmd = make_pickup_fuel_command(200, 100)
         result = encode_pickup_fuel_command(cmd)
@@ -110,7 +111,7 @@ class TestBotCommandEncoding:
         """Test encode_pickup_equipment_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_pickup_equipment_command
         from tankpit_bot.bot.types import make_pickup_equipment_command
-        from tankpit_bot.protocol.commands import build_pickup_equipment_command
+        from tankpit_bot.protocol.command_builders import build_pickup_equipment_command
 
         cmd = make_pickup_equipment_command(200, 100)
         result = encode_pickup_equipment_command(cmd)
@@ -121,7 +122,7 @@ class TestBotCommandEncoding:
         """Test encode_teleport_command encodes command to expected bytes."""
         from tankpit_bot.bot.commands import encode_teleport_command
         from tankpit_bot.bot.types import make_teleport_command
-        from tankpit_bot.protocol.commands import build_teleport_command
+        from tankpit_bot.protocol.command_builders import build_teleport_command
 
         cmd = make_teleport_command(128, 64)
         result = encode_teleport_command(cmd)

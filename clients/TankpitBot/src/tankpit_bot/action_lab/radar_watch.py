@@ -36,7 +36,7 @@ from tankpit_bot.action_lab.probe_runtime import (
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
-from tankpit_bot.protocol.commands import build_toggle_equipment_command
+from tankpit_bot.protocol.command_builders import build_toggle_equipment_command
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)

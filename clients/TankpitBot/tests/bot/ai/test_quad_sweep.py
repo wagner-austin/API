@@ -9,10 +9,7 @@ from tankpit_bot.bot.ai.quad_sweep import (
     quadrant_bounds,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.protocol.commands import (
-    SCOPE_NORTHWEST,
-    SCOPE_SOUTHEAST,
-)
+from tankpit_bot.protocol.commands import SCOPE_NORTHWEST, SCOPE_SOUTHEAST
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,

@@ -17,13 +17,8 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.browser.page_client_snapshot import decode_page_client_snapshot
 from tankpit_bot.capture.xor import xor_decode_body
-from tankpit_bot.protocol.commands import (
-    CMD_KEEPALIVE,
-    CMD_MAP_OPEN,
-    COMMAND_PREFIX,
-    TYPE_QUERY,
-    build_query_command,
-)
+from tankpit_bot.protocol.command_builders import build_query_command
+from tankpit_bot.protocol.commands import CMD_KEEPALIVE, CMD_MAP_OPEN, COMMAND_PREFIX, TYPE_QUERY
 from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.wire.helpers import EncodeError

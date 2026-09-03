@@ -5,6 +5,29 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
+from tankpit_bot.protocol.command_builders import (
+    build_move_command,
+    build_pickup_equipment_command,
+    build_pickup_fuel_command,
+    build_query_command,
+    build_scope_command,
+    build_shoot_command,
+    build_teleport_command,
+    build_toggle_equipment_command,
+)
+from tankpit_bot.protocol.command_frames import (
+    ActionCommand,
+    QueryCommand,
+    decode_action_command,
+    decode_query_command,
+    deserialize_command,
+    encode_action_command,
+    encode_query_command,
+    make_action_command,
+    make_query_command,
+    serialize_action_command,
+    serialize_query_command,
+)
 from tankpit_bot.protocol.commands import (
     CMD_MAP_TELEPORT,
     CMD_MOVE,
@@ -20,25 +43,6 @@ from tankpit_bot.protocol.commands import (
     TYPE_MOVEMENT,
     TYPE_QUERY,
     TYPE_UI,
-    ActionCommand,
-    QueryCommand,
-    build_move_command,
-    build_pickup_equipment_command,
-    build_pickup_fuel_command,
-    build_query_command,
-    build_scope_command,
-    build_shoot_command,
-    build_teleport_command,
-    build_toggle_equipment_command,
-    decode_action_command,
-    decode_query_command,
-    deserialize_command,
-    encode_action_command,
-    encode_query_command,
-    make_action_command,
-    make_query_command,
-    serialize_action_command,
-    serialize_query_command,
 )
 
 # =============================================================================

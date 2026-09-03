@@ -18,7 +18,7 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.physics.capacity import damage_tier
-from tankpit_bot.protocol.commands import build_move_command
+from tankpit_bot.protocol.command_builders import build_move_command
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.server import SimServer

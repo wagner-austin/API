@@ -26,16 +26,18 @@ from tankpit_bot.bot.types import (
     make_pickup_fuel_command,
     make_teleport_command,
 )
+from tankpit_bot.protocol.command_builders import (
+    build_query_command,
+    build_quit_command,
+    build_shoot_command,
+    build_toggle_equipment_command,
+)
 from tankpit_bot.protocol.commands import (
     CMD_ENTER_GAME,
     CMD_INVENTORY,
     CMD_MAP_OPEN,
     CMD_NEAREST_ENEMY,
     CMD_RADAR,
-    build_query_command,
-    build_quit_command,
-    build_shoot_command,
-    build_toggle_equipment_command,
 )
 
 log = get_logger(__name__)

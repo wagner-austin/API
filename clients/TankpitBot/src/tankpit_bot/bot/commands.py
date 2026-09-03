@@ -14,8 +14,7 @@ from tankpit_bot.bot.types import (
     ShootCommandDict,
     TeleportCommandDict,
 )
-from tankpit_bot.protocol.commands import (
-    CMD_RADAR,
+from tankpit_bot.protocol.command_builders import (
     build_move_command,
     build_pickup_equipment_command,
     build_pickup_fuel_command,
@@ -23,6 +22,7 @@ from tankpit_bot.protocol.commands import (
     build_shoot_command,
     build_teleport_command,
 )
+from tankpit_bot.protocol.commands import CMD_RADAR
 
 
 def encode_move_command(command: MoveCommandDict) -> bytes:

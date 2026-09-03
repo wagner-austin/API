@@ -440,112 +440,107 @@ reverse-engineering.
     },
     {
       "id": "actioncommand",
-      "code": "tankpit_bot.protocol.commands:ActionCommand",
+      "code": "tankpit_bot.protocol.command_frames:ActionCommand",
       "law": "Variable-length action frame: '!' + type byte + cmd byte + data."
     },
     {
-      "id": "commandtype",
-      "code": "tankpit_bot.protocol.commands:CommandType",
-      "law": "The two frame shapes this module encodes, as a Literal: 'query' or 'action'."
-    },
-    {
       "id": "querycommand",
-      "code": "tankpit_bot.protocol.commands:QueryCommand",
+      "code": "tankpit_bot.protocol.command_frames:QueryCommand",
       "law": "Three-byte query frame: '!' + type byte + cmd byte, no payload."
     },
     {
       "id": "build-block-command",
-      "code": "tankpit_bot.protocol.commands:build_block_command",
+      "code": "tankpit_bot.protocol.command_builders:build_block_command",
       "law": "Length-prefixed block pick-up / drop frame for a cardinally adjacent tile."
     },
     {
       "id": "build-move-command",
-      "code": "tankpit_bot.protocol.commands:build_move_command",
+      "code": "tankpit_bot.protocol.command_builders:build_move_command",
       "law": "Length-prefixed MOVE frame for a destination tile."
     },
     {
       "id": "build-pickup-equipment-command",
-      "code": "tankpit_bot.protocol.commands:build_pickup_equipment_command",
+      "code": "tankpit_bot.protocol.command_builders:build_pickup_equipment_command",
       "law": "Length-prefixed equipment-pickup frame for a container tile."
     },
     {
       "id": "build-pickup-fuel-command",
-      "code": "tankpit_bot.protocol.commands:build_pickup_fuel_command",
+      "code": "tankpit_bot.protocol.command_builders:build_pickup_fuel_command",
       "law": "Length-prefixed fuel-pickup frame for a container tile."
     },
     {
       "id": "build-query-command",
-      "code": "tankpit_bot.protocol.commands:build_query_command",
+      "code": "tankpit_bot.protocol.command_builders:build_query_command",
       "law": "Length-prefixed payload-free query frame for any query cmd id."
     },
     {
       "id": "build-quit-command",
-      "code": "tankpit_bot.protocol.commands:build_quit_command",
+      "code": "tankpit_bot.protocol.command_builders:build_quit_command",
       "law": "Length-prefixed graceful-quit frame."
     },
     {
       "id": "build-scope-command",
-      "code": "tankpit_bot.protocol.commands:build_scope_command",
+      "code": "tankpit_bot.protocol.command_builders:build_scope_command",
       "law": "Length-prefixed SCOPE frame carrying one of the nine direction bytes."
     },
     {
       "id": "build-shoot-command",
-      "code": "tankpit_bot.protocol.commands:build_shoot_command",
+      "code": "tankpit_bot.protocol.command_builders:build_shoot_command",
       "law": "Length-prefixed SHOOT frame carrying tile and target id (0 when the tile holds no tank)."
     },
     {
       "id": "build-teleport-command",
-      "code": "tankpit_bot.protocol.commands:build_teleport_command",
+      "code": "tankpit_bot.protocol.command_builders:build_teleport_command",
       "law": "Length-prefixed MAP_TELEPORT frame for a map-click destination."
     },
     {
       "id": "build-toggle-equipment-command",
-      "code": "tankpit_bot.protocol.commands:build_toggle_equipment_command",
+      "code": "tankpit_bot.protocol.command_builders:build_toggle_equipment_command",
       "law": "Length-prefixed frame toggling one equipment slot."
     },
     {
       "id": "decode-action-command",
-      "code": "tankpit_bot.protocol.commands:decode_action_command",
+      "code": "tankpit_bot.protocol.command_frames:decode_action_command",
       "law": "Rebuild an ActionCommand from a dict, validating every field."
     },
     {
       "id": "decode-query-command",
-      "code": "tankpit_bot.protocol.commands:decode_query_command",
+      "code": "tankpit_bot.protocol.command_frames:decode_query_command",
       "law": "Rebuild a QueryCommand from a dict, validating every field."
     },
     {
       "id": "deserialize-command",
-      "code": "tankpit_bot.protocol.commands:deserialize_command",
+      "code": "tankpit_bot.protocol.command_frames:deserialize_command",
       "law": "Parse wire bytes back into a command AFTER XOR decoding, dispatching on the type byte."
     },
     {
       "id": "encode-action-command",
-      "code": "tankpit_bot.protocol.commands:encode_action_command",
+      "code": "tankpit_bot.protocol.command_frames:encode_action_command",
       "law": "Project an ActionCommand to a JSON-serializable dict."
     },
     {
       "id": "encode-query-command",
-      "code": "tankpit_bot.protocol.commands:encode_query_command",
+      "code": "tankpit_bot.protocol.command_frames:encode_query_command",
       "law": "Project a QueryCommand to a JSON-serializable dict."
     },
     {
       "id": "make-action-command",
-      "code": "tankpit_bot.protocol.commands:make_action_command",
+      "code": "tankpit_bot.protocol.command_frames:make_action_command",
       "law": "Construct an ActionCommand from a cmd id and its payload bytes."
     },
     {
       "id": "make-query-command",
-      "code": "tankpit_bot.protocol.commands:make_query_command",
+      "code": "tankpit_bot.protocol.command_frames:make_query_command",
       "law": "Construct a payload-free QueryCommand from a cmd id."
     },
     {
       "id": "serialize-action-command",
-      "code": "tankpit_bot.protocol.commands:serialize_action_command",
+      "code": "tankpit_bot.protocol.command_frames:serialize_action_command",
       "law": "Render an ActionCommand to wire bytes BEFORE XOR encoding."
     },
     {
       "id": "serialize-query-command",
-      "code": "tankpit_bot.protocol.commands:serialize_query_command",
+      "code": "tankpit_bot.protocol.command_frames:serialize_query_command",
       "law": "Render a QueryCommand to wire bytes BEFORE XOR encoding."
     }
   ]

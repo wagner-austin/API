@@ -31,7 +31,8 @@ from tankpit_bot.capture.xor import (
     build_session_xor_table,
     xor_decode_body,
 )
-from tankpit_bot.protocol.commands import CMD_SHOOT, deserialize_command
+from tankpit_bot.protocol.command_frames import deserialize_command
+from tankpit_bot.protocol.commands import CMD_SHOOT
 from tankpit_bot.protocol.framing import FramingError
 from tankpit_bot.types import CaptureSession
 

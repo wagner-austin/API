@@ -94,7 +94,8 @@ class ProbeBase(SessionBase):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_MAP_OPEN
 
         return self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open")
 
@@ -110,7 +111,7 @@ class ProbeBase(SessionBase):
         Returns:
             True if the command was sent.
         """
-        from tankpit_bot.protocol.commands import build_quit_command
+        from tankpit_bot.protocol.command_builders import build_quit_command
 
         return self._send_bytes(build_quit_command(), "quit_game")
 
@@ -152,7 +153,8 @@ class ProbeBase(SessionBase):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_RADAR
 
         return self._send_bytes(build_query_command(CMD_RADAR), "radar")
 
@@ -162,7 +164,8 @@ class ProbeBase(SessionBase):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
@@ -176,7 +179,8 @@ class ProbeBase(SessionBase):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import CMD_INVENTORY, build_query_command
+        from tankpit_bot.protocol.command_builders import build_query_command
+        from tankpit_bot.protocol.commands import CMD_INVENTORY
 
         return self._send_bytes(build_query_command(CMD_INVENTORY), "inventory")
 
@@ -191,7 +195,7 @@ class ProbeBase(SessionBase):
         Returns:
             True if command was sent.
         """
-        from tankpit_bot.protocol.commands import build_shoot_command
+        from tankpit_bot.protocol.command_builders import build_shoot_command
 
         return self._send_bytes(
             build_shoot_command(x, y, target_id),

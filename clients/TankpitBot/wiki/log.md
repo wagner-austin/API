@@ -5906,3 +5906,38 @@ The fix was not to squeeze: the prose duplicated [[client-commands]], which the 
 ### Standing question, unanswered
 
 The sim still refuses unmodelled commands loudly, which is right for a test harness and wrong for a hosted server -- an unknown byte from a real client is a denial of service. What the real server does with garbage is NOT measured, and I am not going to guess: silently swallowing unknown input is the "best-effort" the standards ban, and inventing a refusal would be inventing a law. It needs a measurement (send the real server a nonsense command and watch) before it can have an implementation.
+
+---
+## [2026-09-03] lift | commands.py split by role, and a dead alias that led to seven live ones
+
+### The split
+
+`protocol/commands.py` was 598 lines and one addition from the ceiling. Split by the three roles it already had banner comments for, with no re-export shim in the old module — every one of the 31 affected import sites was moved properly:
+
+| module | lines | role |
+|---|---:|---|
+| `commands.py` | 173 | the VOCABULARY — prefix, tick rate, `CMD_*`, `SCOPE_*`, `PLAIN_*`, `TYPE_*`. Pure data, imports nothing |
+| `command_frames.py` | 252 | the typed model — `QueryCommand`/`ActionCommand`, codecs, factories, serialization |
+| `command_builders.py` | 226 | the `build_*` wire builders, the half with behaviour |
+
+The vocabulary keeps the old module name deliberately: it is what nearly every importer actually wants, and the wiki claim addresses in [[client-commands]] bind to it. The 21 claims on the symbols that MOVED had their `code` addresses rewritten, and both new modules were registered in `CLAIM_TARGETS` — they are siblings of `commands`, not submodules, so `_binds_into`'s prefix match does not reach them.
+
+Two mechanical lessons from doing it. The import rewrite flattened three FUNCTION-LOCAL imports to column zero (a regex that replaces a matched statement drops the indentation that sat outside the match); ruff caught all three as syntax errors immediately. And the claim checker caught the one symbol I deleted before I had removed its claim — the enforcement works in both directions, which is the point of it.
+
+### The dead alias, and where it led
+
+`CommandType = Literal["query", "action"]` was defined, exported, claimed, and **referenced by nothing**. Deleted.
+
+That prompted an audit of every named Literal in `src/`, and the audit was WRONG on its first run: it counted a symbol's own definition and its `__all__` entry as uses, then called anything at one reference dead — which put `SweepReason`, annotated at `quad_sweep.py:289`, on a list of things to delete. Corrected to exclude both, the count went from 9 to 7.
+
+**`X = Literal[...]` is not the banned pattern.** [[coding-standards]] bans the `TypeAlias` ANNOTATION and prescribes named Literals as the alternative. 48 of them exist and 41 are load-bearing.
+
+The seven that were not are all in `ledger/outcomes.py`: the per-kind outcome unions, dead because `ActionOutcome` re-listed every one of their members by hand. Deleting them was the obvious move and the wrong one — they carry which outcome belongs to which action kind, information the flat list destroys. Checked first: the flat union and the union of the seven are **exactly equal, 17 members, no difference in either direction**. So `ActionOutcome` is now COMPOSED from them. The duplication is gone, the seven are load-bearing, adding an outcome to a kind widens the total automatically, and a label belonging to no kind can no longer be added at all.
+
+### Audit results, stated plainly
+
+Zero `TypeAlias`, zero `TYPE_CHECKING`, zero `.pyi`, zero `noqa`, zero `except ImportError`, zero `except AttributeError` under `src/`. Guard clean including `shim-ban` and `restricted-symbols`.
+
+NOT audited and deliberately so: thin wrappers. [[coding-standards]] records that the 60 pure pass-throughs in this repo are Protocol implementations and domain naming, that telling those from a pointless alias needs intent rather than syntax, and that they must not be "fixed". That ruling stands.
+
+Gate: make check green — 6,900 tests, 100.00% statements AND branches.

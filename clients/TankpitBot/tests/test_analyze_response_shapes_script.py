@@ -29,7 +29,7 @@ from tankpit_bot.analysis.response_shapes import (
     analyze_response_shapes,
     format_response_shape_diff,
 )
-from tankpit_bot.protocol.commands import build_teleport_command
+from tankpit_bot.protocol.command_builders import build_teleport_command
 from tests.analysis._capture_fixtures import (
     OWN_TANK,
     _command,

@@ -259,7 +259,7 @@ def test_blocks_refuse_teleport_landings_and_mine_placement() -> None:
 
 def test_seam_command_service_carries_the_block_press() -> None:
     """The real command bytes decode into the sim's block kind."""
-    from tankpit_bot.protocol.commands import build_block_command
+    from tankpit_bot.protocol.command_builders import build_block_command
 
     bot, _server, link, _table = boot_seam(blocks=((101, 100),))
     assert bot._send_bytes(build_block_command(101, 100), "block") is True

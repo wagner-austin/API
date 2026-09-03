@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from tankpit_bot.protocol.command_builders import build_scope_command
 from tankpit_bot.protocol.commands import (
     CMD_SCOPE,
     SCOPE_CENTER,
@@ -20,7 +21,6 @@ from tankpit_bot.protocol.commands import (
     SCOPE_NORTHEAST,
     SCOPE_SOUTHEAST,
     SCOPE_WEST,
-    build_scope_command,
 )
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sim.server import SimServer

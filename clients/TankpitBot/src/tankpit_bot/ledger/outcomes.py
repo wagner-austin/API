@@ -117,34 +117,27 @@ from fire-and-forget 2026-08-20: an untracked pan let the next tick's
 radar or map_open dispatch into the scope-pending window the server
 silently drops commands in — half of all scan stalls ever recorded."""
 
-ActionOutcome = Literal[
-    # scan
-    "radar_complete",
-    # move / collect shared
-    "position_reached",
-    "movement_rejected",
-    # teleport
-    "landed_exact",
-    "landed_inexact",
-    # collect
-    "container_consumed",
-    "pickup_empty",
-    "clamped_transfer",
-    "inventory_full",
-    # map_open
-    "map_data_processed",
-    # shoot
-    "hit",
-    "miss",
-    "fired",
-    # scope
-    "confirmed",
-    # shared
-    "command_rejected",
-    "stall_timeout",
-    "superseded",
-]
-"""Union of all seven per-kind outcome vocabularies."""
+ActionOutcome = (
+    ScanOutcome
+    | MoveOutcome
+    | TeleportOutcome
+    | CollectOutcome
+    | MapOpenOutcome
+    | ShootOutcome
+    | ScopeOutcome
+)
+"""Union of all seven per-kind outcome vocabularies.
+
+COMPOSED from them since 2026-09-03, not re-listed. It used to be a
+hand-written flat Literal that repeated every member, which made the
+seven per-kind unions dead exports — documented, published in
+``__all__``, and annotated nowhere — while this list quietly became
+the only thing anyone read. The two agreed exactly (17 members, no
+difference either way) at the moment they were joined, so composing
+changed no type and removed the copy that could have drifted.
+
+Adding an outcome to a kind now widens this automatically, and a
+label that belongs to no kind cannot be added here at all."""
 
 LIVENESS_STALL_STREAK = 12
 """Consecutive zero-dispatch replans of one kind that mean a livelock.

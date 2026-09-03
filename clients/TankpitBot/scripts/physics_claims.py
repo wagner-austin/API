@@ -29,6 +29,13 @@ PHYSICS_PACKAGE = "tankpit_bot.physics"
 
 COMMANDS_MODULE = "tankpit_bot.protocol.commands"
 
+#: The two halves that left ``commands.py`` when it was split by role
+#: 2026-09-03. They are separate targets rather than one prefix because
+#: ``_binds_into`` matches a module or its SUBmodules, and these are
+#: siblings of ``commands``, not children of it.
+COMMAND_FRAMES_MODULE = "tankpit_bot.protocol.command_frames"
+COMMAND_BUILDERS_MODULE = "tankpit_bot.protocol.command_builders"
+
 PROTOCOL_CONSTANTS_MODULE = "tankpit_bot.protocol.constants"
 
 #: Every target the wiki must bind, in onboarding order. A package
@@ -47,6 +54,8 @@ LINE_OF_SIGHT_MODULE = "tankpit_bot.state.line_of_sight"
 CLAIM_TARGETS: tuple[str, ...] = (
     PHYSICS_PACKAGE,
     COMMANDS_MODULE,
+    COMMAND_FRAMES_MODULE,
+    COMMAND_BUILDERS_MODULE,
     PROTOCOL_CONSTANTS_MODULE,
     LEDGER_PACKAGE,
     LINE_OF_SIGHT_MODULE,
