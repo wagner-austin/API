@@ -14,6 +14,14 @@ import time
 from collections.abc import Callable
 from typing import Protocol
 
+import psutil
+from platform_core.environment_record import (
+    HostProbe,
+    VersionReader,
+    installed_version,
+    stdlib_host_probe,
+)
+
 
 def _real_get_current_time_ms() -> int:
     """Real implementation -- wall-clock milliseconds since the Unix epoch.
@@ -128,13 +136,147 @@ install_signal_handlers: InstallSignalHandlersProtocol = _real_install_signal_ha
 force_exit: Callable[[int], None] = os._exit
 
 
+class KillableProcessProtocol(Protocol):
+    """The slice of ``psutil.Process`` the browser-engine kill reads.
+
+    Matches the real API signatures: ``pid`` is an attribute,
+    ``name()`` reports the executable name, ``kill()`` terminates
+    unconditionally. Both callables raise ``psutil.NoSuchProcess``
+    when the process exited between enumeration and the call — the
+    OS boundary the kill loop must accept (same law as
+    ``service/_test_hooks/processes.py``).
+    """
+
+    @property
+    def pid(self) -> int:
+        """Process id."""
+        ...
+
+    def name(self) -> str:
+        """Return the process's executable name.
+
+        Raises:
+            psutil.NoSuchProcess: The process exited already.
+        """
+        ...
+
+    def kill(self) -> None:
+        """Terminate the process unconditionally.
+
+        Raises:
+            psutil.NoSuchProcess: The process exited already.
+        """
+        ...
+
+
+_BROWSER_ENGINE_NAMES = frozenset(
+    {
+        "chrome.exe",
+        "chromium.exe",
+        "headless_shell.exe",
+        "chrome",
+        "chromium",
+        "headless_shell",
+    }
+)
+"""Executable names Playwright's bundled Chromium runs under. The
+node driver (``node.exe``) is deliberately absent: the teardown
+remedy must SPARE the driver so it can observe the engine's death
+and resolve the pending ``browser.close()`` on the main thread."""
+
+
+def _kill_browser_engines(candidates: list[KillableProcessProtocol]) -> list[int]:
+    """Kill every browser-engine process among the candidates.
+
+    Args:
+        candidates: Processes to consider — in production, this
+            process's full descendant tree.
+
+    Returns:
+        PIDs actually killed. A candidate that exited between
+        enumeration and the name read or the kill is skipped — either
+        fate (killed by us, exited on its own) removes the process,
+        which is all the caller needs.
+    """
+    killed: list[int] = []
+    for candidate in candidates:
+        try:
+            name = candidate.name().lower()
+        except psutil.NoSuchProcess:
+            continue
+        if name not in _BROWSER_ENGINE_NAMES:
+            continue
+        try:
+            candidate.kill()
+        except psutil.NoSuchProcess:
+            continue
+        killed.append(candidate.pid)
+    return killed
+
+
+def _real_kill_browser_processes() -> list[int]:
+    """Real implementation — kill Chromium descendants of this process.
+
+    The second rung of the teardown ladder (``browser/lifecycle.py``):
+    when ``browser.close()`` stalls past its grace window, the engine
+    is removed directly and the spared driver resolves the close.
+
+    Returns:
+        PIDs actually killed.
+    """
+    return _kill_browser_engines(list(psutil.Process().children(recursive=True)))
+
+
+#: Browser-engine kill seam. Production arms it inside the teardown
+#: watchdog ladder; tests inject a recording fake (the conftest
+#: default raises, so an unexpected remedy firing fails the test).
+kill_browser_processes: Callable[[], list[int]] = _real_kill_browser_processes
+
+
+def _real_get_host_probe() -> HostProbe:
+    """Real implementation -- the stdlib probe over this machine.
+
+    ``os.cpu_count`` is passed rather than read inside the probe because a
+    machine that does not report a count must be refusable, and the arm that
+    refuses it has to be reachable without owning such a machine.
+
+    Returns:
+        The probe, reading this process's real platform, architecture and
+        logical processor count.
+    """
+    return stdlib_host_probe(os.cpu_count)
+
+
+#: Hookable host probe, for the machine axis of a run fingerprint
+#: (:mod:`tankpit_bot.diagnostics.feature_provenance`). Tests replace this
+#: attribute by save-and-restore with
+#: :class:`platform_core.testing.FakeHostProbe` so a record can be asserted
+#: without depending on the machine the suite happens to run on.
+get_host_probe: Callable[[], HostProbe] = _real_get_host_probe
+
+
+#: Hookable distribution-version reader, for the package axis of a run
+#: fingerprint. Bound to the real reader, which RAISES on a missing
+#: distribution rather than softening it to a placeholder: a fingerprint that
+#: recorded "unknown" would compare equal between two genuinely different
+#: environments, which is the one failure a comparability axis must not have.
+read_distribution_version: VersionReader = installed_version
+
+
 __all__ = [
     "InstallSignalHandlersProtocol",
+    "KillableProcessProtocol",
     "StartWatchdogProtocol",
+    "_kill_browser_engines",
     "_real_get_current_time_ms",
+    "_real_get_host_probe",
+    "_real_kill_browser_processes",
     "force_exit",
     "get_argv",
     "get_current_time_ms",
+    "get_host_probe",
     "install_signal_handlers",
+    "kill_browser_processes",
+    "read_distribution_version",
     "start_watchdog",
 ]

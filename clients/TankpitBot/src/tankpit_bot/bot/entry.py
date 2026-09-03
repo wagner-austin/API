@@ -116,6 +116,13 @@ def main() -> None:
         session_kills=session_kills,
         stop_file_path=stop_file_path,
     )
+    # The session is complete and its artifacts are on disk; bound the
+    # remaining shutdown tail (Playwright stop + interpreter exit) so a
+    # wedged environment can never hold a finished run hostage. CLI
+    # only — the service outlives its sessions by design.
+    from tankpit_bot.browser.lifecycle import arm_session_exit_deadline
+
+    arm_session_exit_deadline()
 
 
 __all__ = [

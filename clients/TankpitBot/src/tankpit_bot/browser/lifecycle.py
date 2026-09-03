@@ -25,7 +25,25 @@ from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
 
-_TEARDOWN_WATCHDOG_SECONDS = 30.0
+_TEARDOWN_REMEDY_SECONDS = 15.0
+"""Grace before the ladder's second rung kills the browser engine.
+
+The close is normally sub-second, but this host's filesystem
+minifilter has been measured inspecting browser teardown for tens of
+seconds (``tests/browser/test_lifecycle.py`` fixture note), so a
+short fuse would kill closes that were merely slow. Fifteen seconds
+is past every observed CLEAN close and well before the terminal
+watchdog, leaving the driver a full window to notice the engine's
+death and resolve the pending ``browser.close()``."""
+
+_TEARDOWN_WATCHDOG_SECONDS = 60.0
+"""Terminal deadline on the whole teardown. Was 30 s, which sat
+INSIDE the measured tens-of-seconds slow-teardown band and forced
+exit 75 on sessions that had completed cleanly (12 of 266 archived
+runs; operator flag 2026-09-03: ``make run`` exited before its
+scorecard). Sixty seconds clears that band and still bounds a true
+wedge; the exit code is the session's outcome, not a blanket 75."""
+
 _TEARDOWN_HANG_EXIT_CODE = 75
 
 
@@ -54,14 +72,116 @@ def _thread_stacks_snapshot() -> str:
     return "\n".join(sections)
 
 
-def _handle_teardown_hang() -> None:
-    """Force the process to exit after a hung browser teardown."""
+def _session_outcome_exit_code() -> int:
+    """The exit code a forced teardown exit must carry.
+
+    The teardown inherits the SESSION's fate, not its own: a hung
+    ``browser.close()`` after a completed session (quit sent,
+    artifacts saved) is an environment cleanup problem, loudly
+    logged, and must not turn the run's exit code into a failure —
+    that is exactly what made ``make run`` abort before its
+    scorecard (operator flag 2026-09-03). ``cleanup_browser`` runs in
+    its callers' ``finally`` blocks, so an exception in flight here
+    IS the session crashing, and the forced exit keeps a failure
+    code for it.
+
+    Returns:
+        ``0`` when no exception is propagating (session completed or
+        was caught upstream), :data:`_TEARDOWN_HANG_EXIT_CODE`
+        otherwise.
+    """
+    if sys.exc_info()[0] is None:
+        return 0
+    return _TEARDOWN_HANG_EXIT_CODE
+
+
+def _remedy_close_hang(closed: threading.Event) -> None:
+    """Second rung: kill the browser engine under a stalled close.
+
+    Fires :data:`_TEARDOWN_REMEDY_SECONDS` after the close began. The
+    engine processes are killed directly while the Playwright node
+    driver is SPARED — the driver is the peer that must observe the
+    engine's death to resolve the pending ``browser.close()`` on the
+    main thread, which is what un-wedges the teardown without a
+    forced exit.
+
+    Args:
+        closed: Set by ``cleanup_browser`` the moment the close
+            returns; a set event means there is nothing to remedy.
+    """
+    if closed.is_set():
+        return
     log.error(
-        "Teardown exceeded %.0fs; forcing process exit (artifacts were saved before cleanup)",
+        "Teardown: browser close still pending after %.0fs; killing the browser "
+        "engine (driver spared so it can resolve the close)",
+        _TEARDOWN_REMEDY_SECONDS,
+    )
+    killed = _test_hooks.kill_browser_processes()
+    log.error("Teardown: killed browser engine pids %s", killed)
+
+
+def _handle_teardown_hang(closed: threading.Event, hang_exit_code: int) -> None:
+    """Terminal rung: force the process to exit after a hung teardown.
+
+    Args:
+        closed: Set when ``browser.close()`` returned; distinguishes
+            a close that never came back from a process that closed
+            fine but then wedged in Playwright/interpreter shutdown
+            (both shapes exist in the run corpus — bot-20260729-010551
+            is the post-close shape).
+        hang_exit_code: The session-outcome code computed when the
+            teardown began (see :func:`_session_outcome_exit_code`).
+    """
+    if closed.is_set():
+        # The close completed. On the CLI this thread only exists
+        # because process exit is wedged; in the long-running service
+        # the process is HEALTHY and must not be shot — before this
+        # guard, the uncancelled watchdog force-exited a serving
+        # process 30 s after every clean session teardown
+        # (bot-20260729-010551: "browser closed" at :35, forced exit
+        # at :29:04). The CLI's post-session deadline lives in
+        # ``bot/entry.py``, armed only after ``bot.run`` returns.
+        return
+    log.error(
+        "Teardown exceeded %.0fs; forcing process exit %d (artifacts were saved before cleanup)",
         _TEARDOWN_WATCHDOG_SECONDS,
+        hang_exit_code,
     )
     log.error("Thread stacks at the moment of the hang:\n%s", _thread_stacks_snapshot())
-    _test_hooks.force_exit(_TEARDOWN_HANG_EXIT_CODE)
+    _test_hooks.force_exit(hang_exit_code)
+
+
+_SESSION_EXIT_DEADLINE_SECONDS = 30.0
+"""CLI tail bound: seconds a finished ``tankpit-bot`` process gets
+between ``bot.run`` returning and actual process exit. The tail is
+Playwright's context-manager stop plus interpreter shutdown — the
+post-close wedge shape (run bot-20260729-010551 wedged there and was
+only saved by an unrelated timer). Thirty seconds is far past any
+clean shutdown; the forced exit carries 0 because the session is
+already complete and its artifacts saved."""
+
+
+def _handle_session_exit_wedge() -> None:
+    """Force a finished CLI process out of a wedged shutdown tail."""
+    log.error(
+        "Process still alive %.0fs after the session ended; forcing exit 0 "
+        "(post-session wedge in Playwright/interpreter shutdown; artifacts already saved)",
+        _SESSION_EXIT_DEADLINE_SECONDS,
+    )
+    log.error("Thread stacks at the moment of the hang:\n%s", _thread_stacks_snapshot())
+    _test_hooks.force_exit(0)
+
+
+def arm_session_exit_deadline() -> None:
+    """Bound the tail between a completed session and process exit.
+
+    CLI-only (``bot/entry.py``, armed AFTER ``bot.run`` returns): the
+    daemon timer dies unnoticed with a normal exit and fires only when
+    shutdown wedges. The long-running service must NEVER arm this —
+    its process is healthy after a session ends and outliving the
+    session is its job.
+    """
+    _test_hooks.start_watchdog(_SESSION_EXIT_DEADLINE_SECONDS, _handle_session_exit_wedge)
 
 
 def navigate_and_login(
@@ -139,17 +259,44 @@ def wait_for_game_ready(
 
 
 def cleanup_browser(browser: BrowserProtocol) -> None:
-    """Close the browser with a teardown watchdog.
+    """Close the browser under the teardown escalation ladder.
+
+    Rung 1 is the normal ``browser.close()``. Rung 2
+    (:func:`_remedy_close_hang`, at :data:`_TEARDOWN_REMEDY_SECONDS`)
+    kills the browser engine directly so the spared driver can
+    resolve the close. Rung 3 (:func:`_handle_teardown_hang`, at
+    :data:`_TEARDOWN_WATCHDOG_SECONDS`) force-exits with the
+    session's outcome code. A close that returns disarms both timers
+    via the shared event — they still fire, and do nothing.
 
     Args:
         browser: Browser instance to close.
     """
-    _test_hooks.start_watchdog(_TEARDOWN_WATCHDOG_SECONDS, _handle_teardown_hang)
+    closed = threading.Event()
+    hang_exit_code = _session_outcome_exit_code()
+
+    def remedy() -> None:
+        _remedy_close_hang(closed)
+
+    def terminal() -> None:
+        _handle_teardown_hang(closed, hang_exit_code)
+
+    from playwright._impl._errors import Error as PlaywrightError
+
+    _test_hooks.start_watchdog(_TEARDOWN_REMEDY_SECONDS, remedy)
+    _test_hooks.start_watchdog(_TEARDOWN_WATCHDOG_SECONDS, terminal)
     log.info("Teardown: closing browser")
     try:
         browser.close()
     except (OSError, RuntimeError) as exc:
         log.debug("Browser close failed (already closed): %s", exc)
+    except PlaywrightError as exc:
+        # The close resolving by exception is rung 2's designed
+        # outcome: the engine was killed under it and the driver
+        # reports the disconnect instead of a clean close. Either
+        # way the browser is gone, which is all teardown needs.
+        log.error("Teardown: browser close resolved by disconnect: %s", exc)
+    closed.set()
     log.info("Teardown: browser closed")
 
 
@@ -278,6 +425,7 @@ def _capture_static_key(page: PageProtocol) -> str | None:
 
 
 __all__ = [
+    "arm_session_exit_deadline",
     "cleanup_browser",
     "gather_intel",
     "navigate_and_login",

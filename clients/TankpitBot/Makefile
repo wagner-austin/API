@@ -369,13 +369,15 @@ dev: install
 	@Write-Host "  Live sessions can break under mid-surgery edits; use 'make up' to operate." -ForegroundColor DarkGray
 	poetry run tankpit-fleet
 
+# One recipe line on purpose: the scorecard must run whatever the
+# session's exit code was -- a failed or force-exited run is EXACTLY
+# when the issue report matters -- and the target still exits with
+# the bot's code so failures stay visible (operator flag 2026-09-03:
+# a teardown wedge exited before the scorecard ever printed).
 run: install
 	@Write-Host ""
 	@Write-Host "==> run (timed session; TANKPIT_BOT_SESSION_SECONDS / _KILLS honored, default 300s)" -ForegroundColor Cyan
-	if (-not $$env:TANKPIT_BOT_SESSION_SECONDS) { $$env:TANKPIT_BOT_SESSION_SECONDS = '300' }; poetry run tankpit-bot
-	@Write-Host ""
-	@Write-Host "==> scorecard" -ForegroundColor Cyan
-	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
+	if (-not $$env:TANKPIT_BOT_SESSION_SECONDS) { $$env:TANKPIT_BOT_SESSION_SECONDS = '300' }; poetry run tankpit-bot; $$bot = $$LASTEXITCODE; Write-Host ""; Write-Host "==> scorecard" -ForegroundColor Cyan; poetry run tankpit-issue-report runs/bot/latest.events.jsonl; if ($$bot -ne 0) { exit $$bot }; exit $$LASTEXITCODE
 
 digest:
 	@Write-Host ""

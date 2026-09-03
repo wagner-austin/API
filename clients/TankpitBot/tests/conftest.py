@@ -110,6 +110,20 @@ def _unexpected_force_exit(exit_code: int) -> None:
     raise AssertionError(f"force_exit({exit_code}) called without a test-installed fake")
 
 
+def _unexpected_kill_browser_processes() -> list[int]:
+    """Fail loudly if the teardown remedy fires during a test.
+
+    The real implementation kills every browser-engine descendant of
+    the test process — which would include a live module-scoped
+    Playwright browser shared by sibling tests. A test that exercises
+    the remedy rung must install its own recording fake.
+
+    Raises:
+        AssertionError: Always.
+    """
+    raise AssertionError("kill_browser_processes called without a test-installed fake")
+
+
 def _noop_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
     """Inert signal-handler installer for tests.
 
@@ -152,6 +166,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     # behavior install recording fakes explicitly.
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
+    _test_hooks.kill_browser_processes = _unexpected_kill_browser_processes
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     # The analysis layer owns its own seams (filesystem reads and
     # archive enumeration). Restoring them here rather than in a
@@ -169,6 +184,7 @@ def _restore_hooks() -> Generator[None, None, None]:
 
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
+    _test_hooks.kill_browser_processes = _unexpected_kill_browser_processes
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     _test_hooks.get_env = _test_hooks._default_get_env
     _test_hooks.get_current_time_ms = _test_hooks._real_get_current_time_ms

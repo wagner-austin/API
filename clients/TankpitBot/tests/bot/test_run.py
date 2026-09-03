@@ -455,6 +455,53 @@ class TestBotBaseMain:
         if "runs\\bot\\latest.log" not in written_files:
             raise AssertionError("Expected bot runtime latest log artifact")
 
+    def test_main_arms_the_session_exit_deadline_after_a_completed_run(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """A completed ``main()`` bounds its own shutdown tail.
+
+        ``fake_sync_playwright_bot`` interrupts inside the game loop,
+        which ``Bot.run`` catches — so ``main()`` returns normally and
+        must arm the post-session exit deadline as its LAST watchdog
+        (after the teardown ladder's two rungs). The service path never
+        arms it, which is why the assertion pins the arm to the CLI.
+        """
+        from collections.abc import Callable
+
+        from tankpit_bot import _test_hooks
+        from tankpit_bot.bot import entry
+        from tankpit_bot.browser.lifecycle import (
+            _SESSION_EXIT_DEADLINE_SECONDS,
+            _handle_session_exit_wedge,
+        )
+        from tests.fakes import fake_sync_playwright_bot
+
+        armed: list[tuple[float, Callable[[], None]]] = []
+
+        def recording_watchdog(seconds: float, on_fire: Callable[[], None]) -> None:
+            armed.append((seconds, on_fire))
+
+        original_pw = _test_hooks.sync_playwright
+        original_argv = _test_hooks.get_argv
+        original_watchdog = _test_hooks.start_watchdog
+        _test_hooks.sync_playwright = fake_sync_playwright_bot
+        _test_hooks.get_argv = lambda: ["tankpit-bot"]
+        _test_hooks.start_watchdog = recording_watchdog
+        original_autoscroll, _autoscroll_calls = _stub_autoscroll_hook()
+
+        try:
+            entry.main()
+        finally:
+            _test_hooks.sync_playwright = original_pw
+            _test_hooks.get_argv = original_argv
+            _test_hooks.start_watchdog = original_watchdog
+            browser_hooks.ensure_autoscroll_off = original_autoscroll
+
+        assert armed[-1][0] == _SESSION_EXIT_DEADLINE_SECONDS
+        assert armed[-1][1] is _handle_session_exit_wedge
+
 
 class TestBotGameLoopStates:
     """Tests for Bot._game_loop AI-driven state handling."""
