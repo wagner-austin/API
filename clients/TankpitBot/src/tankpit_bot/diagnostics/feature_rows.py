@@ -38,69 +38,23 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
-from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.event_stream import load_event_records, run_analyzer_cli
+from tankpit_bot.diagnostics.feature_provenance import (
+    content_digest,
+    feature_fingerprint,
+    feature_run_record,
+    write_run_record,
+)
+from tankpit_bot.diagnostics.feature_row_types import (
+    COUNTED_KINDS,
+    NO_ACTION,
+    FeatureRowDict,
+)
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 log = get_logger(__name__)
-
-#: Emitted when a tick recorded no action outcome. An absent action is
-#: a fact about the tick, not a missing value to be imputed later.
-NO_ACTION = ""
-
-#: Diagnostic kinds counted per tick as features. Chosen because each
-#: names a distinct decision-path event rather than a state sample:
-#: what the planner declined, dispatched, or failed at on that tick.
-COUNTED_KINDS: tuple[str, ...] = (
-    "hop_declined",
-    "radar_dispatch",
-    "container_pickup_dispatched",
-    "plan_released",
-    "command_error",
-    "fleet_knowledge_merged",
-)
-
-
-class FeatureRowDict(TypedDict):
-    """One tick of one run, flattened for tabular modelling.
-
-    Attributes:
-        tick_n: The tick this row describes; the join key every
-            diagnostic but ``session_room_joined`` carries.
-        bot_state: HFSM state and mode at the tick, e.g.
-            ``"COLLECT/SENSE"``, as recorded on the tick's events.
-        action_kind: The action the tick dispatched, or
-            :data:`NO_ACTION` when the tick recorded no outcome.
-        outcome: How that action resolved (``"hit"``, ``"miss"``,
-            ``"radar_complete"``, ...), or :data:`NO_ACTION`.
-        duration_ms: How long the action took, or ``-1`` when the tick
-            recorded no outcome. Negative marks absence explicitly
-            rather than colliding with a real zero-length action.
-        attempt_id: Which attempt at this action the outcome belongs
-            to, or ``-1`` when absent; a rising value across ticks is
-            a retry.
-        hop_declined: Count of declined hop lanes on the tick.
-        radar_dispatch: Count of radar dispatches on the tick.
-        container_pickup_dispatched: Count of pickups dispatched.
-        plan_released: Count of plan releases.
-        command_error: Count of command errors.
-        fleet_knowledge_merged: Count of fleet knowledge merges.
-    """
-
-    tick_n: int
-    bot_state: str
-    action_kind: str
-    outcome: str
-    duration_ms: int
-    attempt_id: int
-    hop_declined: int
-    radar_dispatch: int
-    container_pickup_dispatched: int
-    plan_released: int
-    command_error: int
-    fleet_knowledge_merged: int
 
 
 def encode_feature_row(row: FeatureRowDict) -> JSONObject:
@@ -312,6 +266,24 @@ def render_feature_rows(rows: list[FeatureRowDict]) -> str:
     return "\n".join(lines)
 
 
+def feature_rows_body(rows: list[FeatureRowDict]) -> str:
+    """Render the table as the JSONL text that gets written.
+
+    Named rather than inlined into :func:`write_feature_rows` because the
+    run record's payload digest must be taken over the EXACT content
+    written, and a second place rebuilding the same join would be a
+    second spelling free to drift from this one.
+
+    Args:
+        rows: Rows to render.
+
+    Returns:
+        One JSON object per line, newline-terminated.
+    """
+    body = "\n".join(dump_json_str(encode_feature_row(row)) for row in rows)
+    return f"{body}\n"
+
+
 def write_feature_rows(source_path: Path, rows: list[FeatureRowDict]) -> Path:
     """Write the table beside its source as JSONL, one row per line.
 
@@ -327,13 +299,17 @@ def write_feature_rows(source_path: Path, rows: list[FeatureRowDict]) -> Path:
         The path written.
     """
     destination = source_path.with_suffix("").with_suffix(".features.jsonl")
-    body = "\n".join(dump_json_str(encode_feature_row(row)) for row in rows)
-    _test_hooks.write_text(destination, f"{body}\n")
+    _test_hooks.write_text(destination, feature_rows_body(rows))
     return destination
 
 
 def _build_and_write(source_path: Path) -> list[FeatureRowDict]:
-    """Build the table and persist it beside the source.
+    """Build the table, persist it, and record what produced it.
+
+    The run record is written HERE rather than behind a second command,
+    because a provenance step a caller can skip is one that stops being
+    run: the table would go back to being untraceable the first time
+    somebody exported in a hurry.
 
     Args:
         source_path: JSONL events artifact to read.
@@ -343,7 +319,20 @@ def _build_and_write(source_path: Path) -> list[FeatureRowDict]:
     """
     rows = build_feature_rows(source_path)
     destination = write_feature_rows(source_path, rows)
+    record = feature_run_record(
+        source_path,
+        rows,
+        feature_fingerprint(
+            _test_hooks.get_env,
+            _test_hooks.get_host_probe(),
+            source_path,
+            _test_hooks.read_distribution_version,
+        ),
+        content_digest(feature_rows_body(rows)),
+    )
+    sidecar = write_run_record(destination, record)
     log.info("Feature rows written: %s (%d ticks)", destination, len(rows))
+    log.info("Run record written: %s", sidecar)
     return rows
 
 

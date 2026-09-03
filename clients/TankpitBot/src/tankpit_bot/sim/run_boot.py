@@ -8,7 +8,6 @@ the two round-queueing helpers. The session loop that drives them is
 
 from __future__ import annotations
 
-import zlib
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -40,9 +39,9 @@ from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 from tankpit_bot.sim.world_seed import (
+    PracticeLayout,
     seed_field_population,
     seed_practice_client,
-    select_practice_layout,
 )
 from tankpit_bot.sim.world_seed_mines import (
     MINE_DENSITY,
@@ -155,24 +154,40 @@ def _boot(
     *,
     practice: bool = False,
     stamp: str = "",
+    layout: PracticeLayout,
+    population_seed: int,
     atlas_path: Path | None = None,
     ghost_spec: GhostSpecDict | None = None,
 ) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
     """Wire a real Bot to the sim over the CDP seam.
 
+    THE WORLD IS PASSED IN, NOT DERIVED HERE. ``layout`` and
+    ``population_seed`` used to be computed from ``stamp`` inside this
+    function, which made a run's NAME an input to what it played: an array
+    whose tasks stamp themselves varied the room and the container field
+    along with whatever the sweep meant to vary. Both are now the caller's
+    to state, so a sweep member names its world and the stamp goes back to
+    being a label ([[sim-world-parameterization]]).
+
     Args:
         world: The world the server will own. In practice mode this
-            arrives EMPTY of tanks and containers — the stamp-selected
-            real layout seeds the client spawn and the full 36-bot
-            roster, and ``seed_field_population`` lays down the static
-            container field ([[game-economy]] 2026-07-25: the world
-            never spawns at runtime).
+            arrives EMPTY of tanks and containers — ``layout`` seeds the
+            client spawn and the full 36-bot roster, and
+            ``seed_field_population`` lays down the static container field
+            ([[game-economy]] 2026-07-25: the world never spawns at
+            runtime).
         practice: When True, build the practice-room world before the
             handshake so the join roster dump includes the bots, and
             hand the server their ids for the corpse-window
             reactivation hook.
-        stamp: The run stamp (the layout selector for practice and
-            atlas spawns; unused otherwise).
+        stamp: The run stamp. A LABEL — it names artifacts and nothing
+            else. It no longer reaches the world.
+        layout: The practice layout to seed, for practice and
+            atlas-forage worlds. Required rather than defaulted: a
+            default here is what let the stamp-derived value hide.
+        population_seed: Determinism seed for the static container
+            field. Decides where every container lies, and nothing logs
+            it, so it is stated rather than derived.
         atlas_path: When set, the mined longitudinal atlas replaces
             the statistical container field ([[game-economy]]
             2026-08-01): in practice mode the roster still seeds, but
@@ -204,7 +219,6 @@ def _boot(
     driver: PracticeRoomDriver | None = None
     roster_ids: frozenset[int] = frozenset()
     if practice:
-        layout = select_practice_layout(stamp)
         log.info(
             "practice layout %s: client spawn %s, %d bots",
             layout["provenance"],
@@ -218,7 +232,7 @@ def _boot(
             tally = seed_atlas_population(world, terrain, atlas_path)
             log.info("atlas field %s: %s", atlas_path, tally)
         else:
-            seed_field_population(world, terrain, seed=zlib.crc32(stamp.encode("utf-8")))
+            seed_field_population(world, terrain, seed=population_seed)
     elif ghost_spec is not None:
         _seed_ghost_world(world, terrain, ghost_spec, atlas_path)
         # Reactive ghosts (2026-08-03): bot-named ghosts carry the
@@ -235,7 +249,6 @@ def _boot(
         if roster_ids:
             driver = PracticeRoomDriver(roster_ids)
     elif atlas_path is not None:
-        layout = select_practice_layout(stamp)
         seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
         # A pure-forage world has no targets, so a hunt-ready spawn
         # would exit ``no_viable_targets`` on tick 2 (first standalone

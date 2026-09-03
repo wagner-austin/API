@@ -162,6 +162,7 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
 def configure_probe_runtime_logging(
     probe_name: str,
     stamp: str | None = None,
+    runs_root: str | None = None,
 ) -> ProbeRunArtifactsDict:
     """Configure console logging plus canonical probe artifact outputs.
 
@@ -171,6 +172,9 @@ def configure_probe_runtime_logging(
             archive filenames so multiple probe kinds share
             ``runs/probe/``.
         stamp: Optional archive timestamp stamp for deterministic tests.
+        runs_root: Optional directory the artifacts land under, replacing
+            the fixed ``runs/`` root. A cluster array must set it per
+            task; see :func:`~tankpit_bot.runtime_artifacts.build_probe_run_artifacts`.
 
     Returns:
         Configured probe runtime artifacts.
@@ -180,7 +184,9 @@ def configure_probe_runtime_logging(
             :func:`tankpit_bot.runtime_artifacts.build_probe_run_artifacts`).
     """
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
-    artifacts = build_probe_run_artifacts(probe_name, resolved_stamp)
+    artifacts = build_probe_run_artifacts(
+        probe_name, resolved_stamp, None if runs_root is None else Path(runs_root)
+    )
     setup_rich_logging(level="INFO")
     reset_artifact_files(
         Path(artifacts["latest_log_path"]),

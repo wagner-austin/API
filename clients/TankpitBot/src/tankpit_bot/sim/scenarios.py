@@ -9,10 +9,8 @@ session runs (boot, loop, clock, CLI).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypedDict
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sim.atlas_seed import DEFAULT_ATLAS_PATH
 from tankpit_bot.sim.ghost import GhostSpecDict, compile_ghost_spec
 from tankpit_bot.sim.world import (
     SimContainerDict,
@@ -38,8 +36,6 @@ the real reader rejects is not a simulation of it
 SIM_CLIENT_ID = 9
 SIM_ENEMY_ID = 11
 SIM_FIELD = "field01_r.gif"
-_SIM_DIR = Path("runs") / "sim"
-_DEFAULT_ROUNDS = 150
 
 # The default arena is the most open ground on field01: a fully
 # passable 21x21 clearing centered on (216, 108) (verified against
@@ -429,138 +425,12 @@ def _resolve_session_mode(
     return world, opponent, practice, None, atlas_path, ferry_mode or larder_mode
 
 
-class _CliArgsDict(TypedDict):
-    """The sim CLI's parsed flags.
-
-    ``out`` is the archive directory the session's capture and world
-    land in; it defaults to the shared ``runs/sim`` archive and is
-    pointed elsewhere by ``scripts.build_sim_baseline``, which needs a
-    directory holding exactly one generation of the sim.
-    """
-
-    rounds: int
-    opponent: bool
-    practice: bool
-    ferry: bool
-    larder: bool
-    atlas: str | None
-    ghost: str | None
-    stamp: str | None
-    opponent_name: str
-    out: str
-
-
-def _apply_valued_flag(parsed: _CliArgsDict, token: str, value: str) -> bool:
-    """Apply one flag whose meaning is carried by the NEXT token.
-
-    Args:
-        parsed: The bundle being filled (mutated on a match).
-        token: The flag token.
-        value: The token following it.
-
-    Returns:
-        True when ``token`` is a valued flag and both tokens are
-        consumed; False when it is not one, leaving it for
-        :func:`_apply_bare_flag`.
-
-    Raises:
-        ValueError: If ``--rounds`` names a non-integer. A tick count
-            the caller mistyped is not something to guess at.
-    """
-    if token == "--rounds":
-        parsed["rounds"] = int(value)
-    elif token == "--ghost":
-        parsed["ghost"] = value
-    elif token == "--stamp":
-        parsed["stamp"] = value
-    elif token == "--human-opponent":
-        parsed["opponent_name"] = value
-    elif token == "--out":
-        parsed["out"] = value
-    else:
-        return False
-    return True
-
-
-def _apply_bare_flag(parsed: _CliArgsDict, token: str, rest: list[str]) -> int:
-    """Apply one flag that stands on its own.
-
-    ``--from-atlas`` is the reason this takes ``rest`` rather than a
-    single value: its path is OPTIONAL, so it reads the next token
-    only when that token is not itself a flag.
-
-    Args:
-        parsed: The bundle being filled (mutated on a match).
-        token: The flag token.
-        rest: The tokens after it.
-
-    Returns:
-        How many tokens were consumed — 2 for ``--from-atlas PATH``,
-        1 for everything else including tokens this does not
-        recognise, which are skipped.
-    """
-    if token == "--no-opponent":
-        parsed["opponent"] = False
-    elif token == "--practice":
-        parsed["practice"] = True
-    elif token == "--ferry":
-        parsed["ferry"] = True
-    elif token == "--larder":
-        parsed["larder"] = True
-    elif token == "--from-atlas":
-        if rest and not rest[0].startswith("--"):
-            parsed["atlas"] = rest[0]
-            return 2
-        parsed["atlas"] = str(DEFAULT_ATLAS_PATH)
-    return 1
-
-
-def _parse_cli(args: list[str]) -> _CliArgsDict:
-    """Parse the manual flag loop into one typed bundle.
-
-    The two flag SHAPES are parsed separately — a flag whose value is
-    the next token, and a flag that stands alone — because a single
-    chain covering both grew past the branch ceiling the moment a
-    seventh flag arrived, and the two shapes have genuinely different
-    consumption rules.
-
-    Args:
-        args: Raw CLI tokens.
-
-    Returns:
-        The parsed flags (unknown tokens are skipped).
-    """
-    parsed = _CliArgsDict(
-        rounds=_DEFAULT_ROUNDS,
-        opponent=True,
-        practice=False,
-        ferry=False,
-        larder=False,
-        atlas=None,
-        ghost=None,
-        stamp=None,
-        opponent_name="",
-        out=str(_SIM_DIR),
-    )
-    index = 0
-    while index < len(args):
-        token = args[index]
-        if index + 1 < len(args) and _apply_valued_flag(parsed, token, args[index + 1]):
-            index += 2
-            continue
-        index += _apply_bare_flag(parsed, token, args[index + 1 :])
-    return parsed
-
-
 __all__ = [
     "SIM_CLIENT_ID",
     "SIM_ENEMY_ID",
     "SIM_FIELD",
     "SIM_MAGIC",
-    "_DEFAULT_ROUNDS",
     "_FERRY_CLIENT_FUEL",
-    "_SIM_DIR",
-    "_parse_cli",
     "_require_seeds_passable",
     "_resolve_session_mode",
     "_select_scenario_world",

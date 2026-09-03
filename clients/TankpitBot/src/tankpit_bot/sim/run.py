@@ -34,6 +34,7 @@ from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
+from tankpit_bot.sim.cli_args import _parse_cli, require_named_world
 from tankpit_bot.sim.ghost import (
     GhostTracker,
 )
@@ -46,11 +47,15 @@ from tankpit_bot.sim.scenarios import (
     SIM_CLIENT_ID,
     SIM_ENEMY_ID,
     SIM_MAGIC,
-    _parse_cli,
     _resolve_session_mode,
 )
 from tankpit_bot.sim.session import build_capture_session, deliver_batch
 from tankpit_bot.sim.world import encode_sim_world
+from tankpit_bot.sim.world_seed import (
+    layout_by_provenance,
+    population_seed_for_stamp,
+    select_practice_layout,
+)
 from tankpit_bot.types import encode_capture_session
 
 log = get_logger(__name__)
@@ -89,6 +94,9 @@ def run_sim_session(
     ghost: str | None = None,
     stamp: str | None = None,
     opponent_name: str = "",
+    layout: str | None = None,
+    population_seed: int | None = None,
+    runs_root: str | None = None,
 ) -> SimRunResultDict:
     """Play one production-bot session against the sim and archive it.
 
@@ -126,6 +134,22 @@ def run_sim_session(
             reports how long the live run tracked the recorded
             client. Takes precedence over every other scenario flag.
         stamp: Optional archive stamp override for deterministic tests.
+            A LABEL only: it names artifacts and no longer decides what
+            the session plays.
+        layout: Provenance of the practice layout to play, one of
+            ``PRACTICE_LAYOUT_PROVENANCES``. None derives it from the
+            stamp, which is right for interactive variety and WRONG for
+            a sweep member -- see
+            :func:`~tankpit_bot.sim.world_seed.select_practice_layout`.
+        population_seed: Determinism seed for the static container
+            field. None derives it from the stamp, with the same caveat:
+            this seed decides where every container lies and nothing
+            logs it, so a stamp-varied larder moves a forage measurement
+            invisibly.
+        runs_root: Directory the probe log and event artifacts land
+            under, replacing the fixed ``runs/probe``. None keeps the
+            fixed path. A cluster array MUST set it per task, or N tasks
+            sharing a node overwrite each other's ``latest.*``.
         opponent_name: Optional wire name for the scripted opponent.
             A human-shaped name (e.g. ``guest``) runs the session
             under the human-consent gate and the fair-fight contracts
@@ -139,7 +163,24 @@ def run_sim_session(
         RuntimeError: If the static key or terrain is unavailable.
     """
     run_stamp = stamp if stamp is not None else make_run_stamp()
-    artifacts = configure_probe_runtime_logging("sim", run_stamp)
+    # The stamp -> world derivation lives HERE, in the open, rather than
+    # inside _boot where it used to hide. An explicit value wins; absent
+    # one the stamp still implies the world, which keeps interactive
+    # soaks varying and is exactly what a sweep member must override.
+    run_layout = (
+        layout_by_provenance(layout) if layout is not None else select_practice_layout(run_stamp)
+    )
+    run_population_seed = (
+        population_seed if population_seed is not None else population_seed_for_stamp(run_stamp)
+    )
+    log.info(
+        "sim world: layout %s (%s), population seed %d (%s)",
+        run_layout["provenance"],
+        "named" if layout is not None else "derived from stamp",
+        run_population_seed,
+        "named" if population_seed is not None else "derived from stamp",
+    )
+    artifacts = configure_probe_runtime_logging("sim", run_stamp, runs_root=runs_root)
     world, opponent, practice, ghost_spec, atlas_path, ferry_mode = _resolve_session_mode(
         opponent=opponent,
         practice=practice,
@@ -150,7 +191,13 @@ def run_sim_session(
         opponent_name=opponent_name,
     )
     bot, server, link, driver = _boot(
-        world, practice=practice, stamp=run_stamp, atlas_path=atlas_path, ghost_spec=ghost_spec
+        world,
+        practice=practice,
+        stamp=run_stamp,
+        layout=run_layout,
+        population_seed=run_population_seed,
+        atlas_path=atlas_path,
+        ghost_spec=ghost_spec,
     )
     exit_reason = "rounds_exhausted"
     exit_detail = ""
@@ -248,6 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         exit path is still a successful sim run).
     """
     parsed = _parse_cli(list(argv) if argv is not None else list(sys.argv[1:]))
+    require_named_world(parsed, _test_hooks.get_env)
     result = run_sim_session(
         parsed["rounds"],
         archive_dir=Path(parsed["out"]),
@@ -259,6 +307,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         ghost=parsed["ghost"],
         stamp=parsed["stamp"],
         opponent_name=parsed["opponent_name"],
+        layout=parsed["layout"],
+        population_seed=parsed["population_seed"],
+        runs_root=parsed["runs_root"],
     )
     rounds = parsed["rounds"]
     sys.stdout.write(

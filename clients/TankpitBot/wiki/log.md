@@ -5774,3 +5774,61 @@ The towing refusal keeps (1,1) and got FIRMER, not weaker: exactly three (1,1) c
 A second session is now working in `sim/` on world parameterization — `sim/cli_args.py`, `--layout`, `--population-seed`, and a `require_named_world` gate that refuses an unnamed world on a sweep member. That is the fix for the stamp-picks-the-world confound I retracted a measurement over earlier today, and it is theirs, not mine. I verified before committing that my four sim files carry only my changes and that `make_larder_sim_world` survived their `scenarios.py` restructure.
 
 Gate: guard clean (they split `bot/ai/context.py`, which was the file-size violation); ruff and mypy clean over 1,227 files; 415 sim + 600 sim/analysis/physics/scenarios tests green. The full suite is not mine to certify while two other sessions have work in flight.
+
+---
+
+## [2026-09-02] update | The unnamed-world gate: a forgotten flag now fails the run
+
+Follow-up to the parameterization entry above, on operator direction ("add the gate"). Omitting `--layout` / `--population-seed` was legal-but-confounding; it is now a refusal wherever the numbers will be compared.
+
+**Page updated:** [[sim-world-parameterization]] — the "what a sweep member must do" section now documents a refusal rather than a log line to read.
+
+**The design point:** the gate fires on TWO conditions and only one of them is a declaration. `--sweep` DECLARES the intent to compare; `SLURM_ARRAY_TASK_ID` BETRAYS it. The second is the arm that matters, because the failure being guarded is a *forgotten* flag and a gate you must remember to arm does not guard against forgetting. It keys off the same env var `hpc3.contracts.array` reads, so it triggers on the real cluster rather than on a spelling this package invented.
+
+A half-named world is refused too — naming the layout and forgetting the seed still moves the larder, and that is the half that prints nowhere. A set-but-empty array variable does NOT arm it: a shell exporting the name without a value is not an array task, and gating every local run is how a guard earns its way out of the tree.
+
+**Structural:** the CLI parsing moved from `sim/scenarios.py` (593 lines, against a hard 600 ceiling) into a new `sim/cli_args.py`. Split rather than squeeze — adding the gate inline would have left the file at 599 and the next person with nowhere to go. `scenarios.py` 593 -> 440, `cli_args.py` 257.
+
+**Verified:** guard 0 violations, ruff clean, mypy clean on 1,226 files, 424 tests pass across tests/sim + tests/test_runtime_artifacts, and **100% statement + branch coverage on all five changed sim modules** (cli_args, world_seed, run, run_boot, scenarios — 493 statements, 158 branches, 0 missed).
+
+---
+
+## [2026-09-02] update | `tankpit` registered as an hpc3 project (registered, not yet runnable)
+
+Operator-directed. Registration only; provisioning is the next phase and is not done.
+
+**Page updated:** [[sim-world-parameterization]] — its Status section said "still not a registered hpc3 project", which this makes false; corrected rather than left to rot.
+
+**Landed outside this repo:** `tools/hpc3/runs/hpc3-tankpit.json` (new), a `tankpit` section in `docs/RESEARCH.md` (the enforcement test fails without one), and the project-list pins in `tools/hpc3/tests/test_committed_runs.py` extended to six.
+
+**Free only, and it is not a choice.** `tools/hpc3/wiki/pages/partitions-and-billing.md`: "There is no `accept_billing`. A billing partition is refused outright with `PARTITION_BILLS`." `charge_account` is empty, which `contracts/budget.py` documents as "the default posture" for a workspace that does not spend. Both other CPU projects declare the same.
+
+**No image.** Four of the five existing projects run from a directory environment; `rusted` carries one only because it ships a game jar, a bundled JVM and an assets tree that must be byte-identical. This payload is pure Python out of the monorepo, which is already staged at `/pub/wagnera3/api`.
+
+**Two numbers measured rather than guessed, both 2026-09-02:**
+- Sizing: a 150-round practice session ran 144 s wall, 26 MiB peak Python allocation. Declared 2 CPUs / 2 GB / 60 minutes.
+- `deterministic: true`: two independent sessions with the same named layout and population seed produced a byte-identical `world.json` (`0bc360232d812984b403783c631e2f01…`, 60 rounds). That is what makes `checkpoint_steps: 0` honest under the `requeue AND (checkpoints OR deterministic)` clause. **Same-host only** — cross-node replication is NOT established and a sweep spanning node types must not assume it.
+
+**Verified:** `hpc3-preflight` now reaches `ENV_PATH_MISSING: /pub/wagnera3/envs/tankpit/bin does not exist` — the workspace resolves, the project is found, partition/budget/preemption/experiment all pass, and it stops at the one thing genuinely absent. That is the correct refusal, not a failure.
+
+**Not done:** the environment. Cluster system Python is 3.9 where this needs 3.11, there is no Poetry on the login node, and `/pub/wagnera3/api` sits at commit `80221ea`, behind this tree.
+
+**Pre-existing and NOT mine:** `test_committed_runs.py` has two failing sweep-artifact assertions (126 artifacts vs a pinned 119). Verified by removing my file and re-running — they fail identically without it. Left alone deliberately: they are someone else's drift, and re-pinning a count I do not understand would erase the signal.
+
+---
+
+## [2026-09-02] correction | The `tankpit` registration should ship an image; "no image" was wrong
+
+Operator challenge: "i thought the python version and the api lag was why we shipped images to run?" Checked against `tools/hpc3/wiki/pages/image-build-flow.md` and `contracts/image_spec.py`. **The operator is right and my registration rationale was wrong.**
+
+**What I got wrong:** I justified `image: null` with "four of five projects run from a directory environment, and this payload is pure Python". That is a popularity argument, and it ignored the closest analogue in the registry — `rusted` is ALSO CPU-only on `free` with `requeue` + `deterministic`, and it ships an image. CPU-only permits omitting an image; it does not recommend it.
+
+**What an image actually solves here, both of them named by the operator:**
+- The interpreter — cluster system Python is 3.9, this needs 3.11; an image bundles its own.
+- The code — `image_spec.py` bakes first-party packages as `wheels` and writes `git_commit` into the image, so the payload stops being read from the mutable `/pub/wagnera3/api` checkout (currently at `80221ea`, behind this tree). `image_digest` becomes a real fingerprint axis instead of `NO_VALUE`.
+
+The hazard is documented rather than theoretical: a directory env "can be edited in place while `pinned_packages` is edited to match — which is exactly what happened on 2026-08-28, in under an hour, with every check still passing."
+
+**Pages corrected:** [[sim-world-parameterization]] Status section, and the `tankpit` section of `docs/RESEARCH.md`. Both had asserted the wrong rationale; rewritten to state the image as the target and `image: null` as a stated gap rather than a decision.
+
+**A gap in the documented flow, found here:** the four-command image build assumes an environment already exists — `hpc3-image-capture` probes it over SSH at `env_path`. A NEW project has nothing to capture, so a bootstrap environment has to be created on the cluster first, and only then can the image that replaces it be built. `image-build-flow.md` does not cover that step; the note that "the first spec got made" by pip-freeze-and-paste suggests it was hit before and not written down.

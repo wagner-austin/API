@@ -208,8 +208,67 @@ _SEED_STRIDE = 97
 _PROBE_STRIDE = 251
 
 
+PRACTICE_LAYOUT_PROVENANCES: tuple[str, ...] = tuple(
+    layout["provenance"] for layout in PRACTICE_LAYOUTS
+)
+"""Every layout's provenance, in table order — the names a caller may ask for.
+
+Derived from the table rather than written beside it, so a layout added to
+:data:`PRACTICE_LAYOUTS` is selectable by name without a second edit that
+could be forgotten.
+"""
+
+
+class UnknownPracticeLayoutError(LookupError):
+    """Raised when a named layout is not in :data:`PRACTICE_LAYOUTS`."""
+
+
+def layout_by_provenance(provenance: str) -> PracticeLayout:
+    """Pick the layout a caller NAMED, rather than one derived from a stamp.
+
+    This is the selector a sweep member uses. :func:`select_practice_layout`
+    varies the world with the run's name, which is right for interactive
+    variety and wrong for a measurement — see its docstring.
+
+    Args:
+        provenance: The layout's ``provenance``, one of
+            :data:`PRACTICE_LAYOUT_PROVENANCES`.
+
+    Returns:
+        The named layout.
+
+    Raises:
+        UnknownPracticeLayoutError: When no layout carries that provenance.
+            Raised rather than falling back to a default, because a sweep
+            that silently played a different world than the one its member
+            document names would produce numbers nobody could interpret --
+            which is the failure this selector exists to remove.
+    """
+    for layout in PRACTICE_LAYOUTS:
+        if layout["provenance"] == provenance:
+            return layout
+    raise UnknownPracticeLayoutError(
+        f"no practice layout named {provenance!r}; known: {list(PRACTICE_LAYOUT_PROVENANCES)}"
+    )
+
+
 def select_practice_layout(stamp: str) -> PracticeLayout:
-    """Pick the run's layout deterministically from its stamp.
+    """Pick a layout deterministically from a run's stamp, for VARIETY.
+
+    **Never reach this from a sweep member.** The stamp is a run's NAME, and
+    this function makes it a world INPUT: naming a run changes what it
+    plays. That is wanted interactively -- successive local soaks see
+    different rooms for free -- and it is a confound in any measurement,
+    because an array whose tasks stamp themselves varies the map together
+    with whatever parameter the sweep meant to vary.
+
+    It cost a published result on 2026-09-01: a saturation table was
+    measured across session depths whose stamps moved with them, so the
+    layout moved too, and the conclusion had to be retracted.
+
+    A sweep member names its world with :func:`layout_by_provenance` and
+    passes its own population seed, leaving the stamp to be nothing but a
+    label.
 
     Args:
         stamp: The run stamp (any string).
@@ -218,6 +277,26 @@ def select_practice_layout(stamp: str) -> PracticeLayout:
         One of :data:`PRACTICE_LAYOUTS` — same stamp, same layout.
     """
     return PRACTICE_LAYOUTS[zlib.crc32(stamp.encode("utf-8")) % len(PRACTICE_LAYOUTS)]
+
+
+def population_seed_for_stamp(stamp: str) -> int:
+    """Derive the container-population seed a stamp implies, for VARIETY.
+
+    The same hazard as :func:`select_practice_layout` and the less visible
+    half of it: this seed decides where every container lies, and nothing
+    logs it, so a stamp-varied larder moves a forage or economy measurement
+    with no line in any artifact saying it did.
+
+    Named here rather than left inline at the call site so the derivation is
+    something a sweep can be seen NOT to use.
+
+    Args:
+        stamp: The run stamp (any string).
+
+    Returns:
+        The seed — same stamp, same population.
+    """
+    return zlib.crc32(stamp.encode("utf-8"))
 
 
 def _large_volume(index: int) -> int:
@@ -370,9 +449,13 @@ __all__ = [
     "HIDDEN_FUEL_COUNT",
     "LARGE_VOLUME_CYCLE",
     "PRACTICE_LAYOUTS",
+    "PRACTICE_LAYOUT_PROVENANCES",
     "SMALL_PERIOD",
     "SMALL_VOLUME_CYCLE",
     "PracticeLayout",
+    "UnknownPracticeLayoutError",
+    "layout_by_provenance",
+    "population_seed_for_stamp",
     "seed_field_population",
     "seed_practice_client",
     "select_practice_layout",
