@@ -114,7 +114,27 @@ untracked — it is state, not configuration).
   Now provisioned and verified: checkout, environment (`torch 2.5.1+cu124`,
   `numpy 2.4.6`), and the v3 corpora staged with cluster-side digest
   verification against `runs/turkic-v3-corpus-digests.txt`. All seven sweep
-  members preflight clean, 84 GPU-hours against a declared 84-hour cap.
+  members preflight clean.
+
+  **This paragraph read "84 GPU-hours against a declared 84-hour cap" until
+  2026-09-03, and no configuration ever said that.** `hpc3-turkic-lstm.json`
+  allocates `minutes` per member and declares
+  `budget.self_imposed_gpu_hours: 36.0`. Eighty-four is seven times twelve,
+  which is a number nobody measured — the same shape of mistake as reading
+  `slurm/train_base.sub` as a description of practice, recorded above.
+
+  What the local runs actually took, from `LSTM/train_v3.log` and
+  `train_v3_lane2.log` on 2026-08-15: seven languages in two lanes sharing
+  one consumer GPU, 00:29 to 05:25, so **under five hours wall-clock and
+  roughly ten GPU-hours in total**. Per-language figures from those logs are
+  upper bounds rather than measurements, because the two lanes advanced in
+  lockstep and each interval is bounded by the slower of the pair; the
+  largest such interval is 2h02m.
+
+  The per-member limit was raised from 90 to 150 minutes on 2026-09-03. Ninety
+  sat below the 2h02m upper bound already observed on a shared consumer card,
+  which is a limit set under the measurement rather than over it.
+
   `slurm/train_base.sub` is deleted rather than kept beside the new path.
 - **The sweep pins the card to an A100.** The hpc3 contract refuses a generic
   `--gres=gpu:1`, so the array job's "whatever is free" placement is gone.

@@ -134,6 +134,11 @@ services/covenant-radar-api/data/external/kaggle_prosper_loans/
 !tools/hpc3/runs/
 tools/hpc3/runs/*
 !tools/hpc3/runs/hpc3*.json
+# Corpus digest records are provenance, not run output: they are what a
+# cluster-side stage verifies against. Two were already tracked only
+# because someone force-added them, which is the shape the note above
+# warns about — the next one would have gone missing silently.
+!tools/hpc3/runs/*-digests.txt
 **/corpus/
 
 # But allow source code directories named "data"

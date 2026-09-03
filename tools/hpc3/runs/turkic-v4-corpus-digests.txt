@@ -1,0 +1,53 @@
+# Certified corpus digests: Turkic char-LSTM corpora v4 (rebuild_2026-09)
+#
+# v4 is v3 with one defect corrected and nothing else changed. Kazakh,
+# Kyrgyz and Uzbek-Cyrillic wrote the letter <shcha> as an alveolo-palatal,
+# U+0255 followed by the length mark. McCollum & Chen's Kazakh consonant
+# chart (JIPA 51(2), p. 277) has columns Bilabial, Dental, Post-alveolar,
+# Palatal, Velar and Uvular -- no alveolo-palatal column, so no cell that
+# segment could occupy -- and the prose under the chart enumerates what
+# Kazakh does borrow: "the Russian labiodental fricatives, [f] and [v], as
+# well as the voiceless glottal fricative, [h], from Arabic". U+0255 is not
+# among them. The rules now emit U+0283 plus the length mark, which is the
+# post-alveolar the chart prints.
+#
+# Why it matters beyond tidiness: U+0255 occurred in Kazakh and Kyrgyz and
+# in no other language of the set, so it was a character each model saw in
+# two languages and never in the other five. That is the same shape as the
+# Uyghur glottal-stop artifact recorded in symbol_map.csv, which that row
+# says "systematically inflated Uyghur distances". 987 occurrences in
+# Kazakh, 891 in Kyrgyz, 1,878 in ~30M characters.
+#
+# WHAT DID NOT CHANGE, and this is checkable below:
+#   * The budget is still 11,658,775 characters, still set by Uzbek. The
+#     substitution is two characters for two characters, so no file's
+#     length moves and no language's chars_written moves.
+#   * az, fi, tr, ug and uz are BYTE-IDENTICAL to v3. Their digests below
+#     are the same strings as in turkic-v3-corpus-digests.txt.
+#   * Every lines_in, lines_kept and chars_written in the manifest matches
+#     v3 exactly.
+#
+# WHAT DID CHANGE, besides the two digests:
+#   * Kazakh and Kyrgyz each lose one distinct character, 39 -> 38, because
+#     U+0255 merges into a U+0283 the corpus already contained. The paper's
+#     corpora table reports a Vocabulary column; those two cells move.
+#
+# How v4 was built: the substitution was applied to v3's raw transliterated
+# text rather than by re-downloading OSCAR, because a fresh download samples
+# different lines and would produce a different corpus rather than a
+# corrected one. That is exact, not an approximation: the only difference
+# between the old and new rule files is the <shcha> line, and applying the
+# new rules was checked against applying the old rules and then substituting
+# over 2,944 exhaustive probes per language -- every ordered pair over the
+# full Cyrillic alphabet plus shcha/vowel triples -- with zero mismatches.
+#
+# This record anchors v4 from here. It cannot retroactively verify what
+# trained any model already reported; those bytes were never hashed.
+#
+e3dbdaa758d2b3db97012ebde1c78ac1b07335edc659d76e7dd345a1ed0fb33e  oscar_az_ipa.txt
+dff6e3e4aed891c721d48a17858b3c3f6734f7ea352d249d887a0b46a0d5aaff  oscar_fi_ipa.txt
+d1fe98d2fc7e30e4f9984923fcfa2d56b11838af738359d37053fd053450a6ec  oscar_kk_ipa.txt
+ea4b907bb95f40783237a1c237ae23ae516c78300d4e382cb01a65d135791662  oscar_ky_ipa.txt
+19049664c3dd7cdeb875c1de0882fd6ff8a69baff9cd44fe82fffd3449da69ff  oscar_tr_ipa.txt
+63cd9a8dda95952c2adc74c54cd5bbeb6add18852ca5be1260c025b558fddc93  oscar_ug_ipa.txt
+35d3d502ffdefa5b18f2e7d19445c7b3b865931faade5dfa77746066ba041255  oscar_uz_ipa.txt
