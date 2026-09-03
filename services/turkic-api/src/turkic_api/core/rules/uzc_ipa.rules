@@ -153,7 +153,10 @@ $Vout { е > je ;
 # symbols Kyrgyz uses rather than the reduced ones Kazakh uses.
 # ---------------------------------------------------------------------------
 Ы > ɨ ;  ы > ɨ ;      # Russian
-Щ > ɕː ; щ > ɕː ;     # Russian
+# Russian loan letter, written with the postalveolar rather than the
+# alveolo-palatal this file used to emit. symbol_map.csv already records
+# that this project writes Uzbek's alveolo-palatal series as t͡ʃ/ʃ.
+Щ > ʃː ; щ > ʃː ;
 Ѳ > θ ;  ѳ > θ ;      # FITA, Greek theta loans
 І > ɪ ;  і > ɪ ;      # Kazakh; kk_ipa.rules (McCollum & Chen 2021)
 Ұ > ʊ ;  ұ > ʊ ;      # Kazakh; kk_ipa.rules

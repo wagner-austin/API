@@ -36,7 +36,7 @@ CONSONANTS = {
     "ц": "t͡s",  # always hard
     "ч": "t͡ʃʲ",  # always palatalized
     "ш": "ʃ",  # always hard
-    "щ": "ɕː",  # always palatalized, long; written as kk/ky/uzc write it
+    "щ": "ʃʲː",  # always palatalized, long
 }
 
 VOWELS = {

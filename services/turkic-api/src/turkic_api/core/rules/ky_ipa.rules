@@ -96,13 +96,19 @@ $Vout { у > w ;
 Ц > t͡s ; ц > t͡s ;
 Ч > t͡ʃ ;  ч > t͡ʃ ;
 Ш > ʃ ;  ш > ʃ ;
-Щ > ɕː ; щ > ɕː ;          # Russian loan phoneme  ◄ CHANGED
+# Russian loan phoneme. Written with the postalveolar McCollum 2020 lists
+# rather than the alveolo-palatal this file used to emit, which appears in
+# no inventory the rule files cite. See kk_ipa.rules for the Kazakh chart
+# that settles it.
+Щ > ʃː ; щ > ʃː ;
 Ъ > ʔ ;  ъ > ʔ ;
 Ы > ɯ ;  ы > ɯ ;
 Ь > ʲ ;  ь > ʲ ;
 Э > e ;  э > e ;
 Ю > ju ; ю > ju ;
-Я > ja ; я > ja ;
+# The vowel is the one plain <а> carries: writing ASCII a put a second
+# low-vowel glyph in the corpus for words like аял.
+Я > jɑ ; я > jɑ ;
 Ў > w ;  ў > w ;
 
 # ---------------------------------------------------------------------------

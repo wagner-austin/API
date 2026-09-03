@@ -72,16 +72,16 @@ SWEEP_DIGESTS: Final[dict[str, str]] = {
     "ar_lat.rules": "1fe7c974279e2dc128a07150124a995c14293407eef813b6494ac211c623c981",
     "az_ipa.rules": "bcd33aed22d6dfc5d8349298b9f8c90de5d7226af4be38c6621d5d62ead96776",
     "fi_ipa.rules": "e73378c2eb1b66f3b34ec877d4d581665af5d1e3691e64d34c8d0d02bc0c324a",
-    "kk_ipa.rules": "10a50804b0c00e49b5910ca46a573a26e89503aafdbbda6f60fb7645b02ecd0c",
+    "kk_ipa.rules": "7e5d90bee93c3628af8fdc86852b8468b293e0a8b62088e76f1b9544d84b19eb",
     "kk_lat.rules": "2cdfaf1c5e9b1b49c3ec79beccf86e2355f7b2e1e130baf2f8f0a50e6fcfe34f",
-    "ky_ipa.rules": "09e44f292298a09f340ed8c3bf9e56bd45cf9d40482537c1582b37e354f6ab40",
+    "ky_ipa.rules": "1ad2eec828d726897e15673c29b03f709fa036eaa5132939b35df1c697ec549f",
     "ky_lat.rules": "3828c33ade262585900eba926325bf6c77d4e820468ebbf0b768455a856a7bb3",
-    "ru_ipa.rules": "5481a034942cc44f5b99e6d7b6a895d42427387b6a13994b867fefd4d60844b1",
+    "ru_ipa.rules": "74b041a943a13fd61b5984e2593039b2c23d01725d74b369b24d07a745f414db",
     "tr_ipa.rules": "49304f19db2cd3572a026d5ba3a3a6a6616004de26865ad7efe931356e271522",
     "tr_lat.rules": "cde1a9ba53a597dc4aac52b98bd21ef15c4a9908a5ca40631d32eeaa31c8b31d",
     "ug_ipa.rules": "ef379d45c3018d63ced79c77e0f27120245e34fc06ea3e67fae411bbe96b554a",
     "uz_ipa.rules": "a37b53541c69bede17fee674d252d6e8107388e34f3900a41827be55b9527295",
-    "uzc_ipa.rules": "90b3a65c02662e433cf4f5c684b4ab3c7f3f50aa83ac9593a4e58ae2bae53ad8",
+    "uzc_ipa.rules": "2a49f34ad9f22c4dcb3b60cc604602307f99b96e520d58b2206e4dae77debdf6",
 }
 
 

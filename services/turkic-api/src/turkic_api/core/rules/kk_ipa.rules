@@ -77,14 +77,22 @@ $Vout { У > w ;   $Vout { у > w ;
 Ц > t͡s ; ц > t͡s ;
 Ч > t͡ʃ ;  ч > t͡ʃ ;
 Ш > ʃ ;  ш > ʃ ;
-Щ > ɕː ;  щ > ɕː ;
+# ‹щ› occurs only in Russian loans. McCollum & Chen's chart (p. 277) has no
+# alveolo-palatal column at all, and the prose under it enumerates the
+# non-native sounds Kazakh takes on -- [f], [v] from Russian and [h] from
+# Arabic -- with no alveolo-palatal among them. So ɕː, which this file used
+# to emit here, was a segment the cited description positively excludes.
+# ʃ is in the chart, post-alveolar, and length is not a segment.
+Щ > ʃː ;  щ > ʃː ;
 Ъ > ʔ ;  ъ > ʔ ;
 Ы > ə ;  ы > ə ;
 І > ɪ ;  і > ɪ ;
 Ь > ʲ ;  ь > ʲ ;
 Э > e ;  э > e ;
 Ю > ju ; ю > ju ;
-Я > ja ; я > ja ;
+# The vowel is the one plain <а> carries: writing ASCII a put a second
+# low-vowel glyph in the corpus for words like аяқ.
+Я > jɑ ; я > jɑ ;
 
 # ---------------------------------------------------------------------------
 # Letters outside the Kazakh alphabet that reach the corpus in quoted or
