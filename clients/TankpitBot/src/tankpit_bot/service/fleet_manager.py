@@ -19,6 +19,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
+from tankpit_bot.service.constants import FLEET_CHILD_PORT_BASE, FLEET_CHILD_PORT_COUNT
 from tankpit_bot.service.fleet_adoption import adopt_recorded_bots
 from tankpit_bot.service.fleet_bot import (
     FleetBotDict,
@@ -96,6 +97,36 @@ class FleetManager:
         if adopted:
             log.info("Fleet: adopted %d running bot(s): %s", len(adopted), ", ".join(adopted))
         return adopted
+
+    def _allocate_service_port(self) -> int:
+        """Pick a service port no live child is holding.
+
+        Lowest free port first, so a port is reused as soon as the child
+        that held it dies rather than the range marching upward until it
+        is exhausted by a long-lived fleet.
+
+        Only LIVE children reserve a port: a dead row keeps its port in
+        its report so the number that served its video stays readable,
+        but it must not keep the port out of circulation.
+
+        Returns:
+            A port in ``[FLEET_CHILD_PORT_BASE, +FLEET_CHILD_PORT_COUNT)``.
+
+        Raises:
+            FleetError: If every port in the range is held by a live
+                child. Refused rather than wrapped around, because two
+                children on one port would serve each other's video.
+        """
+        taken = {bot.service_port for bot in self._bots.values() if bot.process.is_running()}
+        for offset in range(FLEET_CHILD_PORT_COUNT):
+            port = FLEET_CHILD_PORT_BASE + offset
+            if port not in taken:
+                return port
+        raise FleetError(
+            f"no free child service port in [{FLEET_CHILD_PORT_BASE}, "
+            f"{FLEET_CHILD_PORT_BASE + FLEET_CHILD_PORT_COUNT}) - "
+            f"{len(taken)} live children hold every one"
+        )
 
     def spawn(
         self,
@@ -177,6 +208,7 @@ class FleetManager:
             raise FleetError(
                 f"instance {instance!r} is already running (pid {existing.process.pid})"
             )
+        service_port = self._allocate_service_port()
         process = service_hooks.spawn_bot_process(
             _child_environment(
                 instance=instance,
@@ -188,10 +220,12 @@ class FleetManager:
                 troop=resolved_troop,
                 doctrine=resolved_doctrine,
                 human_min_rank=resolve_human_min_rank(room),
+                service_port=service_port,
             )
         )
         bot = _ManagedBot(
             instance=instance,
+            service_port=service_port,
             account=account,
             role=resolved_role,
             room=room,
@@ -250,6 +284,7 @@ class FleetManager:
                 started_ms=bot.started_ms,
                 pid=bot.process.pid,
                 created_at=created_at,
+                service_port=bot.service_port,
             )
         )
 
@@ -387,6 +422,34 @@ class FleetManager:
         """
         if instance not in self._bots:
             raise FleetError(f"unknown instance {instance!r}")
+
+    def live_service_port(self, instance: str) -> int:
+        """Return the service port of a RUNNING instance.
+
+        Liveness is part of the answer, not a courtesy check. A dead
+        bot's port goes straight back into circulation
+        (:meth:`_allocate_service_port` reserves live children only), so
+        by the time anyone asks about a finished instance that number
+        may already belong to a different bot. Relaying to it would
+        serve one bot's video under another's name -- the exact
+        confusion the allocator exists to prevent.
+
+        Args:
+            instance: Candidate instance name.
+
+        Returns:
+            The port this instance's own service is serving on.
+
+        Raises:
+            FleetError: If the instance is unregistered, or is
+                registered but no longer running.
+        """
+        bot = self._bots.get(instance)
+        if bot is None:
+            raise FleetError(f"unknown instance {instance!r}")
+        if not bot.process.is_running():
+            raise FleetError(f"instance {instance!r} is not running")
+        return bot.service_port
 
     def stats(self, instance: str) -> JSONObject:
         """Summarize a registered instance's latest run from its events.

@@ -38,6 +38,7 @@ def _bot(instance: str = "alpha", returncode: int | None = None) -> FleetBotDict
         kills=30,
         seconds=2700,
         started_ms=1_788_000_000_000,
+        service_port=27101,
     )
 
 

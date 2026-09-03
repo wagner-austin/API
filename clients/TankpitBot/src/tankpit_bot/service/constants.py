@@ -36,6 +36,25 @@ bind but NOT via ``netsh interface ipv4 show excludedportrange``.
 """
 
 
+FLEET_CHILD_PORT_BASE = 27101
+"""First port the manager may hand to a fleet child's service.
+
+One above :data:`SERVICE_PORT` so a standalone ``tankpit-bot-service``
+and a fleet child can coexist on one host without contending for a
+port. Children bind inside the manager's own container and are reached
+through it, so nothing in this range is ever published.
+"""
+
+FLEET_CHILD_PORT_COUNT = 32
+"""How many child ports the manager may hand out.
+
+A ceiling, not a target: the fleet is bounded by accounts long before
+it is bounded by ports. Exhausting the range is an error rather than a
+wrap-around, because two children sharing a port would silently serve
+each other's video.
+"""
+
+
 def resolve_service_port() -> int:
     """Resolve this process's service port from the environment.
 
@@ -76,6 +95,23 @@ def health_url(port: int) -> str:
     return f"http://127.0.0.1:{port}/health"
 
 
+def child_video_url(port: int) -> str:
+    """Return the loopback MJPEG URL for one fleet child's service.
+
+    Loopback because a child binds inside the manager's own container
+    and is reached only by the manager relaying to it. The address is
+    not configurable for that reason: a child on another host is not a
+    child this manager spawned.
+
+    Args:
+        port: The child's allocated service port.
+
+    Returns:
+        The child's ``/video`` URL.
+    """
+    return f"http://127.0.0.1:{port}/video"
+
+
 SERVICE_IDLE_EXIT_SECONDS = 1800.0
 """Idle self-exit threshold (2026-07-18 lifecycle pass).
 
@@ -91,10 +127,13 @@ SERVICE_IDLE_POLL_SECONDS = 60.0
 
 
 __all__ = [
+    "FLEET_CHILD_PORT_BASE",
+    "FLEET_CHILD_PORT_COUNT",
     "SERVICE_HOST",
     "SERVICE_IDLE_EXIT_SECONDS",
     "SERVICE_IDLE_POLL_SECONDS",
     "SERVICE_PORT",
+    "child_video_url",
     "health_url",
     "resolve_service_port",
 ]

@@ -42,6 +42,7 @@ def _record(instance: str = "alpha", pid: int = 4312) -> FleetProcessRecordDict:
         started_ms=1_788_000_000_000,
         pid=pid,
         created_at=1788265730.7457614,
+        service_port=27101,
     )
 
 

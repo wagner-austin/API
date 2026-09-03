@@ -270,6 +270,7 @@ class TestAsyncMain:
             "/bots/{instance}/stats",
             "/bots/{instance}/hud",
             "/bots/{instance}/activity",
+            "/bots/{instance}/video",
             "/bots/{instance}/stop",
             "/bots/{instance}/restart",
             "/bots/{instance}",

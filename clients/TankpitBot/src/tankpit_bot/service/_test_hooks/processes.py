@@ -142,12 +142,24 @@ _CHILD_BOOTSTRAP = (
     "    key, _, value = pair.partition('=')\n"
     "    os.environ[key] = value\n"
     "del sys.argv[1:]\n"
-    "from tankpit_bot.bot.entry import main\n"
+    "from tankpit_bot.service.service_main import main\n"
     "main()\n"
 )
 # The argv wipe matters: the entry point parses sys.argv, and the
 # KEY=VALUE pairs are bootstrap freight, not bot arguments — the
 # first live fleet spawn died on "unrecognized arguments" without it.
+#
+# A child runs the SERVICE, not the bare bot. Both drive the same tick
+# loop and write the same runs/bot/<instance>/ artifacts — the HUD the
+# manager serves comes from the tick body either way — but the service
+# additionally stands up /video and /frame off the frame bus, which the
+# bare bot entry has no way to expose because it starts no HTTP server
+# at all. TANKPIT_BOT_AUTOSTART makes it run its session rather than
+# idle waiting for a POST /start that will never come, and
+# TANKPIT_BOT_SERVICE_PORT gives it a port of its own; both are set by
+# _child_environment. The service's own boot probe checks the port it
+# resolved, so per-child ports mean children never mistake each other
+# for an already-running instance.
 
 
 def _real_spawn_bot_process(env_overrides: dict[str, str]) -> SpawnedProcessProtocol:

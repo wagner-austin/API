@@ -41,6 +41,10 @@ class FleetBotDict(TypedDict):
         kills: Kill bound the child was spawned with (0 unbounded).
         seconds: Seconds bound the child was spawned with (0 unbounded).
         started_ms: Wall-clock spawn time.
+        service_port: Port this child's own service listens on, INSIDE
+            the manager's container. Reported so the manager can reach
+            it to relay ``/video``; never published, and not something a
+            caller outside the container can dial.
     """
 
     instance: str
@@ -55,6 +59,7 @@ class FleetBotDict(TypedDict):
     kills: int
     seconds: int
     started_ms: int
+    service_port: int
 
 
 def _child_environment(
@@ -68,6 +73,7 @@ def _child_environment(
     troop: str,
     doctrine: str,
     human_min_rank: int,
+    service_port: int,
 ) -> dict[str, str]:
     """Build one child's spawn environment.
 
@@ -107,6 +113,8 @@ def _child_environment(
             behaviour).
         human_min_rank: Lowest human rank this bot may open a fight
             on, resolved from the room it is joining.
+        service_port: Port this child's own service binds, unique
+            across live children.
 
     Returns:
         Environment overrides for the spawned child.
@@ -117,6 +125,14 @@ def _child_environment(
         "TANKPIT_BOT_SESSION_SECONDS": str(seconds),
         "TANKPIT_ROLE": resolved_role,
         "TANKPIT_BOT_HUMAN_MIN_RANK": str(human_min_rank),
+        # A fleet child runs the SERVICE, not the bare bot, so it
+        # serves its own /video and /frame off the same tick loop the
+        # HUD already rides. Nobody will call POST /start on it -- the
+        # manager decided by spawning it -- so it starts its own
+        # session, and the port is explicit because two children
+        # sharing one would serve each other's video.
+        "TANKPIT_BOT_AUTOSTART": "true",
+        "TANKPIT_BOT_SERVICE_PORT": str(service_port),
     }
     if account:
         env["TANKPIT_ACCOUNT"] = account
@@ -144,6 +160,7 @@ class _ManagedBot:
         kills: int,
         seconds: int,
         started_ms: int,
+        service_port: int,
         process: service_hooks.SpawnedProcessProtocol,
     ) -> None:
         """Bind one spawned bot to its metadata.
@@ -158,6 +175,7 @@ class _ManagedBot:
             kills: Kill bound the child received.
             seconds: Seconds bound the child received.
             started_ms: Wall-clock spawn time.
+            service_port: Port this child's service bound.
             process: The spawned child process handle.
         """
         self.instance = instance
@@ -169,6 +187,7 @@ class _ManagedBot:
         self.kills = kills
         self.seconds = seconds
         self.started_ms = started_ms
+        self.service_port = service_port
         self.process = process
 
     def report(self) -> FleetBotDict:
@@ -190,6 +209,7 @@ class _ManagedBot:
             kills=self.kills,
             seconds=self.seconds,
             started_ms=self.started_ms,
+            service_port=self.service_port,
         )
 
 

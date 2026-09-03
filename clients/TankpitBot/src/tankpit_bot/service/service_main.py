@@ -15,6 +15,8 @@ without conditionals in the service code.
 from __future__ import annotations
 
 import asyncio
+import functools
+from collections.abc import Callable
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -25,6 +27,7 @@ from tankpit_bot.bot.config import (
     resolve_prefer_account,
     resolve_target_url,
 )
+from tankpit_bot.bot.entry import resolve_session_kills, resolve_session_seconds
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
@@ -32,7 +35,7 @@ from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.config import resolve_idle_exit_seconds
+from tankpit_bot.service.config import resolve_autostart, resolve_idle_exit_seconds
 from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
@@ -151,6 +154,14 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
     stop_event = asyncio.Event()
     app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
     site = await service_hooks.build_site(app, host, bound_port)
+    # Started AFTER the site is up so ``/video`` is already answering
+    # when the first frame lands on the bus. A fleet child has nobody to
+    # call ``POST /start`` for it -- the manager decided by spawning it.
+    autostart = (
+        asyncio.create_task(_autostart_session(runner, stop_event.set))
+        if resolve_autostart()
+        else None
+    )
     idle_monitor = asyncio.create_task(
         exit_when_idle(
             runner,
@@ -164,6 +175,56 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
         await run_until_stopped(site, stop_event, name="Bot service")
     finally:
         idle_monitor.cancel()
+        if autostart is not None:
+            autostart.cancel()
+
+
+async def _autostart_session(
+    runner: SessionRunnerHTTPProtocol,
+    on_finished: Callable[[], None],
+) -> None:
+    """Run one bounded session, then stop the service.
+
+    :meth:`SessionRunner.start` blocks until the tick loop exits, so it
+    goes to an executor exactly as ``POST /start`` does rather than
+    stalling the event loop that serves ``/video``.
+
+    The bounds come from the same two variables the bot CLI reads, which
+    the fleet already sets on every child, so a fleet bot and a
+    ``make run`` bot are bounded by the same contract.
+
+    THE SERVICE STOPS BECAUSE THE SESSION ENDED, not because a timer
+    noticed. A fleet child exists for exactly one session, and leaving
+    the process to :func:`exit_when_idle` would be wrong in both
+    directions: at the default 1800 s window a finished fleet would sit
+    on dead children for half an hour, and at any window short enough to
+    be useful the monitor would reap a bot during startup -- it counts
+    "no session running" as idle, and Playwright takes on the order of
+    fifteen seconds to reach a first tick. Causing the exit removes the
+    race rather than tuning it.
+
+    Nothing is caught. A session that cannot start is fatal for a
+    process whose only purpose is that session; ``on_finished`` still
+    runs, so the service exits rather than idling with no bot in it.
+
+    Args:
+        runner: The session runner to drive.
+        on_finished: Called once the session ends, however it ends.
+    """
+    loop = asyncio.get_running_loop()
+    session_seconds = resolve_session_seconds([], core_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"))
+    session_kills = resolve_session_kills(core_hooks.get_env("TANKPIT_BOT_SESSION_KILLS"))
+    try:
+        await loop.run_in_executor(
+            None,
+            functools.partial(
+                runner.start,
+                session_seconds=session_seconds,
+                session_kills=session_kills,
+            ),
+        )
+    finally:
+        on_finished()
 
 
 def main() -> None:

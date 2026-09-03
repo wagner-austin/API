@@ -141,6 +141,7 @@ def encode_fleet_bot(bot: FleetBotDict) -> JSONObject:
         "kills": bot["kills"],
         "seconds": bot["seconds"],
         "started_ms": bot["started_ms"],
+        "service_port": bot["service_port"],
     }
 
 
@@ -169,6 +170,7 @@ def decode_fleet_bot(data: JSONObject) -> FleetBotDict:
         kills=require_int(data, "kills"),
         seconds=require_int(data, "seconds"),
         started_ms=require_int(data, "started_ms"),
+        service_port=require_int(data, "service_port"),
     )
 
 

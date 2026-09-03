@@ -72,6 +72,12 @@ class FleetProcessRecordDict(TypedDict):
         created_at: The child's process creation time in epoch
             seconds. Paired with ``pid`` this is an identity: pids are
             recycled, creation times are not.
+        service_port: Port the child's own service is serving on.
+            Recorded because an adopting manager needs it for two
+            reasons: to relay ``/video`` to a bot it did not spawn, and
+            to know the port is SPENT. Without it a fresh child could be
+            handed a port a live adopted child already holds, and the
+            two would serve each other's video.
     """
 
     instance: str
@@ -85,6 +91,7 @@ class FleetProcessRecordDict(TypedDict):
     started_ms: int
     pid: int
     created_at: float
+    service_port: int
 
 
 def process_record_path(instance: str) -> Path:
@@ -142,6 +149,7 @@ def encode_process_record(record: FleetProcessRecordDict) -> JSONObject:
         "started_ms": record["started_ms"],
         "pid": record["pid"],
         "created_at": record["created_at"],
+        "service_port": record["service_port"],
     }
 
 
@@ -169,6 +177,7 @@ def decode_process_record(data: JSONObject) -> FleetProcessRecordDict:
         started_ms=require_int(data, "started_ms"),
         pid=require_int(data, "pid"),
         created_at=require_float(data, "created_at"),
+        service_port=require_int(data, "service_port"),
     )
 
 

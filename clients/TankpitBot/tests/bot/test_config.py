@@ -13,12 +13,13 @@ import pytest
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.config import (
     DEFAULT_TARGET_URL,
+    resolve_env_flag,
     resolve_headless,
     resolve_prefer_account,
     resolve_target_url,
     resolve_weapon_resume_slack,
 )
-from tankpit_bot.service.config import resolve_idle_exit_seconds
+from tankpit_bot.service.config import resolve_autostart, resolve_idle_exit_seconds
 from tests.conftest import FakeEnv
 
 
@@ -221,6 +222,63 @@ class TestResolveHeadless:
             headless = resolve_headless()
             _test_hooks.get_env = FakeEnv({"TANKPIT_PREFER_ACCOUNT": value})
             assert headless is resolve_prefer_account()
+
+
+class TestResolveEnvFlag:
+    """The one boolean parser every flag in the process shares.
+
+    Tested directly rather than only through its callers: it is now the
+    single place a spelling becomes a truth value, so a change here
+    silently moves every flag at once.
+    """
+
+    def test_missing_env_is_false(self) -> None:
+        """An unset variable is not an affirmative."""
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_env_flag("ANY_FLAG") is False
+
+    def test_every_affirmative_spelling_is_accepted(self) -> None:
+        """``true``, ``1`` and ``yes`` all mean yes, in any case."""
+        for value in ("true", "1", "yes", "TRUE", "Yes"):
+            _test_hooks.get_env = FakeEnv({"ANY_FLAG": value})
+            assert resolve_env_flag("ANY_FLAG") is True
+
+    def test_anything_else_is_false(self) -> None:
+        """No other spelling is guessed at."""
+        for value in ("false", "0", "no", "", "on"):
+            _test_hooks.get_env = FakeEnv({"ANY_FLAG": value})
+            assert resolve_env_flag("ANY_FLAG") is False
+
+    def test_it_reads_the_variable_it_was_given(self) -> None:
+        """The name is the argument, not a hardcoded one."""
+        _test_hooks.get_env = FakeEnv({"FIRST": "true", "SECOND": "false"})
+        assert (resolve_env_flag("FIRST"), resolve_env_flag("SECOND")) == (True, False)
+
+
+class TestResolveAutostart:
+    """``resolve_autostart`` decides whether the service plays on boot."""
+
+    def test_missing_env_leaves_the_service_idle(self) -> None:
+        """A standalone service waits for POST /start, as it always has."""
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_autostart() is False
+
+    def test_the_flag_starts_a_session(self) -> None:
+        """A fleet child is told to play, because nobody will tell it later."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_AUTOSTART": "true"})
+        assert resolve_autostart() is True
+
+    def test_session_bounds_alone_do_not_autostart(self) -> None:
+        """Autostart is declared, never inferred.
+
+        Inferring it from the bounds being present would change what an
+        existing ``tankpit-bot-service`` does the moment an operator
+        exported ``TANKPIT_BOT_SESSION_SECONDS`` in their shell.
+        """
+        _test_hooks.get_env = FakeEnv(
+            {"TANKPIT_BOT_SESSION_SECONDS": "300", "TANKPIT_BOT_SESSION_KILLS": "20"}
+        )
+        assert resolve_autostart() is False
 
 
 class TestWeaponResumeSlack:

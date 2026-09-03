@@ -66,6 +66,13 @@ def test_spawn_builds_the_instance_environment(spawner: _FakeSpawner) -> None:
             "TANKPIT_BOT_SESSION_SECONDS": "2700",
             "TANKPIT_ROLE": "fighter",
             "TANKPIT_BOT_HUMAN_MIN_RANK": "1",
+            # A child runs the service, not the bare bot, so it serves
+            # its own /video. It starts its own session because nobody
+            # will POST /start to it, and it binds a port of its own
+            # because two children sharing one would serve each other's
+            # video.
+            "TANKPIT_BOT_AUTOSTART": "true",
+            "TANKPIT_BOT_SERVICE_PORT": "27101",
             "TANKPIT_ACCOUNT": "second",
         }
     ]

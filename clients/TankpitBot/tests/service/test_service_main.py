@@ -38,6 +38,7 @@ from tankpit_bot.service.constants import (
 )
 from tankpit_bot.service.service_main import (
     _async_main,
+    _autostart_session,
     main,
 )
 from tests.conftest import FakeEnv
@@ -148,6 +149,55 @@ class TestAiohttpSiteAdapter:
 class TestAsyncMain:
     """``_async_main`` wiring: bridge/bus/runner constructed and site served."""
 
+    async def test_the_autostart_task_is_cancelled_when_serving_ends(
+        self,
+        restore_service_hooks: None,
+    ) -> None:
+        """A child's autostart task does not outlive the service.
+
+        The task owns a worker thread running a session. Leaving it
+        scheduled after the site is gone would mean a process that has
+        stopped serving still holding a bot, which is the shape of an
+        orphan.
+        """
+        _ = restore_service_hooks
+        top_hooks.get_env = FakeEnv({"TANKPIT_BOT_AUTOSTART": "true"})
+
+        async def cancelling_build_site(
+            app: web.Application, host: str, port: int
+        ) -> SiteRunnerProtocol:
+            _ = (app, host, port)
+            return _CancellingSite()
+
+        service_hooks.build_site = cancelling_build_site
+        service_hooks.build_bot_factory = _make_recording_bot_factory(_RecordingBot())
+
+        with pytest.raises(asyncio.CancelledError):
+            await _async_main()
+
+    async def test_no_autostart_task_exists_without_the_flag(
+        self,
+        restore_service_hooks: None,
+    ) -> None:
+        """A standalone service schedules nothing and waits for POST /start."""
+        _ = restore_service_hooks
+        top_hooks.get_env = FakeEnv({})
+
+        async def cancelling_build_site(
+            app: web.Application, host: str, port: int
+        ) -> SiteRunnerProtocol:
+            _ = (app, host, port)
+            return _CancellingSite()
+
+        service_hooks.build_site = cancelling_build_site
+        recording = _RecordingBot()
+        service_hooks.build_bot_factory = _make_recording_bot_factory(recording)
+
+        with pytest.raises(asyncio.CancelledError):
+            await _async_main()
+
+        assert recording.runs == []
+
     async def test_wires_primitives_and_serves_until_stop(
         self,
         restore_service_hooks: None,
@@ -211,6 +261,94 @@ class TestAsyncMain:
             await _async_main()
 
         assert len(captured_app) == 1
+
+
+class _RecordingSessionRunner:
+    """A session runner recording the bounds it was started with."""
+
+    def __init__(self, *, fails: bool = False) -> None:
+        """Start with nothing recorded.
+
+        Args:
+            fails: Whether ``start`` raises instead of returning.
+        """
+        self.starts: list[tuple[int, int]] = []
+        self._fails = fails
+
+    def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
+        """Record one session start.
+
+        Args:
+            session_seconds: Seconds bound the caller asked for.
+            session_kills: Kill bound the caller asked for.
+
+        Raises:
+            RuntimeError: When this double was built to fail.
+        """
+        self.starts.append((session_seconds, session_kills))
+        if self._fails:
+            raise RuntimeError("session could not start")
+
+    def request_stop(self) -> None:
+        """Unused by the autostart path."""
+        raise AssertionError("autostart must never request a stop")
+
+    def is_running(self) -> bool:
+        """Report idle.
+
+        Returns:
+            Always False; the autostart path never consults this.
+        """
+        return False
+
+
+class TestAutostartSession:
+    """``_autostart_session`` runs one session, then ends the process.
+
+    A fleet child exists for exactly one session. The service stops
+    because that session ENDED, not because an idle timer noticed: the
+    idle monitor counts "no session running" as idle, and a bot spends
+    its first seconds launching a browser, so any window short enough to
+    reap a finished child would also reap a starting one.
+    """
+
+    async def test_the_session_is_bounded_by_the_env(self) -> None:
+        """The bounds are the ones the fleet set on the child."""
+        top_hooks.get_env = FakeEnv(
+            {"TANKPIT_BOT_SESSION_SECONDS": "300", "TANKPIT_BOT_SESSION_KILLS": "20"}
+        )
+        runner = _RecordingSessionRunner()
+        finished: list[bool] = []
+
+        await _autostart_session(runner, lambda: finished.append(True))
+
+        assert runner.starts == [(300, 20)]
+        assert finished == [True]
+
+    async def test_an_unbounded_child_runs_until_stopped(self) -> None:
+        """No bounds set means zero, which the runner reads as unbounded."""
+        top_hooks.get_env = FakeEnv({})
+        runner = _RecordingSessionRunner()
+
+        await _autostart_session(runner, lambda: None)
+
+        assert runner.starts == [(0, 0)]
+
+    async def test_a_session_that_cannot_start_still_stops_the_service(self) -> None:
+        """The failure propagates AND the process is told to end.
+
+        A service left running with no bot in it would sit there holding
+        a port and reporting healthy, which is worse than a child that
+        exits and lets the manager see it die.
+        """
+        top_hooks.get_env = FakeEnv({})
+        runner = _RecordingSessionRunner(fails=True)
+        finished: list[bool] = []
+
+        with pytest.raises(RuntimeError, match="session could not start"):
+            await _autostart_session(runner, lambda: finished.append(True))
+
+        assert finished == [True]
 
 
 class TestHeadlessWiring:

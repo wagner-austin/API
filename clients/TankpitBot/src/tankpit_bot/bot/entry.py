@@ -127,5 +127,6 @@ def main() -> None:
 
 __all__ = [
     "main",
+    "resolve_session_kills",
     "resolve_session_seconds",
 ]

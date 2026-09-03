@@ -44,6 +44,28 @@ def resolve_target_url() -> str:
     return DEFAULT_TARGET_URL
 
 
+def resolve_env_flag(name: str) -> bool:
+    """Return True when the named environment variable spells an affirmative.
+
+    One parser for every boolean setting in the process. The named
+    resolvers below bind a variable to a meaning; this binds a spelling
+    to a truth value, and there is exactly one of it so an operator who
+    learns that ``yes`` works for one flag can rely on it for all of
+    them.
+
+    Args:
+        name: Environment variable to read.
+
+    Returns:
+        True when the value (case-insensitive) is one of ``"true"``,
+        ``"1"`` or ``"yes"``; False otherwise, including when unset.
+    """
+    raw = _test_hooks.get_env(name)
+    if raw is None:
+        return False
+    return raw.lower() in _TRUTHY_VALUES
+
+
 def resolve_prefer_account() -> bool:
     """Return True when ``TANKPIT_PREFER_ACCOUNT`` selects account login.
 
@@ -52,10 +74,7 @@ def resolve_prefer_account() -> bool:
         ``"true"``, ``"1"``, or ``"yes"``; False otherwise (including
         when the env var is unset).
     """
-    raw = _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT")
-    if raw is None:
-        return False
-    return raw.lower() in _TRUTHY_VALUES
+    return resolve_env_flag("TANKPIT_PREFER_ACCOUNT")
 
 
 def resolve_headless() -> bool:
@@ -79,10 +98,7 @@ def resolve_headless() -> bool:
         ``"true"``, ``"1"``, or ``"yes"``; False otherwise, including
         when the env var is unset.
     """
-    raw = _test_hooks.get_env("TANKPIT_HEADLESS")
-    if raw is None:
-        return False
-    return raw.lower() in _TRUTHY_VALUES
+    return resolve_env_flag("TANKPIT_HEADLESS")
 
 
 def resolve_human_rank_window() -> tuple[int, int]:
@@ -159,6 +175,7 @@ def resolve_priority_target() -> str:
 __all__ = [
     "DEFAULT_TARGET_URL",
     "env_ai_config",
+    "resolve_env_flag",
     "resolve_headless",
     "resolve_human_rank_window",
     "resolve_prefer_account",
