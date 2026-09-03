@@ -74,3 +74,23 @@ day and is the file a session under this tree actually loads.
 Pages written: job-arrays
 Pages updated: unsupported-shapes (arrays moved to the left-the-list section), README table (row removed, held out by test_examples)
 Notes: The submission bottleneck was ours, not the cluster's: three SSH round trips per member (~13s each) while Slurm scheduled instantly -- rusted's 96-member waves spent ~18 minutes purely submitting. A sweep now renders into ONE script that IS the member table (case-dispatch on the array task id, no --array directive; the submitter's argument owns the selection, which is what lets a campaign resubmit its sparse gap against a byte-identical script). Identity was MEASURED before it was coded (probe 55678543, throttled): pending tasks aggregate into `N_[a-b%t]` in squeue AND `sacct -X` -- the sacct half was the surprise -- and a pending task id queried directly returns nothing. `contracts/array.py` owns the expansion; the in-flight artifact check and triage's unclaimed check both expand before matching, closing the double-submission race an unexpanded set would have waved through. Per-member job_submitted audit events are gone (telemetry of acts that no longer occur); sweep_submitted carries every task id plus the billing factor. Gate green at 100.00% statements+branches, 1297 tests.
+
+---
+
+## [2026-09-02] update | Where an invariant belongs: PROJECT_UNIMAGED at decode made the first image unobtainable
+
+Written from a session that onboarded a new research project (`tankpit`) end to end and hit the rule from the one direction nothing else does.
+
+**Page written (1):** [[invariant-placement]] — hub-linked from Submission. Index 21 -> 22 pages, Submission 7 -> 8.
+
+**The finding:** two structurally identical "this project is not ready to run" checks sit at different depths. `ENV_PATH_MISSING` is in `core/preflight.py`, on the submit path; `PROJECT_UNIMAGED` was placed in `contracts/workspace.py`, at decode. `decode_workspace` is reached from `cli/_config.py`, the loader every command shares — so a decode-level rule necessarily fires on capture, render and image-build, the three commands whose whole job is to produce the image. `ENV_PATH_MISSING` has never deadlocked anything for exactly one reason: capture does not preflight.
+
+**Measured:** `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit` refused with `PROJECT_UNIMAGED`, whose message instructs the reader to run the command that just refused them. To obtain an image you must already have one.
+
+**Second, live:** `runs/hpc3.json` (cleargbm, committed) stopped decoding, and because `hpc3-research-index` reads every workspace it failed outright. After imaging `tankpit` the project table could not be regenerated and still says tankpit is unimaged. One unimaged project took a tool down for all six.
+
+**The correction, filed as task 1ba0aac4:** move the check to the submit path. Every property survives — no project runs unimaged, no exemption field, cleargbm still refused at submission. It is a MOVE: the decode-site check is deleted outright, with no shim, wrapper, fallback, flag, declarable field or legacy path, per operator constraint. The declarable alternatives (`--allow-unimaged`, `status: provisioning`) are worse because they let a project assert its own compliance.
+
+**The general rule this leaves behind:** an invariant about what a project may DO belongs where doing happens; only an invariant about what a document IS belongs in decode. A rule of the first kind placed in the second location does not fail loudly — it passes for every project already finished and refuses only the ones still being built, so it looks correct right up until somebody tries to start something.
+
+**Also filed:** task e106aa83, on the general asymmetry this is the sharpest instance of — the system's refusals are mature and its on-ramps are not.

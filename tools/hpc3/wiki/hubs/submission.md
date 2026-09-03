@@ -10,4 +10,5 @@ submission rules, and the shapes the contract deliberately cannot express.
 [The submission rules, each with the failure it refuses](../pages/submission-rules.md) -- the eight resolve-time rules and the non-skippable preflight
 [Chains stop when a stage fails](../pages/chains.md) -- kill-on-invalid-dep, whole-pipeline budgeting, chain-vs-sweep
 [A sweep is one sbatch call, and the script is the member table](../pages/job-arrays.md) -- arrays as the sweep transport, sparse campaign resubmission, the measured pending-aggregate identity rules
+[Where an invariant belongs, and what happens when it sits too deep](../pages/invariant-placement.md) -- decode answers "is this document readable", the submit path answers "may this project act"; the image rule placed at decode made the first image unobtainable and took a committed workspace down with it
 [What this package cannot submit](../pages/unsupported-shapes.md) -- multi-node, arrays, qos, constraints; the two shapes that left the list
