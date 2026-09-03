@@ -133,10 +133,29 @@ async def _real_open_child_video(url: str) -> ChildVideoStreamProtocol:
         aiohttp.ClientError: If the child cannot be reached or answers
             with an error status.
     """
+    # The session is OWNED here until the stream takes it, and the
+    # handover is the last thing that happens. Anything that goes wrong
+    # before it — a child that has not bound its port yet, an error
+    # status, or the viewer disconnecting mid-await and cancelling the
+    # task — leaves this function still holding the connection, so the
+    # session is closed on the way out.
+    #
+    # Not a rare path: a warming child refuses EVERY fresh viewer for
+    # its first seconds, and the manager logged an "Unclosed client
+    # session" for each one. Expressed as ownership rather than as an
+    # ``except`` because that is what it is — nothing here handles a
+    # failure, it just declines to leak on one.
     session = aiohttp.ClientSession()
-    response = await session.get(url)
-    response.raise_for_status()
-    return _AiohttpChildVideoStream(session, response)
+    handed_over = False
+    try:
+        response = await session.get(url)
+        response.raise_for_status()
+        stream = _AiohttpChildVideoStream(session, response)
+        handed_over = True
+        return stream
+    finally:
+        if not handed_over:
+            await session.close()
 
 
 #: Upstream-open hook — production reads a real child over HTTP; tests

@@ -9,6 +9,8 @@ stream would skip.
 
 from __future__ import annotations
 
+import asyncio
+import gc
 from collections.abc import AsyncIterator
 
 import pytest
@@ -126,3 +128,45 @@ async def test_an_unreachable_child_raises(upstream: TestServer) -> None:
 
     with pytest.raises(ClientConnectionError):
         await _real_open_child_video(f"http://127.0.0.1:{port}/video")
+
+
+@pytest.mark.asyncio
+async def test_a_refused_child_does_not_leak_its_client_session(
+    upstream: TestServer,
+) -> None:
+    """The session is released when the open fails, not just when it succeeds.
+
+    The two tests above assert the RAISE and would both pass while the
+    connection leaked, which is what happened: the session was created
+    before the request and only handed to the stream on success, so
+    every failure orphaned one. That is not a rare path — a child that
+    has not bound its port yet refuses EVERY viewer for its first
+    seconds, and the manager logged an "Unclosed client session" for
+    each one.
+
+    aiohttp reports an orphaned session through the running loop's
+    exception handler at collection time, so the assertion is made
+    against the real loop with an explicit collection rather than by
+    reaching inside the function.
+    """
+    port = upstream.port
+    if port is None:
+        raise AssertionError("the fixture server must be bound before it is closed")
+    await upstream.close()
+
+    loop = asyncio.get_running_loop()
+    reported: list[str] = []
+    original = loop.get_exception_handler()
+    loop.set_exception_handler(
+        lambda _loop, context: reported.append(str(context.get("message", "")))
+    )
+    try:
+        for _ in range(3):
+            with pytest.raises(ClientConnectionError):
+                await _real_open_child_video(f"http://127.0.0.1:{port}/video")
+        gc.collect()
+        await asyncio.sleep(0)
+    finally:
+        loop.set_exception_handler(original)
+
+    assert [message for message in reported if "Unclosed" in message] == []
