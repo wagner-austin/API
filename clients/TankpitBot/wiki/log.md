@@ -5832,3 +5832,40 @@ The hazard is documented rather than theoretical: a directory env "can be edited
 **Pages corrected:** [[sim-world-parameterization]] Status section, and the `tankpit` section of `docs/RESEARCH.md`. Both had asserted the wrong rationale; rewritten to state the image as the target and `image: null` as a stated gap rather than a decision.
 
 **A gap in the documented flow, found here:** the four-command image build assumes an environment already exists — `hpc3-image-capture` probes it over SSH at `env_path`. A NEW project has nothing to capture, so a bootstrap environment has to be created on the cluster first, and only then can the image that replaces it be built. `image-build-flow.md` does not cover that step; the note that "the first spec got made" by pip-freeze-and-paste suggests it was hit before and not written down.
+
+## [2026-09-03] update | Triage rows 7-13 closed: three fixed, one refuted, teardown ladder shipped, one lifecycle
+
+The flag-triage-20260902 fix table is complete. Rows 9/10 (dead forked
+constants deleted; every `*_MS` clock in `src/` now carries its
+derivation), row 7 (`mine_pin_target_id` scalar → per-target
+`mine_pin_presses` map with placer tiles — the same scalar→map cure
+`greeted_tank_ids` got for the identical ping-pong shape), row 8 (the
+ferry scout's pan now IS its negative belief: `scope_scout_looks` on
+the settled-knowledge floor, `FERRY_LOOK_TTL_MS` as the human-presence
+fallback arm), row 11 (presence-scoped incoming rate: registry-alive
+but wire-silent shooters leave the break window; the book stays
+policy-free), row 13 (the browser-teardown wedge: a three-rung
+escalation ladder — close, engine kill at 15 s with the driver spared,
+forced exit at 60 s carrying the SESSION's outcome — plus a CLI-only
+post-session exit deadline; `make run` prints its scorecard for every
+exit code). Row 12 was REFUTED by its own artifact before any code was
+written: all 11 harvest frame shifts in the validation run earned
+their tick.
+
+Alongside: the fleet lifecycle is now genuinely ONE system —
+`tankpit-fleet-up` (the detached host launcher, `spawn_fleet_manager`,
+`FLEET_LOG_PATH`) deleted; `tankpit-fleet-down` kept as the documented
+transition drain; [[fleet-lifecycle]] operator-surface section
+rewritten.
+
+Live validation (7-min Practice session from `27fa6225`, exit 0): one
+mine press on one tile; 9 scout pans at 9 unique goals, zero repeats;
+one mid-fuel break priced by a live 27/tick measured rate; teardown
+clean with the scorecard printed. Rows 1-6 held (6% radar redundancy,
+0 `progress_stalled`, 27 frontier journeys → 27 unique blocks).
+
+Pages touched: [[flag-triage-20260902]] (fix table rows 7-13 + second
+validation section + pin refreshes), [[bot-behavior-contract]]
+(mine-pin row, teardown-ladder MUST, tree pins), [[fleet-lifecycle]]
+(launcher deletion, historical footnote). Commits `299d82d8` →
+`eded4ab6`, every one behind a green 100.00% gate.
