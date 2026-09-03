@@ -15,14 +15,11 @@ from platform_core.json_utils import JSONValue
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
-from tankpit_bot.browser import (
-    load_static_key,
-    save_static_key,
-)
+from tankpit_bot.browser import load_static_key
 from tests.no_op_keyboard import NoOpKeyboard
 
 # =============================================================================
-# Static Key Load/Save Tests
+# Static Key Load Tests
 # =============================================================================
 
 
@@ -58,31 +55,6 @@ def test_load_static_key_wrong_length_raises() -> None:
             load_static_key()
     finally:
         _test_hooks.read_text = original
-
-
-def test_save_static_key_success() -> None:
-    """Test save_static_key writes key to file."""
-    original = _test_hooks.write_text
-    written_content: list[str] = []
-
-    def fake_write_text(path: Path, content: str) -> None:
-        _ = path
-        written_content.append(content)
-
-    _test_hooks.write_text = fake_write_text
-    try:
-        key = "b" * 1000
-        save_static_key(key)
-        assert len(written_content) == 1
-        assert written_content[0] == key + "\n"
-    finally:
-        _test_hooks.write_text = original
-
-
-def test_save_static_key_wrong_length_raises() -> None:
-    """Test save_static_key raises ValueError for wrong key length."""
-    with pytest.raises(ValueError, match="expected 1000"):
-        save_static_key("short_key")
 
 
 # =============================================================================

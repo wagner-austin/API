@@ -34,21 +34,18 @@ def load_static_key() -> str:
     return key
 
 
-def save_static_key(key: str) -> None:
-    """Save the static XOR key to file.
-
-    Args:
-        key: The 1000-character static key.
-
-    Raises:
-        ValueError: If key is not exactly 1000 characters.
-    """
-    if len(key) != STATIC_KEY_LENGTH:
-        raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
-    _test_hooks.write_text(static_key_file_path(), key + "\n")
-
+# There is deliberately no writer here. The key is package data
+# (:mod:`tankpit_bot.data`), addressed so the question "where is this asset"
+# has one answer under a checkout, a pip install, a container and a cluster
+# image alike ([[packaged-data-assets]]) — and package data is read, never
+# written. The writer that used to live here fired on every session and
+# succeeded only where the install happened to be writable, so it worked in a
+# checkout and killed every containerized fleet bot four seconds into the
+# game. Key rotation is now reported as drift by
+# ``lifecycle.py::_check_shipped_static_key``; regenerating the bundled asset
+# is a deliberate act, not something a running bot does to its own
+# distribution.
 
 __all__ = [
     "load_static_key",
-    "save_static_key",
 ]

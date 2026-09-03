@@ -42,10 +42,7 @@ from tankpit_bot.browser.fuel_probe import (
     JSVariable,
     probe_all,
 )
-from tankpit_bot.browser.key_discovery import (
-    load_static_key,
-    save_static_key,
-)
+from tankpit_bot.browser.key_discovery import load_static_key
 from tankpit_bot.browser.login import (
     AccountLoginResult,
     GuestLoginResult,
@@ -95,6 +92,5 @@ __all__ = [
     "load_static_key",
     "probe_all",
     "resolve_account",
-    "save_static_key",
     "select_account",
 ]

@@ -19,7 +19,10 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
     PageProtocol,
 )
+from tankpit_bot.browser.key_discovery import load_static_key
 from tankpit_bot.browser.types import GameNotJoinedError
+from tankpit_bot.resources import static_key_file_path
+from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types import CapturedMessage
 
@@ -382,8 +385,6 @@ def _capture_static_key(page: PageProtocol) -> str | None:
     """
     import re
 
-    from tankpit_bot.browser.key_discovery import save_static_key
-
     js_check_loaded = (
         "Array.from(document.querySelectorAll('script[src]')).some(s => s.src.includes('tpclient'))"
     )
@@ -419,9 +420,62 @@ def _capture_static_key(page: PageProtocol) -> str | None:
         return None
 
     static_key: str = match.group(1)
-    save_static_key(static_key)
+    _check_shipped_static_key(static_key)
     log.info("Captured static key: %s...", static_key[:20])
     return static_key
+
+
+def _check_shipped_static_key(discovered: str) -> None:
+    """Compare the client's key against the one the wheel ships.
+
+    This used to WRITE the discovered key back over the bundled asset, and
+    that was the defect. ``tankpit_bot.data`` is package data addressed
+    through :func:`importlib.resources.files`, chosen so the question "where
+    is this asset" has exactly one answer under a checkout, a pip install, a
+    container and a cluster image alike ([[packaged-data-assets]]). Package
+    data is read. A process that writes to its own installed files works
+    only where the install happens to be writable -- which a source checkout
+    is and a container is not.
+
+    So every containerized fleet bot died of ``PermissionError`` about four
+    seconds after entering the game: browser up, tank in the world, protocol
+    decoding, and then the session ended before a single tick because a
+    write it did not need was fatal to it. Host ``make run`` never saw it,
+    which is why the fleet looked broken in a way the same bot run by hand
+    was not.
+
+    Nothing in flight needs the write either: this session's XOR table was
+    built from the SHIPPED key before the browser was ever asked for this
+    one (:func:`~tankpit_bot.capture.xor.build_session_xor_table`).
+
+    What the discovery is actually good for is DRIFT. If the game rotates
+    its key, the shipped asset is stale and every session starts on the
+    wrong table until the wheel is rebuilt -- so that is reported loudly,
+    with the new key written into the run's own artifact directory where the
+    operator can pick it up. Not back into the package: regenerating a
+    shipped asset is a deliberate act, and a program that silently rewrites
+    its own distribution is how the packaging defect survived the first
+    time.
+
+    Args:
+        discovered: The key just read out of the live client source.
+
+    Returns:
+        None.
+    """
+    shipped = load_static_key()
+    if discovered == shipped:
+        return
+    captured = bot_run_dir(resolve_bot_instance()) / "rotated_xor_static_key.txt"
+    _test_hooks.write_text(captured, discovered + "\n")
+    log.warning(
+        "STATIC KEY ROTATED: the client's key no longer matches the one this "
+        "build ships (%s). Every session decodes against the shipped key, so "
+        "they are all running on a stale table until the bundled asset is "
+        "regenerated. The new key has been written to %s",
+        static_key_file_path(),
+        captured,
+    )
 
 
 __all__ = [

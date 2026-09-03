@@ -256,6 +256,61 @@ class TestGatherIntel:
         page, _ = _intel_page(headless_browser, f'var config = "{static_key}";')
         assert _capture_static_key(page) == static_key
 
+    def test_an_unrotated_key_writes_nothing_and_says_nothing(
+        self,
+        fake_fs: FakeFileSystem,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The ordinary case: the client's key is the one the wheel ships.
+
+        This is EVERY session until the game rotates its key, and it is
+        the case that used to write. The write went into the installed
+        package, which a source checkout allows and a container refuses,
+        so a bot that was playing fine on the host died four seconds into
+        the game in the fleet. Asserting that nothing is written is
+        therefore the whole point of the test, not a detail of it.
+        """
+        from tankpit_bot.browser.key_discovery import load_static_key
+        from tankpit_bot.browser.lifecycle import _check_shipped_static_key
+
+        before = set(fake_fs.get_written_files())
+        with caplog.at_level(logging.WARNING):
+            _check_shipped_static_key(load_static_key())
+
+        assert set(fake_fs.get_written_files()) == before
+        assert [record.message for record in caplog.records] == []
+
+    def test_a_rotated_key_is_reported_and_captured_beside_the_run(
+        self,
+        fake_fs: FakeFileSystem,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A key that no longer matches is drift, and drift is loud.
+
+        The recovery matters as much as the warning: every session is
+        decoding against the stale shipped key from here on, and the
+        operator needs the new one to rebuild the asset. It lands in the
+        run's own artifact directory — never back in the package, which
+        is the write this whole change exists to remove.
+        """
+        from tankpit_bot.browser.lifecycle import _check_shipped_static_key
+        from tankpit_bot.resources import static_key_file_path
+
+        rotated = "Z" * 1000
+        before = set(fake_fs.get_written_files())
+        with caplog.at_level(logging.WARNING):
+            _check_shipped_static_key(rotated)
+
+        after = fake_fs.get_written_files()
+        fresh = set(after) - before
+        assert len(fresh) == 1
+        captured = fresh.pop()
+        assert captured.endswith("rotated_xor_static_key.txt")
+        assert after[captured] == rotated + "\n"
+        # The shipped asset is untouched — that write is the defect.
+        assert after[str(static_key_file_path())] == "Y" + "A" * 999
+        assert any("STATIC KEY ROTATED" in record.message for record in caplog.records)
+
     @pytest.mark.usefixtures("fake_fs")
     def test_gather_intel_with_real_headless_browser(
         self,
