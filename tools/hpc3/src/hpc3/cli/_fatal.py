@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
+from platform_core.cli_args import HelpRequestedError, usage_text
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError
 
@@ -67,6 +68,13 @@ def run(main: Callable[[Sequence[str] | None], int]) -> int:
     """
     try:
         return main(None)
+    except HelpRequestedError as request:
+        # Before the ValueError arm, which HelpRequestedError subclasses. Asking
+        # what the flags are is not a refusal: it goes to stdout beside the
+        # command's other output and exits zero, so `cmd --help` in a script
+        # does not read as the command having declined to run.
+        _test_hooks.emit(usage_text(request.allowed))
+        return EXIT_OK
     except AppError as refusal:
         # ErrorCodeBase subclasses str, so a member IS its own string value.
         # Annotating rather than reading `.value` keeps the expression typed:

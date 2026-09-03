@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 import pytest
+from platform_core.cli_args import HelpRequestedError
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError
 
@@ -63,6 +64,39 @@ class TestStatusPassesThrough:
     def test_the_three_statuses_are_distinct(self) -> None:
         """A caller scripting these has to be able to tell them apart."""
         assert sorted({EXIT_OK, EXIT_NEGATIVE, EXIT_REFUSED}) == [0, 1, 2]
+
+
+class TestHelpIsNotARefusal:
+    """``--help`` is the one thing a caller who does not know the flags can
+    type. It used to be answered with "unknown argument", which is the
+    interface declining to describe itself, and at status 2.
+    """
+
+    def test_it_prints_usage_and_succeeds(self, emitted: list[str]) -> None:
+        status = _fatal.run(_raising(HelpRequestedError(("--config", "--run"))))
+
+        assert status == EXIT_OK
+        assert emitted == ["usage: --config <value> --run <value>"]
+
+    def test_usage_goes_to_the_report_stream_not_the_error_stream(self, errors: list[str]) -> None:
+        """A caller running `cmd --help > flags.txt` wants the flags in the
+        file, and a zero status so a script does not read it as a failure.
+        """
+        _fatal.run(_raising(HelpRequestedError(("--config",))))
+
+        assert errors == []
+
+    def test_it_is_caught_before_the_value_error_arm_it_subclasses(
+        self, emitted: list[str], errors: list[str]
+    ) -> None:
+        """HelpRequestedError IS a ValueError, so arm order is what decides this.
+        Reversing the two arms would print 'usage: expected one of ...' at
+        status 2 and still look plausible.
+        """
+        status = _fatal.run(_raising(HelpRequestedError(("--config",))))
+
+        assert (status, errors) == (EXIT_OK, [])
+        assert emitted == ["usage: --config <value>"]
 
 
 class TestRefusalsBecomeMessages:

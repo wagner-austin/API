@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from platform_core.cli_args import parse_single_flags, require_flag, take_value
+from platform_core.cli_args import (
+    HELP_FLAGS,
+    HelpRequestedError,
+    parse_single_flags,
+    require_flag,
+    take_value,
+    usage_text,
+)
 
 _FLAGS = ("--host", "--spec")
 
@@ -50,6 +57,41 @@ class TestParseSingleFlags:
     def test_a_missing_value_is_refused(self) -> None:
         with pytest.raises(ValueError, match="requires a value"):
             parse_single_flags(["--host"], _FLAGS)
+
+
+class TestHelp:
+    """Asking what the flags are is the one thing a caller who does not know
+    them can type, so it must not be answered with 'unknown argument'.
+    """
+
+    @pytest.mark.parametrize("flag", HELP_FLAGS)
+    def test_a_help_flag_is_recognised(self, flag: str) -> None:
+        with pytest.raises(HelpRequestedError) as raised:
+            parse_single_flags([flag], _FLAGS)
+
+        assert raised.value.allowed == _FLAGS
+
+    def test_help_wins_over_an_unknown_flag_beside_it(self) -> None:
+        """`cmd --turbo yes --help` is a caller who already guessed wrong."""
+        with pytest.raises(HelpRequestedError):
+            parse_single_flags(["--help", "--turbo", "yes"], _FLAGS)
+
+    def test_help_after_a_valid_flag_is_still_help(self) -> None:
+        with pytest.raises(HelpRequestedError):
+            parse_single_flags(["--host", "hpc3", "--help"], _FLAGS)
+
+    def test_it_is_a_value_error_so_untaught_boundaries_still_refuse(self) -> None:
+        """The compatibility property. A boundary that has not been taught
+        about help must degrade to the refusal it gave before, not to a
+        traceback.
+        """
+        assert issubclass(HelpRequestedError, ValueError)
+
+        with pytest.raises(ValueError, match="expected one of"):
+            parse_single_flags(["--help"], _FLAGS)
+
+    def test_usage_names_every_flag_and_that_each_takes_a_value(self) -> None:
+        assert usage_text(_FLAGS) == "usage: --host <value> --spec <value>"
 
 
 class TestRequireFlag:

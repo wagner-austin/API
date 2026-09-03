@@ -153,10 +153,17 @@ def _sweep_member_artifacts() -> list[JSONValue]:
 
 
 class TestTheCommittedWorkspaces:
-    """Three documents, one per project, sharing one ledger file."""
+    """One document per project, all sharing one ledger file."""
 
     def test_they_declare_every_project_exactly_once(self) -> None:
-        assert sorted(_by_project()) == ["cleargbm", "floor", "mi", "rusted", "turkic-lstm"]
+        assert sorted(_by_project()) == [
+            "cleargbm",
+            "floor",
+            "mi",
+            "rusted",
+            "tankpit",
+            "turkic-lstm",
+        ]
 
     def test_each_workspace_declares_the_project_its_filename_implies(self) -> None:
         declared = {name: sorted(w["projects"]) for name, w in _workspaces().items()}
@@ -164,6 +171,7 @@ class TestTheCommittedWorkspaces:
             "hpc3-floor.json": ["floor"],
             "hpc3-mi.json": ["mi"],
             "hpc3-rusted.json": ["rusted"],
+            "hpc3-tankpit.json": ["tankpit"],
             "hpc3-turkic-lstm.json": ["turkic-lstm"],
             "hpc3.json": ["cleargbm"],
         }
@@ -250,9 +258,10 @@ class TestEveryCommittedSubmissionResolves:
             "sweep-cleargbm-p6-rung4b.json",
             "sweep-cleargbm-p6-rung5.json",
             "sweep-turkic-bases-resume-1.json",
+            "sweep-turkic-bases-v4.json",
             "sweep-turkic-bases.json",
         ]
-        assert sum(expanded) == 119
+        assert sum(expanded) == 126
 
     def test_no_sweep_member_leaves_its_artifact_unstated(self) -> None:
         """Stated, which is not the same as null.
@@ -268,7 +277,7 @@ class TestEveryCommittedSubmissionResolves:
         """
         artifacts = _sweep_member_artifacts()
         stated = sorted(str(a) for a in artifacts if a is not None)
-        assert len(artifacts) == 119
+        assert len(artifacts) == 126
         assert sum(1 for a in artifacts if a is None) == 108
         assert stated[0] == "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
         # 7 from the original sweep, 4 more from the resume round that
@@ -277,4 +286,10 @@ class TestEveryCommittedSubmissionResolves:
         # own and is resubmitted as a new record naming the jobs it resumes --
         # which is why a resume round is a committed document rather than a
         # command someone re-ran.
-        assert len(stated) == 11
+        #
+        # 7 more from sweep-turkic-bases-v4, which retrains every language on
+        # the corrected corpus. Those write to checkpoints_v4 rather than over
+        # checkpoints: five of the seven v3 corpora are byte-identical to v4,
+        # so those checkpoints stay valid, and keeping them is what lets the
+        # v4 run measure run-to-run variability against a real baseline.
+        assert len(stated) == 18

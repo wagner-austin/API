@@ -19,6 +19,50 @@ one is a different corpus; both would otherwise proceed and report success.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from typing import Final
+
+HELP_FLAGS: Final[tuple[str, ...]] = ("--help", "-h")
+"""Tokens that ask what the flags are instead of asking for work."""
+
+
+class HelpRequestedError(ValueError):
+    """The command line asked for usage rather than for the command to run.
+
+    A subclass of :class:`ValueError` deliberately. These flags are read by
+    two packages' entry points, and only one of them translates refusals at a
+    typed boundary. Raising a fresh exception type would turn ``--help`` into
+    a traceback everywhere that has not been taught the new type, which is a
+    worse answer than the refusal it replaced. As a ``ValueError`` subclass it
+    degrades to exactly the old behaviour, and a boundary that wants to print
+    usage and exit zero can catch it first.
+
+    Attributes:
+        allowed: The flags the command accepts, in declaration order, so the
+            boundary can render them without knowing the command.
+    """
+
+    def __init__(self, allowed: Sequence[str]) -> None:
+        """Record which flags the command accepts.
+
+        Args:
+            allowed: Flags this command accepts, each taking one value.
+        """
+        self.allowed: tuple[str, ...] = tuple(allowed)
+        super().__init__("expected one of " + ", ".join(self.allowed))
+
+
+def usage_text(allowed: Sequence[str]) -> str:
+    """Render the accepted flags as a usage line.
+
+    Args:
+        allowed: Flags the command accepts, each taking one value.
+
+    Returns:
+        A single line naming every flag and that each takes a value. Every
+        flag in this parser is single-valued, so the rendering needs no
+        per-flag metadata and cannot drift from the parser's own rules.
+    """
+    return "usage: " + " ".join(f"{flag} <value>" for flag in allowed)
 
 
 def take_value(tokens: Sequence[str], index: int, flag: str) -> str:
@@ -58,6 +102,11 @@ def parse_single_flags(tokens: Sequence[str], allowed: Sequence[str]) -> dict[st
         distinguishes "not given" from "given as empty".
 
     Raises:
+        HelpRequestedError: If ``--help`` or ``-h`` appears anywhere in the
+            tokens. Checked before the unknown-flag refusal, because asking
+            what the flags are is the one thing a caller who does not know
+            them can type, and answering it with "unknown argument" is the
+            interface refusing to describe itself.
         ValueError: If a token is not an allowed flag, a flag is repeated, or
             a flag's value is missing. Repetition raises because the intent
             is ambiguous: silently keeping the last would discard a value the
@@ -67,6 +116,8 @@ def parse_single_flags(tokens: Sequence[str], allowed: Sequence[str]) -> dict[st
     index = 0
     while index < len(tokens):
         token = tokens[index]
+        if token in HELP_FLAGS:
+            raise HelpRequestedError(allowed)
         if token not in allowed:
             raise ValueError(f"unknown argument {token!r}; expected one of {list(allowed)}")
         if token in parsed:
@@ -96,4 +147,11 @@ def require_flag(parsed: Mapping[str, str], flag: str) -> str:
     return parsed[flag]
 
 
-__all__ = ["parse_single_flags", "require_flag", "take_value"]
+__all__ = [
+    "HELP_FLAGS",
+    "HelpRequestedError",
+    "parse_single_flags",
+    "require_flag",
+    "take_value",
+    "usage_text",
+]
