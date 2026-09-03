@@ -99,7 +99,7 @@ def test_northwind_key_words() -> None:
         "ветер": "vʲetʲer",  # 'wind'
         "солнце": "solnt͡se",  # 'sun', ц is unpaired hard
         "сильнее": "sʲilʲnʲeje",  # 'stronger'
-        "плащ": "plaʃʲː",  # 'cloak'
+        "плащ": "plaɕː",  # 'cloak'
         "путник": "putnʲik",  # 'traveler'
         "дуть": "dutʲ",  # 'to blow'
         "снять": "snʲatʲ",  # 'to take off'

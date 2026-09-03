@@ -31,11 +31,19 @@
 # phonetically retroflex /ʂ ʐ/ (p. 61), and Epitran writes them that way.
 # This file keeps the Illustration's own phoneme chart, /ʃ ʒ/ (p. 222),
 # because the file is phonemic and retroflexion is a fact about
-# realisation. For ‹щ› Hamann is direct evidence for what is written here:
-# palatalising a retroflex changes its major place of articulation, so the
-# palatalised sound "is not a retroflex but a palatoalveolar", written
-# [ʃː(ʲ)] with the palatalisation redundant (p. 64). That is ʃʲː, not the
-# alveolo-palatal ɕː the Illustration offers as an alternative (p. 223).
+# realisation.
+#
+# ‹щ› is written ɕː. The Illustration sanctions both notations for the one
+# phoneme -- "a laminal palatalised post-alveolar (or alternatively, an
+# alveolo-palatal [ɕː])" (p. 223) -- and Hamann reads the palatalised
+# retroflex as a palatoalveolar, [ʃː(ʲ)], with the palatalisation redundant
+# (p. 64). Both are defensible, so the tie is broken on cross-language
+# consistency rather than on phonetics: kk_ipa.rules, ky_ipa.rules and
+# uzc_ipa.rules all write ‹щ› as ɕː, and all three name it a Russian loan
+# phoneme, so it is the same borrowed segment. Writing it two ways would
+# make a character-level model read a spelling difference as a language
+# difference, which is the defect the corpus symbol map exists to prevent.
+# test_cross_language_notation.py holds the four files to this.
 #
 # In scope, because the Illustration makes them contrastive (p. 222):
 #   - the palatalised/non-palatalised opposition, written ʲ on the consonant
@@ -126,7 +134,7 @@ $Vout  = [a e i o u ɨ] ;
 Ц > t͡s ;  ц > t͡s ;     # unpaired hard
 Ч > t͡ʃʲ ; ч > t͡ʃʲ ;    # unpaired soft
 Ш > ʃ ;  ш > ʃ ;       # unpaired hard
-Щ > ʃʲː ; щ > ʃʲː ;    # unpaired soft, long
+Щ > ɕː ; щ > ɕː ;      # unpaired soft, long
 
 # ---------------------------------------------------------------------------
 # 3. IOTATED VOWELS
