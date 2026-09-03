@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol.commands import (
+    CMD_KEEPALIVE,
     CMD_MAP_OPEN,
     CMD_MAP_TELEPORT,
     CMD_MINE,
@@ -109,3 +110,29 @@ def test_short_payloads_raise() -> None:
         decode_client_command(bytes([4, CMD_MOVE, 42]))
     with pytest.raises(DecodeError):
         decode_client_command(bytes([6, CMD_SHOOT, 55]))
+
+
+def test_the_client_heartbeat_decodes_to_its_own_kind() -> None:
+    """THE FRAME A REAL CLIENT SENDS EVERY TICK, AND OUR BOT NEVER DOES.
+
+    Payload ``02 21`` — invariant across all 11,871 archived sends,
+    two bytes, no arguments. [[client-commands]] has carried the row
+    (JS class ``dc``) all along; the DECODER did not, so the frame
+    resolved to ``other``, and ``other`` is the one kind the sim
+    server refuses.
+    """
+    command = decode_client_command(bytes([0x02, CMD_KEEPALIVE]))
+
+    assert command["kind"] == "keepalive"
+    assert command["command"] == CMD_KEEPALIVE
+    assert (command["x"], command["y"]) == (0, 0)
+
+
+def test_an_unknown_command_byte_is_still_other() -> None:
+    """Naming the heartbeat must not turn the decoder permissive.
+
+    ``other`` still exists and still means "we have no law for this".
+    A decoder that answered every byte with a plausible kind would
+    hide the next unmodelled command exactly as this one was hidden.
+    """
+    assert decode_client_command(bytes([0x02, 0xFE]))["kind"] == "other"

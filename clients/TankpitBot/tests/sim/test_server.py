@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from tankpit_bot.protocol.commands import CMD_KEEPALIVE, CMD_RADAR
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_CANT_GO,
@@ -15,6 +16,7 @@ from tankpit_bot.protocol.constants import (
 from tankpit_bot.sim.commands import (
     ClientCommandDict,
     SimError,
+    decode_client_command,
 )
 from tankpit_bot.sim.world import (
     make_sim_tank,
@@ -27,6 +29,10 @@ from tests.sim._server_harness import (
     _supervisors,
     _syncs,
 )
+
+#: The client command payload's leading type byte, ``02`` on every one
+#: of the archive's 11,871 heartbeat frames.
+_TYPE = 0x02
 
 
 def test_unsupported_kind_and_unknown_tank_raise() -> None:
@@ -182,3 +188,49 @@ def test_a_walk_draws_a_sync_and_a_standstill_does_not() -> None:
 
     server.queue_command(9, _shoot(15, 10))
     assert 0x3F not in _kinds(server.advance_tick())
+
+
+def test_a_client_heartbeat_is_answered_with_silence_not_a_crash() -> None:
+    """THE CRASH A REAL CLIENT WOULD HAVE HIT IN ITS FIRST 2 SECONDS.
+
+    ``queue_command`` raises ``SimError`` for any kind outside
+    ``_SUPPORTED_KINDS``, and the client keep-alive decoded to
+    ``other`` — so a real browser client, which sends one per tick,
+    took the server down immediately. Our bot has never sent one, so
+    no sim session and no test ever met it.
+
+    Silence is the MEASURED answer, not a shrug: 9,746 of 11,871
+    archived keep-alive windows are wholly silent, and every
+    self-caused token in the remainder belongs to another command
+    whose answer arrived late ([[client-commands]]).
+
+    The command is DECODED from its wire bytes rather than hand-built,
+    so the decoder and the router are pinned together — a hand-built
+    dict cannot catch the decoder naming the frame something else.
+    """
+    server = _server()
+    quiet = server.advance_tick()
+
+    server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
+    beating = server.advance_tick()
+
+    assert _kinds(beating) == _kinds(quiet)
+
+
+def test_a_heartbeat_never_disturbs_the_command_it_rides_beside() -> None:
+    """A tick carrying both answers the real command and nothing more.
+
+    The keep-alive keeps its own schedule, so it lands in the same
+    tick as real work constantly. It must contribute exactly nothing —
+    including no reordering of what the real command drew.
+    """
+    server = _server()
+    server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_RADAR])))
+    without = server.advance_tick()
+
+    server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
+    server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_RADAR])))
+    server.queue_command(9, decode_client_command(bytes([_TYPE, CMD_KEEPALIVE])))
+    with_beats = server.advance_tick()
+
+    assert _kinds(with_beats) == _kinds(without)

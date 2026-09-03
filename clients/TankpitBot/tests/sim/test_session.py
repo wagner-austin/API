@@ -16,7 +16,14 @@ from platform_core.json_utils import JSONObject, require_dict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_body import _tick_once
 from tankpit_bot.browser.page_client_snapshot import decode_page_client_snapshot
-from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
+from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.protocol.commands import (
+    CMD_KEEPALIVE,
+    CMD_MAP_OPEN,
+    COMMAND_PREFIX,
+    TYPE_QUERY,
+    build_query_command,
+)
 from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.wire.helpers import EncodeError
@@ -168,3 +175,64 @@ def test_real_tick_loop_plays_a_session_against_the_sim() -> None:
         raise AssertionError("the seam never established self_state")
     assert (self_state["x"], self_state["y"]) == (truth["x"], truth["y"])
     assert self_state["fuel"] == truth["fuel"]
+
+
+def _query_frame(table: bytes, command: int) -> bytes:
+    """One query-family frame as a real page client puts it on the wire.
+
+    ``[!]`` then the XOR-ciphered ``[TYPE_QUERY][command]``. The frame
+    must be ENCIPHERED, because the seam deciphers everything it
+    routes — ``build_query_command`` returns plaintext with a length
+    header and is the bot's send path, not the page's. The cipher is
+    symmetric, so the decode helper enciphers, exactly as
+    ``SimCDPSession`` builds its own page frames.
+
+    Args:
+        table: The session's XOR table.
+        command: The query command byte.
+
+    Returns:
+        The frame body, lead byte included.
+    """
+    return bytes([COMMAND_PREFIX]) + xor_decode_body(bytes([TYPE_QUERY, command]), table)
+
+
+def test_a_page_client_heartbeat_does_not_kill_the_session() -> None:
+    """THE CRASH, AT THE SEAM A REAL BROWSER ACTUALLY ENTERS THROUGH.
+
+    Every client frame lands in ``route_client_payload``, which decodes
+    it and hands it straight to ``queue_command`` — and that raised
+    ``SimError`` for any kind outside ``_SUPPORTED_KINDS``. The
+    keep-alive decoded to ``other``, so a real client killed the
+    server with its first one, seconds after connecting.
+
+    [[client-commands]] has carried this command (JS class ``dc``) all
+    along. Our bot has never SENT one, and that is the whole reason a
+    sim soaked for months never met it: the corpus we validated
+    against was written by the only client that does not send it.
+    """
+    _bot, server, link, table = boot_seam()
+
+    link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
+
+    assert link.sent_commands[-1] == "keepalive"
+    assert server.advance_tick() == server.advance_tick()
+
+
+def test_a_heartbeat_leaves_the_next_real_command_untouched() -> None:
+    """A client beats constantly; the beat must cost the next command nothing.
+
+    Asserted against a control session that sent the same real command
+    with no heartbeat beside it, so the comparison is the map answer
+    itself rather than a shape written down by hand.
+    """
+    _control_bot, control, control_link, control_table = boot_seam()
+    control_link.send_page_frame(_query_frame(control_table, CMD_MAP_OPEN))
+    expected = [message["msg_type"] for message in control.advance_tick()]
+
+    _bot, server, link, table = boot_seam()
+    link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
+    link.send_page_frame(_query_frame(table, CMD_MAP_OPEN))
+    link.send_page_frame(_query_frame(table, CMD_KEEPALIVE))
+
+    assert [message["msg_type"] for message in server.advance_tick()] == expected

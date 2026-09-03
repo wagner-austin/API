@@ -90,7 +90,7 @@ map programmatically and never key-closed it).[^3]
 |------|------|-------|-------|-------------|-------------|
 | 0x3F | `?` | 2 | Jb | **Heartbeat/ping** (sent on game join) | `[2, '?']` |
 | 0x2E | `.` | 2 | Kb | **Ping** (latency check, sent via F6 key) | `[2, '.']` |
-| 0x21 | `!` | 2 | dc | **Keep-alive** (sent every 30s idle) | `[2, '!']` |
+| 0x21 | `!` | 2 | dc | **Keep-alive**. Cadence REFINED 2026-09-03 from 11,871 archived sends: p10 1,999 ms, **median 2,006 ms**, p90 30,070 ms — the "every 30s idle" figure is the idle TAIL; the common case is one per 2-second tick. The server never answers it: 9,746 windows wholly silent, and every self-caused token in the other 2,125 belongs to another command whose answer arrived late. **Our bot never sends one**, which is why the sim had no law for it until 2026-09-03 and a real client's first keep-alive crashed the server ([[capture-differ]]). | `[2, '!']` |
 | 0x72 | `r` | 3 | cc | **Hotkey action** (equipment toggle) | `[3, 'r', key_code]` — codes 49-53 (ASCII '1'-'5') toggle slots in inventory order: 1 armor, 2 dual, 3 missile, 4 homing, 5 radar (user contract + JS trace 2026-07-24; the server holds the enabled state — a scan with extras disabled consumes nothing) |
 
 ## Connection/Settings Commands (va subclasses)
@@ -293,6 +293,12 @@ reverse-engineering.
       "code": "tankpit_bot.protocol.commands:CMD_SHOOT",
       "value": 115,
       "means": "spacebar - fire at a target position"
+    },
+    {
+      "id": "cmd-keepalive",
+      "code": "tankpit_bot.protocol.commands:CMD_KEEPALIVE",
+      "value": 33,
+      "means": "the client keep-alive, JS class dc. Cadence measured 2026-09-03 over 11,871 archived sends: p10 1,999 ms, median 2,006 ms, p90 30,070 ms -- the table row's 'every 30s idle' is the idle TAIL, the common case is one per 2-second tick. The server NEVER answers it: 9,746 windows wholly silent, and every self-caused token in the other 2,125 belongs to another command whose answer arrived late. Our bot never sends one, so the sim had no law for it and a real client's first keep-alive raised SimError out of queue_command -- a hosted server dying seconds after a browser connected."
     },
     {
       "id": "cmd-statistics",

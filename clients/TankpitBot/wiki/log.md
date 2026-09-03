@@ -5869,3 +5869,40 @@ validation section + pin refreshes), [[bot-behavior-contract]]
 (mine-pin row, teardown-ladder MUST, tree pins), [[fleet-lifecycle]]
 (launcher deletion, historical footnote). Commits `299d82d8` →
 `eded4ab6`, every one behind a green 100.00% gate.
+
+---
+## [2026-09-03] lift | A real client would have killed the server in two seconds
+
+`queue_command` raises `SimError` for any kind outside `_SUPPORTED_KINDS`, and the client keep-alive (0x21) decoded to `other`. So a real browser client -- which sends one per tick, forever -- took the server down on its first one, seconds after connecting. Every client frame reaches that raise: `route_client_payload` decodes and hands straight to it.
+
+**Our bot has never sent one.** That is the entire reason a sim soaked for months never met it: the corpus we validated against was written by the only client that does not send this command.
+
+### What was actually measured
+
+Payload invariantly the two bytes `02 21` across 11,871 archived sends. The real server never answers it -- 9,746 windows wholly silent, and every self-caused token in the other 2,125 belongs to another command whose answer arrived late (the same spill pattern as the radar/teleport rows). So the sim's answer is SILENCE, and the router says so in an explicit branch rather than a fallthrough, so nobody later reads the quiet as an oversight and invents a reply.
+
+`_SUPPORTED_KINDS` still refuses genuinely unmodelled kinds. Naming this one must not make the server permissive: a sim that quietly swallows anything it does not recognise hides the next gap exactly the way this one hid.
+
+### A correction I owe the wiki, not the other way round
+
+I wrote in the code comment that the JS command table "does not list 0x21 as a client command at all". **Wrong.** [[client-commands]] has carried the row -- 0x21, class `dc`, "Keep-alive" -- since the table was mined. I had grepped [[js-source-map]], which is the SERVER message table, found `!`/0x21 there as TankInfo, and concluded absence. Same mistake shape as the ferry drift: grep the wrong page, conclude the wiki is silent, credit yourself with a discovery.
+
+The wiki was ahead of the code again. What the code contributed is a REFINEMENT: the page said "sent every 30s idle", and the archive says p10 1,999 ms, median 2,006 ms, p90 30,070 ms. Both are true -- 30 s is the idle tail, and the common case is one per 2-second tick. It is the common case a hosted server has to survive, so the row now carries both.
+
+### The test is pinned at the seam, and proven able to fail
+
+The crash lives on the client ingress path, so the test drives `send_page_frame` with a genuinely XOR-ciphered frame rather than asserting at `queue_command`. Building it surfaced its own small lesson: `build_query_command` returns PLAINTEXT with a length header (it is the bot's send path), while the seam deciphers everything it routes -- so the first draft decoded to garbage and reported `other`, which is the failure the fix was supposed to remove. The helper now enciphers, the way `SimCDPSession` builds its own page frames.
+
+Negative control run before committing: removing `keepalive` from `_SUPPORTED_KINDS` makes both seam tests raise `SimError: got 'keepalive'`. The fix is load-bearing and the tests can observe its absence.
+
+### A file one line from the ceiling, flagged not split
+
+`protocol/commands.py` was **595 lines at HEAD** — five from the bar — so it was going to fail on whoever added the next line, and that turned out to be me. My first draft put a 20-line measurement docstring on the new constant and took it to 615.
+
+The fix was not to squeeze: the prose duplicated [[client-commands]], which the same change had just updated with exactly those numbers, so removing it is the DRY correction and the size relief is a side effect. The constant now reads as a one-liner like every other row in that table, which is the file's own style.
+
+**The file is still at 598 and still a trap.** The honest split is constants (the command vocabulary) from builders (the `build_*` frame makers, from line 370) — but that is 43 import sites, and two other sessions have ~20 files open in this tree right now. Doing it while they are mid-flight buys a merge conflict for no urgency. Flagged on the board instead, for a quiet moment.
+
+### Standing question, unanswered
+
+The sim still refuses unmodelled commands loudly, which is right for a test harness and wrong for a hosted server -- an unknown byte from a real client is a denial of service. What the real server does with garbage is NOT measured, and I am not going to guess: silently swallowing unknown input is the "best-effort" the standards ban, and inventing a refusal would be inventing a law. It needs a measurement (send the real server a nonsense command and watch) before it can have an implementation.

@@ -44,6 +44,8 @@ CMD_STATISTICS = 118  # 0x76 - 'c' key - Show statistics
 # XOR-encoded commands (type=2, start with '!')
 CMD_PING = 46  # 0x2e - 'F6' key - Ping server, returns latency in ms
 
+CMD_KEEPALIVE = 33  # 0x21 - client keep-alive, JS class dc ([[client-commands]])
+
 # XOR-encoded commands (type=4, start with '!') - Movement
 CMD_MOVE = 112  # 0x70 - Mouse click - Tank movement (click to move)
 # Movement payload: X (1 byte) + Y (1 byte) = target coordinates
@@ -536,6 +538,7 @@ __all__ = [
     "CMD_BLOCK",
     "CMD_ENTER_GAME",
     "CMD_INVENTORY",
+    "CMD_KEEPALIVE",
     "CMD_MAP_OPEN",
     "CMD_MAP_TELEPORT",
     "CMD_MINE",

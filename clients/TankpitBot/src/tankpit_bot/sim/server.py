@@ -70,6 +70,7 @@ _SUPPORTED_KINDS = frozenset(
         "chat",
         "scope",
         "statistics",
+        "keepalive",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
@@ -367,6 +368,24 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin):
             return
         if kind == "scope":
             self._process_scope_command(tank_id, command, messages)
+            return
+        if kind == "keepalive":
+            # THE HEARTBEAT DRAWS SILENCE. Measured over 11,871
+            # archived sends (2026-09-02): the real server answers
+            # none of them — 9,746 windows are wholly silent and every
+            # self-caused token in the rest belongs to another command
+            # whose answer arrived late. So this is not "ignored", it
+            # is answered CORRECTLY, and the branch is explicit rather
+            # than a fallthrough so nobody later reads the silence as
+            # an oversight and invents a reply.
+            #
+            # Before this branch existed a heartbeat did not reach the
+            # router at all: ``queue_command`` raised ``SimError`` on
+            # any kind outside ``_SUPPORTED_KINDS``, so the first
+            # heartbeat from a REAL client — one every 2 s, forever —
+            # took the server down. Our own bot never sends one, which
+            # is exactly why a sim built against our bot never met it
+            # ([[client-commands]]).
             return
         if kind == "statistics":
             # Per-connection, like every other answer: the statistics

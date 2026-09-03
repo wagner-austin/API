@@ -13,6 +13,7 @@ from typing import Literal, TypedDict
 from tankpit_bot.protocol.chat import CMD_CHAT
 from tankpit_bot.protocol.commands import (
     CMD_BLOCK,
+    CMD_KEEPALIVE,
     CMD_MAP_OPEN,
     CMD_MAP_TELEPORT,
     CMD_MINE,
@@ -41,6 +42,7 @@ ClientCommandKind = Literal[
     "chat",
     "scope",
     "statistics",
+    "keepalive",
     "other",
 ]
 
@@ -60,6 +62,12 @@ _BARE_KINDS: dict[int, ClientCommandKind] = {
     # server's answer a RESPONSE rather than a broadcast
     # ([[session-state-deglobalisation]]).
     CMD_STATISTICS: "statistics",
+    # The client keep-alive (JS class ``dc``, [[client-commands]]). A
+    # BARE kind because it carries no arguments -- the whole payload is
+    # ``02 21`` in all 11,871 archived sends -- and it belongs in this
+    # table rather than in ``other`` because the server has a LAW for
+    # it (silence), and a sim that cannot name it cannot obey that law.
+    CMD_KEEPALIVE: "keepalive",
 }
 
 
