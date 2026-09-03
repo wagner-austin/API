@@ -265,14 +265,25 @@ Real research, producing numbers that get compared, reachable by no tool.
   those checkers' verdict and a ruff release that adds a rule moves the
   number with nothing about the models having changed. Observations carry
   counts beside rates.
-- **What it does NOT carry, and this is the honest half.** The TRAINING run
-  emits no `RunRecord` — it recorded a determinism posture
-  (`UNPINNED_STACK`) and nothing else, so the adapter's own provenance is
-  weaker than the comparison's that cites it. The generation configuration
+- **What it does NOT carry, and this is the honest half.** The generation
+  configuration
   (base model, adapter, decoding parameters) is covered only indirectly, by
   the comparison's payload digest over the outcome files. And the corpus was
   emitted while both source repositories were dirty, which the manifest
   flags; no run built on it is citable until it is re-emitted clean.
+- **A claim in this entry was wrong for one day, and the correction is kept.**
+  It said the training run emitted no `RunRecord` and recorded only a
+  determinism posture. Training in fact captured a full `RunFingerprint` all
+  along, written into the manifest beside the weights by the same
+  `capture_run_fingerprint` the benchmarks use: the 2026-09-01 adapter names
+  an RTX 3090 Ti on driver 591.86 with `torch 2.6.0+cu124`. The real gaps
+  were narrower — the manifest is not a `RunRecord`, so nothing could compare
+  it against another experiment, and its package axis named `numpy`, `torch`
+  and `transformers` while a QLoRA run's arithmetic is decided by `peft` and
+  `bitsandbytes`, neither of which was recorded. Both are closed as of
+  `92183bbd`. The lesson is the one this file already carries twice: check
+  the artifact before writing what it contains.
+
 - **Results as of 2026-09-02, stated with their limits.** Perplexity moved
   2.8327 to 1.9631 with 392 of 392 held-out items improving, and train/holdout
   overlap was checked to be zero by path AND by content — the content check
