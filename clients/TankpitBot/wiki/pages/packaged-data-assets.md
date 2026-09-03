@@ -38,13 +38,13 @@ hubs: [architecture]
 # Packaged data assets: the wheel carries the key and the minimaps
 
 *Established 2026-09-03, after one packaging defect cost three cluster
-submissions and produced two independent workarounds.*
+submissions and produced two independent workarounds.*[^1]
 
 ## The defect
 
 `tankpit_bot` read two families of data files that the distribution did not
 contain. `pyproject.toml` shipped only `py.typed`; the assets sat at the
-repository root, outside `src/`.
+repository root, outside `src/`.[^6]
 
 | asset | how it was found | what happened after `pip install` |
 |---|---|---|
@@ -55,7 +55,7 @@ Neither survives an install. So every consumer rebuilt the data environment
 by hand, and **two independent workarounds grew for one defect**: the fleet
 container copied the key in and named it with `TANKPIT_XOR_KEY_FILE`, and a
 cluster job staged forty-six files beside itself, ran from that directory,
-and passed the same variable on every submission.
+and passed the same variable on every submission.[^7]
 
 ## The two failures are the evidence, and they failed differently
 
@@ -71,16 +71,16 @@ Three HPC3 submissions on 2026-09-03:[^1]
 
 That second failure is the one worth keeping. Two assets, two different
 resolution mechanisms, one of them invisible until the other was fixed — a
-defect that could not be discovered in a single pass.
+defect that could not be discovered in a single pass.[^1]
 
 ## The fix, and what was deleted rather than kept
 
 The assets live in `tankpit_bot.data` and ship in the wheel.
 `tankpit_bot.resources` is the one owner of "where is this asset", addressing
 them through `importlib.resources`, so the answer is identical under a
-checkout, a pip install, a container and a cluster image.
+checkout, a pip install, a container and a cluster image.[^8]
 
-**Deleted, not kept beside the fix:**
+**Deleted, not kept beside the fix:**[^9]
 
 - the checkout-relative constant
 - the `TANKPIT_XOR_KEY_FILE` override
@@ -90,11 +90,11 @@ checkout, a pip install, a container and a cluster image.
 
 An environment override is a second answer to a question that must have one,
 and it is precisely what let the defect survive: with the escape hatch in
-place, every consumer could paper over the packaging and none had to fix it.
+place, every consumer could paper over the packaging and none had to fix it.[^9]
 
 `static_key_file_path` moved from `protocol.codec` to `resources` with the
 rest. Locating a resource is not the codec's job, and a re-export left in
-`codec` would be a shim, so all 23 importing modules were repointed instead.
+`codec` would be a shim, so all 23 importing modules were repointed instead.[^10]
 
 ## Two distinctions the module holds deliberately
 
@@ -102,7 +102,7 @@ rest. Locating a resource is not the codec's job, and a re-export left in
 *server* names may honestly ship no minimap — the session runs without
 terrain, which the world service already handles. A file the caller
 *already names* is a broken install. One error for both would have hidden
-which of the two happened.
+which of the two happened.[^11]
 
 **`field42-r.gif` was dead weight, and is gone.** It was byte-identical to
 `field42_r.gif` — both sha256 `73c698d581ac8d12…` — and no lookup could reach
@@ -138,7 +138,7 @@ A distribution that carries its own data works under pip, Docker, apptainer
 and a checkout with no per-consumer ritual. It also means **the hpc3 image
 contract needs no `assets` concept** — an earlier proposal to bake the files
 into the image definition would have been a third workaround at the wrong
-layer.
+layer.[^12]
 
 [^1]: Job ids and failure modes from `/pub/wagnera3/tankpit/logs/`, 2026-09-03. `55715564`'s traceback ends in `XorStaticKeyUnavailableError` raised from `capture/xor.py::require_static_key` after the GIF had already loaded and 5,639 mines had been seeded — the run got far enough to prove the terrain fix worked and the key fix did not exist.
 
@@ -147,3 +147,11 @@ layer.
 [^3]: `sha256sum` and `cmp` on both files, 2026-09-03: each is `73c698d581ac8d125d5dcec06211e967ab858cb8aa23d8ea1e82dbf8b24b3d2b`, and `cmp` exits 0. The unreachability is structural rather than measured: `src/tankpit_bot/resources.py:105` builds the candidate as `data_directory() / f"{field_image.removesuffix('.gif')}{FIELD_GIF_SUFFIX}"`, so with `FIELD_GIF_SUFFIX == "_r.gif"` no input can produce the hyphen spelling.
 [^4]: Verified 2026-09-03 by breaking the tree twice. Copying `field42_r.gif` back to `field42-r.gif` fails at `tests/test_resources.py:88` on `assert 45 == 44`; *renaming* it — which leaves the count at 44 — passes line 88 and falls through to `tests/test_resources.py:92`, `AssertionError: field42-r.gif ships but no lookup can reach it`. The second case is the one the old `continue` silently permitted.
 [^5]: `scripts/download_fields.py`, `download_field_gifs`: `out_path = resolved_dir / f"{field_name}_r.gif"`, the only GIF filename the module constructs.
+
+[^6]: The two lookups as they stood before commit `bccf5afa`: the key was read from `Path(__file__).parent.parent.parent.parent`, four levels above `protocol/codec.py`, which is the repository root from a checkout and `site-packages` from an install; the GIFs were resolved from a bare relative filename in `sniffer/world_service.py::_find_field_gif`. `pyproject.toml:14-18` now ships `src/tankpit_bot/data/*.gif` and `src/tankpit_bot/data/xor_static_key.txt` beside `py.typed`, which previously stood alone.
+[^7]: The container workaround is visible in `Dockerfile:121-128`, which now records the two `COPY` lines and the `ENV TANKPIT_XOR_KEY_FILE` it used to carry and no longer does. The cluster workaround is jobs `55715554`/`55715564`/`55715577`, whose submissions staged 46 files into the working directory and passed the variable per run.
+[^8]: `src/tankpit_bot/resources.py:63`, `data_directory`, returns `Path(str(files(DATA_PACKAGE)))` with `DATA_PACKAGE = "tankpit_bot.data"` at line 33 — one anchor on the installed package rather than on the caller's working directory or the module's parents.
+[^9]: All five deletions are in commit `bccf5afa`, which removes `_CHECKOUT_STATIC_KEY_PATH` and the `TANKPIT_XOR_KEY_FILE` branch from `protocol/codec.py` (-27 lines), the CWD candidate list from `sniffer/world_service.py`, both `COPY`/`ENV` pairs from the `Dockerfile` (-23 lines), and 45 lines from `tests/test_codec.py` — the three tests that pinned the override's behaviour.
+[^10]: Commit `bccf5afa` touches 37 files; the import repoint accounts for most of them, and `protocol/codec.py` retains no re-export of the moved function.
+[^11]: `src/tankpit_bot/resources.py:89` (`field_gif_path`, returning `Path | None`) and `:111` (`require_asset`, raising `BundledAssetMissingError`). The split is pinned by `test_an_unknown_field_resolves_to_none_rather_than_raising` and `test_a_named_asset_that_does_not_ship_is_refused`.
+[^12]: Verified 2026-09-03 by building the wheel and reading it: `tankpit_bot-0.1.0-py3-none-any.whl` carries 44 files under `tankpit_bot/data/*.gif` plus `tankpit_bot/data/xor_static_key.txt`, with no hyphen spelling present. The hpc3 `ImageSpec` (`tools/hpc3/src/hpc3/contracts/image_spec.py:170-182`) declares no assets field.
