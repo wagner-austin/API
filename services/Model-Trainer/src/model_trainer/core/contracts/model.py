@@ -100,13 +100,19 @@ class CartridgeConfig(TypedDict):
             ``IndexError: index out of range in self`` from inside the
             position embedding, naming neither the cartridge nor the limit.
 
-            Measured on this repository's tiny rung (a 64-position model),
-            returns knee sharply by about 8 slots and the knee is set by the
-            base model rather than by how much the corpus holds -- a corpus
-            with sixteen distinct structures needed no more slots than one
-            with a single structure, it simply had a lower ceiling. Sizes in
-            the paper's range assume a base large enough to exploit them.
-            See ``tests/test_cartridge_capacity.py``.
+            HOW MANY SLOTS ARE WORTH BUYING IS A PROPERTY OF THE BASE, not of
+            the corpus. On this repository's tiny rung (a 64-position, 2-layer
+            model) returns knee sharply by about 8 slots and 48 slots score
+            measurably WORSE than 24; a corpus with sixteen distinct
+            structures needed no more slots than one with a single structure,
+            it simply had a lower ceiling. On real gpt2 the same sweep never
+            saturates in range -- 2, 8, 32, 128 and 512 slots each beat the
+            one below by more than the measurement's noise, at a diminishing
+            rate. So the paper's slot counts are not extravagant; they assume
+            a base large enough to exploit them, and this repository has one
+            model of each kind. See ``tests/test_cartridge_capacity.py`` for
+            the tiny rung and ``model_trainer.cli.cartridge_benchmark`` for
+            the real one.
         init_seed: Seed for drawing the initial key and value blocks. A
             cartridge's starting point decides which optimum it reaches, so a
             run that cannot say what it started from cannot be reproduced.

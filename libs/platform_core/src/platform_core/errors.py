@@ -167,6 +167,8 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CARTRIDGE_MODEL_REPORTS_NO_CACHE = "CARTRIDGE_MODEL_REPORTS_NO_CACHE"
     CARTRIDGE_STATE_INCOMPLETE = "CARTRIDGE_STATE_INCOMPLETE"
     CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED = "CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED"
+    CARTRIDGE_MEASUREMENT_UNREPLICATED = "CARTRIDGE_MEASUREMENT_UNREPLICATED"
+    CARTRIDGE_CORPUS_UNUSABLE = "CARTRIDGE_CORPUS_UNUSABLE"
 
     # Knowledge-editing errors
     #
@@ -520,6 +522,13 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # Two settings that are each fine and cannot both hold. 409, like the
     # geometry mismatch, because neither is wrong on its own.
     ModelTrainerErrorCode.CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED: 409,
+    # A gain claimed from too few seeds to know whether it is a gain. 400
+    # because the seed count is the caller's, and the fix is theirs: run it
+    # again with more.
+    ModelTrainerErrorCode.CARTRIDGE_MEASUREMENT_UNREPLICATED: 400,
+    # A corpus that yields nothing to train or nothing to hold out. 400 for
+    # the same reason: the window and the split are the caller's choices.
+    ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE: 400,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

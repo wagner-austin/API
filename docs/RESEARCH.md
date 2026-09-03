@@ -51,13 +51,53 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 
 - **Repo:** this one, `services/Model-Trainer`
 - **Runs:** `model_trainer.cli.{gemm_benchmark, probe_ladder, train_benchmark,
-  sdpa_benchmark, known_answer_probe, forward_benchmark, probe_trace, ...}`
+  sdpa_benchmark, known_answer_probe, forward_benchmark, probe_trace,
+  cartridge_benchmark, ...}`
 - **Produces:** one `RunRecord` JSON per run under `/pub/wagnera3/{bench,gemm,
   sdpa,ladder,trace,...}`
 - **Provenance:** `RunRecord` + `RunFingerprint` — image digest, GPU model,
   driver, determinism posture, host, package versions. The only surface here
   that carries all six axes.
 - **Scale:** 131 ledger rows, the largest body of cluster work.
+
+#### `cartridge_benchmark` — cartridge capacity and composition on a real base
+
+Added 2026-09-03. Measures a trained key-value prefix against a real
+pretrained model over a real corpus, replicated across seeds. It exists
+because the cartridge strategy's unit tests measure a two-layer, two-head
+model with random weights, and three of the conclusions drawn from that model
+did not survive a real one — the tiny model stops gaining at ~8 slots and
+then loses, while gpt2 is still gaining at 512 with no saturation point in
+range; composition retains ~59% rather than ~25%; and an untrained prefix
+goes from harmless to −0.7612 on held-out text.
+
+- **Command:** `python -m model_trainer.cli.cartridge_benchmark --plan
+  gpt2-wiki --corpus <dir> --second-corpus <dir> --device cuda --out <file>`
+- **Needs, on a compute node:** `HF_HOME=/pub/wagnera3/hf
+  TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1`, the same prefix `floor` and the
+  `mi` training runs already use, plus both corpora staged under a bound
+  path. Verified to need no network: the local run that produced the numbers
+  above ran under `HF_HUB_OFFLINE=1`.
+- **Second corpus is required and must be UNRELATED to the first.** Composing
+  two cartridges trained on two halves of one corpus measured 94% retention,
+  and the number was an artifact — each half already predicted the other.
+  Against an unrelated corpus the same code reports 59%.
+- **No run document is committed yet, deliberately.** The registered `mi`
+  image (`55651342e15d`, v23) predates this command, so a committed run
+  naming it would assert something untrue. It needs an image rebuilt from a
+  commit that contains `cartridge_benchmark`, and the document should be
+  written against that digest rather than this one.
+- **Read the spread, not just the mean.** Every arm reports one, and the
+  sweep's separations are judged against the largest spread among the *sweep*
+  arms — not against every arm, because the composition arm trains two
+  cartridges over a doubled prefix and is noisier for reasons that say
+  nothing about the sweep.
+- **A plan is reproducible from its seeds.** It was not until 2026-09-03:
+  training drew dropout from a process-wide RNG nothing seeded, so two runs
+  of one plan disagreed. That was first written up here as GPU contention,
+  because the two runs happened to differ in machine load — a coincidence
+  with a plausible story attached. Whether contention affects these numbers
+  is still unmeasured.
 
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
@@ -106,7 +146,8 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   `platform-core` by git rev, NOT by relative path — see below)
 - **Runs:** `runs/sweep-turkic-bases.json`, seven members, one per language
 - **Produces:** `/pub/wagnera3/LSTM/checkpoints/<lang>_best.pt`; locally
-  `results/*.csv` plus a `RunRecord` sidecar per evaluation
+  `results/*.csv` plus a `RunRecord` sidecar per evaluation, and as of
+  2026-09-03 a second sidecar per *training* run beside each checkpoint
 - **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
   one model's cross-entropy minus another's — with confidence intervals,
   across seven languages and six arms (`pilot_a/b/c`, `variant_b`, `v3`,
@@ -120,6 +161,27 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   `torch`/`numpy` versions. It states the card and driver as absent because
   the scoring path genuinely uses neither, and the determinism stack as
   `none` because it pins nothing — both true.
+
+  **Training writes one too, as of 2026-09-03** (`char_lstm.training_record`,
+  experiment `turkic-char-lstm-base-training`). Every completed run writes
+  `<lang>_best.pt.runrecord.json` beside the checkpoint, labelled with the
+  corpus rather than the language: the generation directory plus the first 12
+  hex of the corpus SHA-256. The digest is there because five of the seven v4
+  corpora are byte-identical to v3 and two are not, so the directory name
+  alone would report a corpus change that did not happen and miss one that
+  did. Unlike the scoring fingerprint this one carries the card and the
+  driver, because training uses both — reusing the scoring fingerprint would
+  have recorded something false, which is worse than recording nothing.
+
+  Its determinism stack also reads `none`, and there that is a statement
+  about configuration, not about outcome. Measured 2026-09-03: the `tr` base
+  trained twice from seed 1234 on one RTX 3090 Ti ten hours apart, no flags
+  set, produced byte-for-byte identical 3,736,656-byte checkpoints and a
+  `best_val_loss` agreeing to every digit. It still records `none`, because
+  reproducing once is not the same as having asked for reproducibility. And
+  it does not generalise: GPT-2 on this same card and torch build diverges
+  from its own seed, so this is a fact about a 933,535-parameter model, not
+  about CUDA.
 
   **The CSVs already in `results/` have no sidecar** and cannot get an honest
   one retroactively — nobody recorded what produced them. Re-running the

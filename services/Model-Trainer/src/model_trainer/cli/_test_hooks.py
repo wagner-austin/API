@@ -12,9 +12,15 @@ of pure code tests the fake.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Protocol
 
 from platform_core.determinism_record import DeterminismRecord
+from platform_core.errors import (
+    AppError,
+    ModelTrainerErrorCode,
+    model_trainer_status_for,
+)
 
 # Imported rather than restated. This module carried its own copy of
 # `ApplyDeterminismProto`, identical to the core one and with no reason to be
@@ -28,6 +34,11 @@ from model_trainer.core._hook_protocols_ml import (
 )
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.model import PreparedLMModel
+
+# Safe at module scope for the same reason `probe_shapes` is: a table of
+# TypedDicts, a digest and a label formatter, importing no torch. The arms it
+# describes live in `cartridge_measurement`, which does.
+from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS, CartridgePlan
 from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
 
 # Safe at module scope where the others are not: `probe_shapes` is a table of
@@ -49,6 +60,27 @@ class LoadHubModelProto(Protocol):
 
     def __call__(self, hub_model_id: str, /) -> PreparedLMModel:
         """Load the named model with nothing applied to it."""
+        ...
+
+
+class ReadCorpusDocumentsProto(Protocol):
+    """Protocol for reading a measurement corpus off the filesystem."""
+
+    def __call__(self, corpus_dir: Path, /) -> tuple[str, ...]:
+        """Read every document in a corpus directory, in a fixed order."""
+        ...
+
+
+class CartridgePlansProto(Protocol):
+    """Protocol for the cartridge plan table.
+
+    Behind a hook for the same reason :data:`ladder_shapes` is: every plan in
+    the real table is minutes of GPU per arm, so a suite that could only reach
+    that table would either run it or leave the entry uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, CartridgePlan]:
+        """Return every declared plan, in table order."""
         ...
 
 
@@ -309,6 +341,15 @@ def _default_run_benchmark_child(argv: list[str], variable: str, value: str, /) 
     return subprocess.run(argv, check=False).returncode
 
 
+def _default_cartridge_plans() -> Mapping[str, CartridgePlan]:
+    """Production cartridge plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return CARTRIDGE_PLANS
+
+
 def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
     """Production probe ladder - used as default hook.
 
@@ -414,7 +455,90 @@ def _default_pin_torch_threads(threads: int) -> int:
     return core_hooks.pin_torch_threads(threads)
 
 
+#: Opening and closing line of a markdown document's YAML frontmatter.
+_FRONTMATTER_FENCE = "---\n"
+
+
+def _strip_frontmatter(text: str, path: Path) -> str:
+    """Return a markdown document's body, without its YAML frontmatter.
+
+    The frontmatter is removed rather than trained on. A cartridge measured
+    over pages that still carry their frontmatter spends part of its prefix
+    learning to predict ``tags:`` and ``fact_checked:``, and the gain it
+    reports is then partly a gain at predicting YAML -- which is real, and is
+    not the thing anybody asked.
+
+    Args:
+        text: The document's full text.
+        path: Where it came from, for the error message.
+
+    Returns:
+        The body. The text unchanged when it opens no frontmatter fence,
+        because a document without frontmatter is all body.
+
+    Raises:
+        AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` when a document opens a
+            fence it never closes. Treating that as body would silently train
+            on the YAML this function exists to remove.
+    """
+    if not text.startswith(_FRONTMATTER_FENCE):
+        return text
+    closing = text.find("\n" + _FRONTMATTER_FENCE, len(_FRONTMATTER_FENCE) - 1)
+    if closing == -1:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE,
+            (
+                f"{path} opens a frontmatter fence and never closes it, so its body "
+                f"cannot be told from its metadata; measuring it would train the "
+                f"cartridge on YAML"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE),
+        )
+    return text[closing + len(_FRONTMATTER_FENCE) + 1 :]
+
+
+def _default_read_corpus_documents(corpus_dir: Path, /) -> tuple[str, ...]:
+    """Production implementation - read a directory of markdown documents.
+
+    Sorted by filename, because the order decides which windows the stride
+    holds out, and an unsorted directory listing would make the held-out set
+    depend on the filesystem.
+
+    Args:
+        corpus_dir: Directory holding the corpus.
+
+    Returns:
+        Every document's body, in filename order. Documents that are empty
+        once their frontmatter is removed are dropped -- they contribute no
+        window, and carrying them would put entries in the corpus digest that
+        no measurement can see.
+
+    Raises:
+        AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` if the directory holds no
+            markdown at all.
+    """
+    bodies = [
+        _strip_frontmatter(path.read_text(encoding="utf-8"), path).strip()
+        for path in sorted(corpus_dir.glob("*.md"))
+    ]
+    kept = tuple(body for body in bodies if body)
+    if not kept:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE,
+            (
+                f"{corpus_dir} holds no markdown document with a body; a cartridge "
+                f"measurement needs text to train on"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE),
+        )
+    return kept
+
+
 load_hub_model: LoadHubModelProto = _default_load_hub_model
+
+read_corpus_documents: ReadCorpusDocumentsProto = _default_read_corpus_documents
+
+cartridge_plans: CartridgePlansProto = _default_cartridge_plans
 
 score_cloze: ScoreClozeProto = _default_score_cloze
 
@@ -444,18 +568,21 @@ probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
 __all__ = [
     "ApplyDeterminismProto",
     "BenchmarkShapesProto",
+    "CartridgePlansProto",
     "CostShapesProto",
     "EnvCublasltWorkspaceProto",
     "ForwardShapesProto",
     "LadderShapesProto",
     "LoadHubModelProto",
     "ProbedShapesProto",
+    "ReadCorpusDocumentsProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
     "TraceRungsProto",
     "TrainShapesProto",
     "apply_determinism_hook",
     "benchmark_shapes",
+    "cartridge_plans",
     "cost_shapes_hook",
     "env_cublaslt_workspace",
     "forward_shapes",
@@ -463,6 +590,7 @@ __all__ = [
     "load_hub_model",
     "pin_torch_threads",
     "probed_shapes_hook",
+    "read_corpus_documents",
     "run_benchmark_child",
     "score_cloze",
     "trace_rungs",

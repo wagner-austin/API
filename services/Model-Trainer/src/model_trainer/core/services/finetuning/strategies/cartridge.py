@@ -14,11 +14,25 @@ checkpointing and the measurement harness this plugs into already exist.
 
 WHAT COMPOSES, AND WHAT IT COSTS. Two cartridges concatenate rather than being
 summed, which is what distinguishes them from steering vectors in the residual
-stream. ``cartridge_slots.compose`` does the joining. Measured on the tiny rung:
-a composed pair retains about a quarter of what each was worth alone, and most
-of that loss is DILUTION -- doubling the prefix with content-free padding costs
-nearly as much as adding a real second cartridge. See
-``tests/test_cartridge_composition.py`` for the arms and the attribution.
+stream. ``cartridge_slots.compose`` does the joining, and it is not free.
+
+HOW MUCH IT COSTS DEPENDS ON THE BASE, WHICH IS THE WHOLE POINT. On the tiny
+rung -- two layers, two heads, randomly initialised -- a composed pair retains
+about a quarter of what each was worth alone. On real gpt2 the same arms
+retain about 59% against an unrelated second corpus. The gap is not noise: a
+base that has learned to attend selectively across a long prefix can hold two
+cartridges at once, and one that has not cannot.
+
+The attribution differs too, and more sharply. On the tiny rung an untrained
+prefix is harmless, so padding a cartridge to twice its length isolates the
+cost of LENGTH and the loss reads as dilution. On gpt2 an untrained prefix
+costs -0.7612 on held-out text, and longer TRAINED prefixes keep paying at
+every size measured -- so there is no dilution term there, and what
+composition loses is interference.
+
+The arms are in ``tests/test_cartridge_composition.py`` (tiny rung, in the
+suite) and ``model_trainer.cli.cartridge_benchmark`` (real base, on a GPU).
+Neither number is the cartridge's; each is the pair's.
 """
 
 from __future__ import annotations

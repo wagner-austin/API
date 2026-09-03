@@ -25,6 +25,27 @@ such a model has learned to do and a randomly-initialised two-layer GPT-2 has
 not. The measurement here bounds what composition costs WHEN THE BASE CANNOT
 ROUTE, which is a different and narrower statement -- and it is the one this
 setup can support.
+
+THAT HEDGE WAS THEN TESTED, AND IT HELD. Run against real gpt2 (2026-09-03,
+``model_trainer.cli.cartridge_benchmark``, plan ``gpt2-wiki``), the same arms
+report composition retaining about 60% rather than about 25% -- against a
+genuinely unrelated second corpus, three seeds, held-out text. Composition is
+substantially cheaper once the base can route, exactly as the paragraph above
+guessed. The narrow statement was the right one to make.
+
+ONE SENTENCE ABOVE DOES NOT TRAVEL, AND IT IS THE ATTRIBUTION. Reading the
+padding arm as isolating DILUTION depends on untrained slots being harmless,
+which is true here and is a property of THIS base rather than of cartridges:
+an untrained prefix costs the tiny model about nothing and costs gpt2 -0.76 on
+the same held-out text, worse than having no cartridge at all. On a real base
+the padding arm therefore measures damage, not length -- and the slot sweep
+there finds longer prefixes strictly better, so dilution does not exist to be
+measured. Same code, same arms, opposite reading.
+
+So the rule the padding arm actually needs is: it isolates length only where
+the untrained control is neutral, and that has to be MEASURED per base before
+the arm means anything. Every number in this file remains correct about the
+tiny model, which is the only thing it ever claimed.
 """
 
 from __future__ import annotations
@@ -163,6 +184,7 @@ class _Composition:
         composed_a: A and B joined, scored on held-out A.
         composed_b: A and B joined, scored on held-out B.
         padded_a: A joined with an UNTRAINED cartridge, scored on held-out A.
+        reversed_a: B and A joined in the OTHER order, scored on held-out A.
     """
 
     def __init__(self) -> None:
@@ -186,6 +208,11 @@ class _Composition:
 
         padded = CartridgeModel(base=model_a.base, slots=compose(model_a.slots, _fresh().slots))
         self.padded_a, _ = score_held_out(padded, held_a)
+
+        reversed_join = CartridgeModel(
+            base=model_a.base, slots=compose(model_b.slots, model_a.slots)
+        )
+        self.reversed_a, _ = score_held_out(reversed_join, held_a)
 
 
 @pytest.fixture(name="composition", scope="module")
@@ -217,6 +244,27 @@ class TestTheComposedCartridgeStillWorks:
         """And on held-out B, which is what "retains both" would require."""
         assert _gain(composition.composed_b) > 0.0
         assert composition.composed_b["p_value"] < 0.01
+
+    def test_the_order_of_composition_does_not_matter(self, composition: _Composition) -> None:
+        """Concatenating the other way round gives the same answer.
+
+        NOT a coincidence and not an approximation. A cartridge's slots are
+        raw parameters that never pass through a position embedding on the way
+        into the cache, so they carry no position; softmax attention over keys
+        and values permuted TOGETHER is permutation-equivariant, and swapping
+        the two halves is such a permutation.
+
+        The bound is 1e-5 rather than exact equality because float32
+        summation is not associative and the reduction runs in a different
+        order -- measured at 3.6e-07 on logits, four decades under the bound.
+
+        Worth a test because it is a real difference from putting two
+        documents in a prompt, where order changes the answer, and because
+        this file's own docstring claimed the opposite until it was measured.
+        """
+        assert composition.reversed_a["mean_treatment"] == pytest.approx(
+            composition.composed_a["mean_treatment"], abs=1e-5
+        )
 
     def test_it_beats_carrying_only_the_wrong_cartridge(self, composition: _Composition) -> None:
         """Composition retains more of A than dropping A entirely would.

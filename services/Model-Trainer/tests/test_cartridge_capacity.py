@@ -29,6 +29,35 @@ exactly what the padding arm measured. It also predicts why the paper sees
 scaling where this does not: their base is large enough to exploit thousands of
 slots, and this one is not.
 
+THAT PREDICTION WAS TESTED, AND IT HELD MORE COMPLETELY THAN EXPECTED. Run
+against real gpt2 (2026-09-03, ``model_trainer.cli.cartridge_benchmark``, plan
+``gpt2-wiki``, three seeds, noise floor 0.0202): 2 -> +0.7358, 8 -> +0.8224,
+32 -> +0.8809, 128 -> +0.9104, 512 -> +0.9381. EVERY 4x step clears the floor,
+including the last. That base has no saturation point anywhere in the range
+this one saturates at eight slots and then reverses in.
+
+AN EARLIER READING OF THAT SWEEP PUT A KNEE AT 128 AND WAS AN ARTEFACT OF
+NOISE. The runs behind it were not reproducible -- training drew dropout from
+an unseeded process-wide generator -- so arm spreads ran two to three times
+larger, the floor came out at 0.0342, and the last two steps fell inside it.
+With the seeding fixed the same sweep is bit-identical across processes and
+those steps separate. A floor that is too large does not make a claim
+conservative; it invents a plateau.
+
+So what differs between the models is not where the knee sits but whether
+there is one: extra slots stop paying here and start COSTING, and on gpt2 they
+keep paying at a diminishing rate (+0.087, +0.058, +0.030, +0.028 per 4x).
+The dilution term is specific to a base that cannot route.
+
+THE NOISE FLOOR BELOW WAS NEVER MEASURED UNTIL 2026-09-03, and it should have
+been before any of the numbers above were written down. At this budget, three
+seeds per slot count give spreads of 0.0086 / 0.0167 / 0.0013 / 0.0037 for 2 /
+8 / 24 / 48 slots, so the floor is 0.0167 and the 24-vs-48 gap of 0.0233
+clears it by 1.4x. It also clears it in the way that matters more: all three
+48-slot runs fall below all three 24-slot runs, with no overlap. The claim
+stands -- but it stood unverified for as long as it took to check, which is
+the part worth not repeating.
+
 A CARTRIDGE ALSO SPENDS CONTEXT, which is a separate and harder cost. The
 prefix occupies positions in the model's window, so the usable input shrinks by
 the slot count. Past the window the failure is torch's ``IndexError: index out

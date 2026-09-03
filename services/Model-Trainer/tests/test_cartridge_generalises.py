@@ -22,6 +22,24 @@ The control that makes it a result rather than an artefact is the untrained
 cartridge: a prefix that has been attached but not trained must score like no
 prefix at all. Without that arm, "adding any prefix helps" would explain the
 numbers just as well.
+
+REPLICATED ON A REAL BASE, 2026-09-03, AND THE CONTROL DID NOT REPLICATE. The
+same arms against gpt2 over twelve wiki pages of real prose
+(``model_trainer.cli.cartridge_benchmark``, plan ``gpt2-wiki``, three seeds)
+report a held-out gain of +0.9104 at 128 slots, against a measured noise floor
+of 0.0202. So the mechanism does carry to a pretrained base and to real prose
+-- which the paragraph above declines to claim, and which turns out to hold.
+
+The untrained arm inverts. A prefix that costs this rung very nearly nothing
+costs gpt2 -0.7612 on the same held-out text: significantly WORSE than having
+no cartridge at all. A random block of keys and values injected into every
+layer damages a base whose attention means something and does nothing to one
+whose weights are noise.
+
+That is why the control belongs in every arm rather than being assumed once.
+Read carelessly it is a free baseline; measured, it is a property of the base,
+and three conclusions elsewhere in this suite were built on this rung's
+version of it.
 """
 
 from __future__ import annotations

@@ -358,10 +358,26 @@ def compose(first: CartridgeSlots, second: CartridgeSlots) -> CartridgeSlots:
     retention and pays attention cost, where summing buys constant cost and
     pays in interference.
 
-    Order is preserved and is the caller's. Concatenating in the other order
-    produces a different object with the same content, because the slots sit
-    at different positions; the composition is not claimed to be commutative
-    and nothing here sorts it.
+    ORDER DOES NOT MATTER, AND THAT IS MEASURED RATHER THAN ASSUMED. This
+    docstring used to say the opposite -- that the two orders give different
+    objects because the slots sit at different positions -- and that was
+    wrong. A cartridge's slots are raw parameters: unlike keys derived from
+    tokens, they never pass through a position embedding on the way into the
+    cache, so they carry no position at all. Softmax attention over a set of
+    keys is permutation-equivariant when the keys and values are permuted
+    together, which concatenating in the other order is.
+
+    Measured on the tiny rung, 2026-09-03: ``compose(a, b)`` and
+    ``compose(b, a)`` agree to 3.6e-07 in logits, as does reversing the slot
+    order inside one composed cartridge -- float32 reduction noise, not a
+    difference. The first attempt at this measurement reported 0.43 and was
+    wrong: it ran the forwards in TRAIN mode, where GPT-2's three 0.1 dropouts
+    make two runs of one input differ anyway. ``score_held_out`` calls
+    ``eval`` for exactly that reason.
+
+    This is a real difference from putting two documents in a prompt, where
+    order changes the answer and the second document is often the one that
+    wins. Callers need not think about it, and nothing here sorts.
 
     Args:
         first: The cartridge whose slots come first.
