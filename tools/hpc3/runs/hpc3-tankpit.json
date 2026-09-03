@@ -13,8 +13,14 @@
       "minutes": 60,
       "requeue": true,
       "checkpoint_steps": 0,
-      "image": null,
-      "env_path": "/pub/wagnera3/envs/tankpit",
+      "image": {
+        "path": "/pub/wagnera3/tankpit/images/v1/tankpit.sif",
+        "sha256": "b838e0242ecceb0da5e1310352d29a089e65e0100aed7982045403ee3425aa8a",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": {
         "platform-core": "0.1.0",
         "tankpit-bot": "0.1.0"

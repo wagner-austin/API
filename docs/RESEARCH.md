@@ -319,37 +319,39 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   and there is no Poetry on the login node. `hpc3-preflight` reports the
   missing environment, which is the correct refusal; nothing has been
   submitted. The remaining work is provisioning, not registration.
-- **It needs an image, and the first registration said otherwise. That was
-  wrong.** The reasoning offered was that four of the five projects above run
-  from a directory environment and this payload is "pure Python". That is a
-  popularity argument, and it ignored the one project most like this one:
-  `rusted` is ALSO CPU-only on `free` with `requeue` and `deterministic`, and
-  it carries an image.
+- **It ships an image, built 2026-09-02.**
+  `/pub/wagnera3/tankpit/images/v1/tankpit.sif`, sha256 `b838e0242ecc…`,
+  126 MB, `env_path` `/opt/env`. The first registration declared `image:
+  null` with the reasoning that four of five projects run from a directory
+  environment and this payload is "pure Python". That was a popularity
+  argument and it was wrong: `rusted` is also CPU-only on `free` with
+  `requeue` and `deterministic`, and it carries an image.
 
-  An image answers both of this project's actual blockers, which a directory
-  environment does not:
-  - **The interpreter.** The cluster's system Python is 3.9 and this package
-    needs 3.11. An image bundles its own (`python:3.11.16-slim-bookworm` is
-    what `abl` builds on).
-  - **The code.** With a directory environment the payload is read from the
-    staged checkout at `/pub/wagnera3/api`, which is mutable and currently
-    sits at `80221ea`, behind this tree. An image bakes first-party code as
-    wheels and records `git_commit` in the image, so there is no second copy
-    to drift — and `image_digest` becomes a real axis of the run fingerprint
-    instead of `NO_VALUE`.
+  The image answers both of this project's real blockers, which a directory
+  environment does not. The cluster's system Python is 3.9 and this package
+  needs 3.11 — the image carries its own (`python:3.11.16-slim-bookworm`).
+  And a directory environment reads its payload from the mutable
+  `/pub/wagnera3/api` checkout, which sat eight days behind; the image bakes
+  first-party code as wheels with `git_commit` written in, so there is no
+  second copy to drift and `image_digest` becomes a real fingerprint axis
+  rather than `NO_VALUE`. The hazard is documented, not theoretical: a
+  directory environment "can be edited in place while `pinned_packages` is
+  edited to match -- which is exactly what happened on 2026-08-28, in under
+  an hour, with every check still passing."
 
-  The directory-environment hazard is documented rather than theoretical:
-  "it can be edited in place while `pinned_packages` is edited to match --
-  which is exactly what happened on 2026-08-28, in under an hour, with every
-  check still passing."
-- **The image is NOT built, so `image` is `null` and that is a stated gap
-  rather than a decision.** `ImageSpec` requires a real `sha256`; declaring a
-  placeholder would be a fabricated digest, which is worse than an absent
-  one. Building it has a chicken-and-egg the four-command flow does not
-  address for a NEW project: `hpc3-image-capture` probes an existing
+  **The wheels were built from a clean `git archive` extract of the commit
+  the spec names, not from the working tree.** Three other sessions had
+  uncommitted changes in that tree at build time; wheels built from it would
+  not have been `bfdce7a5`, which is the stale-wheel failure `image_spec.py`
+  exists to catch, inverted.
+- **Bootstrapping the first image needed a step the documented flow does not
+  cover, and it is worth recording.** `hpc3-image-capture` probes an existing
   environment over SSH at `env_path`, so a project with no environment has
-  nothing to capture. A bootstrap environment on the cluster has to exist
-  first, and only then can the image that replaces it be captured and built.
+  nothing to capture — and the four-command flow starts with capture. A
+  bootstrap environment had to be built by hand first
+  (`/pub/wagnera3/envs/tankpit`, Python 3.11.16 taken from the interpreter
+  inside `envs/cleargbm`, since the cluster module system offers 3.8, 3.10
+  and 3.14 but no 3.11). That environment is disposable now the image exists.
 
 ---
 
