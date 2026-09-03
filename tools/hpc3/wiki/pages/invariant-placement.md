@@ -29,6 +29,9 @@ onboard a project and could not.
 
 ## The two layers this package already has
 
+The package already separates the two questions, and the split is visible in
+where each refusal is raised:[^2]
+
 | question | layer |
 |---|---|
 | is this document well-formed — shapes, types, no contradictions? | `decode_workspace` |
@@ -45,11 +48,11 @@ them is one layer above.
 On 2026-09-02 a rule was added asserting that every registered project must
 declare an `image`. The rule is correct and the reasoning behind it is sound
 — a directory environment carries no digest and can be edited in place while
-`pinned_packages` is edited to match. It was placed in `decode_workspace`.
+`pinned_packages` is edited to match. It was placed in `decode_workspace`.[^3]
 
 `decode_workspace` is reached from the shared CLI config loader, so it runs
-for *every* command. Including the three whose entire purpose is to produce
-the image: capture, render, build. The result:
+for *every* command.[^4] Including the three whose entire purpose is to
+produce the image: capture, render, build. The result:
 
 ```
 $ hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit ...
@@ -61,13 +64,13 @@ PROJECT_UNIMAGED: Every registered project must declare an 'image'. ...
 The error instructs the reader to run the command that just refused them.
 **To obtain an image you must already have one.** Every existing project was
 unaffected, because every existing project already had its image; the rule
-was invisible to everything except the one case it made impossible.
+was invisible to everything except the one case it made impossible.[^5]
 
 It also refused a committed workspace. `runs/hpc3.json` declares `cleargbm`,
 which has no image, so that document stopped decoding — and because
 `hpc3-research-index` reads every workspace, the generated project table
 could no longer be regenerated at all. One unimaged project took a tool down
-for all six.
+for all six.[^6]
 
 ## Why the obvious repairs are worse
 
@@ -112,3 +115,8 @@ only the ones still being built — so it looks correct precisely until
 somebody tries to start something.
 
 [^1]: `src/hpc3/core/preflight.py` — `ENV_PATH_MISSING` is raised there, and in `core/array_submit.py` and `core/image_exec.py`, all on the submit path.
+[^2]: `grep -rn ENV_PATH_MISSING src/hpc3/` → `core/preflight.py`, `core/array_submit.py`, `core/image_exec.py`; `grep -rn PROJECT_UNIMAGED src/hpc3/` → `contracts/workspace.py` only. Measured 2026-09-02.
+[^3]: Observed in `src/hpc3/contracts/workspace.py` on 2026-09-02 while that file was uncommitted work in progress; recorded under `provenance:` rather than pinned, since a blob pin on a live edit would be stale within the hour.
+[^4]: `grep -rln decode_workspace src/hpc3/cli/` → `_config.py` (the shared loader) and `research_index.py`. Measured 2026-09-02.
+[^5]: `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit --commit bfdce7a5 --base-image python:3.11.16-slim-bookworm --env-prefix /opt/env --first-party platform_core,monorepo_guards,tankpit_bot --out specs/tankpit-image.json`, run 2026-09-02, refused with `PROJECT_UNIMAGED`.
+[^6]: Decoding each committed workspace individually on 2026-09-02: `hpc3-floor.json`, `hpc3-mi.json`, `hpc3-rusted.json`, `hpc3-tankpit.json` and `hpc3-turkic-lstm.json` all OK; `hpc3.json` alone refused. `hpc3-research-index --write` failed with the same error.
