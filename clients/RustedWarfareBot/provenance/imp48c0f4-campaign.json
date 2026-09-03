@@ -1,0 +1,496 @@
+{
+  "project": "rusted",
+  "name": "imp48c0f4",
+  "experiment": {
+    "batch": "imp48c0f4",
+    "matches": "96",
+    "arms": "c0f4,control",
+    "lockstep": "75",
+    "fast_forward": "10",
+    "map": "maps/skirmish/[p2]duel_lake.tmx",
+    "difficulty": "3",
+    "payload": "payload-v15"
+  },
+  "members": [
+    {
+      "suffix": "control-s35001",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35001 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35001.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35001.txt"
+    },
+    {
+      "suffix": "control-s35105",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35105 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35105.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35105.txt"
+    },
+    {
+      "suffix": "control-s35209",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35209 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35209.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35209.txt"
+    },
+    {
+      "suffix": "control-s35313",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35313 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35313.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35313.txt"
+    },
+    {
+      "suffix": "control-s35417",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35417 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35417.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35417.txt"
+    },
+    {
+      "suffix": "control-s35521",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35521 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35521.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35521.txt"
+    },
+    {
+      "suffix": "control-s35625",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35625 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35625.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35625.txt"
+    },
+    {
+      "suffix": "control-s35729",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35729 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35729.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35729.txt"
+    },
+    {
+      "suffix": "control-s35833",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35833 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35833.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35833.txt"
+    },
+    {
+      "suffix": "control-s35937",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 35937 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35937.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s35937.txt"
+    },
+    {
+      "suffix": "control-s36041",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36041 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36041.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36041.txt"
+    },
+    {
+      "suffix": "control-s36145",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36145 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36145.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36145.txt"
+    },
+    {
+      "suffix": "control-s36249",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36249 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36249.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36249.txt"
+    },
+    {
+      "suffix": "control-s36353",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36353 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36353.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36353.txt"
+    },
+    {
+      "suffix": "control-s36457",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36457 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36457.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36457.txt"
+    },
+    {
+      "suffix": "control-s36561",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36561 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36561.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36561.txt"
+    },
+    {
+      "suffix": "control-s36665",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36665 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36665.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36665.txt"
+    },
+    {
+      "suffix": "control-s36769",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36769 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36769.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36769.txt"
+    },
+    {
+      "suffix": "control-s36873",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36873 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36873.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36873.txt"
+    },
+    {
+      "suffix": "control-s36977",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 36977 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36977.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s36977.txt"
+    },
+    {
+      "suffix": "control-s37081",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37081 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37081.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37081.txt"
+    },
+    {
+      "suffix": "control-s37185",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37185 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37185.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37185.txt"
+    },
+    {
+      "suffix": "control-s37289",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37289 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37289.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37289.txt"
+    },
+    {
+      "suffix": "control-s37393",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37393 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37393.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37393.txt"
+    },
+    {
+      "suffix": "control-s37497",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37497 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37497.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37497.txt"
+    },
+    {
+      "suffix": "control-s37601",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37601 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37601.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37601.txt"
+    },
+    {
+      "suffix": "control-s37705",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37705 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37705.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37705.txt"
+    },
+    {
+      "suffix": "control-s37809",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37809 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37809.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37809.txt"
+    },
+    {
+      "suffix": "control-s37913",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 37913 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37913.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s37913.txt"
+    },
+    {
+      "suffix": "control-s38017",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38017 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38017.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38017.txt"
+    },
+    {
+      "suffix": "control-s38121",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38121 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38121.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38121.txt"
+    },
+    {
+      "suffix": "control-s38225",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38225 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38225.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38225.txt"
+    },
+    {
+      "suffix": "control-s38329",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38329 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38329.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38329.txt"
+    },
+    {
+      "suffix": "control-s38433",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38433 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38433.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38433.txt"
+    },
+    {
+      "suffix": "control-s38537",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38537 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38537.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38537.txt"
+    },
+    {
+      "suffix": "control-s38641",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38641 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38641.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38641.txt"
+    },
+    {
+      "suffix": "control-s38745",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38745 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38745.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38745.txt"
+    },
+    {
+      "suffix": "control-s38849",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38849 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38849.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38849.txt"
+    },
+    {
+      "suffix": "control-s38953",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 38953 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38953.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s38953.txt"
+    },
+    {
+      "suffix": "control-s39057",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39057 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39057.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39057.txt"
+    },
+    {
+      "suffix": "control-s39161",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39161 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39161.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39161.txt"
+    },
+    {
+      "suffix": "control-s39265",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39265 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39265.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39265.txt"
+    },
+    {
+      "suffix": "control-s39369",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39369 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39369.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39369.txt"
+    },
+    {
+      "suffix": "control-s39473",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39473 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39473.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39473.txt"
+    },
+    {
+      "suffix": "control-s39577",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39577 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39577.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39577.txt"
+    },
+    {
+      "suffix": "control-s39681",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39681 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39681.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39681.txt"
+    },
+    {
+      "suffix": "control-s39785",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39785 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39785.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39785.txt"
+    },
+    {
+      "suffix": "control-s39889",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label control --seed 39889 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39889.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/control-s39889.txt"
+    },
+    {
+      "suffix": "c0f4-s35001",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35001 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35001.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35001.txt"
+    },
+    {
+      "suffix": "c0f4-s35105",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35105 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35105.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35105.txt"
+    },
+    {
+      "suffix": "c0f4-s35209",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35209 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35209.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35209.txt"
+    },
+    {
+      "suffix": "c0f4-s35313",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35313 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35313.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35313.txt"
+    },
+    {
+      "suffix": "c0f4-s35417",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35417 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35417.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35417.txt"
+    },
+    {
+      "suffix": "c0f4-s35521",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35521 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35521.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35521.txt"
+    },
+    {
+      "suffix": "c0f4-s35625",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35625 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35625.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35625.txt"
+    },
+    {
+      "suffix": "c0f4-s35729",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35729 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35729.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35729.txt"
+    },
+    {
+      "suffix": "c0f4-s35833",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35833 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35833.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35833.txt"
+    },
+    {
+      "suffix": "c0f4-s35937",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 35937 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35937.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s35937.txt"
+    },
+    {
+      "suffix": "c0f4-s36041",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36041 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36041.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36041.txt"
+    },
+    {
+      "suffix": "c0f4-s36145",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36145 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36145.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36145.txt"
+    },
+    {
+      "suffix": "c0f4-s36249",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36249 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36249.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36249.txt"
+    },
+    {
+      "suffix": "c0f4-s36353",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36353 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36353.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36353.txt"
+    },
+    {
+      "suffix": "c0f4-s36457",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36457 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36457.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36457.txt"
+    },
+    {
+      "suffix": "c0f4-s36561",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36561 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36561.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36561.txt"
+    },
+    {
+      "suffix": "c0f4-s36665",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36665 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36665.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36665.txt"
+    },
+    {
+      "suffix": "c0f4-s36769",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36769 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36769.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36769.txt"
+    },
+    {
+      "suffix": "c0f4-s36873",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36873 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36873.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36873.txt"
+    },
+    {
+      "suffix": "c0f4-s36977",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 36977 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36977.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s36977.txt"
+    },
+    {
+      "suffix": "c0f4-s37081",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37081 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37081.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37081.txt"
+    },
+    {
+      "suffix": "c0f4-s37185",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37185 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37185.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37185.txt"
+    },
+    {
+      "suffix": "c0f4-s37289",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37289 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37289.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37289.txt"
+    },
+    {
+      "suffix": "c0f4-s37393",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37393 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37393.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37393.txt"
+    },
+    {
+      "suffix": "c0f4-s37497",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37497 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37497.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37497.txt"
+    },
+    {
+      "suffix": "c0f4-s37601",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37601 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37601.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37601.txt"
+    },
+    {
+      "suffix": "c0f4-s37705",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37705 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37705.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37705.txt"
+    },
+    {
+      "suffix": "c0f4-s37809",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37809 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37809.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37809.txt"
+    },
+    {
+      "suffix": "c0f4-s37913",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 37913 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37913.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s37913.txt"
+    },
+    {
+      "suffix": "c0f4-s38017",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38017 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38017.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38017.txt"
+    },
+    {
+      "suffix": "c0f4-s38121",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38121 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38121.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38121.txt"
+    },
+    {
+      "suffix": "c0f4-s38225",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38225 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38225.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38225.txt"
+    },
+    {
+      "suffix": "c0f4-s38329",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38329 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38329.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38329.txt"
+    },
+    {
+      "suffix": "c0f4-s38433",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38433 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38433.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38433.txt"
+    },
+    {
+      "suffix": "c0f4-s38537",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38537 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38537.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38537.txt"
+    },
+    {
+      "suffix": "c0f4-s38641",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38641 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38641.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38641.txt"
+    },
+    {
+      "suffix": "c0f4-s38745",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38745 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38745.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38745.txt"
+    },
+    {
+      "suffix": "c0f4-s38849",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38849 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38849.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38849.txt"
+    },
+    {
+      "suffix": "c0f4-s38953",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 38953 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38953.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s38953.txt"
+    },
+    {
+      "suffix": "c0f4-s39057",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39057 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39057.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39057.txt"
+    },
+    {
+      "suffix": "c0f4-s39161",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39161 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39161.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39161.txt"
+    },
+    {
+      "suffix": "c0f4-s39265",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39265 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39265.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39265.txt"
+    },
+    {
+      "suffix": "c0f4-s39369",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39369 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39369.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39369.txt"
+    },
+    {
+      "suffix": "c0f4-s39473",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39473 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39473.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39473.txt"
+    },
+    {
+      "suffix": "c0f4-s39577",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39577 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39577.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39577.txt"
+    },
+    {
+      "suffix": "c0f4-s39681",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39681 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39681.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39681.txt"
+    },
+    {
+      "suffix": "c0f4-s39785",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39785 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39785.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39785.txt"
+    },
+    {
+      "suffix": "c0f4-s39889",
+      "command": "/opt/env/bin/python -m rw_bot.harness.campaign_match --jobs /pub/wagnera3/rusted/payload-v15/sweeps/imp48c0f4.txt --batch imp48c0f4 --label c0f4 --seed 39889 --lockstep 75 --fast-forward 10 --game /pub/wagnera3/rusted/game --tree /pub/wagnera3/rusted/payload-v15 --traces /pub/wagnera3/rusted/runs/traces --map 'maps/skirmish/[p2]duel_lake.tmx' --difficulty 3 --clones $TMPDIR/rw-clones --result /pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39889.txt",
+      "artifact": "/pub/wagnera3/rusted/runs/sweeps/imp48c0f4/c0f4-s39889.txt"
+    }
+  ]
+}
