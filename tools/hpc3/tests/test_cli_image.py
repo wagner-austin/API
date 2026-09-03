@@ -24,6 +24,14 @@ from hpc3.core.image_layout import (
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
+
 def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
     """Build a valid image-spec document.
 
@@ -34,7 +42,7 @@ def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         The document.
     """
     base: dict[str, JSONValue] = {
-        "base_image": "python:3.11.16-slim-bookworm",
+        "base_image": BASE_IMAGE,
         "env_prefix": "/opt/env",
         "git_commit": _COMMIT,
         "system_packages": [],

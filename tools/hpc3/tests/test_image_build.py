@@ -18,6 +18,14 @@ from hpc3.core.image_layout import COMMIT_NAME, DEFINITION_NAME
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
+
 def _spec(**overrides: JSONValue) -> ImageSpec:
     """Build a valid spec with optional overrides.
 
@@ -28,7 +36,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         The decoded spec.
     """
     base: dict[str, JSONValue] = {
-        "base_image": "python:3.11.16-slim-bookworm",
+        "base_image": BASE_IMAGE,
         "env_prefix": "/opt/env",
         "git_commit": _COMMIT,
         "system_packages": [],
@@ -104,3 +112,11 @@ class TestBuildEnvironment:
 
     def test_it_ends_with_a_newline(self) -> None:
         assert render_build_script(_spec(), image_name="abl.sif").endswith("\n")
+
+
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""

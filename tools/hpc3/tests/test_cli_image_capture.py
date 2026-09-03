@@ -40,6 +40,14 @@ to find, carry a tag.
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
+
 def _args(tmp_path: pathlib.Path, **overrides: str) -> list[str]:
     """Build a complete argument list with optional overrides.
 
@@ -54,7 +62,7 @@ def _args(tmp_path: pathlib.Path, **overrides: str) -> list[str]:
         "--config": str(tmp_path / "hpc3.json"),
         "--project": "abl",
         "--commit": _COMMIT,
-        "--base-image": "python:3.11.16-slim-bookworm",
+        "--base-image": BASE_IMAGE,
         "--env-prefix": "/opt/env",
         "--first-party": "platform_core,model-trainer-server",
         "--symbols": "model_trainer.cluster.preflight:check_corpus_certified",

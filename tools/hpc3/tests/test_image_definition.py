@@ -20,6 +20,13 @@ from hpc3.core.image_layout import (
     WHEEL_DIR,
 )
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
 
 def _spec(**overrides: JSONValue) -> ImageSpec:
     """Build a valid spec with optional overrides.
@@ -31,7 +38,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         The decoded spec.
     """
     base: dict[str, JSONValue] = {
-        "base_image": "python:3.11.16-slim-bookworm",
+        "base_image": BASE_IMAGE,
         "env_prefix": "/opt/env",
         "git_commit": "d11efacd231ef92426eaf92483c33a8504bd770f",
         "system_packages": [],
@@ -188,7 +195,11 @@ class TestDefinition:
         assert f"    chmod -R a+rX {SPEC_DIR} /srv/research" in lines
 
     def test_the_base_image_is_the_bootstrap_source(self) -> None:
-        assert "From: python:3.11.16-slim-bookworm" in render_definition(_spec()).splitlines()
+        spec = _spec()
+        base = spec["base_image"]
+
+        assert f"From: {base}" in render_definition(spec).splitlines()
+        assert "@sha256:" in base
 
     def test_labels_are_emitted(self) -> None:
         assert "    org.corvis.captured 2026-08-25" in render_definition(_spec()).splitlines()

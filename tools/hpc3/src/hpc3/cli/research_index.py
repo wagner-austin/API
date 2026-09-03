@@ -40,6 +40,24 @@ CHECK_FLAG = "--check"
 FLAGS: tuple[str, ...] = (CHECK_FLAG, WRITE_FLAG)
 
 
+def _read_document(path: pathlib.Path) -> str:
+    """Read a text document with its line endings normalised.
+
+    ``read_bytes`` is the package's file seam and does no newline
+    translation, unlike ``pathlib.read_text``. Git checks this repository out
+    with CRLF on Windows while the renderer emits LF, so a byte comparison
+    reported a document as stale whose every line was already correct --
+    a false verdict that would have had someone rewrite a correct file.
+
+    Args:
+        path: The document.
+
+    Returns:
+        Its text, with CRLF collapsed to LF.
+    """
+    return core_hooks.read_bytes(path).decode("utf-8").replace("\r\n", "\n")
+
+
 def runs_directory() -> pathlib.Path:
     """Locate the workspace documents.
 
@@ -74,7 +92,7 @@ def declared_projects(runs: pathlib.Path) -> dict[str, ProjectConfig]:
     """
     projects: dict[str, ProjectConfig] = {}
     for path in sorted(runs.glob("*.json")):
-        document = narrow_json_to_dict(load_json_str(core_hooks.read_bytes(path).decode("utf-8")))
+        document = narrow_json_to_dict(load_json_str(_read_document(path)))
         if "projects" not in document:
             continue
         workspace = decode_workspace(document, config_dir=runs)
@@ -111,7 +129,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     block = render_projects_block(declared_projects(runs_directory()))
     path = index_path()
-    text = core_hooks.read_bytes(path).decode("utf-8")
+    text = _read_document(path)
 
     if WRITE_FLAG in tokens:
         core_hooks.write_text(path, replace_projects_block(text, block))

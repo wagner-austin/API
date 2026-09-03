@@ -34,6 +34,14 @@ from hpc3.contracts.image_spec import (
 _DIGEST = "9ed4e27fd0d8207de3f84e833b98e0cf7e6ab09af66726849ca1cf023326cd51"
 
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
+
 def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
     """Build a valid image-spec payload with optional overrides.
 
@@ -44,7 +52,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         A JSON object suitable for :func:`decode_image_spec`.
     """
     base: dict[str, JSONValue] = {
-        "base_image": "python:3.11.16-slim-bookworm",
+        "base_image": BASE_IMAGE,
         "env_prefix": "/opt/env",
         "git_commit": "d11efacd231ef92426eaf92483c33a8504bd770f",
         "system_packages": [],
@@ -59,6 +67,41 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
     }
     base.update(overrides)
     return base
+
+
+class TestTheBaseImageMustPinADigest:
+    """A tag is a mutable pointer, and this document exists to pin things.
+
+    Not hypothetical: rusted pinned python:3.11-slim-bookworm@sha256:0bee7276,
+    and that same tag now resolves to sha256:528257d4. The tag moved under
+    four specs that named it bare, and nothing in the workspace noticed.
+    """
+
+    def test_a_bare_tag_is_refused(self) -> None:
+        """The whole point: two builds a week apart could differ in silence."""
+        with pytest.raises(JSONTypeError, match="must pin a digest"):
+            _ = decode_image_spec(_spec(base_image="python:3.11.16-slim-bookworm"))
+
+    def test_a_reference_that_is_only_a_digest_is_refused(self) -> None:
+        """An empty image half names nothing to pull."""
+        with pytest.raises(JSONTypeError, match="must pin a digest"):
+            _ = decode_image_spec(_spec(base_image="@sha256:" + "b3" * 32))
+
+    def test_a_digest_of_the_wrong_length_is_refused(self) -> None:
+        """A truncated digest is the one someone pasted by eye."""
+        with pytest.raises(JSONTypeError, match="lowercase hex"):
+            _ = decode_image_spec(_spec(base_image="python:3.11@sha256:b3b3b3"))
+
+    def test_an_uppercase_digest_is_refused(self) -> None:
+        """Registries emit lowercase; anything else was retyped."""
+        with pytest.raises(JSONTypeError, match="lowercase hex"):
+            _ = decode_image_spec(_spec(base_image="python:3.11@sha256:" + "B3" * 32))
+
+    def test_a_pinned_reference_is_admitted_unchanged(self) -> None:
+        """The tag is kept beside the digest; rusted's built images carry both."""
+        pinned = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+
+        assert decode_image_spec(_spec(base_image=pinned))["base_image"] == pinned
 
 
 class TestRoundTrip:

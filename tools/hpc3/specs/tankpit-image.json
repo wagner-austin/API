@@ -1,5 +1,5 @@
 {
-  "base_image": "python:3.11.16-slim-bookworm",
+  "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
   "git_commit": "bccf5afab601906c367c32961ddeb31d5dde53a2",
   "system_packages": [],

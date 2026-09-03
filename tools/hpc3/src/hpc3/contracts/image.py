@@ -26,6 +26,22 @@ SHA256_HEX_LENGTH = 64
 
 _HEX_DIGITS = frozenset("0123456789abcdef")
 
+
+def is_sha256_hex(value: str) -> bool:
+    """Say whether a string is a lowercase-hex sha256 digest.
+
+    The ONE definition, so the bare-digest field and the digest embedded in a
+    base image reference cannot come to disagree about what a digest is.
+
+    Args:
+        value: Candidate digest, without any ``sha256:`` prefix.
+
+    Returns:
+        True when it is exactly 64 lowercase hex characters.
+    """
+    return len(value) == SHA256_HEX_LENGTH and all(ch in _HEX_DIGITS for ch in value)
+
+
 HOST_BOUND_ROOTS = frozenset({"pub", "dfs6b", "data", "tmp", "home"})
 """Roots a job mounts its data under, and so must not put an environment in.
 
@@ -128,7 +144,7 @@ def _require_digest(obj: JSONObject, key: str) -> str:
             comparing against it would pass on the wrong image.
     """
     value = require_str(obj, key)
-    if len(value) != SHA256_HEX_LENGTH or any(ch not in _HEX_DIGITS for ch in value):
+    if not is_sha256_hex(value):
         raise JSONTypeError(
             f"Field '{key}' must be {SHA256_HEX_LENGTH} lowercase hex characters, got {value!r}"
         )
@@ -224,5 +240,6 @@ __all__ = [
     "ImageReference",
     "decode_image_reference",
     "encode_image_reference",
+    "is_sha256_hex",
     "require_json_object",
 ]

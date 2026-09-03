@@ -25,6 +25,14 @@ from hpc3.core.image_selfcheck import canonical_distribution, render_selfcheck
 _PACKAGE = "fixturepkg"
 
 
+BASE_IMAGE = "python:3.11.16-slim-bookworm@sha256:" + "b3" * 32
+"""A digest-pinned base, because the spec contract refuses a bare tag.
+
+Composed rather than written out so the line fits, and so the 64-character
+digest is obviously synthetic rather than mistaken for a real one.
+"""
+
+
 def _spec(**overrides: JSONValue) -> ImageSpec:
     """Build a valid spec with optional overrides.
 
@@ -35,7 +43,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         The decoded spec.
     """
     base: dict[str, JSONValue] = {
-        "base_image": "python:3.11.16-slim-bookworm",
+        "base_image": BASE_IMAGE,
         "env_prefix": "/opt/env",
         "git_commit": "d11efacd",
         "system_packages": [],
