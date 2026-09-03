@@ -1,8 +1,15 @@
 ---
 title: What the cluster sees, and why the comment is live-only
 tags: [cluster-facts, identity, ledger]
-related: [[ledger-closures]], [[run-documents]]
-sources: ["AccountingStoreFlags = (null), measured 2026-08-23", contracts/layout.py, README.md@4dc63f17]
+related: ["[[ledger-closures]]", "[[run-documents]]"]
+source_paths:
+  - "src/hpc3/contracts/layout.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/contracts/layout.py": "cb698fabbd6994fc9b6bc10092e77df3dc7f520e"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "AccountingStoreFlags = (null), measured 2026-08-23"
 fact_checked: 2026-09-01
 confidence: high
 ---

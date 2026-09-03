@@ -1,6 +1,6 @@
 # hpc3 Wiki
 
-**Read this first.** 4 topic hubs, 20 content pages. This is the design record
+**Read this first.** 4 topic hubs, 21 content pages. This is the design record
 and incident narrative behind the rules the `hpc3` package enforces; the
 README next door is the command reference. Follow the hub link for your
 topic; each hub lists its pages with one-line descriptions.

@@ -1,8 +1,17 @@
 ---
 title: The five triage conditions that look like health
 tags: [operations, triage, ledger]
-related: [[ledger-closures]], [[image-ledger-lessons]], [[budget-model]]
-sources: ["261 of 621 pending GPU jobs on DependencyNeverSatisfied (squeue sample)", cli/triage, README.md@4dc63f17]
+related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]"]
+source_paths:
+  - "src/hpc3/cli/triage.py"
+  - "src/hpc3/core/triage.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/cli/triage.py": "69b8368f48a23345b08f55980cf0cec4e7dbcdb0"
+  "src/hpc3/core/triage.py": "fcff2038f7e816e0342f0c6fda663e0c2a55a129"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "261 of 621 pending GPU jobs on DependencyNeverSatisfied (squeue sample)"
 fact_checked: 2026-09-01
 confidence: high
 ---

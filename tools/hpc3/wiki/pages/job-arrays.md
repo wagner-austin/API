@@ -1,8 +1,17 @@
 ---
 title: A sweep is one sbatch call, and the script is the member table
 tags: [submission, arrays, identity]
-related: [[sweeps-and-artifacts]], [[preemption-and-campaigns]], [[job-identity-on-cluster]], [[node-local-scratch]]
-sources: ["probe job 55678543 (free, --array=0-3%2), 2026-09-01", core/array_sbatch.py, core/array_submit.py, contracts/array.py]
+related: ["[[sweeps-and-artifacts]]", "[[preemption-and-campaigns]]", "[[job-identity-on-cluster]]", "[[node-local-scratch]]"]
+source_paths:
+  - "src/hpc3/core/array_sbatch.py"
+  - "src/hpc3/core/array_submit.py"
+  - "src/hpc3/contracts/array.py"
+source_git_blobs:
+  "src/hpc3/core/array_sbatch.py": "8ebc37d14ba8fb7d1dcd8b629225fddb57e1cd53"
+  "src/hpc3/core/array_submit.py": "97a1d6240ff6a7032bbba3a86710c3220d624061"
+  "src/hpc3/contracts/array.py": "cc4f4723f7da7cc3705442e8fe4ec89d68040b72"
+provenance:
+  - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"
 fact_checked: 2026-09-01
 confidence: high
 ---

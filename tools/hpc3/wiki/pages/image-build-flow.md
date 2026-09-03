@@ -1,8 +1,17 @@
 ---
 title: The image build flow, and why a GPU project must declare an image
 tags: [images, identity, gpu]
-related: [[image-ledger-lessons]], [[environment-pins]], [[known-answers]]
-sources: [contracts/image_spec.py, cli/image, cli/image_build, README.md@4dc63f17]
+related: ["[[image-ledger-lessons]]", "[[environment-pins]]", "[[known-answers]]"]
+source_paths:
+  - "src/hpc3/contracts/image_spec.py"
+  - "src/hpc3/cli/image.py"
+  - "src/hpc3/cli/image_build.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/contracts/image_spec.py": "ef0e7c294cd0c8cca9e515605e0be486a6d77f78"
+  "src/hpc3/cli/image.py": "6961a7e21a8bf6427f7191e07c4c91e784c5a7ad"
+  "src/hpc3/cli/image_build.py": "31e8cc8c5ff389857c000e60e31d11cf8534eb90"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---

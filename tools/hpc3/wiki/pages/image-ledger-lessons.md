@@ -1,8 +1,17 @@
 ---
 title: Twenty-one unledgered image builds, and how the path that made them was closed
 tags: [images, ledger, incidents]
-related: [[image-build-flow]], [[triage-conditions]], [[ledger-closures]]
-sources: ["image ebb61ed0 (the 23rd unledgered build)", cli/image_build, README.md@4dc63f17]
+related: ["[[image-build-flow]]", "[[triage-conditions]]", "[[ledger-closures]]"]
+source_paths:
+  - "src/hpc3/cli/image_build.py"
+  - "src/hpc3/core/image_build.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/cli/image_build.py": "31e8cc8c5ff389857c000e60e31d11cf8534eb90"
+  "src/hpc3/core/image_build.py": "2b93eab7d3f31f62a523d8078b8ffc4c440d90a8"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "image ebb61ed0 (the 23rd unledgered build)"
 fact_checked: 2026-09-01
 confidence: high
 ---

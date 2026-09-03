@@ -34,6 +34,42 @@ only from --symbols, so a re-capture drops the abl spec's 29 smoke commands and 
 symbol assertions unless they are re-supplied. The surgical spec edit is what
 cli/image_capture.py's own comment says every version bump has done since onboarding.
 
+## [2026-09-02] register | this wiki joins the fleet, and every page turns out never to have parsed
+Pages updated: all 21 (frontmatter converted to the code-paths contract), index.md (page
+count 20 -> 21, which was simply wrong), SCHEMA.md (frontmatter + citations sections)
+Registered as slug `hpc3` by opus-research-onboarding-0902, board task 429f49fe.
+Notes: The wiki existed as a complete three-tier tree for weeks and was reachable only by
+opening the directory. It was not in `WIKIS` (mcp-shared/src/source-registry/wikis.ts),
+not mounted in the MCPs docker-compose, and the sole inbound link on the whole filesystem
+was tools/hpc3/README.md -- API/wiki/index.md did not mention it, while that same index
+declared infrastructure depth "a real gap". So `wiki_search_query` could not reach it and
+`wiki_audit_*` ran ZERO rules against it.
+
+The finding that justified the whole exercise: ALL 21 PAGES HAD INVALID YAML FRONTMATTER.
+The form SCHEMA.md itself documented -- `related: [[a]], [[b]]` -- is a syntax error, a
+flow sequence followed by a comma. Every page failed yaml.safe_load, 21 of 21. Nothing had
+ever caught it because nothing had ever parsed the wiki. Registration is not only about
+being searchable: an unregistered wiki is an unverified one. SCHEMA.md now documents the
+quoted form and says why.
+
+Converted every page to `source_paths:` + `source_git_blobs:` + `provenance:`. The old
+shorthand (`contracts/budget.py`, `cli/triage`, `README.md@4dc63f17`) named nothing
+resolvable; paths are now repo-relative (`src/hpc3/contracts/budget.py`) and every one
+carries a blob pin -- 100% coverage, deliberately, because `git-blob-hash-pin` is the only
+rule that detects drift and it fires only on pinned paths. Measurement strings (sshare
+readings, probe job ids, /pub paths) and the three citations that genuinely point outside
+tools/hpc3 (platform_core.determinism_env, model_trainer.cli.known_answer_registry,
+RustedWarfareBot's member_command) moved to `provenance:`, following NavProbe's pattern.
+
+Self-check: 21/21 parse, 0 missing paths, 0 unpinned paths, 0 hash drift.
+
+workspaceRoot is /workspace-mounts/api/tools/hpc3, riding the existing /workspace-mounts/api
+bind rather than a dedicated one -- a subdir bind carries no .git and would make every pin
+false-fire "not tracked in HEAD", which is the 2026-07-23 TankpitBot lesson. The onboarding
+generator DOES emit a dedicated workspace-mount line; it is wrong twice over and must not be
+pasted. claudeMdPath points at the api monorepo's root CLAUDE.md, which was created the same
+day and is the file a session under this tree actually loads.
+
 ## [2026-09-01] feature+page | sweeps become one sbatch call -- job arrays, measured first, parsers expanded everywhere
 Pages written: job-arrays
 Pages updated: unsupported-shapes (arrays moved to the left-the-list section), README table (row removed, held out by test_examples)

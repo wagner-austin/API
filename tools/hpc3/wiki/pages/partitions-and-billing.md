@@ -1,8 +1,15 @@
 ---
 title: Billing follows the job's QOS, and free is not a setting
 tags: [cluster-facts, billing, partitions]
-related: [[facts-are-code]], [[submission-rules]], [[budget-model]]
-sources: ["sshare RawUsage measurement 2026-08-23 (cjmayer_lab)", clusters/hpc3.py, README.md@4dc63f17]
+related: ["[[facts-are-code]]", "[[submission-rules]]", "[[budget-model]]"]
+source_paths:
+  - "src/hpc3/clusters/hpc3.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/clusters/hpc3.py": "e6fedebb13c20222c9269b158f0ebed7fbf84cc9"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "sshare RawUsage measurement 2026-08-23 (cjmayer_lab)"
 fact_checked: 2026-09-01
 confidence: high
 ---

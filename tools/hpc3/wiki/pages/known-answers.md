@@ -1,8 +1,16 @@
 ---
 title: An image that still builds is not an image that still computes
 tags: [identity, images, known-answers]
-related: [[image-build-flow]], [[determinism-posture]], [[staging-identity]]
-sources: ["wiki/tools/extraction-eval/runs/known-answers.json (the wiki repo, not this one)", model_trainer.cli.known_answer_registry, README.md@4dc63f17]
+related: ["[[image-build-flow]]", "[[determinism-posture]]", "[[staging-identity]]"]
+source_paths:
+  - "src/hpc3/core/image_selfcheck.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/core/image_selfcheck.py": "14a72028e8f5fc4e80d5ce7742ba018f46f5b40c"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "wiki/tools/extraction-eval/runs/known-answers.json (the wiki repo, not this one)"
+  - "model_trainer.cli.known_answer_registry (services/Model-Trainer, outside this workspaceRoot)"
 fact_checked: 2026-09-01
 confidence: high
 ---

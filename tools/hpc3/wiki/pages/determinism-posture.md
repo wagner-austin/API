@@ -1,8 +1,14 @@
 ---
 title: Determinism is declared, split between launcher and payload, and recorded
 tags: [identity, determinism]
-related: [[known-answers]], [[run-documents]]
-sources: ["measured: RTX 3090 Ti, torch 2.6.0+cu124, transformers 4.46.3", platform_core.determinism_env, README.md@4dc63f17]
+related: ["[[known-answers]]", "[[run-documents]]"]
+source_paths:
+  - "README.md"
+source_git_blobs:
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+provenance:
+  - "measured: RTX 3090 Ti, torch 2.6.0+cu124, transformers 4.46.3"
+  - "platform_core.determinism_env (libs/platform_core, outside this workspaceRoot)"
 fact_checked: 2026-09-01
 confidence: high
 ---

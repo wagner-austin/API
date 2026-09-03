@@ -1,8 +1,15 @@
 ---
 title: The budget is per project, because nothing else says stop
 tags: [operations, budget, submission]
-related: [[submission-rules]], [[partitions-and-billing]], [[triage-conditions]]
-sources: [contracts/budget.py, core/budget.py, README.md@4dc63f17]
+related: ["[[submission-rules]]", "[[partitions-and-billing]]", "[[triage-conditions]]"]
+source_paths:
+  - "src/hpc3/contracts/budget.py"
+  - "src/hpc3/core/budget.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/contracts/budget.py": "ed533e9bba6ad5616ac448a5b8979412929a80fe"
+  "src/hpc3/core/budget.py": "55346abe18818dd299abf50cb27cb7a80a20c789"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---

@@ -1,8 +1,17 @@
 ---
 title: The submission rules, each with the failure it refuses
 tags: [submission, guards]
-related: [[budget-model]], [[preemption-and-campaigns]], [[partitions-and-billing]]
-sources: [contracts/job.py, contracts/preflight.py, README.md@4dc63f17]
+related: ["[[budget-model]]", "[[preemption-and-campaigns]]", "[[partitions-and-billing]]"]
+source_paths:
+  - "src/hpc3/contracts/job.py"
+  - "src/hpc3/contracts/preflight.py"
+  - "src/hpc3/core/preflight.py"
+  - "README.md"
+source_git_blobs:
+  "src/hpc3/contracts/job.py": "45f6be817460501c520ecca58b4f1dbc7341f4d0"
+  "src/hpc3/contracts/preflight.py": "e72df28502ee022931ff38610f697c10fef0dbc0"
+  "src/hpc3/core/preflight.py": "c642109e539eb3a0a7cfb97c6e44ff161fe7cb0a"
+  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---
