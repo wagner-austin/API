@@ -9,3 +9,4 @@ from the cluster's side.
 [What the cluster sees, and why the comment is live-only](../pages/job-identity-on-cluster.md) -- job names, derived directories, HPC3_* env, the comment-vs-ledger split
 [Preemption cancels, checkpoints protect, campaigns converge](../pages/preemption-and-campaigns.md) -- PreemptMode=CANCEL, measured on free-gpu
 [Small-file boots belong on the node's own scratch, never on BeeGFS](../pages/node-local-scratch.md) -- per-job $TMPDIR measured at 1.9 GB/s; the boot-contention class ten members died to, closed at the command chokepoint
+[The interpreter every project needs is not in `module avail python`](../pages/interpreter-availability.md) -- 2.7/3.8/3.10/3.14 as modules and 3.9 as system, while everything here requires 3.11; conda is the door, and the improvised bootstrap left one env symlinked into another
