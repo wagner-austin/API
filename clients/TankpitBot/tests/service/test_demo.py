@@ -21,6 +21,7 @@ from collections.abc import AsyncIterator, Generator
 
 import pytest
 from aiohttp import web
+from aiohttp.client_exceptions import ClientConnectionError
 from aiohttp.test_utils import TestClient, TestServer
 from platform_core.json_utils import (
     JSONValue,
@@ -47,6 +48,7 @@ from tankpit_bot.service.demo import (
 from tankpit_bot.service.fleet_error import FleetError
 from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_routes import make_fleet_app
+from tankpit_bot.service.video_relay import CHILD_WARMUP_RETRY_SECONDS
 from tests.service._fleet_fixtures import (
     _FakeSpawner,
     _restore_account_hooks,
@@ -313,6 +315,36 @@ async def test_the_demo_video_route_relays_a_demo_slot(
 
 
 @pytest.mark.asyncio
+async def test_a_child_that_has_not_bound_its_port_yet_is_503_not_500(
+    demo_client: TestClient[web.Request, web.Application],
+) -> None:
+    """Watching a bot the moment it starts says "not yet", not "broken".
+
+    A child is ``alive`` from the instant it is forked and its video
+    port opens seconds later, so the demo page — which draws a tile as
+    soon as a bot appears — asks early every single time. Uncaught, the
+    connection refusal reached the boundary as a 500 and reported the
+    server as broken while the bot was merely still booting.
+    """
+    assert (await demo_client.post("/demo/spawn")).status == 201
+    original = service_hooks.open_child_video
+    service_hooks.open_child_video = _RefusingOpener()
+    try:
+        response = await demo_client.get("/demo/video/demo-1")
+        body = await response.text()
+    finally:
+        service_hooks.open_child_video = original
+
+    assert response.status == 503
+    assert response.headers["Retry-After"] == str(CHILD_WARMUP_RETRY_SECONDS)
+    # The cause travels: a refused connection that is NOT a warming
+    # child reads identically from outside, so the body has to say
+    # which one this was.
+    assert "is not serving video yet" in body
+    assert "connection refused by the child" in body
+
+
+@pytest.mark.asyncio
 async def test_the_demo_video_route_refuses_a_slot_nothing_is_playing_in(
     demo_client: TestClient[web.Request, web.Application],
 ) -> None:
@@ -464,6 +496,24 @@ class _FakeChildVideoStream:
     async def close(self) -> None:
         """Record one release."""
         self.closes += 1
+
+
+class _RefusingOpener:
+    """An opener that refuses, as a child mid-boot does."""
+
+    async def __call__(self, url: str) -> _FakeChildVideoStream:
+        """Refuse the connection.
+
+        Args:
+            url: Upstream URL the route asked for.
+
+        Returns:
+            Never returns.
+
+        Raises:
+            ClientConnectionError: Always.
+        """
+        raise ClientConnectionError(f"connection refused by the child at {url}")
 
 
 class _Opener:
