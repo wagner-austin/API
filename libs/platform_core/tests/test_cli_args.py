@@ -80,14 +80,14 @@ class TestHelp:
         with pytest.raises(HelpRequestedError):
             parse_single_flags(["--host", "hpc3", "--help"], _FLAGS)
 
-    def test_it_is_a_value_error_so_untaught_boundaries_still_refuse(self) -> None:
-        """The compatibility property. A boundary that has not been taught
-        about help must degrade to the refusal it gave before, not to a
-        traceback.
+    def test_it_is_not_a_value_error_because_it_is_not_a_bad_command_line(self) -> None:
+        """The other raises here mean the command line is wrong. This one means
+        it is a question, and a boundary that cannot tell them apart prints a
+        refusal at a non-zero status for a caller who typed something valid.
         """
-        assert issubclass(HelpRequestedError, ValueError)
+        assert not issubclass(HelpRequestedError, ValueError)
 
-        with pytest.raises(ValueError, match="expected one of"):
+        with pytest.raises(HelpRequestedError):
             parse_single_flags(["--help"], _FLAGS)
 
     def test_usage_names_every_flag_and_that_each_takes_a_value(self) -> None:

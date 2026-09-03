@@ -69,10 +69,9 @@ def run(main: Callable[[Sequence[str] | None], int]) -> int:
     try:
         return main(None)
     except HelpRequestedError as request:
-        # Before the ValueError arm, which HelpRequestedError subclasses. Asking
-        # what the flags are is not a refusal: it goes to stdout beside the
-        # command's other output and exits zero, so `cmd --help` in a script
-        # does not read as the command having declined to run.
+        # Asking what the flags are is not a refusal, so it goes to stdout
+        # beside the command's other output and exits zero: `cmd --help` in a
+        # script must not read as the command having declined to run.
         _test_hooks.emit(usage_text(request.allowed))
         return EXIT_OK
     except AppError as refusal:

@@ -25,16 +25,13 @@ HELP_FLAGS: Final[tuple[str, ...]] = ("--help", "-h")
 """Tokens that ask what the flags are instead of asking for work."""
 
 
-class HelpRequestedError(ValueError):
+class HelpRequestedError(Exception):
     """The command line asked for usage rather than for the command to run.
 
-    A subclass of :class:`ValueError` deliberately. These flags are read by
-    two packages' entry points, and only one of them translates refusals at a
-    typed boundary. Raising a fresh exception type would turn ``--help`` into
-    a traceback everywhere that has not been taught the new type, which is a
-    worse answer than the refusal it replaced. As a ``ValueError`` subclass it
-    degrades to exactly the old behaviour, and a boundary that wants to print
-    usage and exit zero can catch it first.
+    Not a :class:`ValueError`, which is what the other raises here are. Those
+    say the command line is wrong; this one says it is a question. A boundary
+    that treats the two alike prints a refusal for a request that was
+    correctly typed, and exits non-zero for a caller who did nothing wrong.
 
     Attributes:
         allowed: The flags the command accepts, in declaration order, so the

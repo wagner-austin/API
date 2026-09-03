@@ -86,17 +86,17 @@ class TestHelpIsNotARefusal:
 
         assert errors == []
 
-    def test_it_is_caught_before_the_value_error_arm_it_subclasses(
+    def test_a_bad_command_line_is_still_a_refusal(
         self, emitted: list[str], errors: list[str]
     ) -> None:
-        """HelpRequestedError IS a ValueError, so arm order is what decides this.
-        Reversing the two arms would print 'usage: expected one of ...' at
-        status 2 and still look plausible.
+        """The neighbouring case, kept beside it so the two cannot be
+        confused. A mistyped flag is wrong and refuses at status 2; asking
+        what the flags are is a question and succeeds at status 0.
         """
-        status = _fatal.run(_raising(HelpRequestedError(("--config",))))
+        status = _fatal.run(_raising(ValueError("unknown argument '--turbo'")))
 
-        assert (status, errors) == (EXIT_OK, [])
-        assert emitted == ["usage: --config <value>"]
+        assert (status, emitted) == (EXIT_REFUSED, [])
+        assert errors == ["usage: unknown argument '--turbo'"]
 
 
 class TestRefusalsBecomeMessages:
