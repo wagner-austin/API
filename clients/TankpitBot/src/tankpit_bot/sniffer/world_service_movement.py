@@ -17,8 +17,24 @@ from tankpit_bot.state import (
 log = get_logger(__name__)
 
 _FAILED_MOVE_TTL_MS = 30000
+"""How long a failed move destination stays avoided.
+
+The 30 s family's ancestor mark: the ~2 s replan cycle re-scores the
+same ground every tick, so an unmarked failed destination is re-picked
+immediately and forever (the shape `_LANDING_REFUSAL_TTL_MS` cites in
+its 2026-08-05/08-21 incidents). Fifteen replan cycles is long enough
+that the planner has moved its frontier elsewhere, and the mark is
+cleared EARLY on fresh radar data (`clear_failed_move_targets`) —
+new terrain knowledge, not the clock, is the preferred release."""
 
 _FAILED_SCAN_VIEWPORT_TTL_MS = 30000
+"""How long a stalled radar scan blocks re-requesting its viewport.
+
+Same 30 s replan-suppression family as `_FAILED_MOVE_TTL_MS`: a scan
+that produced no response would otherwise be re-dispatched every ~2 s
+replan tick, burning a radar per retry against a viewport the server
+is refusing to answer. Cleared early per-viewport when a scan for
+that origin does complete (`clear_failed_scan_viewport`)."""
 
 _LANDING_REFUSAL_TTL_MS = 30000
 """How long a refused landing blocks the requested tile's ring.

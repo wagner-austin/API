@@ -274,7 +274,7 @@ in the bot is the 10-minute harvest veto.
 | 7 | Mine pin single-slot latch | **open** |
 | 8 | Ferry scout has no negative memory (1/31) | **open** — NOT fixed by the settled law (an earlier board note overclaimed this): the scout's precheck compares against the current window only, and per-goal look history is a separate design |
 | 9 | Three dead forked constants in `world_service.py` | **fixed 2026-09-03** — deleted; grep confirms the only `_FAILED_MOVE_TTL_MS` / `_FAILED_SCAN_VIEWPORT_TTL_MS` / `_RADAR_CACHE_REFRESH_WINDOW_MS` symbols left are the live ones in `world_service_movement.py` / `world_service_radar.py` |
-| 10 | Six undocumented `*_MS` constants | **open** |
+| 10 | Six undocumented `*_MS` constants | **fixed 2026-09-03** — three were row 9's dead forks (deleted); the three live bare ones (`_FAILED_MOVE_TTL_MS`, `_FAILED_SCAN_VIEWPORT_TTL_MS`, `_RADAR_CACHE_REFRESH_WINDOW_MS`) now carry derivation docstrings tying the 30 s family to the ~2 s replan cycle with early knowledge-based release, and the 2 s pairing window to its single-consume lifetime. Every `*_MS` constant in `src/` is now documented |
 | 11 | Incoming rate is not attributed per attacker | **open** — a pair's combined rate prices a one-on-one duel; the unavoidable-break bar at private only moves 36→40 with row 6 because the dominant term is `hits_to_kill x pair_rate` vs capacity. Needs per-shooter windows in the damage book |
 
 ## Machine-checked claims (row 6)

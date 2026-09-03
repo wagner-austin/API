@@ -15,6 +15,14 @@ from tankpit_bot.state.viewport_geometry import (
 )
 
 _RADAR_CACHE_REFRESH_WINDOW_MS = 2000
+"""Pairing window between a zero-delta tunneled radar result and its
+consumer. A zero-delta answer means the server's map cache already
+matched ours; the mark is consumed by the NEXT decide pass (~2 s
+cadence) to skip redundant refresh work. One replan cycle is the
+whole lifetime the pairing needs — a wider window would let a stale
+zero-delta mark suppress a refresh that a later, different scan
+actually earned. The consume also zeroes the mark unconditionally,
+so the window only ever spans one observation."""
 
 
 class WorldServiceRadarMixin:
