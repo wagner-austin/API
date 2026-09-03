@@ -70,7 +70,11 @@ FINGERPRINT_DISTRIBUTIONS: tuple[str, ...] = ("numpy", "torch", "transformers")
 NO_GPU = ""
 
 
-def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunFingerprint:
+def capture_run_fingerprint(
+    device: str,
+    determinism: DeterminismRecord,
+    distributions: tuple[str, ...] = FINGERPRINT_DISTRIBUTIONS,
+) -> RunFingerprint:
     """Record what this process is about to compute a number on.
 
     The card and driver are read only for a cuda run. Querying them for a cpu
@@ -88,6 +92,16 @@ def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunF
         device: The device the measurement runs on, ``"cuda"`` or ``"cpu"``.
         determinism: What determinism was put in force, as returned by
             :func:`platform_ml.determinism.apply_determinism`.
+        distributions: The libraries whose versions decide this run's
+            numbers. Defaults to :const:`FINGERPRINT_DISTRIBUTIONS`, which is
+            what every benchmark records. Training passes a wider set when
+            the run used adapters or quantization, because `peft` and
+            `bitsandbytes` decide that run's arithmetic and are absent from
+            a benchmark's. Naming them is the caller's job by
+            :func:`~platform_core.environment_record.capture_package_versions`'s
+            own contract: recording every installed package would make two
+            runs differ over a dev-dependency bump that cannot reach a
+            number.
 
     Returns:
         The fingerprint. ``image_digest`` is the digest of the image that
@@ -112,7 +126,7 @@ def capture_run_fingerprint(device: str, determinism: DeterminismRecord) -> RunF
         driver_version=_test_hooks.cuda_driver_version() if on_cuda else NO_GPU,
         determinism=determinism,
         host=capture_host_record(_test_hooks.host_probe()),
-        packages=capture_package_versions(FINGERPRINT_DISTRIBUTIONS, _test_hooks.installed_version),
+        packages=capture_package_versions(distributions, _test_hooks.installed_version),
     )
 
 

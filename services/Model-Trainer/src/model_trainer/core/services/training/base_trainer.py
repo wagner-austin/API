@@ -22,6 +22,9 @@ from model_trainer.core.contracts.model import (
 from model_trainer.core.services.training.base_trainer_loop import (
     _TrainerLoop,
 )
+from model_trainer.core.services.training.run_records import (
+    write_training_run_record,
+)
 from model_trainer.core.services.training.checkpoint import (
     TrainingCheckpoint,
     delete_training_checkpoint,
@@ -206,7 +209,7 @@ class BaseTrainer(_TrainerLoop):
             _ = delete_training_checkpoint(self._settings, self._run_id)
 
         ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
-        return TrainOutcome(
+        outcome = TrainOutcome(
             loss=last_loss,
             perplexity=ppl,
             steps=step,
@@ -217,3 +220,19 @@ class BaseTrainer(_TrainerLoop):
             best_val_loss=best_val_loss,
             early_stopped=early_stopped,
         )
+        # The manifest beside the weights already carries a full fingerprint.
+        # What it is NOT is a RunRecord, so platform_core cannot place this
+        # run's numbers beside another experiment's without a translation
+        # step that does not exist -- the same defect covenant_ml's
+        # BenchmarkManifest has. The sidecar is that shape, and it adds two
+        # things the manifest lacks: a digest over the saved weights, and
+        # peft/bitsandbytes in the package axis when the run used them.
+        write_training_run_record(
+            outcome,
+            label=self._run_id,
+            device=self._cfg["device"],
+            determinism=self._determinism,
+            prepared=self._prepared,
+            model_family=self._cfg["model_family"],
+        )
+        return outcome
