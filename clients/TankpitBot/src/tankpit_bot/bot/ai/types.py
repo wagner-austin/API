@@ -300,10 +300,21 @@ class AIStateDict(TypedDict):
             what admits them to acquisition.
         last_scope_scout_ms: Timestamp of the last ferry scope-scout
             (the free Rb viewport pan toward a water-locked goal,
-            [[viewport-shift-protocol]]). Cooldown latch: a pan that
-            reveals no ferry leaves no negative belief behind, so
-            without it the scout would re-fire every tick the larder
-            declines the same water-locked container.
+            [[viewport-shift-protocol]]). Rate-limit latch across ALL
+            goals — the per-goal negative belief lives in
+            :attr:`scope_scout_looks`.
+        scope_scout_looks: The scout's per-goal look memory,
+            {"x,y" goal tile: pan timestamp_ms}. A pan that reveals
+            no ferry IS a fact — ferries move only when ridden
+            ([[ferry-mechanics]] no-drift law) — so a goal whose look
+            postdates the settled-knowledge floor
+            (``DecideCtx.scout_floor_ms``, TTL
+            ``FERRY_LOOK_TTL_MS``) never draws a second pan while the
+            room stays settled. The memoryless scout re-panned the
+            same water on every cooldown expiry: 31 pans, 1 acted on
+            (flag-triage-20260902 row 8; the operator watched one as
+            "it did a tiny north east viewport shift then teleported
+            away").
         sweep_anchor_x: X of the quad sweep's anchor tile (-1 when no
             sweep is latched). The sweep is atomic ([[quad-sweep-doctrine]]):
             it continues only while the tank stands exactly on this
@@ -376,6 +387,7 @@ class AIStateDict(TypedDict):
     pursuit_shot_ms: int
     visited_tank_ids: dict[str, int]
     last_scope_scout_ms: int
+    scope_scout_looks: dict[str, int]
     sweep_anchor_x: int
     sweep_anchor_y: int
     maroon_pan_x: int
@@ -478,6 +490,7 @@ def make_initial_ai_state(
         pursuit_shot_ms=0,
         visited_tank_ids={},
         last_scope_scout_ms=0,
+        scope_scout_looks={},
         sweep_anchor_x=-1,
         sweep_anchor_y=-1,
         maroon_pan_x=-1,

@@ -29,6 +29,7 @@ from tankpit_bot.physics.capacity import rank_scaled_reserve
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.knowledge_floors import (
+    FERRY_LOOK_TTL_MS,
     FORAGE_COVERAGE_TTL_MS,
     HARVEST_MEMORY_TTL_MS,
 )
@@ -68,6 +69,7 @@ class DecideCtx:
         "mode",
         "mode_started_ms",
         "mode_state",
+        "scout_floor_ms",
         "self_state",
         "terrain",
         "timestamp_ms",
@@ -120,6 +122,7 @@ class DecideCtx:
         # watermark, so the sweep runs exactly once per question class.
         self.forage_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, FORAGE_COVERAGE_TTL_MS)
         self.harvest_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, HARVEST_MEMORY_TTL_MS)
+        self.scout_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, FERRY_LOOK_TTL_MS)
 
         self.config: AIConfigDict = ai_state["config"]
         # Rank-scaled fuel reserves ([[flag-triage-20260902]] row 6):

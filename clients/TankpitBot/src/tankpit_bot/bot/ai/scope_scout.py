@@ -16,11 +16,17 @@ the tank to the trailing window edge, so the reachable view is the
 the CURRENT position, never across the map. Goals beyond
 :data:`SCOPE_REACH_TILES` stay the discovery cascade's business.
 
-A pan that reveals no ferry leaves no negative belief behind (0x5A
-patches enumerate the dynamic layer present, never its absence), so
-the scout latches ``last_scope_scout_ms`` and holds off for
-:data:`SCOPE_SCOUT_COOLDOWN_MS` — without the latch the same declined
-water-locked container would re-trigger the pan every tick.
+The wire leaves no negative belief behind (0x5A patches enumerate the
+dynamic layer present, never its absence), so the scout keeps its
+OWN: every pan records its goal in ``scope_scout_looks``, and a goal
+whose look postdates the settled-knowledge floor never draws a
+second pan — no ferry was there, and ferries move only when ridden
+([[ferry-mechanics]] no-drift law), so the fact stands until a
+foreign human appears (flag-triage-20260902 row 8: the memoryless
+scout spent 31 pans for 1 acted on). ``last_scope_scout_ms`` remains
+as the cross-goal rate limit: at most one pan per
+:data:`SCOPE_SCOUT_COOLDOWN_MS` regardless of how many distinct
+goals qualify.
 """
 
 from __future__ import annotations
@@ -216,6 +222,54 @@ def _water_locked_goals(ctx: DecideCtx) -> list[tuple[int, int]]:
     return goals
 
 
+def _nearest_pannable_goal(
+    ctx: DecideCtx,
+    terrain: TerrainMapProtocol,
+    looks: dict[str, int],
+) -> tuple[int, int, int] | None:
+    """Pick the closest water-locked goal a pan can still inform on.
+
+    A candidate is skipped when it is beyond one pan's reach, when
+    its recorded look is still settled knowledge (the per-goal
+    negative belief: this water was looked at, no ferry was on it,
+    and nothing that moves ferries has been seen since —
+    [[ferry-mechanics]] no-drift law), when no pan axis exists, or
+    when the anchored window would show no unseen boarding water.
+
+    Args:
+        ctx: Decision context.
+        terrain: Static terrain (narrowed non-None by the caller).
+        looks: The scout's per-goal look memory.
+
+    Returns:
+        ``(direction, goal_x, goal_y)`` of the nearest qualifying
+        goal, or ``None`` when none qualifies.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    window = viewport_visible_bounds(ctx.world["viewport"])
+    best: tuple[int, int, int, int] | None = None
+    for candidate_x, candidate_y in _water_locked_goals(ctx):
+        dist = max(abs(candidate_x - sx), abs(candidate_y - sy))
+        if dist > SCOPE_REACH_TILES:
+            continue
+        looked_ms = looks.get(f"{candidate_x},{candidate_y}")
+        if looked_ms is not None and looked_ms >= ctx.scout_floor_ms:
+            continue
+        plan = pan_plan_toward(window, sx, sy, candidate_x, candidate_y)
+        if plan is None:
+            continue
+        candidate_direction, shifted_left, shifted_top = plan
+        if not pan_reveals_new_goal_water(
+            terrain, window, shifted_left, shifted_top, candidate_x, candidate_y
+        ):
+            continue
+        if best is None or dist < best[0]:
+            best = (dist, candidate_direction, candidate_x, candidate_y)
+    if best is None:
+        return None
+    return best[1], best[2], best[3]
+
+
 def scope_scout_for_ferry(
     ctx: DecideCtx,
     base_state: AIStateDict,
@@ -236,7 +290,8 @@ def scope_scout_for_ferry(
     Returns:
         The scope-shift decision, or ``None`` when a combat lock is
         held (mid-fight restocks never sightsee), the cooldown is
-        live, terrain is unknown, or no water-locked goal is inside
+        live, terrain is unknown, every reachable goal's look is
+        still settled knowledge, or no water-locked goal is inside
         a single pan's reach.
     """
     if base_state["combat_target_id"] != -1:
@@ -246,26 +301,11 @@ def scope_scout_for_ferry(
     terrain = ctx.terrain
     if terrain is None:
         return None
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    window = viewport_visible_bounds(ctx.world["viewport"])
-    best: tuple[int, int, int, int] | None = None
-    for candidate_x, candidate_y in _water_locked_goals(ctx):
-        dist = max(abs(candidate_x - sx), abs(candidate_y - sy))
-        if dist > SCOPE_REACH_TILES:
-            continue
-        plan = pan_plan_toward(window, sx, sy, candidate_x, candidate_y)
-        if plan is None:
-            continue
-        candidate_direction, shifted_left, shifted_top = plan
-        if not pan_reveals_new_goal_water(
-            terrain, window, shifted_left, shifted_top, candidate_x, candidate_y
-        ):
-            continue
-        if best is None or dist < best[0]:
-            best = (dist, candidate_direction, candidate_x, candidate_y)
-    if best is None:
+    looks = base_state["scope_scout_looks"]
+    chosen = _nearest_pannable_goal(ctx, terrain, looks)
+    if chosen is None:
         return None
-    _, direction, goal_x, goal_y = best
+    direction, goal_x, goal_y = chosen
     emit_ai(
         "scope scout toward water-locked goal (%d,%d): pan direction %d",
         goal_x,
@@ -285,7 +325,16 @@ def scope_scout_for_ferry(
         goal_x,
         goal_y,
         "ferry_scope_scout",
-        AIStateDict(**{**base_state, "last_scope_scout_ms": ctx.timestamp_ms}),
+        AIStateDict(
+            **{
+                **base_state,
+                "last_scope_scout_ms": ctx.timestamp_ms,
+                "scope_scout_looks": {
+                    **looks,
+                    f"{goal_x},{goal_y}": ctx.timestamp_ms,
+                },
+            }
+        ),
         ctx.equip,
         reason_context={"direction": direction},
     )

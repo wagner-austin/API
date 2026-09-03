@@ -121,9 +121,20 @@ def _ctx(
     world: WorldStateDict,
     terrain: InMemoryTerrainMap | None,
     now_ms: int = 100000,
+    human_seen_ms: int = 0,
 ) -> DecideCtx:
-    """Decision context at the standard (100,100) rest state."""
+    """Decision context at the standard (100,100) rest state.
+
+    Args:
+        world: World snapshot.
+        terrain: Static terrain, or None.
+        now_ms: Decision timestamp.
+        human_seen_ms: Foreign-human watermark to seed the world
+            service with — 0 models a settled room (permanent
+            knowledge floor), a recent value models a human about.
+    """
     ws = WorldService()
+    ws.last_foreign_human_seen_ms = human_seen_ms
     self_state = world["self_state"]
     assert self_state is not None
     return DecideCtx(
@@ -171,6 +182,73 @@ def test_water_locked_container_draws_a_pan_toward_its_water() -> None:
     assert decision["behavior"]["target_y"] == 100
     assert decision["behavior"]["reason_context"] == {"direction": SCOPE_EAST}
     assert decision["updated_ai_state"]["last_scope_scout_ms"] == 100000
+    # The pan IS the negative belief: the goal's look is recorded so
+    # the same water never draws a second pan while the room stays
+    # settled (flag-triage-20260902 row 8).
+    assert decision["updated_ai_state"]["scope_scout_looks"] == {"110,100": 100000}
+
+
+def test_a_pan_extends_the_look_map_without_forgetting_earlier_goals() -> None:
+    """A new goal's look joins the map; prior looks survive."""
+    world, terrain = _water_locked_world()
+    base = AIStateDict(**{**make_scanned_ai_state(), "scope_scout_looks": {"40,40": 20000}})
+
+    decision = scope_scout_for_ferry(_ctx(world, terrain), base)
+
+    if decision is None:
+        raise AssertionError("expected the scout to pan")
+    assert decision["updated_ai_state"]["scope_scout_looks"] == {
+        "40,40": 20000,
+        "110,100": 100000,
+    }
+
+
+def test_a_looked_goal_never_draws_a_second_pan_while_settled() -> None:
+    """SETTLED room: the recorded look is permanent negative belief.
+
+    The memoryless scout re-panned the same water on every cooldown
+    expiry — 31 pans, 1 acted on, in the flagged run — and the
+    operator watched one live as "it did a tiny north east viewport
+    shift then teleported away" (flag-triage-20260902 row 8). With
+    the look recorded and no foreign human ever seen, the goal is
+    skipped even though the 30 s cooldown has long expired.
+    """
+    world, terrain = _water_locked_world()
+    base = AIStateDict(**{**make_scanned_ai_state(), "scope_scout_looks": {"110,100": 50000}})
+
+    assert scope_scout_for_ferry(_ctx(world, terrain), base) is None
+
+
+def test_a_foreign_human_re_arms_a_pre_sighting_look() -> None:
+    """A human seen AFTER the look invalidates it: ferries may have moved.
+
+    Look at 50000, human watermark 60000, now 100000: the settled
+    floor is min(100000-30000, 60000) = 60000, the look predates it,
+    and the pan fires again — exactly the one event that can put a
+    ferry on previously looked water.
+    """
+    world, terrain = _water_locked_world()
+    base = AIStateDict(**{**make_scanned_ai_state(), "scope_scout_looks": {"110,100": 50000}})
+
+    decision = scope_scout_for_ferry(_ctx(world, terrain, human_seen_ms=60000), base)
+
+    if decision is None:
+        raise AssertionError("expected the stale look to re-arm the pan")
+    assert decision["updated_ai_state"]["scope_scout_looks"] == {"110,100": 100000}
+
+
+def test_a_look_newer_than_the_human_sighting_still_holds() -> None:
+    """A look taken AFTER the human sighting is fresh knowledge.
+
+    Human watermark 60000, look 90000, now 100000: the floor is
+    60000, the look postdates it, and the goal stays skipped — the
+    human present cannot have ridden a ferry onto water looked at
+    since they were last observed... within the 30 s clock arm.
+    """
+    world, terrain = _water_locked_world()
+    base = AIStateDict(**{**make_scanned_ai_state(), "scope_scout_looks": {"110,100": 90000}})
+
+    assert scope_scout_for_ferry(_ctx(world, terrain, human_seen_ms=60000), base) is None
 
 
 def test_nearest_water_locked_goal_wins_the_pan() -> None:

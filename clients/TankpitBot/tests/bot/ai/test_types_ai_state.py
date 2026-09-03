@@ -178,6 +178,25 @@ class TestAIStateDetail:
         with pytest.raises(ValueError, match="mine_pin_presses values must be str"):
             decode_ai_state(encoded)
 
+    def test_encode_decode_roundtrip_with_scope_scout_looks(self) -> None:
+        """Encode/decode preserves the scout's per-goal look memory."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        assert original["scope_scout_looks"] == {}
+        state = AIStateDict(**{**original, "scope_scout_looks": {"110,100": 100000}})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["scope_scout_looks"] == {"110,100": 100000}
+
+    def test_decode_missing_scope_scout_looks_raises(self) -> None:
+        """Missing ``scope_scout_looks`` raises — no back-compat default."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["scope_scout_looks"]
+        with pytest.raises(ValueError, match="scope_scout_looks"):
+            decode_ai_state(encoded)
+
     def test_decode_missing_manual_mode_raises(self) -> None:
         """Missing ``manual_mode`` raises — no back-compat default."""
         original = make_initial_ai_state()

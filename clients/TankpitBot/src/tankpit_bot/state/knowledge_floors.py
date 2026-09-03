@@ -48,6 +48,22 @@ is actually seen.
 """
 
 
+FERRY_LOOK_TTL_MS = 30000
+"""How long a no-ferry scope-scout look answers "worth another pan?"
+UNDER HUMAN PRESENCE.
+
+Ferry positions are positional, not clocked ([[ferry-mechanics]]
+no-drift law): a ferry moves only when someone rides it, so a pan
+that showed a goal's boarding water WITHOUT a ferry is a fact that
+holds until a foreign human — the only agent that rides ferries in —
+is actually seen. This clock is the settled-knowledge law's fallback
+arm for the scout's per-goal look memory
+(``scope_scout_looks``, [[flag-triage-20260902]] row 8): with a
+human about, a look decays on the scout's own half-minute rhythm;
+settled, it is permanent. The memoryless scout re-panned the same
+water forever — 31 pans, 1 acted on, in the flagged run."""
+
+
 def ttl_floor_ms(now_ms: int, ttl_ms: int) -> int:
     """Return the scan-stamp validity floor under pure clock aging.
 
@@ -100,6 +116,7 @@ def settled_knowledge_floor_ms(
 
 
 __all__ = [
+    "FERRY_LOOK_TTL_MS",
     "FORAGE_COVERAGE_TTL_MS",
     "HARVEST_MEMORY_TTL_MS",
     "settled_knowledge_floor_ms",
