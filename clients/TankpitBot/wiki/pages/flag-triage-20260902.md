@@ -353,6 +353,25 @@ the artifacts are complete regardless.
       approaches, 2 fuel. The pathological class — clock-rot
       re-visits — is gone.
 
+## Live validation (2026-09-03, rows 7-8-11-13)
+
+One bounded 7-minute Practice session from HEAD (`27fa6225`), same
+account and room class, same instrument. Every fix under test showed
+its live signature:
+
+| fix | live signature |
+|---|---|
+| Row 7 (mine pin map) | 1 press, 1 target, 1 tile — no re-press |
+| Row 8 (scout look memory) | **9 pans, 9 UNIQUE goals, zero repeats** (baseline: 31 pans re-hammering the same water) |
+| Row 11 (presence-scoped rate) | 1 break, mid-fuel, priced by a live measured rate (27/tick over 3 hits, projection 285 vs floor 289) — a marginal call made on real numbers |
+| Row 13 (teardown ladder) | `Teardown: browser closed` in-line, scorecard printed, **`make run` exit 0** — the first flagged run shape, gone |
+
+Rows 1-6 held: radar redundancy 6% (baseline 49%), adjacent scope
+reversals 4/16, `progress_stalled` 0, zero full-tank breaks, frontier
+journeys 27 → 27 unique blocks with zero re-targets (the instrument's
+raw "revisited" count is the map-open-defer tick pattern — the same
+block on consecutive ticks of ONE journey, never a return).
+
 ## The pattern worth carrying forward
 
 Four independent flags, one shape: **a clock or a scalar standing in for a
