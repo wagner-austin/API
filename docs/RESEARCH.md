@@ -42,7 +42,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
-| `tankpit` | free | cpu | 2 | 2 | 60 | `b838e0242ecc` | yes | 0 |
+| `tankpit` | free | cpu | 2 | 2 | 60 | `0cfdd5592a1a` | yes | 0 |
 | `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | 27344 |
 
 <!-- /generated: hpc3-projects -->
@@ -319,39 +319,45 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   and there is no Poetry on the login node. `hpc3-preflight` reports the
   missing environment, which is the correct refusal; nothing has been
   submitted. The remaining work is provisioning, not registration.
-- **It ships an image, built 2026-09-02.**
-  `/pub/wagnera3/tankpit/images/v1/tankpit.sif`, sha256 `b838e0242ecc…`,
-  126 MB, `env_path` `/opt/env`. The first registration declared `image:
-  null` with the reasoning that four of five projects run from a directory
-  environment and this payload is "pure Python". That was a popularity
-  argument and it was wrong: `rusted` is also CPU-only on `free` with
-  `requeue` and `deterministic`, and it carries an image.
+- **It ships an image, and the image is self-contained.** v2 at
+  `/pub/wagnera3/tankpit/images/v2/tankpit.sif`, sha256 `0cfdd5592a1a…`,
+  127 MB, `env_path` `/opt/env`, built from commit `bccf5afa`.
 
-  The image answers both of this project's real blockers, which a directory
-  environment does not. The cluster's system Python is 3.9 and this package
-  needs 3.11 — the image carries its own (`python:3.11.16-slim-bookworm`).
-  And a directory environment reads its payload from the mutable
-  `/pub/wagnera3/api` checkout, which sat eight days behind; the image bakes
-  first-party code as wheels with `git_commit` written in, so there is no
-  second copy to drift and `image_digest` becomes a real fingerprint axis
-  rather than `NO_VALUE`. The hazard is documented, not theoretical: a
-  directory environment "can be edited in place while `pinned_packages` is
-  edited to match -- which is exactly what happened on 2026-08-28, in under
-  an hour, with every check still passing."
+  The first registration declared `image: null`, reasoning that four of five
+  projects run from a directory environment and this payload is "pure
+  Python". That was a popularity argument and it was wrong: `rusted` is also
+  CPU-only on `free` with `requeue` and `deterministic`, and it carries an
+  image. The image answers both real blockers — the cluster's system Python
+  is 3.9 where this needs 3.11, and a directory environment reads its
+  payload from the mutable `/pub/wagnera3/api` checkout.
 
-  **The wheels were built from a clean `git archive` extract of the commit
-  the spec names, not from the working tree.** Three other sessions had
-  uncommitted changes in that tree at build time; wheels built from it would
-  not have been `bfdce7a5`, which is the stale-wheel failure `image_spec.py`
-  exists to catch, inverted.
+- **v1 ran, and the three submissions it took are the useful record.** The
+  distribution did not carry its own data: the XOR key was read four parents
+  above its module (site-packages after an install) and the field minimaps
+  by bare CWD-relative names. **The two failed by different mechanisms**, so
+  fixing one did not fix the other — `55715554` died on the GIF, and
+  `55715564` then died on the key *even though the key had just been staged
+  beside the GIF*. `55715577` completed only with the assets staged, a
+  working directory set, and `TANKPIT_XOR_KEY_FILE` passed per run.
+
+  Fixed at the packaging layer rather than the image layer (`bccf5afa`,
+  [[packaged-data-assets]]): the assets ship inside `tankpit_bot.data` and
+  `tankpit_bot.resources` addresses them through `importlib.resources`. The
+  checkout-relative constant, the environment override, the CWD candidate
+  list and the container's COPY/ENV were deleted rather than kept — an
+  override is a second answer to a question that must have one, and it is
+  what let one defect grow two independent workarounds.
+
+  **The proof is the run document.** v2's is a bare command line, where v1's
+  needed a shell, a working directory and an environment variable to find
+  files the wheel should always have carried.
 - **Bootstrapping the first image needed a step the documented flow does not
-  cover, and it is worth recording.** `hpc3-image-capture` probes an existing
-  environment over SSH at `env_path`, so a project with no environment has
-  nothing to capture — and the four-command flow starts with capture. A
-  bootstrap environment had to be built by hand first
-  (`/pub/wagnera3/envs/tankpit`, Python 3.11.16 taken from the interpreter
-  inside `envs/cleargbm`, since the cluster module system offers 3.8, 3.10
-  and 3.14 but no 3.11). That environment is disposable now the image exists.
+  cover.** `hpc3-image-capture` probes an existing environment over SSH at
+  `env_path`, and the four-command flow starts with capture — so a project
+  with no environment has nothing to capture from. A bootstrap environment
+  was built by hand first (`/pub/wagnera3/envs/tankpit`, Python 3.11.16 taken
+  from the interpreter inside `envs/cleargbm`, since the module system offers
+  3.8, 3.10 and 3.14 but no 3.11). It is disposable now the image exists.
 
 ---
 
