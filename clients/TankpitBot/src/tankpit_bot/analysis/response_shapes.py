@@ -29,6 +29,11 @@ from pathlib import Path
 from typing import Final
 
 from tankpit_bot.analysis.response_shapes_types import (
+    CAUSE_COMMAND_NEVER_SENT,
+    CAUSE_LIVE_SILENT_WINDOW,
+    CAUSE_SHAPE_NEVER_ASSEMBLED,
+    CAUSE_SIM_ONLY,
+    CAUSE_TOKEN_NEVER_EMITTED,
     VERDICT_INVENTED_LAW,
     VERDICT_MISSING_LAW,
     CommandShapesDict,
@@ -271,6 +276,7 @@ def diff_shapes(
     """
     live_index = _index(live)
     sim_index = _index(sim)
+    vocabulary = _sim_vocabulary(sim)
     rows: list[ShapeDivergenceDict] = []
     for key, count in live_index.items():
         if key not in sim_index:
@@ -281,6 +287,7 @@ def diff_shapes(
                     live_count=count,
                     sim_count=0,
                     verdict=VERDICT_MISSING_LAW,
+                    cause=_missing_cause(key[0], key[1], vocabulary),
                 )
             )
     for key, count in sim_index.items():
@@ -292,6 +299,7 @@ def diff_shapes(
                     live_count=0,
                     sim_count=count,
                     verdict=VERDICT_INVENTED_LAW,
+                    cause=CAUSE_SIM_ONLY,
                 )
             )
     rows.sort(
@@ -302,6 +310,60 @@ def diff_shapes(
         )
     )
     return rows
+
+
+def _sim_vocabulary(sim: list[CommandShapesDict]) -> dict[str, frozenset[str]]:
+    """What the sim was OBSERVED to emit, per command kind.
+
+    Args:
+        sim: The sim archive's distribution.
+
+    Returns:
+        Each command kind the sim sent, mapped to every token it was
+        seen answering that command with. A kind absent from this map
+        was never sent by the sim corpus at all.
+    """
+    tokens: dict[str, set[str]] = {}
+    for entry in sim:
+        seen = tokens.setdefault(entry["command_kind"], set())
+        for shape in entry["shapes"]:
+            seen.update(shape["shape"])
+    return {kind: frozenset(seen) for kind, seen in tokens.items()}
+
+
+def _missing_cause(
+    command_kind: str,
+    shape: tuple[str, ...],
+    vocabulary: dict[str, frozenset[str]],
+) -> str:
+    """Classify WHY a live-only shape has no sim counterpart.
+
+    A flat missing list mixes phenomena that need different work, and
+    reads as one number: a timing artifact the sim cannot reproduce by
+    construction, a command the corpus never sent, and an actual
+    candidate gap all look identical in it. The order of the tests
+    below is the order of confidence — the cheapest, most certain
+    explanations are ruled out first, so a row reaches
+    :data:`CAUSE_SHAPE_NEVER_ASSEMBLED` only when nothing weaker
+    accounts for it.
+
+    Args:
+        command_kind: The command kind whose window produced it.
+        shape: The live shape's ordered tokens.
+        vocabulary: Per-kind sim token vocabulary from
+            :func:`_sim_vocabulary`.
+
+    Returns:
+        One of the ``CAUSE_`` constants.
+    """
+    if not shape:
+        return CAUSE_LIVE_SILENT_WINDOW
+    emitted = vocabulary.get(command_kind)
+    if emitted is None:
+        return CAUSE_COMMAND_NEVER_SENT
+    if set(shape) - emitted:
+        return CAUSE_TOKEN_NEVER_EMITTED
+    return CAUSE_SHAPE_NEVER_ASSEMBLED
 
 
 def _index(distribution: list[CommandShapesDict]) -> dict[tuple[str, tuple[str, ...]], int]:
@@ -369,12 +431,69 @@ def analyze_response_shapes(
     )
 
 
+#: Missing-side buckets, ordered least to most actionable. The
+#: headings say what work each bucket implies, because the whole point
+#: of the split is that they imply DIFFERENT work — and a flat list
+#: reads as though they imply the same work, which is how 208 rows
+#: looked like 208 sim gaps ([[capture-differ]]).
+_MISSING_CAUSE_ORDER: tuple[tuple[str, str], ...] = (
+    (
+        CAUSE_LIVE_SILENT_WINDOW,
+        "[timing, not a gap] the live window drew nothing; a tick-synchronous "
+        "sim cannot produce this",
+    ),
+    (
+        CAUSE_COMMAND_NEVER_SENT,
+        "[corpus gap] the sim corpus never sent this command at all; "
+        "fix the scenarios, not the server",
+    ),
+    (
+        CAUSE_TOKEN_NEVER_EMITTED,
+        "[check] the live shape holds a token the sim never emits here; "
+        "genuine gap or window overlap",
+    ),
+    (
+        CAUSE_SHAPE_NEVER_ASSEMBLED,
+        "[READ THESE FIRST] the sim emits every token here, just never in this combination",
+    ),
+)
+
+
+def _render_rows(rows: list[ShapeDivergenceDict], limit: int) -> list[str]:
+    """Render divergence rows under a heading, capped and honest.
+
+    Args:
+        rows: The rows to render, already ordered.
+        limit: Maximum rows to render. The cap is reported rather than
+            silently truncating, so a reader knows what was dropped.
+
+    Returns:
+        The rendered lines.
+    """
+    lines = []
+    for row in rows[:limit]:
+        count = row["live_count"] + row["sim_count"]
+        shape = " ".join(row["shape"]) if row["shape"] else "(silent)"
+        lines.append(f"    n={count:<6d} {row['command_kind']:<18s} {shape}")
+    if len(rows) > limit:
+        lines.append(f"    ... {len(rows) - limit} more rows not shown (limit={limit})")
+    return lines
+
+
 def format_response_shape_diff(diff: ResponseShapeDiffDict, limit: int) -> str:
     """Format the comparison as a readable report.
 
+    The INVENTED side leads, because it is the half that means
+    something at any sample size: a shape the sim produced is one it
+    can produce, however small the corpus. The MISSING side is split
+    by cause — see :data:`_MISSING_CAUSE_ORDER` — because an
+    undifferentiated missing list mixes a timing artifact the sim
+    cannot reproduce by construction, commands the corpus never sent,
+    and genuine candidates, and reports all three as one number.
+
     Args:
         diff: The comparison to format.
-        limit: Maximum divergence rows to render per verdict. A cap is
+        limit: Maximum divergence rows to render per group. A cap is
             reported explicitly rather than silently truncating, so a
             reader knows what was dropped.
 
@@ -385,19 +504,22 @@ def format_response_shape_diff(diff: ResponseShapeDiffDict, limit: int) -> str:
         f"live_sessions={diff['live_sessions']} live_windows={diff['live_windows']}",
         f"sim_sessions={diff['sim_sessions']} sim_windows={diff['sim_windows']}",
     ]
-    for verdict, title in (
-        (VERDICT_MISSING_LAW, "MISSING LAWS (real server does it, sim never does)"),
-        (VERDICT_INVENTED_LAW, "INVENTED LAWS (sim does it, archive never shows it)"),
-    ):
-        rows = [row for row in diff["divergences"] if row["verdict"] == verdict]
+    invented = [row for row in diff["divergences"] if row["verdict"] == VERDICT_INVENTED_LAW]
+    missing = [row for row in diff["divergences"] if row["verdict"] == VERDICT_MISSING_LAW]
+    lines.append("")
+    lines.append(f"INVENTED LAWS (sim does it, archive never shows it): {len(invented)}")
+    lines.extend(_render_rows(invented, limit))
+    lines.append("")
+    lines.append(f"MISSING LAWS (real server does it, sim never does): {len(missing)}")
+    for cause, title in _MISSING_CAUSE_ORDER:
+        rows = [row for row in missing if row["cause"] == cause]
+        if not rows:
+            continue
+        behind = sum(row["live_count"] for row in rows)
         lines.append("")
-        lines.append(f"{title}: {len(rows)}")
-        for row in rows[:limit]:
-            count = row["live_count"] + row["sim_count"]
-            shape = " ".join(row["shape"]) if row["shape"] else "(silent)"
-            lines.append(f"  n={count:<6d} {row['command_kind']:<18s} {shape}")
-        if len(rows) > limit:
-            lines.append(f"  ... {len(rows) - limit} more rows not shown (limit={limit})")
+        lines.append(f"  {title}")
+        lines.append(f"    {len(rows)} rows, {behind} live windows behind them")
+        lines.extend(_render_rows(rows, limit))
     return "\n".join(lines)
 
 

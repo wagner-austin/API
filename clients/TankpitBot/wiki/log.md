@@ -5567,3 +5567,43 @@ The MISSING-law side reports 208 rows and means almost nothing, and the differ i
 The stated rule is "every TypedDict needs encode/decode functions". The repo's actual practice is codecs at SERIALIZATION BOUNDARIES: in `sim/` only `world.py`, `commands.py` and `fuel_pickup.py` have them, against ~30 TypedDicts. `fuel_pickup`'s pair (written 2026-09-01 under the literal rule) has exactly one caller — a round-trip test that exists to cover it. I followed the boundary convention for combat rather than propagate code kept alive by its own test, and am flagging it rather than deciding a repo-wide sweep unasked.
 
 Multi-client items still open: session registry, `advance_tick` fan-out, per-connection command intake, mid-session join, the per-connection window check at `server_move.py:89`. None is blocked on purity any more.
+
+---
+## [2026-09-02] lift | Two answers I had waved off: the missing side is triageable, and the codec rule has a scope
+
+Both items I closed the previous entry by flagging rather than handling. The operator asked why not, which was the right question.
+
+### The missing side: I said "the differ isn't why". Half wrong
+
+208 undifferentiated rows report THREE unrelated phenomena as one number. Split by why each is one-sided:
+
+| cause | rows | live windows | implies |
+|---|---:|---:|---|
+| live window drew nothing | 9 | 14,118 | **not a gap** -- timing |
+| command never sent by the corpus | 77 | 4,647 | fix the scenarios |
+| shape holds a token the sim never emits here | 92 | 3,555 | check |
+| sim emits every token, never this combination | **30** | 2,798 | **read these** |
+
+The first bucket is a property of the two servers' CLOCKS. The real server is asynchronous: an answer arriving after the next command opened its window records against that one and leaves the first silent. A tick-synchronous sim answers inside the same batch and cannot produce a silent window for a command it handles. Those 9 rows carry 56% of the missing mass and no amount of sim work will ever close them.
+
+`ShapeDivergenceDict` now carries a `cause`, `_missing_cause` classifies from the sim's own observed vocabulary, and the report prints the buckets with headings that say what work each implies. The INVENTED side now leads, being the half that means something at any sample size.
+
+### The 30 readable rows are mostly ONE coverage hole
+
+`pickup_equipment 67 49 pickup` (n=1,324), `radar 4F 46` (n=616), `pickup_fuel 44 pickup 52c5` (n=366) -- 2,306 of the bucket's 2,798 windows. All three are the **no-walk / no-consumption variant** of a command the corpus only ever exercised in its walking, consuming form. The sim implements all three branches; the baseline bot never stands on what it collects and never runs a radar with no extra to spend.
+
+### Depth is not a lever: the vocabulary SATURATES
+
+`practice` at 200 / 400 / 800 / 1,600 / 3,200 rounds gave 202 / 398 / 774 / 1,598 / 684 windows and 13 / 15 / 16 / 15 / 16 distinct shapes. **Eight times the windows, no new shapes** (the +/-1 is a session-boundary artifact, not a decrease).
+
+That is better than the number it was meant to size. The sim's response-shape vocabulary is complete at ~200 rounds, so "the sim never produces this shape" is ALREADY safe for any command the corpus sends. The gap is branch coverage, not volume -- which is why the previous entry's "closing that needs scenarios that keep the bot supplied with work" was aiming at the wrong thing.
+
+Side observation, recorded not chased: windows per round collapses past 1,600 rounds (3,200 rounds -> 684 windows against 1,600 rounds' 1,598). The bot goes quiet late in a long sim session. Noted because anyone sizing a soak by round count will hit it.
+
+### The codec rule has a scope, and it was already enforced
+
+"Every TypedDict needs encode/decode, every decode needs require_*" read literally would add codecs to ~30 in-process structs in `sim/` alone, every one reachable only from its own round-trip test. The SAFETY property is already enforced structurally by three independent artifacts: the `json` guard rule bans `json.loads` outside `platform_core.json_utils` (so all parsing returns `JSONValue`), the `typing` guard rule bans `Any`/`cast`/`TypeAlias`, and mypy runs `disallow_any_expr`. Together they make an unvalidated `JSONValue -> TypedDict` conversion **unwritable** -- the only way across is `require_*` / `narrow_json_to_*`.
+
+So the rule binds at serialization boundaries, where it is mandatory and mechanically unavoidable, and adds only dead weight elsewhere. Recorded on [[coding-standards]] with the enforcement chain named. The `fuel_pickup` pair I wrote 2026-09-01 under the literal reading is deleted along with the round-trip test that was its only caller; `analysis/response_shapes_types.py` keeps its full codecs, because a diff really is written to an artifact and read back.
+
+Gate: make check green -- 6,775 tests, 100.00% statements AND branches over 33,471 / 9,594, guard exit 0, mypy strict over 1,218 files.

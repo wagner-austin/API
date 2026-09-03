@@ -23,6 +23,11 @@ from tankpit_bot.analysis.response_shapes import (
     tally,
 )
 from tankpit_bot.analysis.response_shapes_types import (
+    CAUSE_COMMAND_NEVER_SENT,
+    CAUSE_LIVE_SILENT_WINDOW,
+    CAUSE_SHAPE_NEVER_ASSEMBLED,
+    CAUSE_SIM_ONLY,
+    CAUSE_TOKEN_NEVER_EMITTED,
     VERDICT_INVENTED_LAW,
     VERDICT_MISSING_LAW,
     CommandShapesDict,
@@ -308,6 +313,77 @@ def test_analyze_skips_a_session_that_cannot_decode(tmp_path: Path) -> None:
     assert diff["divergences"] == []
 
 
+def test_a_missing_row_is_classified_by_why_it_is_one_sided() -> None:
+    """THE TRIAGE. Four causes, four different pieces of work.
+
+    Reported flat, 208 rows read as 208 sim gaps (2026-09-02). They
+    were not: most were a timing artifact a tick-synchronous sim
+    cannot reproduce, or commands the corpus never sent. Each row
+    below is a live shape the sim lacks for a different reason, and
+    the classifier has to tell them apart from the sim's own observed
+    vocabulary alone.
+    """
+    sim = _distribution("radar", ["49", "4F", "46"], 5) + _distribution("teleport", ["5A"], 2)
+    live = (
+        # nothing at all came back: the live window is silent
+        _distribution("radar", [], 3)
+        # the sim corpus never sent a move command
+        + _distribution("move", ["47self"], 4)
+        # 'pickup' is a token the sim never emits for a radar
+        + _distribution("radar", ["4F", "46", "pickup"], 6)
+        # every token here IS in the sim's radar vocabulary
+        + _distribution("radar", ["4F", "46"], 7)
+    )
+
+    causes = {
+        (row["command_kind"], tuple(row["shape"])): row["cause"] for row in diff_shapes(live, sim)
+    }
+    assert causes[("radar", ())] == CAUSE_LIVE_SILENT_WINDOW
+    assert causes[("move", ("47self",))] == CAUSE_COMMAND_NEVER_SENT
+    assert causes[("radar", ("4F", "46", "pickup"))] == CAUSE_TOKEN_NEVER_EMITTED
+    assert causes[("radar", ("4F", "46"))] == CAUSE_SHAPE_NEVER_ASSEMBLED
+
+
+def test_an_invented_row_carries_no_missing_side_cause() -> None:
+    """The triage answers "why is this live shape absent from the sim".
+
+    An invented row is the opposite question, so it is marked as
+    out of scope rather than given a cause that would read as one.
+    """
+    rows = diff_shapes([], _distribution("shoot", ["53self", "49"], 4))
+
+    assert [row["cause"] for row in rows] == [CAUSE_SIM_ONLY]
+
+
+def test_the_report_splits_the_missing_side_and_counts_each_bucket() -> None:
+    """The reader is shown which rows imply which work, and how many."""
+    sim = _distribution("radar", ["49", "4F", "46"], 5)
+    live = _distribution("radar", [], 3) + _distribution("move", ["47self"], 4)
+
+    text = format_response_shape_diff(_diff_of(live, sim), limit=5)
+
+    assert "[timing, not a gap]" in text
+    assert "[corpus gap]" in text
+    assert "1 rows, 3 live windows behind them" in text
+    assert "1 rows, 4 live windows behind them" in text
+    # A bucket with no rows is omitted rather than printed as zero.
+    assert "[READ THESE FIRST]" not in text
+
+
+def test_the_invented_side_leads_the_report() -> None:
+    """It is the half that means something at any sample size.
+
+    A shape the sim produced is one it CAN produce however small the
+    corpus; a shape it did not produce may only be undersampling.
+    """
+    sim = _distribution("shoot", ["53self", "49"], 4)
+    live = _distribution("move", ["47self"], 4)
+
+    text = format_response_shape_diff(_diff_of(live, sim), limit=5)
+
+    assert text.index("INVENTED LAWS") < text.index("MISSING LAWS")
+
+
 def test_format_reports_both_verdicts_and_names_what_it_dropped() -> None:
     """A capped report says how many rows it did not show."""
     live = _distribution("radar", ["49"], 9) + _distribution("move", ["47self"], 8)
@@ -375,6 +451,7 @@ def test_shape_divergence_round_trips() -> None:
         live_count=3403,
         sim_count=0,
         verdict=VERDICT_MISSING_LAW,
+        cause=CAUSE_SHAPE_NEVER_ASSEMBLED,
     )
     assert decode_shape_divergence(encode_shape_divergence(original)) == original
 

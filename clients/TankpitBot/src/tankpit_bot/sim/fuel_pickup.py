@@ -12,17 +12,18 @@ is a pure function of the snapshot. Nothing here mutates the world —
 the transfer itself is applied by
 :func:`tankpit_bot.sim.movement.process_move`, whose arrival pickup
 does the work.
+
+No codec: the snapshot never leaves the process. It is built inside
+one command's routing and consumed by the narrator in the same call,
+so an encode/decode pair here would have had exactly one caller — its
+own round-trip test. The codec rule binds at serialization boundaries,
+where the guard chain already makes an unvalidated crossing
+unwritable ([[coding-standards]], resolved 2026-09-02).
 """
 
 from __future__ import annotations
 
 from typing import TypedDict
-
-from platform_core.json_utils import (
-    JSONObject,
-    require_bool,
-    require_int,
-)
 
 from tankpit_bot.sim.world import SimWorldDict
 
@@ -94,53 +95,7 @@ def resolve_fuel_pickup(
     )
 
 
-def encode_fuel_pickup_outcome(outcome: FuelPickupOutcomeDict) -> JSONObject:
-    """Encode one pickup snapshot to a JSON-serializable dict.
-
-    Args:
-        outcome: The snapshot to encode.
-
-    Returns:
-        JSON object with every snapshot field.
-    """
-    return {
-        "tank_id": outcome["tank_id"],
-        "x": outcome["x"],
-        "y": outcome["y"],
-        "volume_before": outcome["volume_before"],
-        "remaining": outcome["remaining"],
-        "walked": outcome["walked"],
-        "fuel_total": outcome["fuel_total"],
-    }
-
-
-def decode_fuel_pickup_outcome(data: JSONObject) -> FuelPickupOutcomeDict:
-    """Decode one pickup snapshot from JSON with validation.
-
-    Args:
-        data: JSON object carrying the snapshot fields.
-
-    Returns:
-        Validated snapshot.
-
-    Raises:
-        JSONTypeError: If a field has the wrong type.
-        KeyError: If a field is missing.
-    """
-    return FuelPickupOutcomeDict(
-        tank_id=require_int(data, "tank_id"),
-        x=require_int(data, "x"),
-        y=require_int(data, "y"),
-        volume_before=require_int(data, "volume_before"),
-        remaining=require_int(data, "remaining"),
-        walked=require_bool(data, "walked"),
-        fuel_total=require_int(data, "fuel_total"),
-    )
-
-
 __all__ = [
     "FuelPickupOutcomeDict",
-    "decode_fuel_pickup_outcome",
-    "encode_fuel_pickup_outcome",
     "resolve_fuel_pickup",
 ]

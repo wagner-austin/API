@@ -23,12 +23,7 @@ from tankpit_bot.sim.equipment import (
     resolve_equipment_pickup,
     toggle_equipment_slot,
 )
-from tankpit_bot.sim.fuel_pickup import (
-    FuelPickupOutcomeDict,
-    decode_fuel_pickup_outcome,
-    encode_fuel_pickup_outcome,
-    resolve_fuel_pickup,
-)
+from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
 from tankpit_bot.sim.movement import process_move
 from tankpit_bot.sim.narrate import (
     narrate_block_action,
@@ -280,17 +275,3 @@ def test_chat_reaches_every_observer_identically() -> None:
     """The echo is the sender's delivery receipt AND the room's copy."""
     assert narrate_chat(ACTOR, _chat()) == narrate_chat(ACTOR, _chat())
     assert _kinds(narrate_chat(ACTOR, _chat())) == [0x4D]
-
-
-def test_fuel_pickup_outcome_round_trips() -> None:
-    """Encode then decode returns an equal snapshot."""
-    original = FuelPickupOutcomeDict(
-        tank_id=ACTOR,
-        x=10,
-        y=11,
-        volume_before=500,
-        remaining=120,
-        walked=True,
-        fuel_total=980,
-    )
-    assert decode_fuel_pickup_outcome(encode_fuel_pickup_outcome(original)) == original

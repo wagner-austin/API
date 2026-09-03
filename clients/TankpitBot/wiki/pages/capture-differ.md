@@ -273,16 +273,100 @@ the successful landing pinned only for the actor — so nothing failed.
 That is the same shape as every other miss recorded here: **a check
 that cannot observe its own failure.**
 
-### What is still not answerable
+### The missing side WAS the differ's fault, partly (2026-09-02)
 
-The MISSING-law side reported 208 rows and means almost nothing, and
-the reason is not the differ. Four of the five scenarios end in 11–79
-rounds through the production bot's own exit path
-(`no_viable_targets`, `no_productive_collect`); only `practice`
-sustains 400. Raising `--rounds` therefore deepens one scenario and
-nothing else, and 527 sim windows cannot support "the sim never does
-this" against 73,053 live ones. Closing that gap needs scenarios that
-keep the bot supplied with work, not a bigger round budget.
+The first reading of the fresh baseline reported 208 missing rows and
+concluded the differ was blameless — the corpus was just too small.
+That was half wrong, and the half that was wrong is the interesting
+half: **a flat missing list reports three unrelated phenomena as one
+number.** Splitting 208 rows by why each is one-sided:
+
+| cause | rows | live windows | what it implies |
+|---|---:|---:|---|
+| live window drew nothing | 9 | 14,118 | **not a gap.** Timing |
+| command never sent by the sim corpus | 77 | 4,647 | fix the scenarios |
+| shape holds a token the sim never emits here | 92 | 3,555 | check: gap or window overlap |
+| the sim emits every token, never this combination | **30** | 2,798 | **read these first** |
+
+The first bucket is a **property of the two servers' clocks, not of
+the sim's laws.** The real server is asynchronous: a command whose
+answer arrives after the next command has opened its own window
+records against that one and leaves the first silent. A
+tick-synchronous sim answers inside the same batch and so cannot
+produce a silent window for a command it handles. Those 9 rows carry
+56% of the missing mass and can never be closed by any amount of sim
+work.
+
+The second bucket is real but is a CORPUS defect, not a server one —
+the baseline never sent those commands at all. Notably it never sent
+a plain `move`: the five scenarios drive the bot entirely through
+pickup clicks and teleports.
+
+Only the fourth bucket is readable as "the real server assembles
+something the sim does not", and it is 30 rows, not 208. The report
+now prints these groups with those headings, and leads with the
+INVENTED side, which is the half that means something at any sample
+size.
+
+### The 30 readable rows are mostly one coverage hole
+
+| n | command | shape |
+|---:|---|---|
+| 1,324 | `pickup_equipment` | `67 49 pickup` |
+| 616 | `radar` | `4F 46` |
+| 366 | `pickup_fuel` | `44 pickup 52c5` |
+
+All three are the **no-walk / no-consumption variant** of a command
+the corpus only ever exercised in its walking, consuming form: an
+equipment pickup with no `47self` walk echo, a radar that consumed no
+extra (`narrate_radar` gates the leading `0x49` on `consumed_extra`),
+and the own-tile fuel-pickup branch `narrate_fuel_pickup` implements
+exactly. The sim has all three branches; the baseline bot never
+stands on what it collects. Those three rows are 2,306 of the
+bucket's 2,798 live windows.
+
+So the answer to "why can the missing side not be read yet" is three
+concrete things, in descending value: **bucket the rows by cause**
+(done), **make a scenario where the bot collects from its own tile**
+(the single highest-value corpus fix), and **depth on the one
+scenario that sustains**.
+
+### Depth is not a lever at all: the sim's vocabulary SATURATES
+
+Measured directly, `practice` at increasing depth (each a separate
+run; the sim is deterministic, so a longer run's prefix is the shorter
+run byte-for-byte):
+
+| rounds | windows | distinct shapes |
+|---:|---:|---:|
+| 200 | 202 | 13 |
+| 400 | 398 | 15 |
+| 800 | 774 | 16 |
+| 1,600 | 1,598 | 15 |
+| 3,200 | 684 | 16 |
+
+**Eight times the windows, no new shapes.** The ±1 is a
+session-boundary artifact — the final window of a run closes at
+session end and can carry a truncated shape the next depth does not
+produce — not a real decrease.
+
+That is a stronger and more useful result than the round budget it
+was meant to size. The sim's response-shape vocabulary is COMPLETE at
+roughly 200 rounds of the sustaining scenario, so "the sim never
+produces this shape" is already a safe claim for any command the
+corpus actually sends. What is missing is not volume: it is BRANCH
+COVERAGE. The bot never stands on what it collects, never runs a
+radar with no extra to spend, never sends a plain `move`.
+
+Two side observations from the same sweep, recorded rather than
+chased: four of five scenarios end in 11–79 rounds through the
+production bot's own exit path (`no_viable_targets`,
+`no_productive_collect`), which is fine — their job is breadth, and
+they deliver it early. And windows per round COLLAPSES past 1,600
+(3,200 rounds produced 684 windows against 1,600 rounds' 1,598), so
+the bot goes quiet late in a long sim session. Cause not
+investigated; noted because anyone sizing a soak by round count will
+hit it.
 
 ## How to re-run
 

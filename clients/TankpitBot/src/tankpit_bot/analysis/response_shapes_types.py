@@ -36,6 +36,36 @@ VERDICT_MISSING_LAW = "missing_law"
 #: Only the sim produced this shape. The archive never shows it.
 VERDICT_INVENTED_LAW = "invented_law"
 
+#: The row is an invented law; the missing-side triage does not apply.
+CAUSE_SIM_ONLY = "sim_only"
+
+#: The live command drew NOTHING in its window. The real server is
+#: asynchronous, so an answer that arrives after the next command has
+#: opened its own window records against that one and leaves this
+#: window silent. A tick-synchronous sim answers inside the same
+#: batch and cannot produce a silent window for a command it handles,
+#: so these rows are a property of the two servers' timing, not a law
+#: the sim is missing.
+CAUSE_LIVE_SILENT_WINDOW = "live_silent_window"
+
+#: The sim corpus never sent this command KIND at all, so nothing
+#: about its answers has been sampled. A coverage hole in the
+#: scenarios, not a law gap — fix it by making the bot send the
+#: command, not by changing the server.
+CAUSE_COMMAND_NEVER_SENT = "command_never_sent"
+
+#: The live shape contains a token the sim never emits for this
+#: command kind. Either a genuine gap or a window-overlap artifact
+#: (a live window catching a concurrent action's messages); the token
+#: itself says which is worth checking.
+CAUSE_TOKEN_NEVER_EMITTED = "token_never_emitted"
+
+#: Every token in the live shape is one the sim DOES emit for this
+#: command — only the combination is unseen. These are the readable
+#: candidates: the sim demonstrably has the parts, so either it
+#: assembles them differently or the corpus never hit the branch.
+CAUSE_SHAPE_NEVER_ASSEMBLED = "shape_never_assembled"
+
 
 class CommandWindowDict(TypedDict):
     """One client command paired with the shape it drew.
@@ -90,6 +120,14 @@ class ShapeDivergenceDict(TypedDict):
         verdict: :data:`VERDICT_MISSING_LAW` when only the real server
             produced it, :data:`VERDICT_INVENTED_LAW` when only the
             sim did.
+        cause: Why a MISSING row is one-sided — one of the ``CAUSE_``
+            constants. Always :data:`CAUSE_SIM_ONLY` for an invented
+            row. The field exists because a flat missing list mixes
+            three unrelated phenomena and reads as one: on 2026-09-02
+            it reported 208 rows of which 9 were a timing artifact the
+            sim cannot reproduce by construction, 77 were commands the
+            corpus never sent, and only 30 were readable as candidate
+            gaps ([[capture-differ]]).
     """
 
     command_kind: str
@@ -97,6 +135,7 @@ class ShapeDivergenceDict(TypedDict):
     live_count: int
     sim_count: int
     verdict: str
+    cause: str
 
 
 class ResponseShapeDiffDict(TypedDict):
@@ -238,6 +277,7 @@ def encode_shape_divergence(entry: ShapeDivergenceDict) -> JSONObject:
         "live_count": entry["live_count"],
         "sim_count": entry["sim_count"],
         "verdict": entry["verdict"],
+        "cause": entry["cause"],
     }
 
 
@@ -260,6 +300,7 @@ def decode_shape_divergence(data: JSONObject) -> ShapeDivergenceDict:
         live_count=require_int(data, "live_count"),
         sim_count=require_int(data, "sim_count"),
         verdict=require_str(data, "verdict"),
+        cause=require_str(data, "cause"),
     )
 
 
@@ -326,6 +367,11 @@ def _require_token(value: JSONValue) -> str:
 
 
 __all__ = [
+    "CAUSE_COMMAND_NEVER_SENT",
+    "CAUSE_LIVE_SILENT_WINDOW",
+    "CAUSE_SHAPE_NEVER_ASSEMBLED",
+    "CAUSE_SIM_ONLY",
+    "CAUSE_TOKEN_NEVER_EMITTED",
     "VERDICT_INVENTED_LAW",
     "VERDICT_MISSING_LAW",
     "CommandShapesDict",
