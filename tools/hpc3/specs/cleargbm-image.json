@@ -2,9 +2,12 @@
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
   "git_commit": "80221ea1056e08aacd3f5ee01e6c599e166970be",
-  "system_packages": [],
+  "system_packages": [
+    "libgomp1=12.2.0-14+deb12u1"
+  ],
   "extra_index_urls": [
-    "https://pypi.org/simple"
+    "https://pypi.org/simple",
+    "https://download.pytorch.org/whl/cpu"
   ],
   "requirements": [
     "alembic==1.19.1",
@@ -94,7 +97,7 @@
   ],
   "wheels": [
     "cleargbm-0.1.0-py3-none-any.whl",
-    "cleargbm_rs-0.1.0-py3-none-any.whl",
+    "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
     "covenant_domain-0.1.0-py3-none-any.whl",
     "covenant_ml-0.1.0-py3-none-any.whl",
     "covenant_nn-0.1.0-py3-none-any.whl",
@@ -218,7 +221,7 @@
   ],
   "smoke_commands": [],
   "labels": {
+    "org.corvis.project": "cleargbm",
     "org.corvis.env-source": "/pub/wagnera3/envs/cleargbm"
-  },
-  "project": "cleargbm"
+  }
 }
