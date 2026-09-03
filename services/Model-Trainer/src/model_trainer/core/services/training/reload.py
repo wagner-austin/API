@@ -8,18 +8,26 @@ adapter, a delta, so reconstructing needs the base model too:
 alone it binds the path to ``model`` and raises ``TypeError: missing 1
 required positional argument: 'model_id'`` after a whole run has been spent.
 
-So there are THREE artifact formats, not two, and the polymorphism hid that
+So there are FOUR artifact formats, not two, and the polymorphism hid that
 rather than handling it:
 
 - a PEFT adapter, read by writing its state dict into the live wrapper
+- a cartridge, a manifest and a block of key-value tensors, which is not a
+  model either and which ``AutoModelForCausalLM`` rejects the same way
 - a HuggingFace model directory, read by ``AutoModelForCausalLM``
 - a char-LSTM checkpoint, which is not HuggingFace-shaped at all and whose
   directory ``AutoModelForCausalLM`` rejects with "Unrecognized model"
 
-The format is a property of the backend that wrote it, so the reader is
-chosen by ``model_family`` and by the ``is_peft`` flag that records which
-shape the hf_lm backend produced. This is a dispatch over real formats, not
-a fallback chain: nothing is tried after something else fails.
+The cartridge was the fourth, added 2026-09-03, and it arrived the way the
+docstring above predicts: a cartridge run trained to completion and then died
+in ``_restore_best_checkpoint`` with "Unrecognized model in
+.../cartridge-probe", after the whole run had been spent. The same failure
+this module was written about, one format later.
+
+The format is a property of what WROTE it, so the reader is chosen by the
+strategy that produced the artifact and, for the backends that predate
+strategies, by ``model_family``. This is a dispatch over real formats, not a
+fallback chain: nothing is tried after something else fails.
 
 Every reader writes into the live model rather than returning a new one. The
 trainer scores the reloaded weights with an optimizer, a device placement
@@ -100,6 +108,25 @@ def _reload_char_lstm(model: LMModelProto, path: str) -> None:
     _copy_state_into(model, CharLSTMModel.from_pretrained(path))
 
 
+def _reload_cartridge(model: LMModelProto, path: str) -> None:
+    """Reload a saved key-value prefix into the live model.
+
+    In place, like every reader here, and for a reason specific to this one:
+    the cartridge IS the trainable state, so swapping the object would leave
+    the optimizer holding the tensors of a cartridge nobody is using any more
+    and stepping them into the void.
+
+    The blocks travel through the model's own ``load_state_dict``, which
+    checks them against the geometry it was built with. A cartridge saved from
+    a differently shaped model is refused here rather than silently attached.
+
+    Args:
+        model: The live cartridge-wrapped model to write into.
+        path: Directory holding the saved cartridge.
+    """
+    _ = model.load_state_dict(FinetuningHooks.load_cartridge(path).state_dict())
+
+
 def reload_shipped_weights(
     prepared: PreparedLMModel,
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
@@ -109,11 +136,16 @@ def reload_shipped_weights(
 
     Args:
         prepared: The prepared model whose weights are being replaced. Its
-            ``is_peft`` flag records which shape the hf_lm backend wrote.
+            ``strategy_name`` and ``is_peft`` flag record which shape the
+            hf_lm backend wrote.
         model_family: The backend that wrote the artifact, which is what
-            determines its on-disk format.
+            determines its on-disk format for the families that predate
+            strategies.
         path: Directory the artifact was saved to.
     """
+    if prepared.strategy_name == "cartridge":
+        _reload_cartridge(prepared.model, path)
+        return
     if prepared.is_peft:
         FinetuningHooks.reload_adapter_weights(prepared.model, path)
         return

@@ -21,12 +21,20 @@ from typing import Literal, Protocol
 import pytest
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode
+from platform_core.json_utils import dump_json_str, load_json_str
 
-from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.cartridge import (
+    CARTRIDGE_MANIFEST_NAME,
+    decode_cartridge_geometry,
+    encode_cartridge_geometry,
+)
+from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig, PreparedLMModel
 from model_trainer.core.encoding import Encoder, ListEncoded
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     _default_reload_adapter_weights,
 )
+from model_trainer.core.services.finetuning.strategies.cartridge import CartridgeStrategy
+from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.model.backends.char_lstm.model import (
     CharLSTM,
     CharLSTMModel,
@@ -34,10 +42,51 @@ from model_trainer.core.services.model.backends.char_lstm.model import (
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     _default_load_hf_model,
 )
+from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
+from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.services.training.reload import reload_shipped_weights
 from model_trainer.core.types import LMModelProto
 
 _TINY_GPT2 = "sshleifer/tiny-gpt2"
+
+
+def _cartridge_cfg() -> ModelTrainConfig:
+    """Build the minimum config the cartridge strategy reads.
+
+    Returns:
+        A training config selecting the cartridge strategy.
+    """
+    return {
+        "model_family": "hf_lm",
+        "model_size": "tiny",
+        "max_seq_len": 8,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 0.01,
+        "tokenizer_id": None,
+        "corpus_path": "",
+        "corpus_format": "lines",
+        "holdout_fraction": 0.1,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "precision": "fp32",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 3,
+        "test_split_ratio": 0.1,
+        "finetune_lr_cap": 0.01,
+        "loss_mask_prefix_separator": None,
+        "finetuning_strategy": "cartridge",
+        "hub_model_id": "gpt2",
+        "lora": None,
+        "cartridge": CartridgeConfig(enabled=True, num_slots=3, init_seed=5),
+        "quantization": None,
+        "gguf_export": None,
+    }
 
 
 class _Tok:
@@ -350,3 +399,110 @@ class TestAFullModelReloadsThroughItsOwnClass:
         reload_shipped_weights(_prepared(model, is_peft=False), "char_lstm", str(saved))
 
         assert torch.equal(_first_tensor(model), before)
+
+
+class TestTheCartridgeReader:
+    """The fourth artifact format, added the way the third was: by crashing.
+
+    A cartridge directory holds a manifest and a block of key-value tensors.
+    ``AutoModelForCausalLM`` refuses it with "Unrecognized model", exactly as
+    it refuses a char-LSTM checkpoint, so a cartridge run trained to
+    completion and then died in ``_restore_best_checkpoint`` -- after the
+    whole run had been spent, which is the failure mode this module's
+    docstring was written about.
+
+    Nothing here is faked, per this file's standing rule: a real cartridge is
+    trained, saved, scattered and read back through the real reader.
+    """
+
+    def _cartridge_prepared(self) -> tuple[PreparedLMModel, CartridgeModel]:
+        """Build a real cartridge over a real GPT-2, prepared for the trainer.
+
+        Returns:
+            The prepared model and the cartridge wrapper inside it.
+
+        Raises:
+            TypeError: If the strategy returned something else.
+        """
+        base, _ = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        adapted = CartridgeStrategy().adapt(base, "gpt2", _cartridge_cfg())
+        wrapper = adapted.model
+        if not isinstance(wrapper, CartridgeModel):
+            raise TypeError("the cartridge strategy must produce a CartridgeModel")
+        encoder: Encoder = _Tok()
+        return (
+            PreparedLMModel(
+                model=wrapper,
+                tokenizer_id=None,
+                eos_id=0,
+                pad_id=0,
+                max_seq_len=8,
+                tok_for_dataset=encoder,
+                is_peft=False,
+                strategy_name="cartridge",
+                hub_model_id="gpt2",
+                quantization=None,
+            ),
+            wrapper,
+        )
+
+    def test_a_saved_cartridge_reads_back_into_the_live_model(self, tmp_path: Path) -> None:
+        """The path that crashed: save, scatter, restore.
+
+        The blocks are overwritten between the save and the read, so a reader
+        that quietly did nothing would leave the scattered values in place and
+        fail this.
+        """
+        prepared, wrapper = self._cartridge_prepared()
+        saved = {name: tensor.detach().clone() for name, tensor in wrapper.named_parameters()}
+        wrapper.save_pretrained(str(tmp_path))
+
+        for _, tensor in wrapper.named_parameters():
+            tensor.detach().fill_(99.0)
+
+        reload_shipped_weights(prepared, "hf_lm", str(tmp_path))
+
+        assert all(
+            torch.equal(saved[name], tensor.detach()) for name, tensor in wrapper.named_parameters()
+        )
+
+    def test_the_reader_writes_into_the_model_the_trainer_already_holds(
+        self, tmp_path: Path
+    ) -> None:
+        """In place, not by substitution.
+
+        The cartridge IS the trainable state, so an optimizer built before the
+        restore must still be stepping the tensors the restore wrote. Asserted
+        by identity of the prepared model's object across the call.
+        """
+        prepared, wrapper = self._cartridge_prepared()
+        wrapper.save_pretrained(str(tmp_path))
+
+        reload_shipped_weights(prepared, "hf_lm", str(tmp_path))
+
+        assert prepared.model is wrapper
+
+    def test_a_cartridge_from_a_differently_shaped_model_is_refused(self, tmp_path: Path) -> None:
+        """The geometry check runs on the restore path too.
+
+        A saved cartridge whose manifest describes another model would
+        otherwise be installed silently, and the run would finish scoring a
+        prefix built for something else.
+        """
+        prepared, wrapper = self._cartridge_prepared()
+        wrapper.save_pretrained(str(tmp_path))
+
+        manifest = tmp_path / CARTRIDGE_MANIFEST_NAME
+        widened = decode_cartridge_geometry(load_json_str(manifest.read_text(encoding="utf-8")))
+        widened["num_kv_heads"] = widened["num_kv_heads"] + 1
+        manifest.write_text(dump_json_str(encode_cartridge_geometry(widened)), encoding="utf-8")
+
+        with pytest.raises(AppError) as excinfo:
+            reload_shipped_weights(prepared, "hf_lm", str(tmp_path))
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_MISMATCH
+
+    def test_a_directory_holding_no_cartridge_is_refused(self, tmp_path: Path) -> None:
+        """An empty artifact directory must not read as an empty cartridge."""
+        prepared, _ = self._cartridge_prepared()
+        with pytest.raises(FileNotFoundError):
+            reload_shipped_weights(prepared, "hf_lm", str(tmp_path))
