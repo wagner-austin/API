@@ -211,7 +211,13 @@ class ClusterRound:
         """
         commit = self._capture(["git", "rev-parse", "HEAD"])[-1].strip()
         tree = self.scratch / batch / "rw-payload"
-        archive = self.scratch / batch / "rw-payload.tar"
+        # The archive carries the BATCH'S OWN NAME. Two drivers staging
+        # concurrently under one shared name raced on 2026-09-03:
+        # impsearch1's tar landed between vhsearch4's upload and verify,
+        # and the stage's digest check refused the substituted bytes --
+        # loudly, correctly, and fatally for the round. Distinct names
+        # make the race impossible instead of merely detected.
+        archive = self.scratch / batch / f"rw-payload-{batch}.tar"
         self._capture(
             [
                 sys.executable,
@@ -251,7 +257,7 @@ class ClusterRound:
         payload = f"{self.cluster_root}/payload-{batch}"
         self._remote(
             f"set -e; rm -rf {payload}; mkdir -p {payload}; "
-            f"tar -xf {self.cluster_root}/staging/rw-payload.tar -C {payload}"
+            f"tar -xf {self.cluster_root}/staging/rw-payload-{batch}.tar -C {payload}"
         )
 
     def _write_document(self, batch: str, jobs_file: Path) -> Path:

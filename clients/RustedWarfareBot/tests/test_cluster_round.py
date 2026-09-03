@@ -113,7 +113,9 @@ def test_a_clean_round_issues_the_canonical_chain_in_order(tmp_path: Path) -> No
         "rev-parse HEAD",
         "scripts.stage_payload",
         "hpc3.cli.stage",
-        "tar -xf /pub/wagnera3/rusted/staging/rw-payload.tar",
+        # Batch-qualified: two concurrent drivers under one shared tar
+        # name raced on 2026-09-03 and the digest check killed a round.
+        "tar -xf /pub/wagnera3/rusted/staging/rw-payload-probe-r0.tar",
         "scripts.campaign_doc",
         "hpc3.cli.campaign",
         'grep -c "\\.txt$"',

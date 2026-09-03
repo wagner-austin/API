@@ -1,6 +1,6 @@
 # RustedWarfareBot Wiki
 
-**Read this first.** 5 topic hubs, 48 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 5 topic hubs, 49 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 Pinned game build: **Rusted Warfare 1.15 (code 176, build #28)**, working copy at `.game/`. Claims about engine internals are only valid for this build — see `SCHEMA.md` on `game_version` pinning.
 
