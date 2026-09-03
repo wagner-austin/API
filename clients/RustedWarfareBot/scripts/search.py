@@ -53,10 +53,14 @@ from rw_bot.service.submit import batch_config
 
 SWEEP_ROOT = Path("runs/sweeps")
 
-#: The champion the search perturbs. flame-close6 took the Very Hard rung
-#: on 2026-09-02: its own graduation (laws six and nine, +8 then +7 against
-#: the +4 bar) was the first adoption this search produced.
-BASE_DOCTRINE = Path("doctrines/flame-close6.doctrine")
+#: The champion the search perturbs. close0-flame4 took the Very Hard rung
+#: on 2026-09-02, hours after flame-close6 did: vhsearch3, aimed at the
+#: fresh champion's own neighborhood, graduated the arm that deletes its
+#: latch and doubles flame, and it cleared both laws (+14 then +5 against
+#: the +4 bar; combined 48-29 of 96, p=0.005). Two search-produced
+#: champions in one day is the pipeline working, not churn: each held only
+#: until a better-measured arm beat it on untouched seeds.
+BASE_DOCTRINE = Path("doctrines/close0-flame4.doctrine")
 
 #: Where variant doctrine files land, frozen into each batch's tree.
 VARIANT_DIR = Path("doctrines/search")
