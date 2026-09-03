@@ -82,6 +82,16 @@ goes from harmless to −0.7612 on held-out text.
   two cartridges trained on two halves of one corpus measured 94% retention,
   and the number was an artifact — each half already predicted the other.
   Against an unrelated corpus the same code reports 59%.
+- **Belongs to `mi`, and should override `mi`'s size.** `mi` is the right
+  project by definition — Model-Trainer probes and benchmarks out of
+  `services/Model-Trainer` — and a project here is a resource/budget/image
+  profile, not a topic, so this needs no project of its own. But `mi`
+  defaults to 240 minutes and 64 GiB, and one `gpt2-wiki` plan is ~10
+  minutes over a 124M base with a prefix of at most 512 slots. Booking the
+  default is not free: `free-gpu` is preemptible, so a 240-minute window
+  exposes a 10-minute job to preemption it never needed to risk. State
+  `minutes` and `mem_gb` in the run document; overrides are validated
+  exactly as a hand-authored spec is.
 - **No run document is committed yet, deliberately.** The registered `mi`
   image (`55651342e15d`, v23) predates this command, so a committed run
   naming it would assert something untrue. It needs an image rebuilt from a
