@@ -27,7 +27,7 @@ from tankpit_bot.resources import (
 )
 
 _STATIC_KEY_LENGTH = 1000
-_SHIPPED_MINIMAP_COUNT = 45
+_SHIPPED_MINIMAP_COUNT = 44
 
 
 def test_the_data_directory_is_inside_the_installed_package() -> None:
@@ -72,10 +72,16 @@ def test_a_field_the_server_names_resolves_to_its_shipped_minimap() -> None:
 
 
 def test_every_shipped_minimap_is_reachable_by_its_server_name() -> None:
-    """The whole set resolves, not just the one the sim happens to use.
+    """The whole set resolves, and carries exactly one spelling.
 
     A room the bot joins is whichever field the server chose, so a gap in
     this mapping is a session that silently runs without terrain.
+
+    The single-spelling assertion is the half that keeps a duplicate from
+    coming back. ``field42-r.gif`` shipped for eight months beside an
+    identical ``field42_r.gif`` -- unreachable past its underscore sibling,
+    so it was bytes in the wheel that no lookup could ever load. This test
+    used to SKIP such a file; now it fails on it.
     """
     directory = data_directory()
     shipped = sorted(p.name for p in directory.glob("field*.gif"))
@@ -83,7 +89,7 @@ def test_every_shipped_minimap_is_reachable_by_its_server_name() -> None:
 
     for name in shipped:
         if not name.endswith(FIELD_GIF_SUFFIX):
-            continue
+            raise AssertionError(f"{name} ships but no lookup can reach it")
         stem = name.removesuffix(FIELD_GIF_SUFFIX)
         resolved = field_gif_path(f"{stem}.gif")
         if resolved is None:

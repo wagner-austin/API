@@ -541,7 +541,7 @@ The minimap GIF files are 256x256 pixels representing the full map. Each pixel's
 - Game X (0-255) = Image X (0-255)
 - Game Y (0-255) = Image Y (0-255)
 
-### field42-r.gif Color Palette
+### field42_r.gif Color Palette
 
 | RGB | Count | Terrain |
 |-----|-------|---------|
@@ -552,12 +552,21 @@ The minimap GIF files are 256x256 pixels representing the full map. Each pixel's
 ### Implementation
 
 ```python
+from tankpit_bot.resources import require_asset
 from tankpit_bot.terrain import TerrainMap, format_viewport
 
-tm = TerrainMap("field42-r.gif")
+tm = TerrainMap(require_asset("field42_r.gif"))
 terrain = tm.get_terrain(x, y)  # Returns "#", ".", or "W"
 grid = tm.render_viewport(player_x, player_y, 16, 16)
 ```
+
+The bare filename this example used to pass is exactly the CWD-relative
+lookup that `resources.py` exists to remove: it resolved against whatever
+directory the process started in, which is why a cluster job had to stage
+forty-six files beside itself. The minimap it named, `field42-r.gif`, was a
+byte-identical duplicate and was deleted 2026-09-03; the palette counts and
+rock positions below are unchanged by that, since both files held the same
+bytes (sha256 `73c698d581ac8d12`).
 
 ### Verified Rock Positions (field42)
 

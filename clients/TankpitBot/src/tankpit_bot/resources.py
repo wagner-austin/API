@@ -39,12 +39,12 @@ STATIC_KEY_NAME = "xor_static_key.txt"
 FIELD_GIF_SUFFIX = "_r.gif"
 """What a field's terrain minimap is named, given the server's display name.
 
-One spelling, because every shipped minimap uses it. The set also contains
-``field42-r.gif``, a byte-identical twin of ``field42_r.gif`` that no lookup
-can ever reach past its underscore sibling; resolving both spellings would
-be a branch nothing can execute, so only this one is tried and
-``test_every_shipped_minimap_is_reachable_by_its_server_name`` pins that the
-whole set answers to it.
+ONE spelling, and the set is held to it. A minimap named any other way is
+unreachable -- no lookup here can reach past this suffix -- so it would ship
+as bytes nothing can ever load, which is what
+``test_every_shipped_minimap_is_reachable_by_its_server_name`` refuses by
+asserting the whole set answers to this one
+([[packaged-data-assets]]).
 """
 
 

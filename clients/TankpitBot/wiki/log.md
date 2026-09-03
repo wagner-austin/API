@@ -6061,3 +6061,30 @@ Also, for the second time today, a heredoc collapsed `
 `make check` reported 23 uncovered statements and 99.94%. A direct `pytest --cov` run on the same tree reported **100.00%**. The Makefile already documents why — several sessions work this repo at once and overlapping coverage runs corrupt each other, which is what per-run coverage paths exist to stop — and it re-ran green. Worth recording that the failure mode still shows up, because a spurious coverage failure reads exactly like a real one and the temptation is to go hunting for a gap that is not there.
 
 Gate: make check green — 6,938 tests, 100.00% statements AND branches.
+
+## [2026-09-03] update | The duplicate minimap is deleted, and the test that skipped it now fails on it
+
+`field42-r.gif` shipped for nearly eight months beside a byte-identical `field42_r.gif` — both sha256 `73c698d581ac8d12…`, `cmp` exit 0. No lookup could reach it: `resources.py:105` builds its candidate as `stem + FIELD_GIF_SUFFIX`, and `FIELD_GIF_SUFFIX` is `_r.gif`, so no server-supplied field name can produce the hyphen. It was bytes in the wheel that nothing could load.
+
+### The original is the one that looked like the mistake
+
+The intuition runs backwards. `0b17ee63` (2026-01-12) added the HYPHEN file alone, as the single minimap the terrain work started from. `54a5e9f6` (2026-08-05) imported the remaining forty-three under the `_r.gif` convention and produced a second copy of field42 under the new spelling. The January original was stranded by a naming convention that arrived after it — so the file that reads as the stray duplicate is the one that came first.
+
+### The test used to skip exactly this
+
+`test_every_shipped_minimap_is_reachable_by_its_server_name` iterated the shipped set and `continue`d past any name not ending in `_r.gif`. That is precisely the file it should have failed on. The `continue` is now a `raise`, and both halves were exercised against a deliberately broken tree rather than assumed:
+
+- **copy** the file back (count 45): fails at `tests/test_resources.py:88` on `assert 45 == 44`
+- **rename** it (count still 44): passes line 88, fails at line 92 — the case the old `continue` silently permitted
+
+Two assertions catching two different failures, each verified by breaking the tree and watching the right one fire.
+
+### The other producer cannot reintroduce it
+
+`scripts/download_fields.py` writes `f"{field_name}_r.gif"` and constructs no other GIF filename, so the set has one producer and one shape.
+
+### A stale doc example, fixed on the way past
+
+`docs/protocol-decoding-status.md` demonstrated `TerrainMap("field42-r.gif")` — a bare relative filename, which is the CWD-relative lookup `resources.py` exists to remove, naming the file being deleted. Now `TerrainMap(require_asset("field42_r.gif"))`. The palette counts and verified rock positions in that section are unchanged, because both files held the same bytes.
+
+Gate: guard 0 violations across 44 rules; ruff + mypy clean on the changed files; 100 tests green across the asset-resolution surface. The full `make check` is blocked at lint by another session's in-flight `browser/lifecycle.py` (F821 `static_key_file_path`), which is uncommitted, not mine, and reported to the board rather than edited.

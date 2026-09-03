@@ -10,19 +10,26 @@ source_paths:
   - "src/tankpit_bot/protocol/codec.py"
   - "src/tankpit_bot/sniffer/world_service.py"
   - "src/tankpit_bot/sim/run_boot.py"
+  - "tests/test_resources.py"
+  - "scripts/download_fields.py"
   - "pyproject.toml"
   - "Dockerfile"
 source_git_blobs:
-  "src/tankpit_bot/resources.py": "a4ba016bd69d2a6ffcff342d4887295525367162"
+  "src/tankpit_bot/resources.py": "97a6416f44ecfdc88f72294ae34e1828d3e4ae2b"
   "src/tankpit_bot/protocol/codec.py": "b69f89bd1bf4e550a56f48a7761f91acbf35f9e1"
   "src/tankpit_bot/sniffer/world_service.py": "48c3ff79c77bfea915869be662621d6f4b0ee492"
   "src/tankpit_bot/sim/run_boot.py": "d28a3b5cc5f86b77fb04f4095696b389e86bb713"
+  "tests/test_resources.py": "01f6d2dbedc0608bac6752ec2427554e88a9b4fa"
+  "scripts/download_fields.py": "267d3f5ddb0c22e4a2987aff1edbd5f87644f013"
   "pyproject.toml": "99aa1e0b69ac61fe246e3a78735e3aaa4acb4649"
   "Dockerfile": "e41a1035df86e034f28ae521db5a2124908861ae"
 provenance:
   - "HPC3 job 55715554 failed on field01_r.gif not found, 2026-09-03"
   - "HPC3 job 55715564 failed on xor_static_key.txt missing despite the file being staged beside the GIF, 2026-09-03"
   - "HPC3 job 55715577 completed only after TANKPIT_XOR_KEY_FILE was passed per-run, 2026-09-03"
+  - "field42-r.gif and field42_r.gif measured byte-identical (sha256 73c698d581ac8d125d5dcec06211e967ab858cb8aa23d8ea1e82dbf8b24b3d2b), duplicate deleted 2026-09-03"
+  - "Both halves of the spelling assertion exercised against a reintroduced duplicate and against a rename, 2026-09-03: the count catches an added file, the suffix check catches a renamed one"
+  - "git notes attached to 12717125 and bccf5afa recording the split of this change across two commits, 2026-09-03"
 fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
@@ -42,7 +49,7 @@ repository root, outside `src/`.
 | asset | how it was found | what happened after `pip install` |
 |---|---|---|
 | `xor_static_key.txt` | `Path(__file__).parent.parent.parent.parent` | four parents up is site-packages — nothing there |
-| `field*_r.gif` (45) | bare relative filename | resolved against whatever directory the process started in |
+| `field*_r.gif` (45 then, 44 now) | bare relative filename | resolved against whatever directory the process started in |
 
 Neither survives an install. So every consumer rebuilt the data environment
 by hand, and **two independent workarounds grew for one defect**: the fleet
@@ -97,12 +104,33 @@ terrain, which the world service already handles. A file the caller
 *already names* is a broken install. One error for both would have hidden
 which of the two happened.
 
-**`field42-r.gif` is dead weight and the resolver no longer pretends
-otherwise.** It is byte-identical to `field42_r.gif` and no lookup can reach
+**`field42-r.gif` was dead weight, and is gone.** It was byte-identical to
+`field42_r.gif` — both sha256 `73c698d581ac8d12…` — and no lookup could reach
 it past its underscore sibling, so resolving both spellings was a branch
-nothing could execute. The branch is gone; the duplicate asset is left in
-place, since deleting shipped game data is the operator's call and nothing
-depends on it now.
+nothing could execute.[^3] The branch went first; the file followed on
+2026-09-03.
+
+It is worth naming which of the two was the original, because the intuition
+runs backwards. The **hyphen** spelling came first, added 2026-01-12 as the
+single minimap the terrain work started from.[^2] August's bulk import of the
+remaining forty-three standardised on the underscore and produced a second
+copy of field42 under the new spelling, leaving the January original stranded
+as an unreachable twin — a duplicate created by a naming convention arriving
+after the file it renamed.
+
+The deletion is held by a test rather than by this paragraph.
+`test_every_shipped_minimap_is_reachable_by_its_server_name` used to *skip* a
+file that did not end in `_r.gif`; it now fails on one. Both halves were
+exercised against a deliberately broken tree rather than assumed: the count
+assertion catches a file that is *added*, and the suffix assertion catches one
+that is *renamed*, which the count alone cannot see.[^4] A second spelling
+cannot return quietly, because the only thing that made the first one
+survivable was that nothing checked.
+
+The other way a duplicate could return is the downloader, and it cannot:
+`scripts/download_fields.py` writes `f"{field_name}_r.gif"` and has no other
+spelling in it.[^5] So the set has one producer and one shape, and the test
+holds the shape whether or not the producer is what filled the directory.
 
 ## What this buys
 
@@ -113,3 +141,9 @@ into the image definition would have been a third workaround at the wrong
 layer.
 
 [^1]: Job ids and failure modes from `/pub/wagnera3/tankpit/logs/`, 2026-09-03. `55715564`'s traceback ends in `XorStaticKeyUnavailableError` raised from `capture/xor.py::require_static_key` after the GIF had already loaded and 5,639 mines had been seeded — the run got far enough to prove the terrain fix worked and the key fix did not exist.
+
+[^2]: `git log --diff-filter=A --follow` on both spellings, read 2026-09-03. `0b17ee63` (2026-01-12) adds `clients/TankpitBot/field42-r.gif` alone, subject "Add field42-r.gif minimap for ASCII terrain rendering"; `54a5e9f6` (2026-08-05, "the remaining forty-three field minimaps") adds `field42_r.gif` alongside them. Both files moved into `src/tankpit_bot/data/` in `12717125`, which is annotated with a `git notes` record explaining why forty-six asset renames sit under a Model-Trainer subject.
+
+[^3]: `sha256sum` and `cmp` on both files, 2026-09-03: each is `73c698d581ac8d125d5dcec06211e967ab858cb8aa23d8ea1e82dbf8b24b3d2b`, and `cmp` exits 0. The unreachability is structural rather than measured: `src/tankpit_bot/resources.py:105` builds the candidate as `data_directory() / f"{field_image.removesuffix('.gif')}{FIELD_GIF_SUFFIX}"`, so with `FIELD_GIF_SUFFIX == "_r.gif"` no input can produce the hyphen spelling.
+[^4]: Verified 2026-09-03 by breaking the tree twice. Copying `field42_r.gif` back to `field42-r.gif` fails at `tests/test_resources.py:88` on `assert 45 == 44`; *renaming* it — which leaves the count at 44 — passes line 88 and falls through to `tests/test_resources.py:92`, `AssertionError: field42-r.gif ships but no lookup can reach it`. The second case is the one the old `continue` silently permitted.
+[^5]: `scripts/download_fields.py`, `download_field_gifs`: `out_path = resolved_dir / f"{field_name}_r.gif"`, the only GIF filename the module constructs.
