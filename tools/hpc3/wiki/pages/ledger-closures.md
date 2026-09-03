@@ -6,11 +6,9 @@ related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/ledger.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/cli/triage.py": "69b8368f48a23345b08f55980cf0cec4e7dbcdb0"
   "src/hpc3/core/ledger.py": "94065680790919c0a68e097320d228400805b564"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 provenance:
   - "MinJobAge 300s, read from scontrol show config"
 fact_checked: 2026-09-01

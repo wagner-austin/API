@@ -6,11 +6,9 @@ related: ["[[preemption-and-campaigns]]", "[[run-documents]]", "[[submission-rul
 source_paths:
   - "src/hpc3/contracts/sweep.py"
   - "src/hpc3/core/sweep.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/sweep.py": "0893d3d08329be27f076211775f7f7e7b9faa5cc"
   "src/hpc3/core/sweep.py": "6796f42b6a10dbb1ea223b0ae9f3651ff4f1675e"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---

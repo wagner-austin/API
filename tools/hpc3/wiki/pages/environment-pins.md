@@ -6,11 +6,9 @@ related: ["[[image-build-flow]]", "[[submission-rules]]", "[[unsupported-shapes]
 source_paths:
   - "src/hpc3/contracts/pins.py"
   - "src/hpc3/core/env_probe.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/pins.py": "258a892f9f7b32394bfd72940cebb516ea25fd4a"
-  "src/hpc3/core/env_probe.py": "23d389f25a8e49444c388d52bb299160ce76336c"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+  "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"
 fact_checked: 2026-09-01
 confidence: high
 ---

@@ -6,11 +6,9 @@ related: ["[[sweeps-and-artifacts]]", "[[submission-rules]]"]
 source_paths:
   - "src/hpc3/contracts/run.py"
   - "src/hpc3/contracts/experiment.py"
-  - "README.md"
 source_git_blobs:
-  "src/hpc3/contracts/run.py": "a2b27fcaaabd5c9b1e68c2e69da74f5c953916d9"
+  "src/hpc3/contracts/run.py": "857420fb3712cfb66b2ad0ac2d9f984be5de5a15"
   "src/hpc3/contracts/experiment.py": "530e8484b421d13119e951fef3ed8ea8b2706abf"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---

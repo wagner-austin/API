@@ -8,7 +8,7 @@ source_paths:
   - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/layout.py": "cb698fabbd6994fc9b6bc10092e77df3dc7f520e"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
+  "README.md": "104d4dac210676c88c42b5122146c11687239fc5"
 provenance:
   - "AccountingStoreFlags = (null), measured 2026-08-23"
 fact_checked: 2026-09-01

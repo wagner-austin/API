@@ -6,11 +6,9 @@ related: ["[[run-documents]]", "[[triage-conditions]]", "[[budget-model]]"]
 source_paths:
   - "src/hpc3/cli/chain.py"
   - "src/hpc3/core/chain.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/cli/chain.py": "69397052e46245ca787a2419773f548dac7933fa"
   "src/hpc3/core/chain.py": "c021a89a36385bd6a7e52a1c040d6ac4b02c1dea"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 provenance:
   - "squeue sample: 261 of 621 pending GPU jobs on DependencyNeverSatisfied"
 fact_checked: 2026-09-01

@@ -5,10 +5,8 @@ hubs: [images-and-staging]
 related: ["[[image-build-flow]]", "[[determinism-posture]]", "[[staging-identity]]"]
 source_paths:
   - "src/hpc3/core/image_selfcheck.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/core/image_selfcheck.py": "14a72028e8f5fc4e80d5ce7742ba018f46f5b40c"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 provenance:
   - "wiki/tools/extraction-eval/runs/known-answers.json (the wiki repo, not this one)"
   - "model_trainer.cli.known_answer_registry (services/Model-Trainer, outside this workspaceRoot)"

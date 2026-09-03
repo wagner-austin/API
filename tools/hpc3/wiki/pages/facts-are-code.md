@@ -7,12 +7,10 @@ source_paths:
   - "src/hpc3/clusters/hpc3.py"
   - "src/hpc3/clusters/__init__.py"
   - "tests/test_cluster.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/clusters/hpc3.py": "e6fedebb13c20222c9269b158f0ebed7fbf84cc9"
   "src/hpc3/clusters/__init__.py": "000eb8bb475dc1be462db23eaa99c53c29dd1c22"
   "tests/test_cluster.py": "fe098416d4493490ea0f038220506695eebc756f"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---

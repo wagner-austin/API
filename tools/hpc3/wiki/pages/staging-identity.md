@@ -8,13 +8,11 @@ source_paths:
   - "src/hpc3/core/expected.py"
   - "src/hpc3/contracts/provenance.py"
   - "src/hpc3/core/stage.py"
-  - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/stage.py": "52a0836d3ecc451ffd05cfe3860580d8182cd9ec"
   "src/hpc3/core/expected.py": "0ad187f7ba85b5b91ee9d1732c6545825f107cb5"
   "src/hpc3/contracts/provenance.py": "8760fc424d4d9775622b00c4f963735b02be6fa5"
   "src/hpc3/core/stage.py": "582badba6fe1feb258dd91d0be2b7735d1c7898b"
-  "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
 fact_checked: 2026-09-01
 confidence: high
 ---
