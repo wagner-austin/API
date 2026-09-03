@@ -6088,3 +6088,27 @@ Two assertions catching two different failures, each verified by breaking the tr
 `docs/protocol-decoding-status.md` demonstrated `TerrainMap("field42-r.gif")` — a bare relative filename, which is the CWD-relative lookup `resources.py` exists to remove, naming the file being deleted. Now `TerrainMap(require_asset("field42_r.gif"))`. The palette counts and verified rock positions in that section are unchanged, because both files held the same bytes.
 
 Gate: guard 0 violations across 44 rules; ruff + mypy clean on the changed files; 100 tests green across the asset-resolution surface. The full `make check` is blocked at lint by another session's in-flight `browser/lifecycle.py` (F821 `static_key_file_path`), which is uncommitted, not mine, and reported to the board rather than edited.
+
+## [2026-09-03] update | The phantom coverage failure, reproduced and measured a second time
+
+`make check` failed the gate at **99.96%** — 14 statements and 3 branches uncovered, 6938 tests passed. A direct `pytest --cov` run on the **same tree, same commit, same 34157 statements and 9736 branches** reported **100.00%, 0 missing, 0 partial**, 6938 passed.
+
+This is the second recorded instance; the first is logged above as "A coverage number that was not real" (23 statements, 99.94%). Recording the second because one occurrence reads as a fluke and two establish it as the normal failure mode of running this gate while other sessions are live.
+
+### What it is not
+
+Not the unscoped-glob defect. That one was real, was measured in `services/Model-Trainer` on 2026-08-27 (1937 passed, coverage 53.03%), and is already fixed: `scripts/run-tests.ps1` scopes its cleanup to `$covToken*` rather than `.coverage-*`, so a finishing run no longer deletes a concurrent run's data mid-write.
+
+Not a real gap either. The suspect was `browser/lifecycle.py`, which had just gained `_check_shipped_static_key` from another session — measured at **100.00%** (141 statements, 28 branches) on its own.
+
+### The operational rule this leaves
+
+**A coverage failure under `make check` is not evidence until a direct run reproduces it.** The direct run is `poetry run pytest -q --cov=src --cov=scripts --cov-report=term-missing --cov-fail-under=100`. It takes about five minutes and it is cheaper than the alternative, which is reading source hunting for a gap that does not exist — the temptation the earlier entry already warned about.
+
+### A smaller thing found on the way
+
+`runs/` holds **84 orphaned coverage fragments from 5 dead runs, 72 MB** — tokens `a5e41c98`, `12eff09e`, `df4a1e26`, `cbec6557`, `4d91e72c`, dated 2026-08-28 and 2026-09-01. These are runs whose launcher was killed before its `finally` block ran, so the scoped cleanup never fired.
+
+They are inert — each run reads only its own `COVERAGE_FILE`, so they cannot affect a number. But `run-tests.ps1` says "the pre-run sweep is the thing that cleans wreckage", and the pre-run sweep is `reap-test-processes.ps1`, which reaps **processes**. Nothing reaps coverage fragments, so the stated cleanup for them does not exist. Left in place rather than deleted — they are somebody's build output in a gitignored directory, and 72 MB is not urgent.
+
+Gate: 6938 passed, 100.00% statements AND branches, verified directly.
