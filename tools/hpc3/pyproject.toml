@@ -27,6 +27,7 @@ pytest-cov = "^7.0.0"
 pytest-xdist = "^3.6.1"
 
 [tool.poetry.scripts]
+hpc3-bootstrap = "hpc3.cli.bootstrap:entrypoint"
 hpc3-campaign = "hpc3.cli.campaign:entrypoint"
 hpc3-cancel = "hpc3.cli.cancel:entrypoint"
 hpc3-chain = "hpc3.cli.chain:entrypoint"

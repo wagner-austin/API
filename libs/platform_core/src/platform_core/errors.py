@@ -259,6 +259,17 @@ class Hpc3ErrorCode(ErrorCodeBase):
     BUDGET_PROJECTION_EXCEEDED = "BUDGET_PROJECTION_EXCEEDED"
     BUDGET_CONSUMPTION_EXCEEDED = "BUDGET_CONSUMPTION_EXCEEDED"
 
+    # Bootstrap -- creating the FIRST environment, which capture then probes.
+    #
+    # These refuse on the creating path, about what the command itself just
+    # built, rather than gating a project that already runs. That distinction
+    # is the point: every other code here can only ever fire at somebody who
+    # has finished, which is how a system accumulates refusals and no
+    # on-ramps.
+    BOOTSTRAP_ENV_EXISTS = "BOOTSTRAP_ENV_EXISTS"
+    BOOTSTRAP_PYTHON_MISMATCH = "BOOTSTRAP_PYTHON_MISMATCH"
+    BOOTSTRAP_ENV_NOT_SELF_CONTAINED = "BOOTSTRAP_ENV_NOT_SELF_CONTAINED"
+
     # Preflight -- validating a job against the live scheduler before running it.
     PREFLIGHT_REJECTED = "PREFLIGHT_REJECTED"
     PREFLIGHT_UNPARSABLE = "PREFLIGHT_UNPARSABLE"

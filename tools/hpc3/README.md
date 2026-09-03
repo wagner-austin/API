@@ -39,6 +39,19 @@ hpc3-cancel    --config runs/hpc3.json --job 55519937          # stop it, and sa
 
 Working examples of the documents are in [`examples/`](examples/).
 
+**Onboarding a project that does not exist yet** starts one step earlier, because
+every command above assumes an environment to run in and a new project has none:
+
+```bash
+hpc3-bootstrap --config runs/hpc3.json --project newcomer     --env-path /pub/wagnera3/envs/newcomer --python 3.11   # the first environment
+hpc3-image-capture --config runs/hpc3.json --project newcomer     --env-path /pub/wagnera3/envs/newcomer … --out specs/newcomer-image.json
+```
+
+`--python 3.11` does NOT come from `module load python`: the cluster's python
+modules are 2.7, 3.8, 3.10 and 3.14, and everything here needs 3.11. Bootstrap
+goes through `miniconda3` instead, and refuses to hand back an environment that
+borrowed its interpreter from another project.
+
 ---
 
 ## The workspace
@@ -289,6 +302,7 @@ dependencies, CPU-only, and job arrays (a sweep IS one `--array` call now,
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
 | `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record ([staging identity](wiki/pages/staging-identity.md)) |
 | `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
+| `hpc3-bootstrap --config C --project P --env-path E --python V` | creates a project's FIRST environment and proves it owns its own interpreter. The step capture assumes has already happened ([the interpreter is not in `module avail python`](wiki/pages/interpreter-availability.md)) |
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
 | `hpc3-image --spec S --out-dir D --image-name N` | renders the spec into definition, requirements, self-check and build script. Pure; builds nothing |
 | `hpc3-image-build --config C --project P --name N --image-dir D --image-name I` | preflight → submit the rendered build → record it in the ledger ([why this command exists](wiki/pages/image-ledger-lessons.md)) |

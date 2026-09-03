@@ -24,6 +24,7 @@ JOB_SUBMITTED = "hpc3_job_submitted"
 SWEEP_SUBMITTED = "hpc3_sweep_submitted"
 CHAIN_SUBMITTED = "hpc3_chain_submitted"
 FILES_STAGED = "hpc3_files_staged"
+ENVIRONMENT_BOOTSTRAPPED = "hpc3_environment_bootstrapped"
 
 
 def job_submitted(spec: JobSpec, *, host: str, job_id: str, cluster: ClusterFacts) -> None:
@@ -192,12 +193,50 @@ def files_staged(*, host: str, destination: str, count: int, provenance: str) ->
     )
 
 
+def environment_bootstrapped(
+    *, host: str, project: str, env_path: str, python_version: str, conda_module: str
+) -> None:
+    """Record an environment this package created on the cluster.
+
+    Worth a durable event for the same reason a submission is: it writes to
+    shared storage, and a later reader asking "where did this environment come
+    from" currently has nothing but a directory timestamp. The existing
+    ``/pub/wagnera3/envs`` tree is precisely that problem -- three
+    environments, one of them a venv borrowing another's interpreter, and no
+    record anywhere of what made any of them.
+
+    Args:
+        host: SSH destination it was created on.
+        project: Body of work it was created for. Recorded even though the
+            project is typically NOT yet registered when this runs -- that is
+            the point of the command -- so the event is the first thing that
+            ties a directory to a name.
+        env_path: Absolute path of the created environment.
+        python_version: The language version requested AND verified; the
+            environment's own interpreter was asked before this was emitted.
+        conda_module: The exact module that supplied conda, which is what
+            makes the creation repeatable rather than merely described.
+    """
+    _test_hooks.log_event(
+        ENVIRONMENT_BOOTSTRAPPED,
+        {
+            "host": host,
+            "project": project,
+            "env_path": env_path,
+            "python_version": python_version,
+            "conda_module": conda_module,
+        },
+    )
+
+
 __all__ = [
     "CHAIN_SUBMITTED",
+    "ENVIRONMENT_BOOTSTRAPPED",
     "FILES_STAGED",
     "JOB_SUBMITTED",
     "SWEEP_SUBMITTED",
     "chain_submitted",
+    "environment_bootstrapped",
     "files_staged",
     "image_build_submitted",
     "job_submitted",

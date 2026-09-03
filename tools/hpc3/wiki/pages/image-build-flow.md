@@ -102,7 +102,18 @@ editable checkout — so there is no filename to name. A **third-party** one
 with no tag is fine, because it becomes a requirement line the build resolves
 from an index, and a conda-installed package legitimately has no `WHEEL` file[^8].
 
-## Four commands, in order
+## Four commands, in order — and a step zero
+
+**`hpc3-bootstrap`** comes before all four, and only for a project that does
+not have an environment yet. Capture PROBES a live environment; a newcomer has
+nothing to probe, so this list used to begin one step after the beginning and
+that step was improvised every time. It creates the environment through
+`miniconda3` — the cluster's `python` modules are 2.7, 3.8, 3.10 and 3.14, none
+of which is the 3.11 everything here needs — and then refuses to return one
+whose interpreter belongs to another installation
+([[interpreter-availability]]).
+
+An established project skips it. The four below are the recurring flow.
 
 1. **`hpc3-image-capture`** reads a live environment and writes the spec. Do
    NOT hand-write one: pip-freeze-and-paste is unrepeatable and silently
