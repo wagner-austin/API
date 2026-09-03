@@ -142,6 +142,7 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
         "hub_model_id": None,
         "finetuning_strategy": "full",
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -187,6 +188,7 @@ def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
         "hub_model_id": None,
         "finetuning_strategy": "full",
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

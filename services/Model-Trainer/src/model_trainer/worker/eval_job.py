@@ -96,6 +96,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         }

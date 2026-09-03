@@ -118,6 +118,7 @@ class TrainingOrchestrator:
             "hub_model_id": req["hub_model_id"],
             "finetuning_strategy": req["finetuning_strategy"],
             "lora": req["lora"],
+            "cartridge": req["cartridge"],
             "quantization": req["quantization"],
             "gguf_export": req["gguf_export"],
         }

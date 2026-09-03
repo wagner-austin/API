@@ -250,6 +250,7 @@ def make_test_config(
         "finetuning_strategy": finetuning_strategy,
         "hub_model_id": hub_model_id,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

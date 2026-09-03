@@ -153,6 +153,21 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # Fine-tuning strategy selection
     STRATEGY_NAME_UNKNOWN = "STRATEGY_NAME_UNKNOWN"
 
+    # Cartridge (trained key-value prefix) errors.
+    #
+    # Split by who can fix it. An invalid geometry is a malformed artifact or
+    # a nonsensical request; a geometry that does not match the model is two
+    # valid objects that do not belong together, which is the mistake a
+    # caller makes by pointing a saved cartridge at a different base; and a
+    # model that reports no cache at all cannot host a prefix, which is a
+    # property of the model rather than of anything the caller chose.
+    CARTRIDGE_CONFIG_MISSING = "CARTRIDGE_CONFIG_MISSING"
+    CARTRIDGE_GEOMETRY_INVALID = "CARTRIDGE_GEOMETRY_INVALID"
+    CARTRIDGE_GEOMETRY_MISMATCH = "CARTRIDGE_GEOMETRY_MISMATCH"
+    CARTRIDGE_MODEL_REPORTS_NO_CACHE = "CARTRIDGE_MODEL_REPORTS_NO_CACHE"
+    CARTRIDGE_STATE_INCOMPLETE = "CARTRIDGE_STATE_INCOMPLETE"
+    CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED = "CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one
@@ -488,6 +503,22 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # The caller chose a name no strategy answers to, so the request is the
     # thing that is wrong.
     ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN: 400,
+    # The caller asked for the cartridge strategy without the config it needs,
+    # or with counts that describe nothing trainable.
+    ModelTrainerErrorCode.CARTRIDGE_CONFIG_MISSING: 400,
+    ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_INVALID: 400,
+    # Two well-formed objects that do not belong together: a saved cartridge
+    # and a base model of a different shape. 409 rather than 400 because
+    # neither input is wrong on its own.
+    ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_MISMATCH: 409,
+    # A model that returns no key-value cache cannot host a prefix at all.
+    # Nothing the caller passed is malformed, so this is not their error.
+    ModelTrainerErrorCode.CARTRIDGE_MODEL_REPORTS_NO_CACHE: 500,
+    # The file on disk is missing tensors its own manifest declares.
+    ModelTrainerErrorCode.CARTRIDGE_STATE_INCOMPLETE: 500,
+    # Two settings that are each fine and cannot both hold. 409, like the
+    # geometry mismatch, because neither is wrong on its own.
+    ModelTrainerErrorCode.CARTRIDGE_GRADIENT_CHECKPOINTING_UNSUPPORTED: 409,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

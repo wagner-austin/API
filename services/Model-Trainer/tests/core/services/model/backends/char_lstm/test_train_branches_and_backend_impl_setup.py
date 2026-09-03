@@ -304,6 +304,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -392,6 +393,7 @@ def test_train_prepared_skips_save_when_cancelled(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

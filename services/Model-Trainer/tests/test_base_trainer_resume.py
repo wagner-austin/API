@@ -97,6 +97,7 @@ def _make_cfg(corpus_path: str, tokenizer_id: str) -> ModelTrainConfig:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

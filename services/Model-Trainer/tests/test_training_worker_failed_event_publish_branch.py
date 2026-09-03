@@ -112,6 +112,7 @@ def test_training_worker_failed_event_publish_branch(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         },

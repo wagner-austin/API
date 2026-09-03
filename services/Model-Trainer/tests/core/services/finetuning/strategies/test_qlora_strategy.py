@@ -75,6 +75,7 @@ def make_test_config(
         "finetuning_strategy": "qlora",
         "hub_model_id": "meta/llama-7b",
         "lora": lora,
+        "cartridge": None,
         "quantization": quantization,
         "gguf_export": None,
     }

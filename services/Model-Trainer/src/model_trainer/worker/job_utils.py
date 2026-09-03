@@ -427,6 +427,7 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
         "finetuning_strategy": req["finetuning_strategy"],
         "hub_model_id": req["hub_model_id"],
         "lora": req["lora"],
+        "cartridge": req["cartridge"],
         "quantization": req["quantization"],
         "gguf_export": req["gguf_export"],
     }

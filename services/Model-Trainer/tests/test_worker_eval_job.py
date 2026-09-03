@@ -145,6 +145,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

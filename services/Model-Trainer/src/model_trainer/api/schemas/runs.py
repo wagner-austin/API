@@ -32,6 +32,22 @@ class LoraConfigRequest(TypedDict, total=True):
     bias: Literal["none", "all", "lora_only"]
 
 
+class CartridgeConfigRequest(TypedDict, total=True):
+    """API request schema for cartridge configuration.
+
+    Maps to core CartridgeConfig TypedDict.
+
+    Attributes:
+        enabled: Whether the cartridge strategy is enabled.
+        num_slots: Prefix positions to train.
+        init_seed: Seed for the initial draw, so a run is reproducible.
+    """
+
+    enabled: bool
+    num_slots: int
+    init_seed: int
+
+
 class QuantizationConfigRequest(TypedDict, total=True):
     """API request schema for quantization configuration.
 
@@ -85,6 +101,7 @@ class TrainRequest(TypedDict, total=True):
         hub_model_id: HuggingFace model ID (required when model_family='hf_lm').
         finetuning_strategy: Strategy for fine-tuning (full, lora, qlora).
         lora: LoRA configuration (required for lora/qlora strategies).
+        cartridge: Cartridge configuration (required for the cartridge strategy).
         quantization: Quantization config (required for qlora strategy).
     """
 
@@ -117,6 +134,7 @@ class TrainRequest(TypedDict, total=True):
     hub_model_id: str | None
     finetuning_strategy: StrategyName
     lora: LoraConfigRequest | None
+    cartridge: CartridgeConfigRequest | None
     quantization: QuantizationConfigRequest | None
     gguf_export: GgufExportConfigRequest | None
 

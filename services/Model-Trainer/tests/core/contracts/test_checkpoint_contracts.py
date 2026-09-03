@@ -49,6 +49,7 @@ def _make_cfg() -> ModelTrainConfig:
         "finetuning_strategy": "full",
         "hub_model_id": "gpt2-medium",
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

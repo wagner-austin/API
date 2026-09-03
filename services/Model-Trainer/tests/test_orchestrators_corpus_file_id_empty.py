@@ -84,6 +84,7 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         "hub_model_id": None,
         "finetuning_strategy": "full",
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

@@ -239,6 +239,7 @@ class TestQueueEncodingGgufExportInvalidType:
             "hub_model_id": "model",
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": "invalid_string",  # Should be dict or None
         }

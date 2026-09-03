@@ -22,13 +22,13 @@ from model_trainer.core.contracts.model import (
 from model_trainer.core.services.training.base_trainer_loop import (
     _TrainerLoop,
 )
-from model_trainer.core.services.training.run_records import (
-    write_training_run_record,
-)
 from model_trainer.core.services.training.checkpoint import (
     TrainingCheckpoint,
     delete_training_checkpoint,
     load_training_checkpoint,
+)
+from model_trainer.core.services.training.run_records import (
+    write_training_run_record,
 )
 
 _logger = get_logger(__name__)

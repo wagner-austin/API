@@ -64,6 +64,7 @@ class TestQueueEncodingRoundTrip:
                 "target_modules": ("q_proj", "v_proj"),
                 "bias": "none",
             },
+            "cartridge": None,
             "quantization": None,
             "gguf_export": {
                 "enabled": True,
@@ -113,6 +114,7 @@ class TestQueueEncodingRoundTrip:
                 "target_modules": ("q_proj", "v_proj"),
                 "bias": "none",
             },
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         }
@@ -158,6 +160,7 @@ class TestQueueEncodingRoundTrip:
                 "target_modules": ("q_proj",),
                 "bias": "none",
             },
+            "cartridge": None,
             "quantization": None,
             "gguf_export": {"enabled": True, "output_type": "f32"},
         }
@@ -202,6 +205,7 @@ class TestQueueEncodingRoundTrip:
                 "target_modules": ("q_proj",),
                 "bias": "none",
             },
+            "cartridge": None,
             "quantization": None,
             "gguf_export": {"enabled": True, "output_type": "q8_0"},
         }
@@ -414,6 +418,7 @@ class TestTrainingJobWithGgufExport:
                     target_modules=("query", "value"),
                     bias="none",
                 ),
+                "cartridge": None,
                 "quantization": None,
                 "gguf_export": {"enabled": True, "output_type": "f16"},
             },

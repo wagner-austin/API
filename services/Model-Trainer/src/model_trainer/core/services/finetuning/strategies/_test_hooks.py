@@ -1,12 +1,18 @@
 """Test hooks for fine-tuning strategies.
 
-Follows the covenant pattern: production code sets hooks to real implementations,
-tests set hooks to fakes for isolation.
+Follows the covenant pattern: production code sets hooks to real
+implementations, tests set hooks to fakes for isolation.
+
+The PROTOCOLS these implementations satisfy live in ``_hook_protocols``, split
+out when this module passed the package's file-size ceiling. The division is by
+role: that file says what the third-party surfaces look like, this one says
+which implementation is bound to each hook.
 """
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+import pathlib
+from collections.abc import Sequence
 
 import torch
 from platform_core.errors import (
@@ -14,286 +20,186 @@ from platform_core.errors import (
     ModelTrainerErrorCode,
     model_trainer_status_for,
 )
+from platform_core.json_utils import dump_json_str, load_json_str
 
-from model_trainer.core.types import LMModelProto
-
-# ============================================================================
-# Protocols for dynamic PEFT imports
-# ============================================================================
-
-
-class _LoraConfigProto(Protocol):
-    """Protocol for PEFT LoraConfig class."""
-
-    pass
-
-
-class _LoraConfigClassProto(Protocol):
-    """Protocol for LoraConfig constructor."""
-
-    def __call__(
-        self,
-        *,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        target_modules: list[str],
-        bias: str,
-        task_type: Literal["CAUSAL_LM"],
-        fan_in_fan_out: bool = False,
-    ) -> _LoraConfigProto:
-        """Create LoRA configuration.
-
-        Args:
-            r: LoRA rank.
-            lora_alpha: LoRA scaling factor.
-            lora_dropout: Dropout probability.
-            target_modules: Modules to apply LoRA to.
-            bias: Bias training mode.
-            task_type: Task type for PEFT.
-
-        Returns:
-            LoraConfig instance.
-        """
-        ...
-
-
-class _GetPeftModelFn(Protocol):
-    """Protocol for peft.get_peft_model function."""
-
-    def __call__(self, model: LMModelProto, config: _LoraConfigProto) -> LMModelProto:
-        """Wrap model with PEFT adapters.
-
-        Args:
-            model: Base model to wrap.
-            config: LoRA configuration.
-
-        Returns:
-            PEFT-wrapped model.
-        """
-        ...
+from model_trainer.core.contracts.cartridge import (
+    CARTRIDGE_MANIFEST_NAME,
+    CARTRIDGE_WEIGHTS_NAME,
+    CartridgeGeometry,
+    decode_cartridge_geometry,
+    encode_cartridge_geometry,
+)
+from model_trainer.core.services.finetuning.strategies._hook_protocols import (
+    AdapterWeightsReloader,
+    CacheLayerProbe,
+    CartridgeLoader,
+    CartridgeSaver,
+    CartridgeStateReader,
+    FullModelLoader,
+    GradientCheckpointEnabler,
+    KbitTrainingPreparer,
+    PeftModelCreator,
+    PeftModelLoader,
+    PeftModelSaver,
+    PrefixCacheBuilder,
+    PrefixForward,
+    _AutoModelClassProto,
+    _DynamicCacheClassProto,
+    _GetPeftModelFn,
+    _LoadPeftWeightsFn,
+    _LoraConfigClassProto,
+    _LoraConfigProto,
+    _PeftModelClassProto,
+    _PrepareForKbitTrainingFn,
+    _SetPeftModelStateDictFn,
+)
+from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
+    CartridgeSlots,
+    slots_from_state,
+)
+from model_trainer.core.types import (
+    CacheCapableLMProto,
+    ForwardOutProto,
+    KVCacheProto,
+    LMModelProto,
+)
 
 
-class _PeftModelClassProto(Protocol):
-    """Protocol for PeftModel class with from_pretrained."""
+def _default_probe_cache_layers(model: CacheCapableLMProto) -> Sequence[torch.Tensor]:
+    """Production implementation - runs a one-token cached forward.
 
-    def from_pretrained(self, model: LMModelProto, adapter_path: str) -> LMModelProto:
-        """Load PEFT adapters onto a model.
+    Under ``no_grad`` and on the model's own device, because this measures a
+    shape and must neither build a graph nor move the model. No labels, since
+    a loss would be computed and discarded.
 
-        Args:
-            model: Base model to apply adapters to.
-            adapter_path: Path to saved adapter weights.
+    Args:
+        model: The model to measure.
 
-        Returns:
-            Model with adapters loaded.
-        """
-        ...
-
-
-class _LoadPeftWeightsFn(Protocol):
-    """Protocol for peft.load_peft_weights.
-
-    Signature mirrors peft v0.14.0 ``utils/save_and_load.py`` L 489: one
-    required argument, a path or hub id. It resolves safetensors-versus-bin
-    itself, so callers do not name a filename.
+    Returns:
+        One cached key tensor per attention layer.
     """
-
-    def __call__(self, model_id: str) -> dict[str, torch.Tensor]:
-        """Read an adapter's weights off disk.
-
-        Args:
-            model_id: Directory holding the saved adapter.
-
-        Returns:
-            The adapter's state dict.
-        """
-        ...
+    device = next(iter(model.named_parameters()))[1].detach().device
+    probe = torch.zeros((1, 1), dtype=torch.long, device=device)
+    with torch.no_grad():
+        out = model(input_ids=probe, use_cache=True)
+    return [pair[0] for pair in out.past_key_values]
 
 
-class _LoadStateDictResultProto(Protocol):
-    """Protocol for the incompatible-keys result of a state-dict load.
+def _default_build_prefix_cache(
+    blocks: Sequence[tuple[torch.Tensor, torch.Tensor]],
+) -> KVCacheProto:
+    """Production implementation - builds a fresh DynamicCache per forward.
 
-    ``set_peft_model_state_dict`` returns whatever ``load_state_dict``
-    returned (peft v0.14.0 ``utils/save_and_load.py`` L 451 and L 474), and
-    that load runs with ``strict=False``. Under ``strict=False`` every base
-    weight is reported missing, which is expected for an adapter and says
-    nothing. An UNEXPECTED key is different: it means the file holds a
-    parameter the live model has no slot for, so the adapter does not belong
-    to this model.
+    Fresh rather than reused: ``update`` appends, so a cache carried across
+    two forwards would grow a second copy of the prefix. Measured 2026-09-03
+    against transformers 4.46.3 -- two consecutive forwards through freshly
+    built caches produce identical losses and leave the blocks' shapes
+    untouched.
+
+    Args:
+        blocks: Key and value pairs, in layer order.
+
+    Returns:
+        A cache holding exactly those blocks.
     """
+    cache_utils = __import__("transformers.cache_utils", fromlist=["DynamicCache"])
+    cache_cls: _DynamicCacheClassProto = cache_utils.DynamicCache
+    cache = cache_cls()
+    for layer, (keys, values) in enumerate(blocks):
+        _ = cache.update(keys, values, layer)
+    return cache
 
-    unexpected_keys: list[str]
 
+def _default_forward_with_prefix(
+    model: CacheCapableLMProto,
+    *,
+    input_ids: torch.Tensor,
+    labels: torch.Tensor,
+    past_key_values: KVCacheProto,
+    attention_mask: torch.Tensor,
+) -> ForwardOutProto:
+    """Production implementation - one forward pass in front of a prefix.
 
-class _SetPeftModelStateDictFn(Protocol):
-    """Protocol for peft.set_peft_model_state_dict.
+    ``use_cache=False`` so the run does not accumulate its own keys on top of
+    the prefix, which would make the cache grow by the sequence length on
+    every step.
 
-    Signature mirrors peft v0.14.0 ``utils/save_and_load.py`` L 329: the
-    model it takes is the already-wrapped PeftModel, not a base model, and
-    the write happens in place.
+    Args:
+        model: The frozen base model.
+        input_ids: Token ids.
+        labels: Targets for the input's own positions.
+        past_key_values: The prefix.
+        attention_mask: Ones over the prefix and the input together.
+
+    Returns:
+        The model's output.
     """
-
-    def __call__(
-        self, model: LMModelProto, peft_model_state_dict: dict[str, torch.Tensor]
-    ) -> _LoadStateDictResultProto:
-        """Write adapter weights into a live PEFT model.
-
-        Args:
-            model: The wrapped PEFT model to mutate.
-            peft_model_state_dict: Weights to install.
-
-        Returns:
-            The load result, whose unexpected keys the caller checks.
-        """
-        ...
+    return model(
+        input_ids=input_ids,
+        labels=labels,
+        past_key_values=past_key_values,
+        attention_mask=attention_mask,
+        use_cache=False,
+    )
 
 
-class _PrepareForKbitTrainingFn(Protocol):
-    """Protocol for peft.prepare_model_for_kbit_training."""
+def _default_save_cartridge(slots: CartridgeSlots, out_dir: str) -> None:
+    """Production implementation - writes tensors and manifest to a directory.
 
-    def __call__(self, model: LMModelProto) -> LMModelProto:
-        """Ready a quantized model for adapter training.
+    Two files rather than one. The manifest is JSON so a person can read what
+    a cartridge is without loading torch, and the tensors are a torch file
+    because that is what they are.
 
-        Args:
-            model: The quantized base model.
-
-        Returns:
-            The same model, prepared in place and returned for chaining.
-        """
-        ...
-
-
-class _AutoModelClassProto(Protocol):
-    """Protocol for AutoModelForCausalLM class."""
-
-    def from_pretrained(self, model_path: str) -> LMModelProto:
-        """Load model from path.
-
-        Args:
-            model_path: Path to saved model.
-
-        Returns:
-            Loaded model instance.
-        """
-        ...
+    Args:
+        slots: The blocks to write.
+        out_dir: Directory to write into.
+    """
+    directory = pathlib.Path(out_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / CARTRIDGE_MANIFEST_NAME).write_text(
+        dump_json_str(encode_cartridge_geometry(slots.geometry)),
+        encoding="utf-8",
+    )
+    torch.save(slots.state_dict(), directory / CARTRIDGE_WEIGHTS_NAME)
 
 
-# ============================================================================
-# Public Protocols for hooks
-# ============================================================================
+def _default_load_cartridge(cartridge_dir: str) -> CartridgeSlots:
+    """Production implementation - reads a cartridge back off disk.
+
+    Args:
+        cartridge_dir: Directory previously written by the saver.
+
+    Returns:
+        The rebuilt slots.
+
+    Raises:
+        FileNotFoundError: If either the manifest or the weights are absent.
+    """
+    directory = pathlib.Path(cartridge_dir)
+    manifest = directory / CARTRIDGE_MANIFEST_NAME
+    weights = directory / CARTRIDGE_WEIGHTS_NAME
+    if not manifest.is_file():
+        raise FileNotFoundError(f"cartridge manifest not found: {manifest}")
+    if not weights.is_file():
+        raise FileNotFoundError(f"cartridge weights not found: {weights}")
+    geometry = decode_cartridge_geometry(load_json_str(manifest.read_text(encoding="utf-8")))
+    loaded: dict[str, torch.Tensor] = torch.load(weights, weights_only=True)
+    return slots_from_state(loaded, geometry)
 
 
-class AdapterWeightsReloader(Protocol):
-    """Protocol for reloading an adapter's weights into a live PEFT model."""
+def _default_slots_from_state(
+    state: dict[str, torch.Tensor], geometry: CartridgeGeometry
+) -> CartridgeSlots:
+    """Production implementation - rebuilds slots from named tensors.
 
-    def __call__(self, model: LMModelProto, adapter_path: str) -> None:
-        """Reload adapter weights in place.
+    Args:
+        state: The tensors, by name.
+        geometry: The shape they must match.
 
-        Args:
-            model: The live PEFT model to write into.
-            adapter_path: Directory holding the saved adapter.
-        """
-        ...
-
-
-class KbitTrainingPreparer(Protocol):
-    """Protocol for readying a quantized model for adapter training."""
-
-    def __call__(self, model: LMModelProto) -> LMModelProto:
-        """Prepare a quantized model.
-
-        Args:
-            model: The quantized base model.
-
-        Returns:
-            The prepared model.
-        """
-        ...
-
-
-class PeftModelCreator(Protocol):
-    """Protocol for creating PEFT models with LoRA adapters."""
-
-    def __call__(
-        self,
-        model: LMModelProto,
-        *,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        target_modules: tuple[str, ...],
-        bias: str,
-    ) -> LMModelProto:
-        """Create a PEFT model with LoRA adapters.
-
-        Args:
-            model: Base model to wrap with adapters.
-            r: LoRA rank.
-            lora_alpha: LoRA scaling factor.
-            lora_dropout: Dropout probability for LoRA layers.
-            target_modules: Module names to apply LoRA.
-            bias: Bias training mode.
-
-        Returns:
-            Model with LoRA adapters attached.
-        """
-        ...
-
-
-class PeftModelSaver(Protocol):
-    """Protocol for saving PEFT adapter weights."""
-
-    def __call__(self, model: LMModelProto, out_dir: str) -> None:
-        """Save adapter weights to directory.
-
-        Args:
-            model: PEFT model with adapters.
-            out_dir: Output directory path.
-        """
-        ...
-
-
-class PeftModelLoader(Protocol):
-    """Protocol for loading PEFT adapters onto a base model."""
-
-    def __call__(self, model: LMModelProto, adapter_path: str) -> LMModelProto:
-        """Load adapter weights and apply to model.
-
-        Args:
-            model: Base model to apply adapters to.
-            adapter_path: Path to saved adapter weights.
-
-        Returns:
-            Model with adapters loaded.
-        """
-        ...
-
-
-class GradientCheckpointEnabler(Protocol):
-    """Protocol for enabling gradient checkpointing on a model."""
-
-    def __call__(self, model: LMModelProto) -> None:
-        """Enable gradient checkpointing for memory efficiency.
-
-        Args:
-            model: Model to enable checkpointing on.
-        """
-        ...
-
-
-class FullModelLoader(Protocol):
-    """Protocol for loading a full model from a path."""
-
-    def __call__(self, model_path: str) -> LMModelProto:
-        """Load a model from disk.
-
-        Args:
-            model_path: Path to saved model.
-
-        Returns:
-            Loaded model instance.
-        """
-        ...
+    Returns:
+        The rebuilt slots.
+    """
+    return slots_from_state(state, geometry)
 
 
 def _default_create_peft_model(
@@ -444,6 +350,12 @@ class Hooks:
     and call reset() afterwards, which puts the real implementation back.
     """
 
+    probe_cache_layers: CacheLayerProbe = _default_probe_cache_layers
+    build_prefix_cache: PrefixCacheBuilder = _default_build_prefix_cache
+    forward_with_prefix: PrefixForward = _default_forward_with_prefix
+    save_cartridge: CartridgeSaver = _default_save_cartridge
+    load_cartridge: CartridgeLoader = _default_load_cartridge
+    slots_from_state: CartridgeStateReader = _default_slots_from_state
     create_peft_model: PeftModelCreator = _default_create_peft_model
     save_peft_model: PeftModelSaver = _default_save_peft_model
     load_peft_model: PeftModelLoader = _default_load_peft_model
@@ -466,6 +378,12 @@ class Hooks:
 
 def reset_hooks() -> None:
     """Restore every hook to the production implementation it is bound to."""
+    Hooks.probe_cache_layers = _default_probe_cache_layers
+    Hooks.build_prefix_cache = _default_build_prefix_cache
+    Hooks.forward_with_prefix = _default_forward_with_prefix
+    Hooks.save_cartridge = _default_save_cartridge
+    Hooks.load_cartridge = _default_load_cartridge
+    Hooks.slots_from_state = _default_slots_from_state
     Hooks.create_peft_model = _default_create_peft_model
     Hooks.save_peft_model = _default_save_peft_model
     Hooks.load_peft_model = _default_load_peft_model

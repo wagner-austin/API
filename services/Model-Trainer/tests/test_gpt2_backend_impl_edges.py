@@ -84,6 +84,7 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

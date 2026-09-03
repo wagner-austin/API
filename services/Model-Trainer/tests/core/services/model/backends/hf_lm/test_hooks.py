@@ -492,6 +492,7 @@ class TestDefaultCreateTrainer:
             "finetuning_strategy": "full",
             "hub_model_id": None,
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         }

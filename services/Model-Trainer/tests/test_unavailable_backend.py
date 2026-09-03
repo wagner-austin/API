@@ -147,6 +147,7 @@ def test_unavailable_backend_all_methods_raise() -> None:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

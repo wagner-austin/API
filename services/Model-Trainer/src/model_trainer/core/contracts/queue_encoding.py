@@ -27,12 +27,14 @@ from platform_core.json_utils import (
 
 from model_trainer.core.contracts.dataset import require_corpus_format
 from model_trainer.core.contracts.queue_encoding_configs import (
+    _decode_optional_cartridge,
     _decode_optional_gguf_export,
     _decode_optional_lora,
     _decode_optional_quantization,
     decode_gguf_export_config,
     decode_lora_config,
     decode_quantization_config,
+    encode_cartridge_config,
     encode_gguf_export_config,
     encode_lora_config,
     encode_quantization_config,
@@ -61,6 +63,9 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
     """
     lora_encoded: JSONValue = (
         encode_lora_config(payload["lora"]) if payload["lora"] is not None else None
+    )
+    cartridge_encoded: JSONValue = (
+        encode_cartridge_config(payload["cartridge"]) if payload["cartridge"] is not None else None
     )
     quantization_encoded: JSONValue = (
         encode_quantization_config(payload["quantization"])
@@ -100,6 +105,7 @@ def encode_train_request_payload(payload: TrainRequestPayload) -> JSONObject:
         "hub_model_id": payload["hub_model_id"],
         "finetuning_strategy": payload["finetuning_strategy"],
         "lora": lora_encoded,
+        "cartridge": cartridge_encoded,
         "quantization": quantization_encoded,
         "gguf_export": gguf_export_encoded,
     }
@@ -257,6 +263,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
 
     # Decode nested configs via helper functions
     lora = _decode_optional_lora(obj)
+    cartridge = _decode_optional_cartridge(obj)
     quantization = _decode_optional_quantization(obj)
     gguf_export = _decode_optional_gguf_export(obj)
 
@@ -287,6 +294,7 @@ def decode_train_request_payload(obj: JSONObject) -> TrainRequestPayload:
         "hub_model_id": hub_model_id,
         "finetuning_strategy": finetuning_strategy,
         "lora": lora,
+        "cartridge": cartridge,
         "quantization": quantization,
         "gguf_export": gguf_export,
     }

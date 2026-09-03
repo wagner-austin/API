@@ -73,6 +73,36 @@ class LoraConfig(TypedDict):
     bias: Literal["none", "all", "lora_only"]
 
 
+class CartridgeConfig(TypedDict):
+    """Configuration for training a key-value prefix over a frozen base.
+
+    The counterpart of :class:`LoraConfig` for the cartridge strategy. It
+    carries only what a CALLER decides; the rest of a cartridge's shape is the
+    model's and is discovered from it rather than requested (see
+    :class:`~model_trainer.core.contracts.cartridge.CartridgeGeometry`).
+
+    ``lora_alpha`` has no analogue here and its absence is deliberate. A
+    cartridge is not a delta scaled onto a weight, it is a block of attention
+    context, so there is no scaling factor to choose and nothing to fold at
+    inference time.
+
+    Attributes:
+        enabled: Whether the caller asked for this strategy, matching the
+            shape :class:`LoraConfig` uses so the two read alike at the
+            request boundary.
+        num_slots: Prefix positions to train. The capacity knob: Eyuboglu et
+            al. (2025) sweep 128 to 8192 and report quality rising with it,
+            paid for in attention cost at every step of every sequence.
+        init_seed: Seed for drawing the initial key and value blocks. A
+            cartridge's starting point decides which optimum it reaches, so a
+            run that cannot say what it started from cannot be reproduced.
+    """
+
+    enabled: bool
+    num_slots: int
+    init_seed: int
+
+
 class QuantizationConfig(TypedDict):
     """Configuration for model quantization via bitsandbytes.
 
@@ -162,6 +192,7 @@ class ModelTrainConfig(TypedDict):
     # Strategy-specific configuration (None = not used by current strategy)
     hub_model_id: str | None  # HuggingFace model ID for pretrained loading
     lora: LoraConfig | None  # Config for lora/qlora strategies
+    cartridge: CartridgeConfig | None  # Config for the cartridge strategy
     quantization: QuantizationConfig | None  # Config for qlora strategy
     gguf_export: GgufExportConfig | None  # Config for GGUF export (lora strategies only)
 

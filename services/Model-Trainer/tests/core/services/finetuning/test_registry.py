@@ -10,6 +10,7 @@ from model_trainer.core.contracts.finetuning import (
     StrategyName,
 )
 from model_trainer.core.contracts.model import ModelTrainConfig
+from model_trainer.core.contracts.strategy_names import STRATEGY_NAMES
 from model_trainer.core.services.finetuning.registry import (
     FineTuningRegistry,
     StrategyRegistration,
@@ -221,14 +222,14 @@ class TestDefaultRegistry:
     """Tests for the default_registry() function."""
 
     def test_default_registry_contains_all_strategies(self) -> None:
-        """Test that default registry has all three strategies."""
-        reg = default_registry()
-        names = reg.list_strategies()
+        """Test that the default registry has every declared strategy.
 
-        assert "full" in names
-        assert "lora" in names
-        assert "qlora" in names
-        assert len(names) == 3
+        Asserted against ``STRATEGY_NAMES`` rather than a hand-written list,
+        so a strategy declared but never registered fails here -- which is the
+        gap a restated list would hide, and the reason the names were collapsed
+        onto one declaration in the first place.
+        """
+        assert default_registry().list_strategies() == sorted(STRATEGY_NAMES)
 
     def test_default_registry_full_strategy(self) -> None:
         """Test that full strategy is correctly registered."""

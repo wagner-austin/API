@@ -374,6 +374,7 @@ def test_process_train_job_cancelled_block(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         },

@@ -60,6 +60,7 @@ def make_test_config(lora: LoraConfig | None = None) -> ModelTrainConfig:
         "finetuning_strategy": "lora",
         "hub_model_id": "meta/llama-7b",
         "lora": lora,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

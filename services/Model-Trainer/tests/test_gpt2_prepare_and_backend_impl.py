@@ -87,6 +87,7 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -147,6 +148,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -247,6 +249,7 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -283,6 +286,7 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -327,6 +331,7 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

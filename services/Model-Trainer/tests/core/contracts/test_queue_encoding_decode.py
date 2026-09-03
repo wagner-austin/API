@@ -47,6 +47,7 @@ class TestTrainRequestPayloadEncoding:
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         }
@@ -298,6 +299,7 @@ class TestTrainJobPayloadEncoding:
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         }

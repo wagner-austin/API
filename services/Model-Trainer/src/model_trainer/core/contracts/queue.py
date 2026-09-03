@@ -5,6 +5,7 @@ from typing import Literal
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.model import (
+    CartridgeConfig,
     GgufExportConfig,
     LoraConfig,
     QuantizationConfig,
@@ -59,6 +60,7 @@ class TrainRequestPayload(TypedDict):
     hub_model_id: str | None
     finetuning_strategy: StrategyName
     lora: LoraConfig | None
+    cartridge: CartridgeConfig | None
     quantization: QuantizationConfig | None
     gguf_export: GgufExportConfig | None
 

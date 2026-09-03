@@ -144,6 +144,7 @@ def test_training_and_eval_tiny(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -324,6 +325,7 @@ def test_cancel_during_eval_returns_partial_results(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

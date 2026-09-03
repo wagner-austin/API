@@ -16,20 +16,15 @@ from platform_core.validators import (
 from model_trainer.api.validators.runs_config import (
     _decode_loss_mask_prefix_separator,
     _decode_optional_bool,
-    _decode_optional_gguf_export,
     _decode_optional_int_ge,
-    _decode_optional_lora,
-    _decode_optional_quantization,
     _narrow_device,
-    _narrow_finetuning_strategy,
     _narrow_model_family,
     _narrow_optimizer,
     _narrow_precision,
     _validate_bool,
-    _validate_hf_lm_cross_fields,
 )
+from model_trainer.api.validators.runs_hf_lm import _decode_hf_lm_fields
 from model_trainer.core.contracts.dataset import CORPUS_FORMATS, as_corpus_format
-from model_trainer.core.contracts.strategy_names import STRATEGY_NAMES, StrategyName
 
 from ..schemas.runs import (
     BaselineClozeRequest,
@@ -37,9 +32,6 @@ from ..schemas.runs import (
     ClozeRequest,
     EvaluateRequest,
     GenerateRequest,
-    GgufExportConfigRequest,
-    LoraConfigRequest,
-    QuantizationConfigRequest,
     ScoreRequest,
     TrainRequest,
 )
@@ -50,10 +42,6 @@ _DEVICES: frozenset[str] = frozenset({"cpu", "cuda", "auto"})
 _PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
-#: Derived from the StrategyName Literal rather than restated, for the same
-#: reason as _CORPUS_FORMATS below: a restated copy lets the HTTP layer accept
-#: a strategy the registry has never heard of.
-_FINETUNING_STRATEGIES: frozenset[str] = frozenset(STRATEGY_NAMES)
 #: Derived from the CorpusFormat Literal rather than restated, so the HTTP
 #: layer cannot accept a format the decoder rejects, or vice versa.
 _CORPUS_FORMATS: frozenset[str] = frozenset(CORPUS_FORMATS)
@@ -87,77 +75,11 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "hub_model_id",
         "finetuning_strategy",
         "lora",
+        "cartridge",
         "quantization",
         "gguf_export",
     }
 )
-
-
-class _HfLmFields:
-    """Container for decoded HF LM backend fields."""
-
-    hub_model_id: str | None
-    finetuning_strategy: StrategyName
-    lora: LoraConfigRequest | None
-    quantization: QuantizationConfigRequest | None
-    gguf_export: GgufExportConfigRequest | None
-
-    def __init__(
-        self,
-        hub_model_id: str | None,
-        finetuning_strategy: StrategyName,
-        lora: LoraConfigRequest | None,
-        quantization: QuantizationConfigRequest | None,
-        gguf_export: GgufExportConfigRequest | None,
-    ) -> None:
-        self.hub_model_id = hub_model_id
-        self.finetuning_strategy = finetuning_strategy
-        self.lora = lora
-        self.quantization = quantization
-        self.gguf_export = gguf_export
-
-
-def _decode_hf_lm_fields(
-    d: dict[str, JSONValue],
-    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
-) -> _HfLmFields:
-    """Decode and validate HuggingFace LM backend fields.
-
-    Args:
-        d: Raw request dictionary.
-        model_family: Validated model family.
-
-    Returns:
-        _HfLmFields container with decoded values.
-
-    Raises:
-        AppError: If validation fails.
-    """
-    hub_model_id_raw = d.get("hub_model_id")
-    hub_model_id: str | None = None
-    if hub_model_id_raw is not None:
-        hub_model_id = validate_str(hub_model_id_raw, "hub_model_id")
-
-    finetuning_strategy_raw = validate_optional_literal(
-        d.get("finetuning_strategy"), "finetuning_strategy", _FINETUNING_STRATEGIES
-    )
-    finetuning_strategy = _narrow_finetuning_strategy(finetuning_strategy_raw)
-
-    lora = _decode_optional_lora(d)
-    quantization = _decode_optional_quantization(d)
-    gguf_export = _decode_optional_gguf_export(d)
-
-    _validate_hf_lm_cross_fields(
-        model_family, hub_model_id, finetuning_strategy, lora, quantization, gguf_export
-    )
-
-    return _HfLmFields(
-        hub_model_id=hub_model_id,
-        finetuning_strategy=finetuning_strategy,
-        lora=lora,
-        quantization=quantization,
-        gguf_export=gguf_export,
-    )
 
 
 def _decode_train_request(obj: JSONValue) -> TrainRequest:
@@ -299,6 +221,7 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "hub_model_id": hf_fields.hub_model_id,
         "finetuning_strategy": hf_fields.finetuning_strategy,
         "lora": hf_fields.lora,
+        "cartridge": hf_fields.cartridge,
         "quantization": hf_fields.quantization,
         "gguf_export": hf_fields.gguf_export,
     }

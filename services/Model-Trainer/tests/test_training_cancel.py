@@ -164,6 +164,7 @@ def test_training_cancellation_with_redis(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
         },
     }

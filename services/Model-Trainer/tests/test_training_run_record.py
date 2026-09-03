@@ -326,9 +326,7 @@ class TestTheRecord:
 class TestWritingTheSidecar:
     """The record travels with the artifact, not in a log."""
 
-    def test_the_sidecar_is_named_from_the_model_directory(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_the_sidecar_is_named_from_the_model_directory(self, tmp_path: pathlib.Path) -> None:
         """Which file holds the weights differs between an adapter and a full model.
 
         Args:

@@ -138,6 +138,7 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

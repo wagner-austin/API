@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Sequence
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import torch
 
@@ -334,6 +334,90 @@ class TracedLMModelProto(LMModelProto, TracedModuleProto, Protocol):
 
     def to(self: TracedLMModelProto, device: str) -> TracedLMModelProto:
         """Move the model to a device and return it, still traceable."""
+        ...
+
+
+class KVCacheProto(Protocol):
+    """Protocol for a key-value cache handed to a model as ``past_key_values``.
+
+    Deliberately memberless, for the reason :class:`TorchStateValue` is: the
+    object is constructed by one boundary and consumed by another without
+    being introspected in between. What can be DONE to one -- installing a
+    layer's blocks -- belongs to the cache class rather than to a cache
+    instance travelling between them.
+    """
+
+
+class CacheCarryingOutProto(ForwardOutProto, Protocol):
+    """Protocol for a forward output that also carries its key-value cache.
+
+    Extends :class:`ForwardOutProto` rather than replacing it, because a
+    cached forward returns everything an uncached one does and one thing more.
+
+    ``past_key_values`` is a sequence of per-layer ``(key, value)`` pairs, each
+    shaped ``(batch, kv_heads, positions, head_dim)``. Measured 2026-09-03
+    against transformers 4.46.3: both GPT-2 and Llama return that layout from
+    a forward with ``use_cache=True``, and the head count in it is the
+    KEY-VALUE head count, which under grouped-query attention is smaller than
+    the attention head count the model advertises.
+    """
+
+    @property
+    def past_key_values(self) -> Sequence[tuple[torch.Tensor, torch.Tensor]]:
+        """Return the per-layer key and value pairs."""
+        ...
+
+
+@runtime_checkable
+class CacheCapableLMProto(LMModelProto, Protocol):
+    """A language model that can be run against a key-value cache.
+
+    THE SAME GAP :class:`TracedLMModelProto` EXISTS FOR, on a different axis.
+    :class:`LMModelProto` describes the two-argument call the training loop
+    makes, and that narrowness is deliberate -- every fake model in the suite
+    satisfies it cheaply. A transformer can do more: it can be handed a cache
+    to attend to and can hand one back. Code that needs that capability needs
+    a type that states it, rather than a wider ``forward`` on the protocol
+    everything else implements.
+
+    ``__call__`` RATHER THAN A WIDER ``forward``, for two reasons. Overriding
+    ``forward`` with extra parameters would be an incompatible override of the
+    protocol this inherits, and calling a torch module through ``__call__`` is
+    correct where calling ``.forward()`` directly is not: ``Module.__call__``
+    is what dispatches the module's registered hooks, and bypassing it silently
+    disables every one of them.
+
+    Runtime-checkable so a caller holding an :class:`LMModelProto` can narrow
+    to it with ``isinstance`` and refuse, in its own words, a model that cannot
+    host a cache -- rather than reaching for a cast.
+    """
+
+    def __call__(
+        self,
+        *,
+        input_ids: torch.Tensor,
+        labels: torch.Tensor | None = ...,
+        past_key_values: KVCacheProto | None = ...,
+        attention_mask: torch.Tensor | None = ...,
+        use_cache: bool = ...,
+    ) -> CacheCarryingOutProto:
+        """Run a forward pass, optionally against a cache.
+
+        Args:
+            input_ids: Token ids, shaped (batch, positions).
+            labels: Targets for the input's own positions, or None to run
+                without computing a loss.
+            past_key_values: Cache to attend to in front of the input, or None.
+            attention_mask: Ones over the cache and the input TOGETHER when a
+                cache is supplied. A mask covering only the input raises a
+                shape error rather than silently mis-attending -- measured
+                2026-09-03 against transformers 4.46.3.
+            use_cache: Whether to return the cache this pass produced.
+
+        Returns:
+            The model's output, carrying the loss when labels were given and
+            the cache when ``use_cache`` was set.
+        """
         ...
 
 

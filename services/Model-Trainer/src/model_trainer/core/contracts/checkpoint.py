@@ -37,9 +37,11 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.queue_encoding_configs import (
+    _decode_optional_cartridge,
     _decode_optional_gguf_export,
     _decode_optional_lora,
     _decode_optional_quantization,
+    encode_cartridge_config,
     encode_gguf_export_config,
     encode_lora_config,
     encode_quantization_config,
@@ -218,6 +220,9 @@ def encode_model_train_config(cfg: ModelTrainConfig) -> JSONObject:
         JSON-serializable dictionary with every config field.
     """
     lora_encoded: JSONValue = encode_lora_config(cfg["lora"]) if cfg["lora"] is not None else None
+    cartridge_encoded: JSONValue = (
+        encode_cartridge_config(cfg["cartridge"]) if cfg["cartridge"] is not None else None
+    )
     quantization_encoded: JSONValue = (
         encode_quantization_config(cfg["quantization"]) if cfg["quantization"] is not None else None
     )
@@ -251,6 +256,7 @@ def encode_model_train_config(cfg: ModelTrainConfig) -> JSONObject:
         "finetuning_strategy": cfg["finetuning_strategy"],
         "hub_model_id": cfg["hub_model_id"],
         "lora": lora_encoded,
+        "cartridge": cartridge_encoded,
         "quantization": quantization_encoded,
         "gguf_export": gguf_export_encoded,
     }
@@ -297,6 +303,7 @@ def decode_model_train_config(obj: JSONObject) -> ModelTrainConfig:
         "finetuning_strategy": require_strategy_name(require_str(obj, "finetuning_strategy")),
         "hub_model_id": optional_str(obj, "hub_model_id"),
         "lora": _decode_optional_lora(obj),
+        "cartridge": _decode_optional_cartridge(obj),
         "quantization": _decode_optional_quantization(obj),
         "gguf_export": _decode_optional_gguf_export(obj),
     }

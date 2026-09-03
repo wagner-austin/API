@@ -115,6 +115,7 @@ def test_training_worker_loads_pretrained_model(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         },

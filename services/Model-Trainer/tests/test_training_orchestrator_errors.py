@@ -108,6 +108,7 @@ def test_orchestrator_unsupported_model_raises() -> None:
         "hub_model_id": None,
         "finetuning_strategy": "full",
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

@@ -16,10 +16,22 @@ from platform_core.validators import (
 from model_trainer.core.contracts.strategy_names import StrategyName, require_strategy_name
 
 from ..schemas.runs import (
+    CartridgeConfigRequest,
     GgufExportConfigRequest,
     LoraConfigRequest,
     QuantizationConfigRequest,
 )
+
+#: Smallest and largest cartridge a request may ask for.
+#:
+#: One slot is the smallest object that is still a cartridge; zero would train
+#: nothing while reporting success. The ceiling is the largest size Eyuboglu et
+#: al. (2025) report measurements for, and it is a real limit rather than a
+#: round number: every slot is attended to at every position of every sequence,
+#: so the cost is carried by the whole run, and a request for a size nobody has
+#: characterised should be a deliberate change to this line.
+_MIN_SLOTS = 1
+_MAX_SLOTS = 8192
 
 _LORA_BIASES: frozenset[str] = frozenset({"none", "all", "lora_only"})
 
@@ -386,6 +398,65 @@ def _decode_quantization_config(d: dict[str, JSONValue]) -> QuantizationConfigRe
     }
 
 
+def _decode_cartridge_config(d: dict[str, JSONValue]) -> CartridgeConfigRequest:
+    """Decode a cartridge config from a request body.
+
+    Args:
+        d: The request's ``cartridge`` object.
+
+    Returns:
+        The decoded request config.
+
+    Raises:
+        AppError: With ``INVALID_INPUT`` if a field is missing, mistyped, or
+            names a slot count that is not positive.
+    """
+    enabled_raw = d.get("enabled")
+    if enabled_raw is None:
+        enabled = True
+    elif not isinstance(enabled_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="cartridge.enabled must be a boolean",
+            http_status=400,
+        )
+    else:
+        enabled = enabled_raw
+
+    return {
+        "enabled": enabled,
+        "num_slots": validate_int_range(
+            d.get("num_slots"), "cartridge.num_slots", ge=_MIN_SLOTS, le=_MAX_SLOTS
+        ),
+        "init_seed": validate_int_range(d.get("init_seed"), "cartridge.init_seed", ge=0),
+    }
+
+
+def _decode_optional_cartridge(d: dict[str, JSONValue]) -> CartridgeConfigRequest | None:
+    """Decode optional cartridge config from dict.
+
+    Args:
+        d: The request body.
+
+    Returns:
+        The decoded config, or None when the field is absent or null.
+
+    Raises:
+        AppError: With ``INVALID_INPUT`` if the field is present but is not an
+            object, or if its contents are invalid.
+    """
+    cartridge_raw = d.get("cartridge")
+    if cartridge_raw is None:
+        return None
+    if not isinstance(cartridge_raw, dict):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="cartridge must be an object",
+            http_status=400,
+        )
+    return _decode_cartridge_config(cartridge_raw)
+
+
 def _decode_optional_lora(d: dict[str, JSONValue]) -> LoraConfigRequest | None:
     """Decode optional LoRA config from dict."""
     lora_raw = d.get("lora")
@@ -465,49 +536,3 @@ def _decode_optional_gguf_export(d: dict[str, JSONValue]) -> GgufExportConfigReq
             http_status=400,
         )
     return _decode_gguf_export_config(gguf_export_raw)
-
-
-def _validate_hf_lm_cross_fields(
-    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
-    hub_model_id: str | None,
-    finetuning_strategy: StrategyName,
-    lora: LoraConfigRequest | None,
-    quantization: QuantizationConfigRequest | None,
-    gguf_export: GgufExportConfigRequest | None,
-) -> None:
-    """Validate cross-field requirements for HF LM backend."""
-    if model_family == "hf_lm" and hub_model_id is None:
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="hub_model_id is required when model_family is 'hf_lm'",
-            http_status=400,
-        )
-    if finetuning_strategy in ("lora", "qlora") and lora is None:
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message=f"lora config is required for finetuning_strategy '{finetuning_strategy}'",
-            http_status=400,
-        )
-    if finetuning_strategy == "qlora" and quantization is None:
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="quantization config is required for finetuning_strategy 'qlora'",
-            http_status=400,
-        )
-    if quantization is not None and finetuning_strategy != "qlora":
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message=(
-                f"quantization config requires finetuning_strategy 'qlora', got "
-                f"'{finetuning_strategy}'. The loader applies quantization whenever this "
-                f"config is present, so accepting it under another strategy would train a "
-                f"quantized model while reporting an unquantized one"
-            ),
-            http_status=400,
-        )
-    if gguf_export is not None and finetuning_strategy not in ("lora", "qlora"):
-        raise AppError(
-            code=ErrorCode.INVALID_INPUT,
-            message="gguf_export requires finetuning_strategy lora or qlora",
-            http_status=400,
-        )

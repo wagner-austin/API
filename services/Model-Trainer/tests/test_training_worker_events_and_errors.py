@@ -96,6 +96,7 @@ def test_emit_metrics_helpers_publish() -> None:
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -155,6 +156,7 @@ def test_process_train_job_sets_status_message_on_exception(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         },

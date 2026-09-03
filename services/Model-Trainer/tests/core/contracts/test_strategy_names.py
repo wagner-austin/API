@@ -37,7 +37,7 @@ class TestTheDeclaredNames:
         Asserted as a sorted list rather than a membership check, so a name
         that is REMOVED fails too.
         """
-        assert sorted(STRATEGY_NAMES) == ["full", "lora", "qlora"]
+        assert sorted(STRATEGY_NAMES) == ["cartridge", "full", "lora", "qlora"]
 
     def test_no_name_is_declared_twice(self) -> None:
         """A duplicate would make the registry's last registration win silently."""
@@ -50,7 +50,7 @@ class TestRequireStrategyName:
     def test_an_undeclared_name_is_refused_with_its_own_code(self) -> None:
         """Not a generic decode error: the caller picked a value that does not exist."""
         with pytest.raises(AppError) as excinfo:
-            require_strategy_name("cartridge")
+            require_strategy_name("prefix-tuning")
         assert excinfo.value.code is ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN
 
     def test_the_refusal_names_the_value_and_the_alternatives(self) -> None:
@@ -59,7 +59,7 @@ class TestRequireStrategyName:
             require_strategy_name("lorra")
         message = str(excinfo.value)
         assert "'lorra'" in message
-        assert "full, lora, qlora" in message
+        assert "cartridge, full, lora, qlora" in message
 
     def test_the_empty_string_is_refused_like_any_other_unknown(self) -> None:
         """An absent value must not arrive here as "" and be treated as a default."""

@@ -124,6 +124,7 @@ def default_registry() -> FineTuningRegistry:
         - full: Train all parameters (no adapters)
         - lora: LoRA via PEFT library
         - qlora: Quantized LoRA (4-bit + LoRA)
+        - cartridge: Trained key-value prefix over a frozen base
 
     Returns:
         Registry with all strategies registered.
@@ -153,6 +154,14 @@ def default_registry() -> FineTuningRegistry:
     )
     create_qlora_strategy: StrategyFactory = qlora_mod.create_qlora_strategy
     reg.register("qlora", StrategyRegistration(create_qlora_strategy))
+
+    # Cartridge strategy
+    cartridge_mod = __import__(
+        "model_trainer.core.services.finetuning.strategies.cartridge",
+        fromlist=["create_cartridge_strategy"],
+    )
+    create_cartridge_strategy: StrategyFactory = cartridge_mod.create_cartridge_strategy
+    reg.register("cartridge", StrategyRegistration(create_cartridge_strategy))
 
     return reg
 

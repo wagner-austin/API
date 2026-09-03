@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_core.errors import (
+    AppError,
+    ModelTrainerErrorCode,
+    model_trainer_status_for,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -13,7 +18,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
-from .model import GgufExportConfig, LoraConfig, QuantizationConfig
+from .model import CartridgeConfig, GgufExportConfig, LoraConfig, QuantizationConfig
 
 
 def encode_lora_config(config: LoraConfig) -> JSONObject:
@@ -230,6 +235,81 @@ def _decode_optional_lora(obj: JSONObject) -> LoraConfig | None:
     if isinstance(lora_raw, dict):
         return decode_lora_config(lora_raw)
     raise JSONTypeError(f"Field 'lora' must be an object or null, got {type(lora_raw).__name__}")
+
+
+def encode_cartridge_config(config: CartridgeConfig) -> JSONObject:
+    """Encode CartridgeConfig TypedDict to JSONObject for serialization.
+
+    Args:
+        config: Cartridge configuration to encode.
+
+    Returns:
+        JSON-serializable dictionary with all cartridge fields.
+    """
+    return {
+        "enabled": config["enabled"],
+        "num_slots": config["num_slots"],
+        "init_seed": config["init_seed"],
+    }
+
+
+def decode_cartridge_config(obj: JSONObject) -> CartridgeConfig:
+    """Decode JSONObject to CartridgeConfig with full validation.
+
+    The slot count is checked for positivity here rather than left to the
+    strategy: a run whose config says zero slots would otherwise be accepted
+    off the queue, allocate nothing, and train to completion having learned
+    nothing.
+
+    Args:
+        obj: JSON object to decode.
+
+    Returns:
+        Validated CartridgeConfig TypedDict.
+
+    Raises:
+        JSONTypeError: If required fields are missing or have wrong types.
+        AppError: With ``CARTRIDGE_GEOMETRY_INVALID`` if the slot count is not
+            positive.
+    """
+    num_slots = require_int(obj, "num_slots")
+    if num_slots <= 0:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_INVALID,
+            (
+                f"cartridge num_slots must be a positive count, got {num_slots}; a "
+                f"cartridge with no slots holds no trainable parameters and would "
+                f"train to completion having learned nothing"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_GEOMETRY_INVALID),
+        )
+    return CartridgeConfig(
+        enabled=require_bool(obj, "enabled"),
+        num_slots=num_slots,
+        init_seed=require_int(obj, "init_seed"),
+    )
+
+
+def _decode_optional_cartridge(obj: JSONObject) -> CartridgeConfig | None:
+    """Decode optional cartridge config from JSONObject.
+
+    Args:
+        obj: Parent JSON object containing optional 'cartridge' field.
+
+    Returns:
+        Decoded CartridgeConfig or None if field is null/missing.
+
+    Raises:
+        JSONTypeError: If field has wrong type.
+    """
+    cartridge_raw = obj.get("cartridge")
+    if cartridge_raw is None:
+        return None
+    if isinstance(cartridge_raw, dict):
+        return decode_cartridge_config(cartridge_raw)
+    raise JSONTypeError(
+        f"Field 'cartridge' must be an object or null, got {type(cartridge_raw).__name__}"
+    )
 
 
 def _decode_optional_quantization(obj: JSONObject) -> QuantizationConfig | None:

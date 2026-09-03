@@ -54,6 +54,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -151,6 +152,7 @@ def test_char_lstm_invalid_size_raises(settings_with_paths: Settings, tmp_path: 
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -197,6 +199,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -318,6 +321,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -405,6 +409,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -506,6 +511,7 @@ def test_char_lstm_forward_pass_shapes(settings_with_paths: Settings, tmp_path: 
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

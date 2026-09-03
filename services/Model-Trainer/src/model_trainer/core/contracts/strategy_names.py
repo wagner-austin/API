@@ -38,14 +38,15 @@ from platform_core.errors import (
     model_trainer_status_for,
 )
 
-StrategyName = Literal["full", "lora", "qlora"]
+StrategyName = Literal["full", "lora", "qlora", "cartridge"]
 """How a model is adapted before training.
 
 ``full`` trains every parameter. ``lora`` and ``qlora`` train low-rank adapters
-over a frozen base, the second over a quantized one.
+over a frozen base, the second over a quantized one. ``cartridge`` trains a
+key-value prefix over a frozen base, touching no weight at all.
 """
 
-STRATEGY_NAMES: tuple[StrategyName, ...] = ("full", "lora", "qlora")
+STRATEGY_NAMES: tuple[StrategyName, ...] = ("full", "lora", "qlora", "cartridge")
 """Every declared strategy name, in registration order.
 
 Iterable form of :data:`StrategyName`, for error messages and for the test that
@@ -76,6 +77,8 @@ def require_strategy_name(value: str) -> StrategyName:
         return "lora"
     if value == "qlora":
         return "qlora"
+    if value == "cartridge":
+        return "cartridge"
     declared = ", ".join(sorted(STRATEGY_NAMES))
     raise AppError(
         ModelTrainerErrorCode.STRATEGY_NAME_UNKNOWN,

@@ -55,6 +55,7 @@ def test_char_lstm_gradient_flow(settings_with_paths: Settings, tmp_path: Path) 
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -125,6 +126,7 @@ def test_char_lstm_long_input_truncation(settings_with_paths: Settings, tmp_path
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -185,6 +187,7 @@ def test_char_lstm_generation_determinism(settings_with_paths: Settings, tmp_pat
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -296,6 +299,7 @@ def test_char_lstm_continued_training_reduces_loss(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -367,6 +371,7 @@ def test_char_lstm_continued_training_reduces_loss(
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -480,6 +485,7 @@ def test_char_lstm_prepare_raises_when_tokenizer_none(settings_with_paths: Setti
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -518,6 +524,7 @@ def test_char_lstm_prepare_raises_when_tokenizer_id_none(settings_with_paths: Se
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }
@@ -567,6 +574,7 @@ def test_char_lstm_evaluate_raises_when_tokenizer_id_none(settings_with_paths: S
         "finetuning_strategy": "full",
         "hub_model_id": None,
         "lora": None,
+        "cartridge": None,
         "quantization": None,
         "gguf_export": None,
     }

@@ -438,6 +438,7 @@ def test_training_cancel_race_avoids_upload(
             "hub_model_id": None,
             "finetuning_strategy": "full",
             "lora": None,
+            "cartridge": None,
             "quantization": None,
             "gguf_export": None,
         },
