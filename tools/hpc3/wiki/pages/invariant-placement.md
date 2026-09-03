@@ -5,16 +5,19 @@ hubs: [submission]
 related: ["[[submission-rules]]", "[[image-build-flow]]", "[[environment-pins]]", "[[unsupported-shapes]]"]
 source_paths:
   - "src/hpc3/core/preflight.py"
-  - "src/hpc3/contracts/image_spec.py"
+  - "src/hpc3/contracts/project.py"
+  - "src/hpc3/cli/_config.py"
 source_git_blobs:
   "src/hpc3/core/preflight.py": "c642109e539eb3a0a7cfb97c6e44ff161fe7cb0a"
-  "src/hpc3/contracts/image_spec.py": "ef0e7c294cd0c8cca9e515605e0be486a6d77f78"
+  "src/hpc3/contracts/project.py": "c2ff0d9ae27e41570308a457bd875b6c3acb0251"
+  "src/hpc3/cli/_config.py": "81b8e8ee8fc1a7f8a747da7fa481fee84b114a71"
 provenance:
   - "PROJECT_UNIMAGED observed raised from contracts/workspace.py at decode, 2026-09-02, while that file was uncommitted work in progress"
   - "decode_workspace observed reached from cli/_config.py, the shared loader, 2026-09-02"
+  - "811c64cb landed the fix on 2026-09-03 by splitting the reader, not by moving the rule; this page's original prescription was superseded and is corrected in place"
   - "hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit refused with PROJECT_UNIMAGED, 2026-09-02"
   - "hpc3-preflight on the same project after its image was built: OK tankpit.tankpit-sim-smoke, 2026-09-02"
-fact_checked: 2026-09-02
+fact_checked: 2026-09-03
 confidence: high
 ---
 
@@ -93,17 +96,36 @@ say about itself.
 
 ## The correction
 
-Move the check to the submit path, beside `ENV_PATH_MISSING`. Every property
-the rule was written for survives: no project runs unimaged, no exemption
-field exists, `cleargbm` is still refused — at submission, which is where the
-refusal was always meant to bite. What changes is that the commands which
-produce an image may read a project that does not yet have one, which is the
-only way a first image can ever exist.
+**What this page originally prescribed was to move the check to the submit
+path, beside `ENV_PATH_MISSING`. That is not what shipped, and what shipped is
+better.** Commit `811c64cb` fixed it by splitting the READER instead of
+relocating the rule.[^8]
 
-**This is a move, not an addition.** The decode-level check is deleted
-outright rather than deprecated in place; nothing forwards from the old site
-to the new one, and no flag preserves the old behaviour. A shim here would
-reintroduce exactly the exemption the rule exists to deny.
+The invariant stays in decode. What changed is that the onboarding path no
+longer decodes the project registry at all:[^9]
+
+| loader | reads | used by |
+|---|---|---|
+| `load_workspace_connection` → `WorkspaceConnection` | cluster, host, root, ledger, quiet_seconds | the onboarding/capture path |
+| `load_workspace` → `Workspace` | all of that **plus the project registry** | everything else |
+
+`PROJECT_UNIMAGED` now lives in `contracts/project.py`, raised from
+`require_image`.[^9] Capture never reaches it, because capture asks for a
+connection and a connection has no projects in it.
+
+**Why that beats the move.** Relocating the rule to the submit path would have
+left every command still reading the registry, with the refusal merely firing
+later — the onboarding command would still decode a project it cannot satisfy,
+and would be spared only by the accident that nothing checked it yet. Under
+the split, the onboarding path cannot trip the rule because it never loads the
+thing the rule is about. And the distinction is carried by two **types**
+rather than by a convention about which layer calls what, so a new command
+picks its guarantee by choosing a return type and cannot silently pick wrong.
+
+**It is still a move, not an addition.** The decode-level check on the shared
+loader is gone rather than deprecated in place; nothing forwards from the old
+site, and no flag preserves the old behaviour. A shim here would reintroduce
+exactly the exemption the rule exists to deny.
 
 ## The general test
 
@@ -114,6 +136,11 @@ Before adding a refusal, ask which question it answers.
 - *May this project act?* → the submit path. Anything about the world outside
   the document: does the path exist, does the digest resolve, is the
   environment what it claims.
+
+And a third question this incident added, which is the one the adopted fix
+actually answers: *does this caller even need that part of the document?* A
+rule that only bites callers who had no business reading the field is not
+mislocated — the READING is.
 
 A rule of the second kind placed in the first location will not fail
 loudly. It will pass for every project that is already finished and refuse
@@ -126,4 +153,6 @@ somebody tries to start something.
 [^4]: `grep -rln decode_workspace src/hpc3/cli/` → `_config.py` (the shared loader) and `research_index.py`. Measured 2026-09-02.
 [^5]: `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit --commit bfdce7a5 --base-image python:3.11.16-slim-bookworm --env-prefix /opt/env --first-party platform_core,monorepo_guards,tankpit_bot --out specs/tankpit-image.json`, run 2026-09-02, refused with `PROJECT_UNIMAGED`.
 [^6]: Decoding each committed workspace individually on 2026-09-02: `hpc3-floor.json`, `hpc3-mi.json`, `hpc3-rusted.json`, `hpc3-tankpit.json` and `hpc3-turkic-lstm.json` all OK; `hpc3.json` alone refused. `hpc3-research-index --write` failed with the same error.
-[^7]: Regenerated 2026-09-02 by importing the generator from a `git archive` extract of HEAD, whose contract predates the rule, with `index_path` and `runs_directory` rebound to the real paths. All six rows restored and `tankpit`'s image digest picked up; one line changed.
+[^7]: `tools/hpc3/src/hpc3/core/research_index.py`, regenerated 2026-09-02 by importing the generator from a `git archive` extract of HEAD, whose contract predates the rule, with `index_path` and `runs_directory` rebound to the real paths. All six rows restored and `tankpit`'s image digest picked up; one line changed.
+[^8]: Commit `811c64cb`, "Every registered project ships an image, and onboarding can still make one" — 15 files, including a new 333-line `src/hpc3/contracts/project.py` and 63 added lines in `src/hpc3/cli/_config.py`. Read 2026-09-03.
+[^9]: `src/hpc3/contracts/project.py:233` raises `Hpc3ErrorCode.PROJECT_UNIMAGED` from `require_image`; `src/hpc3/cli/_config.py:49` is `load_workspace_connection`, whose docstring states it leaves "the project registry unread" for the onboarding path. `grep -rn PROJECT_UNIMAGED src/hpc3/` now returns `contracts/project.py` and a docstring reference in `contracts/workspace.py`, and no longer the shared loader's decode path. Measured 2026-09-03.

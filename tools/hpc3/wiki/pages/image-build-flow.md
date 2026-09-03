@@ -21,7 +21,7 @@ source_git_blobs:
   "src/hpc3/contracts/image_spec_fields.py": "88d23d5fc4d2646f89f75b1ad5c85d7df9c4c4b2"
   "src/hpc3/cli/image.py": "fa9f24c8972291940866c7fd0a790e5ec45f3215"
   "src/hpc3/cli/image_build.py": "690afc1d5b6cc9732ead9a3d619346b50f563643"
-  "src/hpc3/cli/image_capture.py": "5f17c7e23d4453374a04b79c5f638a392568e82c"
+  "src/hpc3/cli/image_capture.py": "af0766bc1d4da403e2e566d6f0540bc3e1766f40"
   "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"
   "src/hpc3/core/image_capture.py": "dc635e24b966209acc57e44e0f130c55015a9417"
   "README.md": "f52e3c3fc49ebeadf34f228748f207253ad726c0"
