@@ -68,9 +68,15 @@ was invisible to everything except the one case it made impossible.[^5]
 
 It also refused a committed workspace. `runs/hpc3.json` declares `cleargbm`,
 which has no image, so that document stopped decoding — and because
-`hpc3-research-index` reads every workspace, the generated project table
-could no longer be regenerated at all. One unimaged project took a tool down
-for all six.[^6]
+`hpc3-research-index` reads every workspace, the ordinary invocation of the
+generator fails outright. One unimaged project takes a tool down for all
+six.[^6]
+
+The table is still *recoverable*, which is worth stating so nobody reads the
+above as data loss: running the generator against a contract without the rule
+regenerates it correctly. That is a workaround available to someone who
+knows the rule is new and uncommitted, not a property anyone should rely
+on.[^7]
 
 ## Why the obvious repairs are worse
 
@@ -120,3 +126,4 @@ somebody tries to start something.
 [^4]: `grep -rln decode_workspace src/hpc3/cli/` → `_config.py` (the shared loader) and `research_index.py`. Measured 2026-09-02.
 [^5]: `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit --commit bfdce7a5 --base-image python:3.11.16-slim-bookworm --env-prefix /opt/env --first-party platform_core,monorepo_guards,tankpit_bot --out specs/tankpit-image.json`, run 2026-09-02, refused with `PROJECT_UNIMAGED`.
 [^6]: Decoding each committed workspace individually on 2026-09-02: `hpc3-floor.json`, `hpc3-mi.json`, `hpc3-rusted.json`, `hpc3-tankpit.json` and `hpc3-turkic-lstm.json` all OK; `hpc3.json` alone refused. `hpc3-research-index --write` failed with the same error.
+[^7]: Regenerated 2026-09-02 by importing the generator from a `git archive` extract of HEAD, whose contract predates the rule, with `index_path` and `runs_directory` rebound to the real paths. All six rows restored and `tankpit`'s image digest picked up; one line changed.

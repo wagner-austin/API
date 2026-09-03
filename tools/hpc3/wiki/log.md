@@ -87,7 +87,9 @@ Written from a session that onboarded a new research project (`tankpit`) end to 
 
 **Measured:** `hpc3-image-capture --config runs/hpc3-tankpit.json --project tankpit` refused with `PROJECT_UNIMAGED`, whose message instructs the reader to run the command that just refused them. To obtain an image you must already have one.
 
-**Second, live:** `runs/hpc3.json` (cleargbm, committed) stopped decoding, and because `hpc3-research-index` reads every workspace it failed outright. After imaging `tankpit` the project table could not be regenerated and still says tankpit is unimaged. One unimaged project took a tool down for all six.
+**Second, live:** `runs/hpc3.json` (cleargbm, committed) stopped decoding, and because `hpc3-research-index` reads every workspace it fails outright. One unimaged project takes a tool down for all six.
+
+**Correction, same day:** I first recorded that the project table therefore "could not be regenerated". That was wrong, and the operator caught it — I already had the mechanism in hand, having used a `git archive` extract of HEAD to get past the same rule for the image build. Running the generator from that extract, with `index_path` and `runs_directory` rebound to the real paths, regenerated the table correctly: all six rows, one line changed, `tankpit`'s image digest picked up. The tool being broken for its ordinary invocation is true; "the table cannot be fixed" was not.
 
 **The correction, filed as task 1ba0aac4:** move the check to the submit path. Every property survives — no project runs unimaged, no exemption field, cleargbm still refused at submission. It is a MOVE: the decode-site check is deleted outright, with no shim, wrapper, fallback, flag, declarable field or legacy path, per operator constraint. The declarable alternatives (`--allow-unimaged`, `status: provisioning`) are worse because they let a project assert its own compliance.
 
