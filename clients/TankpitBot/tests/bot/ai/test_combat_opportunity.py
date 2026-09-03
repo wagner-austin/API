@@ -65,7 +65,7 @@ def _locked_ctx(
             "mode_state": "ENGAGE",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": tanks["50"]["x"],
             "combat_target_y": tanks["50"]["y"],
             "last_shot_target_id": 50,

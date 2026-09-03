@@ -49,4 +49,4 @@ def test_adjacent_engage_presses_the_pin_once_over_the_wire() -> None:
     assert own_mines, "the 0x4B placement never landed in the bot's own mine registry"
     # The pin never displaced the fight: shots still went out.
     assert link.sent_commands.count("shoot") >= 1
-    assert bot._ai_state["mine_pin_target_id"] == SEAM_ENEMY_ID
+    assert str(SEAM_ENEMY_ID) in bot._ai_state["mine_pin_presses"]

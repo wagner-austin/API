@@ -242,7 +242,7 @@ def test_hunt_refresh_engages_visible_adjacent_locked_target() -> None:
             "mode_state": "REFRESH",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": 101,
             "combat_target_y": 100,
         }
@@ -271,7 +271,7 @@ def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() ->
             "mode_state": "REFRESH",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": 120,
             "combat_target_y": 100,
         }
@@ -340,7 +340,7 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
             "mode_state": "REFRESH",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": 120,
             "combat_target_y": 100,
         }
@@ -375,7 +375,7 @@ def test_hunt_acquire_resumes_visible_locked_target() -> None:
             "mode_state": "ACQUIRE",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": 101,
             "combat_target_y": 100,
         }
@@ -409,7 +409,7 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
             "mode_state": "ACQUIRE",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
-            "mine_pin_target_id": 50,
+            "mine_pin_presses": {"50": "0,0"},
             "combat_target_x": 115,
             "combat_target_y": 100,
         }

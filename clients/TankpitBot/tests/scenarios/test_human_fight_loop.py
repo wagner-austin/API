@@ -71,7 +71,7 @@ def _engaged_fight() -> BotScenario:
     assert pin_tick["command"]["cmd_type"] == "mine_drop"
     assert pin_tick["behavior"]["reason_kind"] == "mine_pin"
     assert pin_tick["updated_ai_state"]["combat_target_id"] == YUPPLER_ID
-    assert pin_tick["updated_ai_state"]["mine_pin_target_id"] == YUPPLER_ID
+    assert pin_tick["updated_ai_state"]["mine_pin_presses"] == {str(YUPPLER_ID): "100,100"}
     scenario.advance_clock()
 
     lock_tick = scenario.decide()

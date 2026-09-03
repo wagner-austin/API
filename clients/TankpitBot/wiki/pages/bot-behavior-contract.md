@@ -11,8 +11,8 @@ source_paths:
   - "src/tankpit_bot/sniffer"
   - "runs/bot/latest.events.jsonl"
 source_git_blobs:
-  "src/tankpit_bot/bot": "c54e809621f084ed509209409e77f05cfae21ac5"
-  "src/tankpit_bot/sniffer": "107e1484d8ab0750043b46b03291e3e3572c2731"
+  "src/tankpit_bot/bot": "06e83fdc0946248f37670424a19ed52bd06a05af"
+  "src/tankpit_bot/sniffer": "a36c9d4efac6747ea871e2a8f9639d5c81e6898c"
 fact_checked: "2026-08-07"
 confidence: high
 verified: 2026-06-20 (anchored to specific code paths + integration tests)
@@ -114,7 +114,7 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 | MUST | **Wartime readiness floor (operator ruling 2026-09-01, verbatim: "like 80% equipment and 50% radar?"):** while `human_war_is_live` — a CONSENTED enemy human standing in the registry `alive` with a presence stamp fresher than 30 s — `hunt_entry_permitted` drops from the full peacetime bar to duals+homings ≥ `(cap*4)//5` and extra radars ≥ `cap//2`. The fuel bar and the gatherer role bar are untouched. The war ends on the human's death (liveness flip) or logout (staleness — a logout emits no deactivation, the Yuppler-ghost precedent, so liveness alone would hold wartime forever). Motivating fight: yuppler farming radars while TESLA was consented and artax fought alone. Verified by `tests/bot/ai/test_mode_gates.py::TestWartimeReadinessFloor`. |
 | MUST | **Sibling locks focus humans, spread bots (operator observation 2026-09-01: "all four bots are locked on the same target ... stacked on a practice bot rather than spreading"):** in the threat sort, a sibling-engaged HUMAN ranks first (focus fire) and a sibling-engaged PRACTICE BOT ranks last; the spread component is senior to the pays-points preference. Verified by `tests/bot/ai/test_threat_ranking.py`. |
 | MUST | **Recruits pay nothing ([[game-rules]] kill-points floor, 19/19 measured):** the threat sort prefers rank-1+ targets over rank-0 within a tier — ordering, never exclusion, so a recruits-only map still gets farmed for spoils and unknown-rank far tanks (registry rank 0) stay huntable. |
-| MUST | **The mine pin (operator order 2026-09-01: "when we get or teleport adjacent to an enemy we should be able to use mines to pin them in"):** the first engage tick within Chebyshev 2 of the target presses `CMD_MINE` once (3x3 self-centered, 10 flat, [[mine-mechanics]]), latched per target id in `mine_pin_target_id`, fuel-gated above `fuel_low_threshold + 10`; every later tick of the engagement shoots. Verified by `tests/bot/ai/test_mine_pin.py` and the pin-then-fight opening of `tests/scenarios/test_human_fight_loop.py`. |
+| MUST | **The mine pin (operator order 2026-09-01: "when we get or teleport adjacent to an enemy we should be able to use mines to pin them in"):** the first engage tick within Chebyshev 2 of the target presses `CMD_MINE` once (3x3 self-centered, 10 flat, [[mine-mechanics]]), recorded per target id with its placer tile in `mine_pin_presses` (a map, not a scalar — the 2026-09-01 A→B→A→B lock shuttle re-mined two tiles through the scalar latch, [[flag-triage-20260902]] row 7; already-pressed ground is skipped even against a fresh target), fuel-gated above `fuel_low_threshold + 10`; every later tick of the engagement shoots. Verified by `tests/bot/ai/test_mine_pin.py` and the pin-then-fight opening of `tests/scenarios/test_human_fight_loop.py`. |
 | MUST NOT | Enter HUNT while `self_state` is None (lifecycle 1.1). |
 | Verified by | `tests/bot/ai/test_mode_controller.py`; `tests/bot/ai/test_strategy_coverage.py::TestHuntOnlyWhenFull`. |
 

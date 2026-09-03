@@ -143,6 +143,41 @@ class TestAIStateDetail:
         with pytest.raises(ValueError, match="greeted_tank_ids"):
             decode_ai_state(encoded)
 
+    def test_encode_decode_roundtrip_with_mine_pin_presses(self) -> None:
+        """Encode/decode preserves the per-target mine-pin press map."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        assert original["mine_pin_presses"] == {}
+        state = AIStateDict(**{**original, "mine_pin_presses": {"50": "210,57", "77": "199,42"}})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["mine_pin_presses"] == {"50": "210,57", "77": "199,42"}
+
+    def test_decode_missing_mine_pin_presses_raises(self) -> None:
+        """Missing ``mine_pin_presses`` raises — no back-compat default."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["mine_pin_presses"]
+        with pytest.raises(ValueError, match="mine_pin_presses"):
+            decode_ai_state(encoded)
+
+    def test_decode_non_object_mine_pin_presses_raises(self) -> None:
+        """A non-object ``mine_pin_presses`` field raises."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        encoded["mine_pin_presses"] = "50:210,57"
+        with pytest.raises(ValueError, match="mine_pin_presses must be an object"):
+            decode_ai_state(encoded)
+
+    def test_decode_mine_pin_presses_non_str_value_raises(self) -> None:
+        """Decode rejects mine_pin_presses with non-str tile values."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        encoded["mine_pin_presses"] = {"50": 21057}
+        with pytest.raises(ValueError, match="mine_pin_presses values must be str"):
+            decode_ai_state(encoded)
+
     def test_decode_missing_manual_mode_raises(self) -> None:
         """Missing ``manual_mode`` raises — no back-compat default."""
         original = make_initial_ai_state()

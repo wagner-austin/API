@@ -17,12 +17,12 @@ source_paths:
   - "src/tankpit_bot/state/scan_coverage.py"
   - "src/tankpit_bot/sniffer/world_service.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/block_harvest.py": "c57b3272341a541aeffb0441d5156febf3e8ca94"
-  "src/tankpit_bot/bot/ai/quad_sweep.py": "b94b237d3e51fbb291d87e84e8740aae9da2997f"
-  "src/tankpit_bot/bot/ai/combat_break.py": "0c1454184769c23e315e87c9d68b249c55b84adb"
-  "src/tankpit_bot/bot/ai/mine_pin.py": "73685b65d26e43cda9f9ef0f308c66060bb3e3ae"
+  "src/tankpit_bot/bot/ai/block_harvest.py": "36583d8cfa1c9ebfa43a3ebe48b44ddd3f0caad0"
+  "src/tankpit_bot/bot/ai/quad_sweep.py": "99f6254cb5dc91fa22c561996e420b4be1528373"
+  "src/tankpit_bot/bot/ai/combat_break.py": "295d58704a009d1f30fa2f09f1f6d0984c2bb6a7"
+  "src/tankpit_bot/bot/ai/mine_pin.py": "fd87a23c17de213fd7b7a9782dfd374226b8833b"
   "src/tankpit_bot/bot/ai/scope_scout.py": "ac49a8329539e1f4b27b896bce05a5423ab3191d"
-  "src/tankpit_bot/state/scan_coverage.py": "7255804c3e14c0c869a0f8fe85691b779f9ade0c"
+  "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
   "src/tankpit_bot/sniffer/world_service.py": "9a2ba3beff7e69e172442c19122da8a2c88d629e"
 fact_checked: "2026-09-02"
 confidence: high
@@ -38,8 +38,9 @@ Eight operator flags raised while watching **Artax in the PRACTICE room**
 > **Release under test: `v0.1.0-fa1c1ae7`**, which was 24 commits behind
 > `HEAD` when these artifacts were produced. In particular the per-room
 > rank floor (`bf5ec9bd`), the container claim mutex (`b5c89f6c`) and the
-> denial-memory fix (`648fa151`) are NOT in it. Blob pins above are
-> `fa1c1ae7`'s, not HEAD's.
+> denial-memory fix (`648fa151`) are NOT in it. Blob pins above track
+> HEAD as fixes land (originally they were `fa1c1ae7`'s); the release
+> tree named below is where the as-flagged sources live.
 
 Evidence: `runs/bot/artax/latest.events.jsonl` inside the release tree
 (`tankpit-releases/v0.1.0-fa1c1ae7/clients/TankpitBot/`), ~46 min,
@@ -271,7 +272,7 @@ in the bot is the 10-minute harvest veto.
 | 4 | Landing radar fires on already-covered ground | **fixed 2026-09-03** — structural: the landing radar was already gated by `radar_spend_worthwhile`, whose uncovered-count now reads the settled floor, so landings on ever-scanned settled ground skip the spend. Combat-landing scans deliberately untouched (they reveal MINES, which are dynamic) |
 | 5 | Intra-viewport teleports (143) | **fixed 2026-09-03** (as row 3's symptom) — lane attribution showed 139 of the measured teleports were `forage_frontier_hop` chasing clock-rotted blocks; with block coverage and visit tombstones on the settled floor the churn source is gone. The hop lanes' own contribution (~14) was already closed by the 2026-09-02 walk-territory law |
 | 6 | Break floor absolute, not rank-relative | **fixed 2026-09-03** — the three fuel reserves are now the RANK-4 REFERENCE tuning, read rank-scaled through `DecideCtx.fuel_low_floor` / `hunt_reserve_floor` / `engagement_budget` (`physics.capacity.rank_scaled_reserve`, integer-exact at lieutenant, claim-bound below). The measured 21:43:44 full-tank break FLIPS: floor 408→343 vs projection 360, the private holds and finishes; the identical fight at the reference rank still breaks, exactly as tuned. RESIDUAL, now row 11 |
-| 7 | Mine pin single-slot latch | **open** |
+| 7 | Mine pin single-slot latch | **fixed 2026-09-03** — `mine_pin_target_id` scalar replaced by the per-target `mine_pin_presses` map ({str(id): "x,y" placer tile}), the same scalar→map cure `greeted_tank_ids` got on 2026-07-31 for the identical ping-pong shape. The A→B→A→B shuttle now buys exactly one press per target, and the recorded placer tile skips any press that would re-lay an identical 3×3 from already-pressed ground — the measured incident's two re-mined tiles are barred by BOTH rules. Regression pinned in `tests/bot/ai/test_mine_pin.py::test_an_intervening_target_does_not_rearm_the_press` |
 | 8 | Ferry scout has no negative memory (1/31) | **open** — NOT fixed by the settled law (an earlier board note overclaimed this): the scout's precheck compares against the current window only, and per-goal look history is a separate design |
 | 9 | Three dead forked constants in `world_service.py` | **fixed 2026-09-03** — deleted; grep confirms the only `_FAILED_MOVE_TTL_MS` / `_FAILED_SCAN_VIEWPORT_TTL_MS` / `_RADAR_CACHE_REFRESH_WINDOW_MS` symbols left are the live ones in `world_service_movement.py` / `world_service_radar.py` |
 | 10 | Six undocumented `*_MS` constants | **fixed 2026-09-03** — three were row 9's dead forks (deleted); the three live bare ones (`_FAILED_MOVE_TTL_MS`, `_FAILED_SCAN_VIEWPORT_TTL_MS`, `_RADAR_CACHE_REFRESH_WINDOW_MS`) now carry derivation docstrings tying the 30 s family to the ~2 s replan cycle with early knowledge-based release, and the 2 s pairing window to its single-consume lifetime. Every `*_MS` constant in `src/` is now documented |

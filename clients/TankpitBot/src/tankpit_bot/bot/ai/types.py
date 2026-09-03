@@ -257,11 +257,19 @@ class AIStateDict(TypedDict):
             yet -- the live double-shot at (162,94), 01:59:57/:59,
             run bot-20260730-015x.
         mine_clearance_shot_ms: Dispatch timestamp of that shot.
-        mine_pin_target_id: Tank id whose engagement already spent its
+        mine_pin_presses: Targets whose engagement already spent its
             one mine-pin press (operator order 2026-09-01: pin an
-            adjacent enemy with the 3x3 ``CMD_MINE`` pattern), or -1.
-            Re-arms by lock movement: a NEW target id differs from
-            the latch, so its first close engage tick presses again.
+            adjacent enemy with the 3x3 ``CMD_MINE`` pattern),
+            {str(tank_id): "x,y" placer tile of that press}. A PER-ID
+            map, not a last-id scalar, for the same reason as
+            :attr:`greeted_tank_ids`: the scalar latch re-armed
+            whenever ANOTHER target intervened, and the 2026-09-01
+            A->B->A->B lock shuttle bought four presses on two tiles
+            (flag-triage-20260902 row 7). The placer tile travels
+            with the id so a press from an already-pressed tile is
+            skipped even against a new target — the identical 3x3
+            pattern buys no new ground. Positional, not clocked,
+            like ferry memory.
         greeted_tank_ids: Tank IDs already given the one-shot HELLO,
             {str(tank_id): greeting timestamp_ms}. A PER-ID map, not
             a last-id scalar: the 2026-07-31 two-human arena soak
@@ -362,7 +370,7 @@ class AIStateDict(TypedDict):
     live_teleports: int
     mine_clearance_aim_key: str
     mine_clearance_shot_ms: int
-    mine_pin_target_id: int
+    mine_pin_presses: dict[str, str]
     greeted_tank_ids: dict[str, int]
     pursuit_shot_target_id: int
     pursuit_shot_ms: int
@@ -464,7 +472,7 @@ def make_initial_ai_state(
         live_teleports=0,
         mine_clearance_aim_key="",
         mine_clearance_shot_ms=0,
-        mine_pin_target_id=-1,
+        mine_pin_presses={},
         greeted_tank_ids={},
         pursuit_shot_target_id=-1,
         pursuit_shot_ms=0,

@@ -400,7 +400,7 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "live_teleports": state["live_teleports"],
         "mine_clearance_aim_key": state["mine_clearance_aim_key"],
         "mine_clearance_shot_ms": state["mine_clearance_shot_ms"],
-        "mine_pin_target_id": state["mine_pin_target_id"],
+        "mine_pin_presses": dict(state["mine_pin_presses"]),
         "greeted_tank_ids": dict(state["greeted_tank_ids"]),
         "pursuit_shot_target_id": state["pursuit_shot_target_id"],
         "pursuit_shot_ms": state["pursuit_shot_ms"],
@@ -484,6 +484,30 @@ def _require_str_int_mapping(data: JSONObject, key: str) -> dict[str, int]:
     return result
 
 
+def _require_str_str_mapping(data: JSONObject, key: str) -> dict[str, str]:
+    """Decode a dict[str, str] field from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Dict mapping string keys to string values.
+
+    Raises:
+        ValueError: If format is invalid.
+    """
+    raw = data.get(key)
+    if not isinstance(raw, dict):
+        raise ValueError(f"{key} must be an object")
+    result: dict[str, str] = {}
+    for k, v in raw.items():
+        if not isinstance(v, str):
+            raise ValueError(f"{key} values must be str, got {type(v).__name__}")
+        result[k] = v
+    return result
+
+
 def decode_ai_state(data: JSONObject) -> AIStateDict:
     """Decode AIStateDict from JSON with validation.
 
@@ -537,7 +561,7 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         live_teleports=require_int(data, "live_teleports"),
         mine_clearance_aim_key=require_str(data, "mine_clearance_aim_key"),
         mine_clearance_shot_ms=require_int(data, "mine_clearance_shot_ms"),
-        mine_pin_target_id=require_int(data, "mine_pin_target_id"),
+        mine_pin_presses=_require_str_str_mapping(data, "mine_pin_presses"),
         greeted_tank_ids=_require_str_int_mapping(data, "greeted_tank_ids"),
         pursuit_shot_target_id=require_int(data, "pursuit_shot_target_id"),
         pursuit_shot_ms=require_int(data, "pursuit_shot_ms"),

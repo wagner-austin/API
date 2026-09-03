@@ -13,9 +13,14 @@ which keeps the pin harassment, not a cage.
 
 The press spends the tick a shot would have used, so the doctrine is
 ONE press per engagement: the first engage tick within reach drops,
-every later tick shoots. The latch is ``mine_pin_target_id`` — it
-re-arms when the lock moves to a new enemy, and a re-engage of the
-same target (resume, pursuit return) never pays a second press.
+every later tick shoots. The latch is ``mine_pin_presses`` — a
+per-target map (the scalar it replaced re-armed whenever another
+target intervened: the 2026-09-01 A→B→A→B lock shuttle bought four
+presses on two tiles, flag-triage-20260902 row 7). Each entry also
+records the placer tile, so a press that would re-lay an identical
+3x3 from already-pressed ground is skipped even against a fresh
+target. A re-engage of the same target (resume, pursuit return)
+never pays a second press.
 """
 
 from __future__ import annotations
@@ -45,12 +50,18 @@ def mine_pin_decision(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDi
         target: The engaged combat target.
 
     Returns:
-        The mine-drop decision (latching the per-target press), or
-        ``None`` when this engagement already pressed, the target is
-        beyond :data:`MINE_PIN_REACH_TILES`, or fuel is too close to
-        the survival floor for a 10-fuel press.
+        The mine-drop decision (recording the per-target press and its
+        placer tile), or ``None`` when this target already got its
+        press, an earlier press was laid from this exact tile (the
+        identical 3x3 buys no new ground), the target is beyond
+        :data:`MINE_PIN_REACH_TILES`, or fuel is too close to the
+        survival floor for a 10-fuel press.
     """
-    if ctx.ai_state["mine_pin_target_id"] == target["tank_id"]:
+    presses = ctx.ai_state["mine_pin_presses"]
+    if str(target["tank_id"]) in presses:
+        return None
+    press_tile = f"{ctx.self_state['x']},{ctx.self_state['y']}"
+    if press_tile in presses.values():
         return None
     reach = max(
         abs(ctx.self_state["x"] - target["x"]),
@@ -87,7 +98,10 @@ def mine_pin_decision(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDi
         AIStateDict(
             **{
                 **_set_combat_target(ctx.base, target),
-                "mine_pin_target_id": target["tank_id"],
+                "mine_pin_presses": {
+                    **ctx.base["mine_pin_presses"],
+                    str(target["tank_id"]): press_tile,
+                },
             }
         ),
         ctx.equip,
