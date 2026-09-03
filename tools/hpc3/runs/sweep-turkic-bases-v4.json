@@ -1,0 +1,52 @@
+{
+  "project": "turkic-lstm",
+  "name": "bases-v4",
+  "experiment": {
+    "kind": "char-lstm-base-training",
+    "corpus": "rebuild_2026-09/corpora_clean_v4",
+    "equalized_char_budget": "11658775",
+    "langs": "tr,az,kk,ky,uz,ug,fi",
+    "matches_paper": "overleaf-tu-paper/LM_MI_LSA_template.tex",
+    "supersedes": "sweep-turkic-bases",
+    "corpus_provenance": "runs/stage-turkic-v4-corpora.json",
+    "wandb": "offline",
+    "wandb_dir": "/pub/wagnera3/turkic-lstm"
+  },
+  "members": [
+    {
+      "suffix": "tr",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang tr --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/tr_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/tr_best.pt"
+    },
+    {
+      "suffix": "az",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang az --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/az_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/az_best.pt"
+    },
+    {
+      "suffix": "kk",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang kk --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/kk_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/kk_best.pt"
+    },
+    {
+      "suffix": "ky",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang ky --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/ky_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/ky_best.pt"
+    },
+    {
+      "suffix": "uz",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang uz --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/uz_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/uz_best.pt"
+    },
+    {
+      "suffix": "ug",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang ug --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/ug_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/ug_best.pt"
+    },
+    {
+      "suffix": "fi",
+      "command": "bash -c \"WANDB_MODE=offline WANDB_DIR=/pub/wagnera3/turkic-lstm python -m char_lstm.train --lang fi --corpus-dir /pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4 --checkpoint-dir /pub/wagnera3/LSTM/checkpoints_v4 && test -f /pub/wagnera3/LSTM/checkpoints_v4/fi_best.pt\"",
+      "artifact": "/pub/wagnera3/LSTM/checkpoints_v4/fi_best.pt"
+    }
+  ]
+}

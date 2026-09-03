@@ -1,0 +1,52 @@
+{
+  "destination": "/pub/wagnera3/LSTM/rebuild_2026-09/corpora_clean_v4",
+  "provenance": {
+    "corpus": "Turkic char-LSTM corpora v4 (rebuild_2026-09)",
+    "source_tree": "~/PROJECTS/LSTM/rebuild_2026-09/corpora_clean_v4",
+    "source_repo_commit": "e944150",
+    "equalized_char_budget": "11,658,775 characters, Uzbek binding -- unchanged from v3",
+    "supersedes": "rebuild_2026-08/corpora_clean_v3, which is not merely older but wrong for two languages. kk_ipa.rules, ky_ipa.rules and uzc_ipa.rules wrote the letter shcha as an alveolo-palatal, U+0255 plus the length mark. McCollum & Chen's Kazakh consonant chart (JIPA 51(2), p. 277) has columns Bilabial, Dental, Post-alveolar, Palatal, Velar and Uvular -- no alveolo-palatal column, hence no cell that segment could occupy -- and the prose under the chart enumerates what Kazakh does borrow: the Russian labiodental fricatives [f] and [v], and [h] from Arabic. U+0255 is not among them. The rules now emit U+0283 plus the length mark, the post-alveolar the chart prints.",
+    "why_it_matters": "U+0255 occurred in Kazakh and Kyrgyz and in no other language of the seven, so it was a character each model saw in two languages and never in the other five. symbol_map.csv records that same shape for the Uyghur glottal-stop artifact as having systematically inflated Uyghur distances. 987 occurrences in Kazakh, 891 in Kyrgyz, 1,878 in roughly 30M characters.",
+    "what_did_not_change": "The substitution is two characters for two characters, so no file length, no chars_written and no budget moves; Uzbek still binds at 11,658,775. Five of the seven files below -- az, fi, tr, ug, uz -- are BYTE-IDENTICAL to v3 and their sha256 values are the same strings as in stage-turkic-v3-corpora.json. Every lines_in, lines_kept and chars_written in the cleaning manifest matches v3 exactly. Only oscar_kk_ipa.txt and oscar_ky_ipa.txt move.",
+    "what_did_change_besides_the_digests": "Kazakh and Kyrgyz each drop from 39 distinct characters to 38, because U+0255 merges into a U+0283 the corpus already contained. The paper's corpora table reports a Vocabulary column; those two cells are stale.",
+    "build_method": "Applied to v3's raw transliterated text rather than by re-downloading OSCAR: a fresh download samples different lines and would yield a different corpus rather than a corrected one, breaking comparability with everything already reported. Exact rather than approximate -- the old and new rule files differ only in the shcha line, and applying the new rules was checked against applying the old rules and then substituting, over 2,944 exhaustive probes per language (every ordered pair over the full Cyrillic alphabet, plus shcha/vowel triples), with zero mismatches. The substitution was done on bytes; an earlier attempt used Python text mode and its newline translation silently turned every CRLF into CR-CRLF, which the cleaner reported as 20,000 input lines instead of 10,000.",
+    "checkpoints_trained_on_v3": "The ledger carries 39 turkic-lstm rows from 2026-08-28 and 2026-08-29. Any Kazakh or Kyrgyz checkpoint under /pub/wagnera3/LSTM/checkpoints was trained on the superseded corpus and needs re-training against this one. The other five languages are unaffected, their corpora being byte-identical."
+  },
+  "files": [
+    {
+      "name": "oscar_az_ipa.txt",
+      "sha256": "e3dbdaa758d2b3db97012ebde1c78ac1b07335edc659d76e7dd345a1ed0fb33e",
+      "size_bytes": 14738481
+    },
+    {
+      "name": "oscar_fi_ipa.txt",
+      "sha256": "dff6e3e4aed891c721d48a17858b3c3f6734f7ea352d249d887a0b46a0d5aaff",
+      "size_bytes": 14275783
+    },
+    {
+      "name": "oscar_kk_ipa.txt",
+      "sha256": "d1fe98d2fc7e30e4f9984923fcfa2d56b11838af738359d37053fd053450a6ec",
+      "size_bytes": 15294526
+    },
+    {
+      "name": "oscar_ky_ipa.txt",
+      "sha256": "ea4b907bb95f40783237a1c237ae23ae516c78300d4e382cb01a65d135791662",
+      "size_bytes": 14816815
+    },
+    {
+      "name": "oscar_tr_ipa.txt",
+      "sha256": "19049664c3dd7cdeb875c1de0882fd6ff8a69baff9cd44fe82fffd3449da69ff",
+      "size_bytes": 13978998
+    },
+    {
+      "name": "oscar_ug_ipa.txt",
+      "sha256": "63cd9a8dda95952c2adc74c54cd5bbeb6add18852ca5be1260c025b558fddc93",
+      "size_bytes": 14491824
+    },
+    {
+      "name": "oscar_uz_ipa.txt",
+      "sha256": "35d3d502ffdefa5b18f2e7d19445c7b3b865931faade5dfa77746066ba041255",
+      "size_bytes": 13096424
+    }
+  ]
+}
