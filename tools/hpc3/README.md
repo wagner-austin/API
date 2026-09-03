@@ -63,10 +63,11 @@ reasons are measured, not stylistic
 ([budget model](wiki/pages/budget-model.md)).
 
 **Adding a project** is one entry in `projects` for any single-node job, GPU
-or CPU (see `examples/` for complete workspaces). A project that requests a
-GPU must declare an `image`
-([image build flow](wiki/pages/image-build-flow.md)); `"gpu": null` is the
-one spelling of CPU-only. Project names are lowercase letters, digits and
+or CPU (see `examples/` for complete workspaces). Every project must declare
+an `image` ([image build flow](wiki/pages/image-build-flow.md)) — CPU-only
+projects included, because what an image pins is not the card, it is the
+compiler, the libc and the BLAS build that decide a timing. `"gpu": null` is
+the one spelling of CPU-only. Project names are lowercase letters, digits and
 hyphens, at most 24 characters.
 
 **Run, sweep and chain documents** say only what is specific to that work:
@@ -121,7 +122,12 @@ A full workspace — two projects, one GPU and one CPU:
       "minutes": 360,
       "requeue": true,
       "checkpoint_steps": 1,
-      "env_path": "/pub/wagnera3/envs/sirius",
+      "image": {
+        "path": "/pub/wagnera3/images/sirius-v3/sirius.sif",
+        "sha256": "d3e9daf77afae31ca644b8cf9d9d25b604ec35bd34965b94f930e3a3b0a1f88a",
+        "binds": ["/pub/wagnera3"]
+      },
+      "env_path": "/opt/env",
       "pinned_packages": {},
       "deterministic": false,
       "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
