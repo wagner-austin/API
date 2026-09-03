@@ -265,6 +265,49 @@ class TracedModuleProto(Protocol):
         """Call ``hook`` before this module computes, until the handle is removed."""
         ...
 
+    def get_submodule(self, target: str) -> TracedModuleProto:
+        """Return the submodule at a dotted path.
+
+        The addressed counterpart of ``named_modules``, which walks. A caller
+        that already knows the path it wants should not have to scan the graph
+        to reach it.
+
+        Args:
+            target: Dotted path, e.g. ``transformer.h.17.mlp.c_proj``.
+
+        Returns:
+            The submodule, itself traceable.
+
+        Raises:
+            AttributeError: If no submodule exists at that path. Torch's
+                message names an attribute rather than the path a caller
+                supplied, so callers that resolve a configured path establish
+                membership against ``named_modules`` first and raise their own
+                error. See ``model_trainer.core.services.model.editing.sites``.
+        """
+        ...
+
+    def get_parameter(self, target: str) -> EditableParameterProto:
+        """Return the parameter at a dotted path, writable.
+
+        The write access is on the PARAMETER type rather than on a second
+        model protocol, which keeps the boundary where the danger is: a caller
+        holding a model can read every parameter through ``named_parameters``
+        and can only change one by naming it here.
+
+        Args:
+            target: Dotted path, e.g.
+                ``transformer.h.17.mlp.c_proj.weight``.
+
+        Returns:
+            The parameter, writable through :class:`EditableParameterProto`.
+
+        Raises:
+            AttributeError: If no parameter exists at that path, with the same
+                caveat and the same remedy as ``get_submodule``.
+        """
+        ...
+
     @property
     def training(self) -> bool:
         """Whether the module is in training mode.
@@ -291,4 +334,41 @@ class TracedLMModelProto(LMModelProto, TracedModuleProto, Protocol):
 
     def to(self: TracedLMModelProto, device: str) -> TracedLMModelProto:
         """Move the model to a device and return it, still traceable."""
+        ...
+
+
+class EditableParameterProto(Protocol):
+    """The parameter surface an in-place weight edit needs.
+
+    Separate from :class:`ParameterLike` and :class:`NamedParameter`, which
+    describe a parameter that can be READ. This one can also be written, and
+    the distinction is the safety property: only code that asked for this type
+    can change a model's weights, and every fake in the suite that merely
+    reports a shape stays unaffected.
+
+    ``copy_`` rather than ``add_`` is the single mutator, deliberately. An
+    edit computes the whole new matrix and then installs it, so applying an
+    update and restoring a snapshot are the same operation with different
+    arguments, and there is no second code path whose arithmetic could drift
+    from the first.
+    """
+
+    @property
+    def shape(self: EditableParameterProto) -> torch.Size:
+        """Return the shape of the parameter tensor."""
+        ...
+
+    def detach(self: EditableParameterProto) -> torch.Tensor:
+        """Return the same storage, off the autograd graph."""
+        ...
+
+    def copy_(self: EditableParameterProto, src: torch.Tensor) -> torch.Tensor:
+        """Overwrite this parameter's storage with ``src``.
+
+        Args:
+            src: Tensor to copy in. Must match this parameter's shape.
+
+        Returns:
+            This parameter's tensor, now holding ``src``'s values.
+        """
         ...

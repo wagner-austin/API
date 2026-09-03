@@ -150,6 +150,24 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CLOZE_ITEM_UNSCOREABLE = "CLOZE_ITEM_UNSCOREABLE"
     CLOZE_FINGERPRINT_MISSING = "CLOZE_FINGERPRINT_MISSING"
 
+    # Knowledge-editing errors
+    #
+    # One code per way a weight edit can be wrong, because they are not one
+    # event. A module that is absent is a configuration mistake the caller can
+    # fix; a key orthogonal to the input is a property of the model at that
+    # position and the same request may succeed elsewhere; a restore that
+    # disagrees with its snapshot means the model in memory is no longer the
+    # one the measurement was taken on, and nothing after it can be believed.
+    EDIT_MODULE_NOT_FOUND = "EDIT_MODULE_NOT_FOUND"
+    EDIT_WEIGHT_NOT_MATRIX = "EDIT_WEIGHT_NOT_MATRIX"
+    EDIT_UPDATE_SHAPE_MISMATCH = "EDIT_UPDATE_SHAPE_MISMATCH"
+    EDIT_KEY_ORTHOGONAL_TO_INPUT = "EDIT_KEY_ORTHOGONAL_TO_INPUT"
+    EDIT_PROMPT_PLACEHOLDER_INVALID = "EDIT_PROMPT_PLACEHOLDER_INVALID"
+    EDIT_SUBJECT_NOT_IN_PROMPT = "EDIT_SUBJECT_NOT_IN_PROMPT"
+    EDIT_ACTIVATION_NOT_CAPTURED = "EDIT_ACTIVATION_NOT_CAPTURED"
+    EDIT_RESTORE_MISMATCH = "EDIT_RESTORE_MISMATCH"
+    EDIT_VERIFICATION_FAILED = "EDIT_VERIFICATION_FAILED"
+
     # Checkpoint / resume errors
     CHECKPOINT_NOT_FOUND = "CHECKPOINT_NOT_FOUND"
     CHECKPOINT_CORRUPT = "CHECKPOINT_CORRUPT"
@@ -179,7 +197,7 @@ class Hpc3ErrorCode(ErrorCodeBase):
     """
 
     # Submission rules -- each maps to one refusal in decode_job_spec.
-    GPU_RUN_UNIMAGED = "GPU_RUN_UNIMAGED"
+    PROJECT_UNIMAGED = "PROJECT_UNIMAGED"
     GPU_TYPE_UNPINNED = "GPU_TYPE_UNPINNED"
     IMAGED_COMMAND_NEEDS_A_SHELL = "IMAGED_COMMAND_NEEDS_A_SHELL"
     RUN_REMOVES_IMAGE = "RUN_REMOVES_IMAGE"
@@ -464,6 +482,18 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # server stored a number it cannot say the configuration of. That is a
     # fault in what was written, not a thing the caller asked for wrongly.
     ModelTrainerErrorCode.CLOZE_FINGERPRINT_MISSING: 500,
+    # Knowledge-editing errors. The split is 400 for a request the caller
+    # composed wrongly, 409 for a request that is well formed and cannot be
+    # satisfied at the named site, and 500 for a fault in what the edit did.
+    ModelTrainerErrorCode.EDIT_MODULE_NOT_FOUND: 404,
+    ModelTrainerErrorCode.EDIT_WEIGHT_NOT_MATRIX: 409,
+    ModelTrainerErrorCode.EDIT_UPDATE_SHAPE_MISMATCH: 409,
+    ModelTrainerErrorCode.EDIT_KEY_ORTHOGONAL_TO_INPUT: 409,
+    ModelTrainerErrorCode.EDIT_PROMPT_PLACEHOLDER_INVALID: 400,
+    ModelTrainerErrorCode.EDIT_SUBJECT_NOT_IN_PROMPT: 400,
+    ModelTrainerErrorCode.EDIT_ACTIVATION_NOT_CAPTURED: 500,
+    ModelTrainerErrorCode.EDIT_RESTORE_MISMATCH: 500,
+    ModelTrainerErrorCode.EDIT_VERIFICATION_FAILED: 500,
     # Checkpoint / resume errors
     ModelTrainerErrorCode.CHECKPOINT_NOT_FOUND: 404,
     ModelTrainerErrorCode.CHECKPOINT_CORRUPT: 500,
