@@ -310,6 +310,46 @@ lieutenant and proportional elsewhere:
 }
 ```
 
+## Live validation (2026-09-03, rows 1-6)
+
+One bounded 16-minute Practice session from HEAD (`9993aa4e`), same
+account, same room class as the flagged run, measured with one
+instrument over both artifacts (`validate_run.py`, proven against the
+baseline first). The room stayed SETTLED throughout — zero foreign
+humans observed — so the settled-knowledge law ran in its
+permanent-knowledge regime the whole session.
+
+| instrument | baseline (74 min) | validation (16 min) |
+|---|---|---|
+| radars within 7 tiles of an earlier radar | 56% (132/235) | **8% (4/45)** |
+| frontier journeys → unique blocks | ~260 → 65, one block targeted 12× | **28 → 28, ZERO re-targets**[^v1] |
+| intra-viewport pickup→teleport→pickup | 173 | 23[^v2] |
+| adjacent scope-shift reversals | 204 | 8 |
+| livelock signature | one 9-minute stall | none |
+| `progress_stalled` releases | n/a | **0** |
+| engagement breaks at ≥1000 fuel | 8 | **0** (11 breaks, all mid-fuel) |
+| kills per minute | 0.28 | **0.56** |
+
+The kill rate DOUBLED while radar spend per minute fell — the ticks
+the clock churn used to eat went to fighting (`shoot_target` is the
+top decision reason, 106 of 420; in the baseline it was
+`forage_frontier_hop` at 435 of 1,954).
+
+One teardown observation, pre-existing and not from these fixes: the
+session ended cleanly (`quit_game`, artifacts saved) and then browser
+teardown exceeded its 30 s watchdog, forcing a nonzero exit that
+stops `make run` before its scorecard step. Flagged on the board;
+the artifacts are complete regardless.
+
+[^v1]: Journey-level, by TARGET block with the map-open-defer
+      duplicate collapsed. Nine blocks were LANDED in twice — landing
+      displacement across block edges, not re-targets.
+[^v2]: By lane: 11 `forage_frontier_hop` (adjacent-block exploration
+      geometry), 7 `equipment_hop` (walk-blocked near stock served by
+      design under the 2026-09-02 walk-territory law), 3 combat
+      approaches, 2 fuel. The pathological class — clock-rot
+      re-visits — is gone.
+
 ## The pattern worth carrying forward
 
 Four independent flags, one shape: **a clock or a scalar standing in for a
