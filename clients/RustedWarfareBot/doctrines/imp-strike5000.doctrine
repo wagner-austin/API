@@ -1,0 +1,46 @@
+# One knob off flame-nocover: strike 0 -> 5000, the release window that
+# opens when the strongest rival's army value falls 5,000 below its
+# recent peak. Graduated from impsearch1 (log 2026-09-03), the first
+# machine search of Impossible's fortress vocabulary: the only arm
+# positive in both rounds with consistent magnitude (+0.317 then +0.271
+# paired margin delta at sd ~0.7-0.8) while nukes1 collapsed and every
+# guns arm read negative. At a 0-win rung the margin is the only
+# readable signal, so this arm's next step is a 48-pair margin
+# CONFIRMATION panel, not the win bar -- nothing here is adopted, and
+# the ledger's no-wins-no-adoption law stands.
+name strike5000
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 5000
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 2
+close 3
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
