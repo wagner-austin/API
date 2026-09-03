@@ -6,4 +6,6 @@ The cross-service platform that makes the monorepo run — Redis (queues + RQ), 
 
 [Reduction order is an environment variable read once](../pages/determinism-env-read-once-at-library-load.md) -- why the cuBLAS / cuBLASLt / BLAS-thread strings live in `platform_core`; setting them after library load is accepted in silence; zero cuBLASLt workspace removes split-K, what that measurably buys across cards, and what it explicitly does not buy
 
+[Guard-pass as a fine-tune metric](../pages/code-style-guard-pass-instrument-limits.md) -- what code-style-eval can and cannot measure: truncation gates the metric before any checker runs, the sandbox's import boundary, why installing the corpus's deps changes the instrument and must enter the fingerprint, and the exact-McNemar power the 392-item corpus does not have
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
