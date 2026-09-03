@@ -9,7 +9,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/contracts/job.py": "45f6be817460501c520ecca58b4f1dbc7341f4d0"
   "README.md": "c4cdcc31ae83beaede3c2635a943ddc0bcf0c083"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-03
 confidence: high
 ---
 
