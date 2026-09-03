@@ -90,9 +90,23 @@ class CartridgeConfig(TypedDict):
         enabled: Whether the caller asked for this strategy, matching the
             shape :class:`LoraConfig` uses so the two read alike at the
             request boundary.
-        num_slots: Prefix positions to train. The capacity knob: Eyuboglu et
-            al. (2025) sweep 128 to 8192 and report quality rising with it,
-            paid for in attention cost at every step of every sequence.
+        num_slots: Prefix positions to train, and the capacity knob. Eyuboglu
+            et al. (2025) sweep 128 to 8192 and report quality rising with it.
+
+            IT IS PAID FOR TWICE. The prefix is attended to at every position
+            of every sequence, and it OCCUPIES POSITIONS IN THE MODEL'S
+            WINDOW: a cartridge of ``n`` slots leaves ``n`` fewer for the
+            actual input, and exceeding the window raises torch's
+            ``IndexError: index out of range in self`` from inside the
+            position embedding, naming neither the cartridge nor the limit.
+
+            Measured on this repository's tiny rung (a 64-position model),
+            returns knee sharply by about 8 slots and the knee is set by the
+            base model rather than by how much the corpus holds -- a corpus
+            with sixteen distinct structures needed no more slots than one
+            with a single structure, it simply had a lower ceiling. Sizes in
+            the paper's range assume a base large enough to exploit them.
+            See ``tests/test_cartridge_capacity.py``.
         init_seed: Seed for drawing the initial key and value blocks. A
             cartridge's starting point decides which optimum it reaches, so a
             run that cannot say what it started from cannot be reproduced.
