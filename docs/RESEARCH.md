@@ -291,7 +291,14 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 
   **The evidence ladder, stated so nobody reads it as more than it is:**
   same-process replay ✓, cross-process on one host ✓, **cross-node on the
-  cluster ✗ — not measured.** `rusted` is the standing warning here: its
+  cluster ✓ — measured 2026-09-03, and on one pair only.** Jobs `55715577`
+  and `55718398` produced a byte-identical `world.json`
+  (`673447d2e720812d…`) across two different NODES (`hpc3-15-23`,
+  `hpc3-15-25`), two different IMAGES (`b838e0242ecc`, `0cfdd5592a1a`) and
+  the code change between them. That is a stronger result than the flag
+  needed and a weaker one than `rusted`'s: this is a single pair, where
+  rusted's panel was twelve seeds across two arms. One pair cannot see an
+  intermittent divergence, which is precisely the failure rusted found. `rusted` is the standing warning here: its
   panel found cross-invocation replay "achievable on this runtime and does
   not always happen", with two members bit-exact across nodes 40 minutes
   apart while their counterparts moved (`9ae66117`), and it declared
