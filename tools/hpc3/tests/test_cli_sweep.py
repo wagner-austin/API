@@ -285,7 +285,9 @@ class TestTriageCli:
         # id-restricted squeue. The account enumeration still is, and must be:
         # a fully closed ledger says nothing about what the cluster is holding
         # now, and this early return used to exit 0 before asking.
-        assert [c.split(" ", 1)[0] for c in second.commands()] == ["squeue"]
+        # The bitstring prefix rides every parsed squeue; the command's
+        # identity is the word after it.
+        assert [c.split(" ")[1] for c in second.commands()] == ["squeue"]
         assert "--me" in second.commands()[0]
 
     def test_the_queue_is_not_asked_about_a_job_that_has_finished(
@@ -307,7 +309,7 @@ class TestTriageCli:
         # The id-restricted query is the one that must not run. The account
         # enumeration is also a squeue and always runs, so asserting on the
         # bare word would now pass for the wrong reason.
-        assert not any(command.startswith("squeue -h -j") for command in fake_run.commands())
+        assert not any("squeue -h -j" in command for command in fake_run.commands())
 
     def test_the_queue_is_asked_only_about_the_ids_that_are_pending(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -332,7 +334,7 @@ class TestTriageCli:
         fake_run.add("date +%s", stdout="now 1000\n")
 
         triage_cli.main(self._config(tmp_path))
-        queue_calls = [c for c in fake_run.commands() if c.startswith("squeue -h -j")]
+        queue_calls = [c for c in fake_run.commands() if "squeue -h -j" in c]
         assert len(queue_calls) == 1
         assert "-j 102" in queue_calls[0]
         assert "101" not in queue_calls[0]

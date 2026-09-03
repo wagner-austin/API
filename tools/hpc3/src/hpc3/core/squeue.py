@@ -40,6 +40,16 @@ holding four GPUs indistinguishable from one the scheduler has not looked at.
 
 _EXPECTED_COLUMNS = 3
 
+#: Environment prefix for every squeue whose ids get parsed. Slurm caps a
+#: job array's task-id expression at SLURM_BITSTR_LEN bytes (default 64)
+#: and TRUNCATES past it -- a sparse convergence resubmission with
+#: scattered indices produced ``55732071_[99,101-103,111-114,12`` with
+#: its bracket never closed, and the parser rightly refused it
+#: (ARRAY_ID_UNPARSABLE, 2026-09-03, measured live: the same queue row
+#: printed whole under this prefix). 4096 bytes holds any selection a
+#: thousand-task array can express.
+_BITSTR = "SLURM_BITSTR_LEN=4096 "
+
 
 def squeue_command(job_ids: Sequence[str]) -> str:
     """Build the pending-reason query for one or more jobs.
@@ -58,7 +68,7 @@ def squeue_command(job_ids: Sequence[str]) -> str:
     """
     if len(job_ids) == 0:
         raise ValueError("squeue_command requires at least one job id")
-    return f"squeue -h -j {','.join(job_ids)} -t PD -o {SQUEUE_FORMAT!r}"
+    return f"{_BITSTR}squeue -h -j {','.join(job_ids)} -t PD -o {SQUEUE_FORMAT!r}"
 
 
 def account_command() -> str:
@@ -73,7 +83,7 @@ def account_command() -> str:
     Returns:
         A ``squeue`` command line covering every state, header suppressed.
     """
-    return f"squeue --me -h -o {ACCOUNT_FORMAT!r}"
+    return f"{_BITSTR}squeue --me -h -o {ACCOUNT_FORMAT!r}"
 
 
 def _split_row(line: str, fmt: str) -> tuple[str, str, str]:

@@ -31,7 +31,11 @@ class TestTheQuery:
     def test_it_names_no_job_ids(self) -> None:
         """An id-restricted query cannot return a job we do not know about,
         which is the only thing this query is for."""
-        assert account_command() == "squeue --me -h -o '%i|%j|%T'"
+        # The SLURM_BITSTR_LEN prefix is load-bearing: the default 64-byte
+        # cap TRUNCATED a sparse array's task-id expression mid-bracket
+        # ('55732071_[99,101-103,111-114,12') and the id parser rightly
+        # refused it (2026-09-03, measured live either way).
+        assert account_command() == "SLURM_BITSTR_LEN=4096 squeue --me -h -o '%i|%j|%T'"
 
     def test_it_asks_for_state_rather_than_reason(self) -> None:
         """A running job's reason is 'None', which would make it look like a
