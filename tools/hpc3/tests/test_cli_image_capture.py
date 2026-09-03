@@ -126,6 +126,36 @@ class TestParseSymbols:
             _ = capture_cli.parse_symbols("  ,  ")
 
 
+class TestParseExtraIndexUrls:
+    """No extra index is an answer, and more than one has to be sayable.
+
+    Unlike ``--symbols``, emptiness here is legitimate: a project drawing
+    every wheel from PyPI genuinely has no additional index. The flag used
+    to be mandatory AND single-valued, which made both of those unsayable.
+    """
+
+    def test_the_flag_being_absent_is_no_extra_index(self) -> None:
+        """``None`` is what the parser sees when the flag was never given."""
+        assert capture_cli.parse_extra_index_urls(None) == []
+
+    def test_one_index(self) -> None:
+        assert capture_cli.parse_extra_index_urls("https://download.pytorch.org/whl/cu124") == [
+            "https://download.pytorch.org/whl/cu124"
+        ]
+
+    def test_several_indexes_keep_their_order(self) -> None:
+        """The field is ordered because pip consults them in order."""
+        assert capture_cli.parse_extra_index_urls("https://a.invalid, https://b.invalid") == [
+            "https://a.invalid",
+            "https://b.invalid",
+        ]
+
+    @pytest.mark.parametrize("raw", ["", "   ", " , ", ",,"])
+    def test_a_value_carrying_no_index_is_no_index(self, raw: str) -> None:
+        """Separators without content say the same thing as omission."""
+        assert capture_cli.parse_extra_index_urls(raw) == []
+
+
 class TestOnboardingAProjectThatIsNotRegisteredYet:
     """The route that exists because registration now requires an image.
 
@@ -289,6 +319,41 @@ class TestCapture:
             "model_trainer_server-0.1.0-py3-none-any.whl",
             "platform_core-0.1.0-py3-none-any.whl",
         ]
+
+    def test_omitting_the_index_flag_captures_no_extra_index(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The whole command runs without the flag, and records the truth.
+
+        This is the case the old ``require_flag`` made impossible. A CPU-only
+        project has no additional index, and the only value available to
+        satisfy a mandatory flag was PyPI itself -- so the spec recorded the
+        default index as an addition to the default index.
+        """
+        _workspace(tmp_path)
+        fake_run.add("bin/python", stdout=_FREEZE)
+        tokens = _args(tmp_path)
+        flag_at = tokens.index("--extra-index-url")
+        del tokens[flag_at : flag_at + 2]
+        assert "--extra-index-url" not in tokens
+
+        assert capture_cli.main(tokens) == 0
+
+        out = tmp_path / "specs" / "abl-image.json"
+        spec = decode_image_spec(load_json_str(out.read_text(encoding="utf-8")))
+        assert spec["extra_index_urls"] == []
+
+    def test_two_indexes_survive_the_round_trip_in_order(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The contract is a list; capture used to be able to write only one."""
+        out = _capture(
+            tmp_path,
+            fake_run,
+            **{"--extra-index-url": "https://first.invalid,https://second.invalid"},
+        )
+        spec = decode_image_spec(load_json_str(out.read_text(encoding="utf-8")))
+        assert spec["extra_index_urls"] == ["https://first.invalid", "https://second.invalid"]
 
     def test_pinned_packages_become_the_version_assertions(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

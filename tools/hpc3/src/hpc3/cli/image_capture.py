@@ -10,6 +10,14 @@ Usage:
         --extra-index-url https://download.pytorch.org/whl/cu124 \\
         --out specs/abl-image.json
 
+``--extra-index-url`` is OPTIONAL and takes a comma-separated list, in the
+order pip should consult them. Omit it entirely for a project whose wheels
+all come from PyPI; that captures ``"extra_index_urls": []``, which is the
+honest answer. It used to be mandatory and single-valued, and both halves of
+that were wrong -- a CPU-only project had to invent one, and the only thing
+available to invent was PyPI itself, so the spec recorded the default index
+as an addition to the default index.
+
 Usage, ONBOARDING a project that is not registered yet -- same flags plus
 ``--env-path``, which names the host directory to probe:
     hpc3-image-capture --config hpc3.json --project newcomer \
@@ -100,6 +108,35 @@ _FLAGS = (
 
 SYMBOL_SEPARATOR = ":"
 LIST_SEPARATOR = ","
+
+
+def parse_extra_index_urls(raw: str | None) -> list[str]:
+    """Parse the additional package indexes a caller declares, if any.
+
+    Args:
+        raw: The comma-separated flag value, or ``None`` when the flag was
+            not given at all.
+
+    Returns:
+        The indexes in the order written, which is the order pip consults
+        them. ``None`` and a value of only separators both give ``[]`` --
+        no additional index, which is the ordinary case and a real answer
+        rather than a missing one.
+
+        The list is what :class:`~hpc3.contracts.image_spec.ImageSpec`
+        declares, and it stays a required field on the spec: the document
+        always states how many extra indexes were used, including when the
+        number is none. What changed is that the CLI no longer demands the
+        caller invent one. Requiring the flag meant a project drawing every
+        wheel from PyPI had to name an index anyway, and the only candidate
+        was PyPI, so specs recorded the default index as an addition to
+        itself. Capturing exactly one was the second half of the same
+        defect, since the field is ordered precisely because a project can
+        need more than one.
+    """
+    if raw is None:
+        return []
+    return [entry.strip() for entry in raw.split(LIST_SEPARATOR) if entry.strip() != ""]
 
 
 def parse_symbols(raw: str) -> list[SymbolCheck]:
@@ -315,7 +352,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # operating-system layer from a pip listing would record packages
         # nobody chose, so the layer is declared by hand or not at all.
         system_packages=[],
-        extra_index_urls=[cli_args.require_flag(parsed, _EXTRA_INDEX_FLAG)],
+        extra_index_urls=parse_extra_index_urls(parsed.get(_EXTRA_INDEX_FLAG)),
         requirements=requirements,
         wheels=wheels,
         # A REGISTERED project already declares which versions its environment
@@ -358,7 +395,14 @@ def entrypoint() -> None:
     raise SystemExit(_fatal.run(main))
 
 
-__all__ = ["LIST_SEPARATOR", "SYMBOL_SEPARATOR", "entrypoint", "main", "parse_symbols"]
+__all__ = [
+    "LIST_SEPARATOR",
+    "SYMBOL_SEPARATOR",
+    "entrypoint",
+    "main",
+    "parse_extra_index_urls",
+    "parse_symbols",
+]
 
 
 if __name__ == "__main__":
