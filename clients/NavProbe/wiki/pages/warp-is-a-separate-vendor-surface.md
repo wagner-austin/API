@@ -8,10 +8,10 @@ source_paths:
   - "src/navprobe/adapters/mjx_warp_render.py"
   - "tests/adapters/test_mjx_warp_bindings.py"
 source_git_blobs:
-  "src/navprobe/adapters/mjx_warp_bindings.py": "5b35d7fedcd8f51cf9fcdb0dc88f7f2ae5a471cc"
-  "src/navprobe/adapters/mujoco_bindings.py": "4c271831d631dd97a50a9a6129fd7d1abf367aa2"
+  "src/navprobe/adapters/mjx_warp_bindings.py": "a2a8fdfa9ee65d6cac09fd9c15818d39111d9284"
+  "src/navprobe/adapters/mujoco_bindings.py": "2665203e9f51764e84020b2e7fcca1d69a2ec5b1"
   "src/navprobe/adapters/mjx_warp_render.py": "898c44998cd0d22b65901c73453c940b081c50ac"
-  "tests/adapters/test_mjx_warp_bindings.py": "d383a1051a002dfff5c15a463645337255b0b1f7"
+  "tests/adapters/test_mjx_warp_bindings.py": "b7bf8ede34c9e1e4e2d1b0b3350f8019ff517205"
 provenance:
   - "mujoco-warp 3.11.0"
 fact_checked: 2026-08-13
@@ -37,6 +37,8 @@ A Protocol loose enough to cover both would have declared a surface neither vend
 
 Exactly one thing: compiling MJCF. `mujoco.MjModel.from_xml_string` is the same call with the same signature for both backends, so it lives once in `mujoco_bindings.py` and both binding modules import the compiled-model Protocol from there.[^1]
 
+The claim is about what the adapters **import**, not about what `mujoco_bindings.py` contains, and the distinction became load-bearing on 2026-08-30: that module grew `MjDataProtocol`, `MjDataLoaderProtocol` and `ForwardProtocol` for the collision-pair work, so it now holds three members neither adapter touches. Both still import `MjModelProtocol` and nothing else, so "exactly one" is unchanged — but it is now a fact about two import lines rather than about the size of the shared module, and re-checking it means reading those lines rather than the module.[^4]
+
 That extraction happened because the second adapter forced the question. Written independently, there would have been two declarations of `from_xml_string`, free to drift into disagreeing about a signature only one of them had checked — and the drift test for one would not have covered the other.
 
 ## Mutation makes the drift tests carry more weight
@@ -52,3 +54,4 @@ So every Warp drift test asserts a difference rather than a return value: `step`
 [^1]: `src/navprobe/adapters/mujoco_bindings.py` — `MjModelProtocol`, `MjModelLoaderProtocol`, `MujocoModuleProtocol`, `load_mujoco`; imported by both `mjx_bindings.py` and `mjx_warp_bindings.py`.
 [^2]: `tests/adapters/test_mjx_warp_bindings.py::TestDeclaredKeywordNames` — `test_step_mutates_the_state_in_place`, `test_render_writes_into_the_context`, `test_assign_writes_through_to_the_device`.
 [^3]: `src/navprobe/adapters/mjx_warp_render.py` — `MjWarpRenderSimulator.__init__` creates the context per instance; the factory shares only the compiled and placed model.
+[^4]: `src/navprobe/adapters/mjx_warp_bindings.py:25` and `src/navprobe/adapters/mjx_bindings.py:31` — both read `from navprobe.adapters.mujoco_bindings import MjModelProtocol`, one name each — `[observed]`. The three unimported members are at `src/navprobe/adapters/mujoco_bindings.py:34`, `:56` and `:71`; their only consumer is `tests/test_collision_pairs.py:45-46`.

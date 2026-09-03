@@ -2,11 +2,9 @@
 title: Open questions, and what would answer each one
 tags: [methodology, roadmap, open-questions]
 related: ["[[the-numbers-are-scene-dependent-the-shapes-replicate]]", "[[mjwarp-cannot-compile-under-warp-deterministic-mode]]", "[[warp-gpu-determinism-fails-on-coupled-bodies]]"]
-source_paths:
-  - "wiki/log.md"
-source_git_blobs:
-  "wiki/log.md": "cebbc930c6e6ace87cbff5328cca025f92811f7e"
-fact_checked: 2026-08-30
+source_paths: []
+source_git_blobs: {}
+fact_checked: 2026-09-03
 confidence: high
 hubs: [instrument-design]
 ---
@@ -16,6 +14,8 @@ hubs: [instrument-design]
 Every measurement page states its own limits. This is the consolidated view: what is not known, and specifically what would settle it. It exists so that "what is left" is a page rather than a memory.
 
 Ordered by value, not by effort.
+
+**This page cites no repo path, deliberately.** It is a synthesis whose evidence is the measurement pages it links — each one carries its own `source_paths`, pins and `measured_with` block, and that is where a claim here is checked. It previously listed `wiki/log.md` in `source_paths`, which `SCHEMA.md` bans outright: the log is a downstream artefact of this wiki, so citing it made this page's evidence circular, and being append-only it also guaranteed the pin would drift on every wiki operation. Removed 2026-09-03 rather than repinned.
 
 ## 1. Is `_sensor_tactile` the only blocker? — ANSWERED 2026-08-18: yes
 

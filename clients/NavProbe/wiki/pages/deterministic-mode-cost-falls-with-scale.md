@@ -5,7 +5,7 @@ related: ["[[tactile-alias-patch-clears-warp-deterministic-compile]]", "[[warp-g
 source_paths:
   - "scripts/world_scaling_sweep.py"
 source_git_blobs:
-  "scripts/world_scaling_sweep.py": "33b3db39bc1dc2713ac09aed213b1f9828b9c099"
+  "scripts/world_scaling_sweep.py": "bd338f7dfa0b398b0fda9b14962cbfdd2b5ab0ac"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
@@ -27,12 +27,15 @@ measured_with:
   deterministic_max_records: 64 (RUN_TO_RUN arm)
   patch: scripts/apply_tactile_alias_patch.py applied for both arms, reverted after
   script_revision: >-
-    this run predates two changes to the cited script, both made 2026-08-19 and neither touching
-    a measurement parameter -- a --device flag (the run used the then-hardcoded first card), and
-    a report format moved from hand-built JSON onto navprobe.codecs.scaling_run. The archived log
-    in the local runs/ directory is therefore JSON where a rerun would emit the wire format; the
-    figures below are unaffected, and the pinned blob is the current file, so the citation is the
-    design rather than byte-for-byte the revision that ran.
+    this run predates three changes to the cited script, none touching a measurement parameter --
+    two made 2026-08-19, a --device flag (the run used the then-hardcoded first card) and a report
+    format moved from hand-built JSON onto navprobe.codecs.scaling_run; and one later, adding
+    linesearch_block_dim=None to the record the sweep emits. That third is a no-op for the
+    figures twice over: it is passed to the RESULT constructor beside device, capacity and scene
+    rather than to the run, and None selects the vendor default block dim, which is what was in
+    effect when this ran. The archived log in the local runs/ directory is therefore JSON where a
+    rerun would emit the wire format; the figures below are unaffected, and the pinned blob is the
+    current file, so the citation is the design rather than byte-for-byte the revision that ran.
 hubs: [determinism-measurement]
 ---
 

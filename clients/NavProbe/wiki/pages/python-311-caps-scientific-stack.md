@@ -5,7 +5,7 @@ related: ["[[jax-cuda-unavailable-on-windows]]"]
 source_paths:
   - "pyproject.toml"
 source_git_blobs:
-  "pyproject.toml": "d40eeea34b2d837f383843f48e8b001a0fe35c45"
+  "pyproject.toml": "ea213132370f70dacbf256a78fdb1300304281cb"
 provenance:
   - "PyPI"
 fact_checked: 2026-08-13

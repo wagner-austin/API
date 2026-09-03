@@ -7,7 +7,7 @@ source_paths:
   - "scripts/det_compile_test.py"
 source_git_blobs:
   "scripts/apply_tactile_alias_patch.py": "a5c27614e81318fe95f5160e5049651dc313ebde"
-  "scripts/det_compile_test.py": "17aa86fa60ab29175b7921ec5721ae7a7b42d95d"
+  "scripts/det_compile_test.py": "c2e8fc46851a087f28fdce4273d3aa1f7cd507a9"
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
