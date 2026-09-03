@@ -44,7 +44,7 @@ from typing_extensions import TypedDict
 
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.contracts.workspace import ProjectConfig
+from hpc3.contracts.project import ProjectConfig
 
 HEADROOM = 4
 """How many times its longest observed run a project may ask for, unremarked.

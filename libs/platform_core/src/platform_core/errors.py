@@ -216,6 +216,7 @@ class Hpc3ErrorCode(ErrorCodeBase):
 
     # Submission rules -- each maps to one refusal in decode_job_spec.
     PROJECT_UNIMAGED = "PROJECT_UNIMAGED"
+    WHEEL_TAG_UNKNOWN = "WHEEL_TAG_UNKNOWN"
     GPU_TYPE_UNPINNED = "GPU_TYPE_UNPINNED"
     IMAGED_COMMAND_NEEDS_A_SHELL = "IMAGED_COMMAND_NEEDS_A_SHELL"
     RUN_REMOVES_IMAGE = "RUN_REMOVES_IMAGE"

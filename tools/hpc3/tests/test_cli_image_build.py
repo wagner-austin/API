@@ -110,16 +110,36 @@ class TestItSubmitsAndRecords:
 
 
 class TestWhatItRefuses:
-    def test_an_undeclared_project_never_reaches_the_cluster(
+    def test_a_mistyped_project_never_reaches_the_cluster(
         self, tmp_path: pathlib.Path, fake_run: FakeRun
     ) -> None:
-        """A ledger row naming a project no workspace declares is the defect
-        this command exists to stop, reached from the inside."""
+        """A ledger row naming the wrong project is still the defect this
+        command exists to stop -- it is now caught against the SCRIPT.
+
+        This used to look the project up in the workspace registry. That check
+        was redundant AND wrong: redundant because the label a mistyped
+        project produces disagrees with the rendered script's own job name,
+        which `check_name_agrees` refuses before preflight; wrong because a
+        project being ONBOARDED is not in the registry at all, so the lookup
+        refused the one command that could produce the image registration
+        requires.
+
+        Agreement with the rendered bytes is the stronger check: it catches
+        the typo AND a renderer and submitter that have drifted apart.
+        """
         _healthy(fake_run)
+
         with pytest.raises(AppError) as excinfo:
             image_build_cli.main(_args(tmp_path, **{"--project": "sirius"}))
-        assert excinfo.value.code is Hpc3ErrorCode.WORKSPACE_PROJECT_UNKNOWN
-        assert fake_run.calls == []
+
+        assert excinfo.value.code is Hpc3ErrorCode.IMAGE_BUILD_NAME_MISMATCH
+        # Exactly one remote call: reading the script. The refusal lands
+        # before the --test-only preflight and before the real sbatch, so
+        # nothing was queued and no ledger row was written. Asserted on the
+        # call COUNT rather than on the absence of "sbatch" in a command,
+        # because the script being read is itself named build.sbatch.
+        assert len(fake_run.calls) == 1
+        assert fake_run.calls[0].remote_command.startswith("cat ")
 
     def test_a_script_naming_a_different_job_is_refused(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

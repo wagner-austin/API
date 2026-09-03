@@ -489,7 +489,7 @@ def budget_document(
     """Build a budget for a project's entry in a workspace document.
 
     Lives on the project rather than the workspace as of 2026-08-28; see
-    :attr:`~hpc3.contracts.workspace.ProjectConfig.budget` for the three
+    :attr:`~hpc3.contracts.project.ProjectConfig.budget` for the three
     forked workspace documents that made the move necessary. Pass it through
     ``project_config(budget=budget_document(...))``.
 

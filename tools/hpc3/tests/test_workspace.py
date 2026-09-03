@@ -13,12 +13,11 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from hpc3.contracts.project import PROJECT_FIELDS, encode_project_config
 from hpc3.contracts.workspace import (
     DEFAULT_QUIET_SECONDS,
-    PROJECT_FIELDS,
     Workspace,
     decode_workspace,
-    encode_project_config,
     encode_workspace,
     require_project_config,
 )
@@ -239,36 +238,65 @@ class TestRequireProjectConfig:
         assert "'abl', 'zodiac'" in excinfo.value.message
 
 
-class TestAGpuProjectMustBeImaged:
-    """Onboarding a standing body of GPU work without an image is refused.
+class TestEveryProjectMustBeImaged:
+    """Onboarding a standing body of work without an image is refused.
 
     The rule exists because it was broken on 2026-08-28: ``turkic-lstm`` was
     registered with a bare ``env_path`` because the CPU project ``cleargbm``
-    has that shape legitimately and it was copied without asking whether the
-    reason carried over. Within the hour that environment was mutated in
-    place with ``pip install``, and every check still passed because
-    ``pinned_packages`` was edited to match.
+    had that shape and it was copied without asking whether the reason
+    carried over. Within the hour that environment was mutated in place with
+    ``pip install``, and every check still passed because ``pinned_packages``
+    was edited to match.
+
+    The CPU exemption that made that copy look legitimate is gone. What an
+    image pins is not the card -- it is the compiler, the libc and the BLAS
+    as much as the CUDA runtime, and none of those appear in ``env_path`` or
+    in a Python package list.
     """
 
     def test_a_gpu_project_without_an_image_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
             decode_project_config(project_config(image=None))
-        assert excinfo.value.code is Hpc3ErrorCode.GPU_RUN_UNIMAGED
+        assert excinfo.value.code is Hpc3ErrorCode.PROJECT_UNIMAGED
+
+    def test_a_cpu_project_without_an_image_is_refused_too(self) -> None:
+        """The exemption is the whole point of the change.
+
+        ``cleargbm`` is the demonstration: its timed arm is compiled Rust, so
+        neither a Python package list nor a directory path describes what
+        produced a benchmark number.
+        """
+        with pytest.raises(AppError) as excinfo:
+            decode_project_config(
+                project_config(
+                    gpu=None, partition="free", image=None, env_path="/pub/envs/cleargbm"
+                )
+            )
+        assert excinfo.value.code is Hpc3ErrorCode.PROJECT_UNIMAGED
+
+    def test_the_refusal_says_the_cpu_case_is_included(self) -> None:
+        """A reader hitting this on a CPU project must not read it as a bug."""
+        with pytest.raises(AppError) as excinfo:
+            decode_project_config(
+                project_config(gpu=None, partition="free", image=None, env_path="/pub/envs/x")
+            )
+        assert "CPU-only" in str(excinfo.value)
 
     def test_the_refusal_names_the_commands_that_fix_it(self) -> None:
         """A refusal that does not say what to do next gets worked around."""
         with pytest.raises(AppError) as excinfo:
             decode_project_config(project_config(image=None))
+        assert "hpc3-image-build" in str(excinfo.value)
         assert "hpc3-image-capture" in str(excinfo.value)
-        assert "hpc3-image" in str(excinfo.value)
 
-    def test_a_cpu_project_without_an_image_is_admitted(self) -> None:
-        """`cleargbm` is real and correct: no card, no driver stack to pin."""
-        config = decode_project_config(
-            project_config(gpu=None, partition="free", image=None, env_path="/pub/envs/cleargbm")
-        )
+    def test_an_imaged_cpu_project_is_admitted(self) -> None:
+        """The rule asks for an image, not for a GPU."""
+        config = decode_project_config(project_config(gpu=None, partition="free"))
+        image = config["image"]
+        if image is None:
+            raise AssertionError("the imaged baseline decoded without its image")
         assert config["gpu"] is None
-        assert config["image"] is None
+        assert image["path"] == "/pub/images/v1/abl.sif"
 
     def test_an_imaged_gpu_project_is_admitted(self) -> None:
         config = decode_project_config(project_config())

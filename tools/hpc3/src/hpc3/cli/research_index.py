@@ -23,7 +23,9 @@ from collections.abc import Sequence
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from hpc3.cli import _fatal
-from hpc3.contracts.workspace import ProjectConfig, decode_workspace
+from hpc3.contracts.project import ProjectConfig
+from hpc3.contracts.workspace import decode_workspace
+from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.research_index import (
     REGENERATE_HINT,
     extract_projects_block,
@@ -72,7 +74,7 @@ def declared_projects(runs: pathlib.Path) -> dict[str, ProjectConfig]:
     """
     projects: dict[str, ProjectConfig] = {}
     for path in sorted(runs.glob("*.json")):
-        document = narrow_json_to_dict(load_json_str(path.read_text(encoding="utf-8")))
+        document = narrow_json_to_dict(load_json_str(core_hooks.read_bytes(path).decode("utf-8")))
         if "projects" not in document:
             continue
         workspace = decode_workspace(document, config_dir=runs)
@@ -109,10 +111,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     block = render_projects_block(declared_projects(runs_directory()))
     path = index_path()
-    text = path.read_text(encoding="utf-8")
+    text = core_hooks.read_bytes(path).decode("utf-8")
 
     if WRITE_FLAG in tokens:
-        path.write_text(replace_projects_block(text, block), encoding="utf-8")
+        core_hooks.write_text(path, replace_projects_block(text, block))
         sys.stdout.write(f"wrote the project table into {path}\n")
         return 0
 
@@ -120,9 +122,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write("the project table matches the registry\n")
         return 0
 
-    sys.stdout.write(
-        f"the project table in {path} is stale; run `{REGENERATE_HINT}`\n\n{block}\n"
-    )
+    sys.stdout.write(f"the project table in {path} is stale; run `{REGENERATE_HINT}`\n\n{block}\n")
     return 1
 
 

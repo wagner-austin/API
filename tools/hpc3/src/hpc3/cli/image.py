@@ -1,7 +1,7 @@
 """CLI: render an image spec into the files a build consumes.
 
 Usage:
-    hpc3-image --config runs/hpc3.json --spec specs/abl-image.json \\
+    hpc3-image --spec specs/abl-image.json \\
         --out-dir runs/abl-build-v23 --image-name abl.sif \\
         --project mi --name image-v23 --image-dir /pub/wagnera3/images/v23
 
@@ -39,10 +39,9 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _config, _fatal, _test_hooks
+from hpc3.cli import _fatal, _test_hooks
 from hpc3.contracts.image_spec import decode_image_spec
 from hpc3.contracts.layout import qualified_name
-from hpc3.contracts.workspace import require_project_config
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.image_build import render_build_script
 from hpc3.core.image_definition import render_definition, render_requirements
@@ -60,15 +59,12 @@ BUILD_SCRIPT_NAME = "build.sh"
 _SPEC_FLAG = "--spec"
 _OUT_DIR_FLAG = "--out-dir"
 _IMAGE_NAME_FLAG = "--image-name"
-_PROJECT_FLAG = "--project"
 _NAME_FLAG = "--name"
 _IMAGE_DIR_FLAG = "--image-dir"
 _FLAGS = (
-    _config.CONFIG_FLAG,
     _SPEC_FLAG,
     _OUT_DIR_FLAG,
     _IMAGE_NAME_FLAG,
-    _PROJECT_FLAG,
     _NAME_FLAG,
     _IMAGE_DIR_FLAG,
 )
@@ -129,23 +125,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     image_name = cli_args.require_flag(parsed, _IMAGE_NAME_FLAG)
     image_dir = cli_args.require_flag(parsed, _IMAGE_DIR_FLAG)
 
+    raw = core_hooks.read_bytes(spec_path).decode("utf-8")
+    spec = decode_image_spec(load_json_str(raw))
+
     # DERIVED, never accepted. This used to take a free-text --job-name, and
     # on 2026-08-28 a build was rendered as `img.abl-sif-v22` -- a name whose
     # project half is `img`, which no workspace declares. `submit_build`
     # refuses exactly that, but only when the build reaches the cluster
     # through it; the raw `sbatch` that name invited leaves no ledger row, and
-    # twenty-two builds went that way. Deriving the name from a project the
-    # workspace must declare makes the malformed one unconstructible and makes
-    # the renderer and the submitter agree by construction rather than by a
-    # refusal one step later.
-    workspace = _config.load_workspace(parsed)
-    project = cli_args.require_flag(parsed, _PROJECT_FLAG)
-    require_project_config(workspace, project)
+    # twenty-two builds went that way.
+    #
+    # The project half now comes from the SPEC rather than from a --project
+    # flag, and there is no registry lookup left here. Capture types the
+    # project once and records it as a field; this renderer bakes that same
+    # string into build.sbatch; `submit_build` refuses a label disagreeing
+    # with the rendered script, before preflight, against the bytes that will
+    # run. Agreement across artifacts is stronger than membership in a table,
+    # because it also catches the render and the submission drifting apart --
+    # and it holds while a project is being ONBOARDED, when the table cannot
+    # answer, since registration needs the digest this build produces.
+    project = spec["project"]
     build_name = require_build_name(cli_args.require_flag(parsed, _NAME_FLAG))
     job_name = qualified_name(project, build_name)
-
-    raw = core_hooks.read_bytes(spec_path).decode("utf-8")
-    spec = decode_image_spec(load_json_str(raw))
 
     core_hooks.make_dir(out_dir)
     rendered = (

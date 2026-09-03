@@ -30,15 +30,9 @@ from platform_core.json_utils import JSONTypeError, JSONValue, require_list
 from hpc3.contracts.chain import ChainSpec, decode_chain_spec
 from hpc3.contracts.job import JobSpec, decode_job_spec
 from hpc3.contracts.layout import require_project
+from hpc3.contracts.project import PROJECT_FIELDS, ProjectConfig, encode_project_config
 from hpc3.contracts.sweep import SweepSpec, decode_sweep_spec
-from hpc3.contracts.workspace import (
-    PROJECT_FIELDS,
-    ProjectConfig,
-    Workspace,
-    encode_project_config,
-    require_project_config,
-    workspace_cluster,
-)
+from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
 
 RUN_IDENTITY_FIELDS = ("project", "name", "command", "experiment", "depends_on", "artifact")
 """What only a run can say. Never inherited, never optional.
@@ -127,33 +121,35 @@ def _merged(
         if field in document:
             merged[field] = document[field]
     merged["project"] = project
-    _check_run_keeps_the_image(defaults, merged, project)
+    _check_run_keeps_the_image(merged, project)
     return merged
 
 
-def _check_run_keeps_the_image(
-    defaults: ProjectConfig, merged: dict[str, JSONValue], project: str
-) -> None:
+def _check_run_keeps_the_image(merged: dict[str, JSONValue], project: str) -> None:
     """Refuse a run that drops the image its project declared.
 
     Overriding ``image`` is legitimate and normal: pinning a NEWER image is
     how an image version gets rolled out one experiment at a time. Setting it
     to null is different in kind. It moves the payload back onto the host
     interpreter, which is the shape
-    :func:`~hpc3.contracts.workspace._check_gpu_project_is_imaged` refuses at
+    :func:`~hpc3.contracts.project._require_project_image` refuses at
     onboarding -- and without this, that rule would be one line of JSON away
     from being switched off per run, which is not a rule.
 
+    There is no "the project had no image either" case to allow. Every
+    project declares one -- :attr:`~hpc3.contracts.project.ProjectConfig`
+    makes the field non-optional -- so a null here is always a removal.
+
     Args:
-        defaults: The project's declared settings.
-        merged: The document's overrides already overlaid on them.
+        merged: The document's overrides already overlaid on the project's
+            declared settings, so ``image`` is always present.
         project: The validated project name, for the message.
 
     Raises:
-        AppError: With ``RUN_REMOVES_IMAGE`` when the project declares an
-            image and the run nulls it.
+        AppError: With ``RUN_REMOVES_IMAGE`` when the run nulls the image its
+            project declares.
     """
-    if defaults["image"] is None or merged.get("image") is not None:
+    if merged.get("image") is not None:
         return
     raise AppError(
         Hpc3ErrorCode.RUN_REMOVES_IMAGE,

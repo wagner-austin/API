@@ -218,7 +218,7 @@
   ],
   "smoke_commands": [],
   "labels": {
-    "org.corvis.project": "cleargbm",
     "org.corvis.env-source": "/pub/wagnera3/envs/cleargbm"
-  }
+  },
+  "project": "cleargbm"
 }

@@ -55,6 +55,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "required_symbols": [{"module": "model_trainer.cluster.preflight", "attribute": "check"}],
         "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
+        "project": "abl",
     }
     base.update(overrides)
     return base
@@ -76,6 +77,7 @@ class TestRoundTrip:
             "extra_index_urls",
             "git_commit",
             "labels",
+            "project",
             "required_symbols",
             "requirements",
             "smoke_commands",

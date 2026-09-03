@@ -31,13 +31,13 @@ from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.ledger import decode_ledger_entry as _decode_ledger_entry
 from hpc3.contracts.preflight import PreflightResult
 from hpc3.contracts.preflight import decode_preflight_result as _decode_preflight_result
+from hpc3.contracts.project import ProjectConfig
+from hpc3.contracts.project import decode_project_config as _decode_project_config
 from hpc3.contracts.status import JobStatus
 from hpc3.contracts.status import decode_job_status as _decode_job_status
 from hpc3.contracts.status import service_units as _service_units
 from hpc3.contracts.sweep import SweepSpec
 from hpc3.contracts.sweep import decode_sweep_spec as _decode_sweep_spec
-from hpc3.contracts.workspace import ProjectConfig
-from hpc3.contracts.workspace import decode_project_config as _decode_project_config
 from hpc3.core import ledger as _ledger
 from hpc3.core.budget import check_consumption as _check_consumption
 from hpc3.core.budget import check_projection as _check_projection

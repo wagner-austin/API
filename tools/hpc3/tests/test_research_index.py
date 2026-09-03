@@ -13,10 +13,12 @@ from hpc3.cli.research_index import (
     runs_directory,
 )
 from hpc3.contracts.cluster import GpuRequest
-from hpc3.contracts.workspace import ProjectConfig
+from hpc3.contracts.project import ProjectConfig
+from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.research_index import (
     BLOCK_END,
     BLOCK_START,
+    REGENERATE_HINT,
     extract_projects_block,
     render_project_row,
     render_projects_block,
@@ -27,7 +29,7 @@ from hpc3.core.research_index import (
 def _project(
     *,
     gpu: GpuRequest | None = None,
-    image_sha: str | None = None,
+    image_sha: str = "b" * 64,
     cpus: int = 4,
     minutes: int = 60,
 ) -> ProjectConfig:
@@ -35,7 +37,8 @@ def _project(
 
     Args:
         gpu: GPU request, or None for CPU-only work.
-        image_sha: Image digest, or None when the project declares no image.
+        image_sha: Image digest. Not optional, because the configuration it
+            builds is not: every project declares an image.
         cpus: Cores per job.
         minutes: Wall clock per job.
 
@@ -50,9 +53,7 @@ def _project(
         minutes=minutes,
         requeue=True,
         checkpoint_steps=0,
-        image=None
-        if image_sha is None
-        else {"path": "/pub/x.sif", "sha256": image_sha, "binds": ["/pub"]},
+        image={"path": "/pub/x.sif", "sha256": image_sha, "binds": ["/pub"]},
         env_path="/opt/env",
         pinned_packages={},
         deterministic=True,
@@ -66,13 +67,12 @@ def _project(
 
 
 class TestRenderingARow:
-    """Each cell states a declared fact, or says it is absent."""
+    """Each cell states a declared fact, or says it is absent.
 
-    def test_a_project_with_no_image_says_none(self) -> None:
-        """A blank cell reads as a formatting fault, not as an absence."""
-        row = render_project_row("cleargbm", _project())
-
-        assert "| none |" in row
+    There is no "no image" case to render. Every project declares one, so the
+    cell that used to say ``none`` is unreachable and the test asserting it is
+    gone rather than kept passing against a state the decoder refuses.
+    """
 
     def test_an_image_is_shown_by_its_digest(self) -> None:
         """The digest is the thing that differs between two images."""
@@ -147,6 +147,17 @@ class TestSubstitutingTheBlock:
         with pytest.raises(ValueError, match="carries no generated block"):
             _ = extract_projects_block("no markers here")
 
+    def test_extracting_markers_out_of_order_is_refused(self) -> None:
+        """Both halves refuse this, and only one was covered.
+
+        Slicing from the opener to a closer that precedes it yields an empty
+        string, which compares unequal to the rendered block and would report
+        the document as stale -- a true verdict reached for a false reason,
+        and the misleading kind of pass.
+        """
+        with pytest.raises(ValueError, match="out of order"):
+            _ = extract_projects_block(f"{BLOCK_END}\n{BLOCK_START}")
+
 
 class TestTheCommittedIndexAgreesWithTheRegistry:
     """The check this whole module exists for.
@@ -209,3 +220,76 @@ class TestTheCommandLine:
         directory: pathlib.Path = runs_directory()
 
         assert directory.is_dir()
+
+
+class TestTheWritingAndStaleBranches:
+    """The two outcomes a build step acts on, and the refusals around them.
+
+    Exercised through the package's own file hooks rather than against
+    docs/RESEARCH.md, because a test that rewrites a tracked document to prove
+    it can rewrite a tracked document is a test nobody can run twice.
+    """
+
+    def test_writing_replaces_the_block_and_reports_where(
+        self, tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--write is the half that mutates, so it says what it touched.
+
+        Args:
+            tmp_path: Temporary directory.
+            capsys: Captured process output.
+        """
+        written: dict[pathlib.Path, str] = {}
+        current = index_path().read_text(encoding="utf-8")
+        stale = current.replace(BLOCK_END, "stale row\n" + BLOCK_END, 1)
+        core_hooks.read_bytes = lambda path: (
+            stale.encode("utf-8") if path == index_path() else path.read_bytes()
+        )
+        core_hooks.write_text = lambda path, text: written.__setitem__(path, text)
+
+        assert main(["--write"]) == 0
+
+        assert written[index_path()] == current
+        assert capsys.readouterr().out == f"wrote the project table into {index_path()}\n"
+
+    def test_a_stale_document_reports_and_returns_one(
+        self, tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Exit 1 is what makes this usable as a build step.
+
+        Args:
+            tmp_path: Temporary directory.
+            capsys: Captured process output.
+        """
+        stale = (
+            index_path()
+            .read_text(encoding="utf-8")
+            .replace(BLOCK_END, "stale row\n" + BLOCK_END, 1)
+        )
+        core_hooks.read_bytes = lambda path: (
+            stale.encode("utf-8") if path == index_path() else path.read_bytes()
+        )
+
+        assert main(["--check"]) == 1
+
+        block = render_projects_block(declared_projects(runs_directory()))
+        assert capsys.readouterr().out == (
+            f"the project table in {index_path()} is stale; run `{REGENERATE_HINT}`\n\n{block}\n"
+        )
+
+
+class TestARegistryThatContradictsItself:
+    """Two workspaces declaring one project leaves no answer to which governs."""
+
+    def test_a_project_declared_twice_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """The name of the second file is in the message, because that is the fix.
+
+        Args:
+            tmp_path: Temporary directory holding two workspace documents.
+        """
+        document = (runs_directory() / "hpc3-rusted.json").read_text(encoding="utf-8")
+        for name in ("hpc3-a.json", "hpc3-b.json"):
+            (tmp_path / name).write_text(document, encoding="utf-8")
+
+        with pytest.raises(ValueError, match="declared twice"):
+            _ = declared_projects(tmp_path)

@@ -11,7 +11,6 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from hpc3.cli import image as image_cli
@@ -21,7 +20,6 @@ from hpc3.core.image_layout import (
     SBATCH_NAME,
     SELFCHECK_NAME,
 )
-from tests.conftest import workspace_document, write_workspace
 
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
@@ -49,6 +47,7 @@ def _payload(**overrides: JSONValue) -> dict[str, JSONValue]:
         ],
         "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
+        "project": "abl",
     }
     base.update(overrides)
     return base
@@ -73,7 +72,6 @@ def _write_spec(tmp_path: pathlib.Path, payload: JSONValue) -> pathlib.Path:
 #: from it -- this file used to carry `JOB_NAME = "img.abl-sif-test"`,
 #: whose project half names nothing, and rendering that was what pushed a
 #: real build onto the unrecorded `sbatch` path.
-PROJECT = "abl"
 BUILD_NAME = "image-test"
 QUALIFIED_JOB_NAME = "abl.image-test"
 IMAGE_DIR = "/pub/wagnera3/images/test"
@@ -83,9 +81,8 @@ def _argv(tmp_path: pathlib.Path, spec_path: pathlib.Path, out_dir: pathlib.Path
     """Build a complete command line for the renderer.
 
     Args:
-        tmp_path: Working directory; the workspace is written here, because
-            the renderer now needs one to validate the project it composes
-            the job name from.
+        tmp_path: Working directory. The renderer reads no workspace: the
+            project it composes the job name from comes from the spec.
         spec_path: The spec document to render from.
         out_dir: Directory the rendered files are written to.
 
@@ -94,10 +91,6 @@ def _argv(tmp_path: pathlib.Path, spec_path: pathlib.Path, out_dir: pathlib.Path
         than in each of the call sites that previously spelled the list out.
     """
     return [
-        "--config",
-        write_workspace(tmp_path / "hpc3.json", workspace_document()),
-        "--project",
-        PROJECT,
         "--name",
         BUILD_NAME,
         "--spec",
@@ -216,12 +209,12 @@ class TestItRefusesRatherThanRenders:
     def test_the_job_name_is_the_qualified_one_and_reaches_the_script(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """Composed here from a declared project, not taken from the caller.
+        """Composed from the SPEC's project, not taken from the caller.
 
         This is what makes the renderer and `hpc3-image-build` agree: the
         submitter reads `#SBATCH -J` back out and requires it to equal
-        `<project>.<name>`, so deriving it from the same rule means the two
-        cannot disagree rather than disagreeing and being refused.
+        `<project>.<name>`, so deriving it from the spec means the two cannot
+        disagree rather than disagreeing and being refused.
 
         Args:
             tmp_path: Working directory.
@@ -232,22 +225,63 @@ class TestItRefusesRatherThanRenders:
             encoding="utf-8"
         )
 
-    def test_a_project_the_workspace_does_not_declare_writes_nothing(
+    def test_the_job_name_follows_the_spec_when_the_spec_changes(
         self, tmp_path: pathlib.Path
     ) -> None:
-        # The defect this closes. `img.abl-sif-v22` was rendered because the
-        # job name was free text; `img` names no project, `hpc3-image-build`
-        # refuses it, and the raw sbatch that name invited records nothing.
-        # Refused at render time now, before any file exists.
+        """Proves the DERIVATION, not just that one string happens to match.
+
+        The previous test would pass if the project were hard-coded anywhere
+        in the renderer. Changing only the spec's project must change the
+        rendered job name, which is what makes `check_name_agrees` meaningful
+        downstream.
+
+        Args:
+            tmp_path: Working directory.
+        """
+        payload = _payload()
+        payload["project"] = "turkic-lstm"
+
+        out_dir = _render(tmp_path, payload)
+
+        rendered = (out_dir / SBATCH_NAME).read_text(encoding="utf-8")
+        assert f"#SBATCH -J turkic-lstm.{BUILD_NAME}" in rendered
+        assert QUALIFIED_JOB_NAME not in rendered
+
+    def test_the_project_cannot_be_supplied_alongside_the_spec(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The defect this closes, and it is closed harder than before.
+
+        `img.abl-sif-v22` was rendered because the job name was free text;
+        `img` names no project, so the raw sbatch that name invited recorded
+        nothing. That used to be caught by looking the project up in the
+        workspace, which a project being ONBOARDED is not in.
+
+        There is now nothing to look up, because there is nothing to supply:
+        the project comes from the spec capture wrote, and the flag is gone.
+        """
         spec_path = _write_spec(tmp_path, _payload())
         out_dir = tmp_path / "build"
-        argv = _argv(tmp_path, spec_path, out_dir)
-        argv[argv.index("--project") + 1] = "img"
 
-        with pytest.raises(AppError) as refusal:
-            _ = image_cli.main(argv)
+        with pytest.raises(ValueError, match="unknown argument"):
+            _ = image_cli.main([*_argv(tmp_path, spec_path, out_dir), "--project", "img"])
 
-        assert refusal.value.code is Hpc3ErrorCode.WORKSPACE_PROJECT_UNKNOWN
+        assert not out_dir.exists()
+
+    def test_a_spec_naming_an_unusable_project_writes_nothing(self, tmp_path: pathlib.Path) -> None:
+        """The name still has to be one squeue would accept.
+
+        Validated by the same function the job contract uses, at decode, so a
+        spec cannot carry a project name the layout rejects.
+        """
+        payload = _payload()
+        payload["project"] = "My Project"
+        spec_path = _write_spec(tmp_path, payload)
+        out_dir = tmp_path / "build"
+
+        with pytest.raises(JSONTypeError):
+            _ = image_cli.main(_argv(tmp_path, spec_path, out_dir))
+
         assert not out_dir.exists()
 
     def test_a_name_containing_a_dot_writes_nothing(self, tmp_path: pathlib.Path) -> None:

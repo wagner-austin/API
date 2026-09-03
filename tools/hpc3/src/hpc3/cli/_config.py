@@ -14,13 +14,61 @@ from __future__ import annotations
 import pathlib
 
 from platform_core import cli_args
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import JSONValue, load_json_str
 
-from hpc3.contracts.workspace import Workspace, decode_workspace
+from hpc3.contracts.workspace import (
+    Workspace,
+    WorkspaceConnection,
+    decode_workspace,
+    decode_workspace_connection,
+)
 from hpc3.core import _test_hooks as core_hooks
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
+
+
+def _read_document(parsed: dict[str, str]) -> tuple[JSONValue, pathlib.Path]:
+    """Read the workspace document named on the command line.
+
+    Args:
+        parsed: Flags already read from the command line.
+
+    Returns:
+        The loaded JSON value and the directory it was read from, which the
+        paths inside it resolve against.
+
+    Raises:
+        ValueError: If ``--config`` was not given.
+        JSONTypeError: If the file is not valid JSON.
+    """
+    path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
+    return load_json_str(core_hooks.read_bytes(path).decode("utf-8")), path.parent
+
+
+def load_workspace_connection(parsed: dict[str, str]) -> WorkspaceConnection:
+    """Read only where the cluster is, leaving the project registry unread.
+
+    For the onboarding path, which needs the host while the project it is
+    onboarding cannot yet be registered -- registration requires an image
+    digest, and producing that digest is what the onboarding path does. See
+    :class:`~hpc3.contracts.workspace.WorkspaceConnection`.
+
+    Args:
+        parsed: Flags already read from the command line.
+
+    Returns:
+        The validated connection.
+
+    Raises:
+        ValueError: If ``--config`` was not given, or the document declares a
+            root that is not an absolute POSIX path.
+        JSONTypeError: If the document's connection fields are invalid.
+        AppError: With ``CLUSTER_UNKNOWN`` if the named cluster has not been
+            measured.
+    """
+    value, config_dir = _read_document(parsed)
+    return decode_workspace_connection(value, config_dir=config_dir)
 
 
 def load_workspace(parsed: dict[str, str]) -> Workspace:
@@ -39,9 +87,12 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
         JSONTypeError: If the document is not a valid workspace.
         AppError: If a project declares a GPU this cluster does not carry.
     """
-    path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
-    raw = core_hooks.read_bytes(path).decode("utf-8")
-    return decode_workspace(load_json_str(raw), config_dir=path.parent)
+    value, config_dir = _read_document(parsed)
+    return decode_workspace(value, config_dir=config_dir)
 
 
-__all__ = ["CONFIG_FLAG", "load_workspace"]
+__all__ = [
+    "CONFIG_FLAG",
+    "load_workspace",
+    "load_workspace_connection",
+]

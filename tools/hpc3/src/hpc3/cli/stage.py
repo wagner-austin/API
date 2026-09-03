@@ -59,7 +59,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
-    host = _config.load_workspace(parsed)["host"]
+    # The connection only: staging bytes needs the host and takes nothing
+    # from the project registry, so it must not fail on a registry entry
+    # that is mid-onboarding.
+    host = _config.load_workspace_connection(parsed)["host"]
     manifest_path = pathlib.Path(cli_args.require_flag(parsed, "--manifest"))
     source_dir = pathlib.Path(cli_args.require_flag(parsed, "--source-dir"))
     expect_path = pathlib.Path(cli_args.require_flag(parsed, "--expect-from"))

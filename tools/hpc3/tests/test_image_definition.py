@@ -42,6 +42,7 @@ def _spec(**overrides: JSONValue) -> ImageSpec:
         "required_symbols": [{"module": "model_trainer", "attribute": "__file__"}],
         "smoke_commands": [],
         "labels": {"org.corvis.captured": "2026-08-25"},
+        "project": "abl",
     }
     base.update(overrides)
     return decode_image_spec(base)

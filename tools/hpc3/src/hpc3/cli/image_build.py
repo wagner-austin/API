@@ -29,8 +29,8 @@ from collections.abc import Sequence
 from platform_core import cli_args
 
 from hpc3.cli import _config, _fatal, _test_hooks
+from hpc3.clusters import require_cluster
 from hpc3.contracts.layout import qualified_name
-from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core.image_submit import submit_build
 
 _PROJECT_FLAG = "--project"
@@ -66,21 +66,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
-    workspace = _config.load_workspace(parsed)
-    cluster = workspace_cluster(workspace)
+    connection = _config.load_workspace_connection(parsed)
+    cluster = require_cluster(connection["cluster"])
 
+    # NO REGISTRY READ AT ALL, and the check that used to be here was
+    # redundant rather than load-bearing. It looked the project up to stop a
+    # ledger row naming one no workspace declares -- but `submit_build` calls
+    # `check_name_agrees` FIRST, before preflight, against the rendered
+    # script's own job name, so a mistyped project makes `label` disagree with
+    # build.sbatch and the build is refused there. That check is strictly
+    # stronger: it catches the typo AND a renderer and submitter that have
+    # drifted apart, and it works while a project is being onboarded, which a
+    # registry lookup cannot -- registration needs the digest this build is
+    # about to produce.
     project = cli_args.require_flag(parsed, _PROJECT_FLAG)
-    # Reads the project config only to refuse an undeclared project. A build
-    # takes none of its resources from there -- they describe building, not
-    # the thing built -- but a ledger row naming a project no workspace
-    # declares is the defect this command exists to stop, arrived at from the
-    # inside.
-    require_project_config(workspace, project)
 
     label = qualified_name(project, cli_args.require_flag(parsed, _NAME_FLAG))
     image_dir = cli_args.require_flag(parsed, _IMAGE_DIR_FLAG)
     image_name = cli_args.require_flag(parsed, _IMAGE_NAME_FLAG)
-    host = workspace["host"]
+    host = connection["host"]
 
     job_id = submit_build(
         host=host,
@@ -88,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         project=project,
         label=label,
         artifact=f"{image_dir}/{image_name}",
-        ledger_path=pathlib.Path(workspace["ledger"]),
+        ledger_path=pathlib.Path(connection["ledger"]),
         submitted_at=_test_hooks.now_iso(),
         cluster=cluster,
     )

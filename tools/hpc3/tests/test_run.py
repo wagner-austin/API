@@ -332,10 +332,17 @@ class TestARunMayNotRemoveTheProjectsImage:
             raise AssertionError("the run did not inherit the project's image")
         assert image["path"] == "/pub/images/v1/abl.sif"
 
-    def test_a_cpu_project_with_no_image_is_unaffected(self) -> None:
-        """Nothing to remove, so nothing to refuse."""
-        spec = resolve_run(
-            _workspace(partition="free", gpu=None, image=None, env_path="/pub/envs/cleargbm"),
-            _run(image=None),
-        )
-        assert spec["image"] is None
+    def test_a_cpu_project_nulling_its_image_is_refused_too(self) -> None:
+        """There is no longer an unimaged project for the null to be harmless on.
+
+        This asserted the opposite until 2026-09-03: a CPU project could
+        declare no image, so a run nulling the field removed nothing and was
+        allowed. Every project declares one now, which makes a null always a
+        removal -- on CPU work exactly as on GPU work.
+        """
+        with pytest.raises(AppError) as excinfo:
+            _ = resolve_run(
+                _workspace(partition="free", gpu=None, env_path="/opt/env"),
+                _run(image=None),
+            )
+        assert excinfo.value.code is Hpc3ErrorCode.RUN_REMOVES_IMAGE

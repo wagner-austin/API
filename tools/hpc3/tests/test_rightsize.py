@@ -22,7 +22,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.closure import Closure, decode_closure, encode_closure
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.contracts.workspace import ProjectConfig, decode_project_config
+from hpc3.contracts.project import ProjectConfig, decode_project_config
 from hpc3.core.rightsize import (
     HEADROOM,
     MINIMUM_OBSERVATIONS,

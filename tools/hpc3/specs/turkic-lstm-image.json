@@ -2,6 +2,7 @@
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
   "git_commit": "68af44fc37a629d7ccc13ef0e9b2058f3ebba88c",
+  "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
   ],
@@ -116,7 +117,7 @@
     "/opt/env/bin/python -c \"import json, random, tempfile, pathlib, torch; from char_lstm.train import load_resume_state; m = torch.nn.Linear(2, 2); p = {'model_state': m.state_dict(), 'optimizer_state': torch.optim.Adam(m.parameters()).state_dict(), 'epoch': 3, 'global_step': 41, 'best_val_loss': 0.5, 'epochs_no_improve': 1, 'vocab_size': 99, 'rng_torch': torch.get_rng_state(), 'rng_cuda': [], 'rng_python_json': json.dumps(random.getstate())}; f = pathlib.Path(tempfile.mkdtemp()) / 'r.pt'; torch.save(p, str(f)); s = {'global_step': 0, 'best_val_loss': 9e9, 'epochs_no_improve': 0}; e = load_resume_state(path=f, model=torch.nn.Linear(2, 2), optimizer=torch.optim.Adam(torch.nn.Linear(2, 2).parameters()), device=torch.device('cpu'), state=s, vocab_size=99); assert e == 4, e\""
   ],
   "labels": {
-    "org.corvis.project": "turkic-lstm",
     "org.corvis.env-source": "/opt/env"
-  }
+  },
+  "project": "turkic-lstm"
 }

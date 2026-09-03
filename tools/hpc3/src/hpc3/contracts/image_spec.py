@@ -37,6 +37,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from hpc3.contracts.image import HOST_BOUND_ROOTS, require_json_object
+from hpc3.contracts.layout import require_project
 
 _PIN_SEPARATOR = "=="
 
@@ -123,6 +124,25 @@ class ImageSpec(TypedDict):
             the path and not the cause, which is exactly how the first
             rendered build job failed.
         labels: Free-form metadata recorded on the image.
+        project: The project this image is for, validated as a project name.
+
+            FIRST-CLASS RATHER THAN A LABEL, and that is the whole point.
+            Capture used to record it as ``org.corvis.project`` among the
+            free-form labels, which nothing requires and nothing validates, so
+            every later step re-took the project from ITS OWN ``--project``
+            flag. Three commands each retyping one string is three chances to
+            typo it, and the defence against that was to look the name up in
+            the workspace registry -- which a project mid-onboarding is not in,
+            because registration needs the digest this build produces.
+
+            Naming it once here removes both problems at once. The renderer
+            reads it instead of being told it, so the job name it bakes into
+            ``build.sbatch`` cannot disagree with the spec; the submitter
+            already refuses a label that disagrees with the rendered script
+            (``check_name_agrees``, before preflight, against the bytes that
+            will run). Agreement across artifacts is a stronger check than
+            membership in a table, and it holds during onboarding, when the
+            table cannot answer.
     """
 
     base_image: str
@@ -136,6 +156,7 @@ class ImageSpec(TypedDict):
     required_symbols: list[SymbolCheck]
     smoke_commands: list[str]
     labels: dict[str, str]
+    project: str
 
 
 def _require_non_empty_str(obj: JSONObject, key: str) -> str:
@@ -471,6 +492,7 @@ def encode_image_spec(spec: ImageSpec) -> JSONObject:
         "required_symbols": [encode_symbol_check(c) for c in spec["required_symbols"]],
         "smoke_commands": list(spec["smoke_commands"]),
         "labels": dict(spec["labels"]),
+        "project": spec["project"],
     }
 
 
@@ -505,6 +527,7 @@ def decode_image_spec(value: JSONValue) -> ImageSpec:
         required_symbols=_require_symbol_checks(obj, "required_symbols"),
         smoke_commands=_require_str_list(obj, "smoke_commands"),
         labels=_require_str_map(obj, "labels", allow_empty=True),
+        project=require_project(obj, "project"),
     )
 
 

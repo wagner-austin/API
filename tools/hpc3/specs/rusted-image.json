@@ -34,13 +34,34 @@
     "rusted-warfare-bot": "0.1.0"
   },
   "required_symbols": [
-    { "module": "rw_bot.harness.campaign_match", "attribute": "main" },
-    { "module": "rw_bot.harness.results_layout", "attribute": "PAYLOAD_DIR" },
-    { "module": "rw_bot.harness.replication", "attribute": "compare_pair" },
-    { "module": "rw_bot.harness.runner", "attribute": "check_frozen_tree" },
-    { "module": "rw_bot.tree_identity", "attribute": "digest_record" },
-    { "module": "rw_bot.provenance", "attribute": "game_packages" },
-    { "module": "rw_bot.harness.agent_build", "attribute": "JAVA_RELEASE" }
+    {
+      "module": "rw_bot.harness.campaign_match",
+      "attribute": "main"
+    },
+    {
+      "module": "rw_bot.harness.results_layout",
+      "attribute": "PAYLOAD_DIR"
+    },
+    {
+      "module": "rw_bot.harness.replication",
+      "attribute": "compare_pair"
+    },
+    {
+      "module": "rw_bot.harness.runner",
+      "attribute": "check_frozen_tree"
+    },
+    {
+      "module": "rw_bot.tree_identity",
+      "attribute": "digest_record"
+    },
+    {
+      "module": "rw_bot.provenance",
+      "attribute": "game_packages"
+    },
+    {
+      "module": "rw_bot.harness.agent_build",
+      "attribute": "JAVA_RELEASE"
+    }
   ],
   "smoke_commands": [
     "xvfb-run -a --server-args=\"-screen 0 800x600x24\" xrandr",
@@ -50,9 +71,9 @@
     "/opt/env/bin/python -c \"import pathlib; from rw_bot.tree_identity import tree_entries, tree_digest; root = pathlib.Path('/tmp/smoke-tree'); root.mkdir(parents=True, exist_ok=True); (root / 'game.txt').write_bytes(b'one'); assert tree_digest(tree_entries(root)) == 'c30d9d9d6a5315f6c714199204adbf66e779c43d85bedc27715f0754741b7c2e'\""
   ],
   "labels": {
-    "org.corvis.project": "rusted",
     "org.corvis.game-build": "1.15 (code 176, build #28)",
     "org.corvis.game-tree": "/pub/wagnera3/rusted/game",
     "org.corvis.payload-tree": "/pub/wagnera3/rusted/payload"
-  }
+  },
+  "project": "rusted"
 }

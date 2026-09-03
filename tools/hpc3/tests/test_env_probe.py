@@ -78,21 +78,25 @@ class TestProbeCommand:
 class TestParseInstalled:
     def test_it_reads_the_measured_environment(self) -> None:
         installed = parse_installed(ABL_PINNED_DISTRIBUTIONS)
-        assert installed["torch"] == "2.6.0+cu124"
-        assert installed["transformers"] == "4.46.3"
+        assert installed["torch"]["version"] == "2.6.0+cu124"
+        assert installed["transformers"]["version"] == "4.46.3"
 
     def test_names_are_normalised_on_the_way_in(self) -> None:
         assert "typing-extensions" in parse_installed(ABL_PINNED_DISTRIBUTIONS)
 
     def test_a_local_version_suffix_survives_intact(self) -> None:
         """+cu124 vs +cu128 is the whole distinction; it must not be trimmed."""
-        assert parse_installed("torch==2.6.0+cu124\n")["torch"] == "2.6.0+cu124"
+        assert parse_installed("torch==2.6.0+cu124\n")["torch"]["version"] == "2.6.0+cu124"
 
     def test_blank_lines_are_skipped(self) -> None:
-        assert parse_installed("\ntorch==2.6.0\n\n") == {"torch": "2.6.0"}
+        assert parse_installed("\ntorch==2.6.0\n\n") == {
+            "torch": {"version": "2.6.0", "wheel_tag": ""}
+        }
 
     def test_a_line_without_the_separator_is_skipped(self) -> None:
-        assert parse_installed("some warning\ntorch==2.6.0\n") == {"torch": "2.6.0"}
+        assert parse_installed("some warning\ntorch==2.6.0\n") == {
+            "torch": {"version": "2.6.0", "wheel_tag": ""}
+        }
 
     def test_output_with_no_distribution_at_all_is_refused(self) -> None:
         """A traceback must not read as 'nothing is installed'."""
@@ -126,12 +130,20 @@ class TestCheckPins:
     def test_a_cuda_build_difference_alone_is_a_mismatch(self) -> None:
         """Same torch, different CUDA build, different kernels."""
         with pytest.raises(AppError) as excinfo:
-            check_pins({"torch": "2.6.0+cu118"}, {"torch": "2.6.0+cu124"}, env_path="/e")
+            check_pins(
+                {"torch": {"version": "2.6.0+cu118", "wheel_tag": ""}},
+                {"torch": "2.6.0+cu124"},
+                env_path="/e",
+            )
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
 
     def test_an_absent_package_is_refused_and_says_so(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            check_pins({"torch": "2.6.0+cu124"}, _ABL_PINS, env_path="/e")
+            check_pins(
+                {"torch": {"version": "2.6.0+cu124", "wheel_tag": ""}},
+                _ABL_PINS,
+                env_path="/e",
+            )
         assert excinfo.value.code is Hpc3ErrorCode.ENV_PACKAGE_MISMATCH
         assert "does not have transformers installed" in excinfo.value.message
 

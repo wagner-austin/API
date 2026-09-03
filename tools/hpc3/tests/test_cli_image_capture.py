@@ -21,13 +21,21 @@ from tests.conftest import FakeRun, project_config, workspace_document, write_wo
 
 _FREEZE = "\n".join(
     [
-        "torch==2.6.0+cu124",
-        "transformers==4.46.3",
-        "pip==26.2.1",
-        "platform-core==0.1.0",
-        "model-trainer-server==0.1.0",
+        "torch==2.6.0+cu124==",
+        "transformers==4.46.3==",
+        "pip==26.2.1==",
+        "platform-core==0.1.0==py3-none-any",
+        "model-trainer-server==0.1.0==py3-none-any",
     ]
 )
+"""What the probe prints: ``name==version==wheel_tag``, one per line.
+
+The third-party lines carry no tag on purpose. Nothing needs one for them --
+they become ``==`` requirement lines the build resolves from an index -- and
+a conda-installed package genuinely has no ``WHEEL`` metadata to report. Only
+the first-party distributions, which become wheel FILES the staging step has
+to find, carry a tag.
+"""
 
 _COMMIT = "d11efacd231ef92426eaf92483c33a8504bd770f"
 
@@ -110,6 +118,141 @@ class TestParseSymbols:
             _ = capture_cli.parse_symbols("  ,  ")
 
 
+class TestOnboardingAProjectThatIsNotRegisteredYet:
+    """The route that exists because registration now requires an image.
+
+    A project cannot be registered until it declares an image digest, and the
+    digest comes from a build driven by the spec this command writes. Reading
+    the whole workspace to reach one string made that circular: a single
+    unimaged project refused the read for the very command whose output would
+    have fixed it. ``--env-path`` reads only the connection instead.
+    """
+
+    def test_a_workspace_whose_project_is_unimaged_is_still_readable(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The deadlock, asserted directly.
+
+        The registry here would be refused by ``decode_workspace``. Onboarding
+        never decodes it, so the capture that produces the missing image can
+        run.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        unimaged = project_config(gpu=None, partition="free")
+        del unimaged["image"]
+        _ = write_workspace(
+            tmp_path / "hpc3.json", workspace_document(projects={"newcomer": unimaged})
+        )
+        fake_run.add("bin/python", stdout=_FREEZE)
+
+        code = capture_cli.main(
+            _args(tmp_path, **{"--project": "newcomer", "--env-path": "/pub/envs/newcomer"})
+        )
+
+        assert code == 0
+
+    def test_the_probe_runs_on_the_host_not_inside_an_image(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """There is no image to enter yet; that is what onboarding means.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        _workspace(tmp_path)
+        fake_run.add("bin/python", stdout=_FREEZE)
+
+        _ = capture_cli.main(_args(tmp_path, **{"--env-path": "/pub/envs/newcomer"}))
+
+        probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
+        assert len(probes) == 1
+        assert "apptainer" not in probes[0]
+        assert "/pub/envs/newcomer" in probes[0]
+
+    def test_the_spec_asserts_the_versions_it_captured(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """An unregistered project has declared no pins, so the probe is the source.
+
+        Asserting nothing is not available: the spec contract refuses an empty
+        ``expected_versions`` because an image that asserts no versions cannot
+        detect its own staleness. Asserting what was captured is a real check
+        that the build reproduced the environment it was taken from.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        _workspace(tmp_path)
+        fake_run.add("bin/python", stdout=_FREEZE)
+
+        _ = capture_cli.main(_args(tmp_path, **{"--env-path": "/pub/envs/newcomer"}))
+
+        spec = decode_image_spec(
+            load_json_str((tmp_path / "specs" / "abl-image.json").read_text(encoding="utf-8"))
+        )
+        assert spec["expected_versions"] == {
+            "torch": "2.6.0+cu124",
+            "transformers": "4.46.3",
+        }
+
+    def test_a_registered_project_pinning_nothing_captures_what_it_has(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Not an onboarding case, and it was broken before this change.
+
+        ``pinned_packages`` may legitimately be empty -- ``rusted`` declares
+        exactly that, its payload being a compiled binary. Capturing such a
+        project produced an empty ``expected_versions``, which the spec
+        contract refuses, so the command failed on a valid registration.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        config = project_config(env_path="/pub/envs/abl", pinned_packages={})
+        _ = write_workspace(tmp_path / "hpc3.json", workspace_document(projects={"abl": config}))
+        fake_run.add("bin/python", stdout=_FREEZE)
+
+        assert capture_cli.main(_args(tmp_path)) == 0
+
+        spec = decode_image_spec(
+            load_json_str((tmp_path / "specs" / "abl-image.json").read_text(encoding="utf-8"))
+        )
+        assert spec["expected_versions"] == {
+            "torch": "2.6.0+cu124",
+            "transformers": "4.46.3",
+        }
+
+    def test_the_registered_route_still_reuses_the_projects_pins(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Without --env-path nothing about the version bump changes.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
+        _workspace(tmp_path)
+        fake_run.add("bin/python", stdout=_FREEZE)
+
+        _ = capture_cli.main(_args(tmp_path))
+
+        spec = decode_image_spec(
+            load_json_str((tmp_path / "specs" / "abl-image.json").read_text(encoding="utf-8"))
+        )
+        assert spec["expected_versions"] != {}
+
+
 class TestCapture:
     """What the command writes, read back through the contract."""
 
@@ -148,16 +291,28 @@ class TestCapture:
         )
         assert spec["expected_versions"] == {"torch": "2.6.0+cu124", "transformers": "4.46.3"}
 
-    def test_the_labels_name_the_project_and_its_source_environment(
+    def test_the_project_is_a_field_and_the_label_names_the_source_environment(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
+        """The project moved out of the free-form labels into a real field.
+
+        It lived only in ``labels`` until 2026-09-03, where nothing requires
+        or validates it, so every later command re-took the project from its
+        own flag and the defence against a typo was a registry lookup a
+        project mid-onboarding cannot satisfy. One source, typed once at
+        capture, read by the renderer.
+
+        Args:
+            tmp_path: Working directory.
+            fake_run: Recorded remote runner.
+            emitted: Captured summary lines.
+        """
         spec = decode_image_spec(
             load_json_str(_capture(tmp_path, fake_run).read_text(encoding="utf-8"))
         )
-        assert spec["labels"] == {
-            "org.corvis.project": "abl",
-            "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned",
-        }
+
+        assert spec["project"] == "abl"
+        assert spec["labels"] == {"org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"}
 
     def test_it_probes_the_projects_own_environment(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -184,16 +339,22 @@ class TestCapture:
         assert len(probes) == 1
         assert "apptainer exec" in probes[0]
 
-    def test_a_project_with_no_image_is_probed_on_the_host(
+    def test_a_cpu_project_is_probed_inside_its_image_too(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
-        """The onboarding case, which is what this command was written for and
-        must keep working: a CPU project's environment is a real directory."""
+        """This asserted the opposite until 2026-09-03.
+
+        A CPU project could then declare no image, so its ``env_path`` was a
+        real host directory and the probe ran on the host. Every project
+        declares an image now, so a registered project can never be imageless
+        and its ``env_path`` is always a container path -- probing the host
+        would look for ``/opt/env`` on the cluster filesystem, where it does
+        not exist.
+        """
         config: JSONValue = project_config(
-            env_path="/pub/wagnera3/envs/abl-pinned",
+            env_path="/opt/env",
             pinned_packages={"torch": "2.6.0+cu124", "transformers": "4.46.3"},
             gpu=None,
-            image=None,
         )
         _ = write_workspace(tmp_path / "hpc3.json", workspace_document(projects={"abl": config}))
         fake_run.add("bin/python", stdout=_FREEZE)
@@ -201,7 +362,7 @@ class TestCapture:
 
         probes = [c.remote_command for c in fake_run.calls if "bin/python" in c.remote_command]
         assert len(probes) == 1
-        assert "apptainer" not in probes[0]
+        assert "apptainer" in probes[0]
 
     def test_it_creates_the_output_directory(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

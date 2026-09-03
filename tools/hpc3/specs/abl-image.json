@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm",
   "env_prefix": "/opt/env",
-  "git_commit": "0a4975e5bd80f2ad13976e55b90b4726bcbd21ce",
+  "git_commit": "89aa2ecd10a8ec51c80012a6260e33ec63c9f15e",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -15,6 +15,7 @@
     "annotated-types==0.8.0",
     "anyio==4.14.2",
     "attrs==26.1.0",
+    "bitsandbytes==0.45.5",
     "certifi==2026.7.22",
     "charset-normalizer==3.5.1",
     "click==8.4.2",
@@ -99,7 +100,8 @@
   ],
   "expected_versions": {
     "torch": "2.6.0+cu124",
-    "transformers": "4.46.3"
+    "transformers": "4.46.3",
+    "bitsandbytes": "0.45.5"
   },
   "required_symbols": [
     {
@@ -319,7 +321,7 @@
     "/opt/env/bin/python -c \"from ordered_kernels.kernels import CUDA_SOURCE, NVRTC_OPTIONS; assert '--fmad=false' in NVRTC_OPTIONS, NVRTC_OPTIONS; assert 'acc[i][j] + xr[i] * wc[j]' in CUDA_SOURCE, 'the separate multiply-add is the bit-compatibility linchpin'; import ordered_kernels.cli.gemm_probe; import ordered_kernels.cli.train_step; import ordered_kernels.cli.bench\""
   ],
   "labels": {
-    "org.corvis.project": "mi",
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"
-  }
+  },
+  "project": "mi"
 }

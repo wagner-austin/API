@@ -35,7 +35,7 @@ registry and this block cannot check it. That gap stays open.
 
 from __future__ import annotations
 
-from hpc3.contracts.workspace import ProjectConfig
+from hpc3.contracts.project import ProjectConfig
 
 #: Opening marker of the generated block, and the ONE place it is written.
 BLOCK_START = "<!-- generated: hpc3-projects. Do not edit by hand. -->"
@@ -54,15 +54,15 @@ def _image_cell(project: ProjectConfig) -> str:
         project: The project's declared configuration.
 
     Returns:
-        The pinned digest's first twelve characters, or ``none`` when the
-        project declares no image. Twelve is enough to tell two images apart
-        by eye and short enough to keep the row readable; the whole digest
-        lives in the workspace document.
+        The pinned digest's first twelve characters. Twelve is enough to tell
+        two images apart by eye and short enough to keep the row readable;
+        the whole digest lives in the workspace document.
+
+        There is no ``none`` case. Every project declares an image, so the
+        cell that used to say so is unreachable -- see
+        :func:`~hpc3.contracts.project._require_project_image`.
     """
-    image = project["image"]
-    if image is None:
-        return "none"
-    return f"`{image['sha256'][:12]}`"
+    return f"`{project['image']['sha256'][:12]}`"
 
 
 def _gpu_cell(project: ProjectConfig) -> str:
