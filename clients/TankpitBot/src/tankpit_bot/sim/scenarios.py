@@ -177,6 +177,94 @@ def make_ferry_sim_world() -> SimWorldDict:
     return world
 
 
+# The larder scenario. Same open clearing as the default arena, but
+# arranged for the collection branches no other scenario reaches: the
+# client stands ON equipment and its slots are EMPTY.
+#
+# Two live shapes motivate it, both from the 2026-09-02 cause triage
+# ([[capture-differ]]) -- `pickup_equipment 67 49 pickup` (1,324 live
+# windows) and `radar 4F 46` (616), neither producible by a bot that
+# always walks to what it collects and always holds extra radars.
+_LARDER_X = 216
+_LARDER_Y = 108
+# Ringed tight: the bot collects nearest-first, so a dense ring keeps
+# it in own-tile and adjacent range instead of walking half a screen
+# between grants. The client's own tile is seeded too -- that is the
+# whole point.
+_LARDER_EQUIPMENT: tuple[tuple[int, int], ...] = (
+    (_LARDER_X, _LARDER_Y),
+    (_LARDER_X + 1, _LARDER_Y),
+    (_LARDER_X, _LARDER_Y + 1),
+    (_LARDER_X - 1, _LARDER_Y),
+    (_LARDER_X, _LARDER_Y - 1),
+    (_LARDER_X + 2, _LARDER_Y + 1),
+    (_LARDER_X - 2, _LARDER_Y - 1),
+    (_LARDER_X + 1, _LARDER_Y - 2),
+    (_LARDER_X - 1, _LARDER_Y + 2),
+    (_LARDER_X + 3, _LARDER_Y),
+    (_LARDER_X - 3, _LARDER_Y),
+    (_LARDER_X, _LARDER_Y + 3),
+)
+# Fuel near enough to keep the session productive, but the tank spawns
+# BELOW capacity so the fuel lane stays live rather than refusing every
+# dispatch on the full-tank predictor.
+_LARDER_FUEL: tuple[tuple[int, int, int], ...] = (
+    (_LARDER_X + 4, _LARDER_Y + 2, 400),
+    (_LARDER_X - 4, _LARDER_Y + 2, 400),
+    (_LARDER_X + 2, _LARDER_Y - 4, 400),
+    (_LARDER_X - 2, _LARDER_Y + 4, 400),
+)
+_LARDER_CLIENT_FUEL = 700
+
+
+def make_larder_sim_world() -> SimWorldDict:
+    """Build the larder scenario: collect without walking, scan for free.
+
+    Every other scenario reaches the collection laws the same way —
+    the bot walks to a container it can see and it is carrying extra
+    radars while it does. Two whole branches therefore never execute,
+    and the response-shape differ reports the live shapes they would
+    produce as MISSING when the sim implements both
+    ([[capture-differ]]):
+
+    * **`pickup_equipment 67 49 pickup`** (1,324 live windows) — a
+      grant with no `47self` walk echo, because the container was
+      already underfoot. The client spawns ON equipment and the ring
+      around it is tight enough that the next one usually is too.
+    * **`radar 4F 46`** (616) — a scan with no leading `0x49`,
+      because ``narrate_radar`` snapshots the inventory only when an
+      EXTRA radar was consumed. The client spawns with all five slots
+      at ZERO, so its early scans are free ones.
+
+    Zeroed slots do double duty: every slot is deficient, so no grant
+    is refused by the inventory-full law while the bot restocks.
+
+    NOT reachable here, and deliberately so: the third shape in that
+    triage, `pickup_fuel 44 pickup 52c5` (366), is a full-tank
+    own-tile fuel click. The production bot has predicted that refusal
+    before dispatch since 2026-08-03 (``bot/executor.py`` consulting
+    ``fuel_pickup_refusal``), so the live windows carrying it were
+    drawn by a SUPERSEDED bot. No scenario can make the current one
+    ask, and a sim that produced it would be answering a question
+    nobody asks any more.
+
+    No opponent: this is a forage scenario, and a fight would pull the
+    bot out of the larder before the branches fire.
+
+    Returns:
+        The seeded world.
+    """
+    world = make_sim_world(SIM_FIELD)
+    client = make_sim_tank(SIM_CLIENT_ID, 2, 1, _LARDER_X, _LARDER_Y, _LARDER_CLIENT_FUEL)
+    client["counts"] = [0, 0, 0, 0, 0]
+    world["tanks"][SIM_CLIENT_ID] = client
+    for x, y in _LARDER_EQUIPMENT:
+        world["equipment"].append(SimEquipmentDict(x=x, y=y))
+    for x, y, volume in _LARDER_FUEL:
+        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume, dotted=True))
+    return world
+
+
 def _require_seeds_passable(world: SimWorldDict, terrain: _test_hooks.TerrainMapProtocol) -> None:
     """Reject a scenario whose seeds sit on illegal ground — loudly.
 
@@ -253,6 +341,7 @@ def _select_scenario_world(
     *,
     practice: bool,
     ferry_mode: bool,
+    larder_mode: bool,
     atlas_mode: bool,
     opponent: bool,
     opponent_name: str,
@@ -263,6 +352,8 @@ def _select_scenario_world(
         practice: Practice-roster session (the world seeds in
             ``_boot``, so it starts empty here).
         ferry_mode: Ferry forage scenario (never has an opponent).
+        larder_mode: Own-tile collection scenario (never has an
+            opponent — a fight pulls the bot out of the larder).
         atlas_mode: Standalone atlas forage world (client + the mined
             real field, no opponent; seeds in ``_boot``).
         opponent: The caller's opponent request.
@@ -275,6 +366,8 @@ def _select_scenario_world(
         return make_sim_world(SIM_FIELD), opponent
     if ferry_mode:
         return make_ferry_sim_world(), False
+    if larder_mode:
+        return make_larder_sim_world(), False
     if atlas_mode:
         return make_sim_world(SIM_FIELD), False
     world = make_default_sim_world()
@@ -288,6 +381,7 @@ def _resolve_session_mode(
     opponent: bool,
     practice: bool,
     ferry: bool,
+    larder: bool,
     atlas: str | None,
     ghost: str | None,
     opponent_name: str,
@@ -295,12 +389,14 @@ def _resolve_session_mode(
     """Resolve the requested flags into one scenario's inputs.
 
     Ghost replay takes precedence over every other flag (a recording
-    IS a complete scenario); then practice > ferry > atlas > default.
+    IS a complete scenario); then practice > ferry > larder > atlas >
+    default.
 
     Args:
         opponent: The caller's opponent request.
         practice: Practice-roster session flag.
         ferry: Ferry scenario flag.
+        larder: Own-tile collection scenario flag.
         atlas: Optional atlas path string.
         ghost: Optional capture path string.
         opponent_name: Optional scripted-opponent wire name.
@@ -320,15 +416,17 @@ def _resolve_session_mode(
         ghost_atlas = Path(atlas) if atlas is not None else None
         return make_sim_world(SIM_FIELD), False, False, ghost_spec, ghost_atlas, False
     ferry_mode = ferry and not practice
-    atlas_path = Path(atlas) if atlas is not None and not ferry_mode else None
+    larder_mode = larder and not (practice or ferry_mode)
+    atlas_path = Path(atlas) if atlas is not None and not (ferry_mode or larder_mode) else None
     world, opponent = _select_scenario_world(
         practice=practice,
         ferry_mode=ferry_mode,
+        larder_mode=larder_mode,
         atlas_mode=atlas_path is not None and not practice,
         opponent=opponent,
         opponent_name=opponent_name,
     )
-    return world, opponent, practice, None, atlas_path, ferry_mode
+    return world, opponent, practice, None, atlas_path, ferry_mode or larder_mode
 
 
 class _CliArgsDict(TypedDict):
@@ -344,6 +442,7 @@ class _CliArgsDict(TypedDict):
     opponent: bool
     practice: bool
     ferry: bool
+    larder: bool
     atlas: str | None
     ghost: str | None
     stamp: str | None
@@ -402,8 +501,12 @@ def _apply_bare_flag(parsed: _CliArgsDict, token: str, rest: list[str]) -> int:
     """
     if token == "--no-opponent":
         parsed["opponent"] = False
-    elif token in ("--practice", "--ferry"):
-        parsed["practice" if token == "--practice" else "ferry"] = True
+    elif token == "--practice":
+        parsed["practice"] = True
+    elif token == "--ferry":
+        parsed["ferry"] = True
+    elif token == "--larder":
+        parsed["larder"] = True
     elif token == "--from-atlas":
         if rest and not rest[0].startswith("--"):
             parsed["atlas"] = rest[0]
@@ -432,6 +535,7 @@ def _parse_cli(args: list[str]) -> _CliArgsDict:
         opponent=True,
         practice=False,
         ferry=False,
+        larder=False,
         atlas=None,
         ghost=None,
         stamp=None,
@@ -462,4 +566,5 @@ __all__ = [
     "_select_scenario_world",
     "make_default_sim_world",
     "make_ferry_sim_world",
+    "make_larder_sim_world",
 ]

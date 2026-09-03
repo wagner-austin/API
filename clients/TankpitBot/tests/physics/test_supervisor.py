@@ -14,10 +14,13 @@ from tankpit_bot.physics.supervisor import (
     equipment_pickup_refusal,
     fuel_pickup_close_code,
     fuel_pickup_refusal,
+    shot_refusal,
     teleport_refusal,
 )
 from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_EMPTY_CONTAINER,
+    SUPERVISOR_ERROR_FRIENDLY_FIRE,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     SUPERVISOR_ERROR_INVENTORY_FULL,
     SUPERVISOR_ERROR_TANK_FULL,
@@ -106,3 +109,39 @@ class TestTeleportRefusal:
             teleport_refusal(838, 848 - TELEPORT_RING1_COST_SLACK)
             == SUPERVISOR_ERROR_INSUFFICIENT_FUEL
         )
+
+
+class TestShotRefusal:
+    """The two measured shot refusals, mined 2026-09-02."""
+
+    def test_an_ordinary_shot_is_not_refused(self) -> None:
+        """In-window aim at a non-ally: nothing stops it."""
+        assert shot_refusal(aim_in_window=True, target_is_ally=False) is None
+
+    def test_an_aim_outside_the_window_draws_cant_do(self) -> None:
+        """47 of 47 archived shoot windows carrying code 0.
+
+        The law was already recorded from the other side: the bot
+        clamps its aim into the window for exactly this reason.
+        """
+        assert shot_refusal(aim_in_window=False, target_is_ally=False) == (SUPERVISOR_ERROR_CANT_DO)
+
+    def test_a_shot_at_an_ally_draws_friendly_fire(self) -> None:
+        """45 of 45 archived shoot windows carrying code 3.
+
+        Production reads this as the one unfakeable proof that an id
+        no longer resolves to an enemy.
+        """
+        assert shot_refusal(aim_in_window=True, target_is_ally=True) == (
+            SUPERVISOR_ERROR_FRIENDLY_FIRE
+        )
+
+    def test_the_window_check_wins_when_both_apply(self) -> None:
+        """Order is a precondition, not a preference.
+
+        A coordinate the server does not consider actionable is
+        refused before anything about the target is read — the same
+        order the move router applies, where the window check precedes
+        container validation.
+        """
+        assert shot_refusal(aim_in_window=False, target_is_ally=True) == (SUPERVISOR_ERROR_CANT_DO)

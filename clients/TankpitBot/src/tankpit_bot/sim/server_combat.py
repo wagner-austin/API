@@ -12,8 +12,10 @@ must remember, then NARRATE the outcome for one connection
 from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
+from tankpit_bot.physics.supervisor import shot_refusal
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.protocol.types import BinaryMessage
+from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_DO
+from tankpit_bot.protocol.types import BinaryMessage, SupervisorDict
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.combat import process_shot
@@ -35,6 +37,53 @@ class SimServerCombatMixin:
     session: ClientSession
     combat: CombatClock
     _roster_ids: frozenset[int]
+
+    def _shot_target_is_ally(self, tank_id: int, target_id: int) -> bool:
+        """Does this shot name a living tank on the shooter's own team?
+
+        A positional shot carries entity id 0 and names nobody. An id
+        naming a tank that is gone or dead is not an ally either — the
+        server's friendly-fire receipt is what production reads as
+        proof the id still resolves to a TEAMMATE, so a stale id must
+        not manufacture one.
+
+        Args:
+            tank_id: The firing tank.
+            target_id: The shot's entity id, 0 for a positional shot.
+
+        Returns:
+            True when the id names a living same-team tank.
+        """
+        if target_id == 0 or target_id == tank_id:
+            return False
+        target = self.world["tanks"].get(target_id)
+        if target is None or not target["alive"]:
+            return False
+        return target["team"] == self.world["tanks"][tank_id]["team"]
+
+    def _refuse_shot(self, tank_id: int, command: ClientCommandDict) -> int | None:
+        """Apply the measured shot-refusal law to one command.
+
+        The window half is checked only for the CLIENT, because the
+        client is the one connection whose stored 0x5A window the sim
+        models — the same restriction ``SimServerMoveMixin`` puts on
+        its own window check. An unmodelled window cannot prove a
+        refusal, so other tanks pass it.
+
+        Args:
+            tank_id: The firing tank.
+            command: The queued shoot command.
+
+        Returns:
+            The refusal's error code, or None when the shot proceeds.
+        """
+        return shot_refusal(
+            aim_in_window=(
+                tank_id != self.session.client_id
+                or self.session.viewport.in_window(command["x"], command["y"])
+            ),
+            target_is_ally=self._shot_target_is_ally(tank_id, command["target_id"]),
+        )
 
     def _process_shoot_command(
         self,
@@ -68,6 +117,22 @@ class SimServerCombatMixin:
             moved: Tanks that relocated earlier this tick (drives the
                 homing selection).
         """
+        refusal = self._refuse_shot(tank_id, command)
+        if refusal is not None:
+            if tank_id == self.session.client_id:
+                # Measured field values, 2026-09-02: code 0 carries
+                # (0, 1) in 47 of 47 archived shoot windows and code 3
+                # carries (1, 0) in 45 of 45. They are NOT the move
+                # family's values and must not be copied from there.
+                messages.append(
+                    SupervisorDict(
+                        msg_type=0x52,
+                        reset_action=0 if refusal == SUPERVISOR_ERROR_CANT_DO else 1,
+                        close_map=1 if refusal == SUPERVISOR_ERROR_CANT_DO else 0,
+                        error_code=refusal,
+                    )
+                )
+            return
         removed_tick = self.session.viewport.removed_at.get(command["target_id"])
         departed_age_ms = (
             None if removed_tick is None else (self.world["tick"] - removed_tick) * TICK_RATE_MS

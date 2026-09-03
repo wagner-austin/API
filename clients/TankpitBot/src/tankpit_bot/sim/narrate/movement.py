@@ -101,8 +101,22 @@ def narrate_move(
         The messages this observer receives, in emission order.
     """
     messages: list[BinaryMessage] = []
-    if outcome["kind"] == "moved" or outcome["path"]:
+    if outcome["path"]:
+        # NO MOVEMENT, NO ECHO. A click on the tile the tank already
+        # occupies resolves as a "moved" outcome with an EMPTY path,
+        # and the real server answers it without a 0x47: measured
+        # 2026-09-02 by tracking each capture's own 0x3D position and
+        # finding every command clicked at exactly that tile — 1,042
+        # of 1,044 own-tile ``pickup_equipment`` clicks drew no echo.
+        # (``pickup_fuel`` reads 23 silent to 9, and plain ``move``
+        # 22 to 21; the residuals are consistent with a stale tracked
+        # position — a click that looked own-tile because the last
+        # 0x3D had not caught up — but only the equipment ratio is
+        # lopsided enough to stand on alone.) The sim echoed every
+        # one, which is why `pickup_equipment 67 49 pickup` — 1,324
+        # live windows — read as a missing law ([[capture-differ]]).
         messages.append(movement_echo(world, outcome))
+    if outcome["kind"] == "moved" or outcome["path"]:
         for x, y in outcome["mine_positions"]:
             messages.append(MineDetonationDict(msg_type=0x45, positions=[(x, y)]))
         if include_pickups and outcome["pickups"]:

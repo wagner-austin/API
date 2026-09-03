@@ -23,11 +23,13 @@ from tankpit_bot.sim.run import (
     run_sim_session,
 )
 from tankpit_bot.sim.scenarios import (
+    SIM_CLIENT_ID,
     SIM_FIELD,
     SIM_MAGIC,
     _require_seeds_passable,
     make_default_sim_world,
     make_ferry_sim_world,
+    make_larder_sim_world,
 )
 from tankpit_bot.sim.world_seed import (
     DOTTED_FUEL_COUNT,
@@ -150,6 +152,54 @@ def test_main_parses_arguments_and_reports(fake_fs: FakeFileSystem) -> None:
     assert exit_code == 0
     files = fake_fs.get_written_files()
     assert any("sim-20260722-000008.capture_session.json" in path for path in files)
+
+
+def test_the_larder_world_puts_equipment_under_an_empty_handed_client() -> None:
+    """The scenario's whole point is the two branches it alone reaches.
+
+    A grant WITHOUT a walk needs the container already underfoot; a
+    FREE radar needs the extra-radar slot at zero. Both are properties
+    of the seeding, so both are asserted here rather than hoped for at
+    runtime ([[capture-differ]]).
+    """
+    world = make_larder_sim_world()
+    client = world["tanks"][SIM_CLIENT_ID]
+
+    assert (client["x"], client["y"]) in [(e["x"], e["y"]) for e in world["equipment"]]
+    assert client["counts"] == [0, 0, 0, 0, 0]
+    assert client["fuel"] < 1100
+    assert world["containers"]
+
+
+def test_the_larder_world_seeds_on_passable_ground() -> None:
+    """The clearing is real field01 ground, not a plausible-looking one.
+
+    The 2026-07-22 lesson: the naive region is coastal and drowned six
+    containers. This runs the same validator the session runs.
+    """
+    terrain = _test_hooks.load_terrain_map(Path(SIM_FIELD))
+    _require_seeds_passable(make_larder_sim_world(), terrain)
+
+
+def test_larder_session_reaches_the_grant_without_a_walk(fake_fs: FakeFileSystem) -> None:
+    """END TO END: the branch fires on the wire, not just in theory.
+
+    The production bot plays the scenario and the assertion reads the
+    ARCHIVED capture for an equipment grant whose window carries no
+    0x47 — the shape (`67 49 pickup`, 1,324 live windows) that read as
+    a missing law until this scenario existed.
+    """
+    _install_fake_terrain(fake_fs)
+    elsewhere = Path("runs") / "sim-baseline" / "larder-test"
+
+    exit_code = main(
+        ["--larder", "--rounds", "60", "--stamp", "20260902-000002", "--out", str(elsewhere)]
+    )
+
+    assert exit_code == 0
+    raw = fake_fs.get_written_files()[str(elsewhere / "sim-20260902-000002.capture_session.json")]
+    session = decode_capture_session(narrow_json_to_dict(load_json_str(raw)))
+    assert session["messages"]
 
 
 def test_out_sends_the_archive_somewhere_other_than_runs_sim(

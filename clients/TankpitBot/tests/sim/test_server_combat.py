@@ -6,6 +6,7 @@ from tankpit_bot.sim.combat import (
     SLOT_DUAL,
     SLOT_HOMING,
 )
+from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import (
     SimContainerDict,
@@ -216,3 +217,81 @@ def test_statistics_counts_the_clients_kills_not_the_rooms() -> None:
     server.queue_command(9, _statistics_key())
     reports = [m for m in server.advance_tick() if m["msg_type"] == 0x56]
     assert [(r["destroyed"], r["deactivated"]) for r in reports] == [(1, 0)]
+
+
+def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
+    """A decoded id-targeted shoot command clicked at (x, y).
+
+    Args:
+        x: Clicked tile X.
+        y: Clicked tile Y.
+        target_id: The shot's entity id.
+
+    Returns:
+        The decoded command.
+    """
+    return ClientCommandDict(
+        kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0, message_id=0, direction=0
+    )
+
+
+def test_a_shot_at_a_teammate_is_refused_with_friendly_fire() -> None:
+    """THE PIN for the measured code-3 refusal.
+
+    45 of 45 archived shoot windows carrying code 3 do so with
+    ``(reset_action=1, close_map=0)`` (2026-09-02 field sweep). The
+    production bot has consumed this receipt since 2026-07-30 —
+    ``_disprove_target_by_friendly_fire`` treats it as the only
+    unfakeable proof that an id no longer resolves to an enemy — but
+    the sim could not produce it, so that path had never been driven
+    end to end by a sim session.
+    """
+    server = _server()
+    server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
+
+    server.queue_command(9, _id_shot(12, 10, 12))
+    messages = server.advance_tick()
+
+    assert _shots(messages) == []
+    assert [m for m in messages if m["msg_type"] == 0x52] == [
+        {"msg_type": 0x52, "reset_action": 1, "close_map": 0, "error_code": 3}
+    ]
+    assert server.world["tanks"][12]["fuel"] == 500
+
+
+def test_a_positional_shot_over_a_teammate_still_fires() -> None:
+    """Friendly fire is an ID law, not a geometry law.
+
+    The refusal is the server answering "that id is on your team".
+    A shot that names nobody is a ground shot and resolves normally,
+    which is what keeps the sim from inventing a no-fire zone around
+    allies.
+    """
+    server = _server()
+    server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
+
+    server.queue_command(9, _shoot(12, 10))
+    messages = server.advance_tick()
+
+    assert len(_shots(messages)) == 1
+    assert [m for m in messages if m["msg_type"] == 0x52] == []
+
+
+def test_a_stale_id_is_not_treated_as_an_ally() -> None:
+    """A dead or unknown id resolves to nobody, so no refusal.
+
+    The friendly-fire receipt is production's proof that the id names
+    a LIVING teammate; manufacturing one for a corpse would teach the
+    bot to blocklist ids the real server would have let it shoot.
+    """
+    server = _server()
+    server.world["tanks"][12] = make_sim_tank(12, 0, 1, 12, 10, 500)
+    server.world["tanks"][12]["alive"] = False
+
+    server.queue_command(9, _id_shot(12, 10, 12))
+    dead_target = server.advance_tick()
+    server.queue_command(9, _id_shot(11, 10, 404))
+    unknown_target = server.advance_tick()
+
+    assert len(_shots(dead_target)) == 1
+    assert len(_shots(unknown_target)) == 1

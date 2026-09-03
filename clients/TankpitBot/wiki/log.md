@@ -5643,3 +5643,48 @@ Consequences by room: empty Practice → knowledge permanent, frontier churn and
 Also killed while gating: a SECOND latent coverage flake — `fleet_manager`'s exited-before-identity-read branch was only ever covered when a real spawned child happened to lose a race (the conftest even documented the seam: "a test wanting the already-exited path clears the entry" — nothing ever did). Deterministic test added; the gate stops flickering.
 
 Gates: make check green — 6,794 tests, 100.00% statements and branches, guard clean. Live validation of rows 1-5 together is the next step after row 6, per the operator's acceptance.
+
+---
+## [2026-09-02] lift | Reading the bucket found two real laws; the larder scenario flushed out a third
+
+Two items: read the 92 `token_never_emitted` rows, and build the own-tile collection scenario. Reading the bucket is what produced most of the value.
+
+### ~3,000 of 3,555 windows are spill, not gaps
+
+For every novel token, what the client had sent IMMEDIATELY BEFORE the window carrying it. The real server is asynchronous, so a slow answer to command N lands inside N+1's window:
+
+    radar    pickup   n=2690   preceded by teleport 75%
+    teleport 4C       n= 195   preceded by map_open 100%
+    map_open 53self   n=  46   preceded by shoot 95%
+
+The bot teleports and scans on landing, so the landing's auto-pick records arrive after the radar's answers. It opens the map and hops, so the 0x4C lands in the teleport's window. Unclosable, and not to be chased ([[capture-differ]]).
+
+### Three shot refusals the sim could not produce
+
+The `52c*` rows were different. `52c0` is CANT_DO and `52c3` is FRIENDLY_FIRE — the server REFUSING a shot — and the sim's entire shoot vocabulary was `{53self}`. No refusal path at all.
+
+Both are already load-bearing in production: `_disprove_target_by_friendly_fire` treats code 3 as the one unfakeable proof that an id no longer resolves to an enemy, written after a ghost drew 43 consecutive rejected shots. **That path had never been driven end to end**, because no sim session could produce the message it consumes.
+
+Field values swept from every 0x52 in a shoot window, invariant in each: code 0 -> `(reset_action=0, close_map=1)` 47/47; code 3 -> `(1, 0)` 45/45. Now `physics.supervisor.shot_refusal`, beside the fuel/equipment/teleport laws.
+
+The sweep also found the sim's move-family code-0 emitting `(1, 0)` where live is `(0, 1)` in 83 of 86 archive-wide — **a field-level divergence the differ is structurally blind to**, because it tokenizes a 0x52 to `52c<code>` and throws the rest away. Recorded, not yet fixed.
+
+Not implemented: code 8 on a shot. The contract lists it; the archive holds zero shot windows carrying it. The sim does not invent shapes.
+
+### The larder scenario, and the law it flushed out
+
+`make_larder_sim_world`: client spawns ON equipment, ringed by more, all five slots ZERO. First run — `radar 4F 46` HIT, `pickup_equipment 67 49 pickup` MISS. Every grant still carried a `47self`.
+
+Measured rather than assumed: tracking each live capture's own 0x3D position and finding every command clicked at exactly that tile — **1,042 of 1,044 own-tile `pickup_equipment` clicks drew NO echo.** NO MOVEMENT, NO ECHO is now the law, and both target shapes appear. Between them those rows are 1,940 live windows.
+
+It settled an older disagreement too: two fuel-choreography tests had docstrings naming the measured shape `44+pickup+52c5` and assertions demanding a leading `0x47` that shape does not contain. **The prose carried the law and the expectation carried the invention, and nothing compared them.** A third instance of the same failure shape this log keeps recording.
+
+### The live archive is a mixture of bot generations
+
+`pickup_fuel 44 pickup 52c5` (366 windows) is a full-tank own-tile fuel click, and the bot has predicted that refusal before dispatch since 2026-08-03. Those windows were drawn by a SUPERSEDED bot. The live side has the same graveyard property as `runs/sim`, and the differ cannot distinguish "the sim lacks this law" from "the current bot never asks for it."
+
+### Gate, honestly
+
+The shared tree is RED — another session has ~20 `bot/ai/` files open mid-edit, one of them (`context.py`, 618 lines) over the file ceiling, and 15 tests failing. None of it is mine and none of it is mine to touch.
+
+My changes were verified in ISOLATION instead: a detached worktree at HEAD with only my 12 changed files copied in. **6,806 passed, 0 real failures** (the 2 reported are wiki `source_paths` checks against the gitignored `runs/` tree the worktree does not have). The worktree was removed afterwards.

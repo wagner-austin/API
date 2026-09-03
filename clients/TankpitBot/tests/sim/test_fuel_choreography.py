@@ -104,12 +104,19 @@ def test_full_tank_own_tile_click_uses_the_no_gain_0x44_form() -> None:
     The measured no-walk shape (``44+pickup+52c5``): the 0x44 comes as
     ``is_free=False, flag=43`` with the unchanged fuel, one record,
     close ``reset_action=0``.
+
+    NO 0x47 leads it. Until 2026-09-02 this assertion demanded one
+    while the docstring above named the measured shape without it —
+    the prose carried the law and the expectation carried the sim's
+    invention, and nothing compared them. The zero-tile echo is now
+    suppressed (see ``narrate_move``: 1,042 of 1,044 archived
+    own-tile equipment clicks drew no echo).
     """
     server = _server(fuel=1100)
     server.world["containers"].append(SimContainerDict(x=10, y=10, volume=300, dotted=True))
     server.queue_command(9, _pickup(10, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, 0x44, "container_pickup", 0x52, 0x2E, 0x2E]
+    assert _kinds(messages) == [0x44, "container_pickup", 0x52, 0x2E, 0x2E]
     assert _gains(messages) == [
         FuelGainDict(msg_type=0x44, fuel_total=1100, is_free=False, flag=43)
     ]
@@ -118,12 +125,15 @@ def test_full_tank_own_tile_click_uses_the_no_gain_0x44_form() -> None:
 
 
 def test_empty_own_tile_click_closes_code_4_without_reset() -> None:
-    """No transfer, no walk, drained: 0x44 no-gain form, rec 0, code 4."""
+    """No transfer, no walk, drained: 0x44 no-gain form, rec 0, code 4.
+
+    Also echo-free — the tank never left its tile.
+    """
     server = _server(fuel=1000)
     server.world["containers"].append(SimContainerDict(x=10, y=10, volume=0, dotted=True))
     server.queue_command(9, _pickup(10, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, 0x44, "container_pickup", 0x52, 0x2E, 0x2E]
+    assert _kinds(messages) == [0x44, "container_pickup", 0x52, 0x2E, 0x2E]
     assert _remainings(messages) == [0]
     assert _closes(messages) == [(4, 0)]
 

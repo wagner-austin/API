@@ -84,6 +84,7 @@ def run_sim_session(
     opponent: bool = True,
     practice: bool = False,
     ferry: bool = False,
+    larder: bool = False,
     atlas: str | None = None,
     ghost: str | None = None,
     stamp: str | None = None,
@@ -104,6 +105,11 @@ def run_sim_session(
             in practice and ferry modes).
         practice: Face the certified practice-bot roster
             (``sim/practice_room``) instead of the scripted harness.
+        larder: Play the own-tile collection scenario
+            (:func:`make_larder_sim_world`) — no opponent, the client
+            standing ON equipment with empty slots, so the grant-
+            without-a-walk and free-radar branches execute. Ignored
+            when ``practice`` or ``ferry`` is set.
         ferry: Play the ferry forage scenario
             (:func:`make_ferry_sim_world`) — no opponent, a
             water-locked larder behind one scope pan. Ignored when
@@ -138,6 +144,7 @@ def run_sim_session(
         opponent=opponent,
         practice=practice,
         ferry=ferry,
+        larder=larder,
         atlas=atlas,
         ghost=ghost,
         opponent_name=opponent_name,
@@ -233,7 +240,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Args:
         argv: Command-line arguments (``--rounds N``,
             ``--no-opponent``, ``--stamp S``, ``--human-opponent
-            NAME``, ``--ferry``, ``--from-atlas [PATH]``, ``--out
+            NAME``, ``--ferry``, ``--larder``, ``--from-atlas [PATH]``, ``--out
             DIR``). Uses ``sys.argv[1:]`` when None.
 
     Returns:
@@ -247,6 +254,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         opponent=parsed["opponent"],
         practice=parsed["practice"],
         ferry=parsed["ferry"],
+        larder=parsed["larder"],
         atlas=parsed["atlas"],
         ghost=parsed["ghost"],
         stamp=parsed["stamp"],

@@ -215,6 +215,15 @@ def test_server_ticks_price_the_departure_age_for_the_shot() -> None:
     inside the TTL, so the wire shows a weapon-3 echo and the homing
     round debits server-side. No 0x49 rides the shot (the live law:
     firing costs never snapshot — response-shape differ 2026-08-01).
+
+    The aim is the tile the client is STANDING on, not the departed
+    tank's real position 30 tiles away. That is what production does
+    and why it works: the snipe fires at an in-viewport ground tile
+    carrying the target's id, and the server's homing seeker tracks
+    the real tank ([[bot-behavior-contract]] § viewport-clamped aim).
+    Before 2026-09-02 this test aimed at the departed tile itself — a
+    shot the live server refuses code 0, which the sim had no law to
+    refuse and so answered with a hit.
     """
     world = _arena()
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
@@ -222,10 +231,37 @@ def test_server_ticks_price_the_departure_age_for_the_shot() -> None:
     server.queue_command(9, _teleport(40, 40))
     away = server.advance_tick()
     assert [m["tank_id"] for m in away if m["msg_type"] == 0x58] == [11]
-    server.queue_command(9, _id_shot(15, 10, 11))
+    landed = world["tanks"][9]
+    server.queue_command(9, _id_shot(landed["x"], landed["y"], 11))
     messages = server.advance_tick()
     shots = [m for m in messages if m["msg_type"] == 0x53]
     assert [s["weapon"] for s in shots] == [WEAPON_HOMING]
     assert [m for m in messages if m["msg_type"] == 0x49] == []
     assert world["tanks"][9]["counts"][SLOT_HOMING] == 1
     assert world["tanks"][11]["fuel"] == 455
+
+
+def test_an_aim_outside_the_window_is_refused_rather_than_rerouted() -> None:
+    """THE PIN for the measured code-0 shot refusal.
+
+    Aiming at a departed tank's REAL tile — outside the client's
+    stored window — is exactly what the live server rejects: 47 of 47
+    archived shoot windows carrying code 0 do so with
+    ``(reset_action=0, close_map=1)`` (2026-09-02 field sweep). The
+    reroute law is untouched: it needs an in-window aim carrying the
+    id, which the test above exercises.
+    """
+    world = _arena()
+    world["tanks"][9]["counts"][SLOT_HOMING] = 2
+    server = _server(world)
+    server.queue_command(9, _teleport(40, 40))
+    server.advance_tick()
+
+    server.queue_command(9, _id_shot(15, 10, 11))
+    messages = server.advance_tick()
+
+    assert [m for m in messages if m["msg_type"] == 0x53] == []
+    refusals = [m for m in messages if m["msg_type"] == 0x52]
+    assert refusals == [{"msg_type": 0x52, "reset_action": 0, "close_map": 1, "error_code": 0}]
+    assert world["tanks"][9]["counts"][SLOT_HOMING] == 2
+    assert world["tanks"][11]["fuel"] == 500

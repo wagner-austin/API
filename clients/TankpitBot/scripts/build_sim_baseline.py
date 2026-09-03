@@ -69,6 +69,9 @@ class BaselineScenarioDict(TypedDict):
         opponent: Whether the scripted opponent returns fire.
         practice: Face the certified practice-bot roster instead.
         ferry: Play the water-locked ferry forage scenario.
+        larder: Play the own-tile collection scenario — the client
+            standing ON equipment with empty slots, which is the only
+            way the grant-without-a-walk and free-radar branches run.
         opponent_name: Wire name for the scripted opponent. A
             human-shaped name runs the session under the consent gate
             and the fair-fight contracts.
@@ -78,13 +81,16 @@ class BaselineScenarioDict(TypedDict):
     opponent: bool
     practice: bool
     ferry: bool
+    larder: bool
     opponent_name: str
 
 
 #: The sweep. Breadth is the lever that actually buys samples, because
 #: each of these drives a DIFFERENT command vocabulary out of the
 #: production bot — and command vocabulary is what a response-shape
-#: diff windows on.
+#: diff windows on. ``larder`` is the worked example: it was added
+#: 2026-09-02 to reach two branches no other scenario touches, and it
+#: closed two missing-law rows worth 1,940 live windows between them.
 #:
 #: The atlas forage scenario is deliberately absent. It reseeds the
 #: container field from the mined longitudinal atlas, which moves
@@ -95,19 +101,27 @@ class BaselineScenarioDict(TypedDict):
 #: fresh clone in exchange for no new shapes.
 SCENARIOS: tuple[BaselineScenarioDict, ...] = (
     BaselineScenarioDict(
-        label="duel", opponent=True, practice=False, ferry=False, opponent_name=""
+        label="duel", opponent=True, practice=False, ferry=False, larder=False, opponent_name=""
     ),
     BaselineScenarioDict(
-        label="solo", opponent=False, practice=False, ferry=False, opponent_name=""
+        label="solo", opponent=False, practice=False, ferry=False, larder=False, opponent_name=""
     ),
     BaselineScenarioDict(
-        label="practice", opponent=True, practice=True, ferry=False, opponent_name=""
+        label="practice", opponent=True, practice=True, ferry=False, larder=False, opponent_name=""
     ),
     BaselineScenarioDict(
-        label="ferry", opponent=False, practice=False, ferry=True, opponent_name=""
+        label="ferry", opponent=False, practice=False, ferry=True, larder=False, opponent_name=""
     ),
     BaselineScenarioDict(
-        label="human", opponent=True, practice=False, ferry=False, opponent_name="guest"
+        label="human",
+        opponent=True,
+        practice=False,
+        ferry=False,
+        larder=False,
+        opponent_name="guest",
+    ),
+    BaselineScenarioDict(
+        label="larder", opponent=False, practice=False, ferry=False, larder=True, opponent_name=""
     ),
 )
 
@@ -159,6 +173,7 @@ def build_baseline(rounds: int, stamp: str) -> Path:
             opponent=scenario["opponent"],
             practice=scenario["practice"],
             ferry=scenario["ferry"],
+            larder=scenario["larder"],
             opponent_name=scenario["opponent_name"],
             stamp=f"{stamp}-{scenario['label']}",
         )

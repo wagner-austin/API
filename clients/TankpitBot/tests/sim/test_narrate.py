@@ -198,6 +198,58 @@ def test_a_blocked_hop_confirms_the_origin_to_the_hopper_only() -> None:
     assert narrate_teleport(world, outcome, BYSTANDER) == []
 
 
+def test_a_click_on_your_own_tile_draws_no_movement_echo() -> None:
+    """NO MOVEMENT, NO ECHO — measured 2026-09-02.
+
+    An own-tile click resolves as a "moved" outcome with an EMPTY
+    path. Tracking each live capture's own 0x3D position and finding
+    every command clicked at exactly that tile: 1,042 of 1,044
+    ``pickup_equipment`` own-tile clicks drew NO 0x47. The sim echoed
+    every one, which is why `pickup_equipment 67 49 pickup` — 1,324
+    live windows — read as a missing law ([[capture-differ]]).
+
+    The pickup records still ride: the click did collect.
+    """
+    world = _world()
+    world["equipment"].append(SimEquipmentDict(x=10, y=10))
+    outcome = process_move(world, InMemoryTerrainMap(), ACTOR, 10, 10)
+    assert outcome["kind"] == "moved"
+    assert outcome["path"] == ""
+
+    assert narrate_move(world, outcome, ACTOR) == []
+
+
+def test_a_walk_of_even_one_tile_still_echoes() -> None:
+    """The law is about movement, not about arriving somewhere new.
+
+    Suppressing the echo whenever the destination was already reached
+    would silence real one-step walks; the gate is the PATH.
+    """
+    world = _world()
+    outcome = process_move(world, InMemoryTerrainMap(), ACTOR, 11, 10)
+    assert outcome["path"] != ""
+
+    assert _kinds(narrate_move(world, outcome, ACTOR)) == [0x47]
+
+
+def test_an_own_tile_arrival_pickup_still_reports_its_records() -> None:
+    """Silence is only the echo — consumption is still narrated.
+
+    Observers track container drain through the records, so dropping
+    them with the echo would hide the collection from the room.
+    """
+    world = _world()
+    world["containers"].append(SimContainerDict(x=10, y=10, volume=500, dotted=True))
+    world["tanks"][ACTOR]["fuel"] = 100
+    outcome = process_move(world, InMemoryTerrainMap(), ACTOR, 10, 10)
+    assert outcome["pickups"]
+
+    assert _kinds(narrate_move(world, outcome, ACTOR)) == [
+        "container_pickup",
+        "container_pickup",
+    ]
+
+
 def test_a_landing_confirms_to_the_hopper_only() -> None:
     """THE HOLE THE FIRST ONE-GENERATION BASELINE FOUND.
 

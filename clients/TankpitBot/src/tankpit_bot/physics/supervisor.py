@@ -31,7 +31,9 @@ from __future__ import annotations
 
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_EMPTY_CONTAINER,
+    SUPERVISOR_ERROR_FRIENDLY_FIRE,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     SUPERVISOR_ERROR_INVENTORY_FULL,
     SUPERVISOR_ERROR_TANK_FULL,
@@ -145,10 +147,67 @@ def teleport_refusal(fuel: int, cost: int) -> int | None:
     return None
 
 
+def shot_refusal(*, aim_in_window: bool, target_is_ally: bool) -> int | None:
+    """The two measured refusals a shoot command can draw.
+
+    Both were mined from the archive's shoot windows on 2026-09-02,
+    and both are INVARIANT in every window that carries them:
+
+    * **Aim outside the client's viewport -> code 0.** 47 of 47
+      windows, always ``(reset_action=0, close_map=1)``. The law was
+      already recorded from the other side — the production bot
+      clamps its aim into the window precisely because "the server
+      rejects any aim outside it with 0x52 code 0" (live run
+      2026-07-03 20:34, five rejections at a target five rows below
+      the window; [[bot-behavior-contract]] § viewport-clamped aim).
+    * **An id-targeted shot at a tank on the shooter's own team ->
+      code 3.** 45 of 45 windows, always
+      ``(reset_action=1, close_map=0)``. Production consumes this as
+      the one unfakeable proof that an id no longer resolves to an
+      enemy (``_disprove_target_by_friendly_fire``, written after a
+      ghost drew 43 consecutive rejected shots).
+
+    The viewport test comes first because it is a precondition on the
+    command being actionable at all — the same order
+    ``SimServerMoveMixin`` applies, where the window check precedes
+    container validation because the server never answers for a
+    coordinate it does not consider actionable.
+
+    NOT modelled: code 8 on a shot. [[bot-behavior-contract]] lists it
+    among the shot-rejecting codes the bot handles, but the archive
+    holds ZERO shot windows carrying it, so the sim would be inventing
+    a shape rather than reproducing one.
+
+    This is not a fork of the bot's own protections: the bot CLAMPS
+    its aim into the window and filters allies out of targeting, which
+    are avoidance mechanisms, not predictions of this predicate.
+
+    Args:
+        aim_in_window: Whether the clicked tile lies inside the
+            shooter's stored viewport window. Callers that do not
+            model a window for the shooter pass True — an unmodelled
+            window cannot prove a refusal.
+        target_is_ally: Whether the shot names a living tank on the
+            shooter's own team. A positional shot (no entity id)
+            passes False.
+
+    Returns:
+        ``SUPERVISOR_ERROR_CANT_DO`` (0) for an out-of-window aim,
+        ``SUPERVISOR_ERROR_FRIENDLY_FIRE`` (3) for a shot at an ally,
+        else None.
+    """
+    if not aim_in_window:
+        return SUPERVISOR_ERROR_CANT_DO
+    if target_is_ally:
+        return SUPERVISOR_ERROR_FRIENDLY_FIRE
+    return None
+
+
 __all__ = [
     "TELEPORT_RING1_COST_SLACK",
     "equipment_pickup_refusal",
     "fuel_pickup_close_code",
     "fuel_pickup_refusal",
+    "shot_refusal",
     "teleport_refusal",
 ]

@@ -331,6 +331,101 @@ concrete things, in descending value: **bucket the rows by cause**
 (the single highest-value corpus fix), and **depth on the one
 scenario that sustains**.
 
+### The 92 token-never-emitted rows, read (2026-09-02)
+
+The bucket was built and then not read. Reading it: for every novel
+token, what had the client sent IMMEDIATELY BEFORE the window that
+carried it. The real server is asynchronous, so a slow answer to
+command N lands inside command N+1's window; if the novel token
+belongs to the previous command, that is what happened.
+
+| command | novel token | n | preceded by |
+|---|---|---:|---|
+| radar | `pickup` | 2,690 | **teleport 75%** |
+| teleport | `4C` | 195 | **map_open 100%** |
+| map_open | `53self` | 46 | **shoot 95%** |
+| shoot | `52c3` | 45 | map_open 88% |
+| shoot | `52c0` | 47 | shoot 74% |
+| pickup_equipment | `52c4` | 87 | pickup_equipment 67% |
+
+**Roughly 3,000 of the bucket's 3,555 windows are spill**, not gaps:
+the bot teleports and immediately scans on landing, so the landing's
+auto-pick records arrive after the radar's answers; it opens the map
+and immediately hops, so the 0x4C lands in the teleport's window.
+Those rows can never be closed and should not be chased.
+
+The `52c*` rows are different, and two of them turned out to be real
+laws.
+
+### Three shot refusals the sim could not produce
+
+Decoding the codes ([[decode-coverage]]): `52c0` is CANT_DO and
+`52c3` is FRIENDLY_FIRE — both are the server REFUSING a shot, and
+the sim's entire shoot vocabulary was `{53self}`. It had no refusal
+path at all.
+
+Both are already load-bearing on the production side:
+`bot-behavior-contract.md` records that a shot-rejecting 0x52 ends
+the feedback wait immediately, and `_disprove_target_by_friendly_fire`
+treats code 3 as the one unfakeable proof that an id no longer
+resolves to an enemy — written after a ghost drew 43 consecutive
+rejected shots. **That path had never been driven end to end**,
+because no sim session could produce the message it consumes.
+
+Field values, swept 2026-09-02 across every 0x52 in a shoot window
+and INVARIANT in each:
+
+| code | meaning | n | `(reset_action, close_map)` |
+|---|---|---:|---|
+| 0 | aim outside the viewport | 47 | **(0, 1)**, 47/47 |
+| 3 | shot at a teammate | 45 | **(1, 0)**, 45/45 |
+
+Implemented as `physics.supervisor.shot_refusal`, beside the fuel,
+equipment and teleport refusal laws. The sweep also showed code 0 is
+`(0, 1)` for EVERY command that draws it (83 of 86 archive-wide) —
+the sim's move-family code-0 used `(1, 0)`, a field-level divergence
+the differ is structurally blind to because it tokenizes a 0x52 to
+`52c<code>` and discards the rest.
+
+NOT implemented: code 8 on a shot. The contract lists it among the
+shot-rejecting codes, but the archive holds ZERO shot windows
+carrying it.
+
+### The larder scenario, and the law it flushed out (2026-09-02)
+
+The three biggest `shape_never_assembled` rows were all the no-walk
+or no-consumption variant of a command the corpus only ever
+exercised walking and consuming. `make_larder_sim_world` targets
+them: the client spawns ON equipment, ringed by more, with all five
+slots at ZERO.
+
+First run: `radar 4F 46` **HIT**, `pickup_equipment 67 49 pickup`
+**MISS** — every grant still carried a `47self`. The sim resolves an
+own-tile click as a "moved" outcome with an EMPTY path and echoed it
+anyway.
+
+Measured rather than assumed: tracking each live capture's own 0x3D
+position and finding every command clicked at exactly that tile —
+**1,042 of 1,044 own-tile `pickup_equipment` clicks drew NO echo.**
+(`pickup_fuel` reads 23 silent to 9 and plain `move` 22 to 21; those
+residuals are consistent with a stale tracked position, but only the
+equipment ratio stands alone.) **No movement, no echo** is now the
+sim's law, and both target shapes appear.
+
+It also settled an older disagreement: two fuel-choreography tests
+had docstrings naming the measured shape `44+pickup+52c5` and
+assertions demanding a leading `0x47` that shape does not contain.
+The prose carried the law, the expectation carried the invention, and
+nothing compared them.
+
+Not reachable, and correctly so: `pickup_fuel 44 pickup 52c5` (366
+live windows) is a full-tank own-tile fuel click. The bot has
+predicted that refusal before dispatch since 2026-08-03, so those
+windows were drawn by a SUPERSEDED bot. **The live archive is a
+mixture of bot generations too** — the same graveyard property as
+`runs/sim` — and the differ cannot tell "the sim lacks this law" from
+"the current bot never asks for it."
+
 ### Depth is not a lever: the sim's vocabulary SATURATES
 
 **The first version of this section was measured wrong and its
