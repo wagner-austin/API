@@ -83,9 +83,15 @@ construction, and only untouched-seed panels adopt.
 
 - Ratio rounding: the smallest integer ratio faithful to a weight vector
   (largest-remainder over a fixed total is the candidate).
-- Fitness at Impossible: margin-only (wins are zero); whether margin
-  gradients there are steep enough to guide a population is exactly what
-  impsearch1's round data will show.
+- Fitness at Impossible: ANSWERED NEGATIVELY (2026-09-03). impsearch1's
+  graduate read +0.27-0.32 across two search rounds and ZERO on 48
+  untouched seeds (imps5k48) -- round-to-round consistency inside one
+  selection process is not independent evidence, and margin fitness at
+  8-16 pairs per candidate selects noise there. A population at
+  Impossible needs far larger generations, a composite fitness
+  (survival depth, economy trajectory), or the corpus-trained heads
+  before it can climb. Very Hard's steeper landscape (deltas 1-2 at
+  similar sd) remains the right first target for v1.
 - Generation seed budget: fresh blocks per generation burn ~2,500-seed
   panels fast; the seed namespace math holds to ~38 generations below
   the search floor and needs widening past that.
