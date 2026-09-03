@@ -45,7 +45,22 @@ services:
       # package is pip-installed, so the path is named explicitly.
       TANKPIT_ACCOUNTS_FILE: /app/accounts.json
     ports:
+      # Loopback only, and it stays that way. The demo at
+      # austinwagner.org/tankpit does NOT reach the fleet through this
+      # mapping — it reaches ``tankpit-public`` on the network below,
+      # which forwards ``/demo/`` and 404s the operator surface. This
+      # port is the operator's own door and is not published.
       - "127.0.0.1:27300:27300"
+    networks:
+      # The manager's own network, so nothing here changes for a fleet
+      # run that is not being demoed.
+      - default
+      # The tunnel's network, joined as external. cloudflared and the
+      # public filter live in the MCPs workspace compose; this is the
+      # only way a container there can resolve ``fleet``. Joining a
+      # network is not publishing a port: the filter is still the only
+      # thing on that network that answers from the internet.
+      - mcp-network
     volumes:
       - ./runs:/app/runs
       - ./accounts.json:/app/accounts.json:ro
@@ -98,3 +113,17 @@ services:
     # `restart: unless-stopped` would relaunch the bot forever, which is
     # both wrong for a demo and a way to hammer a third-party server.
     restart: "no"
+
+networks:
+  # The fleet's own network, created per-project as compose always did.
+  default:
+  # The MCPs workspace's bridge, created by ITS compose (`name:
+  # mcp-network`). External because this compose must never be the one
+  # that creates it: a fleet started before the workspace would
+  # otherwise make an empty network of the same name, and cloudflared
+  # would come up on a different bridge with the same label and resolve
+  # nothing. Absent workspace means `make up` fails by name here, which
+  # is the honest failure — the demo edge genuinely is not there.
+  mcp-network:
+    external: true
+    name: mcp-network
