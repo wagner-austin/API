@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "620fec20307b3041476370d8deac04a6b51e93e9"
+  "Makefile": "2905309654f1591c40bc20b5e861670ebdcc36f0"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [codebase]
@@ -37,8 +37,7 @@ hubs: [codebase]
 | `make sim-run` | Production bot vs the simulator on real field01 terrain — no server, no browser, no fuel spent. Artifacts: `runs/probe/latest.sim.*` + `runs/sim/sim-<stamp>.capture_session.json` (standard CaptureSession — `tankpit-audit --runs-dir` can price it). `tankpit-sim-run --rounds N --no-opponent` for variants. See [[physics-module-roadmap]]. |
 | `make sim-run-practice` | Production bot vs a REAL practice room (2026-07-25 rework): a stamp-selected mined layout seeds the full 36-bot roster (ids 500-535, 9/team) at archive-observed positions plus the client's real join spawn, on a static container field (~620-dot exposure atlas at the live ~40% hold rate + measured hidden population (840 fuel, half drained + 180 equipment); no runtime spawning — the respawn law was falsified). Bots driven by the certified `sim/bot_policy`. The fidelity soak: 150/150 rounds sustainably, kills across the map, exposure law 18/18 on the sim's own capture. `tankpit-sim-run --practice`. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
-| `make service` | Long-running SPA-driven HTTP + SSE server on `0.0.0.0:27100` (nginx proxies `/api/tankbot/*`). The phone's Start Bot button POSTs `/start`. Respawn discipline: exit 0 = graceful (stop the loop), nonzero = crash (retry after 5 s, cap 3 consecutive). See [[bot-service-architecture]]. |
-| `make up` / `make down` / `make dev` | THE fleet lifecycle (consolidated 2026-09-02 by operator order — one command, one system). `up`: newest release → build its image if missing (`tankpit-fleet:v<ver>-<sha>`) → run the fleet CONTAINER (manager + N bot children, page on `127.0.0.1:27300`[^3], release's `runs/` + `accounts.json` mounted). `down`: SIGTERM drain, every bot to the lobby, 10 m grace. `dev`: hot-tree foreground manager, development only. Replaced `make fleet`/`fleet-dev` and the host-mode detached pair — see [[fleet-lifecycle]] operator surface for the transition note. |
+| `make up` / `make down` / `make dev` | THE fleet lifecycle (consolidated 2026-09-02 by operator order — one command, one system). `up`: newest release → build its image if missing (`tankpit-fleet:v<ver>-<sha>`) → run the fleet CONTAINER (manager + N bot children, page on `127.0.0.1:27300`[^3], release's `runs/` + `accounts.json` mounted). `down`: SIGTERM drain, every bot to the lobby, 10 m grace. `dev`: hot-tree foreground manager, development only. Replaced `make fleet`/`fleet-dev` and the host-mode detached pair — see [[fleet-lifecycle]] operator surface for the transition note. Also replaced **`make service`**, the standalone SPA-driven HTTP+SSE server on `0.0.0.0:27100`, deleted 2026-09-03 in `10f97042` along with the config flag that only it justified; `src/tankpit_bot/service/` itself remains and now serves the fleet. |
 | `make smoke` | Shortest live join-and-quit check (`scripts/smoke.py`) |
 | `make debug-run` | Live bot run with protocol frame logging turned up |
 
@@ -78,7 +77,7 @@ hubs: [codebase]
 | `make roundtrip` | Decode→encode→decode every archive message; byte-identity proof for the sim's encoders |
 | `make analyze-timing` | Command-response timing analysis |
 | `make decode` | Replay a capture through real decoders |
-| `make discover` | Extract command constants from JS client |
+| ~~`make discover`~~ | Extracted command constants from the JS client. Retired 2026-08 in `48cda6bd` with the other 43 ungated one-shot scripts (board task f0c3a532) |
 | `make analyze-viewport` | Analyze viewport bounds in captures |
 | `make download-fields` | Fetch the field GIFs the terrain loader decodes |
 

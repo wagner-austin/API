@@ -14,6 +14,7 @@ source_paths:
   - "src/tankpit_bot/sim/narrate/resources.py"
   - "src/tankpit_bot/sim/narrate/world.py"
   - "src/tankpit_bot/sim/server.py"
+  - "src/tankpit_bot/sim/server_queries.py"
   - "runs/bot"
   - "runs/sniff"
   - "runs/bot/bot-20260826-003928.capture_session.json"
@@ -22,7 +23,8 @@ source_git_blobs:
   "src/tankpit_bot/sim/narrate/combat.py": "cc68c7a022eeeca830d2038489b6c4962c9c97ff"
   "src/tankpit_bot/sim/narrate/resources.py": "26e4d5de387a107521864ed5283ef69a655919e9"
   "src/tankpit_bot/sim/narrate/world.py": "5915877643b9d6be3906eb827d718db469b9ce9a"
-  "src/tankpit_bot/sim/server.py": "0a905439794550474ae68e8e1ed73bac500093d9"
+  "src/tankpit_bot/sim/server.py": "244ffe04228c59c63fa7bcd6083dd48c77db8b84"
+  "src/tankpit_bot/sim/server_queries.py": "29c39c2a53aeafb6d45974dd4a5a4f4962dc4473"
 provenance:
   - "src/tankpit_bot/sim/emissions.py and sim/combat_emissions.py -- cited here until 2026-09-03. Both were split into the sim/narrate/ package this page already lists (combat, movement, resources, world); the four successors are now pinned in their place rather than the two dead paths being repinned"
 fact_checked: "2026-09-01"
@@ -162,4 +164,4 @@ measured and pinned by test; the shape and its consequences are in the
 [^8]: `src/tankpit_bot/sim/server.py::_process_stateless_command`, the `statistics` branch.
 [^9]: `src/tankpit_bot/sniffer/constants.py:50` — `0x5A: "ViewportUpdate"`, listed as a radar message type at `:63` and declared PARTIAL-decode at `:168`; the decoded viewport pair is formatted at `src/tankpit_bot/sniffer/formatters.py:223`. The 0x5A origin is the connection's stored window. (Cited only as [[viewport-shift-protocol]] until 2026-09-03 — a wiki-internal pointer is not a locator, and SCHEMA bans citing this wiki as evidence for a claim; the wikilink stays in `related` where it belongs.)
 [^10]: `src/tankpit_bot/sim/server_move.py::_process_move_command` docstring; archive 2026-08-06.
-[^11]: `src/tankpit_bot/sim/server.py::handshake`, blob `57be451a9d0069cf9ca45b398791b0530efaa4fd`.
+[^11]: `src/tankpit_bot/sim/server_queries.py:51` — `def handshake`. This footnote cited `server.py::handshake` until 2026-09-03; the symbol moved when the server was split, and `server.py` no longer contains the string `handshake` at all. The blob it also quoted (`57be451a…`) was `server.py`'s hash at the time of writing and is not a locator for the symbol, which is why the move went unnoticed.
