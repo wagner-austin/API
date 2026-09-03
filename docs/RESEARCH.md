@@ -6,9 +6,10 @@ Read this before auditing, extending, or reproducing any experiment.
 This file exists because nothing like it did, and the cost was measured: on
 2026-08-28 an audit of provenance across this machine examined four research
 surfaces and missed two entirely — LSTM and RustedWarfareBot — because there
-are roughly ninety directories under `~/PROJECTS` and no list. One of the
-surfaces below is still not registered anywhere a tool can see, and one more
-was scoped as an example and never onboarded.
+are roughly ninety directories under `~/PROJECTS` and no list. Both have since
+been onboarded — LSTM as `turkic-lstm` on 2026-08-28, RustedWarfareBot as
+`rusted` on 2026-08-29 — leaving one entry below that was scoped as an example
+and deliberately never registered.
 
 The machine-readable half of this is the `projects` table in the hpc3
 workspace documents (`tools/hpc3/runs/hpc3*.json`). Each entry declares how a
@@ -169,30 +170,101 @@ untracked — it is state, not configuration).
 
 ---
 
-## Not registered anywhere
-
-Real research, producing numbers that get compared, reachable by no tool.
-
-### RustedWarfareBot — system identification against an obfuscated binary
+### `rusted` — RustedWarfareBot, system identification against an obfuscated binary
 
 - **Repo:** this one, `clients/RustedWarfareBot`
+- **Runs:** `rw_bot.harness.campaign_match`, one scheduled job per match, via
+  a campaign document emitted by `scripts.campaign_doc`
 - **Produces:** `runs/*.log` (seeded: `aa-s12345`, `aa-s1337`),
   `sweeps/*.txt` (`aggression`, `army-mix`, `antiair`, `aa-cover`, ...),
-  `models/fleetdoom.ndjson`
+  `models/fleetdoom.ndjson`; on the cluster, one scorecard per match under
+  `/pub/wagnera3/rusted/runs/sweeps/<batch>/`
 - **Compares:** seeded runs across parameter sweeps against a stated goal —
   "100% win rate against the built-in AI at Impossible and every rung below,
   measured".
 - **Provenance:** `rw_bot.provenance`, since 2026-08-29 — a `RunFingerprint`
   per sweep and a `RunRecord` per arm, in the shared vocabulary. The README's
   instinct ("pins every claim to the build it was measured on") was right and
-  is now executed rather than described: the build is a digest of
-  `.game/game-lib.jar`, so it is read off the bytes rather than maintained by
-  hand. Its observations are the arm's win rate with the counts beside it —
-  three wins from three and thirty from thirty are both 1.0, and only one is
-  evidence — plus extractor drops, median worth, unengageable targets and
-  intercepts.
-- **Still not registered as an hpc3 project**, and correctly so: it runs
-  locally against a windowed game, not on the cluster.
+  is now executed rather than described. Its observations are the arm's win
+  rate with the counts beside it — three wins from three and thirty from
+  thirty are both 1.0, and only one is evidence — plus extractor drops,
+  median worth, unengageable targets and intercepts.
+- **Sizing:** one CPU, 2 GB, 45 minutes on `free`. A match measures about
+  twenty minutes and holds about 430 MB; the wall clock leaves room for a
+  cold boot on a slow node while staying under hpc3's sixty-minute preemption
+  threshold, which is what lets the project declare `checkpoint_steps: 0`
+  honestly — the per-match scorecard IS the checkpoint, and a preempted match
+  costs one match.
+- **Not yet submitted, and two things are still missing.** The project
+  declares no `image`, and the game tree is not staged — so `env_path`
+  `/opt/env` names a container path that no job currently enters. Both are
+  stated here rather than papered over with a placeholder digest; nothing has
+  been run against the cluster to see how the failure presents, so no claim
+  is made about which command reports it first.
+
+---
+
+## Not registered anywhere
+
+Real research, producing numbers that get compared, reachable by no tool.
+
+### `code-style` — QLoRA on this monorepo, scored by this monorepo's own guards
+
+- **Repo:** this one. Corpus emitter `tools/code-corpus`, instrument
+  `tools/code-style-eval`, training through `services/Model-Trainer`'s
+  `hf_lm` backend.
+- **Runs:** local on the 3090 Ti, not on the cluster. The instrument IS this
+  repository's checkers — `ruff`, `mypy` and `monorepo_guards` scoped per
+  item through `scripts/guard.py --root` — so running it inside an image
+  would measure that image's copy of the rules rather than the repo's. That
+  is a reason to keep it local, not an omission.
+- **Produces:** `code-corpus-v1.jsonl` plus its holdout; a QLoRA adapter
+  (NF4 storage, bfloat16 compute, double quantization); per-arm generation
+  manifests recording whether each completion terminated or hit the token
+  budget; per-arm outcome JSONL, one row per item per checker;
+  `comparison.json` with a paired 2x2 table and McNemar mid-p; and
+  `perplexity.json`.
+- **Compares:** base Qwen2.5-Coder-1.5B against the same model with the
+  adapter attached, on the same held-out files, two ways — token-level
+  perplexity masked to the continuation, and guard-pass rate. Per-item
+  outcomes throughout, so the contrast is paired rather than two rates
+  subtracted.
+- **Provenance:** a `RunRecord` sidecar beside `comparison.json` since
+  2026-09-02, in the shared vocabulary. Three of its six fingerprint axes are
+  empty BY CONSTRUCTION and say so: scoring is CPU work outside any image and
+  pins no determinism, so image, GPU and driver are unknown, and the
+  determinism posture is recorded as explicitly unpinned. Its packages axis
+  carries `ruff`, `mypy` and `platform-core`, because a guard-pass rate is
+  those checkers' verdict and a ruff release that adds a rule moves the
+  number with nothing about the models having changed. Observations carry
+  counts beside rates.
+- **What it does NOT carry, and this is the honest half.** The TRAINING run
+  emits no `RunRecord` — it recorded a determinism posture
+  (`UNPINNED_STACK`) and nothing else, so the adapter's own provenance is
+  weaker than the comparison's that cites it. The generation configuration
+  (base model, adapter, decoding parameters) is covered only indirectly, by
+  the comparison's payload digest over the outcome files. And the corpus was
+  emitted while both source repositories were dirty, which the manifest
+  flags; no run built on it is citable until it is re-emitted clean.
+- **Results as of 2026-09-02, stated with their limits.** Perplexity moved
+  2.8327 to 1.9631 with 392 of 392 held-out items improving, and train/holdout
+  overlap was checked to be zero by path AND by content — the content check
+  is the one that matters here, because `scripts/guard.py` is byte-identical
+  across all 41 packages. Guard-pass showed NO detectable difference across
+  three sweeps (mid-p 0.84 on the last), and the combined rate sits near 2%,
+  which is a floor where the metric has almost no power to move. The first
+  two sweeps were void for reasons recorded on the board: a token budget that
+  truncated 83% of completions, and before that an unscoped guard invocation
+  that gave every item the same verdict.
+- **Not novel, and the task spec that says otherwise is wrong.** A systematic
+  search found the core already published: ContextCov (arXiv 2603.00822)
+  compiles a repository's written conventions into executable AST and
+  architectural checks, and per-repository LoRA is the upper-bound baseline
+  in Code2LoRA (arXiv 2606.06492). The papers are on the personal wiki under
+  `computational-linguistics`. The defensible claim is fitness for purpose —
+  no public benchmark scores THIS repo's conventions — not originality.
+
+---
 
 ### `sirius` — declared as an example, never run
 
@@ -239,14 +311,34 @@ Its consumers, as of 2026-08-29:
   results CSV.
 - **RustedWarfareBot** — `rw_bot.provenance` builds one per sweep arm.
   Its fingerprint's load-bearing axis is neither a card nor a library: it is
-  the **game jar**, recorded in the packages axis as a SHA-256 of
-  `.game/game-lib.jar`. The project already knew the build decides
-  everything — every wiki page pins `game_version` "because the jar is
-  obfuscated and class names change silently between releases" — but that
-  pin is a hand-maintained string on documentation, and silent renaming is
-  exactly the case a maintained label notices last. The digest is read off
-  the bytes that ran. Two arms measured against different builds now refuse
-  to subtract.
+  the **game**, recorded in the packages axis as three digests. The project
+  already knew the build decides everything — every wiki page pins
+  `game_version` "because the jar is obfuscated and class names change
+  silently between releases" — but that pin is a hand-maintained string on
+  documentation, and silent renaming is exactly the case a maintained label
+  notices last. The digests are read off the bytes that ran. Two arms
+  measured against different builds now refuse to subtract.
+
+  It carried only the first of the three until 2026-08-29, and the other two
+  were found by asking what the jar digest does NOT cover:
+
+  - `rusted-warfare` — SHA-256 of `game-lib.jar`, the engine's code.
+  - `rusted-warfare-jvm` — the bundled runtime's own `JAVA_VERSION` followed
+    by a digest of its whole tree. The two platforms ship **different major
+    versions** — Java 8 in the Linux depot, Java 13 in the Windows one — so
+    this is not a formality. The host axis separates those two today by
+    accident, because the operating systems differ; two Linux runs either
+    side of a depot that bumped its bundled JRE fingerprinted identically.
+  - `rusted-warfare-assets` — a digest of `assets/`, the maps, mods and unit
+    definitions the simulation reads. The project had already lost a batch
+    family to this exact gap: a map missing from a clone sent the engine to
+    its boot sandbox and voided every scorecard, with the jar digest matching
+    throughout.
+
+  The tree digests are `rw_bot.tree_identity`, and they are deliberately
+  reproducible with coreutils alone — `find … | LC_ALL=C sort | xargs
+  sha256sum --text | sha256sum` — because a record only one package can
+  verify is a record nobody checks.
 
 Still outstanding, stated precisely:
 
