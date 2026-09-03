@@ -6011,3 +6011,23 @@ The last two uncovered branches were the `tank_id != client_id` paths of both ne
 Five constants defined and never once sent in 342 sessions: `CMD_PING`, `CMD_TOP10`, `CMD_ACTIVE_FORCES`, `CMD_ACTIVE_PLAYERS`, `CMD_NEAREST_ENEMY`. Real client capabilities nobody in the corpus used.
 
 Gate: make check green — 6,907 tests, 100.00% statements AND branches. Two `service/` tests flaked en route (a Windows file lock on a spawned child's console.log, and an adopted-process exit race); both are the fleet session's, both pass on re-run, and neither is mine.
+
+---
+
+## [2026-09-03] update | The distribution ships its own data; the env override is gone
+
+Root fix for the defect that cost three HPC3 submissions, replacing the workaround shipped earlier the same night.
+
+**Page written (1):** [[packaged-data-assets]] — hub-linked from Architecture. Index 82 -> 83, Architecture 25 -> 26.
+
+**The defect:** `tankpit_bot` read two families of files the wheel did not contain — the XOR key by a path four parents above its module (site-packages after an install), the 45 minimaps by bare CWD-relative names. Every consumer rebuilt the data environment by hand, so TWO independent workarounds grew for ONE packaging defect: the fleet container copied the key in and set `TANKPIT_XOR_KEY_FILE`, and a cluster job staged 46 files, ran from that directory, and passed the same variable per submission.
+
+**The evidence worth keeping — the two assets failed by DIFFERENT mechanisms.** Job `55715554` died on the GIF; staging it and running from its directory fixed that, because the GIF resolves via CWD. Job `55715564` then died on the key *even though the key had just been staged beside the GIF* — it does not resolve via CWD at all. The fix for the first was no fix for the second, and the second was invisible until the first was solved.
+
+**What landed:** assets moved into `tankpit_bot.data` and shipped in the wheel; new `tankpit_bot.resources` is the one owner of "where is this asset", via `importlib.resources`. DELETED rather than kept: the checkout-relative constant, the `TANKPIT_XOR_KEY_FILE` override, `world_service._find_field_gif`'s CWD candidates, the Dockerfile's COPY+ENV, and the three tests pinning the override. `static_key_file_path` moved from `protocol.codec` to `resources` and all 23 importers were repointed — a re-export would have been a shim.
+
+**Two distinctions held deliberately:** `field_gif_path` returns None (a server-named field may honestly ship no minimap; the session runs without terrain) while `require_asset` raises (a file the caller already names is a broken install). And `field42-r.gif` is a byte-identical twin no lookup can reach, so the resolver's second-spelling branch was deleted as unexecutable code; the duplicate asset itself is left for the operator.
+
+**Verified:** `make check` GREEN — guard 0 violations, ruff clean, mypy clean on src+tests+scripts, 6907 tests, **100.00% statements AND branches**, every changed module at 100%. The rebuilt wheel carries all 47 data files.
+
+**Consequence for the cluster:** the hpc3 image contract needs no `assets` concept. An earlier proposal to bake the files into the image definition would have been a third workaround at the wrong layer.
