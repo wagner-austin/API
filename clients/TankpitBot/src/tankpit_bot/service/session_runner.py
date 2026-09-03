@@ -210,17 +210,25 @@ class SessionRunner:
             # until the diag reproduced it in the foreground).
             if _test_hooks.sync_playwright is None:
                 _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
-            # Phone-driven sessions start PINNED TO IDLE: the operator
-            # releases the bot deliberately (AUTO MODE or a specific
-            # mode) once they've seen where the tank spawned. Submitted
-            # through the same bridge a button tap uses, so the first
-            # tick drains it into ``manual_mode = "UNSET"`` — no
-            # special-case in the AI state. Service sessions ONLY:
-            # ``make run`` / replay / scenario harness construct the
-            # bot directly and keep the auto-from-first-tick default
-            # (they have no phone UI to release an idle pin from).
-            # 2026-07-18 at Austin's request.
-            self._mode_bridge.submit("UNSET")
+            # NO IDLE PIN. A service session starts in auto-arbitration,
+            # exactly like ``make run``, because nothing left in this
+            # system can release a pin.
+            #
+            # It used to submit ``"UNSET"`` here (2026-07-18, at Austin's
+            # request): phone-driven sessions started pinned to idle so
+            # the operator could see where the tank spawned and then
+            # release it from the fiesta SPA's bot overlay. That overlay
+            # was deleted on 2026-09-03 when tankpit was decoupled from
+            # fiesta, and the fleet runs THIS entry point for every
+            # child — so the pin outlived the only UI that could lift
+            # it. The visible result was a bot that logged in, entered
+            # the game, and then held position forever, reporting
+            # ``reason=manual_hold`` on every tick.
+            #
+            # Pinning is still reachable and still deliberate: an
+            # operator POSTs ``/mode`` (UNSET / HUNT / COLLECT) through
+            # the same bridge. What is gone is a default that waits for
+            # somebody who is not coming.
             # Configure the per-session run artifacts (archive log,
             # events.jsonl, index row) exactly like the ``make run``
             # entry point does. Until 2026-07-28 the service path

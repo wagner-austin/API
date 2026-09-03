@@ -182,15 +182,23 @@ class TestSessionRunnerStateMachine:
         finally:
             _test_hooks.sync_playwright = original_slot
 
-    def test_start_pins_idle_via_the_mode_bridge(self, fake_fs: FakeFileSystem) -> None:
-        """A service session starts pinned to idle (``"UNSET"`` queued).
+    def test_start_queues_no_mode_so_the_bot_arbitrates_from_the_first_tick(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """A service session starts PLAYING, not pinned to idle.
 
-        The runner submits ``"UNSET"`` before running the bot so the
-        first tick drains it into ``manual_mode = "UNSET"`` — the
-        operator releases the bot from the phone (AUTO MODE or a
-        specific mode) once they've seen the spawn. Direct-run entry
-        points (``make run``, replay, scenarios) bypass the runner and
-        keep the auto-from-first-tick default.
+        The runner used to submit ``"UNSET"`` here so the first tick
+        drained it into ``manual_mode = "UNSET"`` and the bot held
+        position until an operator released it from the fiesta SPA's bot
+        overlay. That overlay was deleted 2026-09-03, and the fleet runs
+        this entry point for every child — so the pin outlived the only
+        UI that could lift it and every fleet bot sat in the game doing
+        nothing, logging ``reason=manual_hold`` forever.
+
+        An empty bridge is the whole assertion: ``_apply_pending_mode_override``
+        leaves ``manual_mode`` alone when the drain comes back empty, so
+        the session keeps the ``None`` default and auto-arbitrates
+        exactly like ``make run``.
         """
         _ = fake_fs
         bridge = ModeBridge()
@@ -198,7 +206,7 @@ class TestSessionRunnerStateMachine:
 
         runner.start()
 
-        assert bridge.drain() == "UNSET"
+        assert bridge.drain() is None
 
     def test_start_returns_to_idle_after_bot_run_completes(self, fake_fs: FakeFileSystem) -> None:
         """After ``bot.run`` returns the runner is idle again."""
