@@ -9,7 +9,7 @@ source_paths:
   - "runs/bot"
   - "src/tankpit_bot/sim/combat.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/combat.py": "9ac96e652e5784ce463b4e8d21e787d47a7ef89c"
+  "src/tankpit_bot/sim/combat.py": "dba943c9a5163bf6faa09fa4d8558311d30474a0"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [combat, protocol]

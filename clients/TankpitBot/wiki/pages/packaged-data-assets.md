@@ -17,7 +17,7 @@ source_git_blobs:
   "src/tankpit_bot/protocol/codec.py": "b69f89bd1bf4e550a56f48a7761f91acbf35f9e1"
   "src/tankpit_bot/sniffer/world_service.py": "48c3ff79c77bfea915869be662621d6f4b0ee492"
   "src/tankpit_bot/sim/run_boot.py": "d28a3b5cc5f86b77fb04f4095696b389e86bb713"
-  "pyproject.toml": "b5a77a8aea2bf8c1c0ade108205422a3a47dfe1d"
+  "pyproject.toml": "99aa1e0b69ac61fe246e3a78735e3aaa4acb4649"
   "Dockerfile": "e41a1035df86e034f28ae521db5a2124908861ae"
 provenance:
   - "HPC3 job 55715554 failed on field01_r.gif not found, 2026-09-03"

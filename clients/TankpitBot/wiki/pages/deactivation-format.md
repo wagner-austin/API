@@ -11,7 +11,7 @@ source_paths:
   - "runs/sniff"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
-  "src/tankpit_bot/physics/capacity.py": "07208a2a67947512d7f592177dc968e1dd9e484c"
+  "src/tankpit_bot/physics/capacity.py": "4210d51e4d200e8031493d0ba23808c9ebbcc162"
 fact_checked: "2026-07-19"
 confidence: high
 hubs: [protocol]

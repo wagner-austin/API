@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/browser/overlay_hud.py"
   - "src/tankpit_bot/browser/flag_capture.py"
 source_git_blobs:
-  "src/tankpit_bot/browser/overlay.py": "d7c588bb375aa605518f368dfefb9c1e69f8dfe1"
+  "src/tankpit_bot/browser/overlay.py": "aafe4e899568196d7024715a4b76bccd383991de"
   "src/tankpit_bot/browser/overlay_hud.py": "67877546967b5fc8025baf94aa84c2af3bcab3fd"
   "src/tankpit_bot/browser/flag_capture.py": "29b74c4d65e877914ede877679ff867d91aba273"
 fact_checked: "2026-08-06"

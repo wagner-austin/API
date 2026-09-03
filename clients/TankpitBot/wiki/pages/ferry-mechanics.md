@@ -8,8 +8,10 @@ related:
 source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
+  - "src/tankpit_bot/analysis/scan.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/movement.py": "b94c2a79cf9896fb351d2804c6242fe8669cee2f"
+  "src/tankpit_bot/analysis/scan.py": "507dcc1e35be2504b4973af43d98c7c2fd0b84a4"
+  "src/tankpit_bot/sim/movement.py": "d3486ee8310ce26c9c5bc6939fe7a7007fe27bd3"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [game-mechanics]
@@ -235,4 +237,4 @@ The "marooned one-tile island" from run 131003 was actually the tank standing ON
 [^2]: `src/tankpit_bot/types/constants.py:25-26` — `TERRAIN_FERRY = 5`, `TERRAIN_FERRY_ROCK = 7`; the ASCII glyph is `ASCII_FERRY = "~"` at `:47`. **Corrected 2026-08-05:** this footnote previously pointed at `state/terrain.py`, which does not define them (the module at `src/tankpit_bot/state/types/terrain.py` is a different file, and `src/tankpit_bot/terrain.py` is a third). **Moved 2026-08-07:** the module is now `types/constants.py`, not `state/types/constants.py` — it was never state, and while it sat under `state/` it made `physics` and `state` mutually dependent ([[package-layering]]). The three line numbers are unchanged; only the package moved.
 [^3]: `runs/bot/bot-20260612-131003.log:7130-7160` (run 131003, 2026-06-12 13:19:08-13:19:10). The bot teleported toward a fuel dot at (131,182) for 81 fuel (`WORLD: Fuel: 168 -> 87 (-81)`) and the server placed it at **(132,180)**, whose rendered viewport row 180 reads `W W W W @ W # #` — water on both sides, rock below, i.e. the one-tile island. **Corrected 2026-08-05:** this footnote previously gave the tank's position as (131,182); that is the fuel container's tile and the teleport TARGET, rendered `F` on row 182 of the same dump. The tank was never there. "Marooned" is the bot's own state name for the condition (`src/tankpit_bot/bot/ai/collect_hops.py:365`), not a string in this log.
 [^ferrylaw]: The three-question split a ferry surface forces — passability, landing legality, landing attainability — is `is_landing_legal` at `src/tankpit_bot/bot/ai/ferry.py:163` and `:308`, beside `is_landing_attainable` at `:189` and `:326`; see [[terrain-composition]] for the full table. The 2026-08-03 unfinished-command receipts are `runs/bot/bot-20260803-180918.capture_session.json` and its `.events.jsonl`. All paths verified present 2026-08-07.
-[^12]: Live vs sim 0x4A rate, 2026-09-02, `analysis.scan` over `runs/bot` + `runs/sniff` (341 sessions) against a sim baseline generated the same day. The sim figure is from 7 fresh sessions on the current build; the ratio is not sensitive to that sample size at three orders of magnitude.
+[^12]: Live vs sim 0x4A rate, 2026-09-02 -- `src/tankpit_bot/analysis/scan.py:164` `scan_archive` (per-session `scan_session` at `:121`) over `runs/bot` + `runs/sniff` (341 sessions) against a sim baseline generated the same day. The sim figure is from 7 fresh sessions on the current build; the ratio is not sensitive to that sample size at three orders of magnitude.

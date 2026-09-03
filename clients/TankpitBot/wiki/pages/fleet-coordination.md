@@ -16,14 +16,14 @@ source_paths:
   - "src/tankpit_bot/bot/tick_body.py"
   - "src/tankpit_bot/bot/ai/threat_primitives.py"
 source_git_blobs:
-  "src/tankpit_bot/fleetshare/__init__.py": e17b3322fd0ab35074c56cfff000a9328d245ae8
-  "src/tankpit_bot/fleetshare/codecs.py": cfcd7ceac84cfdf2246fb215a9925b8e686620e1
-  "src/tankpit_bot/fleetshare/merge.py": 3f0738090b0d27be86af0199f2a1a394adc55bc8
-  "src/tankpit_bot/fleetshare/report.py": 02962fcb3cb27dc041e484ea404d53350ac20923
-  "src/tankpit_bot/fleetshare/role.py": a82ac236569bc9444ea5bbb180a163dd443ccf5c
-  "src/tankpit_bot/fleetshare/types.py": 368d8f5ced92ebe03bc183cc5e5d1f479aaeaec2
-  "src/tankpit_bot/bot/tick_body.py": ccf7e6085214f06b2856774aa08db55b7f550910
-  "src/tankpit_bot/bot/ai/threat_primitives.py": 01a0bb653c8186a41a3dc9aa7f9b122feb9e182b
+  "src/tankpit_bot/fleetshare/__init__.py": 1ecd74a7fd8e92f51bded120de10491f284647d4
+  "src/tankpit_bot/fleetshare/codecs.py": 6ea9e778248510a390779ebdf2bab0d835991140
+  "src/tankpit_bot/fleetshare/merge.py": bce1c259f0e79d5709f3634d30ec3686344d565d
+  "src/tankpit_bot/fleetshare/report.py": a462fdd983bbce1484c7668b326222cf9fcd3e68
+  "src/tankpit_bot/fleetshare/role.py": 61fd24552ab946b2bd0b3993b435666956ce981d
+  "src/tankpit_bot/fleetshare/types.py": 7bc23b7b1177ba508258d777be91da1cc93704de
+  "src/tankpit_bot/bot/tick_body.py": 45addc1e7e7a2e82116c7bd4f4d177941a394f3d
+  "src/tankpit_bot/bot/ai/threat_primitives.py": 20f08cdeabfa0843d4e382394b99ec3434990b40
 fact_checked: "2026-08-19"
 confidence: high
 hubs: [architecture]

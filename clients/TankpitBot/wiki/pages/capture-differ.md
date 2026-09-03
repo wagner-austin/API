@@ -9,12 +9,12 @@ related:
 source_paths:
   - "scripts/build_sim_baseline.py"
   - "scripts/analyze_response_shapes.py"
-  - "analysis_scripts/mine_container_atlas.py"
-  - "analysis_scripts/diff_server_laws.py"
   - "runs/analysis"
 source_git_blobs:
-  "analysis_scripts/mine_container_atlas.py": "b94d5f5fd8ee4369d02a9a8d50143ed059688067"
-  "analysis_scripts/diff_server_laws.py": "7bb83c8dd8aee438f9ad0e3da1f00dc01ef2829b"
+  "scripts/build_sim_baseline.py": "dab6c6baf9bf97e811c6da40e7c33032326b092d"
+  "scripts/analyze_response_shapes.py": "9977e89500553254584f34e00651bd921b337364"
+provenance:
+  - "analysis_scripts/mine_container_atlas.py and analysis_scripts/diff_server_laws.py -- cited here until 2026-09-03, then removed rather than repinned: the whole analysis_scripts/ tree was DELIBERATELY retired in 48cda6bd ('Retire the 44 ungated one-shot scripts', board task f0c3a532). No prose on this page depended on either; they were frontmatter-only citations. Recoverable at git show 48cda6bd^:clients/TankpitBot/analysis_scripts/"
 fact_checked: "2026-09-02"
 confidence: high
 hubs: [protocol]
@@ -333,7 +333,7 @@ scenario that sustains**.
 
 ### The 92 token-never-emitted rows, read (2026-09-02)
 
-The bucket was built and then not read. Reading it: for every novel
+The bucket was built and then went unexamined for a day. Reading it now: for every novel
 token, what had the client sent IMMEDIATELY BEFORE the window that
 carried it. The real server is asynchronous, so a slow answer to
 command N lands inside command N+1's window; if the novel token

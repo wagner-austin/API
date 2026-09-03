@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/service/fleet_telemetry.py"
 source_git_blobs:
   "src/tankpit_bot/diagnostics/event_tail.py": "4d97cda6957481cd5fd578002f9b20923c2ce2e0"
-  "src/tankpit_bot/diagnostics/run_digest_fold.py": "a6a3850fe48cadf840f64d826320254752d4ce29"
+  "src/tankpit_bot/diagnostics/run_digest_fold.py": "c1fbddbe7c7ff432760e9f58dbd06b1dc3fc3983"
   "src/tankpit_bot/service/fleet_stream.py": "9a1fcdcaba2c7edb98cb97a73765118c44c3214c"
   "src/tankpit_bot/service/fleet_telemetry.py": "6b59d1826c8f34a554f8ce6566e271b556f4b449"
 fact_checked: "2026-09-01"
@@ -106,7 +106,7 @@ actually reads and folds) is no slower than one that hits the cache.
 The incremental read has taken the per-poll cost off the run's length
 entirely.[^10]
 
-[^1]: The pre-change `FleetTelemetry.stats` called `build_run_digest`
+[^1]: `src/tankpit_bot/service/fleet_telemetry.py:117` — the pre-change `FleetTelemetry.stats` called `build_run_digest` (`src/tankpit_bot/diagnostics/run_digest.py:38`)
       (whole file) and `activity` called `load_event_records` (whole
       file) on every miss.
 [^2]: `TELEMETRY_CACHE_TTL_MS = 2000`

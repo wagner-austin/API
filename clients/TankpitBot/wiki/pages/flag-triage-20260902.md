@@ -23,7 +23,7 @@ source_git_blobs:
   "src/tankpit_bot/bot/ai/mine_pin.py": "fd87a23c17de213fd7b7a9782dfd374226b8833b"
   "src/tankpit_bot/bot/ai/scope_scout.py": "7f8bf25f88e840e9491e9d829f2eb3dd621ba326"
   "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
-  "src/tankpit_bot/sniffer/world_service.py": "9a2ba3beff7e69e172442c19122da8a2c88d629e"
+  "src/tankpit_bot/sniffer/world_service.py": "48c3ff79c77bfea915869be662621d6f4b0ee492"
 fact_checked: "2026-09-02"
 confidence: high
 hubs: [architecture, combat]
@@ -349,7 +349,7 @@ the artifacts are complete regardless.
       the map-open-defer duplicate collapsed. Nine blocks were LANDED
       in twice — landing displacement across block edges, not
       re-targets.
-[^v2]: Same artifact, `container_pickup_dispatched` /
+[^v2]: `runs/bot/bot-20260902-195506.events.jsonl` — the same artifact as [^v1], named here rather than referred to, since a footnote that only points at another footnote carries no locator of its own. `container_pickup_dispatched` /
       teleport `action_outcome` diagnostics paired by adjacency. By
       lane: 11 `forage_frontier_hop` (adjacent-block exploration
       geometry), 7 `equipment_hop` (walk-blocked near stock served by

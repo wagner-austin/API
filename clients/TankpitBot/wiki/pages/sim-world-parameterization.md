@@ -14,11 +14,11 @@ source_paths:
   - "src/tankpit_bot/runtime_artifacts.py"
 source_git_blobs:
   "src/tankpit_bot/sim/world_seed.py": "29197885d73c089b101f28a6d4088281d6fe7193"
-  "src/tankpit_bot/sim/run_boot.py": "0700aa785e6f6701089fe36a614d62d0db02de61"
+  "src/tankpit_bot/sim/run_boot.py": "d28a3b5cc5f86b77fb04f4095696b389e86bb713"
   "src/tankpit_bot/sim/run.py": "b27fd07adc42b5b63f4000ee855fdd76871f74e0"
   "src/tankpit_bot/sim/scenarios.py": "cc1bb400bcc8082a869b0f7726bc810b75ebfeca"
   "src/tankpit_bot/sim/cli_args.py": "ed02a51a0ab2b669863ae8774e7cfb9b2f87dc6f"
-  "src/tankpit_bot/runtime_artifacts.py": "8439c20a9fe155403b425a5f8751649aef39d3bb"
+  "src/tankpit_bot/runtime_artifacts.py": "8e8960d0acb99419928d7e4b7fa950f9a8931468"
 provenance:
   - "Board task b008ab91, note 2026-09-03T01:36Z — the retracted saturation table that found the layout half"
   - "Board task b008ab91, note 2026-09-03T03:10Z — the population-seed half and the two-blockers-are-one finding"

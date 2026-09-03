@@ -13,16 +13,18 @@ source_paths:
   - "src/tankpit_bot/sim/narrate/combat.py"
   - "src/tankpit_bot/sim/narrate/resources.py"
   - "src/tankpit_bot/sim/narrate/world.py"
-  - "src/tankpit_bot/sim/emissions.py"
-  - "src/tankpit_bot/sim/combat_emissions.py"
   - "src/tankpit_bot/sim/server.py"
   - "runs/bot"
   - "runs/sniff"
   - "runs/bot/bot-20260826-003928.capture_session.json"
 source_git_blobs:
-  "src/tankpit_bot/sim/emissions.py": "1f06cc3bf4975943da0c3b6e54f51de96c2b8573"
-  "src/tankpit_bot/sim/combat_emissions.py": "09b762c4cdd92d495ada7b45890f2ec920095bec"
-  "src/tankpit_bot/sim/server.py": "57be451a9d0069cf9ca45b398791b0530efaa4fd"
+  "src/tankpit_bot/sim/narrate/movement.py": "7d6be21f2147defcb6e773f553960fc1015eef7c"
+  "src/tankpit_bot/sim/narrate/combat.py": "cc68c7a022eeeca830d2038489b6c4962c9c97ff"
+  "src/tankpit_bot/sim/narrate/resources.py": "26e4d5de387a107521864ed5283ef69a655919e9"
+  "src/tankpit_bot/sim/narrate/world.py": "5915877643b9d6be3906eb827d718db469b9ce9a"
+  "src/tankpit_bot/sim/server.py": "0a905439794550474ae68e8e1ed73bac500093d9"
+provenance:
+  - "src/tankpit_bot/sim/emissions.py and sim/combat_emissions.py -- cited here until 2026-09-03. Both were split into the sim/narrate/ package this page already lists (combat, movement, resources, world); the four successors are now pinned in their place rather than the two dead paths being repinned"
 fact_checked: "2026-09-01"
 confidence: high
 verified: 2026-09-01 (341-session archive sweep, zero-trigger test)
@@ -158,6 +160,6 @@ measured and pinned by test; the shape and its consequences are in the
 [^6]: `src/tankpit_bot/sim/emissions.py` module docstring.
 [^7]: `src/tankpit_bot/sim/emissions.py::emit_equipment_pickup` docstring; 2,170 archive windows.
 [^8]: `src/tankpit_bot/sim/server.py::_process_stateless_command`, the `statistics` branch.
-[^9]: [[viewport-shift-protocol]]; the 0x5A origin is the connection's stored window.
+[^9]: `src/tankpit_bot/sniffer/constants.py:50` — `0x5A: "ViewportUpdate"`, listed as a radar message type at `:63` and declared PARTIAL-decode at `:168`; the decoded viewport pair is formatted at `src/tankpit_bot/sniffer/formatters.py:223`. The 0x5A origin is the connection's stored window. (Cited only as [[viewport-shift-protocol]] until 2026-09-03 — a wiki-internal pointer is not a locator, and SCHEMA bans citing this wiki as evidence for a claim; the wikilink stays in `related` where it belongs.)
 [^10]: `src/tankpit_bot/sim/server_move.py::_process_move_command` docstring; archive 2026-08-06.
 [^11]: `src/tankpit_bot/sim/server.py::handshake`, blob `57be451a9d0069cf9ca45b398791b0530efaa4fd`.

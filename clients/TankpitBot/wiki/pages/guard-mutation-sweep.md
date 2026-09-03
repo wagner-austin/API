@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/sniffer/constants.py"
   - "src/tankpit_bot/validate/roundtrip.py"
 source_git_blobs:
-  "tests/sniffer/test_dispatch_exclusivity.py": "2cba91a2286da57d48361cbfdc0784a95884f9f9"
+  "tests/sniffer/test_dispatch_exclusivity.py": "bbc986e8939abe32cc17f6c8c3c2b952b124e3db"
   "src/tankpit_bot/sniffer/constants.py": "fe859e16ecdc3670bdc9e150e290dc607d1bac72"
   "src/tankpit_bot/validate/roundtrip.py": "b57592a4a886e62d202674421642d65ac38ddb49"
 fact_checked: "2026-08-12"

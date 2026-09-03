@@ -11,8 +11,8 @@ source_paths:
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/resource_search.py": "fda4022fcd559f9723f9fd5d19a0c400c50d3f5d"
-  "src/tankpit_bot/state/scan_coverage.py": "06c0ae372146a32a3bc5e5e5a4cd300277ebdac6"
+  "src/tankpit_bot/bot/ai/resource_search.py": "a833600b7b71a469608603c5407fb022979d595d"
+  "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture, combat]

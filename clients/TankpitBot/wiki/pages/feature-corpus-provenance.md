@@ -14,7 +14,7 @@ source_git_blobs:
   "src/tankpit_bot/diagnostics/feature_provenance.py": "e80cee8cd49b694c59f7b7d41199e5416b72d494"
   "src/tankpit_bot/diagnostics/feature_rows.py": "450c70275e522cd78c9ae0dd2d86330594b77d3d"
   "src/tankpit_bot/diagnostics/feature_row_types.py": "a24390e153d46ddfda06b53ce76a9f9f042a9bd4"
-  "src/tankpit_bot/_test_hooks/runtime.py": "beac39f5f046adf0f604d39f5ce9a5f3b1250e92"
+  "src/tankpit_bot/_test_hooks/runtime.py": "b26bbaf2f336c3eae585c9372130461019d53ed6"
 provenance:
   - "docs/RESEARCH.md — the monorepo research index, and the four-step registration procedure this page is measured against"
   - "clients/RustedWarfareBot/src/rw_bot/provenance.py — the `rusted` precedent, adopted 2026-08-29"

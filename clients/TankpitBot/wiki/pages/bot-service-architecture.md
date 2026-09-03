@@ -9,8 +9,8 @@ source_paths:
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/live_view.py"
 source_git_blobs:
-  "src/tankpit_bot/service": "6664510541dbdeabe7e6e64d3740ca3d7c127a3c"
-  "src/tankpit_bot/bot/config.py": "3bfa12cce1125ce8414ca99e64202ae0add5d71b"
+  "src/tankpit_bot/service": "c5634239f76832823a40be0518bb66f20cb6cd2c"
+  "src/tankpit_bot/bot/config.py": "73f00effaaba3a60107229f12ba7743ecd2f16cf"
   "src/tankpit_bot/browser/live_view.py": "e7e18cb9ca4092ed4cbc2ab2762ef934ab909282"
 fact_checked: "2026-08-06"
 confidence: medium

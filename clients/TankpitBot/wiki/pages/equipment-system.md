@@ -9,7 +9,7 @@ source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/equipment.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/equipment.py": "b8b334fef24b91465d7142edc966f2b9ea4dd398"
+  "src/tankpit_bot/sim/equipment.py": "384f9b4724ae30bbb56e97d7482705c5a6f931a0"
 fact_checked: "2026-08-28"
 confidence: high
 hubs: [game-mechanics]
@@ -138,7 +138,7 @@ of it to a mine; and a victim we kill respawns half-stocked, so
 immediate re-pressure after a kill is disproportionately favorable.
 
 [^13]: Frame-exact decode 2026-08-28: `decode_session_frames` + `decode_message` over `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928`, `runs/bot/bot-20260803-180918` capture sessions — for each 0x41 naming the session's own tank (ids 716/601/601/1301), the nearest 0x49 on each side, counts read per `decode_inventory` (`byte & 127`). Mine attribution via the 0x41 killer sentinel (`killer_id_raw >= 65530`, residual = mine team; see [[deactivation-format]]). Corpus context: `tankpit-corpus-audit` over 436 runs put drift flags ONLY on death-runs (-5, -5, -3, -60) plus two minor unexplained +2/+7 on 08-13.
-[^14]: user (Austin), 2026-08-28 -- "a death causes you to lose half inventory or so", confirming the corpus-audit inference the same day; the frame decode then fixed "or so" to ceil(n/2) for tank kills.
+[^14]: Operator testimony, 2026-08-28 -- "a death causes you to lose half inventory or so" -- corroborating the corpus-audit inference the same day. It is testimony, not measurement, and carries no locator of its own by nature; the wire evidence that fixed "or so" to ceil(n/2) for tank kills is [^13], whose captures are `runs/bot/desert/bot-20260826-182204`, `runs/bot/artax/bot-20260826-084859`, `runs/bot/bot-20260826-003928` and `runs/bot/bot-20260803-180918`. Cite [^13] for the rule; this footnote records only that the operator said the same thing independently.
 
 ## Equipment spawns cluster at persistent HOTSPOTS (FULL-CORPUS MINED 2026-08-28)
 
