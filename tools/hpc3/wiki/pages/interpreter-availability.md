@@ -14,7 +14,7 @@ source_git_blobs:
   "src/hpc3/core/bootstrap.py": "689051513c67eb0978667f2fe109c83b0baab1d1"
   "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"
   "README.md": "104d4dac210676c88c42b5122146c11687239fc5"
-  "pyproject.toml": "feba6fe164021d49f8d3e9c2cba0117ab48ee75e"
+  "pyproject.toml": "c36c33ad45cbd4eeade37bd7ec69aae976cdb3df"
 provenance:
   - "module -t avail python on hpc3 login-i15, 2026-09-03: python/2.7.17, 3.8.0, 3.10.2, 3.14.3"
   - "/usr/bin/python3 -V on hpc3 login-i15, 2026-09-03: Python 3.9.25; which python3.11 finds nothing"
