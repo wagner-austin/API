@@ -88,8 +88,19 @@ def _write_generation(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path
     return target
 
 
+#: Distributions the tests fingerprint against: two the dev group guarantees.
+#:
+#: Production names those plus the corpus group, which ``poetry sync --with
+#: dev`` removes before every ``make check``. Binding the seam here keeps the
+#: suite from depending on a ~2 GB optional install to reach one line of the
+#: compare CLI; that the production default is the wider set is asserted
+#: structurally in ``test_provenance.py`` instead of by capturing it.
+TEST_DISTRIBUTIONS: tuple[str, ...] = ("ruff", "mypy")
+
+
 @pytest.fixture(autouse=True)
 def _reset() -> None:
-    """Restore both hook containers around every test."""
+    """Restore both hook containers around every test, then narrow one seam."""
     core_hooks.reset_hooks()
     cli_hooks.reset_hooks()
+    cli_hooks.record_distributions = TEST_DISTRIBUTIONS

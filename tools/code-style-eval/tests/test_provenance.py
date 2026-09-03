@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import pathlib
 
 import pytest
@@ -9,7 +10,9 @@ from platform_core.determinism_record import UNPINNED_STACK
 
 from code_style_eval.contracts.outcomes import ComparisonReport, PairedCounts
 from code_style_eval.core.provenance import (
+    CORPUS_DISTRIBUTIONS,
     EXPERIMENT,
+    FINGERPRINT_DISTRIBUTIONS,
     SCORING_DISTRIBUTIONS,
     comparison_observations,
     comparison_run_record,
@@ -105,7 +108,7 @@ class TestTheFingerprint:
 
     def test_the_absent_axes_are_empty_not_invented(self) -> None:
         """Scoring is CPU work outside any image; claiming a GPU would lie."""
-        fingerprint = scoring_fingerprint()
+        fingerprint = scoring_fingerprint(("ruff", "mypy"))
 
         assert fingerprint["image_digest"] == ""
         assert fingerprint["gpu_model"] == ""
@@ -118,20 +121,68 @@ class TestTheFingerprint:
         rename upstream cannot leave this test passing against a literal the
         production code no longer emits.
         """
-        assert scoring_fingerprint()["determinism"]["stack"] == UNPINNED_STACK
+        assert scoring_fingerprint(("ruff", "mypy"))["determinism"]["stack"] == UNPINNED_STACK
 
     def test_the_host_is_captured(self) -> None:
         """The axis that separates two runs when the GPU axes are all empty."""
-        host = scoring_fingerprint()["host"]
+        host = scoring_fingerprint(("ruff", "mypy"))["host"]
 
         assert host["platform"] != ""
         assert host["logical_cores"] > 0
 
-    def test_every_checker_version_is_captured(self) -> None:
+    def test_the_named_distributions_are_captured(self) -> None:
         """A ruff release that adds a rule moves the rate on its own."""
-        recorded = {package["name"] for package in scoring_fingerprint()["packages"]}
+        recorded = {
+            package["name"] for package in scoring_fingerprint(("ruff", "mypy"))["packages"]
+        }
 
-        assert recorded == set(SCORING_DISTRIBUTIONS)
+        assert recorded == {"ruff", "mypy"}
+
+    def test_a_real_run_records_the_checkers_and_the_corpus_together(self) -> None:
+        """Whether an import resolves is a verdict, so it is provenance.
+
+        A generated file importing numpy fails typing when numpy is absent and
+        passes when it is present, with no change to the model's output. Two
+        runs scored against different resolvable sets must not be able to
+        claim the same fingerprint.
+
+        Asserted on the DEFAULT's composition rather than by capturing it,
+        because capturing needs the optional corpus group installed and
+        ``poetry sync --with dev`` removes it before every ``make check``.
+        """
+        assert set(FINGERPRINT_DISTRIBUTIONS) == set(SCORING_DISTRIBUTIONS) | set(
+            CORPUS_DISTRIBUTIONS
+        )
+
+    def test_an_absent_distribution_is_refused(self) -> None:
+        """Recording a narrower instrument than the one that ran is the defect.
+
+        An empty version, or a silently dropped entry, would let a run scored
+        without the corpus group claim a record indistinguishable from one
+        scored with it.
+        """
+        with pytest.raises(importlib.metadata.PackageNotFoundError):
+            _ = scoring_fingerprint(("no-such-distribution-exists",))
+
+    def test_the_corpus_set_matches_the_declared_group(self) -> None:
+        """The constant and the poetry group are two statements of one set.
+
+        They drift silently otherwise: somebody adds a distribution to the
+        group so an import resolves, the fingerprint keeps recording the old
+        set, and the record understates what the run resolved against.
+        """
+        pyproject = (pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+        block = pyproject.split("[tool.poetry.group.corpus.dependencies]")[1]
+        block = block.split("[tool.poetry.scripts]")[0]
+        declared = {
+            line.split("=")[0].strip().strip('"')
+            for line in block.splitlines()
+            if "=" in line and not line.lstrip().startswith("#")
+        }
+
+        assert declared == set(CORPUS_DISTRIBUTIONS)
 
 
 class TestTheObservations:
@@ -187,7 +238,7 @@ class TestTheRecord:
         covered = tmp_path / "base.jsonl"
         covered.write_text("x", encoding="utf-8")
 
-        record = comparison_run_record(_report(), "sweep-v3", [covered])
+        record = comparison_run_record(_report(), "sweep-v3", [covered], ("ruff", "mypy"))
 
         assert record["experiment"] == EXPERIMENT
         assert record["label"] == "sweep-v3"
@@ -201,7 +252,7 @@ class TestTheRecord:
         covered = tmp_path / "base.jsonl"
         covered.write_text("x", encoding="utf-8")
 
-        record = comparison_run_record(_report(), "s", [covered])
+        record = comparison_run_record(_report(), "s", [covered], ("ruff", "mypy"))
         names = [observation["name"] for observation in record["observations"]]
 
         assert names == sorted(names)
@@ -216,4 +267,4 @@ class TestTheRecord:
         covered.write_text("x", encoding="utf-8")
 
         with pytest.raises(ValueError, match="label"):
-            _ = comparison_run_record(_report(), "", [covered])
+            _ = comparison_run_record(_report(), "", [covered], ("ruff", "mypy"))

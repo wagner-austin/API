@@ -7,6 +7,7 @@ whether they read it at all.
 
 from __future__ import annotations
 
+import importlib.metadata
 import pathlib
 import sys
 from collections.abc import Generator, Sequence
@@ -279,7 +280,7 @@ class TestTheSweep:
 
     def test_the_output_directory_is_created(self, tmp_path: pathlib.Path) -> None:
         """A sweep should not fail on a missing runs/ directory."""
-        holdout = self._holdout(tmp_path, ["a.py"])
+        holdout = _write_holdout(tmp_path, ["a.py"])
         generated = tmp_path / "gen"
         generated.mkdir()
         _write_generation(generated, "a.py")
@@ -322,6 +323,107 @@ def _make_argv() -> Generator[list[str], None, None]:
 # The call form resolves pytest's overloaded decorator to a concrete type;
 # the bare @pytest.fixture expression carries Any under disallow_any_expr.
 argv = pytest.fixture(_make_argv)
+
+
+def _write_holdout(tmp_path: pathlib.Path, paths: Sequence[str]) -> pathlib.Path:
+    """Write a holdout corpus.
+
+    Module level rather than a method, because two classes need it and a
+    method on one of them is not reachable from the other.
+
+    Args:
+        tmp_path: Directory to write into.
+        paths: Item paths to include.
+
+    Returns:
+        The holdout file.
+    """
+    holdout = tmp_path / "h.jsonl"
+    holdout.write_text(
+        "".join(
+            dump_json_str({"repo": "api", "path": p, "text": _SOURCE}) + chr(10) for p in paths
+        ),
+        encoding="utf-8",
+    )
+    return holdout
+
+
+class TestRefusingAWrongInstrument:
+    """Scoring writes no fingerprint, so it must check one before it starts."""
+
+    def test_a_missing_distribution_stops_the_run(self, tmp_path: pathlib.Path) -> None:
+        """The failure this prevents is a run that SUCCEEDS and is wrong.
+
+        ``poetry sync --with dev`` -- which ``make check`` runs every time --
+        removes the optional corpus group, and scoring without it quietly
+        produces outcomes full of missing-stub verdicts about the sandbox
+        rather than about the generated code. Nothing downstream distinguishes
+        those from good ones until the comparison refuses, long after.
+
+        Args:
+            tmp_path: Temporary directory.
+        """
+        holdout = _write_holdout(tmp_path, ["a.py"])
+        generated = tmp_path / "gen"
+        generated.mkdir()
+        _write_generation(generated, "a.py")
+        core_hooks.Hooks.run_checker = _Recorder({})
+        cli_hooks.record_distributions = ("no-such-distribution-exists",)
+        out = tmp_path / "out.jsonl"
+
+        with pytest.raises(importlib.metadata.PackageNotFoundError):
+            _ = main(
+                [
+                    "--holdout",
+                    str(holdout),
+                    "--generated-dir",
+                    str(generated),
+                    "--interpreter",
+                    "py",
+                    "--arm",
+                    "candidate",
+                    "--out",
+                    str(out),
+                    "--check-cwd",
+                    str(tmp_path),
+                ]
+            )
+
+        assert not out.exists()
+
+    def test_the_refusal_precedes_every_checker(self, tmp_path: pathlib.Path) -> None:
+        """A refusal after the work has run is a refusal that saved nothing.
+
+        Args:
+            tmp_path: Temporary directory.
+        """
+        holdout = _write_holdout(tmp_path, ["a.py"])
+        generated = tmp_path / "gen"
+        generated.mkdir()
+        _write_generation(generated, "a.py")
+        recorder = _Recorder({})
+        core_hooks.Hooks.run_checker = recorder
+        cli_hooks.record_distributions = ("no-such-distribution-exists",)
+
+        with pytest.raises(importlib.metadata.PackageNotFoundError):
+            _ = main(
+                [
+                    "--holdout",
+                    str(holdout),
+                    "--generated-dir",
+                    str(generated),
+                    "--interpreter",
+                    "py",
+                    "--arm",
+                    "candidate",
+                    "--out",
+                    str(tmp_path / "out.jsonl"),
+                    "--check-cwd",
+                    str(tmp_path),
+                ]
+            )
+
+        assert recorder.calls == []
 
 
 class TestTheEntryPoint:

@@ -226,7 +226,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     sidecar.write_text(
         dump_json_str(
             encode_run_record(
-                comparison_run_record(report, label, [baseline_path, candidate_path])
+                comparison_run_record(
+                    report,
+                    label,
+                    [baseline_path, candidate_path],
+                    _test_hooks.record_distributions,
+                )
             ),
             compact=False,
             indent=2,

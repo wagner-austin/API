@@ -23,6 +23,7 @@ from code_style_eval.cli import _test_hooks
 from code_style_eval.contracts.outcomes import ItemOutcome, encode_item_outcome
 from code_style_eval.core.checks import checker_environment, score_item
 from code_style_eval.core.prompts import EvalPrompt, build_prompts
+from code_style_eval.core.provenance import verify_scoring_environment
 
 _HOLDOUT_FLAG = "--holdout"
 _GENERATED_FLAG = "--generated-dir"
@@ -284,9 +285,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Returns:
         Exit code 0 when the outcomes were written.
+
+    Raises:
+        importlib.metadata.PackageNotFoundError: Propagated from
+            :func:`verify_scoring_environment` when the scoring environment is
+            not the one a comparison of these outcomes would claim. Checked
+            BEFORE any work, because the failure it prevents is a run that
+            succeeds and is wrong.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     arguments = parse_arguments(tokens)
+    verify_scoring_environment(_test_hooks.record_distributions)
 
     records = arguments.holdout.read_text(encoding="utf-8").splitlines()
     prompts = build_prompts(records, arguments.prompt_lines)

@@ -34,6 +34,7 @@ from code_style_eval.contracts.outcomes import (
     encode_item_outcome,
 )
 from code_style_eval.core.provenance import payload_digest
+from tests.conftest import TEST_DISTRIBUTIONS
 
 
 def _outcome(item_id: str, arm: str, *, passed: bool) -> ItemOutcome:
@@ -74,8 +75,15 @@ def _write(path: pathlib.Path, outcomes: Sequence[ItemOutcome]) -> pathlib.Path:
 
 @pytest.fixture(autouse=True)
 def _reset() -> None:
-    """Restore the CLI hook around every test."""
+    """Restore the CLI hook around every test, then narrow the one seam.
+
+    The narrowing must follow the reset. Without it this fixture rebinds
+    ``record_distributions`` to production, which names the optional corpus
+    group that ``poetry sync --with dev`` has already removed, and every test
+    that writes a run record fails on a distribution the suite never needed.
+    """
     cli_hooks.reset_hooks()
+    cli_hooks.record_distributions = TEST_DISTRIBUTIONS
 
 
 class TestReadingOutcomes:

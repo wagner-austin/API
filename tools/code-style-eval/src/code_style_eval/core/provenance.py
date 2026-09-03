@@ -50,6 +50,46 @@ from code_style_eval.contracts.outcomes import ComparisonReport
 #: verdict, and every spurious difference makes a real one harder to see.
 SCORING_DISTRIBUTIONS: tuple[str, ...] = ("ruff", "mypy", "platform-core")
 
+#: The corpus's own third-party imports, installed so mypy can RESOLVE them,
+#: and the ONE place that set is written. It mirrors the optional
+#: ``[tool.poetry.group.corpus]`` group in this package's pyproject.
+#:
+#: These belong in the fingerprint for the same reason the checkers do: they
+#: decide a verdict. A generated file importing numpy is a typing failure when
+#: numpy is absent and a passing file when it is present, without one token of
+#: the model's output changing. A record that omitted them would let two runs
+#: scored against different resolvable sets claim the same provenance, which
+#: is precisely the defect just closed in Model-Trainer and cleargbm -- a
+#: fingerprint that forgets the thing that moved the number.
+#:
+#: This makes the group REQUIRED for scoring rather than optional in practice:
+#: ``installed_version`` raises on a distribution that is absent, so scoring
+#: without ``poetry install --with corpus`` fails loudly instead of quietly
+#: recording a narrower instrument than the one that ran. That is the intent.
+#: An absence that a reader must infer is the failure mode being designed out.
+#:
+#: tensorflow is NOT here and is not installed: one import site in the whole
+#: corpus against a ~600 MB dependency with no clean Windows/py3.11 wheel. It
+#: stays an unresolved import, reported as one.
+CORPUS_DISTRIBUTIONS: tuple[str, ...] = (
+    "aiohttp",
+    "discord.py",
+    "fastapi",
+    "flask",
+    "google-api-python-client",
+    "httpx",
+    "kaggle",
+    "loguru",
+    "mujoco",
+    "numpy",
+    "pandas",
+    "pillow",
+    "python-dotenv",
+    "toml",
+    "torch",
+    "types-toml",
+)
+
 #: Name under which these numbers are comparable with each other.
 EXPERIMENT = "code-style-guard-pass"
 
@@ -98,7 +138,14 @@ def payload_digest(paths: Sequence[Path]) -> str:
     return digest.hexdigest()
 
 
-def scoring_fingerprint() -> RunFingerprint:
+#: What a real scoring run records: the checkers AND everything the corpus
+#: imports, because both decide verdicts.
+FINGERPRINT_DISTRIBUTIONS: tuple[str, ...] = SCORING_DISTRIBUTIONS + CORPUS_DISTRIBUTIONS
+
+
+def scoring_fingerprint(
+    distributions: tuple[str, ...] = FINGERPRINT_DISTRIBUTIONS,
+) -> RunFingerprint:
     """Capture what this machine contributed to the numbers.
 
     Three of the six axes are recorded as unknown rather than invented.
@@ -112,8 +159,25 @@ def scoring_fingerprint() -> RunFingerprint:
     The generation step DID use a GPU, and that is not lost: it is recorded in
     the per-arm generation manifests, which the payload digest covers.
 
+    Naming the distributions is the CALLER's job, as it is in
+    ``model_trainer.core.run_fingerprint``. A scoring run passes the default
+    and therefore requires ``poetry install --with corpus``; a test that only
+    checks the wiring passes a set it actually has. The alternative -- reading
+    the set from a module constant with no way to override it -- makes the
+    package's own ``make check`` depend on a ~2 GB optional group that
+    ``poetry sync --with dev`` removes on every run.
+
+    Args:
+        distributions: The distributions whose versions decide a verdict here.
+
     Returns:
         The fingerprint.
+
+    Raises:
+        importlib.metadata.PackageNotFoundError: Propagated from
+            ``installed_version`` when a named distribution is absent. Scoring
+            against a narrower instrument than the record claims is the defect
+            this refuses to commit quietly.
     """
     return RunFingerprint(
         image_digest="",
@@ -121,8 +185,36 @@ def scoring_fingerprint() -> RunFingerprint:
         driver_version="",
         determinism=determinism_record(UNPINNED_STACK, {}),
         host=capture_host_record(stdlib_host_probe(os.cpu_count)),
-        packages=capture_package_versions(SCORING_DISTRIBUTIONS, installed_version),
+        packages=capture_package_versions(distributions, installed_version),
     )
+
+
+def verify_scoring_environment(distributions: tuple[str, ...] = FINGERPRINT_DISTRIBUTIONS) -> None:
+    """Refuse to score unless the instrument is the one the record will claim.
+
+    Scoring writes NO fingerprint -- only the comparison does -- so a venv
+    missing the corpus group does not fail, it silently produces outcome files
+    full of missing-stub verdicts about the sandbox rather than about the
+    generated code. The refusal used to arrive at compare time, after the
+    expensive part, and the outcomes on disk by then looked exactly like good
+    ones.
+
+    ``make check`` creates this state on every run: it invokes ``poetry sync
+    --with dev``, and ``sync`` REMOVES an optional group. So the normal
+    developer loop leaves the package unable to score at full fidelity, with
+    nothing saying so.
+
+    Calling this first turns a silently-wrong seven-minute run into a
+    one-second refusal naming the distribution to install.
+
+    Args:
+        distributions: The distributions a run of this instrument requires.
+
+    Raises:
+        importlib.metadata.PackageNotFoundError: Propagated from
+            ``installed_version`` when any is absent.
+    """
+    _ = capture_package_versions(distributions, installed_version)
 
 
 def comparison_observations(report: ComparisonReport) -> tuple[Observation, ...]:
@@ -154,7 +246,10 @@ def comparison_observations(report: ComparisonReport) -> tuple[Observation, ...]
 
 
 def comparison_run_record(
-    report: ComparisonReport, label: str, covered: Sequence[Path]
+    report: ComparisonReport,
+    label: str,
+    covered: Sequence[Path],
+    distributions: tuple[str, ...] = FINGERPRINT_DISTRIBUTIONS,
 ) -> RunRecord:
     """Build the record that belongs beside a comparison.
 
@@ -162,6 +257,7 @@ def comparison_run_record(
         report: The computed comparison.
         label: Which sweep this was, e.g. ``"sweep-v3-cap1536-reppen1.1"``.
         covered: The files the comparison was computed from.
+        distributions: Passed through to :func:`scoring_fingerprint`.
 
     Returns:
         The record.
@@ -173,17 +269,20 @@ def comparison_run_record(
     return run_record(
         experiment=EXPERIMENT,
         label=label,
-        fingerprint=scoring_fingerprint(),
+        fingerprint=scoring_fingerprint(distributions),
         observations=comparison_observations(report),
         payload_digest=payload_digest(covered),
     )
 
 
 __all__ = [
+    "CORPUS_DISTRIBUTIONS",
     "EXPERIMENT",
+    "FINGERPRINT_DISTRIBUTIONS",
     "SCORING_DISTRIBUTIONS",
     "comparison_observations",
     "comparison_run_record",
     "payload_digest",
     "scoring_fingerprint",
+    "verify_scoring_environment",
 ]

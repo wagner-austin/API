@@ -26,6 +26,40 @@ ruff = "^0.14.4"
 pytest-cov = "^7.0.0"
 pytest-xdist = "^3.6.1"
 
+# Third-party distributions the EVALUATION CORPUS imports. Optional and never
+# installed by a normal `poetry install`: this tool does not use any of them.
+# They exist so mypy can resolve what a generated file imports, instead of
+# reporting a missing stub -- a verdict about the scoring sandbox rather than
+# about the generated code.
+#
+# Installing them CHANGES THE INSTRUMENT. A run scored with this group present
+# is not comparable to one scored without it, which is why the group's members
+# are recorded in the run record's packages axis (see core/provenance.py).
+#
+# tensorflow is deliberately absent: one import site in the whole corpus,
+# ~600 MB, and no Windows/py3.11 wheel that installs cleanly. It stays an
+# unresolved import and is reported as one.
+[tool.poetry.group.corpus]
+optional = true
+
+[tool.poetry.group.corpus.dependencies]
+numpy = "*"
+pandas = "*"
+fastapi = "*"
+httpx = "*"
+aiohttp = "*"
+flask = "*"
+loguru = "*"
+python-dotenv = "*"
+pillow = "*"
+"discord.py" = "*"
+torch = "*"
+mujoco = "*"
+kaggle = "*"
+google-api-python-client = "*"
+toml = "*"
+types-toml = "*"
+
 [tool.poetry.scripts]
 code-style-eval = "code_style_eval.cli.evaluate:entrypoint"
 code-style-eval-compare = "code_style_eval.cli.compare:entrypoint"
