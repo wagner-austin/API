@@ -28,7 +28,7 @@ is versioned beside its laws.
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -51,55 +51,20 @@ from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
 from rw_bot.service.queue import batch_status, bootstrap, submit
 from rw_bot.service.submit import batch_config
+from scripts.search_specs import SearchSpec, require_search_spec
 
 SWEEP_ROOT = Path("runs/sweeps")
-
-#: The champion the search perturbs. close0-flame4 took the Very Hard rung
-#: on 2026-09-02, hours after flame-close6 did: vhsearch3, aimed at the
-#: fresh champion's own neighborhood, graduated the arm that deletes its
-#: latch and doubles flame, and it cleared both laws (+14 then +5 against
-#: the +4 bar; combined 48-29 of 96, p=0.005). Two search-produced
-#: champions in one day is the pipeline working, not churn: each held only
-#: until a better-measured arm beat it on untouched seeds.
-BASE_DOCTRINE = Path("doctrines/close0-flame4.doctrine")
 
 #: Where variant doctrine files land, frozen into each batch's tree.
 VARIANT_DIR = Path("doctrines/search")
 
-#: Alternative knob values around the champion (flame 2, close 3, raid 3,
-#: tech 1 per the ledger's champion stack) -- the champion's own values
-#: stay out so every candidate is a real move. Values must satisfy the
-#: doctrine codec's ranges; a bad one stops the search at round zero.
-#: Values equal to the current base doctrine's own are filtered out
-#: mechanically by ``effective_space`` before candidates are generated,
-#: so re-aiming BASE_DOCTRINE never fields a no-op arm again (vhsearch3
-#: did, and it survived round 0 on label-noise). The flame axis runs to 8
-#: because close0-flame4's adoption measured a strong upward gradient at
-#: 2 -> 4 and the cap sat exactly on the champion.
-SPACE: Mapping[str, tuple[int, ...]] = {
-    "flame": (0, 2, 4, 6, 8),
-    "close": (0, 6),
-    "raid": (0, 6),
-    "tech": (0, 2),
-    "medics": (1,),
-    "decoys": (2,),
-}
 
-#: Two-knob candidates drawn per search, law two's sample of the cross
-#: product the arm ladder could never afford.
-PAIR_CANDIDATES = 6
-
-#: Pairs per candidate per round; each round keeps the top half.
-SCHEDULE: tuple[int, ...] = (8, 16)
-
-#: The panels' own match settings, unchanged so search rounds are
-#: comparable with panel history.
+#: The panels' own match settings, invariant across regimes so search
+#: rounds stay comparable with panel history on the same rung.
 MAP_PATH = "maps/skirmish/[p2]duel_lake.tmx"
-DIFFICULTY = 2
 LOCKSTEP = 75
 PIN_DELTA = 3
 FAST_FORWARD = 10
-SAMPLES = 10000
 
 #: Seconds between polls of a running round.
 POLL_SECONDS = 120.0
@@ -145,7 +110,10 @@ def round_seeds(rng_seed: int, round_index: int, pairs: int) -> tuple[int, ...]:
 
 
 def round_job_lines(
-    survivors: Sequence[Candidate], seeds: Sequence[int], variant_dir: Path
+    survivors: Sequence[Candidate],
+    seeds: Sequence[int],
+    variant_dir: Path,
+    spec: SearchSpec,
 ) -> tuple[str, ...]:
     """The round's job lines, pairs interleaved so verdicts pair early.
 
@@ -153,33 +121,37 @@ def round_job_lines(
         survivors: The candidates still alive.
         seeds: The round's seeds.
         variant_dir: Where the candidates' doctrine files live.
+        spec: The regime, for the control doctrine and sample budget.
 
     Returns:
         One control line plus one line per candidate, per seed.
     """
+    control = Path(spec["base"]).as_posix()
+    samples = spec["samples"]
     lines: list[str] = []
     for seed in seeds:
-        lines.append(f"control|{seed}|{BASE_DOCTRINE.as_posix()}|{SAMPLES}")
+        lines.append(f"control|{seed}|{control}|{samples}")
         for moves in survivors:
             label = candidate_label(moves)
             doctrine = (variant_dir / f"{label}.doctrine").as_posix()
-            lines.append(f"{label}|{seed}|{doctrine}|{SAMPLES}")
+            lines.append(f"{label}|{seed}|{doctrine}|{samples}")
     return tuple(lines)
 
 
-def write_variants(survivors: Sequence[Candidate], variant_dir: Path) -> None:
+def write_variants(survivors: Sequence[Candidate], variant_dir: Path, base_path: Path) -> None:
     """Write every surviving candidate's doctrine file.
 
     Args:
         survivors: The candidates still alive.
         variant_dir: The directory the files land in, created if absent.
+        base_path: The doctrine the candidates perturb.
 
     Raises:
         OSError: When a file cannot be written.
         SearchError: Through ``apply_moves``, on a knob outside the
             doctrine.
     """
-    base = parse_doctrine_lines(BASE_DOCTRINE.read_text(encoding="utf-8").splitlines())
+    base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
     variant_dir.mkdir(parents=True, exist_ok=True)
     for moves in survivors:
         variant = apply_moves(base, moves)
@@ -281,13 +253,15 @@ class QueueRunner:
         dsn: The queue database.
     """
 
-    def __init__(self, dsn: str) -> None:
-        """Bind the runner to its queue.
+    def __init__(self, dsn: str, difficulty: int) -> None:
+        """Bind the runner to its queue and regime.
 
         Args:
             dsn: The queue database.
+            difficulty: The AI difficulty every round plays at.
         """
         self.dsn = dsn
+        self.difficulty = difficulty
 
     def run(self, batch: str, job_lines: Sequence[str]) -> None:
         """Submit the round and wait for the fleet to play it.
@@ -301,7 +275,7 @@ class QueueRunner:
             SweepError: When a job line cannot be parsed back.
         """
         jobs = parse_jobs(job_lines)
-        config = batch_config(batch, LOCKSTEP, MAP_PATH, DIFFICULTY, PIN_DELTA, FAST_FORWARD)
+        config = batch_config(batch, LOCKSTEP, MAP_PATH, self.difficulty, PIN_DELTA, FAST_FORWARD)
         conn = patient_connect(self.dsn)
         bootstrap(conn)
         submit(conn, batch, config, jobs)
@@ -311,6 +285,7 @@ class QueueRunner:
 
 def run_search(
     runner: RoundRunner,
+    spec: SearchSpec,
     name: str,
     rng_seed: int,
     sweeps_root: Path = SWEEP_ROOT,
@@ -320,6 +295,7 @@ def run_search(
 
     Args:
         runner: Who plays each round -- the queue or the cluster.
+        spec: The registered regime: base doctrine, knob space, schedule.
         name: The search's name; round batches file as ``<name>-r<i>``.
         rng_seed: Reproducibility anchor for pair sampling and seeds.
         sweeps_root: Where batch artifacts land, injectable for tests.
@@ -341,18 +317,19 @@ def run_search(
         host_hooks.write_line(text)
         lines.append(text)
 
-    base = parse_doctrine_lines(BASE_DOCTRINE.read_text(encoding="utf-8").splitlines())
-    space = effective_space(SPACE, base)
+    base_path = Path(spec["base"])
+    base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
+    space = effective_space(spec["space"], base)
     survivors: tuple[Candidate, ...] = (
         *single_moves(space),
-        *sampled_pairs(space, PAIR_CANDIDATES, rng_seed),
+        *sampled_pairs(space, spec["pair_candidates"], rng_seed),
     )
     note(f"# search {name} (rng {rng_seed}): {len(survivors)} candidates")
-    for round_index, pairs in enumerate(SCHEDULE):
+    for round_index, pairs in enumerate(spec["schedule"]):
         batch = f"{name}-r{round_index}"
-        write_variants(survivors, variant_dir)
+        write_variants(survivors, variant_dir, base_path)
         seeds = round_seeds(rng_seed, round_index, pairs)
-        lines_out = round_job_lines(survivors, seeds, variant_dir)
+        lines_out = round_job_lines(survivors, seeds, variant_dir, spec)
         note(f"# round {round_index}: {len(survivors)} arms, {pairs} pairs, {len(lines_out)} jobs")
         runner.run(batch, lines_out)
         margins = batch_margins(sweeps_root / batch)
@@ -379,21 +356,26 @@ def main(
     """Run one search from the command line.
 
     Args:
-        argv: ``<where> <name> [rng-seed]``, with ``<where>`` a queue DSN
-            or ``hpc3:<workspace.json>`` to play the rounds on the cluster.
-            The prefix routes explicitly; nothing is sniffed. ``None``
-            reads ``sys.argv[1:]``.
+        argv: ``<where> <spec> <name> [rng-seed]``, with ``<where>`` a
+            queue DSN or ``hpc3:<workspace.json>`` to play the rounds on
+            the cluster, and ``<spec>`` a registered regime from
+            :data:`SPECS`. The prefix routes explicitly; nothing is
+            sniffed. ``None`` reads ``sys.argv[1:]``.
         sweeps_root: Where batch artifacts land, injectable for tests.
         variant_dir: Where variant doctrines land, injectable for tests.
 
     Returns:
         ``EXIT_OK``, or ``EXIT_BAD_USAGE`` on a bad argument count.
+
+    Raises:
+        SearchError: ``RW-SEARCH-002`` on an unregistered spec name.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if len(args) not in (2, 3):
-        sys.stdout.write("usage: search <dsn|hpc3:workspace.json> <name> [rng-seed]\n")
+    if len(args) not in (3, 4):
+        sys.stdout.write("usage: search <dsn|hpc3:workspace.json> <spec> <name> [rng-seed]\n")
         return EXIT_BAD_USAGE
-    rng_seed = int(args[2]) if len(args) == 3 else 0
+    spec = require_search_spec(args[1])
+    rng_seed = int(args[3]) if len(args) == 4 else 0
     where = args[0]
     runner: RoundRunner
     if where.startswith(CLUSTER_PREFIX):
@@ -402,7 +384,7 @@ def main(
             host=CLUSTER_HOST,
             cluster_root=CLUSTER_ROOT,
             map_path=MAP_PATH,
-            difficulty=DIFFICULTY,
+            difficulty=spec["difficulty"],
             fast_forward=FAST_FORWARD,
             scratch=CLUSTER_SCRATCH,
             sweeps_root=sweeps_root,
@@ -410,9 +392,9 @@ def main(
             poll_seconds=POLL_SECONDS,
         )
     else:
-        runner = QueueRunner(where)
+        runner = QueueRunner(where, spec["difficulty"])
     # The report streams as it happens; the return value is for callers.
-    run_search(runner, args[1], rng_seed, sweeps_root, variant_dir)
+    run_search(runner, spec, args[2], rng_seed, sweeps_root, variant_dir)
     return EXIT_OK
 
 

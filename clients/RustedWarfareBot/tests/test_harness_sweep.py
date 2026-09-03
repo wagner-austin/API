@@ -24,6 +24,7 @@ from rw_bot.harness.sweep import (
     assigned,
     decode_sweep_job,
     encode_sweep_job,
+    fresh_seeds,
     is_complete,
     job_name,
     make_argv,
@@ -474,3 +475,23 @@ def test_a_job_with_no_lease_is_refused_rather_than_drawn_for() -> None:
     with pytest.raises(SweepError) as caught:
         make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, 0, DISPLAY)
     assert caught.value.code == "RW-SWEEP-005"
+
+
+def test_fresh_seeds_are_odd_disjoint_and_spread() -> None:
+    """The panel-independence picker: nothing already used, everything
+    odd, and the picks stride the whole range instead of clustering at
+    its bottom."""
+    used = {101, 103, 105}
+    picked = fresh_seeds(used, 4, 100, 132)
+    assert picked == (107, 113, 119, 125)
+    assert set(picked) & used == set()
+    assert all(seed % 2 == 1 for seed in picked)
+    # An even start rounds UP to odd rather than fielding an even seed.
+    assert fresh_seeds(frozenset(), 2, 10, 20) == (11, 15)
+
+
+def test_fresh_seeds_refuse_a_range_too_small_to_stay_disjoint() -> None:
+    with pytest.raises(SweepError) as caught:
+        fresh_seeds({11, 13}, 3, 10, 16)
+    assert caught.value.code == "RW-SWEEP-006"
+    assert "1 unused odd seed(s), 3 were asked for" in caught.value.message

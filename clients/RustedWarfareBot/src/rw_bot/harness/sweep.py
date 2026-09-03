@@ -31,6 +31,7 @@ the launcher needs was already per-invocation ([[harness-nodisplay]]).
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from typing import TypedDict
 
 from rw_bot import RwBotError
@@ -201,6 +202,46 @@ def parse_jobs(lines: Sequence[str]) -> tuple[SweepJob, ...]:
     return tuple(
         parse_job_line(line) for line in lines if line.strip() and not line.lstrip().startswith("#")
     )
+
+
+def fresh_seeds(used: AbstractSet[int], count: int, start: int, stop: int) -> tuple[int, ...]:
+    """Pick seeds no prior experiment has consumed, spread across a range.
+
+    Untouched seeds are what laws six and nine trade in: selection on one
+    dataset, confirmation on another, and a seed reused anywhere breaks
+    that independence silently. The picker was written inline four times
+    on 2026-09-02/03 before this lift; each copy globbed the sweep files,
+    parsed the job lines, and spread the survivors by even stride --
+    exactly what this does, once, tested.
+
+    Args:
+        used: Every seed any sweep file has ever named, from
+            :func:`parse_jobs` over their lines.
+        count: How many fresh seeds to pick.
+        start: The range's inclusive lower bound; rounded up to odd,
+            because every seed this project has ever fielded is odd and a
+            mixed convention would make collisions harder to eyeball.
+        stop: The range's exclusive upper bound.
+
+    Returns:
+        ``count`` odd seeds in ``[start, stop)``, none in ``used``, in
+        ascending order, spread by even stride across the available pool.
+
+    Raises:
+        SweepError: ``RW-SWEEP-006`` when the range does not hold
+            ``count`` unused odd seeds -- the range is wrong, not the
+            experiment, and silently reusing a seed would corrupt every
+            panel that trusts disjointness.
+    """
+    pool = [seed for seed in range(start | 1, stop, 2) if seed not in used]
+    if len(pool) < count:
+        raise SweepError(
+            "RW-SWEEP-006",
+            f"the range [{start}, {stop}) holds {len(pool)} unused odd seed(s), "
+            f"{count} were asked for; widen the range rather than reuse a seed",
+        )
+    stride = len(pool) // count
+    return tuple(pool[index * stride] for index in range(count))
 
 
 def job_name(job: SweepJob) -> str:
@@ -505,6 +546,7 @@ __all__ = [
     "assigned",
     "decode_sweep_job",
     "encode_sweep_job",
+    "fresh_seeds",
     "is_complete",
     "is_report_line",
     "job_name",

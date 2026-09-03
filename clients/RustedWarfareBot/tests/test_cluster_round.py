@@ -303,7 +303,7 @@ def test_the_search_entry_point_routes_the_cluster_prefix(tmp_path: Path) -> Non
     try:
         with pytest.raises(ClusterRoundError):
             main(
-                [f"{CLUSTER_PREFIX}runs/hpc3-rusted.json", "probe", "3"],
+                [f"{CLUSTER_PREFIX}runs/hpc3-rusted.json", "vh", "probe", "3"],
                 sweeps_root=tmp_path / "sweeps",
                 variant_dir=tmp_path / "variants",
             )

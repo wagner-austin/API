@@ -11,19 +11,18 @@ import runpy
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONValue
 from psycopg import OperationalError
 from scripts.search import (
-    BASE_DOCTRINE,
     EXIT_BAD_USAGE,
     EXIT_OK,
-    SCHEDULE,
-    SPACE,
     QueueRunner,
     main,
     run_search,
 )
+from scripts.search_specs import SPECS, decode_search_spec, require_search_spec
 
-from rw_bot.harness.search import effective_space
+from rw_bot.harness.search import SearchError, effective_space
 from rw_bot.policy.doctrine_file import parse_doctrine_lines
 from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
@@ -75,7 +74,8 @@ def test_the_search_halves_toward_the_scripted_winner(tmp_path: Path) -> None:
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            QueueRunner("dsn://demo"),
+            QueueRunner("dsn://demo", SPECS["vh"]["difficulty"]),
+            SPECS["vh"],
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -87,14 +87,15 @@ def test_the_search_halves_toward_the_scripted_winner(tmp_path: Path) -> None:
     # (the vhsearch3 no-op-arm lesson), so the expected field is counted
     # off the SAME filtered space, and this test keeps tracking the
     # mechanism when the champion is re-aimed.
-    base = parse_doctrine_lines(BASE_DOCTRINE.read_text(encoding="utf-8").splitlines())
-    singles = sum(len(values) for values in effective_space(SPACE, base).values())
+    spec = SPECS["vh"]
+    base = parse_doctrine_lines(Path(spec["base"]).read_text(encoding="utf-8").splitlines())
+    singles = sum(len(values) for values in effective_space(spec["space"], base).values())
     assert lines[0] == f"# search probe (rng 3): {singles + 6} candidates"
     # Round zero fields every candidate; round one fields half of them.
-    assert f"# round 0: {singles + 6} arms, {SCHEDULE[0]} pairs" in lines[1]
+    assert f"# round 0: {singles + 6} arms, {spec['schedule'][0]} pairs" in lines[1]
     survivors_r1 = (singles + 6) // 2
     round1_header = next(line for line in lines if line.startswith("# round 1:"))
-    assert f"{survivors_r1} arms, {SCHEDULE[1]} pairs" in round1_header
+    assert f"{survivors_r1} arms, {spec['schedule'][1]} pairs" in round1_header
     # The scripted winner: won at half the longest match, control survived,
     # so the paired delta is (2 + 0.5) - 1 = +1.5 in both rounds.
     decoys_lines = [line for line in lines if " decoys2 " in line]
@@ -110,7 +111,64 @@ def test_the_search_halves_toward_the_scripted_winner(tmp_path: Path) -> None:
 
 def test_main_rejects_bad_usage() -> None:
     assert main([]) == EXIT_BAD_USAGE
-    assert main(["a", "b", "c", "d"]) == EXIT_BAD_USAGE
+    assert main(["a", "b", "c", "d", "e"]) == EXIT_BAD_USAGE
+
+
+def test_main_refuses_an_unregistered_spec() -> None:
+    with pytest.raises(SearchError) as caught:
+        main(["dsn://demo", "nosuch", "probe"])
+    assert caught.value.code == "RW-SEARCH-002"
+    assert "imp" in caught.value.message
+    assert "vh" in caught.value.message
+
+
+def test_the_registry_resolves_by_name() -> None:
+    assert require_search_spec("imp")["difficulty"] == 3
+    assert require_search_spec("vh")["difficulty"] == 2
+    # The Impossible regime's values are all previously-fielded ones, and
+    # its base is the rung's standing champion.
+    imp = require_search_spec("imp")
+    assert imp["base"] == "doctrines/flame-nocover.doctrine"
+    assert imp["space"]["guns"] == (1, 2)
+    assert imp["space"]["nukes"] == (1,)
+
+
+def test_decode_refuses_each_malformed_field() -> None:
+    """Every refusal names its field; the registry cannot silently carry
+    a regime the machinery would break on."""
+    good: dict[str, JSONValue] = {
+        "base": "doctrines/flame-nocover.doctrine",
+        "space": {"guns": [1]},
+        "difficulty": 3,
+        "samples": 10000,
+        "schedule": [8, 16],
+        "pair_candidates": 6,
+    }
+
+    def broken(**overrides: JSONValue) -> dict[str, JSONValue]:
+        payload = dict(good)
+        payload.update(overrides)
+        return payload
+
+    cases: list[tuple[dict[str, JSONValue], str]] = [
+        (broken(base=""), "base"),
+        (broken(space={"riad": [5]}), "riad"),
+        (broken(space={"income_ladder": [1]}), "income_ladder"),
+        (broken(space={"guns": []}), "no values"),
+        (broken(space={"guns": [True]}), "integers"),
+        (broken(space={"guns": ["two"]}), "integers"),
+        (broken(difficulty=4), "difficulty"),
+        (broken(difficulty=-1), "difficulty"),
+        (broken(samples=0), "samples"),
+        (broken(schedule=[]), "at least one round"),
+        (broken(schedule=[8, 0]), "positive"),
+        (broken(pair_candidates=-1), "pair_candidates"),
+    ]
+    for payload, fragment in cases:
+        with pytest.raises(SearchError) as caught:
+            decode_search_spec(payload)
+        assert caught.value.code == "RW-SEARCH-002"
+        assert fragment in caught.value.message
 
 
 def test_main_runs_a_search_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -120,7 +178,7 @@ def test_main_runs_a_search_end_to_end(tmp_path: Path, capsys: pytest.CaptureFix
     _test_hooks.sleep = rig.sleep
     try:
         code = main(
-            ["dsn://demo", "probe", "3"],
+            ["dsn://demo", "vh", "probe", "3"],
             sweeps_root=tmp_path / "sweeps",
             variant_dir=tmp_path / "variants",
         )
@@ -172,7 +230,8 @@ def test_a_round_nobody_claims_is_named_loudly_once(
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            QueueRunner("dsn://demo"),
+            QueueRunner("dsn://demo", SPECS["vh"]["difficulty"]),
+            SPECS["vh"],
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -211,7 +270,8 @@ def test_a_database_outage_is_outlasted_not_fatal(
     _test_hooks.sleep = rig.sleep
     try:
         lines = run_search(
-            QueueRunner("dsn://demo"),
+            QueueRunner("dsn://demo", SPECS["vh"]["difficulty"]),
+            SPECS["vh"],
             "probe",
             rng_seed=3,
             sweeps_root=tmp_path / "sweeps",
@@ -240,7 +300,8 @@ def test_a_non_database_error_still_propagates(tmp_path: Path) -> None:
     try:
         with pytest.raises(ValueError):
             run_search(
-                QueueRunner("dsn://demo"),
+                QueueRunner("dsn://demo", SPECS["vh"]["difficulty"]),
+                SPECS["vh"],
                 "probe",
                 rng_seed=3,
                 sweeps_root=tmp_path / "sweeps",
