@@ -360,7 +360,7 @@ def incoming_damage_window(
     book: DamageBookDict,
     now_ms: int,
     window_ms: int,
-    dead_shooter_ids: frozenset[int],
+    excluded_shooter_ids: frozenset[int],
 ) -> tuple[int, int]:
     """Return confirmed incoming (hits, fuel) inside the trailing window.
 
@@ -369,34 +369,37 @@ def incoming_damage_window(
     inflates the rate), and the log is pruned to the window on every
     read so it cannot grow unbounded.
 
-    Hits from shooters in ``dead_shooter_ids`` are excluded — a dead
-    attacker cannot keep firing, so their damage must not project
-    into the next engagement (2026-07-31 arena soak: the
-    attacker-agnostic window carried a freshly killed enemy's 81/tick
-    for the whole 10 s window and three healthy follow-up targets
-    were blocked as "unwinnable at any fuel"). The exclusion is
-    KNOWN-dead only: a shooter the registry cannot vouch for still
-    counts, so a registry gap can never under-report live danger.
-    Dead shooters' entries stay in the log until the window prunes
-    them — liveness can flip back within the window on a respawn.
+    Hits from shooters in ``excluded_shooter_ids`` are excluded. The
+    book is policy-free about WHY a shooter is excluded — the caller
+    (the world service) owns that law: shooters who can no longer
+    fire on us must not project into the next engagement. Two classes
+    qualify today: registry-DEACTIVATED (2026-07-31 arena soak: a
+    freshly killed enemy's 81/tick blocked three healthy follow-up
+    targets as "unwinnable at any fuel") and registry-alive but
+    wire-silent past the presence standard (flag-triage-20260902 row
+    11: a disengaged pair-mate kept pricing the duel for the whole
+    10 s window). A shooter the registry cannot vouch for is NEVER in
+    the set — a registry gap must not under-report live danger.
+    Excluded shooters' entries stay in the log until the window
+    prunes them — presence can flip back within the window.
 
     Args:
         book: The damage book.
         now_ms: Current wall-clock ms.
         window_ms: Trailing window length in ms.
-        dead_shooter_ids: Tank ids the registry currently lists as
-            deactivated.
+        excluded_shooter_ids: Tank ids whose hits must not count —
+            the caller's can-no-longer-fire verdicts.
 
     Returns:
         ``(hits, fuel)`` confirmed within ``[now_ms - window_ms, now_ms]``
-        from shooters not known to be dead.
+        from shooters not excluded.
     """
     floor = now_ms - window_ms
     book["confirmed_incoming"] = [
         hit for hit in book["confirmed_incoming"] if hit["timestamp_ms"] >= floor
     ]
     counted = [
-        hit for hit in book["confirmed_incoming"] if hit["shooter_id"] not in dead_shooter_ids
+        hit for hit in book["confirmed_incoming"] if hit["shooter_id"] not in excluded_shooter_ids
     ]
     hits = len(counted)
     fuel = sum(hit["cost"] for hit in counted)

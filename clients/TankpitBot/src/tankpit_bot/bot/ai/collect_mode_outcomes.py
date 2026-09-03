@@ -37,6 +37,7 @@ from tankpit_bot.bot.ai.radar_economics import (
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.ai.threat_primitives import WIRE_PRESENCE_TTL_MS
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -44,9 +45,12 @@ from tankpit_bot.bot.types import make_hold_command, make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
-# Sustained-fire floor for the escape verb law: matches the break
-# assessment's own 3-hit window floor so "under fire" means the same
-# thing in both places.
+# Sustained-fire floor for the escape verb law. Historically matched
+# the break assessment's 3-hit floor; the break floor dropped to 1 on
+# 2026-08-26 (spaced-fire death) and THIS one deliberately did not:
+# the escape verb law rewrites movement choices wholesale, and a
+# single confirmed hit is not "under fire" for that purpose — the
+# projection math already prices lone hits into the break decision.
 _SUSTAINED_FIRE_HIT_FLOOR = 3
 
 _MAP_ANSWER_WAIT_MS = 4_000
@@ -247,7 +251,7 @@ def escape_under_fire_decision(
         cascade should run.
     """
     fire_hits, _fire_fuel = ctx.ws.get_incoming_damage_window(
-        ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS
+        ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS, WIRE_PRESENCE_TTL_MS
     )
     if fire_hits < _SUSTAINED_FIRE_HIT_FLOOR:
         return None

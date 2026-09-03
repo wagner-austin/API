@@ -31,6 +31,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.mode_gates import human_fight_resume_fuel_floor
 from tankpit_bot.bot.ai.threat_primitives import (
     POSITION_FRESHNESS_TTL_MS,
+    WIRE_PRESENCE_TTL_MS,
     pursuit_homing_budget_spent,
     pursuit_trace_is_live,
 )
@@ -363,7 +364,9 @@ def _break_losing_engagement(
     Returns:
         The lock-held refuel delegation, or ``None`` to keep fighting.
     """
-    hits, fuel_lost = ctx.ws.get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+    hits, fuel_lost = ctx.ws.get_incoming_damage_window(
+        ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS, WIRE_PRESENCE_TTL_MS
+    )
     assessment = assess_engagement_break(ctx, target, hits, fuel_lost)
     if not assessment["break_engagement"]:
         return None

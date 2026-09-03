@@ -200,32 +200,48 @@ class WorldServiceBeliefsMixin:
         """
         return now_ms - self.last_own_mine_hit_ms < _OWN_MINE_HIT_FLIP_MS
 
-    def get_incoming_damage_window(self, now_ms: int, window_ms: int) -> tuple[int, int]:
+    def get_incoming_damage_window(
+        self, now_ms: int, window_ms: int, presence_ttl_ms: int
+    ) -> tuple[int, int]:
         """Return fuel-confirmed incoming (hits, fuel) in the trailing window.
 
         The damage-aware engagement break's rate instrument -- reads the
         session damage book ([[bot-behavior-contract]] §3.3), excluding
-        shooters the registry lists as DEACTIVATED: a dead attacker
-        cannot keep firing, so their hits must not project into the next
-        engagement (2026-07-31 arena soak -- a freshly killed enemy's
-        rate blocked three healthy follow-up targets as "unwinnable").
+        shooters who can no longer fire on us:
+
+        * Registry-DEACTIVATED -- a dead attacker cannot keep firing,
+          so their hits must not project into the next engagement
+          (2026-07-31 arena soak -- a freshly killed enemy's rate
+          blocked three healthy follow-up targets as "unwinnable").
+        * Registry-alive but WIRE-SILENT past ``presence_ttl_ms`` --
+          the disengaged pair-mate ([[flag-triage-20260902]] row 11):
+          a shooter still hitting us refreshes their own presence
+          through their shoot events, so only the genuinely-departed
+          go silent, and a pair's combined rate no longer prices a
+          one-on-one duel for the tail of the window.
+
         Unknown shooters still count -- a registry gap can never
         under-report live danger.
 
         Args:
             now_ms: Current wall-clock ms.
             window_ms: Trailing window length in ms.
+            presence_ttl_ms: Wire-silence beyond this excludes an
+                alive shooter (callers pass the wire-presence
+                standard; the constant lives in the planner layer,
+                which this module must not import).
 
         Returns:
             ``(hits, fuel)`` confirmed within the window from shooters
-            not known to be dead.
+            still able to fire.
         """
-        dead_shooter_ids = frozenset(
+        excluded_shooter_ids = frozenset(
             tank["tank_id"]
             for tank in self.world_state["tanks"].values()
             if tank["liveness"] == "deactivated"
+            or now_ms - tank["last_wire_seen_ms"] > presence_ttl_ms
         )
-        return incoming_damage_window(self.damage_book, now_ms, window_ms, dead_shooter_ids)
+        return incoming_damage_window(self.damage_book, now_ms, window_ms, excluded_shooter_ids)
 
 
 __all__ = [
