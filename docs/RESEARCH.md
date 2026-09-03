@@ -42,6 +42,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
+| `tankpit` | free | cpu | 2 | 2 | 60 | none | yes | 0 |
 | `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | 27344 |
 
 <!-- /generated: hpc3-projects -->
