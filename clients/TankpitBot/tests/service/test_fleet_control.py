@@ -26,12 +26,11 @@ from aiohttp.test_utils import TestServer, unused_port
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.fleet_control import down, fleet_snapshot, up
+from tankpit_bot.service.fleet_control import down, fleet_snapshot
 from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_routes import make_fleet_app
 from tests.conftest import FakeEnv
 from tests.service._fleet_fixtures import (
-    _FakeProcess,
     _FakeSpawner,
     _restore_account_hooks,
     _with_configured_accounts,
@@ -45,16 +44,6 @@ def _closed_port() -> int:
         A port number no server is bound to.
     """
     return unused_port()
-
-
-class _Sleeps:
-    """sleep_seconds double that records instead of waiting."""
-
-    def __init__(self) -> None:
-        self.waits: list[float] = []
-
-    def __call__(self, seconds: float) -> None:
-        self.waits.append(seconds)
 
 
 @pytest.fixture()
@@ -146,83 +135,6 @@ class TestSnapshot:
     def test_an_idle_port_reads_as_no_manager(self) -> None:
         """Nothing listening is an answer, not a failure."""
         assert fleet_snapshot(_closed_port()) is None
-
-
-class TestUp:
-    """Starting a manager, and not starting a second one."""
-
-    async def test_a_manager_already_listening_is_left_alone(
-        self,
-        live_fleet: tuple[FleetManager, TestServer],
-        restore_service_hooks: None,
-    ) -> None:
-        """``make up`` twice is a no-op, not a port-bind crash."""
-        _ = restore_service_hooks
-        manager, server = live_fleet
-        _spawn(manager, "alpha", "artax")
-        _point_at(_port_of(server))
-        launches: list[str] = []
-
-        def unexpected_launch() -> _FakeProcess:
-            launches.append("launch")
-            return _FakeProcess(pid=1)
-
-        service_hooks.spawn_fleet_manager = unexpected_launch
-
-        code = await asyncio.to_thread(up)
-
-        assert code == 0
-        assert launches == []
-
-    async def test_launches_then_waits_until_the_manager_answers(
-        self,
-        restore_service_hooks: None,
-        spawner: _FakeSpawner,
-    ) -> None:
-        """Nothing is listening; the launch is what makes that change.
-
-        The fake launch really does start a manager on the port ``up``
-        is watching, so the poll loop is exercised against a socket
-        that genuinely was not there a moment earlier.
-        """
-        _ = (restore_service_hooks, spawner)
-        loop = asyncio.get_running_loop()
-        port = _closed_port()
-        manager = FleetManager()
-        server = TestServer(make_fleet_app(manager), host="127.0.0.1", port=port)
-        sleeps = _Sleeps()
-        service_hooks.sleep_seconds = sleeps
-
-        def launch() -> _FakeProcess:
-            asyncio.run_coroutine_threadsafe(server.start_server(), loop).result()
-            return _FakeProcess(pid=4242)
-
-        service_hooks.spawn_fleet_manager = launch
-        _point_at(port)
-
-        try:
-            code = await asyncio.to_thread(up)
-        finally:
-            await server.close()
-
-        assert code == 0
-        assert sleeps.waits == [0.5]
-
-    def test_a_manager_that_never_answers_is_reported_as_a_failure(
-        self,
-        restore_service_hooks: None,
-    ) -> None:
-        """A boot that fails exits non-zero instead of hanging."""
-        _ = restore_service_hooks
-        _point_at(_closed_port())
-        sleeps = _Sleeps()
-        service_hooks.sleep_seconds = sleeps
-        service_hooks.spawn_fleet_manager = lambda: _FakeProcess(pid=4242)
-
-        code = up(startup_timeout_s=1.5)
-
-        assert code == 1
-        assert sleeps.waits == [0.5, 0.5, 0.5]
 
 
 class TestDown:

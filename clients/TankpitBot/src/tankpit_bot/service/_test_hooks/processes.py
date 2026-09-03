@@ -16,7 +16,7 @@ from typing import Protocol
 
 import psutil
 
-from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH, bot_run_dir
+from tankpit_bot.runtime_artifacts import bot_run_dir
 
 
 class SpawnedProcessProtocol(Protocol):
@@ -111,23 +111,6 @@ class SleepSecondsProtocol(Protocol):
 
         Args:
             seconds: How long to block for.
-        """
-        ...
-
-
-class SpawnFleetManagerProtocol(Protocol):
-    """Launches a fleet manager that outlives the launching process."""
-
-    def __call__(self) -> SpawnedProcessProtocol:
-        """Start a fleet manager detached from this process.
-
-        The manager must survive the shell that ran ``make up``: it
-        supervises live tanks, and a supervisor that dies with the
-        terminal that started it is the orphan problem all over again.
-
-        Returns:
-            A handle on the launched manager, so the caller can name
-            its pid.
         """
         ...
 
@@ -366,13 +349,6 @@ def _real_open_adopted_process(pid: int, created_at: float) -> SpawnedProcessPro
     return _AdoptedProcess(process)
 
 
-#: Bootstrap the detached fleet manager runs. ``sys.executable -c``
-#: keeps it in this virtualenv and inherits the working directory, so
-#: the manager reads and writes the same ``runs/`` tree the command
-#: that launched it was standing in.
-_FLEET_BOOTSTRAP = "from tankpit_bot.service.fleet import main\nmain()\n"
-
-
 def _real_sleep_seconds(seconds: float) -> None:
     """Real implementation using :func:`time.sleep`.
 
@@ -382,51 +358,17 @@ def _real_sleep_seconds(seconds: float) -> None:
     time.sleep(seconds)
 
 
-def _real_spawn_fleet_manager() -> SpawnedProcessProtocol:
-    """Launch the fleet manager detached, logging to a file.
-
-    Detached rather than a child of the shell that ran ``make up``:
-    the manager supervises live tanks, and one that died with the
-    terminal that started it would be the orphan problem again, one
-    level up.
-
-    Its console goes to :data:`FLEET_LOG_PATH` for the same reason a
-    bot's does -- a failed boot prints its traceback to stderr as the
-    interpreter dies, after any file logging is gone, and discarding
-    that stream would destroy the one artifact explaining why the
-    fleet never came up.
-
-    Returns:
-        The launched manager's process handle.
-    """
-    FLEET_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # Append, not truncate: a relaunch must not erase the record of
-    # why the previous manager stopped.
-    with FLEET_LOG_PATH.open("a", encoding="utf-8") as stream:
-        return _PopenProcess(
-            subprocess.Popen(
-                [sys.executable, "-c", _FLEET_BOOTSTRAP],
-                stdout=stream,
-                stderr=subprocess.STDOUT,
-                creationflags=subprocess.DETACHED_PROCESS,
-                close_fds=True,
-            )
-        )
-
-
-#: Fleet-manager spawn seam. Tests inject a fake that records env and
+#: Bot-process spawn seam. Tests inject a fake that records env and
 #: returns a controllable process double; production spawns the real
-#: ``tankpit-bot`` child.
+#: ``tankpit-bot`` child. (Label corrected 2026-09-03: this binding
+#: was miscommented "Fleet-manager spawn seam" from the day the real
+#: fleet-manager seam was added beside it.)
 spawn_bot_process: SpawnBotProcessProtocol = _real_spawn_bot_process
 
 #: Sleep seam for the lifecycle CLI's poll loops. Tests inject a fake
 #: that records the waits and returns instantly, so a drain is
 #: exercised without one.
 sleep_seconds: SleepSecondsProtocol = _real_sleep_seconds
-
-#: Detached-manager launch seam behind ``make up``. Tests inject a fake
-#: that records the launch instead of opening a console.
-spawn_fleet_manager: SpawnFleetManagerProtocol = _real_spawn_fleet_manager
 
 #: Process-identity seam. Production reads the creation time psutil
 #: reports; tests inject a fake so no real process is needed.

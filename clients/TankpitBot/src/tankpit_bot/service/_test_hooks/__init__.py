@@ -41,24 +41,20 @@ from tankpit_bot.service._test_hooks.bots import (
     build_bot_factory,
 )
 from tankpit_bot.service._test_hooks.processes import (
-    _FLEET_BOOTSTRAP,
     OpenAdoptedProcessProtocol,
     ProcessIdentityProtocol,
     SleepSecondsProtocol,
     SpawnBotProcessProtocol,
     SpawnedProcessProtocol,
-    SpawnFleetManagerProtocol,
     _AdoptedProcess,
     _real_open_adopted_process,
     _real_process_identity,
     _real_sleep_seconds,
     _real_spawn_bot_process,
-    _real_spawn_fleet_manager,
     open_adopted_process,
     process_identity,
     sleep_seconds,
     spawn_bot_process,
-    spawn_fleet_manager,
 )
 from tankpit_bot.service._test_hooks.serving import (
     ProbeExistingInstanceProtocol,
@@ -76,7 +72,6 @@ from tankpit_bot.service._test_hooks.serving import (
 )
 
 __all__ = [
-    "_FLEET_BOOTSTRAP",
     "BotFactoryBuilderProtocol",
     "OpenAdoptedProcessProtocol",
     "ProbeExistingInstanceProtocol",
@@ -86,7 +81,6 @@ __all__ = [
     "SiteRunnerProtocol",
     "SleepSecondsProtocol",
     "SpawnBotProcessProtocol",
-    "SpawnFleetManagerProtocol",
     "SpawnedProcessProtocol",
     "_AdoptedProcess",
     "_AiohttpSite",
@@ -98,7 +92,6 @@ __all__ = [
     "_real_serve_fleet",
     "_real_sleep_seconds",
     "_real_spawn_bot_process",
-    "_real_spawn_fleet_manager",
     "build_bot_factory",
     "build_site",
     "open_adopted_process",
@@ -108,5 +101,4 @@ __all__ = [
     "serve_fleet",
     "sleep_seconds",
     "spawn_bot_process",
-    "spawn_fleet_manager",
 ]

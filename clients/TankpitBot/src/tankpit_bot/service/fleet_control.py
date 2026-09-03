@@ -1,16 +1,25 @@
-"""Start and stop the fleet manager: the ``make up`` / ``make down`` pair.
+"""Drain a fleet manager: the ``tankpit-fleet-down`` transition tool.
 
 Before this existed the only way to stop a fleet was Ctrl+C in the
 window it happened to be running in, which killed the manager and left
 its bots playing on with nothing supervising them. ``down`` replaces
 that with a request the manager can honour properly.
 
-Both commands are CLIENTS. They own no state and hold nothing open, so
-interrupting one changes nothing about the fleet: ``down`` asks the
-manager to drain and then watches, and if the operator walks away
-mid-drain the manager carries on draining and still exits only once
-its last bot has landed. The waiting is the manager's job, not this
-process's.
+The fleet LIFECYCLE is the container pair — ``make up`` / ``make down``
+in the Makefile (operator order 2026-09-02: one system, not two). What
+remains here is the drain those targets direct operators to when a
+pre-container HOST-mode manager still holds port 27300: a container
+manager cannot adopt host bot processes, so the host fleet must land
+through its own manager before the first containerized ``make up``.
+The host LAUNCHER (``tankpit-fleet-up`` / ``fleet_control.up``) was
+deleted 2026-09-03 under the same ruling — old release folders keep
+their own copy for fleets started from them.
+
+``down`` is a CLIENT. It owns no state and holds nothing open, so
+interrupting it changes nothing about the fleet: it asks the manager
+to drain and then watches, and if the operator walks away mid-drain
+the manager carries on draining and still exits only once its last
+bot has landed. The waiting is the manager's job, not this process's.
 
 ``down`` waits without a deadline on purpose. A bot's teardown ends by
 quitting to the lobby, and hurrying that along to satisfy a timeout is
@@ -25,7 +34,6 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.runtime_artifacts import FLEET_LOG_PATH
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet import FLEET_HOST_DEFAULT
 from tankpit_bot.service.fleet_config import resolve_fleet_port
@@ -40,11 +48,6 @@ REQUEST_TIMEOUT_S = 2.0
 
 #: Cadence of the "is it up yet" / "is it gone yet" checks.
 POLL_SECONDS = 0.5
-
-#: How long ``up`` waits for a manager it just launched to answer.
-#: Bounded, unlike the drain: a manager that has not bound its port in
-#: this long has failed to boot, and nothing is at stake in saying so.
-STARTUP_TIMEOUT_S = 30.0
 
 
 def _request(port: int, method: str, path: str) -> str | None:
@@ -118,61 +121,6 @@ def _live_names(snapshot: FleetSnapshotDict) -> list[str]:
     return [bot["instance"] for bot in snapshot["bots"] if bot["alive"]]
 
 
-def up(*, startup_timeout_s: float = STARTUP_TIMEOUT_S) -> int:
-    """Start the fleet manager and wait until it answers.
-
-    Idempotent: a manager already listening on the port is reported
-    and left alone, so a second ``make up`` is a no-op rather than a
-    port-bind crash.
-
-    Args:
-        startup_timeout_s: How long to wait for a freshly launched
-            manager to bind its port before calling the boot failed.
-
-    Returns:
-        ``0`` once a manager is answering, ``1`` if the one just
-        launched never came up.
-    """
-    core_hooks.load_dotenv()
-    port = resolve_fleet_port()
-    running = fleet_snapshot(port)
-    if running is not None:
-        log.info(
-            "Fleet already up on http://%s:%d (boot %s, %d bot(s) running)",
-            FLEET_HOST_DEFAULT,
-            port,
-            running["boot"],
-            len(_live_names(running)),
-        )
-        return 0
-
-    launched = service_hooks.spawn_fleet_manager()
-    log.info("Fleet manager launched (pid %d); waiting for it to answer", launched.pid)
-    waited = 0.0
-    while waited < startup_timeout_s:
-        service_hooks.sleep_seconds(POLL_SECONDS)
-        waited += POLL_SECONDS
-        started = fleet_snapshot(port)
-        if started is not None:
-            adopted = _live_names(started)
-            log.info(
-                "Fleet up on http://%s:%d (boot %s)%s",
-                FLEET_HOST_DEFAULT,
-                port,
-                started["boot"],
-                f"; adopted {len(adopted)} running bot(s): {', '.join(adopted)}" if adopted else "",
-            )
-            return 0
-    log.error(
-        "Fleet manager did not answer on %s:%d within %.0f s; %s holds its output",
-        FLEET_HOST_DEFAULT,
-        port,
-        startup_timeout_s,
-        FLEET_LOG_PATH,
-    )
-    return 1
-
-
 def down() -> int:
     """Drain every bot, then wait for the manager to exit.
 
@@ -226,8 +174,6 @@ def _await_exit(port: int) -> int:
 __all__ = [
     "POLL_SECONDS",
     "REQUEST_TIMEOUT_S",
-    "STARTUP_TIMEOUT_S",
     "down",
     "fleet_snapshot",
-    "up",
 ]

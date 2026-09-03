@@ -27,13 +27,6 @@ the same reason it copies ``accounts.json``."""
 
 _RUNS_DIR = Path("runs")
 
-FLEET_LOG_PATH = _RUNS_DIR / "fleet" / "manager.log"
-"""Console output of a fleet manager started by ``make up``.
-
-The detached manager has no terminal of its own, so this file is where
-a failed boot explains itself -- the same reason each bot's child
-console goes to a file rather than into the launching window."""
-
 _BOT_DIR = _RUNS_DIR / "bot"
 _SNIFF_DIR = _RUNS_DIR / "sniff"
 _PROBE_DIR = _RUNS_DIR / "probe"
@@ -197,7 +190,9 @@ def build_bot_run_artifacts(stamp: str, instance: str) -> BotRunArtifactsDict:
     )
 
 
-def build_probe_run_artifacts(probe_name: str, stamp: str) -> ProbeRunArtifactsDict:
+def build_probe_run_artifacts(
+    probe_name: str, stamp: str, runs_root: Path | None = None
+) -> ProbeRunArtifactsDict:
     """Build canonical artifact paths for one action_lab probe run.
 
     Args:
@@ -205,6 +200,13 @@ def build_probe_run_artifacts(probe_name: str, stamp: str) -> ProbeRunArtifactsD
             (e.g. ``fuel``, ``equipment``, ``movement``, ``teleport``,
             ``enemy_teleport``, ``fuel_drill``). Must be non-empty.
         stamp: Timestamp stamp from :func:`make_run_stamp`.
+        runs_root: Directory the probe artifacts land under, replacing
+            the fixed ``runs/`` root. None keeps that root, which is
+            right for a workstation and WRONG for a cluster array:
+            ``latest.<probe>.log`` is a fixed path, so N tasks sharing a
+            node overwrite each other's, and the archive paths collide
+            too whenever a sweep holds the stamp still to stop it
+            varying the world ([[sim-world-parameterization]]).
 
     Returns:
         Probe artifact path bundle.
@@ -214,13 +216,14 @@ def build_probe_run_artifacts(probe_name: str, stamp: str) -> ProbeRunArtifactsD
     """
     if not probe_name:
         raise ValueError("probe_name must be non-empty")
+    probe_dir = _PROBE_DIR if runs_root is None else runs_root / "probe"
     return ProbeRunArtifactsDict(
-        log_dir=str(_PROBE_DIR),
+        log_dir=str(probe_dir),
         probe_name=probe_name,
-        latest_log_path=str(_PROBE_DIR / f"latest.{probe_name}.log"),
-        archive_log_path=str(_PROBE_DIR / f"{probe_name}-{stamp}.log"),
-        latest_events_path=str(_PROBE_DIR / f"latest.{probe_name}.events.jsonl"),
-        archive_events_path=str(_PROBE_DIR / f"{probe_name}-{stamp}.events.jsonl"),
+        latest_log_path=str(probe_dir / f"latest.{probe_name}.log"),
+        archive_log_path=str(probe_dir / f"{probe_name}-{stamp}.log"),
+        latest_events_path=str(probe_dir / f"latest.{probe_name}.events.jsonl"),
+        archive_events_path=str(probe_dir / f"{probe_name}-{stamp}.events.jsonl"),
     )
 
 
@@ -375,7 +378,6 @@ def decode_sniff_run_artifacts(data: JSONObject) -> SniffRunArtifactsDict:
 
 
 __all__ = [
-    "FLEET_LOG_PATH",
     "TANK_REGISTRY_PATH",
     "BotRunArtifactsDict",
     "ProbeRunArtifactsDict",

@@ -85,7 +85,6 @@ def restore_service_hooks() -> Generator[None, None, None]:
     original_build_bot_factory = service_hooks.build_bot_factory
     original_probe_existing_instance = service_hooks.probe_existing_instance
     original_sleep_seconds = service_hooks.sleep_seconds
-    original_spawn_fleet_manager = service_hooks.spawn_fleet_manager
     original_process_identity = service_hooks.process_identity
     original_open_adopted_process = service_hooks.open_adopted_process
     try:
@@ -98,7 +97,6 @@ def restore_service_hooks() -> Generator[None, None, None]:
         service_hooks.build_bot_factory = original_build_bot_factory
         service_hooks.probe_existing_instance = original_probe_existing_instance
         service_hooks.sleep_seconds = original_sleep_seconds
-        service_hooks.spawn_fleet_manager = original_spawn_fleet_manager
         service_hooks.process_identity = original_process_identity
         service_hooks.open_adopted_process = original_open_adopted_process
 

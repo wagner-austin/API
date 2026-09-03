@@ -14,7 +14,7 @@ source_paths:
   - "src/tankpit_bot/service/serving.py"
 source_git_blobs:
   "src/tankpit_bot/service/fleet.py": "3bdbe67257c01d402b4a4f5dce81fb337e1363ff"
-  "src/tankpit_bot/service/fleet_control.py": "847007ba72621abd7a0e23942c4d109a1a6fafac"
+  "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
   "src/tankpit_bot/service/fleet_record.py": "8cc5acfca6333d8c51ec46921d7b7dc5a6bfc898"
   "src/tankpit_bot/service/fleet_adoption.py": "8de564766a3bb4a389c4df6996d9a637e0a86f11"
   "src/tankpit_bot/service/fleet_manager.py": "f9f31cc03765d47e659993317d8a0ad02e4cf0cf"
@@ -108,13 +108,17 @@ this work.
 
 Retired the same day, one system not two: `make fleet` (foreground
 release manager), `make fleet-dev`, and the short-lived
-`image`/`up-docker`/`down-docker` trio. The detached HOST lifecycle
-(`tankpit-fleet-up`/`-down` entry points, the adoption of host
-processes below) remains in code but is no longer on the operator
-surface; a container manager cannot adopt HOST processes, so any
-pre-container host fleet must be drained (`poetry run
-tankpit-fleet-down` from its release folder) before the first
-containerized `make up`.
+`image`/`up-docker`/`down-docker` trio. The detached HOST **launcher**
+(`tankpit-fleet-up`, `fleet_control.up`, the `spawn_fleet_manager`
+seam and `FLEET_LOG_PATH`) was deleted outright on 2026-09-03 under
+the same one-system ruling — old release folders keep their own copy
+for fleets started from them. What survives is `tankpit-fleet-down`,
+the transition DRAIN both `make` targets direct operators to: a
+container manager cannot adopt HOST processes, so any pre-container
+host fleet must be drained (`poetry run tankpit-fleet-down` from its
+release folder) before the first containerized `make up`. Record
+adoption (above) stays too — it is how a restarted manager of EITHER
+kind finds its own children.
 
 ## Port 27300 is arbitrated, because Windows loopback is not
 
@@ -142,9 +146,10 @@ any non-Docker survivor on the port after the container stops, so
 guard: it binds `0.0.0.0` in its own namespace, and the observed
 failure was never inside the container.
 
-A detached manager has no terminal, so its console goes to
+A detached HOST manager had no terminal, so its console went to
 `runs/fleet/manager.log` — the same reasoning that sends each bot's
-child console to a file.[^8]
+child console to a file. The path constant died with the launcher on
+2026-09-03; the containerized manager's console is `docker logs`.[^8]
 
 [^1]: `src/tankpit_bot/service/fleet.py:3-6` states the doctrine; the
       children are `subprocess.Popen` handles created in
@@ -169,7 +174,9 @@ child console to a file.[^8]
 [^7]: `FleetManager.boot_id`, served by `encode_fleet_snapshot`
       (`service/fleet_wire.py`) and compared in the page's poll loop
       (`service/fleet_page.py`).
-[^8]: `FLEET_LOG_PATH` (`src/tankpit_bot/runtime_artifacts.py`).
+[^8]: Historical: `FLEET_LOG_PATH` lived in
+      `src/tankpit_bot/runtime_artifacts.py` until the 2026-09-03
+      launcher deletion.
 [^9]: `SpawnedProcessProtocol`, `_AdoptedProcess` and `_PopenProcess`
       in `service/_test_hooks/processes.py`; the property is pinned by
       `test_liveness_never_depends_on_recovering_an_exit_code`
