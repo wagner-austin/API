@@ -23,6 +23,7 @@ from tankpit_bot.container.types import (
 from tankpit_bot.physics.supervisor import fuel_pickup_close_code
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_EMPTY_CONTAINER,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
 from tankpit_bot.protocol.types import (
@@ -238,7 +239,8 @@ def narrate_fuel_pickup(
       record x2, 0x44 absolute fuel (``is_free=True, flag=0``),
       record x1, code 5 ``reset_action=0``.
     * **transfer + drain** (container empties): record x2 at
-      remaining 0, code 4 — ``reset_action=1`` after a walk.
+      remaining 0, code 4 — ``reset_action=1`` after a walk, 0
+      without one. Code 5 never resets, walked or not (2,537/2,537).
     * **no transfer, walked** (arrived to find it empty, or a
       full-tank walk-up): record x2, close by stockedness.
     * **no transfer, no walk** (own-tile/adjacent click): 0x44 in its
@@ -285,7 +287,21 @@ def narrate_fuel_pickup(
             messages.append(
                 SupervisorDict(
                     msg_type=0x52,
-                    reset_action=1 if outcome["walked"] else 0,
+                    # reset_action follows the CODE, not the walk. The
+                    # 2026-09-02 field sweep: code 4 splits (1, 0) x610
+                    # against (0, 0) x71 — the walk distinction — while
+                    # code 5 is (0, 0) in ALL 2,537 archived windows,
+                    # walked or not. [[fuel-system]] already said so
+                    # ("code 5, reset_action=0"; "code 4,
+                    # reset_action=1 after a walk"); the sim keyed both
+                    # on the walk alone and emitted code 5 with
+                    # reset_action=1. Caught by the differ the first
+                    # time its 0x52 token carried the fields.
+                    reset_action=(
+                        1
+                        if outcome["walked"] and close_code == SUPERVISOR_ERROR_EMPTY_CONTAINER
+                        else 0
+                    ),
                     close_map=0,
                     error_code=close_code,
                 )

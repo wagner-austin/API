@@ -168,10 +168,27 @@ def test_movement_and_position_tokens_are_self_scoped() -> None:
     assert shape_token(position, OTHER_TANK) is None
 
 
-def test_supervisor_tokens_carry_their_error_code() -> None:
-    """A 0x52's code is part of the shape, not erased into '52'."""
+def test_supervisor_tokens_carry_their_code_and_both_directives() -> None:
+    """A 0x52 is its code AND its two client directives.
+
+    ``reset_action`` ("reset to idle") and ``close_map`` ("close map
+    view") are things the real client DOES ([[decode-coverage]]), so a
+    sim sending the right code with the wrong fields drives a real
+    client wrongly while looking identical to a code-only differ. It
+    did look identical for months — the out-of-window move refusal
+    sent ``(1, 0)`` where all 10 archived move code-0 windows send
+    ``(0, 1)``, and this function threw the evidence away.
+    """
     refusal = SupervisorDict(msg_type=0x52, reset_action=1, close_map=0, error_code=5)
-    assert shape_token(refusal, OWN_TANK) == "52c5"
+    assert shape_token(refusal, OWN_TANK) == "52c5r1m0"
+
+
+def test_two_refusals_with_one_code_are_different_shapes() -> None:
+    """The whole point: same code, different directives, different token."""
+    code_zero = SupervisorDict(msg_type=0x52, reset_action=0, close_map=1, error_code=0)
+    towing = SupervisorDict(msg_type=0x52, reset_action=1, close_map=1, error_code=0)
+
+    assert shape_token(code_zero, OWN_TANK) != shape_token(towing, OWN_TANK)
 
 
 def test_plain_tokens_and_background_messages() -> None:

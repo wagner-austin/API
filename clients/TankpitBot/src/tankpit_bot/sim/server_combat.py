@@ -22,10 +22,11 @@ from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.combat_clock import CombatClock
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.narrate import narrate_corpse_removals, narrate_shot
+from tankpit_bot.sim.server_sessions import SimServerSessionsMixin
 from tankpit_bot.sim.world import SimWorldDict
 
 
-class SimServerCombatMixin:
+class SimServerCombatMixin(SimServerSessionsMixin):
     """Shoot routing and corpse-window closure for the simulator.
 
     The attributes below are DECLARATIONS, not assignments: the
@@ -64,11 +65,11 @@ class SimServerCombatMixin:
     def _refuse_shot(self, tank_id: int, command: ClientCommandDict) -> int | None:
         """Apply the measured shot-refusal law to one command.
 
-        The window half is checked only for the CLIENT, because the
-        client is the one connection whose stored 0x5A window the sim
-        models — the same restriction ``SimServerMoveMixin`` puts on
-        its own window check. An unmodelled window cannot prove a
-        refusal, so other tanks pass it.
+        The window half asks ``click_leaves_own_window``, which
+        resolves the tank's OWN connection before consulting a
+        viewport — an unconnected tank (a roster bot, the scripted
+        opponent, a ghost) has no window, and the server is not
+        entitled to invent one to refuse it with.
 
         Args:
             tank_id: The firing tank.
@@ -78,10 +79,7 @@ class SimServerCombatMixin:
             The refusal's error code, or None when the shot proceeds.
         """
         return shot_refusal(
-            aim_in_window=(
-                tank_id != self.session.client_id
-                or self.session.viewport.in_window(command["x"], command["y"])
-            ),
+            aim_in_window=not self.click_leaves_own_window(tank_id, command["x"], command["y"]),
             target_is_ally=self._shot_target_is_ally(tank_id, command["target_id"]),
         )
 

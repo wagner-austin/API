@@ -409,6 +409,42 @@ NOT implemented: code 8 on a shot. The contract lists it among the
 shot-rejecting codes, but the archive holds ZERO shot windows
 carrying it.
 
+### The 0x52 token now carries its fields — and caught two bugs (2026-09-02)
+
+The shot-refusal sweep turned up a divergence the differ was
+structurally unable to see: it reduced every 0x52 to `52c<code>` and
+discarded `reset_action` and `close_map`. Those are not decoration —
+`decode-coverage` has them from the JS as **"reset to idle"** and
+**"close map view"**, directives the real client ACTS on. A sim that
+sends the right code with the wrong fields drives a real client
+wrongly while looking identical to a code-only differ.
+
+Nothing in the BOT reads either field (`world_state_dispatch` binds
+`error_code` only), which is exactly why it survived. But a 1:1
+server is for real clients, not for our bot.
+
+The token is now `52c<code>r<reset>m<map>`, and the first baseline run
+under it found **two** field bugs:
+
+| site | sim sent | live sends | evidence |
+|---|---|---|---|
+| out-of-window move refusal | `(1, 0)` | **`(0, 1)`** | 83 of 86 archive-wide, 10 of 10 move windows |
+| fuel close, code 5, after a walk | `(1, 0)` | **`(0, 0)`** | **2,537 of 2,537** |
+
+The second is the sharper lesson. `reset_action` follows the CODE,
+not the walk: code 4 genuinely splits (1,0)×610 against (0,0)×71 on
+whether the tank walked, while code 5 is (0,0) in every archived
+window either way. The sim keyed both on the walk. **[[fuel-system]]
+had already recorded the right law** — "code 5, reset_action=0" and
+"code 4, reset_action=1 after a walk" — and the code disagreed with
+the wiki for months with nothing able to notice.
+
+The teleport towing refusal keeps `(1, 1)`, and the sweep firmed it
+up rather than breaking it: exactly THREE `(1, 1)` code-0 frames
+exist in the whole archive, all in teleport windows, and the towing
+law was mined "three-for-three" from the 2026-07-20 capture. Same
+three.
+
 ### The larder scenario, and the law it flushed out (2026-09-02)
 
 The three biggest `shape_never_assembled` rows were all the no-walk

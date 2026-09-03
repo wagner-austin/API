@@ -5689,6 +5689,24 @@ The shared tree is RED — another session has ~20 `bot/ai/` files open mid-edit
 
 My changes were verified in ISOLATION instead: a detached worktree at HEAD with only my 12 changed files copied in. **6,806 passed, 0 real failures** (the 2 reported are wiki `source_paths` checks against the gitignored `runs/` tree the worktree does not have). The worktree was removed afterwards.
 
+---
+
+## [2026-09-02] update | Feature corpus provenance: a run record on the tick table
+
+The tick-level feature table (`tankpit-feature-rows`, shipped 2026-09-01) wrote `<stem>.features.jsonl` with no digest, no fingerprint and no run record. 539 runs and 132,266 rows of design matrix that nothing could trace to what produced it.
+
+**Pages written (1):** [[feature-corpus-provenance]] — hub-linked from Architecture.
+
+**What landed in code:** `diagnostics/feature_provenance.py` (new) emits a `platform_core.run_record.RunRecord` sidecar on the shared `run_record_sidecar` convention, following the `rusted` precedent (`rw_bot/provenance.py`, 2026-08-29) rather than a second vocabulary. `diagnostics/feature_row_types.py` (new) holds the row shape, breaking the import cycle the record created — the same split `run_digest_types.py` already uses. Two additive hooks in `_test_hooks/runtime.py` (`get_host_probe`, `read_distribution_version`) keep the host and package axes injectable.
+
+**The finding worth keeping:** there are TWO configurations here and only one is knowable. An events artifact carries no build stamp, commit or version anywhere, so what produced the EVENTS cannot be recovered for the 539 archived runs — the record describes the DERIVATION and identifies the events only by digest. Claiming a bot build it cannot know would be the exact failure `docs/RESEARCH.md` was written to prevent.
+
+**Second finding, load-bearing on the cluster:** both digests are taken over decoded text, not file bytes. `write_text`/`read_text` translate line endings, so digesting the file on disk would fingerprint a Windows export and its identical Linux copy differently — and report a changed input on every cluster-versus-workstation comparison.
+
+**Verified:** guard 0 violations across all 24 checks (including `monkey-patch-ban`, `run-fingerprint-literal`, `file-size`), ruff clean, mypy clean on 1,224 files, 29 targeted tests green at 100% statement + branch coverage on all three modules, and a sidecar produced from the archived artifact `runs/bot/artax/bot-20260806-210413.events.jsonl` — 93 rows, density 0.939, identical on re-run.
+
+**Not done, stated so it is not mistaken for finished:** stamping the bot's build into events at emission time (the fix for future runs; belongs in the runtime logging path). TankpitBot remains unregistered as an hpc3 project — this closes step 3 of the four in `RESEARCH.md`, and steps 1-2 are deliberately open because the bot drives a live browser and is not cluster work.
+
 ## [2026-09-03] fix | The reserves become fractions of the tank they protect, and the full-tank flight flips
 
 Triage row 6 ([[flag-triage-20260902]]). `fuel_low_threshold` / `hunt_min_fuel` / `engagement_fuel_budget` were flat values whose own docstring said "suitable for lieutenant rank" while every rank paid them: at private capacity the break floor plus the conservative hits-to-kill bound consumed the whole tank, and the measured 21:43:44 case broke off a winnable fight at literally 1100/1100. The config fields stay operator-tunable ints, redefined as the RANK-4 REFERENCE tuning; `physics.capacity.rank_scaled_reserve` (claim-bound, probe-checked in the triage page) scales them by true capacity per tick in `DecideCtx` — integer-exact at lieutenant, so nothing above private changed by so much as a unit at the tuning rank. The measured flag-1 break now HOLDS at private (floor 343 vs projection 360) and the identical inputs at rank 4 still break (408 > 360) — both pinned in `test_combat_break`. Honest residual recorded as ROW 11: the unavoidable-break rate bar only moves 36→40, because the dominant term is `hits_to_kill × pair_rate` vs capacity — per-attacker damage attribution is its own design.
@@ -5702,3 +5720,57 @@ Gates: make check green — 6,821 tests, 100.00% statements and branches. Rows 1
 ## [2026-09-03] validation | Rows 1-6 measured live: zero re-targets, zero stalls, kill rate doubled
 
 The operator-directed acceptance run for the triage fixes: one bounded 16-minute Practice session from HEAD (`9993aa4e`), measured against the flagged 74-minute baseline with a single instrument proven on the baseline first. The room stayed settled (zero foreign humans), so the settled-knowledge law ran in its permanent-knowledge regime throughout. Redundant radars 56% → **8%**; frontier journeys **28 over 28 unique blocks, zero re-targets** (baseline: ~260 over 65 with a block hit 12×; the nine twice-landed blocks were landing displacement, verified by target attribution); intra-viewport teleports 173 → 23, and the surviving 23 attribute to legitimate lanes (adjacent-block exploration, walk-blocked pocket serving, combat); adjacent shift reversals 204 → 8; **no livelock signature, zero `progress_stalled`, zero full-tank engagement breaks** (11 breaks, all mid-fuel — the projection law working); kills per minute 0.28 → **0.56**. The top decision reason flipped from `forage_frontier_hop` (435/1,954) to `shoot_target` (106/420) — the ticks the clocks used to eat went to fighting. Full table in [[flag-triage-20260902]] § Live validation. One pre-existing teardown wedge observed (browser cleanup exceeded its 30 s watchdog after a clean `quit_game`; artifacts intact) — flagged on the board, unowned.
+
+---
+
+## [2026-09-02] update | Sim world parameterization: the stamp stops choosing the world
+
+Precondition for running sim sweeps on HPC3, picked up from the HPC parameterization work left unclaimed on board task b008ab91.
+
+**Pages written (1):** [[sim-world-parameterization]] — hub-linked from Architecture.
+
+**The finding that extended the known one:** the 2026-09-01 retraction named `select_practice_layout`. There is a THIRD stamp-derived world input and it is the dangerous one — `seed_field_population(seed=crc32(stamp))` decides where every container lies, and unlike the layout it prints nowhere. A stamp-varied larder moves any forage or economy number with nothing in any artifact recording that it did.
+
+**The structural finding:** the two cluster blockers are one defect. A stamp that VARIES per array task varies the world by accident; a stamp held FIXED collides on the archive paths, which are all stamp-derived. No stamp policy satisfies both — the stamp was doing double duty as a label and as a world input, and separating those fixes both at once.
+
+**What landed:** `_boot` takes `layout` and `population_seed` as required keyword arguments instead of deriving them; the derivation moved up to the CLI behind new `--layout` and `--population-seed` flags, so interactive runs are unchanged and a sweep member can opt out; `layout_by_provenance` raises `UnknownPracticeLayoutError` rather than defaulting; `--runs-root` moves probe artifacts off the fixed `runs/probe` that N array tasks would share.
+
+**Verified:** guard 0 violations, ruff clean, mypy clean on 1,225 files, 856 tests pass across tests/sim + tests/diagnostics + tests/test_runtime_artifacts, and 100% statement + branch coverage on all four changed sim modules (world_seed, run, run_boot, scenarios).
+
+**Worth keeping:** the new test `test_two_named_layouts_differ_under_one_stamp` FAILED on its first run — both sessions shared a stamp, wrote the same `sim-<stamp>.world.json`, and the assertion compared a file with itself. Blocker 2 reproduced inside the test for blocker 1, which is the clearest evidence available that they are one defect.
+
+**Not done:** TankpitBot is still not a registered hpc3 project. `hpc3-preflight` refuses a `tankpit` run with `WORKSPACE_PROJECT_UNKNOWN` before reaching the cluster. Registration, image and staging are the next step; the cluster itself is reachable (verified: `ssh hpc3` → login-i15, accounts cjmayer_lab and wagnera3).
+
+---
+## [2026-09-02] lift | The differ could not see 0x52 fields; giving it eyes found two bugs immediately
+
+Three follow-ups from the shot-refusal work, in ascending order of what they turned out to be worth.
+
+### The latent multi-client window check — real, and now expressed correctly
+
+`server_move.py` gated its out-of-window refusal on `tank_id == self.session.client_id`, and I had just written the same weld into the shoot router. That comparison does not mean "this tank's own window", it means "the one window we happen to have" — correct today, silently wrong the moment a second connection exists.
+
+New `sim/server_sessions.py`: `session_for(tank_id)` and `click_leaves_own_window(tank_id, x, y)`, mixed into both routers. A tank the sim drives itself has NO connection and therefore no window, which is a different fact from "a connection seeing nothing" and the refusal laws must not confuse them. When the registry lands, only `session_for` changes.
+
+### The 0x52 fields — important, but not for the reason I first thought
+
+`reset_action` and `close_map` are **"reset to idle"** and **"close map view"** ([[decode-coverage]], from the JS). Nothing in the BOT reads either — `world_state_dispatch` binds `error_code` alone — so the divergence I flagged has no behavioural cost today. It has one for the actual goal: a 1:1 server is for REAL CLIENTS, and the real client acts on both.
+
+So the token is now `52c<code>r<reset>m<map>` instead of `52c<code>`. The first baseline under it found **two** field bugs, not one:
+
+| site | sim sent | live sends | evidence |
+|---|---|---|---|
+| out-of-window move refusal | (1, 0) | **(0, 1)** | 83/86 archive-wide, 10/10 move windows |
+| fuel close, code 5, after a walk | (1, 0) | **(0, 0)** | **2,537 / 2,537** |
+
+The second is the one worth keeping. `reset_action` follows the CODE, not the walk: code 4 really does split (1,0)x610 against (0,0)x71 on walking, code 5 is (0,0) either way. The sim keyed both on the walk. **[[fuel-system]] had the right law written down the whole time** — "code 5, reset_action=0"; "code 4, reset_action=1 after a walk" — and the code disagreed with the wiki for months with no mechanism able to notice.
+
+That is the same failure shape as this morning's fuel-choreography tests, where the docstring carried the law and the assertion carried the invention. **Prose and code drift apart silently; only a differ that can see the difference catches it.** The differ could not see this one until today.
+
+The towing refusal keeps (1,1) and got FIRMER, not weaker: exactly three (1,1) code-0 frames exist archive-wide, all in teleport windows, and the towing law was mined "three-for-three" from the 2026-07-20 capture. Same three.
+
+### Coordination note
+
+A second session is now working in `sim/` on world parameterization — `sim/cli_args.py`, `--layout`, `--population-seed`, and a `require_named_world` gate that refuses an unnamed world on a sweep member. That is the fix for the stamp-picks-the-world confound I retracted a measurement over earlier today, and it is theirs, not mine. I verified before committing that my four sim files carry only my changes and that `make_larder_sim_world` survived their `scenarios.py` restructure.
+
+Gate: guard clean (they split `bot/ai/context.py`, which was the file-size violation); ruff and mypy clean over 1,227 files; 415 sim + 600 sim/analysis/physics/scenarios tests green. The full suite is not mine to certify while two other sessions have work in flight.

@@ -90,6 +90,10 @@ def shape_token(message: BinaryMessage, self_id: int | None) -> str | None:
     status syncs are background, not response, and returning None drops
     them from every shape.
 
+    A token is a message type EXCEPT where fields carry semantics the
+    type does not: the three self-scoped tokens name their tank, and
+    the 0x52 carries its error code AND its two client directives.
+
     Args:
         message: One decoded received message.
         self_id: The capturing client's tank id, or None before the
@@ -111,7 +115,18 @@ def shape_token(message: BinaryMessage, self_id: int | None) -> str | None:
     if message["msg_type"] == _POSITION:
         return "3Dself" if message["tank_id"] == self_id else None
     if message["msg_type"] == _SUPERVISOR:
-        return f"52c{message['error_code']}"
+        # The 0x52 token carries its FIELDS, not just its code. Both
+        # are directives the real client acts on — reset_action
+        # "reset to idle", close_map "close map view"
+        # ([[decode-coverage]]) — so a sim that sends the right code
+        # with the wrong fields drives a real client wrongly while
+        # looking identical to a code-only differ. It looked identical
+        # for months: the out-of-window move refusal sent (1, 0) where
+        # every one of the archive's 10 move code-0 windows sends
+        # (0, 1), and nothing could see it because this function threw
+        # the fields away (found 2026-09-02 by a hand sweep, which is
+        # not a mechanism).
+        return f"52c{message['error_code']}r{message['reset_action']}m{message['close_map']}"
     return _PLAIN_TOKENS.get(message["msg_type"])
 
 
