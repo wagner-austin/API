@@ -298,7 +298,17 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   the code change between them. That is a stronger result than the flag
   needed and a weaker one than `rusted`'s: this is a single pair, where
   rusted's panel was twelve seeds across two arms. One pair cannot see an
-  intermittent divergence, which is precisely the failure rusted found. `rusted` is the standing warning here: its
+  intermittent divergence, which is precisely the failure rusted found.
+
+  **Image `b838e0242ecc` (v1) was deleted on 2026-09-03** as a superseded
+  120 MB artifact, so this measurement now stands on what is RECORDED
+  rather than on what can be re-run: the ledger row for `55715577` carries
+  the digest and both `world.json` files are still on disk, but
+  re-executing that half of the pair is no longer possible. A future
+  cross-node panel should be built from images that still exist rather
+  than extended from this pair.
+
+  `rusted` is the standing warning here: its
   panel found cross-invocation replay "achievable on this runtime and does
   not always happen", with two members bit-exact across nodes 40 minutes
   apart while their counterparts moved (`9ae66117`), and it declared
