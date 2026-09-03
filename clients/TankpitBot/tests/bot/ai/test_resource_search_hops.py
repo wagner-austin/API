@@ -8,12 +8,41 @@ from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.types import make_container_state
+from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
 )
+
+
+def _foreign_human(tank_id: int, timestamp_ms: int) -> TankStateDict:
+    """Build a foreign human-named tank observation.
+
+    The settled-knowledge law's clock trigger: a human-style name that
+    is neither this bot nor a fleet sibling advances the foreign-human
+    watermark, restoring TTL aging for scans older than the sighting.
+
+    Args:
+        tank_id: Registry id.
+        timestamp_ms: Observation stamp — becomes the watermark.
+
+    Returns:
+        An alive enemy human tank observation.
+    """
+    return make_tank_state(
+        tank_id=tank_id,
+        x=50,
+        y=50,
+        team=2,
+        rank=3,
+        damage_state=3,
+        name="Sigma",
+        is_bot=False,
+        is_self=False,
+        timestamp_ms=timestamp_ms,
+        liveness="alive",
+    )
 
 
 class TestHarvestMemoryVeto:
@@ -25,11 +54,28 @@ class TestHarvestMemoryVeto:
         container_volume: int,
         container_ts: int,
         now_ms: int,
+        human_seen_ms: int | None = None,
     ) -> DecideCtx:
-        """Build a ctx whose single dot lands on a viewport with one belief."""
+        """Build a ctx whose single dot lands on a viewport with one belief.
+
+        Args:
+            container_volume: Belief volume at the landing viewport.
+            container_ts: Belief timestamp.
+            now_ms: Decision time.
+            human_seen_ms: When set, a foreign human tank observed at
+                this instant — the settled-knowledge law's clock arm
+                ([[flag-triage-20260902]] rows 3-5). ``None`` leaves
+                the room settled: knowledge never ages.
+        """
         ws = WorldService()
         ws.map_fuel_dots = ((150, 100),)
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
+        if human_seen_ms is not None:
+            world["tanks"]["900"] = _foreign_human(900, human_seen_ms)
+        # Production invariant: the ctx world IS the service's world
+        # (tick_body passes bot.world.world_state), and the settled-
+        # knowledge sweep reads the service's copy.
+        ws.world_state = world
         world["containers"]["152,101"] = make_container_state(
             x=152,
             y=101,
@@ -83,9 +129,15 @@ class TestHarvestMemoryVeto:
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
 
-    def test_stale_empty_beliefs_reopen_the_ground(self) -> None:
-        """Beliefs older than the harvest window may have respawned."""
-        ctx = self._ctx_with_beliefs(container_volume=0, container_ts=100000, now_ms=800000)
+    def test_stale_empty_beliefs_reopen_the_ground_under_human_presence(self) -> None:
+        """With a human about, beliefs older than the window may be wrong.
+
+        The settled-knowledge law's clock arm: only a foreign human
+        can refill ground unobserved, so the reopening needs one seen.
+        """
+        ctx = self._ctx_with_beliefs(
+            container_volume=0, container_ts=100000, now_ms=800000, human_seen_ms=800000
+        )
 
         decision = make_resource_search_hop(
             ctx, mode="COLLECT", score=500, reason="search_collect_local"
@@ -96,6 +148,61 @@ class TestHarvestMemoryVeto:
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
+
+
+class TestSettledKnowledge:
+    """The fact arm: a room with no foreign humans never forgets.
+
+    [[flag-triage-20260902]] rows 3-5, measured live: 49% of a static
+    Practice session's radars re-scanned known ground and 139 frontier
+    teleports never left the viewport, because clock expiry invented
+    change no agent could have made.
+    """
+
+    def test_a_settled_rooms_barren_sweep_never_reopens(self) -> None:
+        """No human, any age: swept-and-empty ground stays dead."""
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+
+        # Age well past harvest memory while keeping the stamp inside
+        # the fixture's epoch (now_ms = 1_000_000).
+        ctx = TestBarrenScanVeto()._ctx_with_swept_landing(
+            scan_age_ms=HARVEST_MEMORY_TTL_MS + 100000
+        )
+
+        decision = make_resource_search_hop(
+            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+        )
+
+        assert decision is None
+
+    def test_a_settled_rooms_stale_empty_beliefs_stay_empty(self) -> None:
+        """No human, any age: a drained container cannot have refilled."""
+        ctx = TestHarvestMemoryVeto()._ctx_with_beliefs(
+            container_volume=0, container_ts=100000, now_ms=100000000
+        )
+
+        decision = make_resource_search_hop(
+            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+        )
+
+        assert decision is None
+
+    def test_a_human_sighting_older_than_the_scan_changes_nothing(self) -> None:
+        """A sweep made AFTER the human left is permanent knowledge."""
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+
+        # Sweep at t=300_000, human last seen at t=200_000: the scan
+        # postdates the last possible unobserved change.
+        ctx = TestBarrenScanVeto()._ctx_with_swept_landing(
+            scan_age_ms=HARVEST_MEMORY_TTL_MS + 100000,
+            human_seen_ms=200000,
+        )
+
+        decision = make_resource_search_hop(
+            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+        )
+
+        assert decision is None
 
 
 class TestPreHuntTopOffBias:
@@ -187,7 +294,7 @@ class TestNearestAliveEnemy:
     def test_skips_allies_corpses_and_unsynced(self) -> None:
         """Only alive, position-synced enemies qualify; nearest wins."""
         from tankpit_bot.bot.ai.resource_search import _nearest_alive_enemy
-        from tankpit_bot.state.types import TankStateDict, make_tank_state
+        from tankpit_bot.state.types import make_tank_state
         from tankpit_bot.types.constants import TankLiveness
 
         ws = WorldService()
@@ -263,14 +370,27 @@ class TestBarrenScanVeto:
         scan_age_ms: int,
         positive_belief: bool = False,
         hole: bool = False,
+        human_seen_ms: int | None = None,
     ) -> DecideCtx:
-        """One dot at (150,100); its 16x16 landing viewport swept scan_age_ms ago."""
-        from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
+        """One dot at (150,100); its 16x16 landing viewport swept scan_age_ms ago.
+
+        Args:
+            scan_age_ms: Age of the landing-viewport sweep.
+            positive_belief: Whether a live container belief sits there.
+            hole: Whether one sweep tile is missing.
+            human_seen_ms: When set, a foreign human tank observed at
+                this instant restores clock aging; ``None`` leaves the
+                room settled ([[flag-triage-20260902]] rows 3-5).
+        """
+        from tankpit_bot.state.knowledge_floors import FORAGE_COVERAGE_TTL_MS
 
         ws = WorldService()
         ws.map_fuel_dots = ((150, 100),)
         now_ms = 1000000
         world, self_state = make_world(self_x=100, self_y=100, fuel=1100)
+        if human_seen_ms is not None:
+            world["tanks"]["900"] = _foreign_human(900, human_seen_ms)
+        ws.world_state = world
         # Sweep age must exceed the forage TTL in every test here, so the
         # zero-overlap gate ("already_scanned") never masks the barren gate.
         assert scan_age_ms > FORAGE_COVERAGE_TTL_MS
@@ -301,8 +421,13 @@ class TestBarrenScanVeto:
         )
 
     def test_barren_swept_viewport_is_vetoed(self) -> None:
-        """Fully swept + nothing believed there = guaranteed zero delta."""
-        ctx = self._ctx_with_swept_landing(scan_age_ms=200000)
+        """Fully swept + nothing believed there = guaranteed zero delta.
+
+        Human presence ages the sweep past the forage gate, so the
+        BARREN verdict — not "already_scanned" — is what vetoes; the
+        settled arm is pinned in ``TestSettledKnowledge``.
+        """
+        ctx = self._ctx_with_swept_landing(scan_age_ms=200000, human_seen_ms=1000000)
 
         decision = make_resource_search_hop(
             ctx, mode="COLLECT", score=500, reason="search_collect_local"
@@ -311,8 +436,14 @@ class TestBarrenScanVeto:
         assert decision is None
 
     def test_positive_belief_overrides_barren_sweep(self) -> None:
-        """A known unharvested container gives the swept ground real value."""
-        ctx = self._ctx_with_swept_landing(scan_age_ms=200000, positive_belief=True)
+        """A known unharvested container gives the swept ground real value.
+
+        Under human presence the aged sweep no longer blocks the hop
+        gate, and the positive belief defeats the barren veto.
+        """
+        ctx = self._ctx_with_swept_landing(
+            scan_age_ms=200000, positive_belief=True, human_seen_ms=1000000
+        )
 
         decision = make_resource_search_hop(
             ctx, mode="COLLECT", score=500, reason="search_collect_local"
@@ -325,8 +456,12 @@ class TestBarrenScanVeto:
         assert decision["command"]["target_y"] == 100
 
     def test_incomplete_sweep_is_not_barren(self) -> None:
-        """One unswept tile means the ground still holds unknowns."""
-        ctx = self._ctx_with_swept_landing(scan_age_ms=200000, hole=True)
+        """One unswept tile means the ground still holds unknowns.
+
+        Human presence ages the partial sweep past the forage gate so
+        the barren question is the one being asked.
+        """
+        ctx = self._ctx_with_swept_landing(scan_age_ms=200000, hole=True, human_seen_ms=1000000)
 
         decision = make_resource_search_hop(
             ctx, mode="COLLECT", score=500, reason="search_collect_local"
@@ -338,11 +473,16 @@ class TestBarrenScanVeto:
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
 
-    def test_expired_sweep_reopens_the_ground(self) -> None:
-        """Past harvest memory the sweep is forgotten and the hop returns."""
-        from tankpit_bot.state.scan_coverage import HARVEST_MEMORY_TTL_MS
+    def test_expired_sweep_reopens_the_ground_under_human_presence(self) -> None:
+        """Past harvest memory WITH a human about, the sweep is forgotten.
 
-        ctx = self._ctx_with_swept_landing(scan_age_ms=HARVEST_MEMORY_TTL_MS + 1)
+        The clock arm: unobserved refills need a refiller.
+        """
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+
+        ctx = self._ctx_with_swept_landing(
+            scan_age_ms=HARVEST_MEMORY_TTL_MS + 1, human_seen_ms=1000000
+        )
 
         decision = make_resource_search_hop(
             ctx, mode="COLLECT", score=500, reason="search_collect_local"

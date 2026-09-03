@@ -24,7 +24,7 @@ from tankpit_bot.fleetshare.types import (
 )
 from tankpit_bot.runtime_artifacts import bot_run_dir
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
+from tankpit_bot.state.knowledge_floors import FORAGE_COVERAGE_TTL_MS, ttl_floor_ms
 from tankpit_bot.state.types import has_known_position
 
 FLEET_REPORT_FILENAME = "knowledge.json"
@@ -198,8 +198,9 @@ def _scanned_rows(ws: WorldService, now_ms: int) -> list[FleetScannedTileDict]:
         Tiles within :data:`FORAGE_COVERAGE_TTL_MS`.
     """
     rows: list[FleetScannedTileDict] = []
+    publish_floor = ttl_floor_ms(now_ms, FORAGE_COVERAGE_TTL_MS)
     for key, scanned_ms in ws.world_state["scanned_tiles"].items():
-        if now_ms - scanned_ms > FORAGE_COVERAGE_TTL_MS:
+        if scanned_ms < publish_floor:
             # Expired coverage answers no sibling's "worth a radar?"
             # question -- the shared scan map carries live tiles only.
             continue

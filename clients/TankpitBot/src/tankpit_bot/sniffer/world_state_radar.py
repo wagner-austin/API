@@ -28,6 +28,7 @@ from tankpit_bot.state import (
     remove_mine,
     update_container_from_radar,
 )
+from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
 from tankpit_bot.state.scan_coverage import (
     free_radar_revealed_tiles,
     viewport_tiles,
@@ -93,7 +94,12 @@ def update_world_state_from_radar(
     ws.clear_failed_move_targets()
     reconcile_radar_viewport_resources(ws, containers, mines)
     viewport = ws.world_state["viewport"]
-    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
+    ws.world_state = record_scanned_tiles(
+        ws.world_state,
+        _radar_revealed_tiles(ws),
+        ts,
+        retention_floor_ms=ws.knowledge_floor_ms(ts, HARVEST_MEMORY_TTL_MS),
+    )
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
 
@@ -169,7 +175,12 @@ def update_world_state_from_radar_cache(ws: WorldService) -> None:
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
     viewport = ws.world_state["viewport"]
-    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
+    ws.world_state = record_scanned_tiles(
+        ws.world_state,
+        _radar_revealed_tiles(ws),
+        ts,
+        retention_floor_ms=ws.knowledge_floor_ms(ts, HARVEST_MEMORY_TTL_MS),
+    )
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
     for container in envelope:
@@ -200,7 +211,12 @@ def update_world_state_from_radar_known_resources(ws: WorldService) -> None:
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
     viewport = ws.world_state["viewport"]
-    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
+    ws.world_state = record_scanned_tiles(
+        ws.world_state,
+        _radar_revealed_tiles(ws),
+        ts,
+        retention_floor_ms=ws.knowledge_floor_ms(ts, HARVEST_MEMORY_TTL_MS),
+    )
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
     for rc in envelope:

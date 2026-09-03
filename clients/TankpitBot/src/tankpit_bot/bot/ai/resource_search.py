@@ -47,7 +47,6 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
 )
 from tankpit_bot.state.scan_coverage import (
-    HARVEST_MEMORY_TTL_MS,
     is_viewport_scanned_within,
     is_viewport_untouched,
 )
@@ -133,7 +132,7 @@ def _landing_viewport_known_empty(
             return False
         seen = True
         newest_ms = max(newest_ms, container["timestamp_ms"])
-    return seen and ctx.timestamp_ms - newest_ms <= HARVEST_MEMORY_TTL_MS
+    return seen and newest_ms >= ctx.harvest_floor_ms
 
 
 def _landing_viewport_barren(
@@ -178,8 +177,7 @@ def _landing_viewport_barren(
         top,
         right,
         bottom,
-        ctx.timestamp_ms,
-        ttl_ms=HARVEST_MEMORY_TTL_MS,
+        ctx.harvest_floor_ms,
     )
 
 
@@ -255,7 +253,7 @@ def _dot_hop_rejection(
         top,
         right,
         bottom,
-        ctx.timestamp_ms,
+        ctx.forage_floor_ms,
     ):
         return "already_scanned"
     if _landing_viewport_known_empty(ctx, left, top, right, bottom):

@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 from tankpit_bot.physics.capacity import free_radar_radius
-from tankpit_bot.state.scan_coverage import (
+from tankpit_bot.state.knowledge_floors import (
     FORAGE_COVERAGE_TTL_MS,
+    HARVEST_MEMORY_TTL_MS,
+    settled_knowledge_floor_ms,
+    ttl_floor_ms,
+)
+from tankpit_bot.state.scan_coverage import (
     free_radar_revealed_tiles,
     is_tile_covered,
     is_viewport_fully_covered,
@@ -32,24 +37,56 @@ class TestTileKey:
 
 
 class TestIsTileCovered:
-    """Tests for the per-tile coverage / TTL predicate."""
+    """Tests for the per-tile coverage / floor predicate."""
 
     def test_uncovered_tile_reports_false(self) -> None:
-        """A tile absent from the map is never covered."""
-        assert is_tile_covered({}, 100, 100, 100000) is False
+        """A tile absent from the map is never covered, even at floor 0."""
+        assert is_tile_covered({}, 100, 100, 0) is False
 
-    def test_recently_scanned_tile_is_covered(self) -> None:
-        """A live scan mark makes the tile covered."""
+    def test_stamp_at_or_after_the_floor_is_covered(self) -> None:
+        """A mark at the floor still answers the question."""
         coverage = {"100,100": 100000}
 
         assert is_tile_covered(coverage, 100, 100, 100000) is True
-        assert is_tile_covered(coverage, 100, 100, 100000 + FORAGE_COVERAGE_TTL_MS) is True
+        assert is_tile_covered(coverage, 100, 100, 0) is True
 
-    def test_expired_tile_is_not_covered(self) -> None:
-        """A mark older than the coverage TTL no longer counts."""
+    def test_stamp_before_the_floor_is_not_covered(self) -> None:
+        """A mark below the floor no longer counts."""
         coverage = {"100,100": 100000}
 
-        assert is_tile_covered(coverage, 100, 100, 100000 + FORAGE_COVERAGE_TTL_MS + 1) is False
+        assert is_tile_covered(coverage, 100, 100, 100001) is False
+
+
+class TestKnowledgeFloors:
+    """The two floor constructors behind the settled-knowledge law."""
+
+    def test_ttl_floor_is_pure_clock_aging(self) -> None:
+        """The pre-2026-09-02 semantics, kept for bounded questions."""
+        assert ttl_floor_ms(100000, FORAGE_COVERAGE_TTL_MS) == 100000 - FORAGE_COVERAGE_TTL_MS
+
+    def test_settled_floor_is_zero_when_no_human_was_ever_seen(self) -> None:
+        """A settled room's knowledge is permanent: any stamp clears 0."""
+        assert settled_knowledge_floor_ms(100000000, FORAGE_COVERAGE_TTL_MS, 0) == 0
+
+    def test_settled_floor_is_the_plain_ttl_while_a_human_is_about(self) -> None:
+        """A human seen this instant restores exactly the old clock."""
+        now = 100000000
+        assert (
+            settled_knowledge_floor_ms(now, FORAGE_COVERAGE_TTL_MS, now)
+            == now - FORAGE_COVERAGE_TTL_MS
+        )
+
+    def test_settled_floor_pins_to_a_departed_humans_last_sighting(self) -> None:
+        """Scans made after the human left never age; older ones age out.
+
+        The departed-human arm ([[flag-triage-20260902]] rows 3-5):
+        with the last sighting older than the TTL, the floor IS that
+        sighting — a stamp written since their departure postdates the
+        last possible unobserved change.
+        """
+        now = 100000000
+        departed = now - FORAGE_COVERAGE_TTL_MS * 3
+        assert settled_knowledge_floor_ms(now, FORAGE_COVERAGE_TTL_MS, departed) == departed
 
 
 def _make_world(scanned_tiles: dict[str, int] | None = None) -> WorldStateDict:
@@ -82,7 +119,12 @@ class TestRecordScannedTiles:
         """Every tile in the reveal set lands in scanned_tiles."""
         world = _make_world()
 
-        result = record_scanned_tiles(world, [(10, 10), (10, 11), (11, 11)], 100000)
+        result = record_scanned_tiles(
+            world,
+            [(10, 10), (10, 11), (11, 11)],
+            100000,
+            retention_floor_ms=ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS),
+        )
 
         assert result["scanned_tiles"] == {
             "10,10": 100000,
@@ -99,14 +141,19 @@ class TestRecordScannedTiles:
         minutes ago" after the 180 s forage coverage aged out
         ([[flag-triage-20260729]] F2).
         """
-        from tankpit_bot.state.scan_coverage import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
 
         stale = {"1,1": 100000 - HARVEST_MEMORY_TTL_MS - 1}
         aged_but_remembered = {"3,3": 100000 - FORAGE_COVERAGE_TTL_MS - 1}
         fresh = {"2,2": 100000 - 1000}
         world = _make_world({**stale, **aged_but_remembered, **fresh})
 
-        result = record_scanned_tiles(world, [(10, 10)], 100000)
+        result = record_scanned_tiles(
+            world,
+            [(10, 10)],
+            100000,
+            retention_floor_ms=ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS),
+        )
 
         assert result["scanned_tiles"] == {
             "3,3": 100000 - FORAGE_COVERAGE_TTL_MS - 1,
@@ -118,17 +165,27 @@ class TestRecordScannedTiles:
         """The original world state is unchanged after recording."""
         world = _make_world({"5,5": 99000})
 
-        record_scanned_tiles(world, [(10, 10)], 100000)
+        record_scanned_tiles(
+            world,
+            [(10, 10)],
+            100000,
+            retention_floor_ms=ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS),
+        )
 
         assert world["scanned_tiles"] == {"5,5": 99000}
 
     def test_recording_zero_tiles_still_prunes_expired(self) -> None:
         """An empty reveal set is a valid pure-prune operation."""
-        from tankpit_bot.state.scan_coverage import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
 
         world = _make_world({"1,1": 100000 - HARVEST_MEMORY_TTL_MS - 1})
 
-        result = record_scanned_tiles(world, [], 100000)
+        result = record_scanned_tiles(
+            world,
+            [],
+            100000,
+            retention_floor_ms=ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS),
+        )
 
         assert result["scanned_tiles"] == {}
 
@@ -316,10 +373,8 @@ class TestIsViewportScannedWithin:
 
     def test_full_recent_coverage_is_scanned(self) -> None:
         """Every tile marked inside the window -> True."""
-        from tankpit_bot.state.scan_coverage import (
-            HARVEST_MEMORY_TTL_MS,
-            is_viewport_scanned_within,
-        )
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.scan_coverage import is_viewport_scanned_within
 
         coverage = self._full_coverage(100000)
         assert (
@@ -329,34 +384,29 @@ class TestIsViewportScannedWithin:
                 100,
                 103,
                 103,
-                100000 + HARVEST_MEMORY_TTL_MS,
-                ttl_ms=HARVEST_MEMORY_TTL_MS,
+                ttl_floor_ms(100000 + HARVEST_MEMORY_TTL_MS, HARVEST_MEMORY_TTL_MS),
             )
             is True
         )
 
     def test_one_missing_tile_is_not_scanned(self) -> None:
         """A single unmarked tile means the sweep was incomplete."""
-        from tankpit_bot.state.scan_coverage import (
-            HARVEST_MEMORY_TTL_MS,
-            is_viewport_scanned_within,
-        )
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.scan_coverage import is_viewport_scanned_within
 
         coverage = self._full_coverage(100000)
         del coverage["102,101"]
         assert (
             is_viewport_scanned_within(
-                coverage, 100, 100, 103, 103, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS
+                coverage, 100, 100, 103, 103, ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS)
             )
             is False
         )
 
     def test_expired_coverage_is_not_scanned(self) -> None:
         """Marks older than the window no longer count as knowledge."""
-        from tankpit_bot.state.scan_coverage import (
-            HARVEST_MEMORY_TTL_MS,
-            is_viewport_scanned_within,
-        )
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.scan_coverage import is_viewport_scanned_within
 
         coverage = self._full_coverage(100000)
         assert (
@@ -366,34 +416,33 @@ class TestIsViewportScannedWithin:
                 100,
                 103,
                 103,
-                100000 + HARVEST_MEMORY_TTL_MS + 1,
-                ttl_ms=HARVEST_MEMORY_TTL_MS,
+                ttl_floor_ms(100000 + HARVEST_MEMORY_TTL_MS + 1, HARVEST_MEMORY_TTL_MS),
             )
             is False
         )
 
     def test_edge_viewport_clamps_off_map_tiles(self) -> None:
         """Off-map tiles beyond the 0..255 border cannot dirty the answer."""
-        from tankpit_bot.state.scan_coverage import (
-            HARVEST_MEMORY_TTL_MS,
-            is_viewport_scanned_within,
-        )
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.scan_coverage import is_viewport_scanned_within
 
         coverage = {f"{x},{y}": 100000 for y in range(0, 3) for x in range(0, 3)}
         # Viewport (-2,-2)-(2,2): the on-map part is (0,0)-(2,2), fully marked.
         assert (
-            is_viewport_scanned_within(coverage, -2, -2, 2, 2, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS)
+            is_viewport_scanned_within(
+                coverage, -2, -2, 2, 2, ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS)
+            )
             is True
         )
 
     def test_fully_off_map_viewport_is_not_scanned(self) -> None:
         """Bounds with no on-map tiles carry no knowledge at all."""
-        from tankpit_bot.state.scan_coverage import (
-            HARVEST_MEMORY_TTL_MS,
-            is_viewport_scanned_within,
-        )
+        from tankpit_bot.state.knowledge_floors import HARVEST_MEMORY_TTL_MS
+        from tankpit_bot.state.scan_coverage import is_viewport_scanned_within
 
         assert (
-            is_viewport_scanned_within({}, 260, 260, 270, 270, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS)
+            is_viewport_scanned_within(
+                {}, 260, 260, 270, 270, ttl_floor_ms(100000, HARVEST_MEMORY_TTL_MS)
+            )
             is False
         )

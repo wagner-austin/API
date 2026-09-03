@@ -267,12 +267,12 @@ in the bot is the 10-minute harvest veto.
 |---|---|---|
 | 1 | Cascade livelock v2 (lock cleared by peer) | **fixed 2026-09-02** — quad sweep lock-gated and its raw clear deleted; forage coverage decisions preserve held locks; the search hop releases enumerated (`relocated`); the raw `clear_resource_target` is guard-restricted to `intent.py` (`restricted-symbols`); and `RESOURCE_LOCK_HOLD_BOUND_TICKS` releases any future hold-forever shape as `progress_stalled` |
 | 2 | `walk_or_teleport` unreachable behind `frame_direction` | **fixed 2026-09-02** (as its deeper statement) — the walk-territory RESPONSIBILITY GAP: larder and equipment-hop deferrals now ask the pickup dispatch's own reachability predicate, so walk-blocked near stock is teleport fair game; the exact pocket shape resolves in one tick (pinned in `tests/bot/ai/test_collect_pocket_serving.py`) |
-| 3 | Coverage staleness is clock-based, not event-based | **open** — wants event invalidation + per-room policy |
-| 4 | Landing radar fires on already-covered ground | **open** — suppression seam exists (`latching without radar`) |
-| 5 | Intra-viewport teleports (143) | **open** |
+| 3 | Coverage staleness is clock-based, not event-based | **fixed 2026-09-03** — the SETTLED-KNOWLEDGE LAW: a scan stamp is valid while recent OR while it postdates the last FOREIGN HUMAN sighting (`state/knowledge_floors.py`, `ws.knowledge_floor_ms`, watermark swept from the tank registry with self + fleet siblings excluded via the merge's new `fleet_sibling_tank_ids`). No foreign human ever seen → knowledge is permanent; one present → exactly the old TTL; one departed → pre-departure scans age out once. Fact-based, room-agnostic, zero config plumbing |
+| 4 | Landing radar fires on already-covered ground | **fixed 2026-09-03** — structural: the landing radar was already gated by `radar_spend_worthwhile`, whose uncovered-count now reads the settled floor, so landings on ever-scanned settled ground skip the spend. Combat-landing scans deliberately untouched (they reveal MINES, which are dynamic) |
+| 5 | Intra-viewport teleports (143) | **fixed 2026-09-03** (as row 3's symptom) — lane attribution showed 139 of the measured teleports were `forage_frontier_hop` chasing clock-rotted blocks; with block coverage and visit tombstones on the settled floor the churn source is gone. The hop lanes' own contribution (~14) was already closed by the 2026-09-02 walk-territory law |
 | 6 | Break floor absolute, not rank-relative | **open** |
 | 7 | Mine pin single-slot latch | **open** |
-| 8 | Ferry scout has no negative memory (1/31) | **open** |
+| 8 | Ferry scout has no negative memory (1/31) | **open** — NOT fixed by the settled law (an earlier board note overclaimed this): the scout's precheck compares against the current window only, and per-goal look history is a separate design |
 | 9 | Three dead forked constants in `world_service.py` | **open** — deletion |
 | 10 | Six undocumented `*_MS` constants | **open** |
 

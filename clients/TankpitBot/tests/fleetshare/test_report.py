@@ -240,7 +240,7 @@ class TestReportFreshnessBounds:
 
     def test_only_live_coverage_is_published(self) -> None:
         """Expired tiles answer no sibling's question and stay home."""
-        from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
+        from tankpit_bot.state.knowledge_floors import FORAGE_COVERAGE_TTL_MS
         from tankpit_bot.state.types import WorldStateDict
 
         ws = _world_service()

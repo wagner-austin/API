@@ -343,7 +343,15 @@ def merge_fleet_reports(
     war_ready_count = 0
     forage_goals: dict[str, tuple[int, int]] = {}
     claimed: set[str] = set()
+    siblings: set[int] = set()
     for report in reports:
+        if report["tank_id"] > 0:
+            # The settled-knowledge exclusion set: siblings carry
+            # human-style account names, so without this the fleet
+            # would read its own members as "a human is about" and no
+            # fleet room could ever settle ([[flag-triage-20260902]]
+            # rows 3-5). Pre-spawn reports carry no positive id yet.
+            siblings.add(report["tank_id"])
         consented.update(report["combat_consent_ids"])
         if report["war_ready"]:
             war_ready_count += 1
@@ -382,6 +390,10 @@ def merge_fleet_reports(
     ws.fleet_forage_goals = forage_goals
     ws.fleet_claimed_containers = claimed
     ws.fleet_war_ready_count = war_ready_count
+    # Wholesale like the rest: a drained sibling drops out of the
+    # exclusion set within one exchange, and its parting registry
+    # entry then legitimately reads as foreign until it expires.
+    ws.fleet_sibling_tank_ids = siblings
     return FleetMergeSummaryDict(
         reports=len(reports),
         enemies=enemies_merged,

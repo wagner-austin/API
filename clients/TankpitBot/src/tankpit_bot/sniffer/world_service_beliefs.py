@@ -13,7 +13,9 @@ they belong on the session ([[session-state-deglobalisation]] step 8).
 from __future__ import annotations
 
 from tankpit_bot.ledger.damage_book import DamageBookDict, incoming_damage_window
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.state import WorldStateDict
+from tankpit_bot.state.knowledge_floors import settled_knowledge_floor_ms
 
 #: The reactive walk->teleport flip stays live long enough for the next
 #: decision to dispatch the teleport approach (a few server windows),
@@ -35,6 +37,48 @@ class WorldServiceBeliefsMixin:
     last_own_mine_hit_ms: int
     last_own_gain_ms: int
     mine_reveal_pending_ms: int
+    fleet_sibling_tank_ids: set[int]
+    last_foreign_human_seen_ms: int
+
+    def knowledge_floor_ms(self, now_ms: int, ttl_ms: int) -> int:
+        """Return a scan-stamp validity floor under the settled-knowledge law.
+
+        The fact-based staleness instrument ([[flag-triage-20260902]]
+        rows 3-5): ground changes only when a foreign human changes
+        it, so the registry is swept for human-named tanks that are
+        neither this bot nor a fleet sibling and the newest such
+        observation advances a monotonic watermark. The returned
+        floor is ``min(now - ttl, watermark)`` — permanent knowledge
+        in a settled room, exactly the old clock while a human is
+        about, one aging-out of pre-departure scans after one leaves
+        (:func:`~tankpit_bot.state.knowledge_floors.settled_knowledge_floor_ms`).
+
+        The sweep runs on every call: the registry is a living-tanks
+        list ([[enemy-bot-behavior]]) and a removed human must keep
+        bounding trust in scans that predate their presence, which is
+        why the watermark persists past their 0x58 removal.
+
+        Args:
+            now_ms: Current timestamp.
+            ttl_ms: The question's staleness window while humans are
+                about (e.g. ``FORAGE_COVERAGE_TTL_MS``).
+
+        Returns:
+            The instant at or after which a scan stamp still answers
+            the question.
+        """
+        self_state = self.world_state["self_state"]
+        own_id = -1 if self_state is None else self_state["tank_id"]
+        for tank in self.world_state["tanks"].values():
+            if tank["tank_id"] == own_id:
+                continue
+            if tank["tank_id"] in self.fleet_sibling_tank_ids:
+                continue
+            if not is_human_name(tank["name"]):
+                continue
+            if tank["timestamp_ms"] > self.last_foreign_human_seen_ms:
+                self.last_foreign_human_seen_ms = tank["timestamp_ms"]
+        return settled_knowledge_floor_ms(now_ms, ttl_ms, self.last_foreign_human_seen_ms)
 
     def mark_mine_reveal_pending(self, timestamp_ms: int) -> None:
         """Record that an own-tile mine hit awaits its reveal scan.

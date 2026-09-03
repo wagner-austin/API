@@ -518,3 +518,40 @@ class TestSharedRemovals:
 
         assert ws.fleet_forage_goals == {}
         assert ws.fleet_claimed_containers == set()
+
+
+class TestSiblingTankIds:
+    """The settled-knowledge exclusion set rides the merge.
+
+    Fleet bots carry human-style account names; without the exclusion,
+    every fleet room would read its own members as "a human is about"
+    and never settle ([[flag-triage-20260902]] rows 3-5).
+    """
+
+    def _ws(self) -> WorldService:
+        return TestMergeFleetReports()._world_service()
+
+    def test_reporter_tank_ids_become_the_sibling_set(self) -> None:
+        ws = self._ws()
+        reports = [_report("artax", tank_id=601), _report("despair", tank_id=602)]
+
+        merge_fleet_reports(ws, reports, own_tank_id=2731, own_team=2)
+
+        assert ws.fleet_sibling_tank_ids == {601, 602}
+
+    def test_a_pre_spawn_reporter_contributes_no_id(self) -> None:
+        """A report written before the tank spawned carries no identity."""
+        ws = self._ws()
+
+        merge_fleet_reports(ws, [_report("artax", tank_id=-1)], own_tank_id=2731, own_team=2)
+
+        assert ws.fleet_sibling_tank_ids == set()
+
+    def test_the_set_is_replaced_wholesale_each_pass(self) -> None:
+        """A drained sibling drops out within one exchange."""
+        ws = self._ws()
+        merge_fleet_reports(ws, [_report("artax", tank_id=601)], own_tank_id=2731, own_team=2)
+
+        merge_fleet_reports(ws, [_report("despair", tank_id=602)], own_tank_id=2731, own_team=2)
+
+        assert ws.fleet_sibling_tank_ids == {602}

@@ -84,7 +84,7 @@ def _frontier_walk_target(
         band is already covered (the search hop relocates instead).
     """
     scanned = ctx.world["scanned_tiles"]
-    now_ms = ctx.timestamp_ms
+    floor_ms = ctx.forage_floor_ms
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     bands: list[tuple[int, tuple[int, int]]] = []
     east = range(right + 1, min(right + _FRONTIER_BAND_DEPTH, 255) + 1)
@@ -97,7 +97,7 @@ def _frontier_walk_target(
                 1
                 for x in east
                 for y in range(top, bottom + 1)
-                if not is_tile_covered(scanned, x, y, now_ms)
+                if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (right, sy),
         )
@@ -108,7 +108,7 @@ def _frontier_walk_target(
                 1
                 for x in west
                 for y in range(top, bottom + 1)
-                if not is_tile_covered(scanned, x, y, now_ms)
+                if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (left, sy),
         )
@@ -119,7 +119,7 @@ def _frontier_walk_target(
                 1
                 for x in range(left, right + 1)
                 for y in south
-                if not is_tile_covered(scanned, x, y, now_ms)
+                if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (sx, bottom),
         )
@@ -130,7 +130,7 @@ def _frontier_walk_target(
                 1
                 for x in range(left, right + 1)
                 for y in north
-                if not is_tile_covered(scanned, x, y, now_ms)
+                if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (sx, top),
         )
@@ -172,7 +172,7 @@ def select_forage_target(ctx: DecideCtx) -> tuple[int, int] | None:
         top,
         right,
         bottom,
-        ctx.timestamp_ms,
+        ctx.forage_floor_ms,
         ctx.self_state["rank"],
     )
 
@@ -233,7 +233,7 @@ def plan_forage_search(
         top,
         right,
         bottom,
-        ctx.timestamp_ms,
+        ctx.forage_floor_ms,
     )
     # Extras reveal the whole viewport; free radar only reveals a
     # ``(2r+1)x(2r+1)`` footprint around the tank
@@ -278,7 +278,7 @@ def plan_forage_search(
             top,
             right,
             bottom,
-            ctx.timestamp_ms,
+            ctx.forage_floor_ms,
             ctx.self_state["rank"],
         )
         radar_productive = next_radar_gain > 0

@@ -36,7 +36,6 @@ from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 BLOCK_TILES = 16
@@ -56,7 +55,7 @@ FRONTIER_VISIT_TTL_MS = 180_000
 Containers sit unclaimed until collected, so an empty block means
 someone took its stock; the TTL lets the frontier come back after
 the field has had time to repopulate. Same respawn rationale as
-:data:`~tankpit_bot.state.scan_coverage.FORAGE_COVERAGE_TTL_MS`.
+:data:`~tankpit_bot.state.knowledge_floors.FORAGE_COVERAGE_TTL_MS`.
 """
 
 _ARRIVE_TILES = 2
@@ -102,9 +101,8 @@ def _prune_visits(ws: WorldService, now_ms: int) -> None:
         ws: The session's world service.
         now_ms: Current timestamp.
     """
-    ws.forage_visited = {
-        key: ts for key, ts in ws.forage_visited.items() if now_ms - ts < FRONTIER_VISIT_TTL_MS
-    }
+    visit_floor = ws.knowledge_floor_ms(now_ms, FRONTIER_VISIT_TTL_MS)
+    ws.forage_visited = {key: ts for key, ts in ws.forage_visited.items() if ts > visit_floor}
 
 
 def _covered_blocks(ctx: DecideCtx) -> set[tuple[int, int]]:
@@ -118,7 +116,7 @@ def _covered_blocks(ctx: DecideCtx) -> set[tuple[int, int]]:
     """
     covered: set[tuple[int, int]] = set()
     for key, ts in ctx.world["scanned_tiles"].items():
-        if ctx.timestamp_ms - ts >= FORAGE_COVERAGE_TTL_MS:
+        if ts < ctx.forage_floor_ms:
             continue
         x_str, y_str = key.split(",")
         covered.add((int(x_str) // BLOCK_TILES, int(y_str) // BLOCK_TILES))

@@ -134,7 +134,7 @@ class TestMakeResourceSearchHop:
 
     def test_expired_scan_marks_make_a_viewport_clean_again(self) -> None:
         """Coverage past the forage TTL no longer dirties the viewport."""
-        from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
+        from tankpit_bot.state.knowledge_floors import FORAGE_COVERAGE_TTL_MS
 
         ctx = _ctx(map_fuel_dots=((130, 100),))
         ctx.world["scanned_tiles"]["130,100"] = ctx.timestamp_ms - FORAGE_COVERAGE_TTL_MS - 1

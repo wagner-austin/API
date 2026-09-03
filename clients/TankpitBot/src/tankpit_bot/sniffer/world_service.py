@@ -280,6 +280,19 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # FLEET has proof consented to combat. Replaced wholesale per
         # merge, like the engaged ids above.
         self.fleet_consented_tank_ids: set[int] = set()
+        # Siblings' own tank ids, from their reports' identity field.
+        # Replaced wholesale per merge like every fleet_* field. The
+        # settled-knowledge law's exclusion set: fleet bots carry
+        # human-style account names, and counting a sibling as "a
+        # human is about" would keep every fleet room permanently
+        # unsettled ([[flag-triage-20260902]] rows 3-5).
+        self.fleet_sibling_tank_ids: set[int] = set()
+        # The settled-knowledge watermark: newest observation stamp of
+        # any FOREIGN human tank (not self, not a sibling) this
+        # session ever saw. Monotonic and never pruned — a human who
+        # left the room still bounds how far back scan knowledge is
+        # trusted. 0 = never; read through ``knowledge_floor_ms``.
+        self.last_foreign_human_seen_ms: int = 0
         # How many same-team siblings currently report themselves
         # war-ready (past the wartime readiness floor under a
         # war-joining doctrine). The swarm muster's quorum input

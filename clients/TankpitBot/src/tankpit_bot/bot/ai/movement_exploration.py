@@ -136,7 +136,7 @@ def _exploration_priority(
         next_top,
         next_left + current_viewport["width"] - 1,
         next_top + current_viewport["height"] - 1,
-        ctx.timestamp_ms,
+        ctx.forage_floor_ms,
     )
     reveal_distance = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
     return (is_current, is_failed, is_scanned, -reveal_distance)

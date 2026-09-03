@@ -208,7 +208,7 @@ def plan_quad_sweep(ctx: DecideCtx, base_state: AIStateDict) -> TickDecisionDict
             block_top,
             min(sx + WINDOW_LAST, 255),
             min(sy + WINDOW_LAST, 255),
-            ctx.timestamp_ms,
+            ctx.forage_floor_ms,
         )
         if block_uncovered < SWEEP_START_FLOOR_TILES:
             return None
@@ -272,7 +272,7 @@ def _pending_quadrants(
             bounds[1],
             bounds[2],
             bounds[3],
-            ctx.timestamp_ms,
+            ctx.forage_floor_ms,
         )
         if _quadrant_spend_worthwhile(uncovered, extras):
             pending.append((direction, bounds, uncovered))

@@ -38,26 +38,6 @@ from __future__ import annotations
 from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.state.types import WorldStateDict, coord_key
 
-# A swept tile is re-foraged after this interval -- long enough to push
-# the sweep across the viewport before doubling back, short enough that
-# equipment that respawns later is eventually re-discovered.
-FORAGE_COVERAGE_TTL_MS = 180000
-
-HARVEST_MEMORY_TTL_MS = 600000
-"""How long harvested/barren ground stays vetoed for collect dot hops.
-
-The forage TTL above answers "is this ground worth another RADAR" and
-deliberately ages out fast. Harvest memory answers "did we already
-LEARN this ground is worthless" and must outlive it: run
-bot-20260729-232252 re-hopped picked-clean viewports the moment the
-180 s coverage expired (63% zero-yield hops,
-[[flag-triage-20260729]] F2). Two vetoes share this window: drained
-container beliefs (`_landing_viewport_known_empty`) and barren scan
-memory (`is_viewport_scanned_within` — scanned recently, revealed
-nothing). Container respawn cadence is unmeasured — this bound is a
-working assumption, not a wire-derived law.
-"""
-
 
 def tile_key(x: int, y: int) -> str:
     """Return the dict key for a tile.
@@ -76,7 +56,7 @@ def is_tile_covered(
     scanned_tiles: dict[str, int],
     x: int,
     y: int,
-    now_ms: int,
+    coverage_floor_ms: int,
 ) -> bool:
     """Return True when ``(x, y)`` carries a live scan mark.
 
@@ -84,13 +64,16 @@ def is_tile_covered(
         scanned_tiles: Coverage map keyed by ``"x,y"`` -> scan ms.
         x: Tile X.
         y: Tile Y.
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor — planners take it
+            from ``ws.knowledge_floor_ms(now, FORAGE_COVERAGE_TTL_MS)``
+            (the settled-knowledge law); pure-clock callers from
+            :func:`ttl_floor_ms`.
 
     Returns:
-        True if the tile was scanned within :data:`FORAGE_COVERAGE_TTL_MS`.
+        True if the tile's scan stamp is at or after the floor.
     """
     scanned_ms = scanned_tiles.get(tile_key(x, y))
-    return scanned_ms is not None and now_ms - scanned_ms <= FORAGE_COVERAGE_TTL_MS
+    return scanned_ms is not None and scanned_ms >= coverage_floor_ms
 
 
 def viewport_tiles(
@@ -160,7 +143,7 @@ def is_viewport_untouched(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
+    coverage_floor_ms: int,
 ) -> bool:
     """Return True when NO tile in the viewport carries a live scan mark.
 
@@ -178,14 +161,14 @@ def is_viewport_untouched(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor (see :func:`is_tile_covered`).
 
     Returns:
         True when zero viewport tiles carry a live scan mark.
     """
     for y in range(viewport_top, viewport_bottom + 1):
         for x in range(viewport_left, viewport_right + 1):
-            if is_tile_covered(scanned_tiles, x, y, now_ms):
+            if is_tile_covered(scanned_tiles, x, y, coverage_floor_ms):
                 return False
     return True
 
@@ -196,7 +179,7 @@ def is_viewport_fully_covered(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
+    coverage_floor_ms: int,
 ) -> bool:
     """Return True when every tile in the viewport carries a live scan mark.
 
@@ -206,14 +189,14 @@ def is_viewport_fully_covered(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor (see :func:`is_tile_covered`).
 
     Returns:
         True when no viewport tile is unscanned.
     """
     for y in range(viewport_top, viewport_bottom + 1):
         for x in range(viewport_left, viewport_right + 1):
-            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+            if not is_tile_covered(scanned_tiles, x, y, coverage_floor_ms):
                 return False
     return True
 
@@ -224,7 +207,7 @@ def viewport_uncovered_count(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
+    coverage_floor_ms: int,
 ) -> int:
     """Return how many viewport tiles carry no live scan mark.
 
@@ -239,7 +222,7 @@ def viewport_uncovered_count(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor (see :func:`is_tile_covered`).
 
     Returns:
         Count of viewport tiles without live coverage.
@@ -247,7 +230,7 @@ def viewport_uncovered_count(
     uncovered = 0
     for y in range(viewport_top, viewport_bottom + 1):
         for x in range(viewport_left, viewport_right + 1):
-            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+            if not is_tile_covered(scanned_tiles, x, y, coverage_floor_ms):
                 uncovered += 1
     return uncovered
 
@@ -260,7 +243,7 @@ def free_radar_new_coverage(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
+    coverage_floor_ms: int,
     rank: int,
 ) -> int:
     """Return how many uncovered tiles a free radar at ``(tile_x, tile_y)`` would reveal.
@@ -280,7 +263,7 @@ def free_radar_new_coverage(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor (see :func:`is_tile_covered`).
         rank: Controlled tank rank (``self_state["rank"]``, 0..8).
 
     Returns:
@@ -295,7 +278,7 @@ def free_radar_new_coverage(
     count = 0
     for y in range(y_lo, y_hi + 1):
         for x in range(x_lo, x_hi + 1):
-            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+            if not is_tile_covered(scanned_tiles, x, y, coverage_floor_ms):
                 count += 1
     return count
 
@@ -308,7 +291,7 @@ def select_best_free_radar_position(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
+    coverage_floor_ms: int,
     rank: int,
 ) -> tuple[int, int] | None:
     """Return the viewport tile whose next free radar would reveal the most uncovered ground.
@@ -332,7 +315,7 @@ def select_best_free_radar_position(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
+        coverage_floor_ms: Stamp validity floor (see :func:`is_tile_covered`).
         rank: Controlled tank rank (``self_state["rank"]``, 0..8).
 
     Returns:
@@ -360,7 +343,7 @@ def select_best_free_radar_position(
                 viewport_top,
                 viewport_right,
                 viewport_bottom,
-                now_ms,
+                coverage_floor_ms,
                 rank,
             )
             if score == 0:
@@ -379,11 +362,9 @@ def is_viewport_scanned_within(
     viewport_top: int,
     viewport_right: int,
     viewport_bottom: int,
-    now_ms: int,
-    *,
-    ttl_ms: int,
+    floor_ms: int,
 ) -> bool:
-    """Return True when every on-map viewport tile was scanned within ``ttl_ms``.
+    """Return True when every on-map viewport tile is stamped at or after ``floor_ms``.
 
     The barren-memory predicate ([[flag-triage-20260729]] F2): a
     viewport the radar fully swept within the window is KNOWN ground —
@@ -404,12 +385,12 @@ def is_viewport_scanned_within(
         viewport_top: Viewport top Y (inclusive).
         viewport_right: Viewport right X (inclusive).
         viewport_bottom: Viewport bottom Y (inclusive).
-        now_ms: Current timestamp for TTL evaluation.
-        ttl_ms: Scan-mark lifetime for this question.
+        floor_ms: Stamp validity floor — planners take it from
+            ``ws.knowledge_floor_ms(now, HARVEST_MEMORY_TTL_MS)``.
 
     Returns:
-        True when the whole on-map viewport was scanned within
-        ``ttl_ms``.
+        True when the whole on-map viewport carries stamps at or
+        after the floor.
     """
     left = max(viewport_left, 0)
     top = max(viewport_top, 0)
@@ -420,7 +401,7 @@ def is_viewport_scanned_within(
     for y in range(top, bottom + 1):
         for x in range(left, right + 1):
             scanned_ms = scanned_tiles.get(tile_key(x, y))
-            if scanned_ms is None or now_ms - scanned_ms > ttl_ms:
+            if scanned_ms is None or scanned_ms < floor_ms:
                 return False
     return True
 
@@ -474,20 +455,26 @@ def record_scanned_tiles(
     state: WorldStateDict,
     scanned: list[tuple[int, int]],
     timestamp_ms: int,
+    *,
+    retention_floor_ms: int,
 ) -> WorldStateDict:
-    """Return state with ``scanned`` tiles marked at ``timestamp_ms`` and stale entries pruned.
+    """Return state with ``scanned`` tiles marked and dead entries pruned.
 
-    Marks are retained for :data:`HARVEST_MEMORY_TTL_MS` — longer than
-    the forage TTL they serve for coverage checks — because the
-    barren-memory veto must still know "we swept this ground 4 minutes
-    ago" after the 180 s forage window has aged out
-    ([[flag-triage-20260729]] F2). Coverage predicates keep their own
-    windows; retention only bounds how long the raw marks exist.
+    Marks are retained while they still answer the longest-lived
+    question (harvest memory) — the caller passes
+    ``ws.knowledge_floor_ms(timestamp_ms, HARVEST_MEMORY_TTL_MS)``, so
+    under the settled-knowledge law a static room's marks are
+    permanent (bounded by the 256x256 map, ~65k entries at worst)
+    while human presence restores the clock-based prune
+    ([[flag-triage-20260729]] F2; [[flag-triage-20260902]] rows 3-5).
+    Coverage predicates keep their own floors; retention only bounds
+    how long the raw marks exist.
 
     Args:
         state: Current world state.
         scanned: Tiles the server radar just revealed.
         timestamp_ms: Scan completion timestamp.
+        retention_floor_ms: Oldest stamp worth keeping.
 
     Returns:
         New WorldStateDict with the coverage map updated.
@@ -495,7 +482,7 @@ def record_scanned_tiles(
     pruned = {
         key: scanned_ms
         for key, scanned_ms in state["scanned_tiles"].items()
-        if timestamp_ms - scanned_ms <= HARVEST_MEMORY_TTL_MS
+        if scanned_ms >= retention_floor_ms
     }
     for tx, ty in scanned:
         pruned[tile_key(tx, ty)] = timestamp_ms
@@ -512,8 +499,6 @@ def record_scanned_tiles(
 
 
 __all__ = [
-    "FORAGE_COVERAGE_TTL_MS",
-    "HARVEST_MEMORY_TTL_MS",
     "free_radar_new_coverage",
     "free_radar_revealed_tiles",
     "is_tile_covered",

@@ -27,6 +27,10 @@ from tankpit_bot.fleetshare.claims import fresh_denied_claim_tiles
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.state.knowledge_floors import (
+    FORAGE_COVERAGE_TTL_MS,
+    HARVEST_MEMORY_TTL_MS,
+)
 from tankpit_bot.state.scan_coverage import (
     free_radar_new_coverage,
     viewport_uncovered_count,
@@ -54,7 +58,9 @@ class DecideCtx:
         "config",
         "equip",
         "filtered",
+        "forage_floor_ms",
         "fuel",
+        "harvest_floor_ms",
         "inventory",
         "killed",
         "map_data_ingested_ms",
@@ -107,6 +113,13 @@ class DecideCtx:
         # it here makes the dependency visible and lets two sessions plan
         # independently ([[session-state-deglobalisation]] step 8).
         self.ws = ws
+        # The settled-knowledge floors ([[flag-triage-20260902]] rows
+        # 3-5), computed once per tick: every coverage predicate this
+        # tick reads takes one of these instead of re-deriving clock
+        # math. ``knowledge_floor_ms`` also advances the foreign-human
+        # watermark, so the sweep runs exactly once per question class.
+        self.forage_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, FORAGE_COVERAGE_TTL_MS)
+        self.harvest_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, HARVEST_MEMORY_TTL_MS)
 
         self.config: AIConfigDict = ai_state["config"]
         self.mode = ai_state["mode"]
@@ -486,7 +499,7 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
                 top,
                 right,
                 bottom,
-                ctx.timestamp_ms,
+                ctx.forage_floor_ms,
                 ctx.self_state["rank"],
             )
             > 0
@@ -497,7 +510,7 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         top,
         right,
         bottom,
-        ctx.timestamp_ms,
+        ctx.forage_floor_ms,
     )
     if extras > RADAR_RESERVE_EXTRAS:
         return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES

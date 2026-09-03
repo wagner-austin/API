@@ -371,3 +371,26 @@ def test_fleet_host_resolves_from_the_environment(fake_env: FakeEnv) -> None:
     assert resolve_fleet_host() == FLEET_HOST_DEFAULT
     fake_env.set("TANKPIT_FLEET_HOST", "0.0.0.0")
     assert resolve_fleet_host() == "0.0.0.0"
+
+
+def test_a_child_that_exits_before_the_identity_read_leaves_no_record(
+    records: FakeRecordStore,
+    spawner: _FakeSpawner,
+) -> None:
+    """A spawn whose child died instantly records nothing to adopt.
+
+    The identity seam answers None for a pid nothing runs under, and
+    the manager treats that as "the run is already over" rather than
+    a failure to record. Until 2026-09-03 this branch was covered only
+    when a REAL spawned child happened to exit before the identity
+    read — the same nondeterminism class as the kill-cleanup race —
+    so the gate flickered between 100% and a miss with the timing.
+    """
+    _ = spawner
+    records.identities.clear()
+    manager = FleetManager()
+
+    row = manager.spawn(instance="alpha", account="", kills=0, seconds=60)
+
+    assert row["instance"] == "alpha"
+    assert records.files == {}
