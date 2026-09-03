@@ -1,0 +1,70 @@
+---
+title: Driving the Research — The Operating Page
+tags: [harness, operations, hpc3]
+related: [[harness-doctrine-search]], [[harness-population-search]], [[campaign-ledger]]
+sources: [scripts/search.py, scripts/panel.py, scripts/evolve.py, scripts/search_specs.py, tools/hpc3/runs/hpc3-rusted.json]
+fact_checked: 2026-09-03
+confidence: high
+---
+
+# Driving the Research — The Operating Page
+
+A fresh session drives everything below from
+`clients/RustedWarfareBot/`, via `poetry run`, against the hpc3
+workspace `../../tools/hpc3/runs/hpc3-rusted.json`. There are exactly
+FOUR canonical commands and no other submission path; each is
+kill-resumable (relaunch with identical arguments replays
+deterministically and fast-forwards off the cluster's completed work),
+because the session harness sweeps long-lived local processes and the
+transport to the cluster drops. Free partition only; the operator's
+zero-billing ruling stands.
+
+## The four commands
+
+1. **Knob search** (screening; the VH knob space is a measured local
+   optimum, so new runs of the `vh` spec need a reason):
+   `python -m scripts.search hpc3:../../tools/hpc3/runs/hpc3-rusted.json <spec> <name> <rng>`
+   -- specs live in `scripts/search_specs.py` (`vh`, `imp`); add a
+   regime by adding a validated spec there, never by editing constants.
+2. **Win-bar panel** (the ONLY instrument that adopts):
+   `python -m scripts.panel hpc3:<workspace> <batch> <control.doctrine> <arm-label> <arm.doctrine> <pairs> <difficulty>`
+   -- lays out fresh disjoint seeds itself, plays, converges its own
+   casualties, judges (pairs + margin), one command.
+3. **Population search** (the composition simplex):
+   `python -m scripts.evolve hpc3:<workspace> <name> <rng>`
+4. **Bespoke batches** (factorials, transfer panels): write the sweep
+   file with `used_seeds`/`seed_block`/`fresh_seeds` (never inline seed
+   picking), then `scripts.stage_payload` -> `hpc3.cli.stage` -> extract
+   -> `scripts.campaign_doc` -> `hpc3.cli.campaign` twice (the second
+   pass must print `0 submitted` -- that is the idempotency proof).
+
+## The operating posture (learned the hard way, all measured)
+
+- **Boundary relaunches, not babysitting.** Drivers die (harness
+  sweeps, transport drops); the cluster holds all state. Watch drains
+  with a persistent Monitor over ssh counts; when a boundary hits
+  (drain complete or drained-short), relaunch the same command. It
+  fast-forwards in seconds.
+- **Preemption is rent, not failure.** `PreemptMode=CANCEL` kills free
+  jobs instantly; `--requeue` is inert; `hpc3-campaign` re-run IS the
+  requeue and never resubmits finished or running members.
+- **Seed disjointness is law.** Panels allocate below 200k, search
+  rounds at 200k+, evolution generations at 500k+ -- all mechanical.
+  Never hand-pick seeds.
+- **Selection evidence is not confirmation.** Cross-round or
+  cross-generation consistency inside one search proved worthless twice
+  in one night (strike5000, flame2). Only untouched-seed panels dispose,
+  against the +4 win bar, then fresh replication (laws six and nine).
+- **Every verdict lands in three places** before the work is done: the
+  wiki log (dated entry), the campaign ledger (if a rung or question
+  moved), and a board post under this session's agent identity.
+
+## Where things live
+
+- Champion per rung: [[campaign-ledger]]. Doctrines: `doctrines/*.doctrine`
+  (committed record; `doctrines/search|evolve/` are gitignored run
+  artifacts). Scorecards: `runs/sweeps/<batch>/` locally, mirrored from
+  `/pub/wagnera3/rusted/runs/sweeps/<batch>/`. Judged by
+  `scripts.pairs` and `scripts.margin`.
+- Payloads freeze the working tree; every experiment's campaign doc in
+  `provenance/` names its payload, and digests are verified end to end.
