@@ -24,6 +24,10 @@ runs/
 doctrines/search/
 sweeps/search/
 
+# The population search's per-generation artifacts, same lifecycle.
+doctrines/evolve/
+sweeps/evolve/
+
 # Wiki source archive is the OPPOSITE: every artifact a wiki page
 # cites lives here and MUST be versioned, or citations break on a
 # fresh clone and source-path-exists fails wholesale. The root
