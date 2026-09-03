@@ -14,6 +14,16 @@ in six seconds.
 Under uniform spawn the optimal restock policy is staleness-seeking:
 standing stock accumulates wherever nobody has harvested lately, so
 the best ground is the NEAREST block with no live radar coverage.
+Spawn LOCATION is uniform; spawn COMPOSITION is not — the flag-11
+correction (2026-09-02, label-permutation over 106 field05 runs,
+p<0.017) found real per-block equipment-fraction bias, 0.33-0.76
+against a 0.565 global, a >2x yield spread. The frontier therefore
+carries a COMPOSITION PRIOR: among equally-stale candidates in the
+same distance ring, the block whose sighted containers ran richer in
+equipment wins. The prior is learned per session from unique
+container TILES (``ws.container_kind_sightings``) — fractions, never
+visit counts, so it cannot re-grow the atlas's dwell bias — and
+smoothed toward the global so unread blocks stay neutral.
 The frontier hop picks it, teleports (in-window blocks are stamped
 looked-at by sight -- 0x5A enumerates a window's containers
 radar-free, so every goal is genuinely unseen ground), and latches
@@ -72,6 +82,55 @@ attempts prove the block unlandable; the tombstone sends the circuit
 on and the TTL retries it later.
 """
 
+_EQUIPMENT_FRACTION_GLOBAL_MILLI = 565
+"""Corpus-global equipment fraction (0.565), in thousandths.
+
+The flag-11 correction's baseline (label-permutation over 106 field05
+runs, ``runs/analysis/equipment-spawn-clustering-20260902.json``):
+8,882 equipment tiles of 15,771 sensed container tiles. The
+composition prior smooths toward this value, so an unobserved block
+is neither favored nor shunned — it simply ranks by distance."""
+
+_COMPOSITION_PSEUDOCOUNT = 8
+"""Sightings' worth of pull toward the global fraction.
+
+Half a block's typical single-visit container haul: a block needs a
+few real sightings before its fraction moves off neutral, so one
+lucky equipment container cannot swing the circuit, while the
+measured signal (block fractions 0.33-0.76 at n>=40, >2x yield
+spread) dominates once a block has genuinely been read."""
+
+
+def _block_composition_milli(ws: WorldService) -> dict[tuple[int, int], int]:
+    """Smoothed per-block equipment fractions, in thousandths.
+
+    One pass over the dwell-unbiased unique-tile ledger
+    (``ws.container_kind_sightings``) aggregates each block's
+    (equipment, total) sighting counts; the returned fraction is
+    ``(equipment + K·P0) / (n + K)`` per block. Integer thousandths
+    keep the ranking exact and total — no float comparisons in the
+    sort key. A block absent from the result has zero sightings and
+    ranks at :data:`_EQUIPMENT_FRACTION_GLOBAL_MILLI` — neutral.
+
+    Args:
+        ws: The session's world service.
+
+    Returns:
+        ``(bx, by)`` block index → smoothed equipment fraction in
+        thousandths, for every block with at least one sighting.
+    """
+    counts: dict[tuple[int, int], tuple[int, int]] = {}
+    for key, is_fuel in ws.container_kind_sightings.items():
+        x_str, y_str = key.split(",")
+        block = (int(x_str) // BLOCK_TILES, int(y_str) // BLOCK_TILES)
+        equipment, total = counts.get(block, (0, 0))
+        counts[block] = (equipment + (0 if is_fuel else 1), total + 1)
+    smoothing = _COMPOSITION_PSEUDOCOUNT * _EQUIPMENT_FRACTION_GLOBAL_MILLI
+    return {
+        block: (1000 * equipment + smoothing) // (total + _COMPOSITION_PSEUDOCOUNT)
+        for block, (equipment, total) in counts.items()
+    }
+
 
 def _equipment_deficient(ctx: DecideCtx) -> bool:
     """Return True when the restock bars are not yet met.
@@ -124,7 +183,7 @@ def _covered_blocks(ctx: DecideCtx) -> set[tuple[int, int]]:
 
 
 def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tuple[int, int]]:
-    """Rank reachable unlooked-at block centers nearest-first.
+    """Rank reachable unlooked-at block centers by ring, then composition.
 
     A block qualifies when it holds no live coverage stamp, its
     center is passable, un-tombstoned, and not hostile ground, and
@@ -132,12 +191,23 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
     centers never qualify: the caller stamps them looked-at by
     sight before ranking.
 
+    Ranking is the COMPOSITION PRIOR (flag-11 correction,
+    2026-09-02): among candidates within the same block-width
+    distance ring, the higher smoothed equipment fraction wins;
+    across rings, nearer still wins. Staleness is untouched — every
+    candidate is already unlooked-at, and this function only runs on
+    an equipment-deficient tank (the caller's gate) — so the prior
+    discriminates purely among equally-stale, similarly-priced
+    ground. Trade priced when adopted: one ring spans up to ~16
+    tiles of teleport-cost spread against the measured >2x
+    equipment-yield spread between a field's worst and best blocks.
+
     Args:
         ctx: Decision context.
         terrain: Loaded terrain map (the caller checked presence).
 
     Returns:
-        Candidate ``(x, y)`` centers, nearest first.
+        Candidate ``(x, y)`` centers, best first.
     """
     covered = _covered_blocks(ctx)
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
@@ -146,8 +216,9 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
     claimed_blocks = {
         (gx // BLOCK_TILES, gy // BLOCK_TILES) for gx, gy in ctx.ws.fleet_forage_goals.values()
     }
+    composition = _block_composition_milli(ctx.ws)
     half = BLOCK_TILES // 2
-    ranked: list[tuple[int, int, int]] = []
+    ranked: list[tuple[int, int, int, int, int]] = []
     for by in range(_BLOCK_GRID):
         for bx in range(_BLOCK_GRID):
             if (bx, by) in covered or (bx, by) in claimed_blocks:
@@ -164,9 +235,10 @@ def _stale_block_centers(ctx: DecideCtx, terrain: TerrainMapProtocol) -> list[tu
             distance = max(abs(x - sx), abs(y - sy))
             if teleport_cost(sx, sy, x, y) > budget:
                 continue
-            ranked.append((distance, x, y))
+            fraction = composition.get((bx, by), _EQUIPMENT_FRACTION_GLOBAL_MILLI)
+            ranked.append((distance // BLOCK_TILES, -fraction, distance, x, y))
     ranked.sort()
-    return [(x, y) for _, x, y in ranked]
+    return [(x, y) for _, _, _, x, y in ranked]
 
 
 def _stamp_window_blocks_by_sight(ctx: DecideCtx) -> None:

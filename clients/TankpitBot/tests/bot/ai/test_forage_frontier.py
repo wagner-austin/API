@@ -362,6 +362,115 @@ def test_arrival_tombstones_the_goal_and_picks_fresh() -> None:
     assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (136, 104)
 
 
+def _seed_sightings(ws: WorldService, bx: int, by: int, *, equipment: int, fuel: int) -> None:
+    """Write unique-tile sightings into one block's ledger rows.
+
+    Args:
+        ws: The service whose ledger is seeded.
+        bx: Block index X.
+        by: Block index Y.
+        equipment: Equipment tiles to record.
+        fuel: Fuel tiles to record.
+    """
+    base_x, base_y = bx * BLOCK_TILES, by * BLOCK_TILES
+    for i in range(equipment):
+        ws.container_kind_sightings[f"{base_x + i},{base_y}"] = False
+    for i in range(fuel):
+        ws.container_kind_sightings[f"{base_x + i},{base_y + 1}"] = True
+
+
+def test_equipment_rich_block_wins_within_its_distance_ring() -> None:
+    """The composition prior: richer ground outranks nearer, in-ring.
+
+    Blocks (5,7) (center (88,120), chebyshev 20) and (4,6) (center
+    (72,104), chebyshev 28) share distance ring 1. Twelve sighted
+    equipment tiles against zero fuel put (4,6)'s smoothed fraction
+    at (12000+4520)/20 = 826 vs (5,7)'s neutral 565, so the farther
+    block wins its ring — the flag-11 correction's >2x yield spread
+    is worth up to a ring's width of extra teleport.
+    """
+    ws = WorldService()
+    _seed_sightings(ws, 4, 6, equipment=12, fuel=0)
+    ctx = _frontier_ctx(stale_blocks=((5, 7), (4, 6)), ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (72, 104)
+
+
+def test_a_nearer_ring_still_beats_a_richer_far_ring() -> None:
+    """Across rings distance rules: the prior never overrides cost class.
+
+    Block (6,5) (center (104,88), chebyshev 12, ring 0) is plain
+    ground; block (8,6) (center (136,104), chebyshev 36, ring 2) is
+    maximally equipment-rich. Ring 0 wins — composition discriminates
+    within a cost class, exactly the atlas-trap boundary the design
+    note drew.
+    """
+    ws = WorldService()
+    _seed_sightings(ws, 8, 6, equipment=14, fuel=0)
+    ctx = _frontier_ctx(stale_blocks=((6, 5), (8, 6)), ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (104, 88)
+
+
+def test_fuel_biased_ground_yields_its_ring_to_neutral() -> None:
+    """A block sighted fuel-heavy ranks BELOW an unread block in-ring.
+
+    The NEARER block (5,7) (chebyshev 20) carries fourteen fuel
+    sightings and zero equipment — smoothed fraction (0+4520)/22 =
+    205 — while the farther (4,6) (chebyshev 28, same ring) is
+    unread neutral at 565. The unread block wins: read-and-poor
+    ground loses to open questions at the same cost, and only the
+    prior can produce that order (pure distance would pick (5,7)).
+    """
+    ws = WorldService()
+    _seed_sightings(ws, 5, 7, equipment=0, fuel=14)
+    ctx = _frontier_ctx(stale_blocks=((5, 7), (4, 6)), ws=ws)
+
+    decision = plan_forage_frontier_hop(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected a frontier decision")
+    assert _target(decision["behavior"]["target_x"], decision["behavior"]["target_y"]) == (72, 104)
+
+
+def test_the_sighting_ledger_is_dwell_unbiased() -> None:
+    """Re-observing the same containers adds nothing to the ledger.
+
+    The atlas trap in one assertion: a tank staring at one block for
+    a thousand ticks must weigh exactly as much as one that glanced
+    once. The sweep is keyed by unique tile, so repeated
+    ``record_container_sightings`` calls over the same beliefs leave
+    the ledger — and therefore every block fraction — untouched.
+    """
+    from tankpit_bot.state.types import make_container_state
+
+    ws = WorldService()
+    world, _ = make_world(fuel=800, scanned=False)
+    world["containers"]["64,96"] = make_container_state(
+        x=64, y=96, is_fuel=False, volume=0, timestamp_ms=_NOW
+    )
+    world["containers"]["65,96"] = make_container_state(
+        x=65, y=96, is_fuel=True, volume=300, timestamp_ms=_NOW
+    )
+    ws.world_state = world
+
+    ws.record_container_sightings()
+    first = dict(ws.container_kind_sightings)
+    for _ in range(1000):
+        ws.record_container_sightings()
+
+    assert ws.container_kind_sightings == first
+    assert first == {"64,96": False, "65,96": True}
+
+
 def test_claimed_container_filter_prunes_and_passes_through() -> None:
     """Sibling-claimed containers vanish from ctx.filtered; others stay."""
     from tankpit_bot.state.types import make_container_state

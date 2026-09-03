@@ -123,6 +123,10 @@ class DecideCtx:
         self.forage_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, FORAGE_COVERAGE_TTL_MS)
         self.harvest_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, HARVEST_MEMORY_TTL_MS)
         self.scout_floor_ms: int = ws.knowledge_floor_ms(timestamp_ms, FERRY_LOOK_TTL_MS)
+        # The frontier's composition ledger sweeps beside the floors:
+        # both are per-tick belief digests the planner reads, and one
+        # call site keeps the sweep from running per question.
+        ws.record_container_sightings()
 
         self.config: AIConfigDict = ai_state["config"]
         # Rank-scaled fuel reserves ([[flag-triage-20260902]] row 6):

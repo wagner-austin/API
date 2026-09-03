@@ -5941,3 +5941,32 @@ Zero `TypeAlias`, zero `TYPE_CHECKING`, zero `.pyi`, zero `noqa`, zero `except I
 NOT audited and deliberately so: thin wrappers. [[coding-standards]] records that the 60 pure pass-throughs in this repo are Protocol implementations and domain naming, that telling those from a pointless alias needs intent rather than syntax, and that they must not be "fixed". That ruling stands.
 
 Gate: make check green — 6,900 tests, 100.00% statements AND branches.
+
+## [2026-09-03] update | The frontier learns composition: flag-11's finding becomes a ranking prior
+
+The flag-11 correction (2026-09-02) measured real per-block equipment
+COMPOSITION bias — fractions 0.33-0.76 against a 0.565 global,
+p<0.017, >2x yield spread — and left "a frontier composition prior
+when equipment-deficient" awaiting the operator's order, which
+arrived today. Built as designed on the board thread:
+
+- `ws.container_kind_sightings` — unique container TILES → kind,
+  swept once per tick from current beliefs beside the knowledge
+  floors. Dwell-unbiased by construction: a tile records once, so a
+  thousand ticks of staring weigh what one glance does — the exact
+  property whose absence killed the pickup atlas.
+- `_block_composition_milli` (forage_frontier.py) — smoothed per-block
+  equipment fraction, `(eq + K·P0)/(n + K)`, K=8 pseudocounts, P0 the
+  corpus global. Integer thousandths; unread blocks sit neutral.
+- `_stale_block_centers` ranks by `(distance_ring, -fraction,
+  distance)`, ring = chebyshev // 16: within one block-width of
+  travel cost the equipment-richer block wins; across rings, nearer
+  still wins. Staleness untouched; the frontier already runs only
+  when equipment-deficient, so no new gate.
+
+No committed data file — the corpus numbers are field05's; the
+runtime ledger re-derives the statistic on whatever field the bot
+stands in. Pins: in-ring richness beats distance, cross-ring distance
+beats richness, fuel-poor ground yields its ring to unread neutral,
+and the thousand-reobservation dwell test. Fleet-merging the ledger
+is noted as a future fleetshare candidate, not built.

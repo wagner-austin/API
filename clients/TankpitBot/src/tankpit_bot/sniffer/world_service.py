@@ -11,8 +11,6 @@ fresh instance per test (no global resets needed).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -26,6 +24,7 @@ from tankpit_bot.ledger.ammo_book import AmmoBookDict, make_ammo_book
 from tankpit_bot.ledger.damage_book import DamageBookDict, make_damage_book
 from tankpit_bot.ledger.fuel_book import FuelBookDict, make_fuel_book
 from tankpit_bot.ledger.service import LedgerService
+from tankpit_bot.resources import field_gif_path
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service_beliefs import WorldServiceBeliefsMixin
 from tankpit_bot.sniffer.world_service_movement import WorldServiceMovementMixin
@@ -182,6 +181,16 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         # centers, TTL'd so the frontier returns after the field has
         # had time to repopulate.
         self.forage_visited: dict[str, int] = {}
+        # Unique container-tile sightings, "x,y" -> is_fuel — the
+        # dwell-unbiased composition ledger behind the frontier's
+        # equipment prior (flag-11 correction, 2026-09-02: block
+        # equipment FRACTION is real map signal, p<0.017, while
+        # visit-count signals are the retired atlas's dwell trap). A
+        # tile records once and re-observation rewrites the same
+        # entry, so staring at a block adds nothing. Swept from the
+        # container beliefs once per tick
+        # (``record_container_sightings``).
+        self.container_kind_sightings: dict[str, bool] = {}
         self.movement_rejections: list[int] = []
         # The canonical account-identity model ([[tank-registry]] rank
         # number; state/types/self_account.py) — session-stable "who
@@ -510,25 +519,6 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
     # Private helpers
     # -----------------------------------------------------------------
 
-    def _find_field_gif(self, image: str) -> Path | None:
-        """Find the local GIF file for a field image name.
-
-        Args:
-            image: Field image filename from server (e.g. "field42.gif").
-
-        Returns:
-            Path to the local GIF file, or None if not found.
-        """
-        stem = image.removesuffix(".gif")
-        candidates = [
-            Path(f"{stem}_r.gif"),
-            Path(f"{stem}-r.gif"),
-        ]
-        for path in candidates:
-            if _test_hooks.path_exists(path):
-                return path
-        return None
-
     def _load_terrain_map_if_needed(self) -> _test_hooks.TerrainMapProtocol | None:
         """Load terrain map for the selected room.
 
@@ -545,7 +535,7 @@ class WorldService(WorldServiceRadarMixin, WorldServiceMovementMixin, WorldServi
         if image is None:
             log.warning("No registered room image for selected room %s", self.selected_room)
             return None
-        gif_path = self._find_field_gif(image)
+        gif_path = field_gif_path(image)
         if gif_path is None:
             log.warning("No local GIF found for %s (room %s)", image, self.selected_room)
             return None

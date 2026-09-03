@@ -39,6 +39,7 @@ class WorldServiceBeliefsMixin:
     mine_reveal_pending_ms: int
     fleet_sibling_tank_ids: set[int]
     last_foreign_human_seen_ms: int
+    container_kind_sightings: dict[str, bool]
 
     def knowledge_floor_ms(self, now_ms: int, ttl_ms: int) -> int:
         """Return a scan-stamp validity floor under the settled-knowledge law.
@@ -79,6 +80,26 @@ class WorldServiceBeliefsMixin:
             if tank["timestamp_ms"] > self.last_foreign_human_seen_ms:
                 self.last_foreign_human_seen_ms = tank["timestamp_ms"]
         return settled_knowledge_floor_ms(now_ms, ttl_ms, self.last_foreign_human_seen_ms)
+
+    def record_container_sightings(self) -> None:
+        """Merge current container beliefs into the composition ledger.
+
+        Every container presently believed in — radar, viewport, map
+        dot promotion — records its tile's KIND in
+        ``container_kind_sightings``. The ledger is keyed by tile, so
+        the thousandth tick spent beside a container adds exactly
+        what the first did: nothing. That dwell-unbiasedness is the
+        whole design (flag-11 correction, 2026-09-02) — the retired
+        equipment atlas counted visits and taught the bot to stare at
+        its own history; composition per unique tile is a property of
+        the MAP's spawn layout and cannot be inflated by attention.
+
+        Runs once per decide tick from the context build, beside the
+        knowledge floors — the same sweep-on-read idiom as the
+        foreign-human watermark.
+        """
+        for key, container in self.world_state["containers"].items():
+            self.container_kind_sightings[key] = container["is_fuel"]
 
     def mark_mine_reveal_pending(self, timestamp_ms: int) -> None:
         """Record that an own-tile mine hit awaits its reveal scan.
