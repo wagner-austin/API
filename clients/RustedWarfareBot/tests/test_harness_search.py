@@ -14,6 +14,7 @@ from rw_bot.harness.search import (
     SearchError,
     apply_moves,
     candidate_label,
+    effective_space,
     keep_top,
     paired_delta,
     sampled_pairs,
@@ -65,6 +66,24 @@ def test_moves_apply_onto_the_base_and_rename_the_variant() -> None:
 def test_a_typoed_knob_stops_the_search() -> None:
     with pytest.raises(SearchError) as caught:
         apply_moves(DEFAULT_DOCTRINE, (("riad", 5),))
+    assert caught.value.code == "RW-SEARCH-001"
+
+
+def test_the_effective_space_drops_the_base_values_mechanically() -> None:
+    """The vhsearch3 lesson: a value equal to the base's own is a no-op
+    arm that measures label-noise. DEFAULT_DOCTRINE runs every knob at 0,
+    so every 0 in this space must vanish, and a knob left with nothing
+    must vanish entirely rather than field an empty candidate list."""
+    space = {"flame": (0, 2, 4), "close": (0,), "raid": (6,)}
+    assert effective_space(space, DEFAULT_DOCTRINE) == {
+        "flame": (2, 4),
+        "raid": (6,),
+    }
+
+
+def test_the_effective_space_refuses_an_unknown_knob() -> None:
+    with pytest.raises(SearchError) as caught:
+        effective_space({"riad": (5,)}, DEFAULT_DOCTRINE)
     assert caught.value.code == "RW-SEARCH-001"
 
 

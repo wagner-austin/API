@@ -39,6 +39,7 @@ from rw_bot.harness.search import (
     Candidate,
     apply_moves,
     candidate_label,
+    effective_space,
     keep_top,
     paired_delta,
     sampled_pairs,
@@ -69,8 +70,14 @@ VARIANT_DIR = Path("doctrines/search")
 #: tech 1 per the ledger's champion stack) -- the champion's own values
 #: stay out so every candidate is a real move. Values must satisfy the
 #: doctrine codec's ranges; a bad one stops the search at round zero.
+#: Values equal to the current base doctrine's own are filtered out
+#: mechanically by ``effective_space`` before candidates are generated,
+#: so re-aiming BASE_DOCTRINE never fields a no-op arm again (vhsearch3
+#: did, and it survived round 0 on label-noise). The flame axis runs to 8
+#: because close0-flame4's adoption measured a strong upward gradient at
+#: 2 -> 4 and the cap sat exactly on the champion.
 SPACE: Mapping[str, tuple[int, ...]] = {
-    "flame": (0, 4),
+    "flame": (0, 2, 4, 6, 8),
     "close": (0, 6),
     "raid": (0, 6),
     "tech": (0, 2),
@@ -334,9 +341,11 @@ def run_search(
         host_hooks.write_line(text)
         lines.append(text)
 
+    base = parse_doctrine_lines(BASE_DOCTRINE.read_text(encoding="utf-8").splitlines())
+    space = effective_space(SPACE, base)
     survivors: tuple[Candidate, ...] = (
-        *single_moves(SPACE),
-        *sampled_pairs(SPACE, PAIR_CANDIDATES, rng_seed),
+        *single_moves(space),
+        *sampled_pairs(space, PAIR_CANDIDATES, rng_seed),
     )
     note(f"# search {name} (rng {rng_seed}): {len(survivors)} candidates")
     for round_index, pairs in enumerate(SCHEDULE):

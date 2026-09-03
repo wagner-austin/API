@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from psycopg import OperationalError
 from scripts.search import (
+    BASE_DOCTRINE,
     EXIT_BAD_USAGE,
     EXIT_OK,
     SCHEDULE,
@@ -22,6 +23,8 @@ from scripts.search import (
     run_search,
 )
 
+from rw_bot.harness.search import effective_space
+from rw_bot.policy.doctrine_file import parse_doctrine_lines
 from rw_bot.service import _test_hooks
 from rw_bot.service._test_hooks import Connection
 from tests.service_fakes import FakeConnection
@@ -80,7 +83,12 @@ def test_the_search_halves_toward_the_scripted_winner(tmp_path: Path) -> None:
         )
     finally:
         (_test_hooks.connect, _test_hooks.sleep) = saved
-    singles = sum(len(values) for values in SPACE.values())
+    # The driver filters the base doctrine's own values out of the space
+    # (the vhsearch3 no-op-arm lesson), so the expected field is counted
+    # off the SAME filtered space, and this test keeps tracking the
+    # mechanism when the champion is re-aimed.
+    base = parse_doctrine_lines(BASE_DOCTRINE.read_text(encoding="utf-8").splitlines())
+    singles = sum(len(values) for values in effective_space(SPACE, base).values())
     assert lines[0] == f"# search probe (rng 3): {singles + 6} candidates"
     # Round zero fields every candidate; round one fields half of them.
     assert f"# round 0: {singles + 6} arms, {SCHEDULE[0]} pairs" in lines[1]

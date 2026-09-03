@@ -64,6 +64,43 @@ def single_moves(space: Mapping[str, Sequence[int]]) -> tuple[Candidate, ...]:
     return tuple(((field, value),) for field in sorted(space) for value in space[field])
 
 
+def effective_space(
+    space: Mapping[str, Sequence[int]], base: Doctrine
+) -> dict[str, tuple[int, ...]]:
+    """Drop each knob's base value from its alternatives.
+
+    :func:`single_moves`' contract -- the caller keeps the base doctrine's
+    own values out of the space -- was maintained by hand until 2026-09-02,
+    when re-aiming the search at flame-close6 left ``close 6`` in the space
+    and vhsearch3 fielded a no-op arm: doctrine-identical to control, it
+    measured pure label-noise, survived round 0 on it, and burned sixteen
+    round-1 pairs. The filter is mechanical now; a re-aimed base can no
+    longer silently turn a candidate into a coin toss.
+
+    Args:
+        space: Alternative values per knob.
+        base: The champion the search perturbs.
+
+    Returns:
+        The space with every value equal to the base's own dropped, and
+        any knob with nothing left removed entirely.
+
+    Raises:
+        SearchError: ``RW-SEARCH-001`` when a knob is outside the
+            doctrine's integer fields -- a knob that cannot be perturbed
+            cannot be filtered either.
+    """
+    payload = dict(encode_doctrine(base))
+    filtered: dict[str, tuple[int, ...]] = {}
+    for field in sorted(space):
+        if field not in INT_FIELDS:
+            raise SearchError("RW-SEARCH-001", f"unknown doctrine knob: {field}")
+        values = tuple(value for value in space[field] if value != payload[field])
+        if values != ():
+            filtered[field] = values
+    return filtered
+
+
 def sampled_pairs(
     space: Mapping[str, Sequence[int]], count: int, seed: int
 ) -> tuple[Candidate, ...]:
@@ -167,6 +204,7 @@ __all__ = [
     "SearchError",
     "apply_moves",
     "candidate_label",
+    "effective_space",
     "keep_top",
     "paired_delta",
     "sampled_pairs",
