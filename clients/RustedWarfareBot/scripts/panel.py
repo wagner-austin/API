@@ -77,13 +77,23 @@ class PanelError(RwBotError):
         code: ``RW-PANEL-001`` when the next seed block would cross into
             the search's namespace, ``RW-PANEL-002`` when fewer than one
             pair is asked for, ``RW-PANEL-003`` when a relaunch's request
-            does not match the batch's existing job file.
+            does not match the batch's existing job file, ``RW-PANEL-004``
+            when a sweep file's job line carries no readable seed.
         message: Human-readable description of the refusal.
     """
 
 
 def used_seeds(jobs_dir: Path) -> set[int]:
     """Every seed any sweep file has ever named, committed or generated.
+
+    Disjointness needs the SEED COLUMN, not the whole job, and the seed
+    has been field two of every pipe format this project has ever
+    written: the current ``label|seed|doctrine|samples`` and the
+    pre-doctrine seven-field era still standing in the committed
+    historical sweeps (``aggression.txt`` and kin, which the strict job
+    parser rightly refuses to read as jobs). So this reads the one
+    column both eras agree on and refuses anything that breaks even
+    that.
 
     Args:
         jobs_dir: The sweep-file directory, searched recursively so the
@@ -95,14 +105,26 @@ def used_seeds(jobs_dir: Path) -> set[int]:
         The union of every job line's seed.
 
     Raises:
-        SweepError: Through :func:`parse_jobs`, on a malformed line --
-            a sweep file this cannot read is a file whose seeds cannot
-            be proven disjoint.
+        PanelError: ``RW-PANEL-004`` naming the file and line when a
+            non-comment line has fewer than four pipe fields or a
+            non-integer second field -- a line whose seed cannot be read
+            is a seed that cannot be proven disjoint.
     """
     used: set[int] = set()
     for path in sorted(jobs_dir.rglob("*.txt")):
-        for job in parse_jobs(path.read_text(encoding="utf-8").splitlines()):
-            used.add(job["seed"])
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped == "" or stripped.startswith("#"):
+                continue
+            parts = stripped.split("|")
+            if len(parts) < 4 or not parts[1].strip().isdigit():
+                raise PanelError(
+                    "RW-PANEL-004",
+                    f"{path.as_posix()}: cannot read a seed from job line "
+                    f"{stripped!r}; every format this project has written "
+                    "carries an integer seed as pipe field two",
+                )
+            used.add(int(parts[1]))
     return used
 
 
