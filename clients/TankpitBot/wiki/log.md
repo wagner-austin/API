@@ -6031,3 +6031,33 @@ Root fix for the defect that cost three HPC3 submissions, replacing the workarou
 **Verified:** `make check` GREEN — guard 0 violations, ruff clean, mypy clean on src+tests+scripts, 6907 tests, **100.00% statements AND branches**, every changed module at 100%. The rebuilt wheel carries all 47 data files.
 
 **Consequence for the cluster:** the hpc3 image contract needs no `assets` concept. An earlier proposal to bake the files into the image definition would have been a third workaround at the wrong layer.
+
+---
+## [2026-09-03] lift | The unmapped-command class now has a mechanism instead of a habit
+
+Three command bytes crashed the sim today — the keep-alive at 11,871 archived sends, the enter-game at 343, the inventory request at 4 — and each was found by a one-off sweep I happened to write. That is a habit, not a mechanism, and habits do not survive the session that had them.
+
+`make analyze-command-coverage` reads the archive, classifies every command byte a real client has ever sent against `SUPPORTED_KINDS`, and **exits nonzero** when one is unmapped. Not a report: an unmapped byte is a crash waiting for the first real client, so a green audit that mentioned it in passing would be worse than none.
+
+Current state, 343 sessions, 17 distinct bytes: **16 handled, 1 declared unmodelled (0x44), 0 crashing.** Five constants defined and never once sent: `CMD_PING`, `CMD_TOP10`, `CMD_ACTIVE_FORCES`, `CMD_ACTIVE_PLAYERS`, `CMD_NEAREST_ENEMY`.
+
+`_SUPPORTED_KINDS` became public `SUPPORTED_KINDS` in the same change, because it stopped being an implementation detail the moment something outside the server read it. A private copy of that set living in the audit would have drifted the first time a command was added — which is exactly the failure the audit exists to prevent, reproduced inside the audit.
+
+### What the audit is actually measuring
+
+Not the sim. **The corpus.** The three crashes share one cause: our bot is the only client that does not send those commands, so a sim validated against our own bot cannot see them however long it soaks. `runs/sniff/` is real-client traffic and had the answer the whole time; the audit is just the thing that reads it every time instead of when someone remembers to.
+
+That is why the default sweeps `runs/bot` AND `runs/sniff`. Auditing only our own runs would ask the bot whether it surprises us.
+
+### Three of my own habits the guards caught
+
+The guard rejected `value: object` in an annotation (the sibling module uses `JSONValue`) and two `assert "..." in output` weak assertions — both now compare against the formatter's own output, which cannot drift from it. And my first draft of the types module carried a `_unused_bool_guard` function whose only purpose was keeping an import alive: dead placeholder code, deleted before it reached the gate.
+
+Also, for the second time today, a heredoc collapsed `
+` into a literal newline and broke a string mid-file. Writing Python through shell heredocs is where my edits keep going wrong; the file-writing tools do not have this failure mode.
+
+### A coverage number that was not real
+
+`make check` reported 23 uncovered statements and 99.94%. A direct `pytest --cov` run on the same tree reported **100.00%**. The Makefile already documents why — several sessions work this repo at once and overlapping coverage runs corrupt each other, which is what per-run coverage paths exist to stop — and it re-ran green. Worth recording that the failure mode still shows up, because a spurious coverage failure reads exactly like a real one and the temptation is to go hunting for a gap that is not there.
+
+Gate: make check green — 6,938 tests, 100.00% statements AND branches.

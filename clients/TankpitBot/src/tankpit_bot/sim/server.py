@@ -52,7 +52,13 @@ from tankpit_bot.sim.wire_statements import (
 )
 from tankpit_bot.sim.world import SimWorldDict
 
-_SUPPORTED_KINDS = frozenset(
+#: Every client command kind the tick processor can route. PUBLIC
+#: because it is a contract, not an implementation detail: the
+#: command-coverage audit reads it to answer "does the sim survive
+#: everything a real client sends", and a private copy of this set
+#: living in the audit would drift the moment a command was added
+#: ([[client-commands]]).
+SUPPORTED_KINDS: frozenset[str] = frozenset(
     {
         "move",
         "shoot",
@@ -189,7 +195,7 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin)
             SimError: For unsupported command kinds, unknown tanks, or
                 dead harness-driven tanks.
         """
-        if command["kind"] not in _SUPPORTED_KINDS:
+        if command["kind"] not in SUPPORTED_KINDS:
             # The message names the gap rather than the build phase.
             # It used to read "sim step b handles move/shoot only ...
             # (laws 4-8 land in build step d)" — true in July 2026,
@@ -460,5 +466,6 @@ class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin)
 
 __all__ = [
     "CORPSE_WINDOW_TICKS",
+    "SUPPORTED_KINDS",
     "SimServer",
 ]

@@ -229,7 +229,7 @@ class SimServerQueriesMixin(SimServerSessionsMixin):
         #
         # Before it was handled at all, a heartbeat never reached this
         # router: ``queue_command`` raised ``SimError`` on any kind
-        # outside ``_SUPPORTED_KINDS``, so the first one from a REAL
+        # outside ``SUPPORTED_KINDS``, so the first one from a REAL
         # client — one per tick, forever — took the server down. Our
         # bot never sends one, which is exactly why a sim built
         # against our bot never met it ([[client-commands]]).

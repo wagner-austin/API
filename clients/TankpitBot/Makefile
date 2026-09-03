@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -60,6 +60,7 @@ help:
 	@Write-Host "  make decode                      replay a capture through real decoders"
 	@Write-Host "  make analyze-viewport            analyze viewport bounds in captures"
 	@Write-Host "  make sim-baseline                fresh one-generation sim corpus + fidelity diff"
+	@Write-Host "  make analyze-command-coverage    does the sim survive every command a REAL client sends?"
 	@Write-Host ""
 
 install:
@@ -450,6 +451,11 @@ sim-baseline:
 	@Write-Host ""
 	@Write-Host "==> sim-baseline (fresh one-generation sim corpus + fidelity diff)" -ForegroundColor Cyan
 	poetry run python -m scripts.build_sim_baseline $(ARGS); if ($$LASTEXITCODE -ne 0) { Write-Host "[sim-baseline] failed" -ForegroundColor Red; exit $$LASTEXITCODE }
+
+analyze-command-coverage:
+	@Write-Host ""
+	@Write-Host "==> analyze command coverage (does the sim survive what a REAL client sends?)" -ForegroundColor Cyan
+	poetry run python -m scripts.analyze_command_coverage; if ($$LASTEXITCODE -ne 0) { Write-Host "[command-coverage] an unmapped command byte would crash a hosted server" -ForegroundColor Red; exit $$LASTEXITCODE }
 
 analyze-recipient-policy:
 	@Write-Host ""

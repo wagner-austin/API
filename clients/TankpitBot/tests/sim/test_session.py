@@ -206,7 +206,7 @@ def test_a_page_client_heartbeat_does_not_kill_the_session() -> None:
 
     Every client frame lands in ``route_client_payload``, which decodes
     it and hands it straight to ``queue_command`` — and that raised
-    ``SimError`` for any kind outside ``_SUPPORTED_KINDS``. The
+    ``SimError`` for any kind outside ``SUPPORTED_KINDS``. The
     keep-alive decoded to ``other``, so a real client killed the
     server with its first one, seconds after connecting.
 

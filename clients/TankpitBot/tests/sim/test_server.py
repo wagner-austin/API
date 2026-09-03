@@ -199,7 +199,7 @@ def test_a_client_heartbeat_is_answered_with_silence_not_a_crash() -> None:
     """THE CRASH A REAL CLIENT WOULD HAVE HIT IN ITS FIRST 2 SECONDS.
 
     ``queue_command`` raises ``SimError`` for any kind outside
-    ``_SUPPORTED_KINDS``, and the client keep-alive decoded to
+    ``SUPPORTED_KINDS``, and the client keep-alive decoded to
     ``other`` — so a real browser client, which sends one per tick,
     took the server down immediately. Our bot has never sent one, so
     no sim session and no test ever met it.
