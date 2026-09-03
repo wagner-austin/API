@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run service up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes sim-baseline smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -49,7 +49,6 @@ help:
 	@Write-Host "  make track                       enemy tracking probe (wire vs JS truth)"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
-	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
 	@Write-Host "  make up                          THE fleet command: newest release -> image -> container; page on 27300"
 	@Write-Host "  make down                        drain every bot to the lobby, then stop the container"
 	@Write-Host "  make dev                         fleet manager on the HOT TREE, foreground (development only)"
@@ -283,31 +282,12 @@ bot: install
 	@Write-Host "==> bot (live HFSM)" -ForegroundColor Cyan
 	poetry run tankpit-bot
 
-# Long-running HTTP + SSE server the fiesta SPA drives via /api/tankbot/*.
-# Listens on 0.0.0.0:27100; the phone's Start Bot button POSTs /start
-# which kicks off a live tankpit session (headed Chromium in this
-# console's user session — needs a real display).
-#
-# Respawn discipline:
-#   * exit 0 = graceful (Ctrl+C caught in main OR the idempotency
-#     probe short-circuited because another instance is already
-#     serving). Break the loop; nothing to retry.
-#   * nonzero = actual crash. Retry after a 5 s cooldown, but cap
-#     at 3 consecutive crashes so a hard failure (port permanently
-#     bound by a foreign process, dependency import error) fails
-#     fast instead of spinning forever.
-service: install
-	@Write-Host ""
-	@Write-Host "==> service (long-running SPA-driven HTTP + SSE server)" -ForegroundColor Cyan
-	@Write-Host "  Listens on 0.0.0.0:27100; Ctrl+C to stop." -ForegroundColor DarkGray
-	$$crashCount = 0; while ($$true) { Write-Host ""; Write-Host "[service] Starting at $$(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Cyan; poetry run tankpit-bot-service; if ($$LASTEXITCODE -eq 0) { Write-Host "[service] Exited cleanly; done." -ForegroundColor Green; break }; $$crashCount = $$crashCount + 1; if ($$crashCount -ge 3) { Write-Host "[service] 3 consecutive crashes; giving up." -ForegroundColor Red; exit 1 }; Write-Host "[service] Crashed (exit=$$LASTEXITCODE); restarting in 5s ($$crashCount/3)" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
-
 # The fleet manager is the AI-operated control plane: it spawns
 # tankpit-bot child processes (one per instance namespace) and exposes
 # spawn/list/stop/remove over plain HTTP so an AI session can drive a
 # multi-bot fleet without owning any bot's terminal. Runs in a
-# user-owned terminal for the same reason as `make service` — harness
-# background tasks are killed after ~46 minutes.
+# user-owned terminal because harness background tasks are killed
+# after ~46 minutes.
 # Build a frozen, runnable release snapshot of the bot plus its two
 # path-dep libs at the CURRENT COMMIT (uncommitted work is excluded
 # by construction -- git archive reads HEAD). The fleet manager and

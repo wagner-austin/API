@@ -153,7 +153,7 @@ class TestAsyncMain:
         self,
         restore_service_hooks: None,
     ) -> None:
-        """A child's autostart task does not outlive the service.
+        """A child's session task does not outlive the service.
 
         The task owns a worker thread running a session. Leaving it
         scheduled after the site is gone would mean a process that has
@@ -161,7 +161,7 @@ class TestAsyncMain:
         orphan.
         """
         _ = restore_service_hooks
-        top_hooks.get_env = FakeEnv({"TANKPIT_BOT_AUTOSTART": "true"})
+        top_hooks.get_env = FakeEnv({})
 
         async def cancelling_build_site(
             app: web.Application, host: str, port: int
@@ -174,29 +174,6 @@ class TestAsyncMain:
 
         with pytest.raises(asyncio.CancelledError):
             await _async_main()
-
-    async def test_no_autostart_task_exists_without_the_flag(
-        self,
-        restore_service_hooks: None,
-    ) -> None:
-        """A standalone service schedules nothing and waits for POST /start."""
-        _ = restore_service_hooks
-        top_hooks.get_env = FakeEnv({})
-
-        async def cancelling_build_site(
-            app: web.Application, host: str, port: int
-        ) -> SiteRunnerProtocol:
-            _ = (app, host, port)
-            return _CancellingSite()
-
-        service_hooks.build_site = cancelling_build_site
-        recording = _RecordingBot()
-        service_hooks.build_bot_factory = _make_recording_bot_factory(recording)
-
-        with pytest.raises(asyncio.CancelledError):
-            await _async_main()
-
-        assert recording.runs == []
 
     async def test_wires_primitives_and_serves_until_stop(
         self,

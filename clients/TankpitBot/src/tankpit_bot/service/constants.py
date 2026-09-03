@@ -39,10 +39,10 @@ bind but NOT via ``netsh interface ipv4 show excludedportrange``.
 FLEET_CHILD_PORT_BASE = 27101
 """First port the manager may hand to a fleet child's service.
 
-One above :data:`SERVICE_PORT` so a standalone ``tankpit-bot-service``
-and a fleet child can coexist on one host without contending for a
-port. Children bind inside the manager's own container and are reached
-through it, so nothing in this range is ever published.
+One above :data:`SERVICE_PORT` so the default never collides with a
+child's, keeping a stray process on the base port from silently
+shadowing one. Children bind inside the manager's own container and are
+reached through it, so nothing in this range is ever published.
 """
 
 FLEET_CHILD_PORT_COUNT = 32

@@ -281,20 +281,18 @@ async def test_video_for_a_dead_instance_is_refused(
 
 
 @pytest.mark.asyncio
-async def test_a_spawned_child_is_told_to_autostart_on_its_own_port(
+async def test_a_spawned_child_is_given_its_own_service_port(
     fleet_client: TestClient[web.Request, web.Application],
     spawner: _FakeSpawner,
 ) -> None:
-    """The child environment carries both halves of the video contract.
+    """The child environment names the port its video will be served on.
 
-    A child serves ``/video`` only if it runs the service AND starts its
-    own session; the port makes it reachable and the autostart flag
-    makes it play. Either one missing yields a bot with no video, which
-    is exactly the state this whole change existed to end.
+    The port is what makes a child reachable at all; without it every
+    child would bind the same default and the relay would serve
+    whichever answered first.
     """
     port = await _spawn(fleet_client, "alpha")
 
-    assert spawner.envs[0]["TANKPIT_BOT_AUTOSTART"] == "true"
     assert spawner.envs[0]["TANKPIT_BOT_SERVICE_PORT"] == str(port)
 
 

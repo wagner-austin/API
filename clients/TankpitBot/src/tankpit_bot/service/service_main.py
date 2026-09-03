@@ -35,7 +35,7 @@ from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
-from tankpit_bot.service.config import resolve_autostart, resolve_idle_exit_seconds
+from tankpit_bot.service.config import resolve_idle_exit_seconds
 from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
@@ -155,13 +155,15 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
     app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
     site = await service_hooks.build_site(app, host, bound_port)
     # Started AFTER the site is up so ``/video`` is already answering
-    # when the first frame lands on the bus. A fleet child has nobody to
-    # call ``POST /start`` for it -- the manager decided by spawning it.
-    autostart = (
-        asyncio.create_task(_autostart_session(runner, stop_event.set))
-        if resolve_autostart()
-        else None
-    )
+    # when the first frame lands on the bus.
+    #
+    # Unconditional: every process running this function is a fleet
+    # child, and the manager already decided it should play by spawning
+    # it. Nobody is going to POST /start to it. The standalone service
+    # that once idled waiting for that call was deleted with
+    # ``make service`` (2026-09-03), and a flag whose false branch no
+    # caller can reach is configuration in name only.
+    autostart = asyncio.create_task(_autostart_session(runner, stop_event.set))
     idle_monitor = asyncio.create_task(
         exit_when_idle(
             runner,
@@ -175,8 +177,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
         await run_until_stopped(site, stop_event, name="Bot service")
     finally:
         idle_monitor.cancel()
-        if autostart is not None:
-            autostart.cancel()
+        autostart.cancel()
 
 
 async def _autostart_session(
@@ -228,7 +229,14 @@ async def _autostart_session(
 
 
 def main() -> None:
-    """Console entry point for ``tankpit-bot-service``.
+    """Entry point every fleet child runs.
+
+    The standalone ``tankpit-bot-service`` console script this once
+    backed was deleted along with ``make service`` (2026-09-03): its
+    only consumer was the fiesta SPA, and its other job — serving
+    video — is now done by fleet children, which run THIS function via
+    the child bootstrap in
+    :mod:`tankpit_bot.service._test_hooks.processes`.
 
     Loads the ``.env`` file via :data:`core_hooks.load_dotenv`,
     probes for an already-running instance via
@@ -237,11 +245,11 @@ def main() -> None:
     :data:`service_hooks.serve` (defaults to :func:`asyncio.run` around
     :func:`_async_main`).
 
-    The probe short-circuit makes the entry-point idempotent: a
-    second ``make service`` (or a double-tap of the phone's SERVER
-    button, once Phase C.2 lands) exits cleanly with a "already
-    running" log line instead of crash-looping on the port-bind
-    conflict that the previous respawn loop retried every 5 s.
+    The probe short-circuit is what keeps per-child ports honest: it
+    checks the port THIS process resolved, so two children never
+    mistake each other for a duplicate, and a child handed a port a
+    live sibling already holds exits cleanly instead of crash-looping
+    on the bind conflict.
 
     A ``KeyboardInterrupt`` unwinds cleanly — the aiohttp
     ``AppRunner``'s cleanup handles socket teardown.
@@ -249,7 +257,7 @@ def main() -> None:
     core_hooks.load_dotenv()
     if service_hooks.probe_existing_instance():
         log.info(
-            "tankpit-bot-service already responding on %s:%d; exiting idempotently.",
+            "A bot service is already responding on %s:%d; exiting idempotently.",
             SERVICE_HOST,
             resolve_service_port(),
         )

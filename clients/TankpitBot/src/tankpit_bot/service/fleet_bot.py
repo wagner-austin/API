@@ -127,11 +127,9 @@ def _child_environment(
         "TANKPIT_BOT_HUMAN_MIN_RANK": str(human_min_rank),
         # A fleet child runs the SERVICE, not the bare bot, so it
         # serves its own /video and /frame off the same tick loop the
-        # HUD already rides. Nobody will call POST /start on it -- the
-        # manager decided by spawning it -- so it starts its own
-        # session, and the port is explicit because two children
-        # sharing one would serve each other's video.
-        "TANKPIT_BOT_AUTOSTART": "true",
+        # HUD already rides. The port is explicit because two children
+        # sharing one would serve each other's video; the session
+        # starts on its own because that is what a fleet child is for.
         "TANKPIT_BOT_SERVICE_PORT": str(service_port),
     }
     if account:

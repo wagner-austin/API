@@ -33,7 +33,6 @@ psutil = "^7.0"
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer.core:main"
 tankpit-bot = "tankpit_bot.bot.entry:main"
-tankpit-bot-service = "tankpit_bot.service.service_main:main"
 tankpit-teleport-probe = "scripts.teleport_probe:main"
 tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
 tankpit-respawn-watch-probe = "scripts.respawn_watch_probe:main"

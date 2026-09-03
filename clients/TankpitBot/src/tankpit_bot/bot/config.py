@@ -1,12 +1,12 @@
 """Bot-launch configuration resolved from the process environment.
 
-Two settings — the tankpit target URL and the guest-vs-account login
-preference — need to be read the same way from every code path that
-launches a :class:`Bot`. Centralising the resolvers here keeps
-:mod:`tankpit_bot.bot.entry` (one-shot ``tankpit-bot`` CLI) and
-:mod:`tankpit_bot.service.service_main` (long-running
-``tankpit-bot-service``) in lockstep — an env-var-handling difference
-between the two used to be a silent divergence risk.
+Settings that launch a :class:`Bot` need to be read the same way from
+every code path that launches one. Centralising the resolvers here
+keeps :mod:`tankpit_bot.bot.entry` (the one-shot ``tankpit-bot`` CLI)
+and :mod:`tankpit_bot.service.service_main` (what every fleet child
+runs) in lockstep — an env-var-handling difference between the two used
+to be a silent divergence risk, and ``headless`` proved it by sitting
+as a hardcoded literal in BOTH until 2026-09-02.
 
 Both resolvers read through :func:`tankpit_bot._test_hooks.get_env`, so
 tests inject deterministic values without touching the real process
