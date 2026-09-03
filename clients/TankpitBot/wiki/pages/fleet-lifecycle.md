@@ -13,13 +13,13 @@ source_paths:
   - "src/tankpit_bot/service/fleet_manager.py"
   - "src/tankpit_bot/service/serving.py"
 source_git_blobs:
-  "src/tankpit_bot/service/fleet.py": "3bdbe67257c01d402b4a4f5dce81fb337e1363ff"
+  "src/tankpit_bot/service/fleet.py": "56d79de6501b66746acbe98912915e69844552b9"
   "src/tankpit_bot/service/fleet_control.py": "65a2cc9d7f01394ae5d6c2c98022ac4cfb831c43"
-  "src/tankpit_bot/service/fleet_record.py": "8cc5acfca6333d8c51ec46921d7b7dc5a6bfc898"
-  "src/tankpit_bot/service/fleet_adoption.py": "8de564766a3bb4a389c4df6996d9a637e0a86f11"
-  "src/tankpit_bot/service/fleet_manager.py": "f9f31cc03765d47e659993317d8a0ad02e4cf0cf"
+  "src/tankpit_bot/service/fleet_record.py": "5886d2a66b66087f421366aed051793f6154252c"
+  "src/tankpit_bot/service/fleet_adoption.py": "32d4aaea0a2968db120498eef69b8c8c6d090883"
+  "src/tankpit_bot/service/fleet_manager.py": "2fd3050bcc019edaad12f5874e89c83dc8192826"
   "src/tankpit_bot/service/serving.py": "5bc4eeb8e04acca18551ab9bb153b812f6b50dbf"
-fact_checked: "2026-09-01"
+fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
 ---
@@ -66,6 +66,13 @@ survive by design, and the **next** manager adopts them. Every spawn
 writes `runs/bot/<instance>/process.json`; every boot reads those
 records back, re-attaches to the processes still alive, and deletes
 the records of the ones that finished unwatched.[^5]
+
+Since 2026-09-03 the record also carries the child's engagement
+**doctrine** (so an adopted bot still reports what it fights under)
+and its **service_port** (so a restarted manager knows which loopback
+port each child's video/frame surface holds — without it,
+`_allocate_service_port` could hand a live child's port to a new
+spawn).
 
 A record names an **identity, not a pid**. Windows recycles pids, so a
 manager restarted minutes later could otherwise adopt an unrelated

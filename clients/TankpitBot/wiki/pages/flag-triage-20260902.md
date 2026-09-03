@@ -344,10 +344,14 @@ teardown exceeded its 30 s watchdog, forcing a nonzero exit that
 stops `make run` before its scorecard step. Flagged on the board;
 the artifacts are complete regardless.
 
-[^v1]: Journey-level, by TARGET block with the map-open-defer
-      duplicate collapsed. Nine blocks were LANDED in twice — landing
-      displacement across block edges, not re-targets.
-[^v2]: By lane: 11 `forage_frontier_hop` (adjacent-block exploration
+[^v1]: `runs/bot/bot-20260902-195506.events.jsonl`, "forage
+      frontier" AI-channel lines. Journey-level, by TARGET block with
+      the map-open-defer duplicate collapsed. Nine blocks were LANDED
+      in twice — landing displacement across block edges, not
+      re-targets.
+[^v2]: Same artifact, `container_pickup_dispatched` /
+      teleport `action_outcome` diagnostics paired by adjacency. By
+      lane: 11 `forage_frontier_hop` (adjacent-block exploration
       geometry), 7 `equipment_hop` (walk-blocked near stock served by
       design under the 2026-09-02 walk-territory law), 3 combat
       approaches, 2 fuel. The pathological class — clock-rot
