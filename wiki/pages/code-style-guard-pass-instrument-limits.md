@@ -89,7 +89,7 @@ The corpus holds 392 items. **No amount of retuning the run reaches significance
 
 The one comparison with real power does not favour the adapter. Termination: base 134/226 (59.3%) against candidate 121/226 (53.5%), 44 base-only against 31 candidate-only, net -13, exact p 0.165 and mid-p 0.135[^4]. **Not significant, but the point estimate is a regression** -- the fine-tune appears to make the model ramble more, which is the opposite of the intended effect and is the result most worth re-testing at a larger n.
 
-Read together: the adapter clearly learned this codebase's next-token distribution, and produced no detectable change in whole-file guard-pass.
+Read together: the adapter clearly learned this codebase's next-token distribution, and produced no detectable change in whole-file guard-pass[^11][^2].
 
 ## An operational hazard, and how it is contained
 
@@ -107,13 +107,13 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
 [^2]: `runs/sweep-v1/base.outcomes.jsonl` and `runs/sweep-v1/candidate.outcomes.jsonl` (226 rows each) with `runs/sweep-v1/comparison.json`; strata recomputed over the same rows.
 [^3]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `comparison_observations` -- counts are recorded beside rates deliberately, and the docstring states why.
 [^4]: `runs/sweep-v1/base.generation.jsonl` and `runs/sweep-v1/candidate.generation.jsonl` (the `finished` flag per item) joined to the outcome rows by `item_id`.
-[^5]: `finishable()` in the generation driver -- admits a prompt only when the tokenized reference fits the budget.
+[^5]: `runs/sweep-v1/base.generation.jsonl` -- 226 rows, one per prompt admitted out of the 392-item corpus. The driver that applied the budget filter is a scratchpad script rather than a repo path, so the selection is citable only through the artifact it produced, not through source.
 [^6]: `tools/code-style-eval/src/code_style_eval/core/checks.py` section `package_source_roots` and `checker_environment` -- MYPYPATH construction, and the docstring's stated limit on third-party imports.
-[^7]: AST import scan over the 287 generated files that parse, under `runs/sweep-v1/base/` and `runs/sweep-v1/candidate/`; top-level names filtered against `sys.stdlib_module_names` and the monorepo's 54 package roots.
+[^7]: AST import scan over `runs/sweep-v1/base/**/*.py` and `runs/sweep-v1/candidate/**/*.py` -- 287 of 452 files parsed, the rest being truncated and unparseable; top-level names filtered against `sys.stdlib_module_names` and the 54 package roots matching `<repo>/*/*/src/*`.
 [^8]: `tools/code-style-eval/pyproject.toml` section `[tool.poetry.group.corpus]` -- the declared set, and the comment recording why tensorflow is absent.
-[^9]: `runs/sweep-v3-nodeps/` against `runs/sweep-v1/` -- the same generated files scored before and after the group, with mypy failure buckets counted per arm.
+[^9]: `runs/sweep-v3-nodeps/comparison.json.runrecord.json` (label `sweep-v3-cap1536-reppen1.1`, 3 distributions recorded) against `runs/sweep-v1/comparison.json.runrecord.json` (label `sweep-v4-cap1536-reppen1.1-corpusdeps`, 19). The same generated files, scored before and after the group; mypy failure buckets counted per arm from the two `*.outcomes.jsonl` pairs.
 [^10]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `CORPUS_DISTRIBUTIONS`, `FINGERPRINT_DISTRIBUTIONS` and `scoring_fingerprint`.
 [^11]: `runs/sweep-v1-cap384/perplexity.json` -- `items_improved` 392, `items_worsened` 0, per-item NLL for both arms.
-[^12]: `tools/code-style-eval/Makefile` targets `lint` and `test` -- both run `poetry sync --with dev`.
+[^12]: `tools/code-style-eval/Makefile:9` and `tools/code-style-eval/Makefile:30` -- the `lint` and `test` targets, each running `poetry sync --with dev`.
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
