@@ -189,18 +189,25 @@ untracked — it is state, not configuration).
   rate with the counts beside it — three wins from three and thirty from
   thirty are both 1.0, and only one is evidence — plus extractor drops,
   median worth, unengageable targets and intercepts.
-- **Sizing:** one CPU, 2 GB, 45 minutes on `free`. A match measures about
-  twenty minutes and holds about 430 MB; the wall clock leaves room for a
-  cold boot on a slow node while staying under hpc3's sixty-minute preemption
-  threshold, which is what lets the project declare `checkpoint_steps: 0`
-  honestly — the per-match scorecard IS the checkpoint, and a preempted match
-  costs one match.
-- **Not yet submitted, and two things are still missing.** The project
-  declares no `image`, and the game tree is not staged — so `env_path`
-  `/opt/env` names a container path that no job currently enters. Both are
-  stated here rather than papered over with a placeholder digest; nothing has
-  been run against the cluster to see how the failure presents, so no claim
-  is made about which command reports it first.
+- **Sizing, read off `runs/hpc3-rusted.json` rather than described:** four
+  CPUs, 2 GB, 100 minutes on `free`, `requeue` on, `deterministic` on,
+  `checkpoint_steps: 0`. The zero is honest because the per-match scorecard
+  IS the checkpoint: a preempted match costs one match.
+- **Declares an image**, `/pub/wagnera3/rusted/images/v4/rusted.sif` pinned
+  by sha256 `b1eaaa2e`, binding `/pub/wagnera3`, with `env_path` `/opt/env`
+  inside it.
+- **Not yet submitted, and what is missing is the staged game tree**, not the
+  image. Nothing has been run against the cluster to see how that failure
+  presents, so no claim is made here about which command reports it first.
+- **This entry disagreed with the registry until 2026-09-02**, claiming one
+  CPU, 45 minutes and no image at all, against a workspace document committed
+  seven minutes earlier in `b81c7f91` that declared four CPUs, 100 minutes
+  and an sha256-pinned image. The prose was corrected against the registry,
+  which this file's own preamble names as the machine-readable half. Worth
+  keeping as a worked example: `test_committed_runs.py` passed throughout,
+  because it asserts that every registered project APPEARS here and that
+  declared repo paths exist, and nothing compares a sizing sentence against
+  the numbers it describes. Presence is enforced; agreement is not.
 
 ---
 
