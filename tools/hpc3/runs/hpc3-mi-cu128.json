@@ -1,0 +1,40 @@
+{
+  "cluster": "hpc3",
+  "host": "hpc3",
+  "root": "/pub/wagnera3",
+  "ledger": "ledger.jsonl",
+  "quiet_seconds": 1800,
+  "projects": {
+    "mi-cu128": {
+      "partition": "free-gpu32",
+      "gpu": {
+        "model": "RTX6000",
+        "count": 1
+      },
+      "cpus": 8,
+      "mem_gb": 64,
+      "minutes": 55,
+      "requeue": true,
+      "checkpoint_steps": 0,
+      "image": {
+        "path": "/pub/wagnera3/images/cu128-v1/abl-cu128.sif",
+        "sha256": "6d9ba0baac40b238b2e8b479c17ed5d08b055c7af6b000711888d6e22afc69b2",
+        "binds": [
+          "/pub/wagnera3"
+        ]
+      },
+      "env_path": "/opt/env",
+      "pinned_packages": {
+        "torch": "2.7.1+cu128",
+        "transformers": "4.46.3"
+      },
+      "deterministic": true,
+      "budget": {
+        "self_imposed_gpu_hours": 12.0,
+        "max_service_units": 0.0,
+        "charge_account": ""
+      },
+      "repo": "../../.."
+    }
+  }
+}
