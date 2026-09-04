@@ -1,6 +1,10 @@
 {
   "project": "code-style",
   "name": "qlora-qwen-v1",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
   "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 APP__DATA_ROOT=/pub/wagnera3/code-style/data APP__ARTIFACTS_ROOT=/pub/wagnera3/code-style/data/artifacts APP__RUNS_ROOT=/pub/wagnera3/code-style/data/runs APP__LOGS_ROOT=/pub/wagnera3/code-style/data/logs modeltrainer-cluster-train --payload /pub/wagnera3/code-style/payloads/code-style-qlora-v1.json --corpus-dir /pub/wagnera3/code-style/train-corpora --artifacts-dir /pub/wagnera3/code-style/artifacts/qlora-v1",
   "artifact": "/pub/wagnera3/code-style/artifacts/qlora-v1",
   "experiment": {
@@ -14,6 +18,8 @@
     "corpus_version": "code-corpus-v1",
     "holdout": "0.05",
     "test_split": "0.05",
-    "corpus_clean": "dirty-at-emission-not-citable"
+    "corpus_clean": "dirty-at-emission-not-citable",
+    "card": "A30",
+    "card_reason": "free-gpu-has-8-A100s-against-64-A30s;A30-is-Ampere-so-bf16-and-nf4-are-unchanged"
   }
 }
