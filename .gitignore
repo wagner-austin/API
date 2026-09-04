@@ -114,6 +114,41 @@ services/covenant-radar-api/data/external/kaggle_credit_card_fraud/
 services/covenant-radar-api/data/external/kaggle_sba_loans/
 services/covenant-radar-api/data/external/kaggle_risk_analytics/
 services/covenant-radar-api/data/external/kaggle_prosper_loans/
+
+# THREE GITHUB-SOURCED DATASETS THAT WERE NEVER ACTUALLY COMMITTED, and one
+# reference clone at the repo root. All four were recorded as GITLINKS -- bare
+# submodule pointers -- because each still contained a `.git` directory when it
+# was added, so `git add` stored a commit id instead of the files. There is no
+# `.gitmodules` in this repository, so those pointers name a commit nothing can
+# fetch: a fresh clone gets four empty directories, and every CI run since has
+# warned `fatal: No url found for submodule path 'amex_1st_place'` followed by
+# `The process 'git' failed with exit code 128`.
+#
+# They are ignored rather than committed. Two reasons, and the second is the
+# real one:
+#   * three of them no longer even contain a `.git`, so nothing here is a
+#     submodule any more -- the pointer is a fossil;
+#   * they are third-party research artifacts published with their own papers
+#     (PAKDD 2021 for the HAT set, Information Sciences 2024 for ComRisk), and
+#     redistributing 44 MB of somebody else's dataset from a PUBLIC repository
+#     is a licensing decision, not a cleanup. Committing them is still open --
+#     the `!.../data/external/**` rule above says the intent was to version
+#     them -- but it needs an owner who has read those licences.
+#
+# The commit each pointer named, kept here because removing the gitlinks is
+# what deletes it from the tree:
+#   amex_1st_place                 03b86f584bb61a34e31eb6343bd33ae753a92c02
+#     from https://github.com/jxzly/Kaggle-American-Express-Default-Prediction-1st-solution.git
+#   github_american_bankruptcy     8bcd8db3b432b1fa6d65e26753b5c9fc6567438d
+#   github_chinese_hat             843eb0a30059581e9153662f8544453ec1506a86
+#   github_chinese_smesd           a80524b3b67436cd2f74755f6ffa08a554ff2d02
+# The last three lost their `.git` before this was found, so their upstream
+# URLs are not recoverable from the checkout; each carries a README naming the
+# paper it accompanies.
+/amex_1st_place/
+services/covenant-radar-api/data/external/github_american_bankruptcy/
+services/covenant-radar-api/data/external/github_chinese_hat/
+services/covenant-radar-api/data/external/github_chinese_smesd/
 **/datasets/
 # But allow source code directories named "datasets"
 !**/src/**/datasets/
