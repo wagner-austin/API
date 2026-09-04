@@ -128,7 +128,8 @@ def resolve_human_rank_window() -> tuple[int, int]:
 def resolve_video_fps() -> float:
     """Return the live-view capture rate from ``TANKPIT_BOT_VIDEO_FPS``.
 
-    Default 30 fps, raised from 12 on 2026-09-03 because 12 was
+    Default 60 fps as of 2026-09-04, raised from 30, which was itself
+    raised from 12 a day earlier because 12 was
     UNDERSAMPLING THE GAME'S ANIMATIONS. Walking, a radar sweep and a
     projectile's travel are each many frames, and a histogram of frame
     arrivals from a live playing bot showed 71 of 148 inter-frame gaps
@@ -138,14 +139,27 @@ def resolve_video_fps() -> float:
     allowed to take them, so whatever happened in between was thrown
     away and the motion arrived stepped.
 
-    30 is affordable rather than aspirational. Measured in this
-    workspace's own container against six stacked 384x256 canvases all
-    repainting every frame (the worst case the real client can present):
-    the caster achieved 30.3/s and the page's own requestAnimationFrame
-    stayed at 59.8/s, versus a 60.0/s baseline with no caster at all. It
-    costs the page nothing. 60 fps was equally free on CPU and was not
-    taken because its worst case is 584 KB/s through a Cloudflare
-    tunnel, against 301 KB/s at 30.
+    30 WAS STILL THE FLOOR, and ``tankpit-stream-probe`` is what said
+    so. Measuring the public stream at 30 Hz: median inter-frame gap
+    28 ms, and 35 of 107 gaps sitting within tolerance of the 33 ms
+    sampling interval. A median FASTER than the interval means the game
+    is painting at roughly 35 fps while motion is happening, so a third
+    of the frames were still being taken as fast as the caster was
+    allowed rather than as fast as the content changed.
+
+    Affordable, measured in this workspace's own container against six
+    stacked 384x256 canvases all repainting every frame (the worst case
+    the real client can present): the caster achieved 59.0/s while the
+    page's own requestAnimationFrame stayed at 60.0/s, against a 60.0/s
+    baseline with no caster at all. It costs the page nothing at any of
+    the three rates.
+
+    The bandwidth objection that kept this at 30 was answered by
+    measurement too. That worst case is 584 KB/s, but it assumes every
+    canvas changing every frame, which the game does not do: the public
+    stream at 30 Hz measured 216 KB/s with a 0 per cent duplicate share.
+    Doubling the sample rate cannot double a bill that only motion
+    pays.
 
     The real cost is lower than either number because unchanged frames
     are no longer sent at all (see
@@ -159,7 +173,7 @@ def resolve_video_fps() -> float:
         ValueError: If the env value is set but not a number.
     """
     raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_FPS")
-    return float(raw) if raw is not None else 30.0
+    return float(raw) if raw is not None else 60.0
 
 
 def resolve_video_quality() -> float:

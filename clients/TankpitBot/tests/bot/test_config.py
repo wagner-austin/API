@@ -80,19 +80,19 @@ class TestResolveIdleExitSeconds:
 class TestResolveVideoSettings:
     """``resolve_video_fps`` / ``resolve_video_quality`` contracts (2026-07-29)."""
 
-    def test_fps_defaults_to_thirty(self) -> None:
-        """No env var yields the 30 fps capture default.
+    def test_fps_defaults_to_sixty(self) -> None:
+        """No env var yields the 60 fps capture default.
 
-        Raised from 12 on 2026-09-03. At 12 the caster's own 83 ms
-        interval WAS the observed frame rate for half of a live
-        session's frames, so the game's animations -- walking, a radar
-        sweep, a projectile crossing the screen -- were sampled slower
-        than they were drawn and arrived stepped.
+        12 -> 30 -> 60, each step taken because a measurement said the
+        previous one was still the floor. At 30 the public stream's
+        MEDIAN inter-frame gap was 28 ms, faster than the 33 ms
+        interval, with a third of gaps pinned at it -- the signature of
+        sampling slower than the source paints.
         """
         from tankpit_bot.bot.config import resolve_video_fps
 
         _test_hooks.get_env = FakeEnv({})
-        assert resolve_video_fps() == 30.0
+        assert resolve_video_fps() == 60.0
 
     def test_fps_override_wins(self) -> None:
         """A numeric override replaces the default."""
