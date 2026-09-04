@@ -24,6 +24,12 @@ from collections.abc import Generator, Mapping, Sequence
 import pytest
 from platform_core.json_utils import load_json_str
 from platform_core.run_record import Observation, decode_run_record
+from platform_ml.determinism import (
+    ATTENTION_MATH_ONLY,
+    ATTENTION_SETTING,
+    SPLIT_K_REMOVED,
+    SPLIT_K_SETTING,
+)
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli import cartridge_qa_benchmark as bench
@@ -278,7 +284,9 @@ class TestMeasureQaPlan:
 class TestRunRecord:
     def test_it_carries_the_question_set_experiment(self, tmp_path: pathlib.Path) -> None:
         """Not the loss experiment's, so the two cannot be differenced."""
-        record = bench.qa_run_record("tiny", corpus=tmp_path, device="cpu")
+        record = bench.qa_run_record(
+            "tiny", corpus=tmp_path, device="cpu", remove_split_k=False, math_attention=False
+        )
 
         assert record["experiment"] == QA_EXPERIMENT
         assert record["label"].startswith(
@@ -287,7 +295,23 @@ class TestRunRecord:
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):
-            bench.qa_run_record("no-such-plan", corpus=tmp_path, device="cpu")
+            bench.qa_run_record(
+                "no-such-plan",
+                corpus=tmp_path,
+                device="cpu",
+                remove_split_k=False,
+                math_attention=False,
+            )
+
+    def test_the_treated_arm_is_recorded_in_the_fingerprint(self, tmp_path: pathlib.Path) -> None:
+        """A treated record must not be mistakable for an untreated one."""
+        treated = bench.qa_run_record(
+            "tiny", corpus=tmp_path, device="cpu", remove_split_k=True, math_attention=True
+        )
+
+        settings = dict(treated["fingerprint"]["determinism"]["settings"])
+        assert settings[SPLIT_K_SETTING] == SPLIT_K_REMOVED
+        assert settings[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
 
 
 class TestTheCommandLine:
@@ -299,6 +323,8 @@ class TestTheCommandLine:
             str(tmp_path),
             "--device",
             "cpu",
+            "--controls",
+            "none",
             "--out",
             str(tmp_path / "nested" / "record.json"),
         ]
@@ -313,8 +339,26 @@ class TestTheCommandLine:
         assert restored["experiment"] == QA_EXPERIMENT
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
-        with pytest.raises(ValueError, match="--out"):
+        with pytest.raises(ValueError, match="--controls"):
             bench.main(["--plan", "tiny", "--corpus", str(tmp_path), "--device", "cpu"])
+
+    def test_the_output_path_is_still_required_once_the_arm_is_given(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The controls flag is parsed first, so keep the --out refusal covered."""
+        with pytest.raises(ValueError, match="--out"):
+            bench.main(
+                [
+                    "--plan",
+                    "tiny",
+                    "--corpus",
+                    str(tmp_path),
+                    "--device",
+                    "cpu",
+                    "--controls",
+                    "none",
+                ]
+            )
 
     def test_the_console_entry_point_exits_zero(self, tmp_path: pathlib.Path) -> None:
         saved = sys.argv

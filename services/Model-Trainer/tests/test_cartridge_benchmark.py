@@ -24,6 +24,12 @@ from collections.abc import Generator, Mapping
 import pytest
 from platform_core.json_utils import load_json_str
 from platform_core.run_record import decode_run_record
+from platform_ml.determinism import (
+    ATTENTION_MATH_ONLY,
+    ATTENTION_SETTING,
+    SPLIT_K_REMOVED,
+    SPLIT_K_SETTING,
+)
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
@@ -251,7 +257,12 @@ class TestRunRecord:
         second.mkdir()
 
         record = bench.cartridge_run_record(
-            "tiny", corpus=first, second_corpus=second, device="cpu"
+            "tiny",
+            corpus=first,
+            second_corpus=second,
+            device="cpu",
+            remove_split_k=False,
+            math_attention=False,
         )
 
         assert record["experiment"] == CARTRIDGE_EXPERIMENT
@@ -260,8 +271,51 @@ class TestRunRecord:
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):
             bench.cartridge_run_record(
-                "no-such-plan", corpus=tmp_path, second_corpus=tmp_path, device="cpu"
+                "no-such-plan",
+                corpus=tmp_path,
+                second_corpus=tmp_path,
+                device="cpu",
+                remove_split_k=False,
+                math_attention=False,
             )
+
+    def test_the_treated_arm_is_recorded_in_the_fingerprint(self, tmp_path: pathlib.Path) -> None:
+        """THE POINT OF THE FLAG.
+
+        A record measured under the controls has to be distinguishable from
+        one measured without them, or the cross-card comparison this exists
+        for would silently difference two different configurations. The
+        settings keys are written only when the control was applied, so their
+        presence is the evidence.
+        """
+        first = tmp_path / "alpha"
+        second = tmp_path / "beta"
+        first.mkdir()
+        second.mkdir()
+
+        treated = bench.cartridge_run_record(
+            "tiny",
+            corpus=first,
+            second_corpus=second,
+            device="cpu",
+            remove_split_k=True,
+            math_attention=True,
+        )
+        untreated = bench.cartridge_run_record(
+            "tiny",
+            corpus=first,
+            second_corpus=second,
+            device="cpu",
+            remove_split_k=False,
+            math_attention=False,
+        )
+
+        treated_settings = dict(treated["fingerprint"]["determinism"]["settings"])
+        untreated_settings = dict(untreated["fingerprint"]["determinism"]["settings"])
+        assert treated_settings[SPLIT_K_SETTING] == SPLIT_K_REMOVED
+        assert treated_settings[ATTENTION_SETTING] == ATTENTION_MATH_ONLY
+        assert SPLIT_K_SETTING not in untreated_settings
+        assert ATTENTION_SETTING not in untreated_settings
 
 
 class TestMain:
@@ -282,6 +336,8 @@ class TestMain:
                 str(second),
                 "--device",
                 "cpu",
+                "--controls",
+                "none",
                 "--out",
                 str(out),
             ]
@@ -290,6 +346,58 @@ class TestMain:
         assert code == 0
         restored = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
         assert restored["experiment"] == CARTRIDGE_EXPERIMENT
+
+    def test_the_controls_arm_is_required(self, tmp_path: pathlib.Path) -> None:
+        """Same reasoning as the second corpus: no default would be honest.
+
+        A cartridge record whose posture was guessed names a condition it may
+        not have run under, and the two arms produce different numbers -- that
+        is the whole reason the flag exists.
+        """
+        first = tmp_path / "alpha"
+        second = tmp_path / "beta"
+        first.mkdir()
+        second.mkdir()
+
+        with pytest.raises(ValueError, match="--controls"):
+            bench.main(
+                [
+                    "--plan",
+                    "tiny",
+                    "--corpus",
+                    str(first),
+                    "--second-corpus",
+                    str(second),
+                    "--device",
+                    "cpu",
+                    "--out",
+                    str(tmp_path / "r.json"),
+                ]
+            )
+
+    def test_an_unknown_controls_arm_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
+        first = tmp_path / "alpha"
+        second = tmp_path / "beta"
+        first.mkdir()
+        second.mkdir()
+
+        with pytest.raises(ValueError, match="both"):
+            bench.main(
+                [
+                    "--plan",
+                    "tiny",
+                    "--corpus",
+                    str(first),
+                    "--second-corpus",
+                    str(second),
+                    "--device",
+                    "cpu",
+                    "--controls",
+                    "split-k-and-attention",
+                    "--out",
+                    str(tmp_path / "r.json"),
+                ]
+            )
 
     def test_the_second_corpus_is_required(self, tmp_path: pathlib.Path) -> None:
         """There is no default that would be honest.
@@ -308,6 +416,8 @@ class TestMain:
                     str(tmp_path),
                     "--device",
                     "cpu",
+                    "--controls",
+                    "none",
                     "--out",
                     str(tmp_path / "r.json"),
                 ]
@@ -347,6 +457,8 @@ class TestInvocationForms:
             str(second),
             "--device",
             "cpu",
+            "--controls",
+            "none",
             "--out",
             str(tmp_path / "record.json"),
         ]

@@ -81,6 +81,7 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     qa_plan_label,
 )
 from model_trainer.core.services.model.cloze.score import score_cloze_items
+from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.corpus_cloze import build_items
 
 _log = get_logger(__name__)
@@ -90,7 +91,7 @@ CORPUS_FLAG = "--corpus"
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
 
-_FLAGS = (PLAN_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG)
+_FLAGS = (PLAN_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
 
 
 def build_question_set(
@@ -253,16 +254,30 @@ def measure_qa_plan(
     return tuple(observations), digest
 
 
-def qa_run_record(plan_name: str, *, corpus: pathlib.Path, device: str) -> RunRecord:
+def qa_run_record(
+    plan_name: str,
+    *,
+    corpus: pathlib.Path,
+    device: str,
+    remove_split_k: bool,
+    math_attention: bool,
+) -> RunRecord:
     """Pin determinism, run every arm, and record it.
+
+    The posture is an argument for the reason set out in
+    :func:`~model_trainer.cli.cartridge_benchmark.cartridge_run_record`: this
+    command could otherwise only ever observe the untreated arm, and the
+    question the controls exist to answer is a comparison between arms.
 
     Args:
         plan_name: Which plan to run.
         corpus: Directory of markdown documents.
         device: Device to measure on.
+        remove_split_k: Whether to take split-K out of cuBLASLt's options.
+        math_attention: Whether to restrict attention to the math kernel.
 
     Returns:
-        The record.
+        The record, its fingerprint carrying whichever controls were applied.
 
     Raises:
         KeyError: If the plan name is unknown, naming the plans that exist.
@@ -270,7 +285,8 @@ def qa_run_record(plan_name: str, *, corpus: pathlib.Path, device: str) -> RunRe
     """
     plan = require_cartridge_plan(_measurement_hooks.qa_plans(), plan_name)
     fingerprint: RunFingerprint = capture_run_fingerprint(
-        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+        device,
+        probe_determinism(device, remove_split_k=remove_split_k, math_attention=math_attention),
     )
     observations, digest = measure_qa_plan(plan, corpus=corpus, device=device)
     return run_record(
@@ -299,10 +315,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
+    remove_split_k, math_attention = require_control_arm(
+        cli_args.require_flag(parsed, CONTROLS_FLAG)
+    )
+
     record = qa_run_record(
         cli_args.require_flag(parsed, PLAN_FLAG),
         corpus=pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        remove_split_k=remove_split_k,
+        math_attention=math_attention,
     )
 
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))

@@ -83,6 +83,7 @@ from model_trainer.core.services.model.cartridge_plans import (
     plan_label,
     require_cartridge_plan,
 )
+from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 
 _log = get_logger(__name__)
 
@@ -92,7 +93,7 @@ SECOND_CORPUS_FLAG = "--second-corpus"
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
 
-_FLAGS = (PLAN_FLAG, CORPUS_FLAG, SECOND_CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG)
+_FLAGS = (PLAN_FLAG, CORPUS_FLAG, SECOND_CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
 
 
 def sweep_observations(sweep: Sequence[ReplicatedGain], floor: float) -> tuple[Observation, ...]:
@@ -249,17 +250,45 @@ def cartridge_run_record(
     corpus: pathlib.Path,
     second_corpus: pathlib.Path,
     device: str,
+    remove_split_k: bool,
+    math_attention: bool,
 ) -> RunRecord:
     """Pin determinism, run every arm, and record it.
+
+    WHY THE POSTURE IS AN ARGUMENT RATHER THAN FIXED AT ``none``. It was
+    fixed, at ``(False, False)``, and that made this command unable to run
+    the one arm it most needed. The first cross-card check -- an RTX 3090 Ti
+    against a V100, identical code, identical corpus digest, identical seeds
+    -- found every trained arm disagreeing by 1e-3 to 7e-3 while the
+    UNTRAINED arm, which does forward passes and no optimisation, agreed to
+    9.1e-08. That is float32 last-bit disagreement in the forward kernels,
+    integrated through training. The two controls in
+    :mod:`~model_trainer.core.services.model.control_arms` are the measured
+    fix for exactly those kernels, and this command could not reach them, so
+    the obvious next measurement was a code change rather than a run.
+
+    An argument, not a flip of the constant, for the reason
+    :func:`~model_trainer.cli.known_answer_probe.probe_determinism` states:
+    an instrument that imposes an intervention cannot measure it. The
+    ``none`` arm has to stay reachable or the treated numbers have nothing
+    to be compared against.
 
     Args:
         plan_name: Which plan to run.
         corpus: Directory of markdown documents to measure.
         second_corpus: Unrelated documents for the composition arm.
         device: Device to measure on.
+        remove_split_k: Whether to take split-K out of cuBLASLt's options.
+        math_attention: Whether to restrict attention to the math kernel.
+            On a 16 GB card this is the control that can turn a run that
+            fits into one that does not: the math path materialises the whole
+            ``[batch, heads, seq, seq]`` score matrix, so its cost grows with
+            the square of the plan's window.
 
     Returns:
-        The record.
+        The record. Its fingerprint carries whichever controls were applied,
+        so two records measured under different arms are distinguishable
+        without reading the command line that produced them.
 
     Raises:
         KeyError: If the plan name is unknown, naming the plans that exist.
@@ -268,7 +297,8 @@ def cartridge_run_record(
     """
     plan = require_cartridge_plan(_measurement_hooks.cartridge_plans(), plan_name)
     fingerprint: RunFingerprint = capture_run_fingerprint(
-        device, probe_determinism(device, remove_split_k=False, math_attention=False)
+        device,
+        probe_determinism(device, remove_split_k=remove_split_k, math_attention=math_attention),
     )
     observations, digest = measure_plan(
         plan, corpus=corpus, second_corpus=second_corpus, device=device
@@ -299,12 +329,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    remove_split_k, math_attention = require_control_arm(
+        cli_args.require_flag(parsed, CONTROLS_FLAG)
+    )
 
     record = cartridge_run_record(
         cli_args.require_flag(parsed, PLAN_FLAG),
         corpus=pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         second_corpus=pathlib.Path(cli_args.require_flag(parsed, SECOND_CORPUS_FLAG)),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        remove_split_k=remove_split_k,
+        math_attention=math_attention,
     )
 
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
