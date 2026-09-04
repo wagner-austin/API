@@ -32,6 +32,7 @@ fleet-preflight = "fleet.cli.preflight:entrypoint"
 fleet-run = "fleet.cli.run:entrypoint"
 fleet-watch = "fleet.cli.watch:entrypoint"
 fleet-cancel = "fleet.cli.cancel:entrypoint"
+fleet-bootstrap = "fleet.cli.bootstrap:entrypoint"
 
 [tool.mypy]
 python_version = "3.11"
