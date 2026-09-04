@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-surveillance",
+  "files": [
+    {
+      "name": "aclu-ccops-guiding-principles.md",
+      "sha256": "56126e6bafd8bd7a7262e0b03aa5c995293089224827b9be8cb7489bd4c88cd6",
+      "size_bytes": 5659
+    },
+    {
+      "name": "aclu-ccops-model-bill.md",
+      "sha256": "af2e7c90fbf2bb6d5de35b6927a493d63a4dd98923198d851b4fa934d0d973db",
+      "size_bytes": 6618
+    },
+    {
+      "name": "acpc-2025-apf-open-records-win.md",
+      "sha256": "c1e5e1fa1fff2eefc2117f3da7c96bbbb3dcfd3ba0457a78aa5d9bba4162bd1b",
+      "size_bytes": 5291
+    },
+    {
+      "name": "aliso-viejo-2025-fixed-lpr-camera-proposal.md",
+      "sha256": "e4707647818d3784c8192a67120fc03a7e50700c219e455e19b057893ae9d3f7",
+      "size_bytes": 8085
+    },
+    {
+      "name": "aliso-viejo-2026-police-services-ocsd.md",
+      "sha256": "bdc18e56bfbbb6a5468d1578e08fcd0f40e73f3264bc5ad6294453b5e88397af",
+      "size_bytes": 7549
+    },
+    {
+      "name": "alpr-failure-modes-to-wrongful-arrests-synthesis.md",
+      "sha256": "da853c4a98982164de82ce47ae7ca3f3aee5267d7600d8b1d21a4ee5a913b162",
+      "size_bytes": 12740
+    },
+    {
+      "name": "anaheim-2026-motorola-alpr-ocoa.md",
+      "sha256": "2bbd21ac2cae8f3a5f8a5c85b88858050baeea39137472498c0f2487ff6c8c95",
+      "size_bytes": 6303
+    },
+    {
+      "name": "ariel-2015-rialto-bwc-rct.md",
+      "sha256": "97da6a3f6dac552868c9287303d0f67881a62d4c0a3e3ed294757791b411c609",
+      "size_bytes": 4707
+    },
+    {
+      "name": "atlas-of-surveillance-methodology.md",
+      "sha256": "c124265060c7def2a7d48ae2928d875652025c1bcad76fb518a96854478a510b",
+      "size_bytes": 7105
+    },
+    {
+      "name": "axon-2019-ethics-board-alpr-report.md",
+      "sha256": "f394b218c8d10d4f37fcd016fd8203f1dcdec601db420fb237f7cbaa99de9c3b",
+      "size_bytes": 6841
+    },
+    {
+      "name": "axon-2022-ai-ethics-board-resignation.md",
+      "sha256": "715fafe383e40b3634cf2d5b97593461297a5efe5f284e2d5896d3b460c83b0b",
+      "size_bytes": 6854
+    },
+    {
+      "name": "axon-2025-fixed-alpr-launch-release.md",
+      "sha256": "bffa867c81792ddda52d578877390bc3c07f0946678659ba0249315733991e42",
+      "size_bytes": 5051
+    },
+    {
+      "name": "axon-beyond-cjis-security-whitepaper.md",
+      "sha256": "efcd78d54fbc278fd0b2ab5247b6fab2a1d3a373550b154c774c7885511053bf",
+      "size_bytes": 5804
+    },
+    {
+      "name": "bonta-2023-ca-alpr-bulletin.md",
+      "sha256": "806b2a7b344430b2db673384d060350d9cc8570952fac10b7975945bab6498fc",
+      "size_bytes": 4551
+    },
+    {
+      "name": "bonta-2025-el-cajon-alpr-lawsuit.md",
+      "sha256": "6cd8eab3b7dcb7b03d7eb3d5f6880c19c880419be7f1e7a38253f7386ff4cde7",
+      "size_bytes": 6832
+    },
+    {
+      "name": "buena-park-2026-pd-flock-transparency.md",
+      "sha256": "1b519089df2ace265028ded6f2874d2024ed63b23dee7c7cf76894d0177fb10b",
+      "size_bytes": 6836
+    },
+    {
+      "name": "buolamwini-2018-gender-shades.md",
+      "sha256": "451f1feff805f95cd179b6ce90c6271255b0b2891ea5c19196d008249be00a54",
+      "size_bytes": 4730
+    },
+    {
+      "name": "ca-civ-code-alpr-title-1-81-23.md",
+      "sha256": "938461bccfef9f3cbd3fa7e84ebc6bb29d7dff03232379f0222ca267cd6d2da6",
+      "size_bytes": 7185
+    },
+    {
+      "name": "ca-sb-274-2025-alpr-bill.md",
+      "sha256": "294edae0414067ef937849f7015928e825f02ea1a78a664c2ffcf412dd660983",
+      "size_bytes": 7701
+    },
+    {
+      "name": "ca-sb-34-2015-alpr-statute.md",
+      "sha256": "b53937b8db9df1b4da679b3dcde44f010988151e022d9fff9e5fd9ae182904c7",
+      "size_bytes": 5377
+    },
+    {
+      "name": "ca-state-auditor-2019-118-alpr.md",
+      "sha256": "c98689a2475b4c1f2e4b798306b6960b4ea7990368979c3cd7b550fdf824670d",
+      "size_bytes": 5591
+    },
+    {
+      "name": "cambridge-2025-flock-termination.md",
+      "sha256": "69de9f7178e3821d63324307da7ef97159343eab5856bdba3bd3f954e308fb4b",
+      "size_bytes": 4467
+    },
+    {
+      "name": "carpenter-2018-scotus-opinion.md",
+      "sha256": "c40efc649f1477ebbf871e803949cf206c6251b37267682841c15c514e9a5d4f",
+      "size_bytes": 5514
+    },
+    {
+      "name": "chatrie-2026-scotus-opinion.md",
+      "sha256": "d0cc5196a6633210a98c1cd4ef70bc13fa9be6a116c262cb3fe2e9d290843604",
+      "size_bytes": 6654
+    },
+    {
+      "name": "costa-mesa-2023-parking-lpr-report.md",
+      "sha256": "2a1756c2ba6b9650bfd9354552c462cde7bfca2a063fa3035fe1cf66bb16260c",
+      "size_bytes": 4082
+    },
+    {
+      "name": "costa-mesa-2024-alpr-lease-agreement-report.md",
+      "sha256": "177cad65592cc9ec954273a8619809a288456360be5e813e1ccefa4e9c4a5fae",
+      "size_bytes": 6160
+    },
+    {
+      "name": "costa-mesa-2026-07-21-public-comments.md",
+      "sha256": "cde5f7084c898d35f7b48394f39971fd0497ed1eecf2b5f760f2c1acf5be89d9",
+      "size_bytes": 6424
+    },
+    {
+      "name": "costa-mesa-2026-flock-alpr-council-report.md",
+      "sha256": "63fd6b84318a3f6cd4152ff31d54043788ebeb07022f2d28eabb1b057fff812e",
+      "size_bytes": 6760
+    },
+    {
+      "name": "costa-mesa-2026-pd-flock-transparency.md",
+      "sha256": "1ae78ae7631f76adc9c9514cab5b4366ae3ac1876f59f04c3bb70a6b3b0b7499",
+      "size_bytes": 6903
+    },
+    {
+      "name": "costa-mesa-flock-contract-attachments-26-315.md",
+      "sha256": "fff40d8f4679b4f4bc5febacb6e6dceaf438ed0cb89efea138a3aa521ff8323c",
+      "size_bytes": 7092
+    },
+    {
+      "name": "costa-mesa-pd-policy-429-alpr.md",
+      "sha256": "4c3eaa1188c7ed0637ce243dfdea9e938c5c9b077f962031940eb417aee71f12",
+      "size_bytes": 7828
+    },
+    {
+      "name": "culver-city-2025-alpr-data-sharing-limits.md",
+      "sha256": "16c1a81335470b4e4a8be6f3deea279544eba66b6bc45ebcfb4fab47f4cdc4fc",
+      "size_bytes": 4238
+    },
+    {
+      "name": "deflock-ilm-2026-wilmington-sting-center.md",
+      "sha256": "188b94a422e87dd5dd6a5c02452598bca3121a58e62576d1045c2b7b73713c52",
+      "size_bytes": 6956
+    },
+    {
+      "name": "eff-2020-rtcc-surveillance-compounded.md",
+      "sha256": "d222398c82d5185671c589dc61c91dc4121b3b05a4e98297879042efed4e4e4b",
+      "size_bytes": 7101
+    },
+    {
+      "name": "eff-2023-fusus-records-campaign.md",
+      "sha256": "d13d0c87d5f4f8fd42a8429da6ad7ee8a7e6b914d22038c15b4c5afe752bfa13",
+      "size_bytes": 6874
+    },
+    {
+      "name": "eff-2024-human-toll-alpr-errors.md",
+      "sha256": "e68f56c304359e62f876cb7d2574e1dfee2e026c6bc7a82032d3cd21637bea85",
+      "size_bytes": 7183
+    },
+    {
+      "name": "eff-2024-lucy-parsons-labs-apf-records-suit.md",
+      "sha256": "24316726f9d885ba3051b2eddcc0130f2029633e391ed14278a15f65b0d5ff75",
+      "size_bytes": 4371
+    },
+    {
+      "name": "eff-2026-free-surveillance-grant-funding.md",
+      "sha256": "36ffe5f047fbd4ae8ef623dbabd2beec3b19c584f8ca8df065e69c2dda112a32",
+      "size_bytes": 6275
+    },
+    {
+      "name": "epic-2026-schmidt-4th-cir-amicus.md",
+      "sha256": "a1ddd46ab19edc2308ea78957f40f0cb12085d1a3994eb1924233ceedacb8faf",
+      "size_bytes": 8576
+    },
+    {
+      "name": "eugene-2021-cahoots-program-analysis.md",
+      "sha256": "757cdb07ffc972b1940e5b2b1f3f728741c4853d33bcacd6fa8e018d8393e768",
+      "size_bytes": 5485
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include mass-surveillance-and-civil-liberties, sorted by filename, first 40",
+    "why": "composition partner 3 for the companion p-sweep (bc29dc3e); cross-gain measured -0.42 against me-public in the a67d6038 baseline",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-epi",
+  "files": [
+    {
+      "name": "association-and-causation.md",
+      "sha256": "1d80c685a1958c23a8667ac1101e87f56cb8159fa24aed075e17230e76212aa7",
+      "size_bytes": 8152
+    },
+    {
+      "name": "attack-rate.md",
+      "sha256": "d9ccf778f9aced25339e9c11ce93f82cbe06ec5090d2aa9a1a6ce5ad771a7621",
+      "size_bytes": 5700
+    },
+    {
+      "name": "attributable-risk-and-population-attributable-risk.md",
+      "sha256": "6fa45c733d436c598bf06095865656cac20557c7593fb4ff95a922f2c9d39093",
+      "size_bytes": 5916
+    },
+    {
+      "name": "bias-in-epidemiologic-studies.md",
+      "sha256": "8c5bbb8e4496df123926c27e2b6b49fb5646bf2eedd4b26c137a97c61882443e",
+      "size_bytes": 6663
+    },
+    {
+      "name": "case-control-studies.md",
+      "sha256": "7073e468d95bacc7d381ceb51a74f346c0b629959f42a39a4f2c4a9ee05d0915",
+      "size_bytes": 4502
+    },
+    {
+      "name": "case-fatality.md",
+      "sha256": "40991ca0f9897e5ff215bd75f8ebb987453b58bc0da6d4d95ad9ea65f8ec9811",
+      "size_bytes": 4151
+    },
+    {
+      "name": "case-reports-and-case-series.md",
+      "sha256": "79010e7cdaf54324c14b54f7280e015ee6d2569d9dbe885cf4930b1b4551db67",
+      "size_bytes": 4976
+    },
+    {
+      "name": "cohort-studies.md",
+      "sha256": "fd65d30a858cbe3de5b28d0bda8d9b12e43c7b715035fbb12913d5d667985fbd",
+      "size_bytes": 7134
+    },
+    {
+      "name": "common-vehicle-and-propagated-outbreaks.md",
+      "sha256": "2258cc76e19a1f0ba78e67cb400c26bcde6d59518483b432e3c194c2e7b19009",
+      "size_bytes": 5192
+    },
+    {
+      "name": "confounding.md",
+      "sha256": "b9b73550c7b3c8ef92112c0265a0e7ea3fa7e4b6a1d6c7ac03e18749819655fb",
+      "size_bytes": 5030
+    },
+    {
+      "name": "cornfield-1951-comparative-rates.md",
+      "sha256": "acfba45a03288071235439a9d551ee03dd3ff165616bfb6f2f7607cd046f8c49",
+      "size_bytes": 12696
+    },
+    {
+      "name": "cross-sectional-studies.md",
+      "sha256": "db7969bcced99a7da3609e278ba2c9531ae199c5838acee7226fbb45134fc2cc",
+      "size_bytes": 3717
+    },
+    {
+      "name": "dawber-1951-framingham-study.md",
+      "sha256": "3f8c73870de4f50c0a4d6fbbed3412ce3fe51395d398f513b13f269640b7e236",
+      "size_bytes": 11873
+    },
+    {
+      "name": "doll-hill-1950-smoking-carcinoma-lung.md",
+      "sha256": "c83b73169cdb6142bd7c4686121dc6e7d565f58e01528a520039c963c833090c",
+      "size_bytes": 14494
+    },
+    {
+      "name": "ecologic-studies-and-the-ecologic-fallacy.md",
+      "sha256": "1b1da6a311af3b89e16d44b0521a28b2bf288a6c35eff0ab19ba8fc92e961b2e",
+      "size_bytes": 5780
+    },
+    {
+      "name": "endemic-epidemic-and-pandemic.md",
+      "sha256": "07e0ad82ee2937fb15249d715a6eb979343d969834664e1524a1485529ea7570",
+      "size_bytes": 3866
+    },
+    {
+      "name": "epidemic-curves.md",
+      "sha256": "de016f927a1e1bd27c50c014d90902f7357cfd15cc68eaa725c9db071bbc0a5d",
+      "size_bytes": 4625
+    },
+    {
+      "name": "epidemiologic-triad.md",
+      "sha256": "dbed5739f366de9e62089e6239f9328bdc52648e14e16570fc5417c7dbf0ca01",
+      "size_bytes": 4216
+    },
+    {
+      "name": "epidemiology-study-guide-errata.md",
+      "sha256": "7bee7f1fb67c6bbfde7d6d4917757fa0121cb8df35efd681f387ee60b27a3c11",
+      "size_bytes": 9646
+    },
+    {
+      "name": "gap-statement-quantitative-baseline.md",
+      "sha256": "fe9ba46e7567de239dd57c32031702254d0b19ee01f8017a52f9ee3c74c77b48",
+      "size_bytes": 13717
+    },
+    {
+      "name": "genetic-epidemiology-and-gene-environment-interaction.md",
+      "sha256": "fe33edbb6513982eac8fb9d1fd0972026fddbe23b096b7526a5bb2c1355a8cc0",
+      "size_bytes": 5431
+    },
+    {
+      "name": "gordis-2014-epidemiology-5e.md",
+      "sha256": "2a887fcf8ad018139ec2d57e7259d3f52cbaa6b553a3e1613040cfd3624fc2e6",
+      "size_bytes": 4239
+    },
+    {
+      "name": "herd-immunity.md",
+      "sha256": "b04a3e70b7efdc7976918cc8bb98ef0f022eb3367caa55c16100d4d6a293130e",
+      "size_bytes": 3823
+    },
+    {
+      "name": "hill-1965-association-or-causation.md",
+      "sha256": "6228aa069175d8129d6c32b28d84825709c9be2d65a76dcb8639d3f1cbf9b519",
+      "size_bytes": 20732
+    },
+    {
+      "name": "hoffmann-2014-tidier-intervention-checklist.md",
+      "sha256": "ee1ab7e354abfff6efb4955c623b42b8cdab312fad184fcd91a423f48b74487a",
+      "size_bytes": 14821
+    },
+    {
+      "name": "holmes-1843-contagiousness-of-puerperal-fever.md",
+      "sha256": "127f8cbc3722774835ba623111ec7135320d11b1059b381d68b68fed46307b77",
+      "size_bytes": 15681
+    },
+    {
+      "name": "incidence-and-cumulative-incidence.md",
+      "sha256": "5ddf6c49046827b7925bd3e2610deda56681fd1cd629a99afbefdb7c0d8ec399",
+      "size_bytes": 5445
+    },
+    {
+      "name": "incidence-rate-and-person-time.md",
+      "sha256": "60074b372f5a6d56987629f4b091b6a5938be64df01a52eebf5b0efe6104890a",
+      "size_bytes": 4197
+    },
+    {
+      "name": "incubation-period-and-latent-period.md",
+      "sha256": "869830bddea991880b54b5153a70ea0471a35168dbc821038f0636f28abfad9d",
+      "size_bytes": 5392
+    },
+    {
+      "name": "jenner-1798-variolae-vaccinae.md",
+      "sha256": "6753bde16c1f2c3e098be378450dcccdda9ccc2d4c2f3d8063318248459657af",
+      "size_bytes": 10107
+    },
+    {
+      "name": "levels-of-prevention.md",
+      "sha256": "04fe59fe9950e83bc777ac081672acba2ba93c5a4854ca424467e191be118964",
+      "size_bytes": 6160
+    },
+    {
+      "name": "lind-1753-treatise-of-the-scurvy.md",
+      "sha256": "36ca4969fea679da36983005d1d7c7edd26305700f1abaf3204b95c6fcf4b1fb",
+      "size_bytes": 22228
+    },
+    {
+      "name": "lister-1867-antiseptic-principle.md",
+      "sha256": "4d479b4003cf0891d1a23ad847391093d44238403cde899bbcd53989b8c3be44",
+      "size_bytes": 14243
+    },
+    {
+      "name": "matching-in-case-control-studies.md",
+      "sha256": "7a23a5ec6f5309471408b942a86032f9e00c22062c06c5faaa8447bf6709e019",
+      "size_bytes": 5301
+    },
+    {
+      "name": "modes-of-disease-transmission.md",
+      "sha256": "9f06a7dd6c7e666712384a0a1ed40dc6ec64500253b8882f733a8b4521f9d70c",
+      "size_bytes": 4213
+    },
+    {
+      "name": "mortality-rate-and-specific-rates.md",
+      "sha256": "96b2a9f3d59a1c0b03a7667eecf620800e256a4158300c90a66b89bc5b6351d5",
+      "size_bytes": 4211
+    },
+    {
+      "name": "mrc-1948-streptomycin-tuberculosis-trial.md",
+      "sha256": "6943255c41b629a7b4d13b01ee8cb85e267dc39904fec76de6ab891c344fae15",
+      "size_bytes": 15935
+    },
+    {
+      "name": "odds-ratio.md",
+      "sha256": "af34c5153d8944f4dd2dd84b14c1d240c1b89f8c085beeac3635326f9ccae60c",
+      "size_bytes": 6442
+    },
+    {
+      "name": "outbreak-investigation-and-cross-tabulation.md",
+      "sha256": "d065095b806bd55a1c9c8043b16b29c1c45539e7509fc1eb7f24dc77736d807f",
+      "size_bytes": 5202
+    },
+    {
+      "name": "pare-1910-journeys-in-diverse-places.md",
+      "sha256": "fd16a27ac1b359d4cd0193d66a68f8851c7c52430c2ed553c00597c2c30b7583",
+      "size_bytes": 14332
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include epidemiology, sorted by filename, first 40",
+    "why": "the TRAINED COMPANION's corpus for the companion p-sweep -- held out from every composition by the CLI's own refusal, so composition robustness is measured against strangers, not memorised partners",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}
