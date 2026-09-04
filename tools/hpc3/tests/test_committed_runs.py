@@ -256,15 +256,52 @@ class TestTheResearchIndexNamesEveryProject:
         missing = sorted(name for name in _by_project() if f"`{name}`" not in text)
         assert missing == []
 
-    def test_every_declared_repo_exists(self) -> None:
-        """A path nobody checks is a path that is eventually wrong."""
+    def test_every_declared_repo_inside_this_monorepo_exists(self) -> None:
+        """A path nobody checks is a path that is eventually wrong.
+
+        Only the ones this repository can actually know about. ``turkic-lstm``
+        declares ``../../../../LSTM`` -- a SIBLING checkout, one level above
+        the monorepo root -- because that project genuinely lives outside this
+        tree, which ``docs/RESEARCH.md`` states plainly. Whether that directory
+        exists is a property of the machine, not of this repository, so a CI
+        runner that checks out only this repo will never have it.
+
+        This test asserted every path unconditionally until 2026-09-04, which
+        meant it passed on exactly one machine and failed the first time
+        anything else ran it. Narrowing it to in-repo paths keeps what it was
+        built to catch -- a typo'd or stale ``repo`` in a workspace document --
+        and stops claiming to check what it cannot see.
+        """
+        root = _RUNS.parents[2].resolve()
         absent = sorted(
             name
             for name, workspace in _workspaces().items()
             for config in workspace["projects"].values()
-            if not pathlib.Path(config["repo"]).is_dir()
+            if (resolved := pathlib.Path(config["repo"]).resolve()).is_relative_to(root)
+            and not resolved.is_dir()
         )
+
         assert absent == []
+
+    def test_a_repo_outside_this_monorepo_is_named_in_the_index(self) -> None:
+        """What the test above stops checking, this one refuses to lose.
+
+        An out-of-tree ``repo`` is unverifiable here, so the compensating
+        control is that the project must still be described in the research
+        index -- which is where a reader learns the checkout is expected
+        beside this one rather than inside it.
+        """
+        root = _RUNS.parents[2].resolve()
+        text = _INDEX.read_text(encoding="utf-8")
+        outside = [
+            name
+            for workspace in _workspaces().values()
+            for name, config in workspace["projects"].items()
+            if not pathlib.Path(config["repo"]).resolve().is_relative_to(root)
+        ]
+
+        assert outside != []
+        assert [name for name in outside if f"`{name}`" not in text] == []
 
     def test_the_index_states_which_surfaces_are_unregistered(self) -> None:
         """The entries no tool can see are the ones a reader most needs.
