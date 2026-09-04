@@ -18,6 +18,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS
+from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
 
 _FRONTMATTER = "---\ntitle: A page\ntags: [x]\n---\n"
 
@@ -99,3 +100,14 @@ class TestCartridgePlansHook:
     def test_the_default_is_the_declared_table(self) -> None:
         """Identity, not equality: a copy would let the two drift apart."""
         assert measurement_hooks.cartridge_plans() is CARTRIDGE_PLANS
+
+
+class TestQaPlansHook:
+    def test_the_default_is_the_declared_table(self) -> None:
+        """The production side of a hook every test replaces.
+
+        A suite that only ever installs a fake never runs the default, so the
+        one line that decides which plans production can reach goes uncovered
+        and could name the wrong table.
+        """
+        assert measurement_hooks.qa_plans() is QA_PLANS
