@@ -375,6 +375,36 @@ VARIED_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
 }
 
 
+#: Fixed for the reason the other experiment names are. The diverse sweep
+#: REUSES :class:`VariedCompanionSweepPlan` -- the knobs are identical and
+#: only the pool's construction differs (K corpora instead of K seeds of
+#: one corpus) -- but it is a different measurement answering a different
+#: question, so it records under its own experiment.
+DIVERSE_COMPANION_SWEEP_EXPERIMENT = "cartridge-diverse-companioned-composition"
+
+
+#: The diverse-pool plans. ``gpt2-companions-diverse`` matches
+#: ``gpt2-companions-varied`` on every field, so the two records isolate
+#: exactly one difference: whether the pool's members carry one voice or
+#: three. The varied record (n4 +51.0%, n8 +18.3%) and the single-companion
+#: record (n4 +44.6%, n8 +26.5%) are the baselines its cells subtract
+#: against.
+DIVERSE_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
+    "gpt2-companions-diverse": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+}
+
+
 def varied_companion_sweep_label(name: str, plan: VariedCompanionSweepPlan, *, digest: str) -> str:
     """Build the label identifying one varied-count sweep on one primary corpus.
 
@@ -499,6 +529,8 @@ __all__ = [
     "COMPANION_SWEEP_PLANS",
     "COMPOSITION_SWEEP_EXPERIMENT",
     "COMPOSITION_SWEEP_PLANS",
+    "DIVERSE_COMPANION_SWEEP_EXPERIMENT",
+    "DIVERSE_COMPANION_SWEEP_PLANS",
     "VARIED_COMPANION_SWEEP_EXPERIMENT",
     "VARIED_COMPANION_SWEEP_PLANS",
     "CartridgePlan",

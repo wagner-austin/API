@@ -26,6 +26,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.resources import decode_resources, encode_resources
+
 #: The recipe every dispatch runs. One string, in one place, so a dispatch and
 #: a local build cannot diverge.
 MAKE_TARGET = "check"
@@ -48,11 +50,23 @@ class ProjectConfig(TypedDict):
         expected_minutes: How long the suite takes on a node of the fleet's
             usual size. Used to size the lease, so a dispatch cannot hold a
             project's environment for longer than the work plausibly needs.
+        exclusive_resources: Fleet-wide things this suite needs exclusively,
+            by name. Empty for a self-contained suite, which is every project
+            whose cost is only CPU and memory.
+
+            DECLARED PER PROJECT BECAUSE IT IS A FACT ABOUT THE RECIPE.
+            ``packages/db``'s ``test`` target runs ``migrate-test`` before
+            vitest, and that applies migrations to a single shared
+            ``corvis_test``; the suite touches that database every time it
+            runs, on any node. A workspace-level or node-level declaration
+            could not say which SUITES contend, only which machines do, and
+            the machines are not the thing there is one of.
     """
 
     worker_ram_gb: float
     minimum_workers: int
     expected_minutes: int
+    exclusive_resources: tuple[str, ...]
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -99,6 +113,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "worker_ram_gb": project["worker_ram_gb"],
         "minimum_workers": project["minimum_workers"],
         "expected_minutes": project["expected_minutes"],
+        "exclusive_resources": encode_resources(project["exclusive_resources"]),
     }
 
 
@@ -144,6 +159,9 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         worker_ram_gb=worker_ram_gb,
         minimum_workers=minimum_workers,
         expected_minutes=expected_minutes,
+        exclusive_resources=decode_resources(
+            value.get("exclusive_resources"), field="project.exclusive_resources"
+        ),
     )
 
 

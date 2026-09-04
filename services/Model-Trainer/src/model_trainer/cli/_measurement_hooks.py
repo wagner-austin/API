@@ -27,6 +27,7 @@ from model_trainer.core.services.model.cartridge_plans import (
     CARTRIDGE_PLANS,
     COMPANION_SWEEP_PLANS,
     COMPOSITION_SWEEP_PLANS,
+    DIVERSE_COMPANION_SWEEP_PLANS,
     VARIED_COMPANION_SWEEP_PLANS,
     CartridgePlan,
     CompanionSweepPlan,
@@ -339,6 +340,22 @@ def _default_varied_companion_sweep_plans() -> Mapping[str, VariedCompanionSweep
 
 varied_companion_sweep_plans: VariedCompanionSweepPlansProto = _default_varied_companion_sweep_plans
 
+
+def _default_diverse_companion_sweep_plans() -> Mapping[str, VariedCompanionSweepPlan]:
+    """Production diverse-pool plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return DIVERSE_COMPANION_SWEEP_PLANS
+
+
+#: Same protocol as the varied table: the plan SHAPE is shared and only the
+#: pool's construction differs, which is a CLI concern, not a table one.
+diverse_companion_sweep_plans: VariedCompanionSweepPlansProto = (
+    _default_diverse_companion_sweep_plans
+)
+
 qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -374,6 +391,7 @@ __all__ = [
     "companion_sweep_plans",
     "composition_sweep_plans",
     "cost_shapes_hook",
+    "diverse_companion_sweep_plans",
     "forward_shapes",
     "ladder_shapes",
     "probed_shapes_hook",

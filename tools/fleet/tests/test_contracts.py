@@ -103,6 +103,7 @@ def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectC
         worker_ram_gb=1.1,
         minimum_workers=minimum_workers,
         expected_minutes=expected_minutes,
+        exclusive_resources=(),
     )
 
 

@@ -36,12 +36,15 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.errors import AppError, FleetErrorCode
 from platform_core.logging import get_logger, setup_logging
 
 from fleet.cli import _config
+from fleet.contracts.lease import describe_contention
 from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.project import ProjectConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import capacity, dispatch, probe, records
+from fleet.core import _test_hooks, capacity, dispatch, leases, probe, records
 
 _log = get_logger(__name__)
 
@@ -81,6 +84,7 @@ def choose(
             no node can take the work.
     """
     plan = require_project(loaded.workspace, project)
+    require_resources_free(loaded, plan)
     if named is not None:
         node = require_node(loaded.workspace, named)
         state = _probe(loaded, name=named, node=node)
@@ -91,6 +95,39 @@ def choose(
         candidates.append((name, declared, _probe(loaded, name=name, node=declared)))
     chosen, workers = capacity.first_fit(tuple(candidates), plan)
     return chosen, loaded.workspace["nodes"][chosen], workers
+
+
+def require_resources_free(loaded: _config.LoadedWorkspace, plan: ProjectConfig) -> None:
+    """Refuse before probing anything if a fleet-wide resource is held.
+
+    CHECKED BEFORE THE NODES, not among them. A resource there is one of in
+    the fleet makes EVERY node refuse for the same reason, so probing three
+    and collecting three identical refusals costs three round trips and
+    produces a message shaped like a capacity problem -- which sends the
+    reader looking for a bigger machine that would not have helped.
+
+    This is not the enforcement. :func:`fleet.core.leases.acquire` is, and it
+    re-checks through the same function, so a resource taken between here and
+    there is still refused.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        plan: The project being dispatched.
+
+    Raises:
+        AppError: With ``RESOURCE_HELD``, naming the resource, its holder,
+            and that no other node is an alternative.
+    """
+    contention = leases.contended_by(
+        loaded.leases,
+        wanted=plan["exclusive_resources"],
+        now_unix=_test_hooks.now(),
+    )
+    if contention is None:
+        return
+    blocking, names = contention
+    detail = describe_contention(blocking, names=names, now_unix=_test_hooks.now())
+    raise AppError(FleetErrorCode.RESOURCE_HELD, f"cannot dispatch: {detail}")
 
 
 def _probe(loaded: _config.LoadedWorkspace, *, name: str, node: NodeConfig) -> NodeState:
@@ -176,7 +213,7 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["choose", "entrypoint", "main"]
+__all__ = ["choose", "entrypoint", "main", "require_resources_free"]
 
 
 # Without this, `python -m fleet.cli.run` imports the module, runs nothing and

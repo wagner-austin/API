@@ -172,6 +172,51 @@ authoritative list every time anybody builds and a second copy drifts silently
 in the direction of staging too little — which surfaces as a lockfile error on
 a node and reads as the project's fault.
 
+## The other kind of lease: a thing there is one of
+
+A `(node, project)` lease serialises a project's environment on one machine.
+Some suites contend for something a node does not own. MCPs `packages/db` runs
+`migrate-test` before vitest, and that applies migrations to a single shared
+`corvis_test` — two of them deadlock on an `AccessExclusiveLock` whether they
+are on one machine or three. Distributing that suite moves the CPU contention
+off one box and leaves the database contention exactly where it was, and makes
+it worse: two nodes cannot see each other's processes, and a per-node capacity
+check admits both while neither node is short of anything.
+
+So a project may declare what it needs exclusively:
+
+```json
+"packages/db": {
+  "worker_ram_gb": 0.5, "minimum_workers": 4, "expected_minutes": 6,
+  "exclusive_resources": ["corvis_test"]
+}
+```
+
+The names are free strings, because what is exclusive is a fact about the
+world rather than about this package — `corvis_test` is one database because
+there is one, and no introspection here would discover that.
+
+**It is the same lease record**, not a second kind of claim. One thing to
+expire, one to release, no way for two to disagree about whether a run is
+still going.
+
+`RESOURCE_HELD` is a separate code from `LEASE_HELD` because the two send a
+reader in opposite directions. An environment is per node, so the answer is
+another node. A fleet-wide resource has no second copy, so the answer is to
+wait — and the refusal says so rather than leaving somebody hunting for
+capacity that could not have helped:
+
+```
+cannot dispatch: corvis_test is held fleet-wide by opus-weight-injection-0902
+(run tools-fleet-1788562637, tools/fleet on sedona), 570s remaining;
+there is one of it in the fleet, so no other node is an alternative
+```
+
+It is checked **before any node is probed**, by both `fleet-run` and
+`fleet-preflight`, through the same function `leases.acquire` enforces with.
+Probing three nodes to collect three identical refusals costs three round
+trips and produces a message shaped like a capacity problem.
+
 ## Cancelling
 
 `fleet-cancel` is the only command that kills anything, and it kills exactly

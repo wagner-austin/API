@@ -59,6 +59,7 @@ def _lease(
         session_id="acc774c0-3bc3-4cce-9dda-c7a12fb99519",
         acquired_unix=acquired,
         expires_unix=expires,
+        resources=(),
     )
 
 

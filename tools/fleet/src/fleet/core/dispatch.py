@@ -93,7 +93,10 @@ def open_lease(
         now_unix: Current time, whole seconds since the epoch.
 
     Returns:
-        The lease, sized at :data:`LEASE_SLACK` times the estimate.
+        The lease, sized at :data:`LEASE_SLACK` times the estimate and
+        carrying whatever fleet-wide resources the project declared. Read
+        from the plan rather than passed separately, so a caller cannot
+        dispatch a project while forgetting what it contends for.
     """
     return Lease(
         node=node,
@@ -103,6 +106,7 @@ def open_lease(
         session_id=session_id,
         acquired_unix=now_unix,
         expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
+        resources=plan["exclusive_resources"],
     )
 
 

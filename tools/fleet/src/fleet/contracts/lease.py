@@ -45,6 +45,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.resources import contended, decode_resources, encode_resources
+
 
 class Lease(TypedDict):
     """A claim on one project's environment on one node.
@@ -71,6 +73,13 @@ class Lease(TypedDict):
             wedged run -- and a wedge that holds an unexpiring lease converts
             one stuck suite into a project nobody can ever build again. A
             lease that outlives its holder is the thing an expiry is for.
+        resources: Fleet-wide exclusive resources this dispatch also holds,
+            from its project's declaration. Carried in the SAME record as the
+            environment claim rather than in a second kind of lease, so there
+            is one thing to expire, one thing to release, and no way for the
+            two to disagree about whether a run is still going. Empty for
+            every project whose suite is self-contained, which is most of
+            them. See :mod:`fleet.contracts.resources`.
     """
 
     node: str
@@ -80,6 +89,7 @@ class Lease(TypedDict):
     session_id: str
     acquired_unix: int
     expires_unix: int
+    resources: tuple[str, ...]
 
 
 def claims(lease: Lease, *, node: str, project: str) -> bool:
@@ -103,6 +113,52 @@ def claims(lease: Lease, *, node: str, project: str) -> bool:
         True when the lease holds exactly that node and project.
     """
     return lease["node"] == node and lease["project"] == project
+
+
+def contends(lease: Lease, *, wanted: tuple[str, ...]) -> tuple[str, ...]:
+    """Name the exclusive resources this lease would deny a new dispatch.
+
+    Distinct from :func:`claims`, and the distinction is the whole point of
+    the resource lease. ``claims`` asks about ONE NODE's copy of a project's
+    environment, and the answer to a refusal is "use another node". This asks
+    about something there is exactly one of in the fleet, and the answer is
+    "no node will help" -- so the two cannot share a code path or a message
+    without one of them being misleading.
+
+    Args:
+        lease: The lease that may be in the way.
+        wanted: The resources a new dispatch is asking for.
+
+    Returns:
+        The contended names, empty when there is no overlap.
+    """
+    return contended(lease["resources"], wanted)
+
+
+def describe_contention(lease: Lease, *, names: tuple[str, ...], now_unix: int) -> str:
+    """Render a resource refusal for the session that just hit it.
+
+    A separate rendering from :func:`describe_lease` because a reader who is
+    told only "held by X" will go looking for another node, and for a
+    fleet-wide resource that search cannot succeed. The line says so.
+
+    Args:
+        lease: The lease holding the resources.
+        names: The contended names.
+        now_unix: Current time, whole seconds since the epoch.
+
+    Returns:
+        One line naming the resources, the holder, and the fact that no other
+        node is an escape.
+    """
+    remaining = lease["expires_unix"] - now_unix
+    window = f"{remaining}s remaining" if remaining > 0 else f"expired {-remaining}s ago"
+    return (
+        f"{', '.join(names)} is held fleet-wide by {lease['agent']} "
+        f"(run {lease['run_id']}, {lease['project']} on {lease['node']}, session "
+        f"{lease['session_id']}), {window}; there is one of it in the fleet, so no other "
+        "node is an alternative"
+    )
 
 
 def is_expired(lease: Lease, *, now_unix: int) -> bool:
@@ -161,6 +217,7 @@ def encode_lease(lease: Lease) -> JSONObject:
         "session_id": lease["session_id"],
         "acquired_unix": lease["acquired_unix"],
         "expires_unix": lease["expires_unix"],
+        "resources": encode_resources(lease["resources"]),
     }
 
 
@@ -199,13 +256,16 @@ def decode_lease(value: JSONValue) -> Lease:
         session_id=require_str(value, "session_id"),
         acquired_unix=acquired_unix,
         expires_unix=expires_unix,
+        resources=decode_resources(value.get("resources"), field="lease.resources"),
     )
 
 
 __all__ = [
     "Lease",
     "claims",
+    "contends",
     "decode_lease",
+    "describe_contention",
     "describe_lease",
     "encode_lease",
     "is_expired",

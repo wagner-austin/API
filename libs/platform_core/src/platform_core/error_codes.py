@@ -413,6 +413,13 @@ class FleetErrorCode(ErrorCodeBase):
     LEASE_HELD = "LEASE_HELD"
     LEASE_NOT_HELD = "LEASE_NOT_HELD"
     LEASE_EXPIRED = "LEASE_EXPIRED"
+    # Distinct from LEASE_HELD, because the two send a reader in opposite
+    # directions. A held environment is per node and the answer is another
+    # node; a held fleet-wide resource -- the one `corvis_test` every MCPs
+    # database suite migrates -- has no second copy anywhere, so the only
+    # answer is to wait. One code would send half its readers hunting for
+    # capacity that could not have helped.
+    RESOURCE_HELD = "RESOURCE_HELD"
 
     # Toolchain -- what a node must already have to be dispatched to.
     # Measured 2026-09-04: `make` was present on one node of three.

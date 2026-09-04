@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.logging import get_logger, setup_logging
 
-from fleet.cli import _config
+from fleet.cli import _config, run
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import capacity, probe, records
@@ -110,6 +110,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     loaded = _config.load_workspace(parsed)
     project = cli_args.require_flag(parsed, PROJECT_FLAG)
+
+    # A fleet-wide resource is checked first, through the same function the
+    # dispatch enforces with. Without it this command would answer "yes,
+    # lavender, 12 workers" about a project that fleet-run will refuse for a
+    # reason no node can fix -- which is worse than not asking, because the
+    # reader now has a specific wrong answer.
+    run.require_resources_free(loaded, require_project(loaded.workspace, project))
 
     named = parsed.get(NODE_FLAG)
     if named is None:

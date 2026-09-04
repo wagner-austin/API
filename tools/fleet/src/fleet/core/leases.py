@@ -29,7 +29,9 @@ from platform_core.json_utils import dump_json_str, load_json_str
 from fleet.contracts.lease import (
     Lease,
     claims,
+    contends,
     decode_lease,
+    describe_contention,
     describe_lease,
     encode_lease,
     is_expired,
@@ -123,6 +125,43 @@ def find_by_run(path: pathlib.Path, *, run_id: str, now_unix: int) -> Lease | No
     return None
 
 
+def contended_by(
+    path: pathlib.Path, *, wanted: tuple[str, ...], now_unix: int
+) -> tuple[Lease, tuple[str, ...]] | None:
+    """Find the lease holding a fleet-wide resource a dispatch needs.
+
+    ONE FUNCTION WITH TWO CALLERS THAT REACT DIFFERENTLY, deliberately.
+    :func:`acquire` calls it and refuses; ``fleet-preflight`` and
+    ``fleet-run`` call it BEFORE probing any node and report. Both have to
+    answer the same question, and a second implementation of "is this
+    contended" is how the advisory answer and the authoritative one come to
+    disagree -- with the advisory one being the one people read.
+
+    The early call is not the enforcement. It exists because a fleet-wide
+    resource makes every node refuse for the same reason, so probing three
+    nodes to collect three identical refusals wastes the round trips and
+    produces a message that reads as a capacity problem.
+
+    Args:
+        path: The lease file.
+        wanted: The resources a dispatch is asking for. Empty asks nothing
+            and can never be contended, which is the path every
+            self-contained project takes.
+        now_unix: Current time, whole seconds since the epoch.
+
+    Returns:
+        The holding lease and the names it denies, or None when nothing is in
+        the way.
+    """
+    if not wanted:
+        return None
+    for lease in held_leases(path, now_unix=now_unix):
+        names = contends(lease, wanted=wanted)
+        if names:
+            return lease, names
+    return None
+
+
 def acquire(
     path: pathlib.Path,
     lease: Lease,
@@ -143,16 +182,30 @@ def acquire(
 
     Raises:
         AppError: With ``LEASE_HELD`` when another dispatch holds this node
-            and project, naming the holder and how long is left. Refused
-            rather than queued: a caller that wanted to wait can wait on the
-            message, and a queue inside a command-line tool is a background
-            process by another name.
+            and project, naming the holder and how long is left, or with
+            ``RESOURCE_HELD`` when one holds a fleet-wide resource this
+            dispatch needs. TWO CODES because the fixes differ and a reader
+            acts on them differently: an environment is per node, so the
+            answer is another node; a fleet-wide resource has no second copy,
+            so the answer is to wait. One code would send half its readers
+            hunting for capacity that would not have helped.
+
+            Refused rather than queued: a caller that wanted to wait can wait
+            on the message, and a queue inside a command-line tool is a
+            background process by another name.
     """
     holder = find_holder(path, node=lease["node"], project=lease["project"], now_unix=now_unix)
     if holder is not None:
         raise AppError(
             FleetErrorCode.LEASE_HELD,
             f"cannot dispatch: {describe_lease(holder, now_unix=now_unix)}",
+        )
+    contention = contended_by(path, wanted=lease["resources"], now_unix=now_unix)
+    if contention is not None:
+        blocking, names = contention
+        raise AppError(
+            FleetErrorCode.RESOURCE_HELD,
+            f"cannot dispatch: {describe_contention(blocking, names=names, now_unix=now_unix)}",
         )
     surviving = held_leases(path, now_unix=now_unix)
     _test_hooks.write_text(
@@ -218,6 +271,7 @@ def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
 
 __all__ = [
     "acquire",
+    "contended_by",
     "find_by_run",
     "find_holder",
     "held_leases",

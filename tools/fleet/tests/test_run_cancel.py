@@ -43,7 +43,9 @@ def _plan() -> ProjectConfig:
     Returns:
         The project.
     """
-    return ProjectConfig(worker_ram_gb=1.1, minimum_workers=2, expected_minutes=5)
+    return ProjectConfig(
+        worker_ram_gb=1.1, minimum_workers=2, expected_minutes=5, exclusive_resources=()
+    )
 
 
 class TestRunIdentity:
@@ -141,6 +143,7 @@ class TestRun:
             "session_id": "acc774c0-3bc3-4cce-9dda-c7a12fb99519",
             "acquired_unix": DEMO_NOW,
             "expires_unix": DEMO_NOW + 600,
+            "resources": (),
         }
 
     def test_a_second_dispatch_into_one_project_is_refused_before_anything_is_copied(

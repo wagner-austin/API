@@ -240,6 +240,7 @@ class TestTheWiring:
             "session_id": "acc774c0-3bc3-4cce-9dda-c7a12fb99519",
             "acquired_unix": DEMO_NOW,
             "expires_unix": DEMO_NOW + 600,
+            "resources": (),
         }
 
     def test_collecting_twice_closes_the_run_once(
