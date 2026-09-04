@@ -116,6 +116,29 @@ def test_load_data_bank_settings() -> None:
     assert cfg["max_file_bytes"] == 0
 
 
+def test_load_data_bank_settings_reads_the_environment() -> None:
+    """The four storage knobs come from the environment, not from literals.
+
+    They WERE literals, which meant data-bank-api's own ``railway.toml`` had
+    been setting ``DATA_ROOT``, ``MIN_FREE_GB`` and ``DELETE_STRICT_404``
+    into a loader that ignored all three -- the deployment declared a 2 GB
+    free-space floor and ran on 1. The defaults above are unchanged, so this
+    is the test that says the values are now reachable at all.
+    """
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://ignored")
+    env.set("API_UPLOAD_KEYS", "one")
+    env.set("DATA_ROOT", "/srv/bank")
+    env.set("MIN_FREE_GB", "2")
+    env.set("DELETE_STRICT_404", "true")
+    env.set("MAX_FILE_BYTES", "1048576")
+    cfg = load_data_bank_settings()
+    assert cfg["data_root"] == "/srv/bank"
+    assert cfg["min_free_gb"] == 2
+    assert cfg["delete_strict_404"] is True
+    assert cfg["max_file_bytes"] == 1048576
+
+
 def test_load_turkic_api_settings_defaults() -> None:
     env = make_fake_env()
     env.set("TURKIC_DATA_BANK_API_KEY", "secret")

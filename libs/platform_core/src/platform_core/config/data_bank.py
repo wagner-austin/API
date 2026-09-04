@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from ._utils import _optional_env_str, _require_env_csv, _require_env_str
+from ._utils import (
+    _optional_env_str,
+    _parse_bool,
+    _parse_int,
+    _parse_str,
+    _require_env_csv,
+    _require_env_str,
+)
 
 
 class Settings(TypedDict):
@@ -25,12 +32,24 @@ def load_settings() -> Settings:
     read_set = _require_env_csv("API_READ_KEYS") if read_keys is not None else upload_keys
     delete_set = _require_env_csv("API_DELETE_KEYS") if delete_keys is not None else upload_keys
 
+    # These four were LITERALS, and three of them are set by the service's
+    # own `railway.toml` -- DATA_ROOT, MIN_FREE_GB, DELETE_STRICT_404 -- so
+    # the deployment has been configuring a loader that never read them. It
+    # runs on MIN_FREE_GB=1 while its own manifest says 2.
+    #
+    # The literals become the defaults, so an environment that sets nothing
+    # gets exactly what it got before. What changes is that setting them now
+    # does something, and that `create_app` can be pointed somewhere
+    # writable: with `/data/files` unconditional, building the app on any
+    # host without a writable filesystem root raises PermissionError before
+    # a single route is reachable, which is why this service's app-factory
+    # test could only ever pass on Windows.
     return {
         "redis_url": redis_url,
-        "data_root": "/data/files",
-        "min_free_gb": 1,
-        "delete_strict_404": False,
-        "max_file_bytes": 0,
+        "data_root": _parse_str("DATA_ROOT", "/data/files"),
+        "min_free_gb": _parse_int("MIN_FREE_GB", 1),
+        "delete_strict_404": _parse_bool("DELETE_STRICT_404", False),
+        "max_file_bytes": _parse_int("MAX_FILE_BYTES", 0),
         "api_upload_keys": upload_keys,
         "api_read_keys": read_set,
         "api_delete_keys": delete_set,
