@@ -1,0 +1,44 @@
+# evolve2's graduate (g3m10, +4.137 at 8 pairs): the independent-rng
+# replication of evolve1, and it landed on the BYTE-IDENTICAL doctrine
+# -- same goals, same everything but the name -- despite a different
+# trajectory (peaked at g3 not g4, elite leaned hover where evolve1's
+# leaned heavy). The continuous-weight divergence was a flat direction
+# that vanishes in largest-remainder apportionment at five army slots.
+# Kept as evolve2's record; the artifact at the bar is evolve1-g4m2,
+# and clearing it clears both.
+name evolve2-g3m10
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
