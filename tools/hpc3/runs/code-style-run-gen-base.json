@@ -1,0 +1,16 @@
+{
+  "project": "code-style",
+  "name": "gen-v1-base",
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 modeltrainer-continuations --spec /pub/wagnera3/code-style/specs/code-style-gen-v1-base.json --out-dir /pub/wagnera3/code-style/generated/base --record /pub/wagnera3/code-style/results/gen-v1-base.json",
+  "artifact": "/pub/wagnera3/code-style/generated/base",
+  "experiment": {
+    "arm": "base",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B",
+    "adapter_run": "code-style-qlora-qwen-v1",
+    "decoding": "greedy-repetition-penalty-1.1",
+    "max_new_tokens": "1536",
+    "batch_size": "32",
+    "seed": "0",
+    "holdout": "code-corpus-v1.holdout-73b16b01"
+  }
+}

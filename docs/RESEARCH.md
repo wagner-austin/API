@@ -39,6 +39,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | ckpt steps |
 |---|---|---|---|---|---|---|---|---|
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | 0 |
+| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `65762bbd4d30` | yes | 500 |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
@@ -450,46 +451,76 @@ goes from harmless to −0.7612 on held-out text.
 
 ---
 
-## Not registered anywhere
-
-Real research, producing numbers that get compared, reachable by no tool.
-
 ### `code-style` — QLoRA on this monorepo, scored by this monorepo's own guards
 
-- **Repo:** this one. Corpus emitter `tools/code-corpus`, instrument
-  `tools/code-style-eval`, training through `services/Model-Trainer`'s
-  `hf_lm` backend.
-- **Runs:** local on the 3090 Ti, not on the cluster. The instrument IS this
-  repository's checkers — `ruff`, `mypy` and `monorepo_guards` scoped per
-  item through `scripts/guard.py --root` — so running it inside an image
-  would measure that image's copy of the rules rather than the repo's. That
-  is a reason to keep it local, not an omission.
+- **Repo:** this one. Corpus emitter `tools/code-corpus`, training and
+  generation through `services/Model-Trainer`, scoring through
+  `tools/code-style-eval`.
+- **Runs:** `runs/code-style-run-train.json`, then
+  `runs/code-style-run-gen-base.json` and `-candidate.json`. The order is not
+  enforced by a dependency: the generation arms load the adapter the training
+  run saved, so submitting one before the other finishes fails on a missing
+  metadata file rather than on anything subtler.
+- **Both commands read a committed document** rather than a configuration's
+  worth of flags — `runs/code-style-qlora-v1.json` for the training payload
+  and `runs/code-style-gen-v1-{base,candidate}.json` for the two arms — so
+  the arms provably differ in one field. Thirteen flags would be thirteen
+  chances to type one differently between two arms that must differ in
+  exactly one thing, which is the same argument `modeltrainer-cluster-train`
+  already makes for its payload.
+- **Scoring stays off the cluster, and that is a finding rather than a gap.**
+  The instrument IS this repository's checkers — `ruff`, `mypy` and
+  `monorepo_guards` scoped per item through `scripts/guard.py --root` — so
+  running it inside an image would measure that image's copy of the rules
+  rather than the repo's. The GPU half is what the cluster is for; the CPU
+  half is what the repository is for, and they meet at a directory of files
+  and a manifest whose shape is `platform_core.continuation_task`.
 - **Produces:** `code-corpus-v1.jsonl` plus its holdout; a QLoRA adapter
-  (NF4 storage, bfloat16 compute, double quantization); per-arm generation
-  manifests recording whether each completion terminated or hit the token
-  budget; per-arm outcome JSONL, one row per item per checker;
+  (NF4 storage, bfloat16 compute, double quantization); per-arm directories of
+  generated files with a manifest recording whether each completion terminated
+  or hit the token budget; per-arm outcome JSONL, one row per item per checker;
   `comparison.json` with a paired 2x2 table and McNemar mid-p; and
   `perplexity.json`.
-- **Compares:** base Qwen2.5-Coder-1.5B against the same model with the
-  adapter attached, on the same held-out files, two ways — token-level
-  perplexity masked to the continuation, and guard-pass rate. Per-item
-  outcomes throughout, so the contrast is paired rather than two rates
-  subtracted.
-- **Provenance:** a `RunRecord` sidecar beside `comparison.json` since
-  2026-09-02, in the shared vocabulary. Three of its six fingerprint axes are
-  empty BY CONSTRUCTION and say so: scoring is CPU work outside any image and
-  pins no determinism, so image, GPU and driver are unknown, and the
-  determinism posture is recorded as explicitly unpinned. Its packages axis
-  carries `ruff`, `mypy` and `platform-core`, because a guard-pass rate is
-  those checkers' verdict and a ruff release that adds a rule moves the
-  number with nothing about the models having changed. Observations carry
-  counts beside rates.
-- **What it does NOT carry, and this is the honest half.** The generation
-  configuration
-  (base model, adapter, decoding parameters) is covered only indirectly, by
-  the comparison's payload digest over the outcome files. And the corpus was
-  emitted while both source repositories were dirty, which the manifest
-  flags; no run built on it is citable until it is re-emitted clean.
+- **Compares:** the QLoRA adapter against **its own base** — the same weights
+  under the same NF4 quantization, with nothing attached — on the same
+  held-out files, two ways: token-level perplexity masked to the continuation,
+  and guard-pass rate. Per-item outcomes throughout, so the contrast is paired
+  rather than two rates subtracted. The control is deliberately NOT
+  `load_prepared_hf_lm_from_hub`, which loads unquantized on purpose;
+  comparing an NF4 adapter against bfloat16 weights would measure two changes
+  at once.
+- **Provenance:** a `RunRecord` from each of the three stages as of
+  2026-09-03. Generation's carries the decoding parameters' effect through a
+  digest over which items finished, and reads its package axis from the
+  ARTIFACT's metadata rather than from the model that loaded — so both arms
+  name the same libraries, including `peft`, which the base arm does not
+  execute but which decides what the candidate is. Scoring's still has three
+  empty fingerprint axes BY CONSTRUCTION, and says so: it is CPU work outside
+  any image and pins no determinism.
+- **What it does NOT carry, and this is the honest half.** The corpus was
+  emitted while both source repositories were dirty, which the manifest flags;
+  no run built on it is citable until it is re-emitted clean. And **every
+  number this project has produced so far was produced locally, before
+  registration.** Registration makes the next run reproducible; it does not
+  reach backwards.
+- **Results as of 2026-09-02, stated with their limits.** Perplexity moved
+  2.8327 to 1.9631 with 392 of 392 held-out items improving, and train/holdout
+  overlap was checked to be zero by path AND by content — the content check
+  is the one that matters here, because `scripts/guard.py` is byte-identical
+  across all 41 packages. Guard-pass showed NO detectable difference across
+  three sweeps (mid-p 0.84 on the last), and the combined rate sits near 2%,
+  which is a floor where the metric has almost no power to move: 226 items
+  gave 5 discordant pairs and a power of 0.21, where roughly 800 items would
+  be needed for 0.73. The first two sweeps were void for reasons recorded on
+  the board: a token budget that truncated 83% of completions, and before that
+  an unscoped guard invocation that gave every item the same verdict.
+- **Not novel, and the task spec that says otherwise is wrong.** A systematic
+  search found the core already published: ContextCov (arXiv 2603.00822)
+  compiles a repository's written conventions into executable AST and
+  architectural checks, and per-repository LoRA is the upper-bound baseline
+  in Code2LoRA (arXiv 2606.06492). The papers are on the personal wiki under
+  `computational-linguistics`. The defensible claim is fitness for purpose —
+  no public benchmark scores THIS repo's conventions — not originality.
 - **A claim in this entry was wrong for one day, and the correction is kept.**
   It said the training run emitted no `RunRecord` and recorded only a
   determinism posture. Training in fact captured a full `RunFingerprint` all
@@ -502,26 +533,18 @@ Real research, producing numbers that get compared, reachable by no tool.
   `bitsandbytes`, neither of which was recorded. Both are closed as of
   `92183bbd`. The lesson is the one this file already carries twice: check
   the artifact before writing what it contains.
-
-- **Results as of 2026-09-02, stated with their limits.** Perplexity moved
-  2.8327 to 1.9631 with 392 of 392 held-out items improving, and train/holdout
-  overlap was checked to be zero by path AND by content — the content check
-  is the one that matters here, because `scripts/guard.py` is byte-identical
-  across all 41 packages. Guard-pass showed NO detectable difference across
-  three sweeps (mid-p 0.84 on the last), and the combined rate sits near 2%,
-  which is a floor where the metric has almost no power to move. The first
-  two sweeps were void for reasons recorded on the board: a token budget that
-  truncated 83% of completions, and before that an unscoped guard invocation
-  that gave every item the same verdict.
-- **Not novel, and the task spec that says otherwise is wrong.** A systematic
-  search found the core already published: ContextCov (arXiv 2603.00822)
-  compiles a repository's written conventions into executable AST and
-  architectural checks, and per-repository LoRA is the upper-bound baseline
-  in Code2LoRA (arXiv 2606.06492). The papers are on the personal wiki under
-  `computational-linguistics`. The defensible claim is fitness for purpose —
-  no public benchmark scores THIS repo's conventions — not originality.
+- **A second claim was wrong for a week.** This entry said the pipeline
+  existed end to end. Training and generation were scratchpad scripts with
+  absolute Windows paths compiled into them, and the generator had
+  hand-rolled a model loader `load_prepared_hf_lm_from_handle` had already
+  provided for months. Both are closed as of `5bea978c`; the training half
+  needed no new code at all, only a payload document.
 
 ---
+
+## Not registered anywhere
+
+Real research, producing numbers that get compared, reachable by no tool.
 
 ### `sirius` — declared as an example, never run
 
@@ -636,6 +659,28 @@ hpc3-image --spec specs/<name>-image.json --out-dir … --image-name <name>
 #    scp the rendered files AND the first-party wheels into the image directory
 hpc3-image-build --config … --project <name> --name … --image-dir … --image-name <name>
 ```
+
+**STEPS 0-3 ASSUME THE PROJECT NEEDS ITS OWN IMAGE, AND MOST DO NOT.** A
+project whose workload is an existing package's CLI needs that package's
+image REBUILT from a newer commit, not a new image. `code-style` was
+registered on 2026-09-03 by rebuilding `specs/abl-image.json` -- the image
+`mi` already uses -- against fresh first-party wheels, and it declares the
+result. The recurring job is a version bump; the four-step flow above is the
+first-image case, which happens once per image family and not once per
+project.
+
+For a version bump: build the five wheels, edit `git_commit` in the spec
+(which is what every version bump has actually done -- see
+`tools/hpc3/wiki/pages/capture-source-drift.md`), render, stage, build.
+`hpc3-image-capture` will NOT help: it probes the image, so re-running it
+reproduces the environment the last image sealed rather than the repository's
+current state.
+
+**A rename in any package that spec names is a change to the image recipe.**
+`required_symbols` and `smoke_commands` cite Python module paths, and
+`tools/hpc3/tests/test_committed_specs.py` re-checks them; run `make check`
+in `tools/hpc3` after moving anything across a module boundary, rather than
+learning it from a `%post` failure twenty-five minutes into a build.
 
 Then, and only then:
 

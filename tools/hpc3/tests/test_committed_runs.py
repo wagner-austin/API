@@ -293,11 +293,29 @@ class TestEveryCommittedSubmissionResolves:
         assert sorted(named - set(_by_project())) == []
 
     def test_every_run_document_resolves(self) -> None:
+        """Resolution IS the assertion: ``resolve_run`` raises rather than returns.
+
+        THE PROJECT LIST THAT USED TO BE HERE WAS THE THIRD HARDCODED
+        INVENTORY IN THIS FILE, and the two above it were derived on
+        2026-09-03 precisely because "registering a project meant editing this
+        file, and the edit was discovered by meeting a red test rather than by
+        following a step". This one was left, so registering ``code-style``
+        met it as exactly that -- a fourth surprise failure, in the file whose
+        own docstring says a seventh project needs no edit here.
+
+        What the list was standing in for is stronger stated as a property,
+        and is asserted below: every document resolves against the workspace
+        declaring the project it NAMES, and comes back naming that same
+        project. A set comparison could not catch a document that resolved to
+        the wrong project as long as some other document named the right one.
+        """
         owners = _by_project()
         runs = [(p, d) for _, p, d in _submissions() if "command" in d and "members" not in d]
         resolved = [resolve_run(owners[project], doc)["project"] for project, doc in runs]
-        assert sorted(set(resolved)) == ["floor", "mi", "turkic-lstm"]
-        assert len(resolved) == len(runs)
+
+        # A rule that silently resolves nothing passes forever.
+        assert runs != []
+        assert resolved == [project for project, _ in runs]
 
     def test_every_sweep_document_resolves_and_expands(self) -> None:
         owners = _by_project()
