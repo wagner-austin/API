@@ -116,6 +116,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 eco_covered=1,
                 own_covered=3,
                 foe_covered=2,
+                rival_army=8200,
             ),
         ),
         (Loss(frame=7, unit_id=1, type_name="c_tank", x=900.0, y=250.0, killer="c_artillery"),),
@@ -145,6 +146,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "eco_covered",
         "own_covered",
         "foe_covered",
+        "rival_army",
     ]
     assert lines[1].split() == [
         "7",
@@ -171,6 +173,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "1",
         "3",
         "2",
+        "8200",
     ]
     assert lines[2] == ""
     assert lines[3].split() == ["frame", "unit", "type", "x", "y", "killer"]
@@ -200,6 +203,7 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 eco_covered=0,
                 own_covered=0,
                 foe_covered=0,
+                rival_army=0,
                 air_seen=0,
                 navy_blood=0,
                 events="-",

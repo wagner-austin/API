@@ -16,6 +16,7 @@ from rw_bot.mechanics.upgrades import TIER_CHAINS, satisfies
 from rw_bot.policy.economy import EXTRACTOR_TYPE
 from rw_bot.policy.field import coverage
 from rw_bot.policy.scoreboard import local_player, rival_income
+from rw_bot.policy.situation import read_situation
 from rw_bot.policy.trace import (
     Loss,
     Tick,
@@ -140,6 +141,11 @@ class Recorder:
                 eco_covered=covered["eco_covered"],
                 own_covered=covered["own_covered"],
                 foe_covered=covered["foe_covered"],
+                # The momentum signal itself, read the way Momentum reads it
+                # -- zero when no scoreboard, which a drop reader must skip.
+                rival_army=(
+                    0 if (situation := read_situation(sample)) is None else situation["rival_army"]
+                ),
             )
         )
 

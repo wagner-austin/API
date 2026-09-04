@@ -143,6 +143,20 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             the simulation forks, which turns "runs do not reproduce" into a
             sample number and a first divergent unit
             ([[policy-determinism]]).
+        rival_army: The strongest surviving hostile's ARMY value -- the
+            exact figure :class:`~rw_bot.policy.situation.Momentum` windows,
+            as distinct from ``rival`` which is worth (army plus buildings)
+            and UNDERSTATES army drops whenever buildings grow through a
+            wave's death. Appended after ``foe_covered`` per the appendix
+            rule so every positional reader's index survives. Zero when the
+            sample carries no scoreboard; a drop reader must skip zeros
+            exactly as Momentum skips recording them, because a zero read
+            as a value fakes a peak-sized fall. The column exists because
+            every drop-gated knob (strike, rebuild) reads this signal and
+            no record of its actual range at any rung existed -- the 15,000
+            thresholds were calibrated against worth dips that top out at
+            14,150 across 144 Impossible scorecards (imprb48, log
+            2026-09-04).
     """
 
     frame: int
@@ -169,6 +183,7 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     eco_covered: int
     own_covered: int
     foe_covered: int
+    rival_army: int
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -246,7 +261,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'worth':>9}{'rival':>9}{'income':>8}{'rival_income':>14}{'world':>12}"
         f"{'plan':>10}{'workers':>9}"
         f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}{'events':>8}"
-        f"{'eco_covered':>13}{'own_covered':>13}{'foe_covered':>13}"
+        f"{'eco_covered':>13}{'own_covered':>13}{'foe_covered':>13}{'rival_army':>12}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
@@ -256,6 +271,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
         f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}{t['events']:>8}"
         f"{t['eco_covered']:>13}{t['own_covered']:>13}{t['foe_covered']:>13}"
+        f"{t['rival_army']:>12}"
         for t in ticks
     )
     lines.append("")
