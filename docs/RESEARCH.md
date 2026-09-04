@@ -167,6 +167,45 @@ replication check, and it held).
   composition-aware training, per the
   ICAE multi-span finding — belongs to board task `292c3272`.
 
+#### `cartridge_companion_sweep` — composition-aware training moves the ceiling
+
+Added 2026-09-04 (board task `bc29dc3e`), and it answers the sweep above:
+the two-compartment ceiling is a property of naive training, not of
+composition. Every cartridge in a grid cell is trained with a frozen
+companion present at a swept per-step probability, two companion kinds
+(fresh noise; a plain-trained cartridge on a corpus HELD OUT from every
+composition partner, refused by the CLI if it overlaps), and the same arms
+and controls as the baseline sweep.
+
+- **Command:** `python -m model_trainer.cli.cartridge_companion_sweep
+  --plan gpt2-companions --corpus <dir> --other-corpora <d1,d2,d3>
+  --companion-corpus <dir> --device cuda --out <file>`
+- **Result, measured 2026-09-04 on the 3090 Ti, bit-identical across two
+  full-grid processes (record sha256 `9e87e816…`):** the trained-companion
+  recipe at p=0.5 puts four-compartment retention at **+44.6%** where the
+  naive baseline was **−45.4%** — a +0.78 swing on the composed mean
+  against a 0.049 floor, from the grid's tightest cell — while
+  two-compartment retention rises 62.8% → 78.3% and the solo cost is four
+  hundredths of gain. Content-companionship beats noise-companionship on
+  every axis. The overdose endpoint is real in both kinds: p=1.0 training
+  destroys solo performance (noise −0.68; trained −0.32, whose composed
+  arms then BEAT its alone arm — a cartridge adapted to company).
+- **The retention observation is conditional by design:** absent where a
+  cell's alone arm did not improve on the base, because a ratio against a
+  non-gain has no reading; the raw arm means always carry the verdict.
+  That rule exists because the p=1.0 collapse is a real cell every full
+  grid hits, and the first version of the CLI died on it.
+- **No run document is committed yet:** the newest cluster image (v33,
+  `5dfd78a7…`) predates commit `05108c8f`, whose ratio-absence handling
+  the full grid requires — the third live catch for the image-freshness
+  gap task `2c8161a3` names. A v34 built from ≥ `05108c8f` unblocks the
+  V100 replication; the request stands on the board.
+- **Open extensions, filed rather than implied:** n8 and varied-count
+  companion exposure (does the p=0.5 recipe hold when deployment count
+  exceeds training exposure), the budget slot policy, and the scale rung
+  (`gpt2-medium` locally, a 7B base on A100 — cheap for cartridges, since
+  only slots carry optimizer state).
+
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
 - **Repo:** this one — `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,
