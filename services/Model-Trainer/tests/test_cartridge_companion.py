@@ -195,6 +195,32 @@ class TestForward:
 
         assert float(actual.loss.item()) == pytest.approx(float(expected.loss.item()))
 
+    def test_construction_moves_the_companion_onto_the_base_device(self) -> None:
+        """The constructor owns device coherence, not the caller.
+
+        A noise provider draws on the CPU and nothing else moves the draw;
+        on a CUDA base the first forward would torch.cat across devices.
+        This suite runs on CPU where the assertion is trivially satisfiable,
+        so what it pins is that the move HAPPENS in the constructor: the
+        companion's tensors end on the base's device whatever device the
+        provider drew them on.
+        """
+        base = _base()
+        geometry = measure_geometry(base, num_slots=2)
+        companion = initialise_slots(geometry, seed=2)
+
+        model = CompanionedCartridgeModel(
+            base=base,
+            slots=initialise_slots(geometry, seed=1),
+            companion=companion,
+            companion_probability=1.0,
+        )
+
+        base_device = next(iter(base.named_parameters()))[1].device
+        for name, tensor in companion.state_dict().items():
+            assert tensor.device == base_device, name
+        assert model.geometry["num_slots"] == 2
+
     def test_to_moves_the_companion_with_the_model(self) -> None:
         base = _base()
         geometry = measure_geometry(base, num_slots=2)

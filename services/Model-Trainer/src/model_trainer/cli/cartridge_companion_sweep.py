@@ -185,6 +185,53 @@ class _CompanionProviders:
         return self._trained[seed]
 
 
+def cell_observations(
+    arm: str,
+    alone: ReplicatedGain,
+    composed: ReplicatedGain,
+    untrained_composed: ReplicatedGain,
+    cross: Sequence[ReplicatedGain],
+) -> tuple[Observation, ...]:
+    """Name one grid cell's numbers for the record.
+
+    Pure assembly, split from the grid walk so the ratio-absence rule is
+    testable against constructed arms: forcing a real cartridge to fail its
+    own corpus deterministically turned out to be harder than the failure
+    itself (the tiny rung learns positively even at learning rate 50).
+
+    THE RATIO EXISTS ONLY WHERE THE ALONE ARM IMPROVED ON THE BASE -- the
+    same condition retention() itself refuses on. A heavily companioned
+    cartridge can fail to learn its own corpus (measured: noise at p=1.0
+    scores -0.68 alone), and that is a RESULT this grid exists to find, not
+    an error: the raw arms carry it, and an absent retention reads as
+    'alone did not improve on base', checkable from the alone mean's sign
+    in the same record.
+
+    Args:
+        arm: The cell's name, e.g. ``"noise-p0.5-n4"``.
+        alone: The solo-cost arm.
+        composed: The full trained composition.
+        untrained_composed: The noise-composition control.
+        cross: One cross-gain arm per other corpus.
+
+    Returns:
+        Gain observations for every arm, the retention ratio where it is
+        readable, and the composed-versus-untrained interference verdict.
+    """
+    named: list[Observation] = []
+    for measured in [alone, composed, untrained_composed, *cross]:
+        named.extend(gain_observations(measured))
+    if alone["mean"] > 0.0:
+        named.append(Observation(name=f"{arm}_retention", value=retention(alone, composed)))
+    named.extend(
+        sweep_observations(
+            [composed, untrained_composed],
+            noise_floor([composed, untrained_composed]),
+        )
+    )
+    return tuple(named)
+
+
 def measure_grid(
     plan: CompanionSweepPlan,
     *,
@@ -207,7 +254,9 @@ def measure_grid(
 
     Returns:
         ``(observations, digest)`` -- the named numbers, and the digest of
-        the primary corpus.
+        the primary corpus. A cell's ``_retention`` observation is absent
+        when its alone arm did not improve on the base; the raw arm means
+        are always present and carry that verdict in their sign.
 
     Raises:
         ValueError: If too few other corpora are supplied, or the companion
@@ -300,16 +349,8 @@ def measure_grid(
                     untrained_composed["mean"],
                 )
                 composed_arms.append(composed)
-                for measured in [alone, composed, untrained_composed, *cross]:
-                    observations.extend(gain_observations(measured))
-                observations.append(
-                    Observation(name=f"{arm}_retention", value=retention(alone, composed))
-                )
                 observations.extend(
-                    sweep_observations(
-                        [composed, untrained_composed],
-                        noise_floor([composed, untrained_composed]),
-                    )
+                    cell_observations(arm, alone, composed, untrained_composed, cross)
                 )
             floor = noise_floor(composed_arms)
             observations.append(
@@ -428,6 +469,7 @@ def entrypoint() -> None:
 __all__ = [
     "COMPANION_KINDS",
     "COMPANION_SEED_STRIDE",
+    "cell_observations",
     "companion_sweep_run_record",
     "entrypoint",
     "main",

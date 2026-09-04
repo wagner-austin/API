@@ -332,6 +332,13 @@ class CompanionedCartridgeModel(CartridgeModel):
         super().__init__(base=base, slots=slots)
         self._companion = companion
         self._companion_probability = companion_probability
+        # The companion joins the base's device HERE, not in a caller: a
+        # provider draws noise slots on the CPU (initialise_slots draws
+        # nowhere else), and the first forward on a CUDA base would
+        # torch.cat across devices. A CPU-only suite cannot reach that
+        # failure, so the invariant lives in the constructor where no code
+        # path can skip it.
+        self._companion.to(str(next(iter(base.named_parameters()))[1].detach().device))
 
     def to(self, device: str) -> LMModelProto:
         """Move the base, the trainee slots and the companion onto a device.

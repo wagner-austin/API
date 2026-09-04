@@ -154,6 +154,49 @@ class TestProviders:
             assert torch.equal(tensor, second[name]), name
 
 
+class TestCellObservations:
+    """The pure assembly, driven by constructed arms.
+
+    Split from the grid walk precisely so this failure shape is testable:
+    the real grid measured a noise-p1.0 cartridge at -0.68 alone, and the
+    first CLI version died in retention() there, taking every later cell
+    with it. The tiny rung cannot be forced to fail its own corpus (it
+    learns positively even at learning rate 50), so the branch is driven
+    with real replicate()-built arms instead.
+    """
+
+    def test_a_failed_alone_arm_keeps_its_numbers_and_drops_the_ratio(self) -> None:
+        from model_trainer.core.contracts.replicated_measurement import replicate
+
+        alone = replicate("cell-alone", [(7, -0.7), (8, -0.65), (9, -0.68)])
+        composed = replicate("cell-composed", [(7, -0.6), (8, -0.66), (9, -0.7)])
+        untrained = replicate("cell-untrained-composed", [(7, 0.8), (8, 0.85), (9, 0.86)])
+
+        named = sweep.cell_observations("cell", alone, composed, untrained, ())
+
+        values = {observation["name"]: observation["value"] for observation in named}
+        assert values["cell-alone_mean"] == pytest.approx(-0.6766666666666667)
+        assert "cell_retention" not in values
+        # The interference verdict still computes: untrained mean 0.83667
+        # minus composed mean -0.65333 is +1.49 against a 0.1 pair floor.
+        assert values["cell-composed_to_cell-untrained-composed_separated"] == 1.0
+        assert values["cell-composed_to_cell-untrained-composed_difference"] == pytest.approx(1.49)
+
+    def test_a_positive_alone_arm_carries_its_ratio(self) -> None:
+        from model_trainer.core.contracts.replicated_measurement import replicate
+
+        alone = replicate("cell-alone", [(7, 0.8), (8, 0.82), (9, 0.84)])
+        composed = replicate("cell-composed", [(7, 0.4), (8, 0.41), (9, 0.42)])
+        untrained = replicate("cell-untrained-composed", [(7, 0.3), (8, 0.31), (9, 0.32)])
+        cross = (replicate("cell-cross-0", [(7, -0.1), (8, -0.12), (9, -0.11)]),)
+
+        named = sweep.cell_observations("cell", alone, composed, untrained, cross)
+
+        values = {observation["name"]: observation["value"] for observation in named}
+        assert values["cell_retention"] == pytest.approx(0.41 / 0.82)
+        assert values["cell-cross-0_mean"] == pytest.approx(-0.11)
+
+
 class TestMeasureGrid:
     def test_every_arm_is_named_once(self, tmp_path: pathlib.Path) -> None:
         primary, beta, gamma, delta = _staged(tmp_path, ("alpha", "beta", "gamma", "delta"))
