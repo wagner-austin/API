@@ -5,6 +5,8 @@ Tests production implementations and fake class methods.
 
 from __future__ import annotations
 
+import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,11 +27,15 @@ from instrument_io.fakes import (
 )
 from instrument_io.testing import (
     _prod_cleanup_temp_dir,
+    _prod_convert_raw_to_mzml,
+    _prod_create_temp_dir,
+    _prod_find_thermorawfileparser,
     _prod_shutil_which,
     _prod_smps_read_lines,
     _prod_txt_detect_encoding,
     _prod_txt_read_lines,
     _prod_txt_read_text,
+    hooks,
     reset_hooks,
 )
 from instrument_io.types.spectrum import MSSpectrum, SpectrumData, SpectrumMeta, SpectrumStats
@@ -463,3 +469,62 @@ class TestProdCleanupTempDir:
         in a finally block either way."""
         _prod_cleanup_temp_dir(tmp_path / "never_created")
         assert not (tmp_path / "never_created").exists()
+
+
+class TestProdThermoWrappers:
+    """The remaining production wrappers, tested directly.
+
+    All three were reached only by the real-parser path, which needs
+    ThermoRawFileParser and a .NET runtime. That used to happen incidentally:
+    five integration tests ran, failed on Linux, and covered these on their
+    way down. Making those tests skip honestly -- they cannot run without
+    Mono -- removed the failures AND the incidental coverage, so the wrappers
+    now get tests of their own rather than a side effect of a broken run.
+    """
+
+    def test_create_temp_dir_makes_a_real_directory(self) -> None:
+        temp_dir = _prod_create_temp_dir()
+        try:
+            assert temp_dir.is_dir()
+            assert temp_dir.name.startswith("thermo_")
+        finally:
+            _prod_cleanup_temp_dir(temp_dir)
+
+    def test_find_thermorawfileparser_returns_the_bundled_assembly(self, tmp_path: Path) -> None:
+        """The bundled path is the first candidate the finder considers."""
+        bundled = tmp_path / "ThermoRawFileParser.exe"
+        bundled.touch()
+        hooks.get_bundled_exe_path = lambda: bundled
+        assert _prod_find_thermorawfileparser() == bundled
+
+    def test_convert_raw_to_mzml_delegates_to_the_parser(self, tmp_path: Path) -> None:
+        """Drive the wrapper through a real subprocess, as the sibling tests do.
+
+        A stand-in executable that creates the expected output is the same
+        technique test_protocols_thermo.py uses for the function underneath;
+        reusing it here covers the delegation without needing the real
+        parser or a .NET runtime.
+        """
+        raw_file = tmp_path / "sample.raw"
+        raw_file.touch()
+        output_dir = tmp_path / "out"
+        output_dir.mkdir()
+
+        if sys.platform == "win32":
+            script_path = tmp_path / "parser.bat"
+            script_path.write_text(
+                f'@echo off\necho. > "{output_dir}\\sample.mzML"\nexit /b 0\n',
+                encoding="utf-8",
+            )
+        else:
+            script_path = tmp_path / "parser.sh"
+            script_path.write_text(
+                f'#!/bin/bash\ntouch "{output_dir}/sample.mzML"\nexit 0\n',
+                encoding="utf-8",
+            )
+            script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
+
+        hooks.find_thermorawfileparser = lambda: script_path
+        result = _prod_convert_raw_to_mzml(raw_file, output_dir)
+        assert result == output_dir / "sample.mzML"
+        assert result.exists()
