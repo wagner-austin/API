@@ -76,7 +76,16 @@ class LiteralSet:
 
         Args:
             subject: Kebab-case label for this set.
-            defining_module: Repo-relative path suffix of the declaring module.
+            defining_module: Path SUFFIX of the declaring module, matched with
+                ``endswith``, and it must include the package segment. Two
+                services in this monorepo own a
+                ``core/contracts/dataset.py`` -- Model-Trainer, which
+                declares CORPUS_FORMATS, and Art-Trainer, whose file is
+                about LoRA datasets and never had it. Given the bare
+                ``core/contracts/dataset.py``, this rule matched
+                Art-Trainer's file while checking Art-Trainer, found no
+                tuple, and reported that the guard had gone inert -- a
+                red gate on a service that was never in scope.
             tuple_name: Name the declaring module binds the set to.
             field_names: Field and parameter names whose Literal must match.
             consequence: What goes wrong when the sets disagree.
@@ -90,7 +99,7 @@ class LiteralSet:
 
 CORPUS_FORMAT_SET: Final = LiteralSet(
     subject="corpus-format",
-    defining_module="core/contracts/dataset.py",
+    defining_module="model_trainer/core/contracts/dataset.py",
     tuple_name="CORPUS_FORMATS",
     field_names=frozenset({"corpus_format"}),
     consequence=(
@@ -101,7 +110,7 @@ CORPUS_FORMAT_SET: Final = LiteralSet(
 
 STRATEGY_NAME_SET: Final = LiteralSet(
     subject="strategy-name",
-    defining_module="core/contracts/strategy_names.py",
+    defining_module="model_trainer/core/contracts/strategy_names.py",
     tuple_name="STRATEGY_NAMES",
     field_names=frozenset({"finetuning_strategy"}),
     consequence=(

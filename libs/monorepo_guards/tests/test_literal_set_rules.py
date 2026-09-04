@@ -23,7 +23,12 @@ from monorepo_guards.literal_set_rules import (
     LiteralSetRule,
 )
 
-_DECLARING = "core/contracts/dataset.py"
+# Taken from the rule rather than restated. These fixtures exercise the
+# REAL declaring path, so a change to it -- such as qualifying it by
+# package, which is what stopped this rule firing on Art-Trainer's
+# unrelated core/contracts/dataset.py -- moves the fixtures with it
+# instead of breaking fourteen tests that were never about the path.
+_DECLARING = CORPUS_FORMAT_SET.defining_module
 
 
 def _write(path: Path, text: str) -> Path:
@@ -365,7 +370,7 @@ class TestTheStrategyNameSet:
     use the strategy set's own declaring module, tuple name and field name.
     """
 
-    _STRATEGY_DECLARING = "core/contracts/strategy_names.py"
+    _STRATEGY_DECLARING = STRATEGY_NAME_SET.defining_module
 
     def _strategy_declaring(self, tmp_path: Path, members: str) -> Path:
         """Write a stand-in module binding STRATEGY_NAMES.
