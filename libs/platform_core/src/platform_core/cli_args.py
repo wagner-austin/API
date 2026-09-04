@@ -18,6 +18,7 @@ one is a different corpus; both would otherwise proceed and report success.
 
 from __future__ import annotations
 
+import argparse
 from collections.abc import Mapping, Sequence
 from typing import Final
 
@@ -144,9 +145,164 @@ def require_flag(parsed: Mapping[str, str], flag: str) -> str:
     return parsed[flag]
 
 
+def _wrong_type(key: str, value: str | int | bool | list[str] | None, expected: str) -> ValueError:
+    """Build the refusal for a namespace attribute of the wrong type.
+
+    Args:
+        key: The attribute read.
+        value: What was found there. Spelled as the union argparse can
+            actually produce rather than as ``object``, which the workspace's
+            typing guard refuses and which would let any value in here.
+        expected: The type the command declared.
+
+    Returns:
+        The error to raise, naming the key, the expected type and the actual
+        one. All three, because the cause is a parser declaration in another
+        function and the reader has no other way to find it.
+    """
+    return ValueError(
+        f"--{key.replace('_', '-')} parsed as {type(value).__name__}, expected {expected}; "
+        "the parser's declaration for this flag disagrees with the type its "
+        "reader wants"
+    )
+
+
+def namespace_str(ns: argparse.Namespace, key: str, default: str) -> str:
+    """Read a string argument from an argparse namespace.
+
+    Args:
+        ns: The parsed namespace.
+        key: The attribute to read.
+        default: Value to use when the flag was not given.
+
+    Returns:
+        The flag's value, or ``default`` when the flag was not given --
+        which argparse reports either by leaving the attribute off entirely
+        or by setting it to None for a declared-but-unsupplied option. Both
+        mean "not given"; neither is the wrong-type case below.
+
+    Raises:
+        ValueError: If the attribute is present with a non-string value. Both
+            copies of this function that preceded it returned the default
+            instead, and each carried a test pinning that silence. Absent and
+            wrong-typed are different events: the first is a caller declining
+            a flag, the second is a parser declaration contradicting its
+            reader, and only the second is a defect.
+    """
+    value: str | int | bool | list[str] | None = getattr(ns, key, default)
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value
+    raise _wrong_type(key, value, "str")
+
+
+def namespace_str_or_none(ns: argparse.Namespace, key: str) -> str | None:
+    """Read an optional string argument from an argparse namespace.
+
+    Args:
+        ns: The parsed namespace.
+        key: The attribute to read.
+
+    Returns:
+        The flag's value, or None when it was not given.
+
+    Raises:
+        ValueError: If the attribute is present with a non-string value.
+    """
+    value: str | int | bool | list[str] | None = getattr(ns, key, None)
+    if value is None or isinstance(value, str):
+        return value
+    raise _wrong_type(key, value, "str or None")
+
+
+def namespace_int(ns: argparse.Namespace, key: str, default: int) -> int:
+    """Read an integer argument from an argparse namespace.
+
+    Args:
+        ns: The parsed namespace.
+        key: The attribute to read.
+        default: Value to use when the flag was not given.
+
+    Returns:
+        The flag's value, or ``default`` when the flag was not given --
+        which argparse reports either by leaving the attribute off entirely
+        or by setting it to None for a declared-but-unsupplied option. Both
+        mean "not given"; neither is the wrong-type case below.
+
+    Raises:
+        ValueError: If the attribute is present with a non-integer value.
+            ``bool`` is rejected as well: it is an ``int`` to Python, and a
+            ``store_true`` flag read as a count would silently become 1.
+    """
+    value: str | int | bool | list[str] | None = getattr(ns, key, default)
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _wrong_type(key, value, "int")
+    return value
+
+
+def namespace_bool(ns: argparse.Namespace, key: str, default: bool) -> bool:
+    """Read a boolean argument from an argparse namespace.
+
+    Args:
+        ns: The parsed namespace.
+        key: The attribute to read.
+        default: Value to use when the flag was not given.
+
+    Returns:
+        The flag's value, or ``default`` when the flag was not given --
+        which argparse reports either by leaving the attribute off entirely
+        or by setting it to None for a declared-but-unsupplied option. Both
+        mean "not given"; neither is the wrong-type case below.
+
+    Raises:
+        ValueError: If the attribute is present with a non-boolean value.
+    """
+    value: str | int | bool | list[str] | None = getattr(ns, key, default)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raise _wrong_type(key, value, "bool")
+
+
+def namespace_str_tuple(ns: argparse.Namespace, key: str) -> tuple[str, ...]:
+    """Read a repeatable string argument from an argparse namespace.
+
+    Args:
+        ns: The parsed namespace.
+        key: The attribute to read, declared with ``action="append"``.
+
+    Returns:
+        The values given, empty when the flag was not given at all.
+
+    Raises:
+        ValueError: If the attribute is present but is not a list, or holds a
+            non-string element. The version this replaces dropped offending
+            elements silently, so a mistyped attachment path shortened the
+            list and the mail went without it.
+    """
+    value: str | int | bool | list[str] | None = getattr(ns, key, None)
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise _wrong_type(key, value, "list of str")
+    for element in value:
+        if not isinstance(element, str):
+            raise _wrong_type(key, element, "str")
+    return tuple(value)
+
+
 __all__ = [
     "HELP_FLAGS",
     "HelpRequestedError",
+    "namespace_bool",
+    "namespace_int",
+    "namespace_str",
+    "namespace_str_or_none",
+    "namespace_str_tuple",
     "parse_single_flags",
     "require_flag",
     "take_value",

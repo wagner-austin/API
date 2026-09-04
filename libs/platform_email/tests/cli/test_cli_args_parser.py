@@ -23,44 +23,6 @@ def _reset_hooks_after_test() -> Generator[None, None, None]:
 # =============================================================================
 
 
-class TestExtractStr:
-    """Tests for _extract_str function."""
-
-    def test_extracts_string(self) -> None:
-        """Test extracts string value."""
-        ns = argparse.Namespace(key="value")
-        result = cli._extract_str(ns, "key", "default")
-        assert result == "value"
-
-    def test_returns_default_for_missing(self) -> None:
-        """Test returns default for missing key."""
-        ns = argparse.Namespace()
-        result = cli._extract_str(ns, "missing", "default")
-        assert result == "default"
-
-    def test_returns_default_for_non_string(self) -> None:
-        """Test returns default for non-string value."""
-        ns = argparse.Namespace(key=123)
-        result = cli._extract_str(ns, "key", "default")
-        assert result == "default"
-
-
-class TestExtractInt:
-    """Tests for _extract_int function."""
-
-    def test_extracts_int(self) -> None:
-        """Test extracts int value."""
-        ns = argparse.Namespace(key=42)
-        result = cli._extract_int(ns, "key", 0)
-        assert result == 42
-
-    def test_returns_default_for_missing(self) -> None:
-        """Test returns default for missing key."""
-        ns = argparse.Namespace()
-        result = cli._extract_int(ns, "missing", 10)
-        assert result == 10
-
-
 class TestDecodeListArgs:
     """Tests for decode_list_args function."""
 
@@ -80,92 +42,6 @@ class TestDecodeReadArgs:
         ns = argparse.Namespace(index=5)
         result = cli.decode_read_args(ns)
         assert result["index"] == 5
-
-
-class TestExtractOptionalStr:
-    """Tests for _extract_optional_str function."""
-
-    def test_extracts_string(self) -> None:
-        """Test extracts string value when present."""
-        ns = argparse.Namespace(key="value")
-        result = cli._extract_optional_str(ns, "key")
-        assert result == "value"
-
-    def test_returns_none_for_missing(self) -> None:
-        """Test returns None for missing key."""
-        ns = argparse.Namespace()
-        result = cli._extract_optional_str(ns, "missing")
-        assert result is None
-
-    def test_returns_none_for_none_value(self) -> None:
-        """Test returns None when value is None."""
-        ns = argparse.Namespace(key=None)
-        result = cli._extract_optional_str(ns, "key")
-        assert result is None
-
-    def test_returns_none_for_non_string(self) -> None:
-        """Test returns None for non-string value."""
-        ns = argparse.Namespace(key=123)
-        result = cli._extract_optional_str(ns, "key")
-        assert result is None
-
-
-class TestExtractBool:
-    """Tests for _extract_bool function."""
-
-    def test_extracts_true(self) -> None:
-        """Test extracts True value."""
-        ns = argparse.Namespace(key=True)
-        result = cli._extract_bool(ns, "key", False)
-        assert result is True
-
-    def test_extracts_false(self) -> None:
-        """Test extracts False value."""
-        ns = argparse.Namespace(key=False)
-        result = cli._extract_bool(ns, "key", True)
-        assert result is False
-
-    def test_returns_default_for_missing(self) -> None:
-        """Test returns default for missing key."""
-        ns = argparse.Namespace()
-        result = cli._extract_bool(ns, "missing", True)
-        assert result is True
-
-    def test_returns_default_for_non_bool(self) -> None:
-        """Test returns default for non-bool value."""
-        ns = argparse.Namespace(key="not_a_bool")
-        result = cli._extract_bool(ns, "key", False)
-        assert result is False
-
-
-class TestExtractStrTuple:
-    """Tests for _extract_str_tuple function."""
-
-    def test_extracts_list_of_strings(self) -> None:
-        """Test extracts list of strings as tuple."""
-        attach_list: list[str] = ["file1.pdf", "file2.zip"]
-        ns = argparse.Namespace(attach=attach_list)
-        result = cli._extract_str_tuple(ns, "attach")
-        assert result == ("file1.pdf", "file2.zip")
-
-    def test_returns_empty_tuple_for_none(self) -> None:
-        """Test returns empty tuple when value is None."""
-        ns = argparse.Namespace(attach=None)
-        result = cli._extract_str_tuple(ns, "attach")
-        assert result == ()
-
-    def test_returns_empty_tuple_for_missing(self) -> None:
-        """Test returns empty tuple for missing key."""
-        ns = argparse.Namespace()
-        result = cli._extract_str_tuple(ns, "attach")
-        assert result == ()
-
-    def test_filters_non_string_entries(self) -> None:
-        """Test filters out non-string entries from list."""
-        mixed_list: list[str | int] = ["file.pdf", 123, "other.txt"]
-        ns = argparse.Namespace(attach=mixed_list)
-        result = cli._extract_str_tuple(ns, "attach")
-        assert result == ("file.pdf", "other.txt")
 
 
 class TestDecodeSendArgs:

@@ -13,6 +13,13 @@ from typing import TypedDict
 # Token Types
 # =============================================================================
 # Use "common" tenant for multi-tenant support
+from platform_core.cli_args import (
+    namespace_bool,
+    namespace_int,
+    namespace_str,
+    namespace_str_tuple,
+)
+
 from platform_email.cli_auth import STYLE_ERROR, _print
 from platform_email.cli_commands import (
     cmd_auth,
@@ -56,92 +63,17 @@ class SearchArgs(TypedDict):
     count: int
 
 
-def _extract_str(ns: argparse.Namespace, key: str, default: str) -> str:
-    """Extract string attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-        default: Default value if not found or wrong type.
-
-    Returns:
-        String value or default.
-    """
-    val: str | int | bool | None = getattr(ns, key, default)
-    return val if isinstance(val, str) else default
-
-
-def _extract_int(ns: argparse.Namespace, key: str, default: int) -> int:
-    """Extract int attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-        default: Default value if not found or wrong type.
-
-    Returns:
-        Int value or default.
-    """
-    val: str | int | bool | None = getattr(ns, key, default)
-    return val if isinstance(val, int) else default
-
-
 def decode_list_args(args: argparse.Namespace) -> ListArgs:
     """Decode list arguments."""
     return ListArgs(
-        folder=_extract_str(args, "folder", "inbox"),
-        count=_extract_int(args, "count", 10),
+        folder=namespace_str(args, "folder", "inbox"),
+        count=namespace_int(args, "count", 10),
     )
 
 
 def decode_read_args(args: argparse.Namespace) -> ReadArgs:
     """Decode read arguments."""
-    return ReadArgs(index=_extract_int(args, "index", 1))
-
-
-def _extract_str_tuple(ns: argparse.Namespace, key: str) -> tuple[str, ...]:
-    """Extract a tuple of strings from namespace (for argparse append actions).
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-
-    Returns:
-        Tuple of strings, empty if not found or wrong type.
-    """
-    val: str | int | bool | list[str] | None = getattr(ns, key, None)
-    if isinstance(val, list):
-        return tuple(v for v in val if isinstance(v, str))
-    return ()
-
-
-def _extract_optional_str(ns: argparse.Namespace, key: str) -> str | None:
-    """Extract optional string attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-
-    Returns:
-        String value if present and is a string, None otherwise.
-    """
-    val: str | int | bool | None = getattr(ns, key, None)
-    return val if isinstance(val, str) else None
-
-
-def _extract_bool(ns: argparse.Namespace, key: str, default: bool) -> bool:
-    """Extract bool attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-        default: Default value if not found or wrong type.
-
-    Returns:
-        Bool value or default.
-    """
-    val: str | int | bool | None = getattr(ns, key, default)
-    return val if isinstance(val, bool) else default
+    return ReadArgs(index=namespace_int(args, "index", 1))
 
 
 def decode_send_args(args: argparse.Namespace) -> SendArgs:
@@ -154,13 +86,13 @@ def decode_send_args(args: argparse.Namespace) -> SendArgs:
         SendArgs with to, subject, body_file, cc, bcc, and html fields.
     """
     return SendArgs(
-        to=_extract_str(args, "to", ""),
-        subject=_extract_str(args, "subject", ""),
-        body_file=_extract_str(args, "body_file", ""),
-        cc=_extract_str(args, "cc", ""),
-        bcc=_extract_str(args, "bcc", ""),
-        html=_extract_bool(args, "html", False),
-        attachments=_extract_str_tuple(args, "attach"),
+        to=namespace_str(args, "to", ""),
+        subject=namespace_str(args, "subject", ""),
+        body_file=namespace_str(args, "body_file", ""),
+        cc=namespace_str(args, "cc", ""),
+        bcc=namespace_str(args, "bcc", ""),
+        html=namespace_bool(args, "html", False),
+        attachments=namespace_str_tuple(args, "attach"),
     )
 
 
@@ -174,8 +106,8 @@ def decode_search_args(args: argparse.Namespace) -> SearchArgs:
         SearchArgs with query and count fields.
     """
     return SearchArgs(
-        query=_extract_str(args, "query", ""),
-        count=_extract_int(args, "count", 10),
+        query=namespace_str(args, "query", ""),
+        count=namespace_int(args, "count", 10),
     )
 
 
@@ -281,7 +213,7 @@ def main() -> None:
     """Main entry point."""
     parser = _build_parser()
     args = parser.parse_args()
-    command_str = _extract_str(args, "command", "")
+    command_str = namespace_str(args, "command", "")
     _dispatch_command(command_str, args)
 
 

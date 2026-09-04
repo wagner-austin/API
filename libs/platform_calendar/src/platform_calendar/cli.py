@@ -7,6 +7,7 @@ import argparse
 from datetime import datetime, timedelta
 from typing import TypedDict
 
+from platform_core.cli_args import namespace_int, namespace_str, namespace_str_or_none
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -71,50 +72,6 @@ class DeleteArgs(TypedDict):
     date: str
 
 
-def _extract_str(ns: argparse.Namespace, key: str, default: str) -> str:
-    """Extract string attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-        default: Default value if not found or not a string.
-
-    Returns:
-        String value.
-    """
-    val: str | None = getattr(ns, key, default)
-    return val if isinstance(val, str) else default
-
-
-def _extract_str_or_none(ns: argparse.Namespace, key: str) -> str | None:
-    """Extract optional string attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-
-    Returns:
-        String value or None.
-    """
-    val: str | None = getattr(ns, key, None)
-    return val if isinstance(val, str) else None
-
-
-def _extract_int(ns: argparse.Namespace, key: str, default: int) -> int:
-    """Extract int attribute from namespace.
-
-    Args:
-        ns: Namespace to extract from.
-        key: Attribute name.
-        default: Default value if not found or not an int.
-
-    Returns:
-        Int value.
-    """
-    val: int | None = getattr(ns, key, default)
-    return val if isinstance(val, int) else default
-
-
 def decode_list_args(args: argparse.Namespace) -> ListArgs:
     """Decode list arguments from argparse.Namespace.
 
@@ -124,7 +81,7 @@ def decode_list_args(args: argparse.Namespace) -> ListArgs:
     Returns:
         Typed ListArgs structure.
     """
-    raw_date = _extract_str_or_none(args, "date")
+    raw_date = namespace_str_or_none(args, "date")
     date = raw_date if raw_date is not None else _get_now().strftime("%Y-%m-%d")
     return ListArgs(date=date)
 
@@ -138,14 +95,14 @@ def decode_create_args(args: argparse.Namespace) -> CreateArgs:
     Returns:
         Typed CreateArgs structure.
     """
-    title = _extract_str(args, "title", "")
-    time_val = _extract_str(args, "time", "")
-    raw_date = _extract_str_or_none(args, "date")
+    title = namespace_str(args, "title", "")
+    time_val = namespace_str(args, "time", "")
+    raw_date = namespace_str_or_none(args, "date")
     date = raw_date if raw_date is not None else _get_now().strftime("%Y-%m-%d")
-    duration = _extract_int(args, "duration", 60)
-    raw_location = _extract_str_or_none(args, "location")
+    duration = namespace_int(args, "duration", 60)
+    raw_location = namespace_str_or_none(args, "location")
     location = raw_location if raw_location is not None else ""
-    account = _extract_str(args, "account", "Personal")
+    account = namespace_str(args, "account", "Personal")
 
     return CreateArgs(
         title=title,
@@ -166,7 +123,7 @@ def decode_delete_args(args: argparse.Namespace) -> DeleteArgs:
     Returns:
         Typed DeleteArgs structure.
     """
-    raw_date = _extract_str_or_none(args, "date")
+    raw_date = namespace_str_or_none(args, "date")
     date = raw_date if raw_date is not None else _get_now().strftime("%Y-%m-%d")
     return DeleteArgs(date=date)
 
@@ -492,5 +449,5 @@ def main() -> None:
     """Main entry point."""
     parser = _build_parser()
     args = parser.parse_args()
-    command_str = _extract_str(args, "command", "")
+    command_str = namespace_str(args, "command", "")
     _dispatch_command(command_str, args)

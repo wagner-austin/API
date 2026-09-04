@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import argparse
+
 import pytest
 
 from platform_core.cli_args import (
     HELP_FLAGS,
     HelpRequestedError,
+    namespace_bool,
+    namespace_int,
+    namespace_str,
+    namespace_str_or_none,
+    namespace_str_tuple,
     parse_single_flags,
     require_flag,
     take_value,
@@ -102,3 +109,97 @@ class TestRequireFlag:
         """No default: a defaulted host sends work somewhere unnamed."""
         with pytest.raises(ValueError, match="--host is required"):
             require_flag({}, "--host")
+
+
+class TestNamespaceReaders:
+    """Reading an argparse namespace without the silence it used to carry.
+
+    Two libraries had a private copy of these -- `platform_calendar` and
+    `platform_email` -- with annotations that had already drifted apart
+    (`str | None` against `str | int | bool | None`) and the same function
+    living under two names. Both returned the DEFAULT when the attribute was
+    present with the wrong type, and both carried a test pinning that.
+
+    Absent and wrong-typed are different events. The first is a caller
+    declining a flag. The second is a parser declaration contradicting the
+    reader that consumes it, which no run can be correct under.
+    """
+
+    def test_a_declared_string_is_read(self) -> None:
+        assert namespace_str(argparse.Namespace(folder="inbox"), "folder", "sent") == "inbox"
+
+    def test_an_absent_flag_takes_the_default(self) -> None:
+        assert namespace_str(argparse.Namespace(), "folder", "inbox") == "inbox"
+
+    def test_a_string_flag_holding_a_number_is_refused(self) -> None:
+        """The case both copies answered with the default, and both pinned
+        with a test. Nothing in a correct parser reaches it."""
+        with pytest.raises(ValueError, match="parsed as int, expected str"):
+            namespace_str(argparse.Namespace(folder=123), "folder", "inbox")
+
+    def test_the_refusal_names_the_flag_as_it_was_typed(self) -> None:
+        """The cause is a declaration in another function, so the message has
+        to be greppable from the command line the operator ran."""
+        with pytest.raises(ValueError, match=r"--dry-run"):
+            namespace_str(argparse.Namespace(dry_run=1), "dry_run", "")
+
+    def test_an_optional_string_reads_none_when_absent(self) -> None:
+        assert namespace_str_or_none(argparse.Namespace(), "query") is None
+
+    def test_an_optional_string_is_read_when_present(self) -> None:
+        assert namespace_str_or_none(argparse.Namespace(query="a"), "query") == "a"
+
+    def test_an_optional_string_holding_a_list_is_refused(self) -> None:
+        given: list[str] = ["a"]
+
+        with pytest.raises(ValueError, match="expected str or None"):
+            namespace_str_or_none(argparse.Namespace(query=given), "query")
+
+    def test_an_integer_is_read(self) -> None:
+        assert namespace_int(argparse.Namespace(count=42), "count", 10) == 42
+
+    def test_an_absent_integer_takes_the_default(self) -> None:
+        assert namespace_int(argparse.Namespace(), "count", 10) == 10
+
+    def test_a_boolean_is_not_accepted_as_an_integer(self) -> None:
+        """`bool` is an `int` to Python, so a `store_true` flag read as a
+        count would silently become 1 and the command would run once."""
+        with pytest.raises(ValueError, match="parsed as bool, expected int"):
+            namespace_int(argparse.Namespace(count=True), "count", 10)
+
+    def test_an_integer_flag_holding_a_string_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="parsed as str, expected int"):
+            namespace_int(argparse.Namespace(count="10"), "count", 10)
+
+    def test_a_boolean_is_read(self) -> None:
+        assert namespace_bool(argparse.Namespace(force=True), "force", False) is True
+
+    def test_an_absent_boolean_takes_the_default(self) -> None:
+        assert namespace_bool(argparse.Namespace(), "force", True) is True
+
+    def test_a_boolean_flag_holding_an_integer_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="parsed as int, expected bool"):
+            namespace_bool(argparse.Namespace(force=1), "force", False)
+
+    def test_a_repeatable_flag_reads_every_value(self) -> None:
+        given: list[str] = ["a.txt", "b.txt"]
+        namespace = argparse.Namespace(attach=given)
+
+        assert namespace_str_tuple(namespace, "attach") == ("a.txt", "b.txt")
+
+    def test_an_absent_repeatable_flag_is_empty(self) -> None:
+        assert namespace_str_tuple(argparse.Namespace(), "attach") == ()
+
+    def test_a_repeatable_flag_holding_one_bad_element_is_refused(self) -> None:
+        """The version this replaces dropped offending elements silently, so a
+        mistyped attachment shortened the list and the mail went without it."""
+        given: list[str | int] = ["a.txt", 7]
+
+        with pytest.raises(ValueError, match="parsed as int, expected str"):
+            namespace_str_tuple(argparse.Namespace(attach=given), "attach")
+
+    def test_a_repeatable_flag_holding_a_bare_string_is_refused(self) -> None:
+        """`--attach a.txt` declared without `action="append"` arrives as a
+        string, and iterating it would attach one file per character."""
+        with pytest.raises(ValueError, match="expected list of str"):
+            namespace_str_tuple(argparse.Namespace(attach="a.txt"), "attach")

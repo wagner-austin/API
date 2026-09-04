@@ -5,10 +5,9 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 
+import pytest
+
 from platform_calendar.cli import (
-    _extract_int,
-    _extract_str,
-    _extract_str_or_none,
     decode_create_args,
     decode_delete_args,
     decode_list_args,
@@ -78,8 +77,11 @@ class TestCreateArgs:
         assert result["date"] == "2026-02-20"
         assert result["location"] == ""
 
-    def test_decode_create_args_non_string_title(self) -> None:
-        """Test decoding create args with non-string title."""
+    def test_a_title_that_is_not_a_string_is_refused(self) -> None:
+        """This used to assert `result["title"] == ""`, which is to say it
+        pinned the behaviour of CREATING A CALENDAR EVENT WITH NO TITLE and
+        reporting success. Absent is a caller declining a flag; wrong-typed is
+        the parser's declaration disagreeing with its reader."""
         ns = argparse.Namespace(
             title=123,
             time="10:00",
@@ -88,11 +90,13 @@ class TestCreateArgs:
             location=None,
             account="Personal",
         )
-        result = decode_create_args(ns)
-        assert result["title"] == ""
 
-    def test_decode_create_args_non_int_duration(self) -> None:
-        """Test decoding create args with non-int duration."""
+        with pytest.raises(ValueError, match="--title parsed as int, expected str"):
+            decode_create_args(ns)
+
+    def test_a_duration_that_is_not_an_integer_is_refused(self) -> None:
+        """It used to fall back to 60 minutes, so an unparseable duration
+        booked an hour and said nothing."""
         ns = argparse.Namespace(
             title="Test",
             time="10:00",
@@ -101,8 +105,9 @@ class TestCreateArgs:
             location=None,
             account="Personal",
         )
-        result = decode_create_args(ns)
-        assert result["duration"] == 60
+
+        with pytest.raises(ValueError, match="--duration parsed as str, expected int"):
+            decode_create_args(ns)
 
 
 class TestDeleteArgs:
@@ -124,77 +129,6 @@ class TestDeleteArgs:
 
 # =============================================================================
 # Test Extract Functions
-# =============================================================================
-
-
-class TestExtractStr:
-    """Tests for _extract_str."""
-
-    def test_extract_str_found(self) -> None:
-        """Test extracting existing string."""
-        ns = argparse.Namespace(key="value")
-        result = _extract_str(ns, "key", "default")
-        assert result == "value"
-
-    def test_extract_str_not_found(self) -> None:
-        """Test extracting missing key returns default."""
-        ns = argparse.Namespace()
-        result = _extract_str(ns, "missing", "default")
-        assert result == "default"
-
-    def test_extract_str_non_string(self) -> None:
-        """Test extracting non-string value returns default."""
-        ns = argparse.Namespace(key=123)
-        result = _extract_str(ns, "key", "default")
-        assert result == "default"
-
-
-class TestExtractStrOrNone:
-    """Tests for _extract_str_or_none."""
-
-    def test_extract_str_or_none_found(self) -> None:
-        """Test extracting existing string."""
-        ns = argparse.Namespace(key="value")
-        result = _extract_str_or_none(ns, "key")
-        assert result == "value"
-
-    def test_extract_str_or_none_missing(self) -> None:
-        """Test extracting missing key returns None."""
-        ns = argparse.Namespace()
-        result = _extract_str_or_none(ns, "missing")
-        assert result is None
-
-    def test_extract_str_or_none_non_string(self) -> None:
-        """Test extracting non-string value returns None."""
-        ns = argparse.Namespace(key=123)
-        result = _extract_str_or_none(ns, "key")
-        assert result is None
-
-
-class TestExtractInt:
-    """Tests for _extract_int."""
-
-    def test_extract_int_found(self) -> None:
-        """Test extracting existing int."""
-        ns = argparse.Namespace(key=42)
-        result = _extract_int(ns, "key", 0)
-        assert result == 42
-
-    def test_extract_int_missing(self) -> None:
-        """Test extracting missing key returns default."""
-        ns = argparse.Namespace()
-        result = _extract_int(ns, "missing", 99)
-        assert result == 99
-
-    def test_extract_int_non_int(self) -> None:
-        """Test extracting non-int value returns default."""
-        ns = argparse.Namespace(key="not an int")
-        result = _extract_int(ns, "key", 99)
-        assert result == 99
-
-
-# =============================================================================
-# Test Account
 # =============================================================================
 
 

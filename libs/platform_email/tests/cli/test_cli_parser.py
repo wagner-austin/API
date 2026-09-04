@@ -7,6 +7,7 @@ from collections.abc import Generator
 from datetime import datetime
 
 import pytest
+from platform_core.cli_args import namespace_int, namespace_str
 
 from platform_email import cli
 from platform_email.testing import hooks, reset_hooks
@@ -32,23 +33,23 @@ class TestBuildParser:
         parser = cli._build_parser()
         # Verify it can parse known commands
         args = parser.parse_args(["auth"])
-        command = cli._extract_str(args, "command", "")
+        command = namespace_str(args, "command", "")
         assert command == "auth"
 
     def test_parses_auth_command(self) -> None:
         """Test parses auth command."""
         parser = cli._build_parser()
         args = parser.parse_args(["auth"])
-        command = cli._extract_str(args, "command", "")
+        command = namespace_str(args, "command", "")
         assert command == "auth"
 
     def test_parses_list_command_with_options(self) -> None:
         """Test parses list command with options."""
         parser = cli._build_parser()
         args = parser.parse_args(["list", "-f", "sent", "-n", "20"])
-        command = cli._extract_str(args, "command", "")
-        folder = cli._extract_str(args, "folder", "")
-        count = cli._extract_int(args, "count", 0)
+        command = namespace_str(args, "command", "")
+        folder = namespace_str(args, "folder", "")
+        count = namespace_int(args, "count", 0)
         assert command == "list"
         assert folder == "sent"
         assert count == 20
@@ -57,7 +58,7 @@ class TestBuildParser:
         """Test parses send command with body_file positional arg."""
         parser = cli._build_parser()
         args = parser.parse_args(["send", "to@test.com", "Subject", "/path/to/body.txt"])
-        command = cli._extract_str(args, "command", "")
+        command = namespace_str(args, "command", "")
         send_args = cli.decode_send_args(args)
         assert command == "send"
         assert send_args["to"] == "to@test.com"
@@ -123,7 +124,7 @@ class TestBuildParser:
         """Test parses search command with query and count."""
         parser = cli._build_parser()
         args = parser.parse_args(["search", "turkic workshop", "-n", "20"])
-        command = cli._extract_str(args, "command", "")
+        command = namespace_str(args, "command", "")
         search_args = cli.decode_search_args(args)
         assert command == "search"
         assert search_args["query"] == "turkic workshop"
@@ -444,5 +445,5 @@ class TestMain:
         parser = cli._build_parser()
         args = parser.parse_args(["folders"])
         # Dispatch would be called with these args
-        command = cli._extract_str(args, "command", "")
+        command = namespace_str(args, "command", "")
         assert command == "folders"
