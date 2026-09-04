@@ -61,6 +61,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         close=0,
         guns=0,
         nukes=0,
+        rebuild=0,
     )
 
 
@@ -286,6 +287,15 @@ def test_a_negative_nuke_count_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-024"
+
+
+def test_a_negative_rebuild_drop_is_refused() -> None:
+    """Zero already means the walk back starts at once; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["rebuild"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-029"
 
 
 def test_a_missing_field_is_an_error_not_a_default() -> None:

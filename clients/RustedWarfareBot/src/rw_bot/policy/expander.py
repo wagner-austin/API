@@ -33,7 +33,9 @@ from rw_bot.policy.economy import (
     expand_production,
     waiting,
 )
+from rw_bot.policy.floor import FLOOR_MINIMUM, economy_floor
 from rw_bot.policy.ledger import Reaches
+from rw_bot.policy.reclaim import embargoed as reclaim_embargo
 from rw_bot.policy.workforce import Workforce
 from rw_bot.wire.command import BuildOrder, build_order
 from rw_bot.wire.state import Entity, Sample
@@ -45,57 +47,6 @@ from rw_bot.wire.state import Entity, Sample
 #: this lacked: with one builder every factory placed is an extractor not
 #: placed, and that arm wiped three matches of six ([[policy-production]]).
 _SPARE_WORKER_FLOOR = 2
-
-#: Pools the rival lands before the expansion race is decided.
-#:
-#: **Measured, not chosen.** Every winning duel_lake solo trace ends the race
-#: with the survey reading 8-9 of the map's 9 pools occupied and the bot
-#: holding 6-7 of them: the Very Hard opponent claims two, sometimes three,
-#: and the race is won by taking everything else
-#: (`runs/traces/vh-solo24`, log 2026-08-03; census strings in
-#: `runs/sweeps/vh-solo24`).
-RIVAL_POOL_SHARE = 2
-
-#: The floor no map can lower: the first extractor is always protected.
-#:
-#: Across 46 duels, matches without an economy at all lost outright -- final
-#: income at or below 38/s failed 6 of 7 -- so however few pools a map offers,
-#: claiming the first is never outranked by replacing a loss
-#: ([[policy-holding-ground]]).
-FLOOR_MINIMUM = 1
-
-
-def economy_floor(visible: int, unreachable: int) -> int:
-    """Derive the extractor count below which expansion outranks a loss.
-
-    **The number used to be a literal seven, and seven was one map's answer.**
-    The definitive solo run's traces split cleanly on it and nothing else in
-    the first 1,500 samples: the duel_lake opening is a bloodless expansion
-    race, every win reached 6-7 extractors by s1500 and every loss stalled at
-    4-5, so the floor was raised from four to seven and Very Hard went from
-    0/24 to 14/24 (`runs/traces/vh-solo24`, log 2026-08-03).
-
-    Carried to four other maps, the same seven lost every match it did not
-    stalemate -- 0W/5L/3S -- because their extractor peaks were 2-4: a floor
-    the map cannot fund is never crossed, so expansion stayed protected
-    forever and the army channels starved on maps where the race was already
-    over (`runs/sweeps/xmap-*`, log 2026-08-05). The number was never the
-    policy; the map's own pool count was.
-
-    So the floor is what duel_lake's seven actually measured: **everything
-    the builder can reach, minus the share the rival takes.** On duel_lake's
-    9 reachable pools that is exactly the seven the traces demanded; on a
-    map offering four it is two, and protection ends where the map's race
-    does instead of where duel_lake's did.
-
-    Args:
-        visible: Pools the sample carries in total.
-        unreachable: Pools the builder cannot walk to at all.
-
-    Returns:
-        The derived floor, never below :data:`FLOOR_MINIMUM`.
-    """
-    return max(FLOOR_MINIMUM, visible - unreachable - RIVAL_POOL_SHARE)
 
 
 class Expander:
@@ -128,6 +79,7 @@ class Expander:
         enabled: bool,
         aa_cover: bool = False,
         cover: bool = True,
+        rebuild: int = 0,
     ) -> None:
         """Open an expander.
 
@@ -144,12 +96,20 @@ class Expander:
             cover: Whether turrets are bought at all. The on-vs-off A/B
                 became possible only when siting made them land
                 ([[policy-holding-ground]]).
+            rebuild: The rival army-value drop required before a RAZED
+                pool may be re-claimed, zero for off. Virgin pools claim
+                as always -- the opening never sees a razed pool, so the
+                gate cannot slow it -- but the walk back to a pool the
+                rival took waits for the wave that took it to break,
+                read from the same momentum signal the strike release
+                uses ([[impossible-economy-problem]], [[policy-situation]]).
         """
         self.count = 0
         self.factories = 0
         self.enabled = enabled
         self.aa_cover = aa_cover
         self.cover = cover
+        self.rebuild = rebuild
         self.reason = "no sample seen yet" if enabled else "expansion disabled"
         # Which stage was even arrived at, per observation. The final `reason`
         # above is one sentence for a whole match and cannot tell "defence
@@ -183,6 +143,8 @@ class Expander:
         workforce: Workforce,
         plan_wants_worker: bool = False,
         air_seen: bool = False,
+        wave_drop: int = 0,
+        razed: Sequence[tuple[float, float]] = (),
     ) -> tuple[BuildOrder, ...]:
         """Ask the economy what to do about this sample.
 
@@ -238,6 +200,14 @@ class Expander:
                 by the campaign's :class:`~rw_bot.policy.assess.AirWatch` --
                 a fact about the match rather than about this channel, which
                 used to keep a private copy of it.
+            wave_drop: How far the rival's army value sits below its recent
+                peak, from the campaign's
+                :class:`~rw_bot.policy.situation.Momentum` -- the wave-break
+                signal the rebuild gate reads. Ignored when the knob is off.
+            razed: Where razed extractors stood, from the campaign's
+                :class:`~rw_bot.policy.reclaim.Razed`. Withheld from the
+                pool survey until the wave breaks; empty when nothing has
+                been lost, which is every sample of a healthy match.
 
         Returns:
             The build order to send, or nothing when the economy declined to
@@ -340,6 +310,10 @@ class Expander:
             # one ([[policy-holding-ground]]).
             claimed=workforce.claims(),
             refused=workforce.refused(),
+            # Razed pools wait for the wave that took them to break; virgin
+            # pools never appear here, so the opening is untouched
+            # ([[impossible-economy-problem]]).
+            embargoed=reclaim_embargo(tuple(razed), wave_drop, self.rebuild),
         )
         # Kept because it is the informative one when nothing is bought at all.
         # "No pool was taken" has five distinct causes and :class:`Expansion`
@@ -585,4 +559,4 @@ class Expander:
         )
 
 
-__all__ = ["FLOOR_MINIMUM", "RIVAL_POOL_SHARE", "Expander", "economy_floor"]
+__all__ = ["Expander"]

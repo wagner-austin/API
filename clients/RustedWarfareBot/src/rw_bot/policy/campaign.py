@@ -66,6 +66,7 @@ from rw_bot.policy.nuker import Nuker
 from rw_bot.policy.production import wanted_producers
 from rw_bot.policy.quartermaster import Quartermaster
 from rw_bot.policy.raid import Raider
+from rw_bot.policy.reclaim import Razed
 from rw_bot.policy.recorder import Recorder
 from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, OrderTracker
 from rw_bot.policy.rush import Rusher
@@ -124,6 +125,7 @@ def play(
     close: int = 0,
     guns: int = 0,
     nukes: int = 0,
+    rebuild: int = 0,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
@@ -162,13 +164,9 @@ def play(
         reinforce: Type names idle producers should keep making. Empty means
             fight with what exists and make nothing.
         reserve: Credits held back from expansion for the army.
-        max_workers: The most builders worth holding. Every one past the point
-            where they can be usefully employed is credits standing still
-            instead of fighting ([[policy-production]]).
+        max_workers: The most builders worth holding. See Doctrine.
         counter: Tilt production toward the layers the opponent fields.
-        navtilt: When the counter tilt's naval clause runs -- off, on any
-            seen fleet, or only after the fleet has drawn blood
-            ([[policy-exact-timing]], the naval wall; log 2026-08-08).
+        navtilt: When the counter tilt's naval clause runs. See Doctrine.
         cover: Buy turrets beside bare structures at all.
         intercept: Turn the reserve on a raider inside our outpost radius.
         guard_cap: The most reserve units an interception commits; 0 is all.
@@ -177,9 +175,8 @@ def play(
         scout: Keep a scout walking the pools, feeding the counter tilt.
         rush: March released waves at the estimated enemy start.
         raid: The raid party's size, or zero for no raiding.
-        creep: Walk turrets toward the enemy start, one covered step each.
-        hold: Percent of the anchor-to-mirror line the reserve stands at,
-            zero for the anchor -- the choke-holding verb (log 2026-08-09).
+        creep: Walk turrets toward the enemy start. See Doctrine.
+        hold: Percent of the line the reserve stands at. See Doctrine.
         riposte: Release the whole reserve the moment an intrusion ends.
         tech: Factories to unlock a tier on, zero for none. See Doctrine.
         lurk: Scouts kept alive at the enemy start, zero for none. See Doctrine.
@@ -200,6 +197,8 @@ def play(
             Doctrine.
         nukes: Nuke launchers stood and kept firing at the priciest hostile
             structure in sight. See Doctrine.
+        rebuild: Rival army-value drop required before a razed pool may be
+            re-claimed. See Doctrine.
         income_ladder: Refused extractor conversions save toward themselves.
             See Doctrine.
 
@@ -232,7 +231,7 @@ def play(
         OSError: When the connection fails.
     """
     tracker = OrderTracker(plan, stall_samples, afford_samples)
-    expander = Expander(catalogue, profiles, expand, aa_cover, cover)
+    expander = Expander(catalogue, profiles, expand, aa_cover, cover, rebuild)
     workforce = Workforce(EXPAND_RETRY_SAMPLES)
     recorder = Recorder(trace, profiles)
     scores = Scorekeeper(catalogue, profiles)
@@ -261,6 +260,9 @@ def play(
     lurkers = Lurker()
     scatter = Decoys()
     momentum = Momentum()
+    # Pools taken from us, read by the expander's rebuild gate; observed
+    # unconditionally like momentum (:mod:`rw_bot.policy.reclaim`).
+    razed_pools = Razed()
     quartermaster = Quartermaster(
         medics=medics, navy=navy, bunkers=bunkers, flame=flame, guns=guns, battery=battery
     )
@@ -313,6 +315,7 @@ def play(
             if scout or raid:
                 intel.observe(sample)
             momentum.observe(sample)
+            razed_pools.observe(sample)
             airwatch.observe(sample)
             # The closer: dominance decays, so a decided match is ended
             # while it is decided -- eleven of nineteen dominant Very Hard
@@ -448,6 +451,8 @@ def play(
                     workforce,
                     plan_step["wants_worker"],
                     air_seen=airwatch.seen(),
+                    wave_drop=momentum.drop(),
+                    razed=razed_pools.positions(),
                 ),
             )
             # The walks send AFTER the expander, never before: the engine

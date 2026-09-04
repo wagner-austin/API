@@ -250,7 +250,26 @@ def test_an_enemy_extractor_holds_a_pool_just_as_firmly() -> None:
         "unreachable": 0,
         "exposed": 0,
         "refused_blocked": 0,
+        "embargoed_blocked": 0,
     }
+
+
+def test_an_embargoed_pool_is_withheld_and_counted() -> None:
+    """A razed pool waits for the wave that took it to break: withheld
+    from the offer while the caller says so, offered again the moment the
+    caller passes nothing -- unlike a refusal, the exclusion is temporary
+    ([[impossible-economy-problem]])."""
+    razed = pool_at(0, 220, 130)
+    spare = pool_at(1, 600, 130)
+    world = sample(ANCHOR, BUILDER, pools=(razed, spare), credits=10_000)
+    held = survey_pools(
+        world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), (), ((razed["x"], razed["y"]),)
+    )
+    assert held["pool"] == spare
+    assert held["embargoed_blocked"] == 1
+    released = survey_pools(world, ANCHOR, BUILDER, CATALOGUE, PROFILES, (), (), ())
+    assert released["pool"] == razed
+    assert released["embargoed_blocked"] == 0
 
 
 def test_a_pool_another_worker_is_walking_to_is_not_free() -> None:
@@ -389,6 +408,7 @@ def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
         "unreachable": 0,
         "exposed": 1,
         "refused_blocked": 0,
+        "embargoed_blocked": 0,
     }
 
 

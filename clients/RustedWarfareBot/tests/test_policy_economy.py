@@ -191,6 +191,33 @@ def test_the_reason_counts_the_extractors_already_standing() -> None:
     assert plan["owned"] == 2
 
 
+def test_an_embargoed_pool_is_not_claimed_and_the_reason_counts_it() -> None:
+    """The rebuild gate's exclusion arrives here as positions: the razed
+    pool is withheld from the survey and the refusal names it, so a match
+    that starved behind the embargo says so in its own words
+    ([[impossible-economy-problem]])."""
+    world = sample(
+        BUILDER,
+        unit(213, "commandCenter", 0.0, 0.0),
+        pools=(pool_at(300.0, 0.0),),
+        options=(CAN_PLACE,),
+    )
+    plan = expand_economy(
+        world,
+        CATALOGUE,
+        PROFILES,
+        reserve=0,
+        free=free(world),
+        claimed=(),
+        refused=(),
+        embargoed=((300.0, 0.0),),
+    )
+    assert plan["build"] is False
+    assert plan["reason"] == (
+        "no pool free of 1: 0 occupied, 0 unreachable, 0 exposed, 1 embargoed"
+    )
+
+
 def test_a_worker_the_loop_has_not_offered_is_not_used() -> None:
     """Availability has one owner, and it is not this module.
 
@@ -348,7 +375,7 @@ def test_every_pool_taken_is_reported_with_its_counts() -> None:
         world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
     )
     assert plan["build"] is False
-    assert plan["reason"] == "no pool free of 2: 1 occupied, 1 unreachable, 0 exposed"
+    assert plan["reason"] == "no pool free of 2: 1 occupied, 1 unreachable, 0 exposed, 0 embargoed"
     assert plan["occupied"] == 1
 
 
@@ -406,4 +433,4 @@ def test_no_pool_in_sight_is_not_an_error() -> None:
         world, CATALOGUE, PROFILES, reserve=0, free=free(world), claimed=(), refused=()
     )
     assert plan["build"] is False
-    assert plan["reason"] == "no pool free of 0: 0 occupied, 0 unreachable, 0 exposed"
+    assert plan["reason"] == "no pool free of 0: 0 occupied, 0 unreachable, 0 exposed, 0 embargoed"

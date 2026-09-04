@@ -227,6 +227,7 @@ def expand_economy(
     free: Sequence[Entity],
     claimed: Sequence[tuple[float, float]],
     refused: Sequence[tuple[float, float]],
+    embargoed: Sequence[tuple[float, float]] = (),
     type_name: str = EXTRACTOR_TYPE,
 ) -> Expansion:
     """Decide whether to claim another resource pool, and which one.
@@ -277,6 +278,11 @@ def expand_economy(
             worker was available at a time ([[policy-holding-ground]]).
         refused: Sites the engine already refused silently, from the
             workforce's ledger, which the pool survey must not offer again.
+        embargoed: Sites where a razed extractor stood, withheld while the
+            rival's wave holds so the walk back is not into the fire that
+            razed it. Temporary, unlike a refusal: the caller passes an
+            empty sequence once the wave breaks
+            ([[impossible-economy-problem]]).
         type_name: The extractor type to place.
 
     Returns:
@@ -305,7 +311,7 @@ def expand_economy(
     # the base. A player holding no immobile structure measures from the builder
     # instead, which is the build plan's own fallback.
     anchor = find_anchor(sample, catalogue) or builder
-    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed, refused)
+    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed, refused, embargoed)
     owned = count_extractors(sample, type_name)
     if survey["pool"] is None:
         return Expansion(
@@ -314,7 +320,7 @@ def expand_economy(
             reason=(
                 f"no pool free of {survey['visible']}: "
                 f"{survey['occupied']} occupied, {survey['unreachable']} unreachable, "
-                f"{survey['exposed']} exposed"
+                f"{survey['exposed']} exposed, {survey['embargoed_blocked']} embargoed"
             ),
             type_name="",
             unit_id=0,

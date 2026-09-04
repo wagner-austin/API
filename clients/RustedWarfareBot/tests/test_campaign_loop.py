@@ -11,7 +11,7 @@ from __future__ import annotations
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
-from rw_bot.policy.expander import economy_floor
+from rw_bot.policy.floor import economy_floor
 from rw_bot.policy.match_report import format_report
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.wire.state import Sample

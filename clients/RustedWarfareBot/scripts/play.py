@@ -485,6 +485,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         close=doctrine["close"],
         guns=doctrine["guns"],
         nukes=doctrine["nukes"],
+        rebuild=doctrine["rebuild"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],
         kite=doctrine["kite"],

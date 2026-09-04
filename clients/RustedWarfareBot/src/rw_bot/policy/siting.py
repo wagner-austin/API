@@ -342,6 +342,10 @@ class PoolSurvey(TypedDict):
         exposed: How many were reachable only through hostile fire.
         refused_blocked: How many the engine already refused silently, per the
             workforce's ledger, and were therefore never offered.
+        embargoed_blocked: How many stand where a razed extractor stood
+            while the rival's wave has not yet broken -- withheld so the
+            builder's walk back is not into the fire that razed it
+            ([[impossible-economy-problem]]).
     """
 
     pool: ResourcePool | None
@@ -350,6 +354,7 @@ class PoolSurvey(TypedDict):
     unreachable: int
     exposed: int
     refused_blocked: int
+    embargoed_blocked: int
 
 
 def survey_pools(
@@ -360,6 +365,7 @@ def survey_pools(
     profiles: Mapping[str, CombatProfile],
     claimed: Sequence[tuple[float, float]],
     refused: Sequence[tuple[float, float]],
+    embargoed: Sequence[tuple[float, float]] = (),
 ) -> PoolSurvey:
     """Choose a resource pool to build on, and account for the rejects.
 
@@ -410,6 +416,11 @@ def survey_pools(
             doomed order would be re-sent for the rest of the match, exactly
             the ring chooser's disease on a different placement rule
             (wiki log 2026-08-31, verdict-withheld).
+        embargoed: Sites where a razed extractor stood, withheld while the
+            rival's wave holds ([[impossible-economy-problem]]). Unlike a
+            refusal this exclusion is temporary: the caller passes an empty
+            sequence the moment the wave breaks, and the pool is offered
+            again.
 
     Returns:
         The chosen pool with the counts behind the choice. ``pool`` is None when
@@ -426,11 +437,15 @@ def survey_pools(
     unreachable = 0
     exposed = 0
     refused_blocked = 0
+    embargoed_blocked = 0
     origin = (builder["x"], builder["y"])
     limit = POOL_OCCUPIED_RADIUS**2
     for pool in sample["pools"]:
         if is_refused((pool["x"], pool["y"]), refused):
             refused_blocked += 1
+            continue
+        if is_refused((pool["x"], pool["y"]), embargoed):
+            embargoed_blocked += 1
             continue
         if _is_occupied(sample, pool, catalogue):
             occupied += 1
@@ -460,6 +475,7 @@ def survey_pools(
         unreachable=unreachable,
         exposed=exposed,
         refused_blocked=refused_blocked,
+        embargoed_blocked=embargoed_blocked,
     )
 
 

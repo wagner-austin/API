@@ -49,6 +49,7 @@ _BAD_NAVTILT = "RW-DOCTRINE-025"
 _BAD_HOLD = "RW-DOCTRINE-026"
 _BAD_NAVY_COUNT = "RW-DOCTRINE-027"
 _BAD_BATTERY_COUNT = "RW-DOCTRINE-028"
+_BAD_REBUILD_DROP = "RW-DOCTRINE-029"
 
 
 def _count(
@@ -132,6 +133,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     close = _count(payload, "close", _BAD_CLOSE_RATIO, "a dominance multiple with 0 for never")
     guns = _count(payload, "guns", _BAD_GUN_COUNT, "top-tier gun turrets to hold, 0 none")
     nukes = _count(payload, "nukes", _BAD_NUKE_COUNT, "nuke launchers to stand, 0 none")
+    rebuild = _count(payload, "rebuild", _BAD_REBUILD_DROP, "a rival army-value drop, 0 for off")
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -193,6 +195,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         close=close,
         guns=guns,
         nukes=nukes,
+        rebuild=rebuild,
     )
 
 
@@ -244,6 +247,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "close": doctrine["close"],
         "guns": doctrine["guns"],
         "nukes": doctrine["nukes"],
+        "rebuild": doctrine["rebuild"],
     }
 
 

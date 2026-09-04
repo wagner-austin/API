@@ -82,6 +82,7 @@ INT_FIELDS: Final = (
     "close",
     "guns",
     "nukes",
+    "rebuild",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -302,6 +303,17 @@ class Doctrine(TypedDict):
             refutations) says saving this deep during contested Very Hard
             play loses; this knob is for the fortress context where
             survival is already solved ([[policy-budget]]).
+        rebuild: Credits the strongest rival's army value must sit below
+            its recent peak before a RAZED pool may be re-claimed, zero
+            for off. The Impossible autopsy's shape is built-then-razed:
+            the economy machinery works, the pool re-enters the survey
+            the moment nothing stands on it, and the builder's walk back
+            dies to the same wave that razed it
+            ([[impossible-economy-problem]]). This gates only pools we
+            HELD and lost -- virgin pools claim as always, so the opening
+            never waits -- on the same wave-break signal the strike
+            release reads, because the wave being broken is what makes
+            the walk survivable ([[policy-situation]]).
         income_ladder: Whether a refused extractor conversion saves toward
             itself. Off is the Impossible measurement: unconditional saving
             doubled income and lost, because the army pauses let the enemy's
@@ -371,6 +383,7 @@ class Doctrine(TypedDict):
     close: int
     guns: int
     nukes: int
+    rebuild: int
 
 
 #: The style everything so far was measured under, exactly.
@@ -425,6 +438,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     close=0,
     guns=0,
     nukes=0,
+    rebuild=0,
 )
 
 

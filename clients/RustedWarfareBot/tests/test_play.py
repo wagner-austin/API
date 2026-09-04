@@ -126,7 +126,8 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         # last: "no pool was taken" has five distinct causes and this
         # enumerates them, where defence would report only that it ran last
         # ([[policy-economy]]).
-        "expansions     0 (0 factories) (no pool free of 0: 0 occupied, 0 unreachable, 0 exposed)",
+        "expansions     0 (0 factories) "
+        "(no pool free of 0: 0 occupied, 0 unreachable, 0 exposed, 0 embargoed)",
         "extractors     3 -> 3",
         "attack orders  0",
         "rallied        0",
@@ -165,7 +166,7 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         # and refuted on exactly that ambiguity -- it had fired three times in
         # twelve full matches ([[policy-holding-ground]]).
         "reach          income                  reached     2  acted     0"
-        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
+        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed, 0 embargoed",
         "reach          defence                 reached     2  acted     0"
         "  last: no free worker can place c_turret_t1",
         "reach          throughput              reached     2  acted     0"
@@ -257,7 +258,8 @@ def test_the_sample_budget_defaults_when_not_given(
         # last: "no pool was taken" has five distinct causes and this
         # enumerates them, where defence would report only that it ran last
         # ([[policy-economy]]).
-        "expansions     0 (0 factories) (no pool free of 0: 0 occupied, 0 unreachable, 0 exposed)",
+        "expansions     0 (0 factories) "
+        "(no pool free of 0: 0 occupied, 0 unreachable, 0 exposed, 0 embargoed)",
         "extractors     3 -> 3",
         "attack orders  0",
         "rallied        0",
@@ -292,7 +294,7 @@ def test_the_sample_budget_defaults_when_not_given(
         # shape -- never reached at all -- is the one in the test above, and a
         # refusal count renders both as zero.
         "reach          income                  reached   120  acted     0"
-        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
+        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed, 0 embargoed",
         "reach          defence                 reached   120  acted     0"
         "  last: no free worker can place c_turret_t1",
         "reach          throughput              reached   120  acted     0"
@@ -385,6 +387,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     close=0,
                     guns=0,
                     nukes=0,
+                    rebuild=0,
                 )
             )
         )
@@ -535,6 +538,7 @@ def test_the_predicted_mode_loads_the_shipped_model_and_plays(
                     close=0,
                     guns=0,
                     nukes=0,
+                    rebuild=0,
                 )
             )
         )
