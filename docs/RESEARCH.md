@@ -219,13 +219,45 @@ and controls as the baseline sweep.
   non-gain has no reading; the raw arm means always carry the verdict.
   That rule exists because the p=1.0 collapse is a real cell every full
   grid hits, and the first version of the CLI died on it.
-- **Open extensions, filed rather than implied:** varied-count companion
-  exposure is now MOTIVATED, not speculative — the n4→n8 retention decay
-  (44.6% → 26.5%) is the gap it exists to close, and the n8 record is its
-  baseline; the budget slot policy under companioned training; the scale
-  rung (`gpt2-medium` locally, a 7B base on A100 — cheap for cartridges,
-  since only slots carry optimizer state); the V100 replication of the
-  original n2/n4 grid, unblocked now that v34 exists.
+- **Open extensions, filed rather than implied:** the budget slot policy
+  under companioned training; the scale rung (`gpt2-medium` locally, a 7B
+  base on A100 — cheap for cartridges, since only slots carry optimizer
+  state); the V100 replication of the original n2/n4 grid, unblocked now
+  that v34 exists. Varied-count exposure was measured the same day and
+  REFUTED at its target — see the next subsection.
+
+#### `cartridge_varied_companion_sweep` — varied-count exposure, refuted at its target
+
+Added 2026-09-04 (board task `7815a0fd`), attacking the n4→n8 retention
+decay: every cartridge trains beside a DRAWN number (uniform 1..K when
+present) of frozen seed-variant companions from one held-out corpus, the
+pool's first member byte-identical to the recorded single companion so the
+records compare as supersets.
+
+- **Command:** `python -m model_trainer.cli.cartridge_varied_companion_sweep
+  --plan gpt2-companions-varied --corpus <dir> --other-corpora <d1..d7>
+  --companion-corpus <dir> --device cuda --out <file>`
+- **Result, measured 2026-09-04 on HPC3** (jobs 55759514/55761217 on one
+  V100, image v35 `4e02f3b0…` from `0aacbd24`, records bit-identical,
+  sha256 `1fd6bb9d…`, run documents
+  `tools/hpc3/runs/cartridge-companions-varied-v100-v35{,-twin}.json`,
+  0 SU): **the hypothesis is refuted at its target.** At trained-kind,
+  p=0.5, K=3: n8 retention is **+18.3%** against the single-companion
+  +26.5% — the composed difference (−0.073) sits at ~1× the cell spreads,
+  so at best flat, plausibly worse. n4 improves modestly to **+51.0%**
+  (vs 44.6%) with the composed spread collapsing 0.049 → 0.010, the
+  tightest composed cell in the program, at a higher solo cost (−0.063
+  vs −0.044).
+- **The mechanism reading is the finding:** count-invariance WAS learned —
+  the untrained-composed controls (+0.60 at n4, +0.30 at n8) sit far above
+  every earlier grid's noise-composition arms — yet real strangers still
+  interfere at both counts. The count-decay is CONTENT interference, not
+  count shock, confirming the n8 finding from the opposite direction:
+  content-companionship is load-bearing, and a pool of three same-corpus
+  companions cannot teach content diversity.
+- **The motivated follow-on is a content-DIVERSE pool** (companions drawn
+  from several held-out corpora), deliberately excluded from this cell as
+  a second variable; this record is its baseline.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
