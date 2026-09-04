@@ -7,6 +7,7 @@ They are skipped if the CLI tool is not available.
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,14 +21,33 @@ BUNDLED_EXE = TOOLS_DIR / "ThermoRawFileParser.exe"
 
 
 def _thermorawfileparser_available() -> bool:
-    """Check if ThermoRawFileParser is available."""
-    if BUNDLED_EXE.exists():
-        return True
+    """Report whether this machine can RUN ThermoRawFileParser.
+
+    Existence is not availability, and the difference is what made these
+    five tests die rather than skip on Linux CI. The bundled artifact is a
+    .NET assembly -- a Windows PE ``.exe`` -- committed to the repo, so
+    ``BUNDLED_EXE.exists()`` is True on every platform. On Linux it is a
+    file the kernel cannot execute, and the suite failed with
+    ``PermissionError: [Errno 13]`` from inside ``subprocess.run`` instead
+    of skipping, which this module's own docstring says is the intent.
+
+    Returns:
+        True when something here can actually execute the parser: a native
+        build on PATH, or a .NET assembly plus a runtime that interprets it
+        -- Windows natively, Mono elsewhere, which is exactly the split
+        ``readers/thermo.py`` documents in its install notes.
+    """
+    # A native build runs anywhere, whatever it was written in.
     if shutil.which("ThermoRawFileParser") is not None:
         return True
-    if shutil.which("ThermoRawFileParser.exe") is not None:
-        return True
-    return (Path.home() / ".dotnet" / "tools" / "ThermoRawFileParser.exe").exists()
+    assembly_present = (
+        BUNDLED_EXE.exists()
+        or shutil.which("ThermoRawFileParser.exe") is not None
+        or (Path.home() / ".dotnet" / "tools" / "ThermoRawFileParser.exe").exists()
+    )
+    if not assembly_present:
+        return False
+    return sys.platform == "win32" or shutil.which("mono") is not None
 
 
 def _get_raw_file() -> Path:

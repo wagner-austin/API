@@ -24,6 +24,7 @@ from instrument_io.fakes import (
     _FakeNdArray3D,
 )
 from instrument_io.testing import (
+    _prod_cleanup_temp_dir,
     _prod_shutil_which,
     _prod_smps_read_lines,
     _prod_txt_detect_encoding,
@@ -437,3 +438,28 @@ class TestFakePDF:
         pdf = FakePDF([page])
         with pdf as p:
             assert len(p.pages) == 1
+
+
+class TestProdCleanupTempDir:
+    """Tests for the _prod_cleanup_temp_dir production wrapper.
+
+    Tested directly because nothing else reaches it. Every Thermo test
+    replaces ``hooks.cleanup_temp_dir`` with a lambda -- correctly, since
+    they are not testing directory removal -- so the real wrapper ran only
+    on the production path, which needs ThermoRawFileParser and a .NET
+    runtime. On a Linux CI runner that path cannot execute at all, and these
+    three lines were the whole of this package's coverage gap.
+    """
+
+    def test_removes_the_directory_and_its_contents(self, tmp_path: Path) -> None:
+        temp_dir = tmp_path / "thermo_abc"
+        temp_dir.mkdir()
+        (temp_dir / "converted.mzML").write_text("<mzML/>", encoding="utf-8")
+        _prod_cleanup_temp_dir(temp_dir)
+        assert not temp_dir.exists()
+
+    def test_absent_directory_is_not_an_error(self, tmp_path: Path) -> None:
+        """Conversion can fail before the directory exists, and cleanup runs
+        in a finally block either way."""
+        _prod_cleanup_temp_dir(tmp_path / "never_created")
+        assert not (tmp_path / "never_created").exists()
