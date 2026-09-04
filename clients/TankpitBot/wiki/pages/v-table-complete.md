@@ -7,6 +7,8 @@ related:
   - "[[client-commands]]"
 source_paths:
   - "tpclient.js:155"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every V[x].h() parser traced line by line)

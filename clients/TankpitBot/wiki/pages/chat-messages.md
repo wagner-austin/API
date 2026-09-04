@@ -7,6 +7,8 @@ related:
 source_paths:
   - "tpclient.js:243"
   - "tpclient.js:24"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-07-29"
 confidence: high
 verified: 2026-07-29 (65 entries from JS E[] 2026-06-19; wire format + M echo + flood mute live-verified sniff-20260729-214411)

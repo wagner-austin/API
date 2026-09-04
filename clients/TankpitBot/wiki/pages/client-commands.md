@@ -8,6 +8,8 @@ related:
 source_paths:
   - "tpclient.js:25"
   - "tpclient.js:6"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-09-03"
 confidence: high
 verified: 2026-06-19 (every command class traced through JS source)

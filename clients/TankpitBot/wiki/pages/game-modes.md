@@ -12,6 +12,7 @@ source_paths:
   - "tpclient.js:265"
   - "docs/sources/sigmas-tankpit-guide-v3.4.pdf"
 source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
   "docs/sources/sigmas-tankpit-guide-v3.4.pdf": "6ec5665374ed38b2dfc8fda94aad35c4b99c1256"
 fact_checked: "2026-07-06"
 confidence: high
