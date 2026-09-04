@@ -18,6 +18,7 @@ from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks.http_stream import (
     _HttpClientStream,
     _real_open_http_stream,
+    resolve_target,
 )
 
 BOUNDARY = b"--tankpitbotframe"
@@ -40,16 +41,32 @@ def _part(marker: int) -> bytes:
 class _FakeStream:
     """An :class:`HttpStreamProtocol` over a fixed chunk list."""
 
-    def __init__(self, chunks: list[bytes], content_type: str = CONTENT_TYPE) -> None:
+    def __init__(
+        self,
+        chunks: list[bytes],
+        content_type: str = CONTENT_TYPE,
+        status: int = 200,
+    ) -> None:
         """Bind the stream to the bytes it will hand out.
 
         Args:
             chunks: Returned one per ``read``; exhaustion returns b"".
             content_type: The header the reader takes its boundary from.
+            status: The response status the probe checks first.
         """
         self._chunks = list(chunks)
         self._content_type = content_type
+        self._status = status
         self.closed = 0
+
+    @property
+    def status(self) -> int:
+        """The bound status.
+
+        Returns:
+            The status code.
+        """
+        return self._status
 
     @property
     def content_type(self) -> str:
@@ -192,6 +209,27 @@ class TestCollect:
         assert len(frames) == 2
         assert hooked[0].closed == 1
 
+    def test_a_refusal_is_named_by_its_status_not_by_the_boundary(self) -> None:
+        """A 404 is a valid text/plain response, and must read as a 404.
+
+        Measured against the live endpoint: a demo slot whose bot had
+        ended answered 404, and the probe reported "no boundary in
+        content type text/plain". That blames the stream for a target
+        that was simply not there, which is the same misdirection the
+        https bug produced.
+        """
+        streams: list[_FakeStream] = [_FakeStream([], content_type="text/plain", status=404)]
+        original = core_hooks.open_http_stream
+        core_hooks.open_http_stream = lambda url: streams[0]
+        core_hooks.get_current_time_ms = _StepClock(10)
+        try:
+            with pytest.raises(ValueError, match="answered 404, not a stream"):
+                collect("http://x/v", 5.0)
+        finally:
+            core_hooks.open_http_stream = original
+
+        assert streams[0].closed == 1
+
     def test_a_response_without_a_boundary_is_refused_and_still_closed(
         self, hooked: list[_FakeStream]
     ) -> None:
@@ -307,6 +345,7 @@ class TestRealHttpStream:
         # does not require it, so `with` has to name the real type.
         try:
             with _HttpClientStream(f"http://127.0.0.1:{port}/video?x=1") as stream:
+                assert stream.status == 200
                 assert stream.content_type == CONTENT_TYPE
                 while True:
                     chunk = stream.read(16)
@@ -333,6 +372,40 @@ class TestRealHttpStream:
             server.shutdown()
 
         assert content_type == ""
+
+    def test_an_https_url_resolves_to_tls_on_443(self) -> None:
+        """The bug that shipped: https fell through to cleartext on 80.
+
+        The probe's whole point is measuring the PUBLIC stream, which is
+        https, and the failure was silent in the worst way: the request
+        reached an endpoint, came back as a text/plain error page, and
+        the probe then blamed the stream for having no multipart
+        boundary.
+        """
+        assert resolve_target("https://tankpit.austinwagner.org/demo/video/demo-1") == (
+            True,
+            "tankpit.austinwagner.org",
+            443,
+            "/demo/video/demo-1",
+        )
+
+    def test_plain_http_keeps_port_80_and_no_tls(self) -> None:
+        """The loopback case, which is the other half of the branch."""
+        assert resolve_target("http://127.0.0.1:27300/demo/video/demo-1?a=2") == (
+            False,
+            "127.0.0.1",
+            27300,
+            "/demo/video/demo-1?a=2",
+        )
+
+    def test_an_empty_path_becomes_root(self) -> None:
+        """``http://host`` is a legal URL and must still request something."""
+        assert resolve_target("http://example.org")[3] == "/"
+
+    def test_a_non_http_scheme_is_refused(self) -> None:
+        """A ws:// or file:// URL is a caller error, named here."""
+        with pytest.raises(ValueError, match="scheme must be http or https"):
+            _real_open_http_stream("ws://127.0.0.1:1/video")
 
     def test_a_url_without_a_host_is_refused(self) -> None:
         """A caller bug, named where it happens.

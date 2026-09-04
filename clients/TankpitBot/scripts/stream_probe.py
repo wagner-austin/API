@@ -107,13 +107,19 @@ def collect(url: str, seconds: float) -> tuple[list[bytes], list[float], float]:
         one read).
 
     Raises:
-        ValueError: If the response carries no multipart boundary.
+        ValueError: If the endpoint refused, or the response carries no
+            multipart boundary. The status is checked FIRST, because a
+            refusal is a valid text/plain response and blaming the
+            boundary for it points at the stream when the target was
+            simply not there.
     """
     frames: list[bytes] = []
     arrivals: list[float] = []
     buffer = b""
     stream = core_hooks.open_http_stream(url)
     try:
+        if stream.status != 200:
+            raise ValueError(f"{url} answered {stream.status}, not a stream")
         boundary = boundary_from_content_type(stream.content_type)
         start = core_hooks.get_current_time_ms()
         while True:

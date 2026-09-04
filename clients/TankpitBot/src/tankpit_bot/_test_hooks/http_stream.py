@@ -17,7 +17,7 @@ resolve concretely and no cast is needed.
 
 from __future__ import annotations
 
-from http.client import HTTPConnection, HTTPResponse
+from http.client import HTTPConnection, HTTPResponse, HTTPSConnection
 from types import TracebackType
 from typing import Protocol
 from urllib.parse import urlparse
@@ -25,6 +25,21 @@ from urllib.parse import urlparse
 
 class HttpStreamProtocol(Protocol):
     """One open HTTP response being read incrementally."""
+
+    @property
+    def status(self) -> int:
+        """The response status.
+
+        Exposed because a caller that only sees the body cannot tell a
+        stream from a refusal: a 404 arrives as a perfectly valid
+        text/plain response, and a reader looking for a multipart
+        boundary reports "this stream has no boundary" when the truth
+        is "that slot is not running".
+
+        Returns:
+            The HTTP status code.
+        """
+        ...
 
     @property
     def content_type(self) -> str:
@@ -70,6 +85,43 @@ class OpenHttpStreamProtocol(Protocol):
         ...
 
 
+def resolve_target(url: str) -> tuple[bool, str, int, str]:
+    """Split a stream URL into the pieces a connection needs.
+
+    Pure, and separate from opening the socket, so the scheme and port
+    decisions are testable without a network. That split is not
+    cosmetic: the first version of this module folded them into the
+    constructor and defaulted everything to plain HTTP on port 80, so an
+    ``https://`` URL reached the public endpoint as cleartext, came back
+    as a text/plain error page, and the probe blamed the STREAM for
+    having no multipart boundary. The fault was the client, and nothing
+    could see it because nothing could call it.
+
+    Args:
+        url: Absolute URL to GET.
+
+    Returns:
+        Whether TLS is required, the host, the port, and the
+        request path with any query string reattached.
+
+    Raises:
+        ValueError: If the URL carries no host, or names a scheme other
+            than http/https. Both are refused rather than defaulted.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname
+    if host is None:
+        raise ValueError(f"stream URL missing host: {url!r}")
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"stream URL scheme must be http or https: {url!r}")
+    secure = parsed.scheme == "https"
+    port = parsed.port if parsed.port is not None else (443 if secure else 80)
+    path = parsed.path if parsed.path != "" else "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    return secure, host, port, path
+
+
 class _HttpClientStream:
     """An :class:`HttpStreamProtocol` over a typed :mod:`http.client` response."""
 
@@ -80,20 +132,26 @@ class _HttpClientStream:
             url: Absolute URL to GET.
 
         Raises:
-            ValueError: If the URL carries no host.
+            ValueError: If :func:`resolve_target` refuses the URL.
             OSError: If the host cannot be reached.
         """
-        parsed = urlparse(url)
-        host = parsed.hostname
-        if host is None:
-            raise ValueError(f"stream URL missing host: {url!r}")
-        port = parsed.port if parsed.port is not None else 80
-        path = parsed.path if parsed.path != "" else "/"
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-        self._connection = HTTPConnection(host, port, timeout=30.0)
+        secure, host, port, path = resolve_target(url)
+        self._connection: HTTPConnection = (
+            HTTPSConnection(host, port, timeout=30.0)
+            if secure
+            else HTTPConnection(host, port, timeout=30.0)
+        )
         self._connection.request("GET", path)
         self._response: HTTPResponse = self._connection.getresponse()
+
+    @property
+    def status(self) -> int:
+        """The response status.
+
+        Returns:
+            The HTTP status code.
+        """
+        return self._response.status
 
     @property
     def content_type(self) -> str:
@@ -176,4 +234,5 @@ __all__ = [
     "_HttpClientStream",
     "_real_open_http_stream",
     "open_http_stream",
+    "resolve_target",
 ]
