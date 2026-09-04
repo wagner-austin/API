@@ -296,8 +296,13 @@ def start(
         now_unix=now_unix,
     )
 
-    members = manifest.build_tree(project_root, project)
-    payload = staging.archive(project_root, members, archive_dir / f"{run_id}.tgz")
+    members = manifest.build_tree(project_root, project, external=plan["external_paths"])
+    # Named by run AND node. A run id is the project and the second it
+    # started, so two sessions dispatching one project to two nodes in the
+    # same second produce the same id -- and with archives in one scratch
+    # directory rather than one per workspace, that is two writers on one
+    # file. The lease stops them sharing a node, not a filename.
+    payload = staging.archive(project_root, members, archive_dir / f"{run_id}-{node_name}.tgz")
     target = staging.stage(
         node["host"], run_id=run_id, stage_root=node["stage_root"], payload=payload
     )

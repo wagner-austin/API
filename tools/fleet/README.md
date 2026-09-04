@@ -156,6 +156,17 @@ a way that reads as the code's fault.
 package exists to stop two dispatches sharing, and one machine's has absolute
 paths baked into it. The node builds its own from the lockfile that is sent.
 
+**The archive itself is built outside the repository**, and getting that wrong
+twice is instructive. Left beside `fleet.json` it was staged by the next
+dispatch, which grew 185 KB → 1.4 → 4.5 → 13.5 → 20.7 → 42.5 MB, each carrying
+its predecessors. Excluding the directory it sat in fixed the size and broke
+something worse: `tools/hpc3` commits 294 run documents under
+`tools/hpc3/runs`, force-added past the monorepo's `**/runs/` ignore, and its
+suite reads them — so the exclusion failed four of its tests for a reason that
+read as hpc3's fault. A scratch file inside the tree being staged is the whole
+error, and excluding a directory to compensate is how a fix becomes a second
+bug.
+
 **A project is not the unit of staging, and the first real dispatch proved
 it.** `tools/fleet` went to sedona as one directory, which is what "dispatch a
 project" reads as and cannot build: its `pyproject.toml` resolves
@@ -216,6 +227,30 @@ It is checked **before any node is probed**, by both `fleet-run` and
 `fleet-preflight`, through the same function `leases.acquire` enforces with.
 Probing three nodes to collect three identical refusals costs three round
 trips and produces a message shaped like a capacity problem.
+
+## A project's suite may read outside its own directory
+
+`tools/hpc3` was dispatched to lavender and four of its tests failed: its
+suite reads `docs/RESEARCH.md` at the monorepo root, the index of every body
+of work on the machine, and a staged tree did not have it. Same class as the
+guard rules that resolve their declaring module from the root — except the
+guards can be *asked* (`monorepo_guards.external_inputs`) and a project's
+tests cannot, because nothing but the project knows what they open.
+
+So the project declares it:
+
+```json
+"tools/hpc3": {
+  "worker_ram_gb": 0.25, "minimum_workers": 4, "expected_minutes": 5,
+  "external_paths": ["docs"]
+}
+```
+
+The declaration can drift from the code, and that is accepted rather than
+solved: the drift surfaces as a loud remote failure naming the missing file,
+which is exactly how the field was found. A declared path that has since been
+renamed is refused at dispatch rather than at tar, because `tar: docs: Cannot
+stat` names a path and the reader's actual fix is to edit the workspace.
 
 ## Cancelling
 

@@ -44,7 +44,11 @@ def _plan() -> ProjectConfig:
         The project.
     """
     return ProjectConfig(
-        worker_ram_gb=1.1, minimum_workers=2, expected_minutes=5, exclusive_resources=()
+        worker_ram_gb=1.1,
+        minimum_workers=2,
+        expected_minutes=5,
+        exclusive_resources=(),
+        external_paths=(),
     )
 
 
@@ -67,13 +71,14 @@ class TestRunIdentity:
 
 
 class TestRun:
-    def test_the_archive_is_built_where_the_records_live(
+    def test_the_archive_is_built_outside_the_repository(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
-        """Not beside the workspace document. An archive is run output, and
-        one left where a tree is staged FROM is carried by the next dispatch:
-        measured 2026-09-04, a 20.7 MB archive beside fleet.json made the
-        following dispatch 42.5 MB."""
+        """An archive is scratch, and one left inside the tree being staged is
+        carried by the next dispatch: measured 2026-09-04, a 20.7 MB archive
+        beside fleet.json made the following dispatch 42.5 MB. Excluding the
+        directory it sat in was the second wrong answer -- it hid 294 committed
+        run documents that tools/hpc3's suite reads."""
         # The archive is placed where the workspace says archives go. tar is
         # faked, so if run.py used any OTHER directory the dispatch would fail
         # reading its own archive back -- which is what makes exit 0 here an
@@ -98,9 +103,11 @@ class TestRun:
         )
 
         assert code == 0
-        assert loaded.archives != loaded.directory
-        assert (loaded.archives / f"{DEMO_RUN_ID}.tgz").is_file()
-        assert not (loaded.directory / f"{DEMO_RUN_ID}.tgz").exists()
+        assert (loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz").is_file()
+        # The invariant that matters: not inside the tree being staged, so it
+        # cannot be picked up by the next dispatch of it.
+        assert repo not in loaded.archives.parents
+        assert not (loaded.directory / f"{DEMO_RUN_ID}-lavender.tgz").exists()
 
     def test_a_dispatch_leases_stages_launches_and_records(
         self, config_path: pathlib.Path, repo: pathlib.Path

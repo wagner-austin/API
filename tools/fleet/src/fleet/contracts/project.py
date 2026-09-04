@@ -26,7 +26,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.resources import decode_resources, encode_resources
+from fleet.contracts.resources import decode_names, encode_names
 
 #: The recipe every dispatch runs. One string, in one place, so a dispatch and
 #: a local build cannot diverge.
@@ -61,12 +61,28 @@ class ProjectConfig(TypedDict):
             runs, on any node. A workspace-level or node-level declaration
             could not say which SUITES contend, only which machines do, and
             the machines are not the thing there is one of.
+        external_paths: Repo-relative paths OUTSIDE this project that its
+            build reads, staged alongside it. Empty for a self-contained
+            suite.
+
+            MEASURED, NOT ANTICIPATED. ``tools/hpc3`` was dispatched to
+            lavender on 2026-09-04 and four of its tests failed: its suite
+            reads ``docs/RESEARCH.md`` at the monorepo root, which is the
+            index of every body of work on the machine, and a staged tree did
+            not have it. The guards' own out-of-package reads are discovered
+            by asking :mod:`monorepo_guards`; a project's TESTS can only be
+            declared, because nothing but the project knows what they open.
+
+            The declaration can drift from the code, and that is accepted
+            rather than solved: the drift surfaces as a loud remote failure
+            naming the missing file, which is how this field was found.
     """
 
     worker_ram_gb: float
     minimum_workers: int
     expected_minutes: int
     exclusive_resources: tuple[str, ...]
+    external_paths: tuple[str, ...]
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -113,7 +129,8 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "worker_ram_gb": project["worker_ram_gb"],
         "minimum_workers": project["minimum_workers"],
         "expected_minutes": project["expected_minutes"],
-        "exclusive_resources": encode_resources(project["exclusive_resources"]),
+        "exclusive_resources": encode_names(project["exclusive_resources"]),
+        "external_paths": encode_names(project["external_paths"]),
     }
 
 
@@ -159,9 +176,10 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         worker_ram_gb=worker_ram_gb,
         minimum_workers=minimum_workers,
         expected_minutes=expected_minutes,
-        exclusive_resources=decode_resources(
+        exclusive_resources=decode_names(
             value.get("exclusive_resources"), field="project.exclusive_resources"
         ),
+        external_paths=decode_names(value.get("external_paths"), field="project.external_paths"),
     )
 
 

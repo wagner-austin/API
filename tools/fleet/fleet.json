@@ -62,7 +62,8 @@
     "tools/hpc3": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
-      "expected_minutes": 2
+      "expected_minutes": 5,
+      "external_paths": ["docs"]
     },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,

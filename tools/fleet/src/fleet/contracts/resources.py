@@ -39,7 +39,7 @@ from __future__ import annotations
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 
-def decode_resources(value: JSONValue, *, field: str) -> tuple[str, ...]:
+def decode_names(value: JSONValue, *, field: str) -> tuple[str, ...]:
     """Decode and validate a declared list of exclusive resource names.
 
     Args:
@@ -75,7 +75,7 @@ def decode_resources(value: JSONValue, *, field: str) -> tuple[str, ...]:
     return tuple(names)
 
 
-def encode_resources(resources: tuple[str, ...]) -> list[JSONValue]:
+def encode_names(resources: tuple[str, ...]) -> list[JSONValue]:
     """Encode a list of resource names.
 
     Args:
@@ -103,4 +103,4 @@ def contended(held: tuple[str, ...], wanted: tuple[str, ...]) -> tuple[str, ...]
     return tuple(name for name in wanted if name in held)
 
 
-__all__ = ["contended", "decode_resources", "encode_resources"]
+__all__ = ["contended", "decode_names", "encode_names"]

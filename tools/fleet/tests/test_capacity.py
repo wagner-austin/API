@@ -92,6 +92,7 @@ def _project(*, minimum_workers: int = 4, worker_ram_gb: float = 1.1) -> Project
         minimum_workers=minimum_workers,
         expected_minutes=5,
         exclusive_resources=(),
+        external_paths=(),
     )
 
 

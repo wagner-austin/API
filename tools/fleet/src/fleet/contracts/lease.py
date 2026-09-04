@@ -45,7 +45,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.resources import contended, decode_resources, encode_resources
+from fleet.contracts.resources import contended, decode_names, encode_names
 
 
 class Lease(TypedDict):
@@ -217,7 +217,7 @@ def encode_lease(lease: Lease) -> JSONObject:
         "session_id": lease["session_id"],
         "acquired_unix": lease["acquired_unix"],
         "expires_unix": lease["expires_unix"],
-        "resources": encode_resources(lease["resources"]),
+        "resources": encode_names(lease["resources"]),
     }
 
 
@@ -256,7 +256,7 @@ def decode_lease(value: JSONValue) -> Lease:
         session_id=require_str(value, "session_id"),
         acquired_unix=acquired_unix,
         expires_unix=expires_unix,
-        resources=decode_resources(value.get("resources"), field="lease.resources"),
+        resources=decode_names(value.get("resources"), field="lease.resources"),
     )
 
 

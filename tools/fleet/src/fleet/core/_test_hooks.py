@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
+import tempfile
 import time
 from collections.abc import Sequence
 from typing import Protocol
@@ -175,6 +176,22 @@ class DirectoryExistsProtocol(Protocol):
         """
 
 
+class TempRootProtocol(Protocol):
+    """Reports the system's directory for scratch files."""
+
+    def __call__(self) -> pathlib.Path:
+        """Locate the temporary directory.
+
+        A hook because it reads the environment, and this package routes
+        every impure act through the seam. The one caller is the staging
+        archive, which is scratch by construction: tar writes it, its bytes
+        are read once and sent, and nothing opens it again.
+
+        Returns:
+            The directory scratch files belong in.
+        """
+
+
 class MakeDirectoryProtocol(Protocol):
     """Creates a directory and every parent it needs."""
 
@@ -310,6 +327,15 @@ def _default_directory_exists(path: pathlib.Path) -> bool:
     return path.is_dir()
 
 
+def _default_temp_root() -> pathlib.Path:
+    """Locate the real temporary directory.
+
+    Returns:
+        The system scratch directory.
+    """
+    return pathlib.Path(tempfile.gettempdir())
+
+
 def _default_make_directory(path: pathlib.Path) -> None:
     """Create a real directory and its parents.
 
@@ -337,6 +363,7 @@ read_bytes: ReadBytesProtocol = _default_read_bytes
 file_exists: FileExistsProtocol = _default_file_exists
 directory_exists: DirectoryExistsProtocol = _default_directory_exists
 make_directory: MakeDirectoryProtocol = _default_make_directory
+temp_root: TempRootProtocol = _default_temp_root
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
 
@@ -351,6 +378,7 @@ __all__ = [
     "ReadBytesProtocol",
     "ReadTextProtocol",
     "RunProtocol",
+    "TempRootProtocol",
     "WriteTextProtocol",
     "append_text",
     "directory_exists",
@@ -360,5 +388,6 @@ __all__ = [
     "read_bytes",
     "read_text",
     "run",
+    "temp_root",
     "write_text",
 ]

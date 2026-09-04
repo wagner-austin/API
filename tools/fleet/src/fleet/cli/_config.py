@@ -87,22 +87,29 @@ class LoadedWorkspace:
     def archives(self) -> pathlib.Path:
         """Directory the staging archives are built in.
 
-        THE LEDGER'S DIRECTORY, not the workspace document's, and the
-        difference is not cosmetic. An archive is run OUTPUT, the same kind of
-        thing as the ledger, and this monorepo gitignores ``**/runs/`` and the
-        stager excludes it -- so putting archives there makes them invisible
-        to both, which is what they should be.
+        OUTSIDE THE REPOSITORY, and it took two wrong answers to get here. An
+        archive is pure scratch: tar writes it, its bytes are read once and
+        sent to a node, and nothing ever opens it again.
 
-        Measured 2026-09-04, when they were built beside the document instead:
-        moving ``fleet.json`` to the package root moved the archives with it,
-        so a 20.7 MB archive landed in ``tools/fleet/``, showed up untracked in
-        everybody's ``git status``, and was then STAGED BY THE NEXT DISPATCH --
-        which arrived at 42.5 MB carrying its own predecessor.
+        Built beside the workspace document, a 20.7 MB archive landed in
+        ``tools/fleet/``, showed up untracked in everybody's ``git status``,
+        and was STAGED BY THE NEXT DISPATCH -- which arrived at 42.5 MB
+        carrying its predecessor. Moving them under ``runs/`` and excluding
+        that directory from staging fixed the size and broke something worse:
+        ``tools/hpc3`` commits 294 run documents under ``tools/hpc3/runs``,
+        force-added past the monorepo's ``**/runs/`` ignore, and its suite
+        reads them. A dispatch that hid them failed four tests on lavender for
+        a reason that looked like hpc3's fault.
+
+        A scratch file inside the tree being staged is the whole error, and
+        excluding a directory to compensate is how a fix becomes a second bug.
+        Out of the repository, nothing needs excluding.
 
         Returns:
-            The resolved path.
+            The scratch directory, named so a person who finds it knows what
+            left it there.
         """
-        return self.ledger.parent
+        return _test_hooks.temp_root() / "fleet-archives"
 
     @property
     def leases(self) -> pathlib.Path:

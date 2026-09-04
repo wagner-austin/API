@@ -19,7 +19,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from fleet.cli import _config, preflight, run
 from fleet.contracts.lease import Lease, contends, decode_lease, encode_lease
 from fleet.contracts.project import decode_project_config
-from fleet.contracts.resources import contended, decode_resources
+from fleet.contracts.resources import contended, decode_names
 from fleet.core import _test_hooks, leases, records, staging
 from tests.conftest import (
     DEMO_NOW,
@@ -68,27 +68,27 @@ class TestDecoding:
     def test_an_absent_list_is_no_resources(self) -> None:
         """The ordinary case. A self-contained suite should not have to say
         that it is self-contained."""
-        assert decode_resources(None, field="r") == ()
+        assert decode_names(None, field="r") == ()
 
     def test_names_keep_their_declared_order(self) -> None:
-        assert decode_resources(["b", "a"], field="r") == ("b", "a")
+        assert decode_names(["b", "a"], field="r") == ("b", "a")
 
     def test_a_repeated_name_is_carried_once(self) -> None:
-        assert decode_resources(["a", "a"], field="r") == ("a",)
+        assert decode_names(["a", "a"], field="r") == ("a",)
 
     def test_a_non_list_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a list"):
-            decode_resources("corvis_test", field="r")
+            decode_names("corvis_test", field="r")
 
     def test_a_non_string_entry_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match=r"r\[1\] must be a string"):
-            decode_resources(["a", 7], field="r")
+            decode_names(["a", 7], field="r")
 
     def test_an_empty_name_is_refused(self) -> None:
         """A resource named "" would be contended by every other unnamed one,
         silently serialising projects that share nothing."""
         with pytest.raises(JSONTypeError, match="is empty"):
-            decode_resources(["a", "  "], field="r")
+            decode_names(["a", "  "], field="r")
 
     def test_a_project_declaring_none_decodes_to_none(self) -> None:
         plan = decode_project_config(

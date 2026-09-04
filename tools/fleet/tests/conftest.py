@@ -108,6 +108,41 @@ class FakeClock:
         return self.seconds
 
 
+class FakeTempRoot:
+    """A scratch root a test pins to its own directory.
+
+    Satisfies :class:`~fleet.core._test_hooks.TempRootProtocol`.
+
+    WITHOUT THIS THE SUITE RACES ITSELF. Archives live outside the repository
+    now, in one shared scratch directory, and every dispatch test uses the
+    same pinned clock -- so under ``-n auto`` several workers write one
+    ``libs-demo-1757000000-lavender.tgz`` and each reads back another's bytes.
+    The symptom is a digest mismatch in whichever test lost the race, which is
+    the intermittent failure the hook reset exists to prevent.
+
+    Attributes:
+        root: The directory to hand out.
+    """
+
+    root: pathlib.Path
+
+    def __init__(self, root: pathlib.Path) -> None:
+        """Pin the scratch root.
+
+        Args:
+            root: The directory to hand out.
+        """
+        self.root = root
+
+    def __call__(self) -> pathlib.Path:
+        """Report the pinned root.
+
+        Returns:
+            Whatever ``root`` holds.
+        """
+        return self.root
+
+
 def ok(stdout: str) -> _test_hooks.CommandResult:
     """Build a successful command result.
 
@@ -285,6 +320,7 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         Path to the written document.
     """
     _test_hooks.now = FakeClock(DEMO_NOW)
+    _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     path = tmp_path / "fleet.json"
     path.write_text(dump_json_str(workspace_document()), encoding="utf-8")
     return path
@@ -311,7 +347,7 @@ def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:
     return staging.archive(
         repo,
         manifest.build_tree(repo, DEMO_PROJECT),
-        loaded.archives / f"{DEMO_RUN_ID}.tgz",
+        loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz",
     )
 
 
@@ -332,5 +368,6 @@ def _restore() -> None:
     _test_hooks.file_exists = _test_hooks._default_file_exists
     _test_hooks.directory_exists = _test_hooks._default_directory_exists
     _test_hooks.make_directory = _test_hooks._default_make_directory
+    _test_hooks.temp_root = _test_hooks._default_temp_root
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text

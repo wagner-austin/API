@@ -168,6 +168,86 @@ class TestGuardInputs:
         assert "libs/platform_core/pyproject.toml" not in members
 
 
+class TestDeclaredExternalPaths:
+    """What a project's own SUITE reads from outside itself."""
+
+    def test_a_declared_path_is_carried(self, tmp_path: pathlib.Path) -> None:
+        """THE hpc3 CASE, measured on lavender 2026-09-04. Four of its tests
+        failed on a staged tree because its suite reads docs/RESEARCH.md at
+        the monorepo root. The guards' outside reads can be discovered by
+        asking monorepo_guards; a project's tests can only be declared."""
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "RESEARCH.md").write_text("# index\n", encoding="utf-8")
+
+        members = manifest.build_tree(tmp_path, "apps/a", external=("docs",))
+
+        assert "docs" in members
+
+    def test_a_declared_file_is_carried(self, tmp_path: pathlib.Path) -> None:
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+        (tmp_path / "VERSION").write_text("1\n", encoding="utf-8")
+
+        assert "VERSION" in manifest.build_tree(tmp_path, "apps/a", external=("VERSION",))
+
+    def test_a_declared_path_already_inside_the_tree_is_not_named_twice(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+
+        members = manifest.build_tree(tmp_path, "apps/a", external=("apps/a",))
+
+        assert members.count("apps/a") == 1
+
+    def test_a_shared_file_inside_a_staged_member_is_not_named_twice(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Staging the monorepo root carries every shared file already, and
+        naming one again would put it in the archive twice."""
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+        write_manifest(
+            tmp_path, "apps/b", '[tool.poetry.dependencies]\nwhole = { path = "../.." }\n'
+        )
+        write_manifest(tmp_path, manifest.ROOT_MEMBER, "[tool.poetry.dependencies]\n")
+
+        members = manifest.build_tree(tmp_path, "apps/b")
+
+        assert members == ("apps/b", manifest.ROOT_MEMBER)
+
+    def test_a_declared_path_that_is_gone_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """tar would say `Cannot stat`, which names a path and not a
+        declaration -- and the reader's fix is to edit the workspace."""
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+
+        with pytest.raises(AppError) as refusal:
+            manifest.build_tree(tmp_path, "apps/a", external=("docs",))
+
+        assert refusal.value.code is FleetErrorCode.PROJECT_MANIFEST_MISSING
+        assert "external_paths" in refusal.value.message
+
+    def test_a_declared_path_outside_the_root_is_refused(self, tmp_path: pathlib.Path) -> None:
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+
+        with pytest.raises(AppError) as refusal:
+            manifest.build_tree(tmp_path, "apps/a", external=("../elsewhere",))
+
+        assert refusal.value.code is FleetErrorCode.PROJECT_DEPENDENCY_ESCAPES_ROOT
+
+    def test_declaring_nothing_changes_nothing(self, tmp_path: pathlib.Path) -> None:
+        shared(tmp_path)
+        write_manifest(tmp_path, "apps/a", "[tool.poetry.dependencies]\n")
+
+        assert manifest.build_tree(tmp_path, "apps/a", external=()) == manifest.build_tree(
+            tmp_path, "apps/a"
+        )
+
+
 class TestWalkingSyntheticTrees:
     """The shapes the real repository does not happen to contain."""
 
@@ -285,11 +365,9 @@ class TestWalkingSyntheticTrees:
         )
         write_manifest(tmp_path, ".", "[tool.poetry.dependencies]\n")
 
-        assert manifest.build_tree(tmp_path, "apps/a") == (
-            "apps/a",
-            ".",
-            *manifest.SHARED_PATHS,
-        )
+        # Nothing shared is named after it: the root member already carries
+        # every one of them, and naming them again would duplicate the files.
+        assert manifest.build_tree(tmp_path, "apps/a") == ("apps/a", manifest.ROOT_MEMBER)
 
 
 class TestRefusals:

@@ -75,6 +75,19 @@ SHARED_DIRECTORIES: Final[tuple[str, ...]] = ("scripts", "libs/monorepo_guards")
 #: :func:`guard_inputs` would carry this file anyway, but only if it is there --
 #: it reports what exists. Requiring it here is what turns its absence into a
 #: refusal instead of a failure on somebody else's machine.
+#: ``.gitignore`` IS NOT HERE, AND IT WAS FOR TEN MINUTES. Ruff reads it, so
+#: it looked like an input to every ``make lint`` in the monorepo. Staging it
+#: changes nothing, measured on lavender 2026-09-04: the file arrived, ruff
+#: still reported 902 errors in ``tools/hpc3/runs``, because ruff applies
+#: ``.gitignore`` only inside a git repository and a staged tree has no
+#: ``.git``. Locally the same command passes and
+#: ``ruff check . --no-respect-gitignore`` reports exactly 902 -- the same
+#: number, which is what identifies the mechanism rather than merely
+#: suggesting it.
+#:
+#: That makes hpc3's lint result depend on ambient git state, which is a
+#: property of that project rather than of this one. It is fixed by an
+#: ``exclude`` in its own ruff config, not by carrying more files here.
 SHARED_FILES: Final[tuple[str, ...]] = (GUARD_CONFIG_NAME,)
 
 #: Everything a dispatch carries beyond the project and its dependencies.
@@ -83,13 +96,28 @@ SHARED_PATHS: Final[tuple[str, ...]] = (*SHARED_DIRECTORIES, *SHARED_FILES)
 #: The file a project declares its dependencies in.
 MANIFEST_NAME = "pyproject.toml"
 
+#: How the monorepo root spells itself as a tar member.
+#:
+#: Produced by :func:`_resolve` when a manifest declares a dependency on the
+#: root itself. It covers every other path, and :func:`_within` has to know
+#: that or a shared file would be named a second time and land in the archive
+#: twice.
+ROOT_MEMBER = "."
 
-def build_tree(project_root: pathlib.Path, project: str) -> tuple[str, ...]:
+
+def build_tree(
+    project_root: pathlib.Path, project: str, *, external: tuple[str, ...] = ()
+) -> tuple[str, ...]:
     """Name every repo-relative directory a dispatch of this project needs.
 
     Args:
         project_root: Absolute path to the monorepo root.
         project: Repo-relative project path.
+        external: Extra repo-relative paths the project DECLARED its build
+            reads, from
+            :attr:`~fleet.contracts.project.ProjectConfig.external_paths`.
+            Defaulted empty so a caller computing a tree without a plan --
+            the tests that check the walk itself -- need not invent one.
 
     Returns:
         The project, its transitive path dependencies, and
@@ -108,14 +136,57 @@ def build_tree(project_root: pathlib.Path, project: str) -> tuple[str, ...]:
     ordered = list(_walk(project_root, project))
     for directory in SHARED_DIRECTORIES:
         _require_shared(project_root, directory, kind="directory")
-        if directory not in ordered:
+        if not _within(ordered, directory):
             ordered.append(directory)
     for name in SHARED_FILES:
         _require_shared(project_root, name, kind="file")
+        if not _within(ordered, name):
+            ordered.append(name)
+    for declared in external:
+        _require_declared(project_root, project, declared)
+        if not _within(ordered, declared):
+            ordered.append(declared)
     for name in guard_inputs(project_root):
         if not _within(ordered, name):
             ordered.append(name)
     return tuple(ordered)
+
+
+def _require_declared(project_root: pathlib.Path, project: str, relative: str) -> None:
+    """Refuse a declared external path the monorepo does not have.
+
+    Checked HERE rather than left to tar, because tar's message names a path
+    and not a declaration -- and the reader's fix is to edit the workspace,
+    which they will not guess from ``tar: docs: Cannot stat``.
+
+    Args:
+        project_root: Absolute path to the monorepo root.
+        project: The project that declared it, for the message.
+        relative: The declared repo-relative path.
+
+    Raises:
+        AppError: With ``PROJECT_MANIFEST_MISSING`` when it is absent, or
+            ``PROJECT_DEPENDENCY_ESCAPES_ROOT`` when it resolves outside the
+            monorepo -- an outside path has no name that could be extracted
+            on a node, exactly as for a path dependency.
+    """
+    resolved = (project_root / relative).resolve()
+    root = project_root.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise AppError(
+            FleetErrorCode.PROJECT_DEPENDENCY_ESCAPES_ROOT,
+            f"{project} declares external_paths {relative!r}, which resolves to {resolved} "
+            f"outside {root}; a dispatch stages paths relative to the monorepo root and has "
+            "no name to give this one on a node",
+        )
+    if not (_test_hooks.file_exists(resolved) or _test_hooks.directory_exists(resolved)):
+        raise AppError(
+            FleetErrorCode.PROJECT_MANIFEST_MISSING,
+            f"{project} declares external_paths {relative!r} and it is not under "
+            f"{project_root}; the declaration says the build reads it, so staging without it "
+            "would fail on a node with a message about a missing file rather than about a "
+            "workspace that names one that is gone",
+        )
 
 
 def guard_inputs(project_root: pathlib.Path) -> tuple[str, ...]:
@@ -160,7 +231,10 @@ def _within(ordered: list[str], candidate: str) -> bool:
         always, and the project itself -- and naming a file twice would put
         it in the archive twice.
     """
-    return any(candidate == member or candidate.startswith(f"{member}/") for member in ordered)
+    return any(
+        candidate == member or member == ROOT_MEMBER or candidate.startswith(f"{member}/")
+        for member in ordered
+    )
 
 
 def _walk(project_root: pathlib.Path, project: str) -> tuple[str, ...]:

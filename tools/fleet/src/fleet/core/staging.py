@@ -51,14 +51,22 @@ EXCLUDED_DIRECTORIES = (
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
-    # `runs` is a package's own OUTPUT -- coverage fragments, ledgers, and the
-    # archives this module writes. Excluding it stops a dispatch carrying the
-    # previous ones: measured 2026-09-04, five consecutive dispatches of
-    # tools/fleet grew 185 KB, 1.4 MB, 4.5 MB, 13.5 MB, 20.7 MB, each one
-    # staging its predecessors. Nothing on the node needs it -- the shared
-    # launcher creates `runs/` before writing coverage there.
-    "runs",
 )
+
+#: WHY `runs` IS NOT ON THAT LIST, though it was for an hour.
+#:
+#: Five consecutive dispatches of tools/fleet grew 185 KB, 1.4 MB, 4.5 MB,
+#: 13.5 MB, 20.7 MB, because each staged the archives the previous ones had
+#: left in the tree. Excluding `runs` fixed the size and broke something
+#: worse: `tools/hpc3` commits 294 run documents under `tools/hpc3/runs`,
+#: force-added past the monorepo's `**/runs/` ignore, and its suite reads
+#: them -- so the exclusion made four of its tests fail on lavender for a
+#: reason that read as hpc3's fault.
+#:
+#: The archives were the error, not the directory. They are scratch and now
+#: live outside the repository entirely
+#: (:attr:`fleet.cli._config.LoadedWorkspace.archives`), so nothing about a
+#: project's own tree has to be hidden to keep them out.
 
 #: What the reassembled archive is called on the node.
 ARCHIVE_NAME = "tree.tgz"

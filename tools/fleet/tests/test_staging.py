@@ -3,8 +3,8 @@
 Only the ssh boundary is faked. The archive is a real tar built by the real
 tar binary over a real temporary tree and the digest is a real SHA-256, so
 what is exercised is the transport as it will actually behave -- including the
-exclusions that keep one machine's ``.venv``, and the previous dispatch's own
-archive, off another.
+exclusion that keeps one machine's ``.venv`` off another, and the absence of
+one that would have hidden a project's committed records.
 
 The scripts a node is HANDED are tested in ``test_launch.py``, beside the
 module that renders them.
@@ -45,23 +45,23 @@ class TestArchive:
         assert "Makefile" in listing
         assert ".venv" not in listing
 
-    def test_a_previous_dispatch_s_archive_is_not_carried(
+    def test_a_committed_runs_directory_is_carried(
         self, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        """Measured 2026-09-04: five consecutive dispatches of tools/fleet
-        produced archives of 185 KB, 1.4 MB, 4.5 MB, 13.5 MB and 20.7 MB,
-        each one staging its predecessors out of `runs/`. Nothing on the node
-        needs that directory -- the shared launcher creates it."""
-        stale = repo / DEMO_PROJECT / "runs"
-        stale.mkdir()
-        (stale / "previous.tgz").write_text("x" * 8192, encoding="utf-8")
+        """`runs` was excluded for an hour to stop archives compounding, and
+        that hid 294 committed run documents under tools/hpc3/runs which its
+        suite reads -- four tests failed on lavender for a reason that read as
+        hpc3's fault. The archives were the error; they live outside the
+        repository now, so nothing about a project's tree is hidden."""
+        committed = repo / DEMO_PROJECT / "runs"
+        committed.mkdir()
+        (committed / "registry.json").write_text("{}\n", encoding="utf-8")
         destination = tmp_path / "tree.tgz"
 
         staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
 
         listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
-        assert "previous.tgz" not in listing
-        assert "runs" not in listing
+        assert "registry.json" in listing
 
     def test_the_dependency_a_lockfile_resolves_against_is_inside(
         self, repo: pathlib.Path, tmp_path: pathlib.Path
