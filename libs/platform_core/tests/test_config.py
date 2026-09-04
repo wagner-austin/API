@@ -12,15 +12,17 @@ from platform_core.config import (
     _parse_bool,
     _parse_float,
     _parse_int,
+    _parse_log_format,
     _parse_log_level,
     _parse_str,
     _require_env_csv,
     _require_env_str,
 )
+from platform_core.config._utils import _validate_log_format, _validate_log_level
 from platform_core.config.art_trainer import load_settings as load_art_trainer_settings
 from platform_core.config.data_bank import load_settings as load_data_bank_settings
 from platform_core.config.turkic_api import load_settings as load_turkic_api_settings
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.testing import make_fake_env
 
 
@@ -233,10 +235,69 @@ def test_parse_log_level() -> None:
         env.set("LOG_LEVEL", level)
         assert _parse_log_level("LOG_LEVEL", "INFO") == "CRITICAL"
 
-    # Invalid value falls back to default
     env.clear()
     env.set("LOG_LEVEL", "invalid")
-    assert _parse_log_level("LOG_LEVEL", "WARNING") == "WARNING"
+    with pytest.raises(JSONTypeError, match="Invalid log level: invalid"):
+        _parse_log_level("LOG_LEVEL", "WARNING")
+
+
+def test_parse_log_format() -> None:
+    env = make_fake_env()
+    assert _parse_log_format("LOG_FORMAT", "json") == "json"
+
+    for spelling in ["TEXT", "text", "Text"]:
+        env.set("LOG_FORMAT", spelling)
+        assert _parse_log_format("LOG_FORMAT", "json") == "text"
+
+    env.clear()
+    env.set("LOG_FORMAT", "json")
+    assert _parse_log_format("LOG_FORMAT", "text") == "json"
+
+    env.clear()
+    env.set("LOG_FORMAT", "yaml")
+    with pytest.raises(JSONTypeError, match="Invalid log format: yaml"):
+        _parse_log_format("LOG_FORMAT", "json")
+
+
+class TestValidatingALogLevel:
+    """An unrecognised level is refused rather than quietly downgraded.
+
+    `_parse_log_level` used to return the default, so `LOG_LEVEL=TRACE`
+    started the service at INFO and logged nothing about it -- and the levels
+    an operator is most likely to mistype are the verbose ones they reached
+    for while debugging, so the failure hid exactly the output that was asked
+    for. `grandma-api` and `opportunity-radar-api` had each written a strict
+    copy beside it rather than fix it; those copies are gone and this is the
+    one that remains.
+    """
+
+    def test_every_level_is_accepted_in_any_case(self) -> None:
+        assert _validate_log_level("debug") == "DEBUG"
+        assert _validate_log_level("INFO") == "INFO"
+        assert _validate_log_level("Warning") == "WARNING"
+        assert _validate_log_level("ERROR") == "ERROR"
+        assert _validate_log_level("critical") == "CRITICAL"
+
+    def test_an_unrecognised_level_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="Invalid log level: TRACE"):
+            _validate_log_level("TRACE")
+
+
+class TestValidatingALogFormat:
+    """The set is `json` and `text`, and it is now spelled once.
+
+    It had been written three times -- `platform_core.logging` plus a copy in
+    each of the two services -- which is the shape a fourth copy spelling
+    `console` would have joined without anything noticing.
+    """
+
+    def test_both_formats_are_accepted_in_any_case(self) -> None:
+        assert _validate_log_format("JSON") == "json"
+        assert _validate_log_format("Text") == "text"
+
+    def test_an_unrecognised_format_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="Invalid log format: console"):
+            _validate_log_format("console")
 
 
 def test_default_get_env_returns_real_environ() -> None:

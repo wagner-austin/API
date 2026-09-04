@@ -143,6 +143,20 @@ class TestNamespaceReaders:
         with pytest.raises(ValueError, match=r"--dry-run"):
             namespace_str(argparse.Namespace(dry_run=1), "dry_run", "")
 
+    def test_a_declared_but_unsupplied_string_takes_the_default(self) -> None:
+        """argparse sets a declared option it did not receive to None rather
+        than leaving the attribute off. Reading that as a type error is what
+        the first run of this caught: `main` with no subcommand reported
+        "--command parsed as NoneType", which is argparse's normal encoding of
+        absence, not a defect."""
+        assert namespace_str(argparse.Namespace(folder=None), "folder", "inbox") == "inbox"
+
+    def test_a_declared_but_unsupplied_integer_takes_the_default(self) -> None:
+        assert namespace_int(argparse.Namespace(count=None), "count", 10) == 10
+
+    def test_a_declared_but_unsupplied_boolean_takes_the_default(self) -> None:
+        assert namespace_bool(argparse.Namespace(force=None), "force", True) is True
+
     def test_an_optional_string_reads_none_when_absent(self) -> None:
         assert namespace_str_or_none(argparse.Namespace(), "query") is None
 

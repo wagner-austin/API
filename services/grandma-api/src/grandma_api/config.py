@@ -5,14 +5,14 @@ Provides TypedDict settings with encode/decode/require_* validation.
 
 from __future__ import annotations
 
-from typing import Literal
-
 from platform_core.config import (
     _parse_int,
+    _parse_log_format,
     _parse_log_level,
     _require_env_str,
+    _validate_log_format,
+    _validate_log_level,
 )
-from platform_core.config._utils import _optional_env_str
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -20,12 +20,8 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
-from platform_core.logging import LogLevel
+from platform_core.logging import LogFormat, LogLevel
 from typing_extensions import TypedDict
-
-# Log format type for this service
-LogFormat = Literal["json", "text"]
-
 
 # =============================================================================
 # Settings TypedDict
@@ -58,52 +54,6 @@ def encode_grandma_api_settings(settings: GrandmaApiSettings) -> JSONObject:
         "log_level": settings["log_level"],
         "log_format": settings["log_format"],
     }
-
-
-def _validate_log_level(value: str) -> LogLevel:
-    """Validate and convert string to LogLevel.
-
-    Args:
-        value: String value to validate.
-
-    Returns:
-        Validated LogLevel.
-
-    Raises:
-        JSONTypeError: If value is not a valid log level.
-    """
-    upper = value.upper()
-    if upper == "DEBUG":
-        return "DEBUG"
-    if upper == "INFO":
-        return "INFO"
-    if upper == "WARNING":
-        return "WARNING"
-    if upper == "ERROR":
-        return "ERROR"
-    if upper == "CRITICAL":
-        return "CRITICAL"
-    raise JSONTypeError(f"Invalid log level: {value}")
-
-
-def _validate_log_format(value: str) -> LogFormat:
-    """Validate and convert string to LogFormat.
-
-    Args:
-        value: String value to validate.
-
-    Returns:
-        Validated LogFormat.
-
-    Raises:
-        JSONTypeError: If value is not a valid log format.
-    """
-    lower = value.lower()
-    if lower == "json":
-        return "json"
-    if lower == "text":
-        return "text"
-    raise JSONTypeError(f"Invalid log format: {value}")
 
 
 def decode_grandma_api_settings(obj: JSONObject) -> GrandmaApiSettings:
@@ -153,27 +103,6 @@ def require_grandma_api_settings(obj: JSONValue) -> GrandmaApiSettings:
 # =============================================================================
 # Environment Loading
 # =============================================================================
-
-
-def _parse_log_format(key: str, default: LogFormat) -> LogFormat:
-    """Parse log format from environment with default.
-
-    Args:
-        key: Environment variable name.
-        default: Default value if not set.
-
-    Returns:
-        Parsed LogFormat.
-    """
-    val = _optional_env_str(key)
-    if val is None:
-        return default
-    lower = val.lower()
-    if lower == "json":
-        return "json"
-    if lower == "text":
-        return "text"
-    return default
 
 
 def load_settings() -> GrandmaApiSettings:

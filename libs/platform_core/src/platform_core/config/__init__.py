@@ -28,21 +28,28 @@ from __future__ import annotations
 from . import _test_hooks as config_test_hooks
 from ._test_hooks import _default_get_env
 from ._utils import (
+    LogFormat,
+    LogLevel,
     _decode_table,
     _decode_toml,
     _optional_env_str,
     _parse_bool,
     _parse_float,
     _parse_int,
+    _parse_log_format,
     _parse_log_level,
     _parse_str,
     _require_env_csv,
     _require_env_str,
+    _validate_log_format,
+    _validate_log_level,
 )
 from .covenant_radar import MLBackend
 from .discordbot import require_discord_token
 
 __all__ = [
+    "LogFormat",
+    "LogLevel",
     "MLBackend",
     "_decode_table",
     "_decode_toml",
@@ -51,10 +58,13 @@ __all__ = [
     "_parse_bool",
     "_parse_float",
     "_parse_int",
+    "_parse_log_format",
     "_parse_log_level",
     "_parse_str",
     "_require_env_csv",
     "_require_env_str",
+    "_validate_log_format",
+    "_validate_log_level",
     "config_test_hooks",
     "require_discord_token",
 ]

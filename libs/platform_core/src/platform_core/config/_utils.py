@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.logging import LogFormat, LogLevel
 
 from . import _test_hooks
 
-# Log level type - must match platform_core.logging.LogLevel
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 _VALID_LOG_LEVELS: frozenset[LogLevel] = frozenset(
     {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 )
@@ -77,22 +75,69 @@ def _parse_bool(key: str, default: bool) -> bool:
     raise ValueError(f"Invalid boolean value for {key}: {val!r}")
 
 
+def _validate_log_level(value: str) -> LogLevel:
+    """Narrow a string to a log level.
+
+    Args:
+        value: The value to narrow, in any case.
+
+    Returns:
+        The matching level.
+
+    Raises:
+        JSONTypeError: If the value names no level. It does NOT fall back to
+            a default: `_parse_log_level` used to, so `LOG_LEVEL=TRACE`
+            started the service at INFO and logged nothing about it. An
+            operator who set a level and did not get it has no way to tell
+            from the running process, and the levels they are most likely to
+            mistype are the verbose ones they reached for while debugging.
+    """
+    upper = value.upper()
+    if upper == "DEBUG":
+        return "DEBUG"
+    if upper == "INFO":
+        return "INFO"
+    if upper == "WARNING":
+        return "WARNING"
+    if upper == "ERROR":
+        return "ERROR"
+    if upper == "CRITICAL":
+        return "CRITICAL"
+    raise JSONTypeError(f"Invalid log level: {value}")
+
+
+def _validate_log_format(value: str) -> LogFormat:
+    """Narrow a string to a log format.
+
+    Args:
+        value: The value to narrow, in any case.
+
+    Returns:
+        The matching format.
+
+    Raises:
+        JSONTypeError: If the value names no format.
+    """
+    lower = value.lower()
+    if lower == "json":
+        return "json"
+    if lower == "text":
+        return "text"
+    raise JSONTypeError(f"Invalid log format: {value}")
+
+
 def _parse_log_level(key: str, default: LogLevel) -> LogLevel:
     val = _optional_env_str(key)
     if val is None:
         return default
-    upper_val = val.upper()
-    if upper_val == "DEBUG":
-        return "DEBUG"
-    if upper_val == "INFO":
-        return "INFO"
-    if upper_val == "WARNING":
-        return "WARNING"
-    if upper_val == "ERROR":
-        return "ERROR"
-    if upper_val == "CRITICAL":
-        return "CRITICAL"
-    return default
+    return _validate_log_level(val)
+
+
+def _parse_log_format(key: str, default: LogFormat) -> LogFormat:
+    val = _optional_env_str(key)
+    if val is None:
+        return default
+    return _validate_log_format(val)
 
 
 def _decode_toml(path: Path) -> dict[str, JSONValue]:
@@ -111,6 +156,7 @@ def _decode_table(data: dict[str, JSONValue], key: str) -> dict[str, JSONValue]:
 
 __all__ = [
     "JSONValue",
+    "LogFormat",
     "LogLevel",
     "_decode_table",
     "_decode_toml",
@@ -118,8 +164,11 @@ __all__ = [
     "_parse_bool",
     "_parse_float",
     "_parse_int",
+    "_parse_log_format",
     "_parse_log_level",
     "_parse_str",
     "_require_env_csv",
     "_require_env_str",
+    "_validate_log_format",
+    "_validate_log_level",
 ]

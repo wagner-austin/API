@@ -220,8 +220,11 @@ class TestLoadSettings:
         finally:
             config_test_hooks.get_env = original_fn
 
-    def test_load_settings_log_format_defaults_on_invalid(self) -> None:
-        """Test that invalid log format falls back to default."""
+    def test_load_settings_refuses_an_invalid_log_format(self) -> None:
+        """This asserted the settings came back as "json" -- the service
+        started emitting a format nobody asked for and said nothing. The
+        service's own decoder already refused the same value; only the
+        environment path fell back, so the two disagreed about one set."""
         original_fn = config_test_hooks.get_env
 
         env_vars = {
@@ -234,8 +237,8 @@ class TestLoadSettings:
         config_test_hooks.get_env = fake_get_env
 
         try:
-            settings = load_settings()
-            assert settings["log_format"] == "json"  # Default
+            with pytest.raises(JSONTypeError, match="Invalid log format: invalid_format"):
+                load_settings()
         finally:
             config_test_hooks.get_env = original_fn
 

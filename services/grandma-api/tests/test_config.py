@@ -7,8 +7,6 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from grandma_api.config import (
     GrandmaApiSettings,
-    _validate_log_format,
-    _validate_log_level,
     decode_grandma_api_settings,
     encode_grandma_api_settings,
     load_settings,
@@ -79,33 +77,6 @@ def test_require_grandma_api_settings_not_dict() -> None:
         require_grandma_api_settings(value)
 
 
-def test_validate_log_level_all_levels() -> None:
-    """Test _validate_log_level with all valid levels."""
-    assert _validate_log_level("debug") == "DEBUG"
-    assert _validate_log_level("INFO") == "INFO"
-    assert _validate_log_level("Warning") == "WARNING"
-    assert _validate_log_level("ERROR") == "ERROR"
-    assert _validate_log_level("critical") == "CRITICAL"
-
-
-def test_validate_log_level_invalid() -> None:
-    """Test _validate_log_level raises on invalid level."""
-    with pytest.raises(JSONTypeError, match="Invalid log level"):
-        _validate_log_level("INVALID")
-
-
-def test_validate_log_format_all_formats() -> None:
-    """Test _validate_log_format with all valid formats."""
-    assert _validate_log_format("JSON") == "json"
-    assert _validate_log_format("text") == "text"
-
-
-def test_validate_log_format_invalid() -> None:
-    """Test _validate_log_format raises on invalid format."""
-    with pytest.raises(JSONTypeError, match="Invalid log format"):
-        _validate_log_format("xml")
-
-
 def test_load_settings_success() -> None:
     """Test loading settings from environment."""
     set_fake_env(
@@ -167,8 +138,12 @@ def test_load_settings_empty_openai_key() -> None:
         load_settings()
 
 
-def test_load_settings_invalid_log_level_uses_default() -> None:
-    """Test invalid log level falls back to default."""
+def test_load_settings_refuses_an_invalid_log_level() -> None:
+    """This asserted `settings["log_level"] == "INFO"` -- the service started
+    at the default and said nothing about the level it was actually given.
+    The levels an operator most often mistypes are the verbose ones they
+    reached for while debugging, so the silence hid exactly the output that
+    was asked for."""
     set_fake_env(
         {
             "OPENAI_API_KEY": "sk-test",
@@ -177,12 +152,12 @@ def test_load_settings_invalid_log_level_uses_default() -> None:
         }
     )
 
-    settings = load_settings()
-    assert settings["log_level"] == "INFO"
+    with pytest.raises(JSONTypeError, match="Invalid log level: INVALID"):
+        load_settings()
 
 
-def test_load_settings_invalid_log_format_uses_default() -> None:
-    """Test invalid log format falls back to default."""
+def test_load_settings_refuses_an_invalid_log_format() -> None:
+    """Likewise: `LOG_FORMAT=xml` used to start the service emitting JSON."""
     set_fake_env(
         {
             "OPENAI_API_KEY": "sk-test",
@@ -191,8 +166,8 @@ def test_load_settings_invalid_log_format_uses_default() -> None:
         }
     )
 
-    settings = load_settings()
-    assert settings["log_format"] == "json"
+    with pytest.raises(JSONTypeError, match="Invalid log format: xml"):
+        load_settings()
 
 
 def test_load_settings_explicit_json_format() -> None:
