@@ -39,7 +39,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | ckpt steps |
 |---|---|---|---|---|---|---|---|---|
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | 0 |
-| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `65762bbd4d30` | yes | 0 |
+| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | 0 |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
@@ -73,7 +73,8 @@ range; composition retains ~59% rather than ~25%; and an untrained prefix
 goes from harmless to −0.7612 on held-out text.
 
 - **Command:** `python -m model_trainer.cli.cartridge_benchmark --plan
-  gpt2-wiki --corpus <dir> --second-corpus <dir> --device cuda --out <file>`
+  gpt2-wiki --corpus <dir> --second-corpus <dir> --device cuda --controls
+  none --out <file>`
 - **Needs, on a compute node:** `HF_HOME=/pub/wagnera3/hf
   TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1`, the same prefix `floor` and the
   `mi` training runs already use, plus both corpora staged under a bound
@@ -93,11 +94,23 @@ goes from harmless to −0.7612 on held-out text.
   exposes a 10-minute job to preemption it never needed to risk. State
   `minutes` and `mem_gb` in the run document; overrides are validated
   exactly as a hand-authored spec is.
-- **No run document is committed yet, deliberately.** The registered `mi`
-  image (`55651342e15d`, v23) predates this command, so a committed run
-  naming it would assert something untrue. It needs an image rebuilt from a
-  commit that contains `cartridge_benchmark`, and the document should be
-  written against that digest rather than this one.
+- **`--controls` is required and has no default.** It names which cross-card
+  controls the run applies (`none` / `split-k` / `attention` / `both`, from
+  `core/services/model/control_arms.py`), and the fingerprint records the
+  ones that were applied. Required for the same reason `--second-corpus` is:
+  the two arms compute different numbers, so a record whose posture was
+  guessed names a condition it may not have run under. Every number reported
+  on this page was measured under `none`.
+- **One run document is committed:** `tools/hpc3/runs/cartridge-gpt2-wiki-v100-v32.json`,
+  against image `65762bbd4d30` (v32) — the first `mi` image built from a
+  commit containing this command. It pins a V100 rather than `mi`'s default
+  A100, and the reason is a measured incident rather than a preference — the
+  A100-pinned attempt sat PENDING five hours on a partition whose A30s and
+  V100s were free, and `hpc3.contracts.gpu_supply` carries the account and
+  the preflight rule that now refuses it. Until v32 existed
+  there was deliberately no document, because the then-registered image
+  (`55651342e15d`, v23) predated the command and a run naming it would have
+  asserted something untrue.
 - **Read the spread, not just the mean.** Every arm reports one, and the
   sweep's separations are judged against the largest spread among the *sweep*
   arms — not against every arm, because the composition arm trains two
@@ -147,9 +160,11 @@ replication check, and it held).
   cross-gain arm, never assumed. And a hostile cross-gain does not predict
   composition damage: the most hostile-alone corpus (−0.42) composed as
   benignly as the friendliest at n2.
-- **No run document is committed, deliberately,** for the reason
-  `cartridge_benchmark` states above: the registered `mi` image predates
-  both commands. The follow-on — composition-aware training, per the
+- **No run document is committed, deliberately:** the registered `mi` image
+  predates this command, so a committed run naming it would assert something
+  untrue. (`cartridge_benchmark` was in the same position until image v32;
+  its document is now committed against that digest.) The follow-on —
+  composition-aware training, per the
   ICAE multi-span finding — belongs to board task `292c3272`.
 
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
