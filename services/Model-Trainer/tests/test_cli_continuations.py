@@ -19,6 +19,7 @@ import pathlib
 
 import pytest
 from platform_core.continuation_task import generated_path, manifest_path
+from platform_core.json_utils import dump_json_str
 
 from model_trainer.cli import continuations
 from tests._continuations_support import (
@@ -201,3 +202,33 @@ def test_a_resumed_run_redoes_a_partial_batch_whole(tmp_path: pathlib.Path) -> N
     _ = continuations.main(tokens)
 
     assert recorder.batches == [["src/a.py", "src/b.py"]]
+
+
+@pytest.mark.usefixtures("restore_hooks")
+def test_a_batch_killed_between_its_manifest_and_its_files_heals_itself(
+    tmp_path: pathlib.Path,
+) -> None:
+    # The manifest is appended BEFORE the files, so a process killed between
+    # the two leaves rows for items that are not on disk. The resume check
+    # reads files, not rows, so it redoes that batch and the later rows win.
+    #
+    # The other order is the one that needs a human: files with no rows read
+    # as complete, and the digest then refuses a directory nobody can fix
+    # without deleting the batch by hand.
+    recorder = Recorder()
+    install(recorder)
+    spec = spec_file(tmp_path, paths=("src/a.py", "src/b.py"), batch_size=2)
+    out_dir = tmp_path / "generated" / "candidate"
+    out_dir.mkdir(parents=True)
+    manifest_path(out_dir).write_text(
+        dump_json_str({"item_id": "src/a.py", "finished": True})
+        + "\n"
+        + dump_json_str({"item_id": "src/b.py", "finished": True})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert continuations.main(command_line(tmp_path, spec)) == 0
+    assert recorder.batches == [["src/a.py", "src/b.py"]]
+    assert generated_path(out_dir, "src/a.py").is_file()
+    assert continuations.read_manifest(out_dir) == {"src/a.py": False, "src/b.py": False}

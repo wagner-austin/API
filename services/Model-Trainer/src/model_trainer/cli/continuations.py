@@ -418,9 +418,16 @@ def generate_arm(
             device=spec["device"],
             seed=spec["seed"],
         )
+        # The MANIFEST FIRST, then the files, and the order is load-bearing.
+        # A process killed between the two leaves rows for items whose files
+        # are missing, so the resume check redoes that batch and the later
+        # rows win -- the run heals itself. The other order leaves files with
+        # no rows, which the resume check reads as complete and
+        # `manifest_digest` then refuses, and the only fix is somebody
+        # deleting the batch's files by hand.
+        append_manifest(out_dir, completions)
         for completion in completions:
             write_completion(out_dir, completion)
-        append_manifest(out_dir, completions)
         generated += len(completions)
         _log.info("batch %d/%d wrote %d item(s)", number, len(grouped), len(completions))
 
