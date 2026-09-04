@@ -229,33 +229,49 @@ and controls as the baseline sweep.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
-Registered 2026-09-04 by `opus-hpc3-survey-0822` (board task `9e4db632`,
-commit `3400be03`). **This section was written by a different session to
-close a red `make check`, from that session's own board posts and committed
-spec rather than from its work; the owner should correct or replace it.**
-`test_committed_runs.py` fails when a registered project's name does not
-appear in this file, and the workspace document landed without it.
+Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
+battery ran and closed the same day. First-hand section by the owner; the
+onboarding miss that briefly left this file red — a registered project whose
+name appeared nowhere here — was mine, and another session bridged it.
 
-- **Repo:** this one, `services/Model-Trainer`
+- **Repo:** this one, `services/Model-Trainer` + `clients/OrderedKernels`;
+  workspace `tools/hpc3/runs/hpc3-mi-cu128.json`, spec
+  `tools/hpc3/specs/abl-cu128-image.json`
 - **Why it exists:** the `RTX6000` GRES on `free-gpu32` is 96 GB RTX PRO 6000
   Blackwell hardware, `sm_120`, which the cu124 image cannot drive — its CUDA
   runtime enumerates zero devices there. The blocker was software, not
-  billing: those nodes are free, and nine jobs had already run on them
-  unbilled.
-- **Stack:** torch 2.7.1+cu128 / CUDA 12.8, image `6d9ba0baac40` (cu128-v1,
-  38/38 smokes green). `transformers` is held at 4.46.3, the same version the
-  cu124 line pins, so the model code is constant and only the numerical stack
-  moves.
-- **Verified on hardware:** arch probe 55751296 on `hpc3-gpu-n54-03` reports
-  capability `[12, 0]` and `sm_120` in the arch list.
-- **Provenance posture, and the boundary that matters:** this starts a NEW
-  baseline. **Cross-stack digests are not comparable** — a cu128 record cannot
-  be differenced against the cu124 corpus. Its claims are arm-versus-arm and
-  card-versus-card WITHIN the cu128 stack, which is why the battery re-runs a
-  known card (the L40S) as a comparison partner.
-- **One toolchain finding already banked:** torch 2.7.1's SDPA eligibility
-  APIs initialise CUDA even for a CPU-device probe, so a smoke that passed on
-  every cu124 build fails on a driverless build node. Root fix `d6363b9b`.
+  billing: those nodes are free (metered at zero, verified 2026-08-31).
+- **Stack:** torch 2.7.1+cu128 / CUDA 12.8 / NVRTC 12.8.61, image
+  `6d9ba0baac40` (cu128-v1, build 55749663, 38/38 smokes). Wheels built at
+  `e007e999`, the SAME commit as the cu124 line's v33 image, and
+  `transformers`/`cupy`/`numpy` held identical — so the two lines differ only
+  in the CUDA stack.
+- **Runs:** 23 jobs, all `COMPLETED`, 2026-09-04 (55751296–55752044): arch
+  probes, gemm all five arms, train_step owned+ordered through xl, sdpa
+  probe, attn_probe, floor150 rank1, and the full 2,627-item fully-owned
+  score on both the RTX PRO 6000 (4:04) and the L40S (3:14). Records under
+  `/pub/wagnera3/{gemm,train,attn,floor}/cu128-v1/`.
+- **Verdict, within-stack:** ordered/owned records bit-identical across the
+  Blackwell card and the L40S — gemm 186/186, train 1,283/1,283, attention
+  stages 140/140, full-set outcomes one payload (`sha256:e964e46b…`),
+  accuracy 1,374/2,627 on both. Vendor cuBLAS still speaks per-card dialects
+  (18/93 digests shared), so the arms-versus-answers contrast survives on
+  sm_120.
+- **Verdict, cross-stack (measured, not assumed):** the L40S's cu128 records
+  equal its cu124 corpus records for every arm tried — ordered gemm 186/186,
+  ordered train 1,283/1,283, floor150 rank1 payload equal, vendor cublas
+  186/186 — and the full-set outcomes file is byte-identical to the Windows
+  cu124 one. **Cross-stack comparability remains a per-jump measurement, not
+  a property:** it held for 2.6.0+cu124 → 2.7.1+cu128; the next toolchain
+  starts unproven. Full narrative: personal wiki,
+  `a-loss-agrees-where-the-computation-does-not` footnote 22 (`e2be2a3`).
+- **Two toolchain defects banked, fixed at root:** torch 2.7's SDPA
+  eligibility APIs initialise CUDA even for a CPU-device probe, fatal on
+  driverless build nodes (`d6363b9b`); and `ordered_kernels`' gemm/bench
+  CLIs read shape-table hooks from the module `5bea978c` had moved them out
+  of — a cluster-only crash the tests missed because faking a nonexistent
+  attribute silently creates it (`8fdeca63`). The pinned image bridges the
+  old hook name via `run_ordered_gemm_probe.py` beside the gemm artifacts.
 
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
