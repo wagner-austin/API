@@ -29,7 +29,7 @@ provenance:
   - "HPC3 job 55715577 completed only after TANKPIT_XOR_KEY_FILE was passed per-run, 2026-09-03"
   - "field42-r.gif and field42_r.gif measured byte-identical (sha256 73c698d581ac8d125d5dcec06211e967ab858cb8aa23d8ea1e82dbf8b24b3d2b), duplicate deleted 2026-09-03"
   - "Both halves of the spelling assertion exercised against a reintroduced duplicate and against a rename, 2026-09-03: the count catches an added file, the suffix check catches a renamed one"
-  - "git notes attached to 12717125 and bccf5afa recording the split of this change across two commits, 2026-09-03"
+  - "git notes on 12717125 and bccf5afa recorded this split until 2026-09-03, when all five notes in the repository were deleted and their contents migrated into the wikis; refs/notes/commits had never been pushed"
 fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
@@ -149,13 +149,21 @@ bytes left in their commit and the code left in ours — and `bccf5afa`'s
 subject overclaims on its own terms, since it names minimaps it does not
 contain.[^14]
 
-Both commits carry a `git notes` annotation saying this, following the
-convention three earlier commits already use here.[^15] **The notes are the
-convenience, not the record.** `refs/notes/commits` has never been pushed to
-`origin`, so every note in this repository — including the three from July —
-is visible only on the machine that wrote it. A reader who clones sees none of
-them. That is why the table above is on this page rather than only in a note:
-the wiki is committed and shared, the notes are neither.
+This was recorded as a `git notes` annotation on both commits, following a
+convention three earlier commits already used. **Those notes are gone, and
+the table above is why they could be.**[^15]
+
+`refs/notes/commits` was never pushed to `origin`, so every note in this
+repository — these two and three from July — was visible only on the machine
+that wrote it, and no clone ever saw one. That is not a record; it is a
+private annotation that looks like one. All five were migrated into the wikis
+and deleted on 2026-09-03, on the reasoning that two systems where one is
+undistributed is worse than one system that is. The July three moved to
+`clients/RustedWarfareBot/wiki/log.md`.
+
+What is genuinely lost is the point-of-use prompt: `git log` on a minimap no
+longer explains itself, and a reader has to reach this page instead. That is
+the trade, made deliberately.
 
 ## What this buys
 
@@ -167,7 +175,7 @@ layer.[^12]
 
 [^1]: Job ids and failure modes from `/pub/wagnera3/tankpit/logs/`, 2026-09-03. `55715564`'s traceback ends in `XorStaticKeyUnavailableError` raised from `capture/xor.py::require_static_key` after the GIF had already loaded and 5,639 mines had been seeded — the run got far enough to prove the terrain fix worked and the key fix did not exist.
 
-[^2]: `git log --diff-filter=A --follow` on both spellings, read 2026-09-03. `0b17ee63` (2026-01-12) adds `clients/TankpitBot/field42-r.gif` alone, subject "Add field42-r.gif minimap for ASCII terrain rendering"; `54a5e9f6` (2026-08-05, "the remaining forty-three field minimaps") adds `field42_r.gif` alongside them. Both files moved into `src/tankpit_bot/data/` in `12717125`, which is annotated with a `git notes` record explaining why forty-six asset renames sit under a Model-Trainer subject.
+[^2]: `git log --diff-filter=A --follow` on both spellings, read 2026-09-03. `0b17ee63` (2026-01-12) adds `clients/TankpitBot/field42-r.gif` alone, subject "Add field42-r.gif minimap for ASCII terrain rendering"; `54a5e9f6` (2026-08-05, "the remaining forty-three field minimaps") adds `field42_r.gif` alongside them. Both files moved into `src/tankpit_bot/data/` in `12717125`; why forty-six asset renames sit under a Model-Trainer subject is explained in this page's own section on the split, which is where that record now lives.
 
 [^3]: `sha256sum` and `cmp` on both files, 2026-09-03: each is `73c698d581ac8d125d5dcec06211e967ab858cb8aa23d8ea1e82dbf8b24b3d2b`, and `cmp` exits 0. The unreachability is structural rather than measured: `src/tankpit_bot/resources.py:105` builds the candidate as `data_directory() / f"{field_image.removesuffix('.gif')}{FIELD_GIF_SUFFIX}"`, so with `FIELD_GIF_SUFFIX == "_r.gif"` no input can produce the hyphen spelling.
 [^4]: Verified 2026-09-03 by breaking the tree twice. Copying `field42_r.gif` back to `field42-r.gif` fails at `tests/test_resources.py:88` on `assert 45 == 44`; *renaming* it — which leaves the count at 44 — passes line 88 and falls through to `tests/test_resources.py:92`, `AssertionError: field42-r.gif ships but no lookup can reach it`. The second case is the one the old `continue` silently permitted.
@@ -182,4 +190,4 @@ layer.[^12]
 [^12]: Verified 2026-09-03 by building the wheel and reading it: `tankpit_bot-0.1.0-py3-none-any.whl` carries 44 files under `tankpit_bot/data/*.gif` plus `tankpit_bot/data/xor_static_key.txt`, with no hyphen spelling present. The hpc3 `ImageSpec` (`tools/hpc3/src/hpc3/contracts/image_spec.py:170-182`) declares no assets field.
 [^13]: `git log --follow` on `src/tankpit_bot/data/field01_r.gif` and on `xor_static_key.txt`, read 2026-09-03: both list `12717125` as their most recent commit. `git show --name-status 12717125` reports 46 `R100` entries under `clients/` alongside 12 additions and 62 modifications under `services/` and `libs/`. `git ls-remote origin 'refs/notes/*'` returns nothing.
 [^14]: Commit timestamps, read 2026-09-03: `12717125` at 01:41:28 -0700, `bccf5afa` at 01:53:39 -0700. `git show --stat bccf5afa` lists 37 files and no `.gif` among them, against a subject reading "TankpitBot ships its own data: the wheel carries the key and the minimaps".
-[^15]: `git notes list` returns five entries, read 2026-09-03: `12717125` and `bccf5afa` from this change, plus `52379073`, `63ed06e3` and `e0f5ff3a` from 2026-07-26, all three opening with the same line, "Also contains, from a concurrent session and unmentioned in the subject:".
+[^15]: `git notes list` returned five entries when read on 2026-09-03 — `12717125` and `bccf5afa` from this change, plus `52379073`, `63ed06e3` and `e0f5ff3a` from 2026-07-26, all three opening with the same line, "Also contains, from a concurrent session and unmentioned in the subject:". All five were removed the same day after their contents were verified present in the wikis; `git notes list` now returns nothing.
