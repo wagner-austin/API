@@ -9,11 +9,15 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/contracts/cloze.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py
+  - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa.py": d6d94d33de70b0c09734a951773c3c38965da42c
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": e14dc465701df5af4e77c4facd8103aff35ab8ce
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 7db1915bc512a500532d53ae028d39d5eb61186d
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 67f057b3af4354a571abcf3d246951a122651c53
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 9aafe105357bb6ebb7462afbc8221aa16a0facd6
+  "services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py": d8d1e89ba5c1920464a501048a028d9b24b97acc
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "gpt2 (12 layers, 12 heads, 1024 positions), 12 me-wiki pages carrying visibility: public, 128 slots, seeds 7/8/9, determinism pinned"
@@ -92,6 +96,32 @@ Each was found by running the measurement, and none surfaced as an error:
 - **`item_id` of document-plus-term repeats**, because a page names its own
   subject in several sentences. Arms are paired by id, so duplicates collapse
   in the lookup and pair one arm's outcome against a different question's.
+
+## The numbers above were measured under one kernel posture
+
+Both benchmarks now require `--controls` (`none` / `split-k` / `attention` /
+`both`, from `core/services/model/control_arms.py`), and the fingerprint
+records which controls were applied.[^ctl] **Everything on this page was
+measured under `none`** — the arm that applies neither control, which is what
+the command was hardcoded to before the flag existed.
+
+That is not a footnote. On the loss benchmark, running the same plan under all
+four arms moved the noise floor from 0.0123 (`split-k`) to 0.0326 (`both`) and
+flipped two of four separation verdicts, while the forward-only arm — no
+optimiser, pure kernel arithmetic — moved by up to 3.07e-07 depending on which
+control was applied.[^arms] No arm is the canonical one. A question-set record
+and a loss record measured under different arms are different configurations,
+which is why the posture is in the fingerprint rather than in a comment.
+
+[^ctl]: `services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py`,
+    `qa_run_record` and `main`; the arm table is
+    `core/services/model/control_arms.py` § `CONTROL_ARMS`.
+
+[^arms]: `services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py`
+    § `cartridge_run_record`, whose docstring records the cross-card
+    measurement the flag was added for. The four arms were run on a 3090 Ti on
+    2026-09-04; board task `1fc5afed-89a7-400e-b79e-378f322711c7` carries the
+    full table, and commit `f297331e` carries the code.
 
 ## Reading this beside the loss numbers
 
