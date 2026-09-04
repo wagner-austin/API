@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-plant-eco",
+  "files": [
+    {
+      "name": "agilent-gc-ms-d-file-structure.md",
+      "sha256": "f9fe1825c1fff4047a34ed899f917a3bc07aff5b24233d0a8bd4beb647db9beb",
+      "size_bytes": 9752
+    },
+    {
+      "name": "atkinson-arey-2003-atmospheric-voc-degradation.md",
+      "sha256": "f770f4d9abae9ee66b31dddf5736148225347b3ca6345eb23e225552595fc8a2",
+      "size_bytes": 7983
+    },
+    {
+      "name": "ault-2016-sw-megadrought.md",
+      "sha256": "88ce617de53ef7d4fea9fdf9bb7b5ee0f75766a75052463d008b80b0fa124d6e",
+      "size_bytes": 6693
+    },
+    {
+      "name": "blande-2010-air-pollution-impedes-plant-communication.md",
+      "sha256": "35c44afd0bc3bbb6fbc301e416bfce3c09fe53fbc18a82d1bbc057745ecacabd",
+      "size_bytes": 6539
+    },
+    {
+      "name": "bora-sharma-2010-artemisia-genus-review.md",
+      "sha256": "b1dbd09fca5a1968649d0d1ffb2c0abfe4f0b2a63d1cd51a59cf2262078f78ba",
+      "size_bytes": 3091
+    },
+    {
+      "name": "bourtsoukidis-2018-amazon-soil-sesquiterpene.md",
+      "sha256": "eadbf8f494504eb8e6e6101d44ed5a114f9abc448004604432c6b698a1226e79",
+      "size_bytes": 7654
+    },
+    {
+      "name": "bouvier-brown-2009-bearpex-monoterpenes-sesquiterpenes.md",
+      "sha256": "7592c6140a59e2f75950d25e015b8120c407c1f49e5a77966ed0f3031116181a",
+      "size_bytes": 6209
+    },
+    {
+      "name": "bratman-2024-olfactory-pathway.md",
+      "sha256": "f58c369ad973aa5c11f00abe6faf97e32749a6ce8b58e2b171cb83cf45ae7261",
+      "size_bytes": 7993
+    },
+    {
+      "name": "chen-2011-terpene-synthase-family.md",
+      "sha256": "9954dcc430da091759e619258417741f12ca11ab5a88ffdf183f549e13b117a5",
+      "size_bytes": 18681
+    },
+    {
+      "name": "chiral-emissions-coelution-ion-extraction.md",
+      "sha256": "495e7e7ffc45fc9af5f227af51ed54e9b577fc63b4c8b675b42e5ace19191a02",
+      "size_bytes": 9280
+    },
+    {
+      "name": "chiral-terpene-literature-review-progress.md",
+      "sha256": "db4c7acbefc52dfeae13c14e369ece6f7e4f98325b60716a55577e71b6f1a06b",
+      "size_bytes": 10155
+    },
+    {
+      "name": "dudareva-2013-biosynthesis-function-vocs.md",
+      "sha256": "9bb4b818f7fe54b0f5fba37f7e4995a164c6ac1bdee0a3457ed8acc9ff18a9c5",
+      "size_bytes": 13660
+    },
+    {
+      "name": "faiola-2012-bvoc-fid-quantification.md",
+      "sha256": "64ab2d9dae44b9fea9b5b1a0570ff1af86f0cd29fe2db4376f248795d05337ed",
+      "size_bytes": 7044
+    },
+    {
+      "name": "faiola-2013-soa-soil-leaf-litter.md",
+      "sha256": "b3ffb697461d5a218c439130716828db8b47a21470d25a67541b87af676e2583",
+      "size_bytes": 9618
+    },
+    {
+      "name": "faiola-2015-biogenic-soa-baseline-herbivory.md",
+      "sha256": "efc141ecef6ce52d0695e3442d1da6ce4aa1116fad31ae769dd762856c99aad8",
+      "size_bytes": 7721
+    },
+    {
+      "name": "faiola-2015-simulated-herbivory-voc-profiles.md",
+      "sha256": "d9caa8803014c63dc8d19042e4f97594dafff6f27ec6912aba513089a01365b7",
+      "size_bytes": 7489
+    },
+    {
+      "name": "faiola-2018-ptr-tofms-bvoc.md",
+      "sha256": "e90dfc4ea5b873dd273bb8d3bd04739f00e7ac010b7e27896b137d7ebc5b2816",
+      "size_bytes": 6410
+    },
+    {
+      "name": "faiola-2020-insect-herbivory-stress-volatiles-synthesis.md",
+      "sha256": "56736f3a92d7920610a9a9dbcaef215d08ec16be1d9251bed199ee9294f0d92c",
+      "size_bytes": 14583
+    },
+    {
+      "name": "faiola-2022-herbivory-radiative-forcing.md",
+      "sha256": "7d4177f35778045fafdc7dbcd1f3fc4b2c0bd2a100e1602eb14cd2758c057b03",
+      "size_bytes": 9568
+    },
+    {
+      "name": "faiola-2024-soa-photooxidation.md",
+      "sha256": "55c43760e34c14b131fd8a2cfd7de4b73351475bf410f0d422309baeec7ce795",
+      "size_bytes": 7774
+    },
+    {
+      "name": "faiola-chiral-gc-method-enantiomer-order.md",
+      "sha256": "031b32eaa7086a69ec469ac749f7319ba42ee699c4b0fa067a02f89606bf0b28",
+      "size_bytes": 12799
+    },
+    {
+      "name": "farre-armengol-2016-phyllosphere-microbiota-voc.md",
+      "sha256": "608e800b9f392b0f8e735779e9611f1e3b174d404644fad025336b325dd8e0c5",
+      "size_bytes": 7319
+    },
+    {
+      "name": "gao-1989-canopy-turbulent-organized-structure.md",
+      "sha256": "6390e53a37c7edcae51355d8136dc8956a9cfbfe00d910c55d0df641742580da",
+      "size_bytes": 4994
+    },
+    {
+      "name": "gu-2024-limonene-enantiomeric-ratios.md",
+      "sha256": "5d3b749d5a040d4c48e7c11f463de6150e5ae8e10d055f64cc1af95a242d2a45",
+      "size_bytes": 10529
+    },
+    {
+      "name": "guenther-1994-us-woodland-voc-emissions.md",
+      "sha256": "2f8dcb556eed9f4580c42f259a6cfccea0067a668d71c8dcb1cb9cbe0982e53d",
+      "size_bytes": 4256
+    },
+    {
+      "name": "guenther-1995-first-bvoc-emission-model.md",
+      "sha256": "6f5a9418ede7ce8884a00113ec8c4fbb4c270d06775b293b7c6767c871f408de",
+      "size_bytes": 18216
+    },
+    {
+      "name": "guenther-2012-megan21.md",
+      "sha256": "d524708dc4cd98cb955c6504d4686f083cfb1abb48b8ad0d0055791cf72634ee",
+      "size_bytes": 13487
+    },
+    {
+      "name": "hobo-environmental-data-protocol.md",
+      "sha256": "66dd6b380b7f9a711d9adeecaf9febe1c2899f64ad24476874c72cc3faf63bb7",
+      "size_bytes": 13549
+    },
+    {
+      "name": "holopainen-blande-2013-where-do-hipvs-go.md",
+      "sha256": "c4bd1263aad1f6eefff920e67608c1750f35782452614910dbfb38c148836cc5",
+      "size_bytes": 7683
+    },
+    {
+      "name": "holopainen-gershenzon-2010-multiple-stress-vocs.md",
+      "sha256": "306b9128273c649576bfd0d709815297d42dd8d7d941e4400779eb47aa723a26",
+      "size_bytes": 10666
+    },
+    {
+      "name": "insam-seewald-2010-soil-microbial-vocs.md",
+      "sha256": "684a4cb671e7bbaac2786afb4064e62e60c7b56c12910390792dc53297ec0d1e",
+      "size_bytes": 6725
+    },
+    {
+      "name": "ivanescu-2015-artemisia-sesquiterpene-lactones.md",
+      "sha256": "42aae8ec9b312163c5ce41e8cb35c8c0b6ddc06fae69f583d378e3ad3618a742",
+      "size_bytes": 3682
+    },
+    {
+      "name": "jasmine-uci-tropical-bvoc-thermal-stress.md",
+      "sha256": "d8c13b97b0b16963766bc7b01dd515074aee21213db509ed890a3ce7e638f38e",
+      "size_bytes": 15139
+    },
+    {
+      "name": "kesselmeier-staudt-1999-bvoc-overview.md",
+      "sha256": "38b65fd97f1aafa4fda436c49eeec73cc8c6888157ce6ccbd43807f8818b2cf1",
+      "size_bytes": 22732
+    },
+    {
+      "name": "khalaj-2024-oxygenated-terpenes-aerosol.md",
+      "sha256": "b1f404e070bc1b722bb1f9dcd2759b8ce11d3d8760a792502705013beb6e59af",
+      "size_bytes": 9117
+    },
+    {
+      "name": "laothawornkitkul-2009-bvoc-earth-system.md",
+      "sha256": "999ad8f9e0501e85fcf76b5c96026b1acddcb82bac31b65066548b249212d1b3",
+      "size_bytes": 7105
+    },
+    {
+      "name": "lichtenthaler-1999-dxp-mep-pathway.md",
+      "sha256": "a77baee3b3481dd8b0133f5d0f36d779b7ed8eea77d612b1e848c3c67f4e3103",
+      "size_bytes": 11326
+    },
+    {
+      "name": "lindinger-1998-ptr-ms-original.md",
+      "sha256": "24dc0577d5cb1c61a1e7308d63724b7622f9e1c7896fde9d1271e4f4c532f6c8",
+      "size_bytes": 12181
+    },
+    {
+      "name": "liu-2024-limonene-myrcene-mixture-soa.md",
+      "sha256": "2762034b1d2384eae9f09f0a0b4ab8215b4d3b56e399016ba8b0088be71c19e9",
+      "size_bytes": 11521
+    },
+    {
+      "name": "liu-2025-acyclic-terpene-viscosity-volatility.md",
+      "sha256": "290153e85b712b789a5989f33f84c0c2e6da41b7a4e0aedf0ce8ead46ad8a430",
+      "size_bytes": 11923
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include plant-chemical-ecology, sorted by filename, first 40",
+    "why": "composition partner 7 for the n8 companion grid (684492dd); chosen over the tech and hpc3 wikis, both measured leaky against me-public (+0.18/+0.41 cross-gain); its own cross-gain is verified in-run by the grid's cross-gain arm, not assumed",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-qft",
+  "files": [
+    {
+      "name": "anderson-1933-positive-electron.md",
+      "sha256": "655ac9b7ab0dd75542a7326915826679d415e83ee5d3f5dfe8c5a9aba6317e5c",
+      "size_bytes": 9082
+    },
+    {
+      "name": "anomalous-magnetic-moment-g-2.md",
+      "sha256": "5692a749356d3096a81b927d5e30ac9abe6f34a9f1de43da1eec2b87ada7a1df",
+      "size_bytes": 15168
+    },
+    {
+      "name": "bethe-1947-electromagnetic-shift-energy-levels.md",
+      "sha256": "c5afaa01b87288ad13a98efcb54eed0d7021159bb07cc80e6b8f45067ba8d4e9",
+      "size_bytes": 8848
+    },
+    {
+      "name": "casimir-1948-attraction-conducting-plates.md",
+      "sha256": "31a08b136d88068271b2a01c23cd29355ac4d9de44cf571f4afa112b421a91c3",
+      "size_bytes": 7463
+    },
+    {
+      "name": "dirac-1928-quantum-theory-electron-part-2.md",
+      "sha256": "f1d0a6633811b297c8fd2adef0cfcd98d3d770adbc3dad136b97919ac35f4dc3",
+      "size_bytes": 8056
+    },
+    {
+      "name": "dirac-1928-quantum-theory-electron.md",
+      "sha256": "87db93daa5ab5e864a0d9f88c5e3100b71565cfa164516809d00ed61d765fa01",
+      "size_bytes": 7746
+    },
+    {
+      "name": "dirac-1930-theory-electrons-protons.md",
+      "sha256": "0e6e08c228d8996b97c41c75af2fcc38b56b385f7f54e92c2231c0140133a603",
+      "size_bytes": 11032
+    },
+    {
+      "name": "dyson-1949-radiation-theories-tsf.md",
+      "sha256": "9657e4c0ffca830fa0c7e7353168523ff4a628fe7c0191e044bb7c9c3bd68e40",
+      "size_bytes": 8412
+    },
+    {
+      "name": "electron-field.md",
+      "sha256": "52a4a212b4621d0faaa99dec1d66b817ef8c70e05d7a934f66f45ba7c55f3147",
+      "size_bytes": 13656
+    },
+    {
+      "name": "fermi-1932-quantum-theory-radiation.md",
+      "sha256": "02b753212c860e95b333ae8a6ae4ad793d922e871ccc15df48ab92b5cfcd8fb3",
+      "size_bytes": 11161
+    },
+    {
+      "name": "feynman-1949-space-time-approach-qed.md",
+      "sha256": "fe6ac52d2c8fcbcb4962cbde61559551187f67a86e11601da1b7a08c652b5fe6",
+      "size_bytes": 13626
+    },
+    {
+      "name": "feynman-1949-theory-of-positrons.md",
+      "sha256": "4d208f1155937134586f6690ce254bfb1144bb01f8d2858648a7e538c75beac6",
+      "size_bytes": 10208
+    },
+    {
+      "name": "feynman-diagrams.md",
+      "sha256": "f3b158ba7b2f7d23960033f05a39dc36a782c664641f36ebc945e27a5ea1eee2",
+      "size_bytes": 12128
+    },
+    {
+      "name": "gauge-invariance-and-qed.md",
+      "sha256": "a72532e061382084eced747d7e540f74d69d87e4b39b55e3f5227a00e455b8bb",
+      "size_bytes": 13318
+    },
+    {
+      "name": "higgs-mechanism.md",
+      "sha256": "982f2362b820a50defb44f2e4ef6486843a3c8aff11a6797136c5c6908e9ef7b",
+      "size_bytes": 11439
+    },
+    {
+      "name": "lamb-retherford-1947-hydrogen-fine-structure.md",
+      "sha256": "79312a56c4ba755cb777d1f3284c05a19f311972defdabbff84f0b836fbc2073",
+      "size_bytes": 8903
+    },
+    {
+      "name": "quantum-field-concept.md",
+      "sha256": "6641f3f8b5eaa5d1e1275575d68b4369ce91eda4e00548c55d15dbeff8ca78de",
+      "size_bytes": 10979
+    },
+    {
+      "name": "renormalization-in-qft.md",
+      "sha256": "75d9a70da94d6e50995c2ab8e491fe5ba3c73b78f97893eee35cd34ebc52a3ff",
+      "size_bytes": 14527
+    },
+    {
+      "name": "schwinger-1948-magnetic-moment-electron.md",
+      "sha256": "455545beb8e6c0c9df44b48f93bb4a83a62505ab96d71788b3a5a017cb19fe20",
+      "size_bytes": 8552
+    },
+    {
+      "name": "second-quantization.md",
+      "sha256": "d2bbd5cc7d1a9659c76a211dd33d4282317931af2f3408c1bf1a5232bc100ad1",
+      "size_bytes": 14737
+    },
+    {
+      "name": "standard-model-overview.md",
+      "sha256": "8a790acec0d7882ee952ce14fbdbe79fe0b143e8ba2aa503d00d38d9737a13da",
+      "size_bytes": 23000
+    },
+    {
+      "name": "t-hooft-1971-renormalizable-massive-yang-mills.md",
+      "sha256": "3d1a619476a3240a9f62ee32bb8bdfc96e370180a5cfd39eefafcb331dde1d75",
+      "size_bytes": 11622
+    },
+    {
+      "name": "tomonaga-1946-relativistically-invariant-qft.md",
+      "sha256": "32c9bb2cbdf0422d05da37eaf7c2d81870ff3bbe1802e03f91afb0c42ce60c0f",
+      "size_bytes": 9836
+    },
+    {
+      "name": "vacuum-fluctuations-and-casimir.md",
+      "sha256": "d18a771d1d5d5474a370096f4c1a469ef9284ca9644c7b2f6409767bfa37d063",
+      "size_bytes": 17185
+    },
+    {
+      "name": "weinberg-1967-model-of-leptons.md",
+      "sha256": "abbaf805f327fba3dbeee80f1859de7f3df0880fe104656da9fcb1ccb951cea8",
+      "size_bytes": 8713
+    },
+    {
+      "name": "wilson-1971-renormalization-group-critical-phenomena-i.md",
+      "sha256": "14f1223d30871d0c478801d277e2689f578cbdccf04812a64ccb78a340d84d94",
+      "size_bytes": 13292
+    },
+    {
+      "name": "wilson-1971-renormalization-group-critical-phenomena-ii.md",
+      "sha256": "374335b69f40befacbadc8907773671bd8f2ecf2bd925f61d11e248756c5e989",
+      "size_bytes": 9856
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include quantum-field-theory, sorted by filename, all of them",
+    "why": "composition partner 6 for the n8 companion grid (684492dd); cross-gain measured -0.428 against me-public in the a67d6038 clean-roster baseline",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}

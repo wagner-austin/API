@@ -1,0 +1,136 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-formal-sem",
+  "files": [
+    {
+      "name": "cabagan-isabela-fieldwork-context.md",
+      "sha256": "8261b400af7ef53273b8bd8da6a34eb366f0dfa374df245cb0153d21e21bd55e",
+      "size_bytes": 5973
+    },
+    {
+      "name": "david-inman-uci-linguist.md",
+      "sha256": "aac4a7ccf504e37aab8c3c3ec5936d980fd89d99335fbecb43ff6e6776f0cd4d",
+      "size_bytes": 5096
+    },
+    {
+      "name": "dita-2007-ibanag-reference-grammar.md",
+      "sha256": "48d1dfbe9f48cc8eb52b0c72e19a2e4dc82c38c263e7f7185ba5450efb823def",
+      "size_bytes": 14061
+    },
+    {
+      "name": "dita-2009-philippine-corpora.md",
+      "sha256": "af391034f858a9ece3da4f0e748c039754f1262ba1a2c358118fb2592f8f1784",
+      "size_bytes": 8055
+    },
+    {
+      "name": "dita-2010-philippine-pronouns.md",
+      "sha256": "acbe2056389e12e456461001c8f891311a5c9c562af7b575e9f73c0a26e57957",
+      "size_bytes": 6489
+    },
+    {
+      "name": "dolatre-2021-ibanag-tuguegarao-cabagan.md",
+      "sha256": "f7227def2a5c3d3a9bfefe5032e6e107ef72409f5f4decf05417fafb8c4ae194",
+      "size_bytes": 9607
+    },
+    {
+      "name": "espinal-mcnally-2011-bare-nominals-incorporating-verbs.md",
+      "sha256": "7022c1a917dd0230a0cc729ef5c639796e47b45da6577c6df9c76f4a535cfb42",
+      "size_bytes": 8242
+    },
+    {
+      "name": "frankie-boren-uci-language-science.md",
+      "sha256": "a7414f0c0d6b6632f101a2f9f658ce1432a4298a839be5172b40bcbc07a3fbb2",
+      "size_bytes": 11095
+    },
+    {
+      "name": "functional-application-semantic-composition-montague-frege.md",
+      "sha256": "7342ec48239508b20afa56dbc19206ded07da13e3abca16db2d3d7bf357706a4",
+      "size_bytes": 8812
+    },
+    {
+      "name": "gregory-scontras-uci.md",
+      "sha256": "e9caa4cc25ead603cc602bb201711340a5583d1bebd5de0dec740ff476153cad",
+      "size_bytes": 7976
+    },
+    {
+      "name": "ibanag-diaspora-california.md",
+      "sha256": "1e7d77f5bc71bde857bbe6a172e3adc742087a2e7fc6d0a0b89bb27960a71bc0",
+      "size_bytes": 4302
+    },
+    {
+      "name": "ibanag-language-context.md",
+      "sha256": "c3f5c2745c1fc8e8035378ee7075945fa5a49c2182ff54fe2db35708d4bd1076",
+      "size_bytes": 6394
+    },
+    {
+      "name": "ibanag-tu-linker-modification-abstract.md",
+      "sha256": "d4e047a5a7649589acdc6427dd1a6101729622e61d45376a6f7078dc660e7746",
+      "size_bytes": 11372
+    },
+    {
+      "name": "inman-2025-atlas-database.md",
+      "sha256": "57c5ed325ce2b6c3a0b21863fee98439d9b476a69e119699b37cbc3aa4f764a2",
+      "size_bytes": 8327
+    },
+    {
+      "name": "isabela-province-ethnolinguistic-composition.md",
+      "sha256": "25300c7e70b9f97a177e79f35c6ab0c98b29a1cf431bf02482c8d71e24eab1c7",
+      "size_bytes": 7753
+    },
+    {
+      "name": "massam-2001-pseudo-noun-incorporation-niuean.md",
+      "sha256": "2fc308a3c585af045890270dcacab2fee7064f9a1eb1d19ab83e81b859df126b",
+      "size_bytes": 6820
+    },
+    {
+      "name": "mcnally-2016-modification-cambridge-handbook.md",
+      "sha256": "6cb3f25f6a982558e34a462b8c2c43116952c80f12dbc2af47223a28e2bb2a8d",
+      "size_bytes": 10913
+    },
+    {
+      "name": "mod-functional-head-rubin-scontras-nicolae.md",
+      "sha256": "c09589e1a9b5e8eee6b4ea337d8282483922c6b828e4faa706295537f0ccb6bd",
+      "size_bytes": 9796
+    },
+    {
+      "name": "pantaleon-2026-isu-sociolinguistic.md",
+      "sha256": "439e1537fbfe85b54109cc5ea8b00378d053e0f80d209b49a705c197cea5e97d",
+      "size_bytes": 7878
+    },
+    {
+      "name": "pseudo-noun-incorporation-concept.md",
+      "sha256": "a3381ccf5f0eb2f64a6f3d439aba6f5fc9d7189934286ac3e28c050a231eddad",
+      "size_bytes": 11329
+    },
+    {
+      "name": "sag-2022-bare-singulars-turkish.md",
+      "sha256": "ba55b6c189ecadbbdab92fe7f854c32b350b79b737caa8048e6b3a7bc57977ad",
+      "size_bytes": 9706
+    },
+    {
+      "name": "scontras-nicolae-2014-tagalog-linker.md",
+      "sha256": "97a45128f47cebe3fe10dae0341c3a8ca1468ff8ea6b49413796d2a7e2c68d8e",
+      "size_bytes": 7826
+    },
+    {
+      "name": "tagalog-linker-na-ng-schachter-otanes.md",
+      "sha256": "608a0cfa36bb2dbaa428fa3290bf71e3c0bf14c81a0b758d82c3332f13441633",
+      "size_bytes": 7774
+    },
+    {
+      "name": "tarun-2020-ibanag-orthography.md",
+      "sha256": "1278711f032b447f3fc02a0212de5dc6b141dd41b3f56c79417070e0897bd5c1",
+      "size_bytes": 10560
+    },
+    {
+      "name": "verbs-as-event-predicates-kratzer.md",
+      "sha256": "d45105f957b25da53e4e7ad87247fff2eebd41ac17ceee902516700cc921cdb7",
+      "size_bytes": 9815
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include formal-semantics-of-modification, sorted by filename, all of them",
+    "why": "composition partner 5 for the n8 companion grid (684492dd); cross-gain measured +0.029 (spread 0.058, within floor) against me-public in the a67d6038 clean-roster baseline",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}

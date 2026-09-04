@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "e007e9990bea44e7dcd7099c94d41d53fb87675e",
+  "git_commit": "acaedbb33695af6933ee4760098d8e5ef3fb6c9a",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -362,7 +362,7 @@
     }
   ],
   "smoke_commands": [
-    "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import COMPANION_SWEEP_PLANS, COMPOSITION_SWEEP_PLANS, companion_sweep_label; plan = COMPANION_SWEEP_PLANS['gpt2-companions']; label = companion_sweep_label('gpt2-companions', plan, digest='0' * 64); assert label.startswith('gpt2-companions-gpt2-w256-s4-e12-lr0.01-n2.4-c64-p0.25.0.5.1.0-seeds7.8.9-'), label; assert 'gpt2-compartments' in COMPOSITION_SWEEP_PLANS\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import COMPANION_SWEEP_PLANS, COMPOSITION_SWEEP_PLANS, companion_sweep_label; plan = COMPANION_SWEEP_PLANS['gpt2-companions']; label = companion_sweep_label('gpt2-companions', plan, digest='0' * 64); assert label.startswith('gpt2-companions-gpt2-w256-s4-e12-lr0.01-n2.4-c64-p0.25.0.5.1.0-seeds7.8.9-'), label; assert 'gpt2-compartments' in COMPOSITION_SWEEP_PLANS; n8 = COMPANION_SWEEP_PLANS['gpt2-companions-n8']; assert n8['compartment_counts'] == (8,) and n8['probabilities'] == (0.25, 0.5), n8\"",
     "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_companion_sweep import COMPANION_KINDS, COMPANION_SEED_STRIDE; assert COMPANION_KINDS == ('noise', 'trained'), COMPANION_KINDS; assert COMPANION_SEED_STRIDE == 11; from model_trainer.core.services.finetuning.strategies.cartridge_slots import SLOT_AXIS; assert SLOT_AXIS == 2, 'slot concat axis moved and every composed cartridge would be silently wrong'\"",
     "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
     "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",

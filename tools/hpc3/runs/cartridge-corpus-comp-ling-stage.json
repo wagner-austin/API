@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-comp-ling",
+  "files": [
+    {
+      "name": "arnett-bergen-2024-morphologically-complex-lms.md",
+      "sha256": "8c1c4e2c05c743424df1ade6638a5b4ddcb2f78422bfe19bd43d84a94f737bdf",
+      "size_bytes": 5604
+    },
+    {
+      "name": "arslan-2016-turkish-deasciification.md",
+      "sha256": "c18100dfb38871f2f5d038b9f18d316ff6c9bb0f6b3ea24345843ea009492bfe",
+      "size_bytes": 7431
+    },
+    {
+      "name": "baidildinova-wagner-2024-neurips-lstm-mi.md",
+      "sha256": "fc9568b384dcfa741433588e1f9cd68cda47c06fb7a551e0d18b2a5cf160df63",
+      "size_bytes": 13646
+    },
+    {
+      "name": "banon-bernabeu-2024-fastspell.md",
+      "sha256": "ab04d096bcd3860d8590acfcedeec58e79217f26cc03618aba9302d657777ff0",
+      "size_bytes": 4760
+    },
+    {
+      "name": "bayram-fincan-2025-turkish-tokenization-standards.md",
+      "sha256": "dec0e168a249927311db17cba7ae155f515c8240724fae9e86bf7b8698f161d3",
+      "size_bytes": 4387
+    },
+    {
+      "name": "chambers-trudgill-1980-dialectology.md",
+      "sha256": "fc7d3e58f680d455eaae844639f5a04a050dfd7d3449ba4a3a27112f609b8359",
+      "size_bytes": 5816
+    },
+    {
+      "name": "character-level-language-modeling.md",
+      "sha256": "199d4e30789b5ff5f6964308150a383f8d713a75e7a1f5e0e040a96cf93ae6af",
+      "size_bytes": 5211
+    },
+    {
+      "name": "clark-2026-intercomprehension-smc.md",
+      "sha256": "2110096a76190f9cce51f52f245dfe09e3777e073de7fa20d1898314bcb7cfe9",
+      "size_bytes": 15823
+    },
+    {
+      "name": "common-turkic-alphabet-1991.md",
+      "sha256": "705947ee55c80e499b0eb6eeb08825ef25d56981c625ef9b6b990a88aaab0817",
+      "size_bytes": 5201
+    },
+    {
+      "name": "cross-entropy-as-mi-proxy-lstm-methodology.md",
+      "sha256": "b7c464a18c5ed5e0a243f53ea3f24390516cac0a7947292911e47f6f31342677",
+      "size_bytes": 7805
+    },
+    {
+      "name": "davari-2023-cka-reliability.md",
+      "sha256": "f1f1684469665b6023b8819f6be8a692c1afd0ec890de478ae34324e075d5e4b",
+      "size_bytes": 4594
+    },
+    {
+      "name": "devlin-2019-bert.md",
+      "sha256": "d0bee0e92bc76102776d1aa41fd544eec5bace574235c9905190948c85fbc0fc",
+      "size_bytes": 5471
+    },
+    {
+      "name": "duval-janbaz-2006-latin-script-uyghur.md",
+      "sha256": "5133355d100487a9b07b26a7c621e4b4f1153d464d0598918179d5a9d2727ff4",
+      "size_bytes": 12547
+    },
+    {
+      "name": "gooskens-heuven-2021-mutual-intelligibility.md",
+      "sha256": "81131a1fef1fe3d03e27492c6329d11ba4ef3f80d2674e273c1497c9fd29465c",
+      "size_bytes": 10422
+    },
+    {
+      "name": "grimes-1992-vocab-similarity-intelligibility.md",
+      "sha256": "4718858a1f51ec2ba9f691993dcc68623fb7a0d8c8956111618e0841228d7f5c",
+      "size_bytes": 10679
+    },
+    {
+      "name": "hamann-2004-retroflex-fricatives-slavic.md",
+      "sha256": "ce1fd0aa02939ee39acaf230d9fb229b71331af5c88f283eee206b5373541324",
+      "size_bytes": 5163
+    },
+    {
+      "name": "heggarty-2000-quantifying-phonetic-change.md",
+      "sha256": "dfae6e429bb2a8c1a79836d7bfbe43ec22d8d0036ab4cb164feb9a3711b4a5d0",
+      "size_bytes": 5979
+    },
+    {
+      "name": "hochreiter-schmidhuber-1997-lstm.md",
+      "sha256": "85e8919ed16df591edd5d988671ac885058e147b03f6b61cd9a8f82b947f2da6",
+      "size_bytes": 8158
+    },
+    {
+      "name": "holtzman-2020-neural-text-degeneration.md",
+      "sha256": "1a5ee2710363fdcdafa08f015eb780296af3584deb68061ceb2b4c30979837bd",
+      "size_bytes": 5867
+    },
+    {
+      "name": "icu-uts35-ldml-transforms.md",
+      "sha256": "44d7f7c57963d49cb82d49691f880362cf027e5aa3b671ce2460d7f490b6a2c0",
+      "size_bytes": 11231
+    },
+    {
+      "name": "ido-2025-uzbek.md",
+      "sha256": "c58933564e025c60face140c3b24ffc795a005ddfbc0307c3d05d1fc8e96255e",
+      "size_bytes": 8877
+    },
+    {
+      "name": "joulin-2017-fasttext-bag-of-tricks.md",
+      "sha256": "6fbec9a6fe425f486501b8105438d7fb091df3c13e6bd8bb8dcf21058fbd01b0",
+      "size_bytes": 6420
+    },
+    {
+      "name": "joulin-2017-fasttext-zip.md",
+      "sha256": "a5d153fe42a388672fa7d1985d7fd15aaed00f586e8758d97e5c7153461a4e80",
+      "size_bytes": 4666
+    },
+    {
+      "name": "kaya-tantug-2024-turkish-tokenization-granularity.md",
+      "sha256": "e4a3db675c3a1c22fcfb7c575b9ab7cb864bd0f34a6b9398a93619a15a938e72",
+      "size_bytes": 4515
+    },
+    {
+      "name": "kazakh-latin-alphabet-reform-2017.md",
+      "sha256": "22fb269ca43ac754eaa8867253639567644b50f160991372fd6bcd3bc7c245dd",
+      "size_bytes": 8731
+    },
+    {
+      "name": "keskar-2019-ctrl-repetition-penalty.md",
+      "sha256": "e59f13e96844fcf0d1fbd9cc3d7e29b6e58be592b4f438599c02e467780dbe3d",
+      "size_bytes": 4979
+    },
+    {
+      "name": "kornblith-2019-cka-representation-similarity.md",
+      "sha256": "42f4ca17c2f225b7645ab9cf71c3967a85d8534f50e34f045620381f4d6fc176",
+      "size_bytes": 4826
+    },
+    {
+      "name": "kudo-richardson-2018-sentencepiece.md",
+      "sha256": "9079850215b47cc7baeb9326085b8bbe8b1bf42edb5fb50593c9d121f3d58f3d",
+      "size_bytes": 8156
+    },
+    {
+      "name": "lee-2020-wikipron.md",
+      "sha256": "01fda6955aaeb8085a18eb8c00673c6dadf634a70c3c150d07616c0c54bbcf2c",
+      "size_bytes": 6472
+    },
+    {
+      "name": "levenshtein-1966-binary-codes.md",
+      "sha256": "3ba690e4f23aa0e7c488cba49302c389e955a2245d397b45428a91da94f007ac",
+      "size_bytes": 8192
+    },
+    {
+      "name": "lsci209-final-baidildinova.md",
+      "sha256": "ed23f5e5e3cac829d0b96ee08863976f6dc857880be224b1452287a0b773d3dd",
+      "size_bytes": 5751
+    },
+    {
+      "name": "matras-2012-language-contact.md",
+      "sha256": "10e12297363d81799e5857b6f1bd210e94a7496ece3fcfa68191d0624ff19231",
+      "size_bytes": 4582
+    },
+    {
+      "name": "maxutov-2024-do-llms-speak-kazakh.md",
+      "sha256": "f1076f04c840ff48c7eeaad658d1c9bbcd34551b7d18ea71d447fb447f0d2ef9",
+      "size_bytes": 5317
+    },
+    {
+      "name": "mayer-2021-uyghur-backness-harmony.md",
+      "sha256": "3dd339160cffe82846c8d2f754c58cab11ddb5881c945eed72d011fa8c8c6c32",
+      "size_bytes": 8877
+    },
+    {
+      "name": "mccollum-2020-kyrgyz.md",
+      "sha256": "f584c0501b700afd53757af297ee62a9ba2f1545ae6c93545d7ddc7fe2c25ee9",
+      "size_bytes": 7886
+    },
+    {
+      "name": "mccollum-2021-uyghur.md",
+      "sha256": "a2475b4c8d6be12bee4f24b1d3d74198f2f93433cf4435be19f3b98633c7672f",
+      "size_bytes": 7497
+    },
+    {
+      "name": "mccollum-chen-2021-kazakh.md",
+      "sha256": "b7e4e2fd82175d317c1d8651f6fc16056307736b77301267d0d968a2c59e4f7e",
+      "size_bytes": 7622
+    },
+    {
+      "name": "mirzakhalov-2021-turkic-mt.md",
+      "sha256": "73abf093b4019c0c3d203e697ca40bc16622cf7f53fbca53ed13fb1faa02ed36",
+      "size_bytes": 4044
+    },
+    {
+      "name": "mokari-werner-2017-azerbaijani.md",
+      "sha256": "a16c5956ec8690123e16314eb7bcea5718f7927f528c1c398abd77768d6e8702",
+      "size_bytes": 11060
+    },
+    {
+      "name": "mussakhojayeva-2023-multilingual-asr-turkic.md",
+      "sha256": "c6e3d4c02f8ba8bd14f480786643bcff1a5b07c2b29e0fc7efd88cc89f2e482f",
+      "size_bytes": 4472
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include computational-linguistics, sorted by filename, first 40",
+    "why": "composition partner 4 for the n8 companion grid (684492dd); cross-gain measured -0.089 against me-public in the a67d6038 clean-roster baseline",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}
