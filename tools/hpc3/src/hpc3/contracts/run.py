@@ -34,7 +34,15 @@ from hpc3.contracts.project import PROJECT_FIELDS, ProjectConfig, encode_project
 from hpc3.contracts.sweep import SweepSpec, decode_sweep_spec
 from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
 
-RUN_IDENTITY_FIELDS = ("project", "name", "command", "experiment", "depends_on", "artifact")
+RUN_IDENTITY_FIELDS = (
+    "project",
+    "name",
+    "command",
+    "experiment",
+    "depends_on",
+    "artifact",
+    "gpu_pinned_because",
+)
 """What only a run can say. Never inherited, never optional.
 
 ``experiment`` is here rather than among the project defaults because what a
@@ -212,6 +220,10 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     # the project defaults cannot, because two runs of one project write to
     # two different files, which is the whole reason the ledger needs it.
     merged["artifact"] = document.get("artifact")
+    # Only a run can claim its card pin is the measurement: a project-level
+    # default would waive the gpu-supply rule for every run, restoring the
+    # inherited-default queueing the rule exists to catch.
+    merged["gpu_pinned_because"] = document.get("gpu_pinned_because")
     return decode_job_spec(
         merged,
         workspace_cluster(workspace),

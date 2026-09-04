@@ -84,6 +84,7 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             name=f"{spec['base']['name']}-{member['suffix']}",
             partition=spec["base"]["partition"],
             gpu=spec["base"]["gpu"],
+            gpu_pinned_because=spec["base"]["gpu_pinned_because"],
             cpus=spec["base"]["cpus"],
             mem_gb=spec["base"]["mem_gb"],
             minutes=spec["base"]["minutes"],

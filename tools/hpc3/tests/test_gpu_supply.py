@@ -51,6 +51,7 @@ def _spec(model: str | None, count: int = 1) -> JobSpec:
         name="cartridge-gpt2-wiki",
         partition="free-gpu",
         gpu=None if model is None else {"model": model, "count": count},
+        gpu_pinned_because=None,
         cpus=8,
         mem_gb=16,
         minutes=30,
@@ -129,6 +130,15 @@ class TestCheckRequestedGpuAvailable:
         assert excinfo.value.code is Hpc3ErrorCode.GPU_MODEL_EXHAUSTED
         assert "A30 (1 free)" in excinfo.value.message
         assert "V100 (2 free)" in excinfo.value.message
+
+    def test_a_declared_pin_reason_waives_the_refusal(self) -> None:
+        """The same exhausted-A100 supply as the incident, but the run says
+        why the card is required -- a per-card measurement queues for its
+        card deliberately instead of being redirected to a different one."""
+        spec = _spec("A100")
+        spec["gpu_pinned_because"] = "per-card determinism record; the card is the arm"
+
+        check_requested_gpu_available(spec, parse_gpu_supply(_SINFO))
 
     def test_a_model_with_free_cards_passes(self) -> None:
         check_requested_gpu_available(_spec("V100"), parse_gpu_supply(_SINFO))

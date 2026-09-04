@@ -13,10 +13,10 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.job import (
-    PREEMPTION_PROTECTION_THRESHOLD_MINUTES,
     JobSpec,
     encode_job_spec,
 )
+from hpc3.contracts.job_rules import PREEMPTION_PROTECTION_THRESHOLD_MINUTES
 from tests.against_hpc3 import decode_job_spec
 from tests.conftest import gpus
 
@@ -35,6 +35,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "name": "arm-b-42",
         "partition": "free-gpu",
         "gpu": gpus("A100"),
+        "gpu_pinned_because": None,
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -70,6 +71,7 @@ class TestValidSpec:
             "env_path",
             "experiment",
             "gpu",
+            "gpu_pinned_because",
             "image",
             "mem_gb",
             "minutes",
@@ -79,6 +81,46 @@ class TestValidSpec:
             "project",
             "requeue",
         ]
+
+
+class TestTheGpuPinReason:
+    """The gpu-supply rule waives its exhausted-model refusal for a run that
+    declares WHY its card pin is the measurement. The declaration is typed
+    here so a blank or misplaced one dies at decode, before any queue is
+    joined on its authority."""
+
+    def test_a_declared_reason_is_kept(self) -> None:
+        spec = decode_job_spec(
+            _spec(gpu_pinned_because="per-card determinism record; the card is the arm"),
+        )
+
+        assert spec["gpu_pinned_because"] == ("per-card determinism record; the card is the arm")
+
+    def test_absent_decodes_to_none(self) -> None:
+        payload = _spec()
+        del payload["gpu_pinned_because"]
+
+        assert decode_job_spec(payload)["gpu_pinned_because"] is None
+
+    def test_a_blank_reason_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="a blank reason is not a reason"):
+            decode_job_spec(_spec(gpu_pinned_because="   "))
+
+    def test_a_non_string_reason_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="non-empty string"):
+            decode_job_spec(_spec(gpu_pinned_because=7))
+
+    def test_a_reason_on_a_cpu_only_job_is_refused(self) -> None:
+        """On a CPU partition, so the misplaced reason is the ONLY defect --
+        on a GPU partition the partition-mismatch rule fires first."""
+        with pytest.raises(JSONTypeError, match="no GPU pin to justify"):
+            decode_job_spec(
+                _spec(
+                    partition="free",
+                    gpu=None,
+                    gpu_pinned_because="there is no card here",
+                ),
+            )
 
 
 class TestTheDeclaredArtifactIsCheckedAgainstItsOwnCommand:

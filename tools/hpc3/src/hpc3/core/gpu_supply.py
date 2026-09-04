@@ -22,6 +22,7 @@ whoever knows why the model was pinned, which is never this function.
 from __future__ import annotations
 
 from platform_core.errors import AppError, Hpc3ErrorCode
+from platform_core.logging import get_logger
 
 from hpc3.contracts.gpu_supply import (
     GpuSupply,
@@ -31,6 +32,8 @@ from hpc3.contracts.gpu_supply import (
 )
 from hpc3.contracts.job import JobSpec
 from hpc3.core import remote
+
+_log = get_logger("hpc3.gpu_supply")
 
 #: Reads each node's GPU inventory and what is allocated on it, in one call.
 #:
@@ -83,6 +86,21 @@ def check_requested_gpu_available(spec: JobSpec, supply: tuple[GpuSupply, ...]) 
     )
     if alternatives == ():
         return
+    reason = spec["gpu_pinned_because"]
+    if reason is not None:
+        # The run declared its card pin IS the measurement, so queueing for
+        # the exhausted model is the decision the refusal below exists to
+        # force. Logged rather than silent: a deliberate wait should still
+        # say what it is waiting behind.
+        _log.info(
+            "%r queues for exhausted %s x%d deliberately (%s) -- supply: %s",
+            spec["name"],
+            request["model"],
+            request["count"],
+            reason,
+            describe_supply(supply),
+        )
+        return
     offered = ", ".join(f"{entry['model']} ({entry['free']} free)" for entry in alternatives)
     raise AppError(
         Hpc3ErrorCode.GPU_MODEL_EXHAUSTED,
@@ -95,8 +113,9 @@ def check_requested_gpu_available(spec: JobSpec, supply: tuple[GpuSupply, ...]) 
             f"guaranteed rather than when backfill will find one. Measured 2026-09-04: an "
             f"A100-pinned job estimated at nine days waited five hours and was cancelled, "
             f"and the same work on a V100 the same partition had free started in about a "
-            f"hundred seconds. Either pin a model that is free, or say why this one is "
-            f"required and wait deliberately."
+            f"hundred seconds. Either pin a model that is free, or declare "
+            f"'gpu_pinned_because' in the run document -- the card is the measurement, say "
+            f"so -- and wait deliberately."
         ),
     )
 

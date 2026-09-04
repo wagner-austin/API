@@ -20,7 +20,8 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.budget import Budget, Consumption
 from hpc3.contracts.cluster import ClusterFacts, gpu_count
-from hpc3.contracts.job import MINUTES_PER_HOUR, JobSpec
+from hpc3.contracts.job import JobSpec
+from hpc3.contracts.job_rules import MINUTES_PER_HOUR
 from hpc3.contracts.status import JobStatus, gpu_hours, service_units
 
 

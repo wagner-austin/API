@@ -107,7 +107,18 @@ class TestResolveRun:
             "experiment": {"arm": "B", "seed": "42"},
             "command": "python train.py --arm B",
             "artifact": None,
+            "gpu_pinned_because": None,
         }
+
+    def test_a_run_may_declare_why_its_card_pin_must_hold(self) -> None:
+        """Run-level only: a project default would waive the gpu-supply rule
+        for every run, restoring the inherited-default queueing it catches."""
+        spec = resolve_run(
+            _workspace(),
+            _run(gpu_pinned_because="per-card record; the card is the arm"),
+        )
+
+        assert spec["gpu_pinned_because"] == "per-card record; the card is the arm"
 
     def test_changing_a_project_default_changes_every_run(self) -> None:
         """One edit, not one per document -- the reason this layer exists."""
