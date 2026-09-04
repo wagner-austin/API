@@ -3,7 +3,17 @@ title: Step three at Impossible -- what a learned head may drive, and what it ma
 tags: [impossible, learning, design]
 hubs: [bot-architecture]
 related: ["[[impossible-economy-problem]]", "[[harness-population-search]]", "[[policy-exact-timing]]"]
-sources: [wiki/log.md 2026-09-04, src/rw_bot/policy/doom.py, runs/sweeps/impstrike48, models/fleetdoom.ndjson]
+source_paths:
+  - "src/rw_bot/policy/doom.py"
+  - "models/fleetdoom.ndjson"
+  - "wiki/log.md"
+source_git_blobs:
+  "src/rw_bot/policy/doom.py": 69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c
+  "models/fleetdoom.ndjson": 7083f4c071b6a9372a4e65916fd9430ff1deeb58
+  "wiki/log.md": 89b7e75fb26e4b2b6cd9f3a448609405b830bd53
+provenance:
+  - "runs/sweeps/impstrike48 — sweep run directory, untracked by git"
+  - "wiki/log.md entry dated 2026-09-04"
 fact_checked: 2026-09-04
 confidence: high
 ---
