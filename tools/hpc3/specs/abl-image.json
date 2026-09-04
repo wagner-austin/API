@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "5bea978c018bb84727fe101cf6b2842435055835",
+  "git_commit": "e007e9990bea44e7dcd7099c94d41d53fb87675e",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -104,6 +104,22 @@
     "bitsandbytes": "0.45.5"
   },
   "required_symbols": [
+    {
+      "module": "model_trainer.cli.cartridge_composition_sweep",
+      "attribute": "main"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_companion_sweep",
+      "attribute": "main"
+    },
+    {
+      "module": "model_trainer.core.services.model.cartridge_companioned",
+      "attribute": "measure_companioned_scaling"
+    },
+    {
+      "module": "model_trainer.core.services.finetuning.strategies.cartridge_model",
+      "attribute": "CompanionedCartridgeModel"
+    },
     {
       "module": "model_trainer.cluster.preflight",
       "attribute": "check_corpus_certified"
@@ -335,9 +351,19 @@
     {
       "module": "platform_workers.redis",
       "attribute": "RedisStrProto"
+    },
+    {
+      "module": "model_trainer.cluster.preflight",
+      "attribute": "check_model_available"
+    },
+    {
+      "module": "model_trainer.worker.job_utils",
+      "attribute": "build_cfg"
     }
   ],
   "smoke_commands": [
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import COMPANION_SWEEP_PLANS, COMPOSITION_SWEEP_PLANS, companion_sweep_label; plan = COMPANION_SWEEP_PLANS['gpt2-companions']; label = companion_sweep_label('gpt2-companions', plan, digest='0' * 64); assert label.startswith('gpt2-companions-gpt2-w256-s4-e12-lr0.01-n2.4-c64-p0.25.0.5.1.0-seeds7.8.9-'), label; assert 'gpt2-compartments' in COMPOSITION_SWEEP_PLANS\"",
+    "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_companion_sweep import COMPANION_KINDS, COMPANION_SEED_STRIDE; assert COMPANION_KINDS == ('noise', 'trained'), COMPANION_KINDS; assert COMPANION_SEED_STRIDE == 11; from model_trainer.core.services.finetuning.strategies.cartridge_slots import SLOT_AXIS; assert SLOT_AXIS == 2, 'slot concat axis moved and every composed cartridge would be silently wrong'\"",
     "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
     "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
@@ -371,7 +397,9 @@
     "/opt/env/bin/python -c \"from platform_core.continuation_task import EvalPrompt, batches, finishable; p = [EvalPrompt(item_id=f'{i}.py', prompt='h'*(i%3), reference='x') for i in range(6)]; assert batches(p, len, 2) == batches(list(reversed(p)), len, 2), 'batch composition must not depend on input order, or the arms are not paired'; assert [q['item_id'] for q in finishable(p, len, 1)] == [q['item_id'] for q in p], 'a one-token reference fits a one-token budget'\"",
     "/opt/env/bin/python -c \"from platform_core.continuation_task import generated_path, item_root, manifest_path; import pathlib; d = pathlib.Path('out'); t = generated_path(d, 'src/pkg/mod.py'); assert t == d / 'src__pkg__mod.py' / 'src' / 'src__pkg__mod.py', t; assert item_root(d, 'src/pkg/mod.py') in t.parents, 'the guards would be pointed where the file is not'; assert manifest_path(d).parent == d.parent, 'the manifest must not sit among the files'\"",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.continuation_batch import left_pad, split_at_eos, truncate_to_tail; assert left_pad([[1,2,3],[9]], 0) == ([[1,2,3],[0,0,9]], [[1,1,1],[0,0,1]]), 'padding must be on the LEFT for decoder-only generation'; assert truncate_to_tail([1,2,3,4,5], 2) == [4,5], 'an over-long prompt keeps its TAIL'; assert split_at_eos([5,6,0,1], 0) == ([5,6], True)\"",
-    "/opt/env/bin/python -c \"from model_trainer.core.contracts.continuation_sweep import decode_continuation_sweep_spec, encode_continuation_sweep_spec; d = {'run_id':'r','arm':'base','artifact_path':'/a','holdout_path':'/h','prompt_lines':20,'max_new_tokens':1536,'max_prompt_tokens':1024,'batch_size':32,'repetition_penalty':1.1,'seed':0,'device':'cuda','experiment':'e','label':'l'}; assert encode_continuation_sweep_spec(decode_continuation_sweep_spec(d)) == d, 'spec must round-trip'\""
+    "/opt/env/bin/python -c \"from model_trainer.core.contracts.continuation_sweep import decode_continuation_sweep_spec, encode_continuation_sweep_spec; d = {'run_id':'r','arm':'base','artifact_path':'/a','holdout_path':'/h','prompt_lines':20,'max_new_tokens':1536,'max_prompt_tokens':1024,'batch_size':32,'repetition_penalty':1.1,'seed':0,'device':'cuda','experiment':'e','label':'l'}; assert encode_continuation_sweep_spec(decode_continuation_sweep_spec(d)) == d, 'spec must round-trip'\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.compute import device_selector as d; assert not hasattr(d, 'recommended_batch_size_for'), 'the silent batch-size override is back in this image'\"",
+    "/opt/env/bin/python -c \"from model_trainer.cluster.preflight import check_model_available; from platform_core.errors import AppError, ModelTrainerErrorCode; import tempfile, os; d = tempfile.mkdtemp(); ok = os.path.join(d, 'm'); os.mkdir(ok); open(os.path.join(ok, 'config.json'), 'w').write('{\\\"model_type\\\": \\\"gpt2\\\"}'); check_model_available(ok); raised = None\ntry:\n    check_model_available(os.path.join(d, 'absent'))\nexcept AppError as e:\n    raised = e.code\nassert raised is ModelTrainerErrorCode.MODEL_NOT_FOUND, raised\""
   ],
   "labels": {
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"
