@@ -15,15 +15,45 @@ CDP BINDING (``Runtime.addBinding`` → ``window.__botCastDeliver``).
 
 Why a binding and not a loopback HTTP POST: Chrome's Local Network
 Access gate intercepts page fetches to 127.0.0.1 behind a permission
-no automated browser can grant — the fetch neither resolves nor
-rejects, it hangs forever (measured 2026-07-29: caster ticks=36 in
-3 s, posts=0, the one-shot probe fetch equally stuck; Playwright
-1.57 exposes no ``local-network-access`` permission to grant). The
-binding channel has no such gate — and unlike the screencast it has
-NO BACKPRESSURE: the page keeps capturing at its configured fps
-regardless of what the bot thread is doing; frames queued during a
+no automated browser can grant THROUGH THE PERMISSIONS API — the
+fetch neither resolves nor rejects, it hangs forever (measured
+2026-07-29: caster ticks=36 in 3 s, posts=0, the one-shot probe
+fetch equally stuck; Playwright 1.57 exposes no
+``local-network-access`` permission to grant).
+
+CORRECTION (2026-09-03): this paragraph used to end there and was
+read as a law that the loopback POST is impossible. It is not. The
+gate is a Chromium FEATURE, and the bot owns its own launch args.
+Measured, five POSTs from a real https://tankpit.com page to a
+loopback listener in this workspace's own container:
+
+    default flags                              server received 0/5
+    --disable-features=LocalNetworkAccessChecks,
+      BlockInsecurePrivateNetworkRequests,
+      PrivateNetworkAccessSendPreflights,
+      PrivateNetworkAccessRespectPreflightResults
+                                               server received 5/5
+
+So the constraint is "not grantable per-page at runtime", not "not
+possible". Nobody had tried turning the feature off. Recorded because
+a law stated without its escape hatch stops the next reader from
+looking, and this one did: it was cited as the reason a whole
+transport could not be reconsidered.
+
+What the binding channel actually buys is no gate and NO
+BACKPRESSURE: the page keeps capturing at its configured fps
+regardless of what the bot thread is doing. Frames queued during a
 tick stall burst-deliver afterwards and collapse into the
 latest-wins frame bus.
+
+That collapse is NOT the source of the stalls a viewer sees, which
+is the other thing this paragraph was used to explain. Measured
+2026-09-03: during ``page.wait_for_timeout`` — how the tick loop
+actually waits (``bot/tick_loop.py`` L 241, L 246) — binding frames
+arrive at 31.3/s, versus 29.3/s while the thread is otherwise inside
+Playwright. The dispatcher pumps events throughout, so a tick does
+not starve the stream. A pure-Python busy loop DOES block delivery
+(0/s, then 94 frames in 7 ms), but the bot never waits that way.
 
 The tick loop drives demand exactly like the screencast did:
 subscribers on the frame bus → :meth:`LiveViewService.ensure` every

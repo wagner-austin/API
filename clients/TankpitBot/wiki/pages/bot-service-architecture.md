@@ -106,15 +106,25 @@ replacement is wire-only, inside this repo:[^3]
   384x256 + the 384x48 Menu strip, DPI-scaled) to one JPEG per frame
   and hands the data URL to the bot over a CDP BINDING
   (`Runtime.addBinding` → `window.__botCastDeliver`; the handler
-  decodes and publishes to the frame bus, loud on drift). **Law
+  decodes and publishes to the frame bus, loud on drift). **~~Law
   (2026-07-29): a game-page fetch to loopback CANNOT deliver the
-  frames** — Chrome's Local Network Access gate parks page →
-  `127.0.0.1` fetches behind an ungrantable permission and they hang
-  forever, resolving nothing and rejecting nothing (in-page
+  frames~~ — WITHDRAWN 2026-09-03, it is false as stated.** Chrome's
+  Local Network Access gate does park page → `127.0.0.1` fetches
+  behind a permission that cannot be granted at runtime, and they
+  hang forever resolving nothing and rejecting nothing (in-page
   telemetry: `ticks=36 posts=0` in 3 s; Playwright 1.57 has no
-  `local-network-access` permission). The binding channel has no
+  `local-network-access` permission). But the gate is a Chromium
+  FEATURE and the bot owns its own launch args. Measured, five POSTs
+  from a real `https://tankpit.com` page to a loopback listener in
+  the fleet container: **0/5 received with default flags, 5/5 with
+  `--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults`**.
+  The real constraint is "not grantable per page at runtime", not
+  "impossible". Nobody had tried turning the feature off, and the law
+  was later cited as the reason an entire transport could not be
+  reconsidered -- which is what a law stated without its escape hatch
+  costs.[^8] The binding channel has no
   gate and no backpressure: the page captures at its configured
-  fps — env `TANKPIT_BOT_VIDEO_FPS` (default 12) /
+  fps — env `TANKPIT_BOT_VIDEO_FPS` (default 30 since 2026-09-03, was 12) /
   `TANKPIT_BOT_VIDEO_QUALITY` (default 0.8) — regardless of what
   the bot thread is doing; frames queued during a tick stall
   burst-deliver and collapse into the latest-wins bus. Measured:
@@ -377,3 +387,4 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 [^6]: code truth on disk: `src/tankpit_bot/types/rooms.py` (`LOBBY_ROOMS`, `DEFAULT_LOBBY_ROOM`), `service/fleet_manager.py::FleetManager.rooms`, `service/fleet_routes.py` (`GET /rooms`), `service/fleet_page.py` (`<select id="room">` + `fillSelect`), `browser/room_join.py::_resolve_room_entry` (prefix match). Ground truth for the two-room lobby is the ROOM_LIST capture in `runs/bot/arterial/bot-20260813-212329.log`: `+1|Practice|1|0,0,0,0,0,0,0|-1|p|field01.gif|2026` and `5=World (Desert)` — the same capture [[game-rules]] cites. Selector-to-resolver coupling is pinned by `tests/login/test_join.py::test_every_offered_room_selector_resolves_against_a_live_lobby`.
 [^4]: `Makefile:265-268` — the `service` target (`service: install`) starts the "long-running SPA-driven HTTP + SSE server", listening on `0.0.0.0:27100`. The Startup-folder `.cmd` described here is machine state on the operator's workstation, not a repo artifact, so it is not verifiable from this checkout; only the `make service` entry point it invokes is.
 [^7]: this repo, 2026-09-03: `10f97042` deleted the `service` Makefile target and the `tankpit-bot-service` console script; `ff1ac1be` removed the `_mode_bridge.submit("UNSET")` idle pin from `service/session_runner.py`; `dfdbf310` added `service/demo.py` + `service/demo_routes.py` (the three `/demo/` routes). Cross-repo in `~/PROJECTS/MCPs`: `02cfd967` deleted `fiesta/src/tankbot/`, `fiesta/src/boot/bot-overlay.ts`, `fiesta/profiles/tankpit.json`, the `location /api/tankbot/` block in `fiesta/nginx.conf`, and the `botCommand` / `botVideoUrl` / `botServerLaunchCommand` profile fields; `54925b6d` added `tankpit-public/nginx.conf` (forwards `/demo/`, returns 404 otherwise) and the `tankpit.austinwagner.org` ingress. Fleet children run this service via the child bootstrap in `service/_test_hooks/processes.py`.
+[^8]: measured 2026-09-03 in the fleet container, `tankpit-fleet:v0.1.0-76a0f62b`: a headless Chromium loaded `https://tankpit.com/` and issued five `fetch` POSTs to a loopback listener, counted server-side. 0 of 5 arrived under default launch args; 5 of 5 arrived when Chromium was launched with the Local Network Access and Private Network Access feature checks disabled. Frame delivery timing from the same session: binding frames arrive at 31.3/s during `page.wait_for_timeout`, which is how `bot/tick_loop.py` L 241 and L 246 actually wait, so a tick does not starve the stream.

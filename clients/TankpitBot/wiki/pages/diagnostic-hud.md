@@ -57,8 +57,10 @@ target + in-flight action · session K/H/M/RJ + the flag button.[^1]
 
 Clicking **⚑ FLAG** calls the `__botFlagDeliver` CDP binding (bindings,
 not loopback fetches — Chrome's Local Network Access gate hangs
-page→127.0.0.1 fetches forever, the same reason the live-view caster
-uses a binding). The service emits a `human_flag` DIAGNOSTIC event to
+page→127.0.0.1 fetches forever UNDER DEFAULT LAUNCH ARGS, the same
+reason the live-view caster uses a binding; measured 2026-09-03 the
+gate is a Chromium feature the bot can disable at launch, so this is
+a default and not an impossibility, see [[bot-service-architecture]]). The service emits a `human_flag` DIAGNOSTIC event to
 `runs/bot/latest.events.jsonl` carrying `flag_seq`, `clicked_at_ms`,
 and `recent_ticks` — a JSON snapshot of the last 8 HUD payloads (~16s
 of bot thinking). `make analyze` and JSONL queries can anchor on
