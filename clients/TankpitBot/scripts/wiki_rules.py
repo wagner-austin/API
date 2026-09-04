@@ -272,8 +272,37 @@ def _provenance_violations(
             # 2026-08-17 (board task f0c3a532).
             continue
         violations.append(f"{page}: source_paths entry '{source}' does not exist")
+    # Compare the pin key against the FILE each source_paths entry names,
+    # not against the entry verbatim. The loop above already strips the
+    # ``:NN`` locator before asking whether a citation exists, because what
+    # exists is the file; this loop asked the opposite question of the same
+    # data and got a different answer.
+    #
+    # A git blob id addresses a FILE. Keying pins by the anchored form would
+    # make a page citing six lines of one file carry six identical 40-hex
+    # hashes that must drift together, and ``git cat-file blob <hash>`` would
+    # be the same call for all six — redundancy the format would then
+    # require. One hash per file is what the hash IS.
+    #
+    # Latent since the rule was written and first reached 2026-09-04: no page
+    # in this wiki had ever combined a ``:NN`` anchor in source_paths with a
+    # source_git_blobs pin, so the branch had never run. The twenty
+    # tpclient.js pages were the first, which is why a green audit and a red
+    # in-repo suite disagreed about the same twenty pages.
+    #
+    # This matches the workspace-canonical rule: wiki-check's
+    # ``git-blob-hash-pin`` computes ``pinKey = isAnchor ?
+    # lineAnchorBasePath(entry) : entry`` (rules-code-paths/anchors.ts).
+    # The enforcement is unchanged — every pinned key must still be a path
+    # the page cites — the two loops now just agree on what a source_paths
+    # entry means.
+    # Stripped on BOTH sides, so either spelling of a pin key resolves: the
+    # anchored form ``src/fixture.py:42-58`` that the existing corpus uses,
+    # and the bare ``tpclient.js`` that addresses the same blob for a page
+    # citing several lines of one file.
+    cited_files = {_LINE_LOCATOR.sub("", source) for source in source_paths}
     for anchored, blob in blob_pins.items():
-        if anchored not in source_paths:
+        if _LINE_LOCATOR.sub("", anchored) not in cited_files:
             violations.append(f"{page}: source_git_blobs key '{anchored}' is not in source_paths")
         if _BLOB_HASH.match(blob) is None:
             violations.append(f"{page}: source_git_blobs['{anchored}'] is not a 40-hex object id")

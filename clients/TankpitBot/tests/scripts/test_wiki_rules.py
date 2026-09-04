@@ -305,6 +305,23 @@ class TestProvenance:
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
         assert run_wiki_rules(tmp_path) == 0
 
+    def test_bare_pin_key_resolves_an_anchored_source_path(self, tmp_path: Path) -> None:
+        """A pin keyed by the FILE satisfies a ``source_paths`` line anchor.
+
+        A git blob id addresses a file, so a page citing several lines of
+        one file pins it once by the bare path. The rule strips the ``:NN``
+        locator on both sides, matching wiki-check's ``git-blob-hash-pin``.
+
+        Latent until 2026-09-04: no page in this wiki had combined an
+        anchored ``source_paths`` entry with a pin, so the branch that
+        compared them verbatim had never run, and the twenty tpclient.js
+        pages were the first to reach it.
+        """
+        _green_tree(tmp_path)
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "src/fixture.py:16"')
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
+
     def test_url_source_is_skipped(self, tmp_path: Path) -> None:
         """An ``https://`` source is not checked against the filesystem."""
         _green_tree(tmp_path)
