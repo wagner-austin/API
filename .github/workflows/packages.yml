@@ -33,6 +33,18 @@ name: packages
 #     one package would put a hardcoded OS table here. The second is
 #     established and green. Both are excluded by the selector's caller below,
 #     not by a rule inside the selector.
+#   * clients/TankpitBot keeps its own workflow on windows-latest. Its suite
+#     is written against Windows separators and a case-insensitive filesystem
+#     -- 17 failures on ubuntu, none of them a defect in the bot, all of them
+#     a Windows path separator, which is an ordinary character on Linux.
+#   * libs/cleargbm_rs is not a poetry project at all. It is a maturin/PEP-621
+#     Rust extension built with uv (`uv pip install -e ".[dev]"`), and its gate
+#     is cargo fmt, cargo clippy, cargo test and cargo llvm-cov at 100% SEGMENT
+#     coverage beside the Python suite. `poetry sync --with dev` fails on it
+#     with "Group(s) not found: dev" because it declares
+#     `[project.optional-dependencies]`, not a poetry group. Forcing it through
+#     this matrix would be pretending it is something it is not; it needs its
+#     own workflow, which is filed rather than guessed at here.
 #   * A first run of this is expected to find red packages. That is the point
 #     and not a regression: a suite nothing has ever executed is not known to
 #     pass, it is only unobserved. Anything it finds was already broken.
@@ -83,7 +95,7 @@ jobs:
           git diff --name-only "$base" "${{ github.sha }}" > changed.txt || true
           # Packages with a dedicated workflow are checked there, not here.
           selected="$(python scripts/ci_select_packages.py < changed.txt \
-            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api'}; \
+            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot'}; \
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"

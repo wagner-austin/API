@@ -1,0 +1,106 @@
+name: tankpitbot
+
+# TankpitBot's suite is written against Windows, so it runs on Windows.
+#
+# Its first run under the shared `packages` workflow, on ubuntu, reported
+# 17 failed / 6915 passed / 11 errors. Not one of them was a defect in the
+# bot. They are all the same thing:
+#
+#   * `ValueError: archive events path does not match bot-<stamp>:
+#     runs\bot\bot-20260620-150138.events.jsonl` -- a path split on a
+#     backslash, which is an ordinary character on Linux
+#   * `KeyError: 'runs\\bot\\latest.summary.txt'` -- artifact keys built with
+#     the platform separator
+#   * `test_real_wiki_is_conformant: assert 22 == 0` -- passes locally
+#     (32 passed), so a case-sensitive filesystem or a separator, not content
+#   * `this test needs two configured accounts` -- environment, not code
+#
+# The same suite on Windows is 6938 passed at 100.00% statements AND branches.
+# That is the same finding navprobe.yml records one directory over, and the
+# remedy is the same: run the suite where its assumptions hold, rather than
+# rewrite 17 tests under time pressure to prove a portability property nobody
+# has asked for yet.
+#
+# WHAT THIS DOES NOT CLAIM, and it matters more here than for navprobe.
+# NavProbe's product IS Windows -- it opts a process out of Win32 power
+# throttling. TankpitBot's is not: the fleet ships as a LINUX container
+# (`Dockerfile`, `python:3.11-slim-bookworm`), so a Windows-only gate cannot
+# see a Linux regression in the thing that actually deploys. That gap is real
+# and is filed rather than papered over; this workflow buys a suite that runs
+# at all, which is strictly more than the nothing it had before.
+#
+# `shell: bash` for the same reason navprobe pins it: GitHub runs pwsh steps
+# with a single trailing `exit $LASTEXITCODE`, which propagates only the LAST
+# command's status, so a failing `ruff check` followed by a passing
+# `ruff format --check` would report success.
+
+on:
+  push:
+    paths:
+      - "clients/TankpitBot/**"
+      - "libs/platform_core/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/tankpitbot.yml"
+  pull_request:
+    paths:
+      - "clients/TankpitBot/**"
+      - "libs/platform_core/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/tankpitbot.yml"
+
+concurrency:
+  group: tankpitbot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: clients/TankpitBot
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.4
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v6
+        with:
+          path: clients/TankpitBot/.venv
+          key: tankpitbot-venv-${{ hashFiles('clients/TankpitBot/poetry.lock') }}
+
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry sync --with dev
+
+      # Chromium only, and only the browser -- `--with-deps` runs apt and is
+      # meaningless here. The bot drives Chromium; installing all three
+      # engines costs minutes for engines nothing opens.
+      - name: Install Chromium for Playwright
+        run: poetry run playwright install chromium
+
+      - name: Guards
+        run: poetry run python -m scripts.guard
+
+      - name: Lint
+        run: |
+          poetry run ruff check .
+          poetry run ruff format --check .
+
+      - name: Types
+        run: poetry run mypy
+
+      - name: Tests
+        run: >
+          poetry run pytest -n auto
+          --cov-branch --cov=src --cov=scripts --cov-report=term-missing
