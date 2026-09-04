@@ -45,9 +45,34 @@ name: packages
 #     `[project.optional-dependencies]`, not a poetry group. Forcing it through
 #     this matrix would be pretending it is something it is not; it needs its
 #     own workflow, which is filed rather than guessed at here.
+#   * clients/OrderedKernels needs a GPU, and says so itself: "every Python
+#     line in this package executes for real on a GPU". Its conftest skips
+#     the whole suite when `torch.cuda.is_available()` is False, so on a CPU
+#     runner it does not fail -- it runs nothing, and then fails the 100%
+#     gate with a coverage figure measuring an empty run. It ALSO cannot
+#     typecheck here: it deliberately declares no first-party path
+#     dependencies (platform-ml pulls shap 0.50.0, which pins llvmlite to a
+#     beta PyPI has deleted), and its Makefile builds and `--no-deps`
+#     installs four sibling wheels on every lint. Replicating that here
+#     would put a per-package build recipe in a generic matrix, and it would
+#     still leave the suite skipping. This one wants a GPU runner, which is
+#     a decision about infrastructure rather than a line of YAML.
 #   * A first run of this is expected to find red packages. That is the point
 #     and not a regression: a suite nothing has ever executed is not known to
 #     pass, it is only unobserved. Anything it finds was already broken.
+#
+# WHAT THE FIRST RUN ACTUALLY FOUND, since the sentence above promised to
+# look. Sixteen red of thirty-nine. Four were already fixed on main by the
+# time the log was read. Four were real and are fixed: libs/cleargbm never
+# ran a test at all (a non-portable Rust binary the runner's CPU could not
+# execute), libs/covenant_nn and services/handwriting-ai were meeting a 100%
+# gate with a graphics card rather than with tests, and libs/instrument_io
+# asked whether a Windows .exe EXISTED when it meant whether this machine
+# could run it. Of the rest, libs/platform_kaggle needs a Kaggle credential
+# in CI -- `import kaggle` authenticates at import and calls exit(1), so two
+# lines cannot execute without one -- and services/Art-Trainer's install
+# timed out pulling multi-gigabyte CUDA wheels, which is install weight
+# rather than a defect.
 
 on:
   push:
@@ -95,7 +120,7 @@ jobs:
           git diff --name-only "$base" "${{ github.sha }}" > changed.txt || true
           # Packages with a dedicated workflow are checked there, not here.
           selected="$(python scripts/ci_select_packages.py < changed.txt \
-            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot'}; \
+            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels'}; \
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"
