@@ -1,13 +1,17 @@
-"""Tests for the command entry-point audit.
+"""Tests for enumerating the commands in a command directory.
 
 Built against real directories of real source under ``tmp_path``, not against
-this repository's own packages. Two reasons. The audit's whole job is to
-report a defect, and a test that only ever pointed it at correct code could
-never see it report one -- every assertion would be `== ()` and the functions
-could return `()` unconditionally and pass. And keying platform_core's suite
-to the current contents of ``model_trainer`` or ``hpc3`` would make this file
-fail whenever someone added a command there, which is not this library's
-business.
+this repository's own packages. Keying platform_core's suite to the current
+contents of ``model_trainer`` or ``hpc3`` would make this file fail whenever
+someone added a command there, which is not this library's business.
+
+The audit used to decide whether each command was GUARDED as well, by
+searching its text for two substrings. Those functions are gone, and their
+tests with them: the decision is made on the AST by
+``monorepo_guards.entrypoint_rules.EntrypointRule``, which runs in every
+package's ``make lint`` rather than only in the three packages that
+remembered to call this. What remains is enumeration, which a guard cannot
+do for a test that wants to RUN each command.
 """
 
 from __future__ import annotations
@@ -15,17 +19,13 @@ from __future__ import annotations
 import pathlib
 
 from platform_core.entrypoint_audit import (
-    GUARD_CALL,
-    MAIN_GUARD,
     command_modules,
     defines_entrypoint,
-    misguarded_commands,
     public_modules,
-    unguarded_commands,
 )
 
 #: A command as it should be written.
-GUARDED = f'''"""A command."""
+GUARDED = '''"""A command."""
 
 
 def main(argv: object = None) -> int:
@@ -39,37 +39,8 @@ def entrypoint() -> None:
 __all__ = ["entrypoint", "main"]
 
 
-if {MAIN_GUARD}:
-{GUARD_CALL}
-'''
-
-#: The defect: an entry point with no guard, so `python -m` does nothing.
-UNGUARDED = '''"""A command that does nothing when run as a module."""
-
-
-def main(argv: object = None) -> int:
-    return 0
-
-
-def entrypoint() -> None:
-    raise SystemExit(main())
-'''
-
-#: The defect one layer in: guarded, but calling the wrong function. `main`
-#: returns a status into nothing, so the process exits 0 regardless.
-MISGUARDED = f'''"""A command whose guard drops the exit code."""
-
-
-def main(argv: object = None) -> int:
-    return 1
-
-
-def entrypoint() -> None:
-    raise SystemExit(main())
-
-
-if {MAIN_GUARD}:
-    main()
+if __name__ == "__main__":
+    entrypoint()
 '''
 
 #: Not a command at all: helpers with no entry point, which correctly need no
@@ -114,6 +85,13 @@ def test_a_mention_of_the_entry_point_is_not_a_definition() -> None:
     assert defines_entrypoint('"""calls entrypoint"""\n__all__ = ["entrypoint"]') is False
 
 
+def test_a_nested_function_named_entrypoint_is_not_a_definition() -> None:
+    # The console script binds a MODULE-level name; a closure is not it.
+    source = "def outer() -> None:\n    def entrypoint() -> None:\n        return None\n"
+
+    assert defines_entrypoint(source) is False
+
+
 def test_public_modules_excludes_private_and_dunder(tmp_path: pathlib.Path) -> None:
     cli = _package(tmp_path, {"alpha": GUARDED, "beta": LIBRARY})
     (cli / "__init__.py").write_text("", encoding="utf-8")
@@ -130,40 +108,10 @@ def test_command_modules_selects_less_than_the_directory(tmp_path: pathlib.Path)
     assert [p.name for p in public_modules(cli)] == ["alpha.py", "beta.py"]
 
 
-def test_an_unguarded_command_is_reported(tmp_path: pathlib.Path) -> None:
-    cli = _package(tmp_path, {"alpha": GUARDED, "broken": UNGUARDED})
-
-    assert unguarded_commands(cli) == ("broken.py",)
-
-
-def test_a_library_without_a_guard_is_not_reported(tmp_path: pathlib.Path) -> None:
-    # `LIBRARY` has no guard and must not be demanded to have one.
+def test_a_directory_of_only_libraries_yields_no_commands(tmp_path: pathlib.Path) -> None:
+    # A caller parametrizes over this list. Returning the whole directory
+    # when nothing in it is a command would have every helper run as a
+    # command and fail for a reason that has nothing to do with the defect.
     cli = _package(tmp_path, {"beta": LIBRARY})
 
-    assert unguarded_commands(cli) == ()
-
-
-def test_a_fully_guarded_package_reports_nothing(tmp_path: pathlib.Path) -> None:
-    cli = _package(tmp_path, {"alpha": GUARDED, "gamma": GUARDED})
-
-    assert unguarded_commands(cli) == ()
-    assert misguarded_commands(cli) == ()
-
-
-def test_a_guard_calling_main_is_reported(tmp_path: pathlib.Path) -> None:
-    # Guarded, so `unguarded_commands` is silent -- and still broken, because
-    # `main()` returns its status into nothing and the process exits 0.
-    cli = _package(tmp_path, {"sneaky": MISGUARDED})
-
-    assert unguarded_commands(cli) == ()
-    assert misguarded_commands(cli) == ("sneaky.py",)
-
-
-def test_an_unguarded_command_is_not_also_reported_as_misguarded(
-    tmp_path: pathlib.Path,
-) -> None:
-    # The two findings are disjoint: a module with no guard cannot have a
-    # wrong one, and reporting it twice would double-count one defect.
-    cli = _package(tmp_path, {"broken": UNGUARDED})
-
-    assert misguarded_commands(cli) == ()
+    assert command_modules(cli) == ()

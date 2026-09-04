@@ -13,13 +13,18 @@ invocation forms disagree, and the broken one looks exactly like a scoring run
 that legitimately produced nothing. It cost real time on 2026-08-27 while
 re-registering the cloze floors.
 
-THE RULE ITSELF NOW LIVES IN :mod:`platform_core.testing`. It used to live
-here, and its own docstring recorded that "the same shape had already been hit
-twice in the sibling ``hpc3`` package" -- where it then sat unfixed until
+WHERE THE SHAPE CHECK LIVES, AND WHY NOT HERE. It used to live in this file,
+and its own docstring recorded that "the same shape had already been hit twice
+in the sibling ``hpc3`` package" -- where it then sat unfixed until
 2026-08-28, when all twelve hpc3 commands turned out to have it, including a
-preflight that reported a clean green light without checking anything. Two
-copies of a rule is how one gets fixed and the other does not. This file
-asserts against the shared scan; it does not re-derive it.
+preflight that reported a clean green light without checking anything. It was
+then lifted into a shared scan the packages CALLED, which moved the problem
+rather than solving it: ``code_style_eval`` never called it, and on 2026-09-04
+lost a scoring pass over 226 files to the same defect.
+
+``monorepo_guards.entrypoint_rules.EntrypointRule`` decides it now, on the
+AST, for every package in the repository, inside every ``make lint``. Nothing
+has to remember to call it. This file no longer asserts it.
 
 WHY THE PREDICATE IS "DEFINES ``entrypoint``" AND NOT A FILE LIST. Not every
 module under ``cli/`` is a command -- ``record_reports`` is a library of report
@@ -35,12 +40,7 @@ from __future__ import annotations
 
 import pathlib
 
-from platform_core.entrypoint_audit import (
-    command_modules,
-    misguarded_commands,
-    public_modules,
-    unguarded_commands,
-)
+from platform_core.entrypoint_audit import command_modules, public_modules
 
 CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "src" / "model_trainer" / "cli"
 
@@ -58,14 +58,3 @@ def test_at_least_one_module_is_a_library_rather_than_a_command() -> None:
     without = set(public_modules(CLI_DIR)) - set(command_modules(CLI_DIR))
 
     assert without != set()
-
-
-def test_every_command_runs_when_run_as_a_module() -> None:
-    assert unguarded_commands(CLI_DIR) == ()
-
-
-def test_the_guard_calls_the_entry_point_rather_than_main() -> None:
-    # `entrypoint` raises SystemExit(main()); calling `main()` from the guard
-    # would return an exit code into nothing and the process would exit 0
-    # whatever the command reported.
-    assert misguarded_commands(CLI_DIR) == ()

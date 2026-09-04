@@ -10,17 +10,22 @@ start?", so a preflight that never runs and exits 0 is not a missing check --
 it is a GREEN LIGHT that checked nothing. Four jobs were one step from being
 submitted on the strength of exactly that.
 
-The predicate and the scan live in :mod:`platform_core.entrypoint_audit`, because
-``model_trainer`` had already been bitten three times by this shape and fixed
-it there while the note in its test recorded that hpc3 had it too. Two copies
-of the rule is how one of them gets fixed and the other does not -- which is
-literally the history here. This file asserts; it does not re-derive.
+WHERE THE SHAPE CHECK LIVES, AND WHY NOT HERE. It lived in a shared scan that
+each package CALLED, which moved the problem rather than solving it:
+``code_style_eval`` never called it, and on 2026-09-04 lost a scoring pass
+over 226 files to the same defect -- the third package, after the note in
+``model_trainer``'s test had already recorded that hpc3 had it too.
+``monorepo_guards.entrypoint_rules.EntrypointRule`` decides it now, on the
+AST, for every package inside every ``make lint``. Nothing has to remember
+to call it, so this file no longer asserts it.
 
-WHAT THIS ADDS OVER THE SHARED SCAN. The static checks prove the guard is
+WHAT THIS FILE STILL DOES, BECAUSE A GUARD CANNOT. A guard proves the block is
 PRESENT. :func:`test_running_a_command_as_a_module_reaches_its_entry_point`
 proves it FIRES, which is the property that was actually missing, and it is
 what makes the twelve guard lines covered by a test that means something
-rather than by a pragma.
+rather than by a pragma. Its command list comes from
+:mod:`platform_core.entrypoint_audit`, which enumerates and no longer
+judges.
 """
 
 from __future__ import annotations
@@ -34,9 +39,7 @@ import pytest
 from platform_core.entrypoint_audit import (
     command_modules,
     defines_entrypoint,
-    misguarded_commands,
     public_modules,
-    unguarded_commands,
 )
 
 from hpc3.cli import _test_hooks
@@ -94,14 +97,6 @@ def test_a_mention_of_the_entry_point_is_not_a_definition() -> None:
     assert defines_entrypoint("def entrypoint() -> None: ...") is True
     assert defines_entrypoint("def main() -> int: ...") is False
     assert defines_entrypoint('"""calls entrypoint"""\n__all__ = ["entrypoint"]') is False
-
-
-def test_every_command_runs_when_run_as_a_module() -> None:
-    assert unguarded_commands(CLI_DIR) == ()
-
-
-def test_the_guard_calls_the_entry_point_rather_than_main() -> None:
-    assert misguarded_commands(CLI_DIR) == ()
 
 
 @pytest.mark.parametrize("module_name", _command_names())

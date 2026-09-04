@@ -266,3 +266,17 @@ __all__ = [
     "parse_arguments",
     "score_arm",
 ]
+
+
+# Without this, `python -m code_style_eval.cli.evaluate` imports the module,
+# defines these functions and exits 0 -- having scored nothing while
+# reporting success. That is worse than a crash: the console script works, so
+# the two invocation forms disagree, and the silent one looks exactly like a
+# run that legitimately produced no output.
+#
+# It cost a real scoring run on 2026-09-04, against 226 generated files that
+# had just taken an A30 thirty-three minutes to produce. The sibling packages
+# `model_trainer` and `hpc3` each carry this guard and a test that enforces
+# it; this package carried neither.
+if __name__ == "__main__":
+    entrypoint()
