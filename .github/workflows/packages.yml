@@ -1,0 +1,144 @@
+name: packages
+
+# THE GATE EXISTS FOR FORTY-THREE PACKAGES AND CI RAN IT FOR TWO.
+#
+# Every package under clients/, services/, libs/ and tools/ carries a `check`
+# target and a scripts/guard.py -- all forty-three, with no exceptions. Until
+# 2026-09-04, exactly two of those targets were executed by CI:
+# services/turkic-api and clients/NavProbe. libs/platform_core appeared in
+# turkic-api's path filter, but only as a TRIGGER for turkic-api's suite; its
+# own 875 tests ran nowhere, and neither did tools/hpc3's 1381 nor
+# clients/TankpitBot's 6938.
+#
+# That is the incident recorded in navprobe.yml's own header, unresolved:
+# "The lesson had been encoded for one service rather than as a habit, so the
+# next project without a workflow repeated it." Encoding it as a habit is what
+# this file is. A package joins CI by HAVING A GATE, not by someone
+# remembering to add it here.
+#
+# WHY A MATRIX AND NOT FORTY-ONE FILES. Forty-one near-identical workflows is
+# the duplication that made a lifecycle bug need fixing thirty-six times in
+# scripts/run-tests.ps1's header. A matrix cannot be path-filtered per entry,
+# so the entry list is computed instead: scripts/ci_select_packages.py reads
+# which packages a change actually affects, following the path dependencies
+# each pyproject.toml already declares. A change to platform_core selects the
+# thirty-eight packages that import it; a change to one client selects one.
+# The selector is a plain script precisely so it can be run and checked
+# locally rather than debugged through pushes.
+#
+# WHAT THIS DOES NOT COVER, deliberately:
+#   * clients/NavProbe and services/turkic-api keep their own workflows. The
+#     first MUST run on windows-latest -- its tests call the real Win32
+#     boundary -- and folding a per-package runner into this matrix to serve
+#     one package would put a hardcoded OS table here. The second is
+#     established and green. Both are excluded by the selector's caller below,
+#     not by a rule inside the selector.
+#   * A first run of this is expected to find red packages. That is the point
+#     and not a regression: a suite nothing has ever executed is not known to
+#     pass, it is only unobserved. Anything it finds was already broken.
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.select.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The selector diffs against the previous state, which a shallow
+          # clone does not have.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Select the packages this change affects
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A push carries `before`; a pull request carries a base sha. A
+          # first push to a branch reports an all-zero `before`, which names
+          # no commit -- fall back to the first parent so the diff is still
+          # against something real rather than empty.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+          echo "diffing $base..${{ github.sha }}"
+          git diff --name-only "$base" "${{ github.sha }}" > changed.txt || true
+          # Packages with a dedicated workflow are checked there, not here.
+          selected="$(python scripts/ci_select_packages.py < changed.txt \
+            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api'}; \
+                         print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
+          echo "selected: $selected"
+          echo "packages=$selected" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: discover
+    if: needs.discover.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      # One package's failure must not cancel the rest: the first run of this
+      # workflow is a survey, and a survey that stops at the first red tells
+      # you one thing instead of forty.
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.discover.outputs.packages) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.4
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v6
+        with:
+          path: ${{ matrix.package }}/.venv
+          key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package)) }}
+
+      # `sync` rather than `install`, matching the other workflows: install
+      # leaves behind anything the lock file no longer mentions, which is how
+      # a removed dependency kept resolving out of a stale environment.
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry sync --with dev
+
+      - name: Guards
+        run: poetry run python -m scripts.guard
+
+      - name: Lint
+        run: |
+          poetry run ruff check .
+          poetry run ruff format --check .
+
+      - name: Types
+        run: poetry run mypy src tests scripts
+
+      - name: Tests
+        run: >
+          poetry run pytest -n auto
+          --cov-branch --cov=src --cov=scripts --cov-report=term-missing
