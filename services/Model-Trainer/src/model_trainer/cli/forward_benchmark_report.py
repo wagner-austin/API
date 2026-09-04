@@ -22,7 +22,7 @@ from platform_core import cli_args
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import RunRecord
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.cli.forward_benchmark import forward_prefix
 from model_trainer.cli.record_reports import read_run_records
 from model_trainer.cli.sdpa_benchmark import PINNED_KEY
@@ -75,7 +75,7 @@ def report_lines(named_records: tuple[tuple[str, RunRecord], ...]) -> tuple[str,
         values = {o["name"]: o["value"] for o in record["observations"]}
         lines.append(f"[{index}] {name}  {describe_run_fingerprint(record['fingerprint'])}")
         lines.append(f"  {'row':<20} {'default ms':>11} {'math ms':>10} {'slower':>12}   memory")
-        for shape in _test_hooks.forward_shapes():
+        for shape in _measurement_hooks.forward_shapes():
             prefix = forward_prefix(shape)
             lines.append(
                 f"  {shape['name']:<20} "

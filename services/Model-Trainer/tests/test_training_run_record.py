@@ -15,6 +15,7 @@ from model_trainer.core.services.training.run_records import (
     QUANTIZATION_DISTRIBUTION,
     TRAINING_EXPERIMENT,
     TRANSFORMERS_DISTRIBUTION,
+    model_distributions,
     saved_model_digest,
     training_distributions,
     training_observations,
@@ -128,6 +129,31 @@ class TestWhichLibrariesAreRecorded:
 
         assert PEFT_DISTRIBUTION in names
         assert QUANTIZATION_DISTRIBUTION in names
+
+    def test_an_evaluation_reaches_the_same_table_by_the_same_answers(self) -> None:
+        """The table lives in one place, and a sweep reads it the other way round.
+
+        Training reads the three answers off a prepared model; a continuation
+        sweep reads them out of a saved run's metadata, because its base arm
+        deliberately attaches no adapter and would otherwise report a
+        narrower set than the arm it controls for. Two copies of the table
+        would be two package axes that drift, and a drifted axis answers
+        wrongly rather than obviously not at all.
+        """
+        through_training = training_distributions(_Prepared(is_peft=True, quantized=True), "hf_lm")
+        through_metadata = model_distributions(
+            uses_transformers=True, uses_peft=True, uses_quantization=True
+        )
+
+        assert through_metadata == through_training
+
+    def test_a_run_using_none_of_the_three_records_only_the_base_set(self) -> None:
+        """Named separately from the char_lstm case, which reaches it via a family."""
+        names = model_distributions(
+            uses_transformers=False, uses_peft=False, uses_quantization=False
+        )
+
+        assert names == BASE_TRAINING_DISTRIBUTIONS
 
     def test_no_distribution_is_named_twice(self) -> None:
         """capture_package_versions refuses a repeated name outright."""

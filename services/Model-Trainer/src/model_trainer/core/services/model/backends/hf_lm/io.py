@@ -36,6 +36,14 @@ from model_trainer.core.services.model.backends.hf_lm.prepare import (
 )
 from model_trainer.core.types import LMModelProto
 
+METADATA_NAME = "hf_lm_metadata.json"
+"""What a saved run's metadata file is called inside its artifact directory.
+
+Named once because three readers now open it: a resumed run, an arm being
+reloaded for evaluation, and the paired control that arm is compared
+against.
+"""
+
 
 class HFLMMetadata(TypedDict):
     """Metadata stored with HF LM model artifacts.
@@ -187,10 +195,75 @@ def save_prepared_hf_lm(
         is_peft=is_peft,
         quantization=prepared.quantization,
     )
-    metadata_path = out_path / "hf_lm_metadata.json"
+    metadata_path = out_path / METADATA_NAME
     metadata_path.write_text(
         dump_json_str(_encode_metadata(metadata)),
         encoding="utf-8",
+    )
+
+
+def read_hf_lm_metadata(artifact_path: str) -> HFLMMetadata:
+    """Read what a saved run recorded about how it was loaded.
+
+    Args:
+        artifact_path: Path to saved model directory.
+
+    Returns:
+        The run's metadata.
+
+    Raises:
+        FileNotFoundError: If the metadata file is missing. A directory
+            without one is not a saved run, and guessing its strategy or its
+            quantization would reconstruct a different model while reporting
+            success.
+    """
+    metadata_path = Path(artifact_path) / METADATA_NAME
+
+    if not metadata_path.exists():
+        raise FileNotFoundError(f"Metadata not found: {metadata_path}")
+
+    metadata_json = load_json_str(metadata_path.read_text(encoding="utf-8"))
+    return _decode_metadata(narrow_json_to_dict(metadata_json))
+
+
+def _prepared_around(
+    model: LMModelProto,
+    metadata: HFLMMetadata,
+    *,
+    strategy_name: StrategyName | None,
+    is_peft: bool,
+) -> PreparedLMModel:
+    """Wrap a loaded model in the tokenizer and token ids its run used.
+
+    Shared by the two loaders below so that an arm and its control differ in
+    the model they hold and in nothing else. Duplicating this was how the
+    tokenizer, the eos id or the max sequence length could come to differ
+    between two things being subtracted from each other.
+
+    Args:
+        model: The loaded model, adapted or not.
+        metadata: What the run recorded.
+        strategy_name: The finetuning strategy applied to ``model``, or None
+            when none was.
+        is_peft: Whether ``model`` carries adapter modules.
+
+    Returns:
+        The prepared model.
+    """
+    hf_tokenizer = HFHooks.load_hf_tokenizer(metadata["hub_model_id"])
+    eos_id, pad_id, _ = _token_ids_from_hf_tokenizer(hf_tokenizer)
+
+    return PreparedLMModel(
+        model=model,
+        tokenizer_id=metadata["tokenizer_id"],
+        eos_id=eos_id,
+        pad_id=pad_id,
+        max_seq_len=_get_model_max_seq_len(model),
+        tok_for_dataset=HFTokenizerEncoder(hf_tokenizer),
+        strategy_name=strategy_name,
+        hub_model_id=metadata["hub_model_id"],
+        is_peft=is_peft,
+        quantization=metadata["quantization"],
     )
 
 
@@ -219,45 +292,60 @@ def load_prepared_hf_lm_from_handle(
     """
     # Note: tokenizer parameter is unused - HF LM uses tokenizer from hub_model_id
     del tokenizer  # Explicitly mark as unused to satisfy linters
-    artifact = Path(artifact_path)
-    metadata_path = artifact / "hf_lm_metadata.json"
-
-    if not metadata_path.exists():
-        raise FileNotFoundError(f"Metadata not found: {metadata_path}")
-
-    metadata_json = load_json_str(metadata_path.read_text(encoding="utf-8"))
-    metadata_obj = narrow_json_to_dict(metadata_json)
-    metadata = _decode_metadata(metadata_obj)
-
-    # Load base model from HuggingFace
-    load_model = HFHooks.load_hf_model
-    load_hf_tokenizer = HFHooks.load_hf_tokenizer
+    metadata = read_hf_lm_metadata(artifact_path)
 
     # Reloading a saved run: the adapter is re-attached to a base model loaded
     # the same way the run loaded it, so a quantized run reloads quantized.
-    base_model = load_model(metadata["hub_model_id"], metadata["quantization"])
-    hf_tokenizer = load_hf_tokenizer(metadata["hub_model_id"])
+    base_model = HFHooks.load_hf_model(metadata["hub_model_id"], metadata["quantization"])
 
-    # Get strategy and load adapted weights
     registry = default_registry()
     strategy = registry.get(metadata["strategy_name"])
     adapted = strategy.load_adapted(base_model, metadata["hub_model_id"], artifact_path)
 
-    # Extract token IDs
-    eos_id, pad_id, _ = _token_ids_from_hf_tokenizer(hf_tokenizer)
-
-    return PreparedLMModel(
-        model=adapted.model,
-        tokenizer_id=metadata["tokenizer_id"],
-        eos_id=eos_id,
-        pad_id=pad_id,
-        max_seq_len=_get_model_max_seq_len(adapted.model),
-        tok_for_dataset=HFTokenizerEncoder(hf_tokenizer),
+    return _prepared_around(
+        adapted.model,
+        metadata,
         strategy_name=metadata["strategy_name"],
-        hub_model_id=metadata["hub_model_id"],
         is_peft=metadata["is_peft"],
-        quantization=metadata["quantization"],
     )
+
+
+def load_base_of_prepared_hf_lm(artifact_path: str) -> PreparedLMModel:
+    """Load the base a saved run adapted, WITHOUT reapplying the adapter.
+
+    This is the paired control for :func:`load_prepared_hf_lm_from_handle`,
+    and it is a different thing from :func:`load_prepared_hf_lm_from_hub`.
+    That one loads unquantized weights, because a baseline exists to be
+    compared against and must carry no arm. This one deliberately DOES carry
+    the arm's quantization, because it is not a baseline -- it is the control
+    for one specific adapter, and the question being asked is what the
+    adapter did.
+
+    An adapter trained against NF4 weights and compared against bfloat16
+    ones would be a comparison of two changes at once: the adapter and the
+    dequantization. Reading the quantization out of the run's own metadata,
+    rather than accepting it as an argument, is what makes that impossible
+    to get wrong by hand.
+
+    Args:
+        artifact_path: Path to the saved model directory whose base is
+            wanted.
+
+    Returns:
+        PreparedLMModel holding the unadapted base, loaded exactly as the
+        run loaded it.
+
+    Raises:
+        FileNotFoundError: If metadata file is missing.
+        RuntimeError: If required hooks are not configured.
+    """
+    metadata = read_hf_lm_metadata(artifact_path)
+    base_model = HFHooks.load_hf_model(metadata["hub_model_id"], metadata["quantization"])
+
+    # Recorded as having no strategy and no adapter, which is the whole
+    # difference between this and the arm -- and it is recorded rather than
+    # implied so a run record cannot mistake the control for the arm.
+    return _prepared_around(base_model, metadata, strategy_name=None, is_peft=False)
 
 
 def load_prepared_hf_lm_from_hub(hub_model_id: str) -> PreparedLMModel:
@@ -335,8 +423,11 @@ def _get_model_max_seq_len(model: LMModelProto) -> int:
 
 
 __all__ = [
+    "METADATA_NAME",
     "HFLMMetadata",
+    "load_base_of_prepared_hf_lm",
     "load_prepared_hf_lm_from_handle",
     "load_prepared_hf_lm_from_hub",
+    "read_hf_lm_metadata",
     "save_prepared_hf_lm",
 ]

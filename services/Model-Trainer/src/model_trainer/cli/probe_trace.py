@@ -43,7 +43,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
@@ -239,7 +239,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     record = trace_run_record(
         device,
-        _test_hooks.trace_rungs(),
+        _measurement_hooks.trace_rungs(),
         remove_split_k=remove_split_k,
         math_attention=math_attention,
         kernel=kernel,

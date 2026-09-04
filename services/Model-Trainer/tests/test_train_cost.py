@@ -34,7 +34,7 @@ from platform_core.run_record import (
 from platform_core.testing import sample_run_fingerprint
 from torch.nn.attention import SDPBackend
 
-from model_trainer.cli import _test_hooks as cli_hooks
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import sdpa_benchmark_report as shared_report
 from model_trainer.cli import train_benchmark as bench_cli
 from model_trainer.cli import train_benchmark_report as report_cli
@@ -79,11 +79,11 @@ def _cheap_train() -> Generator[None, None, None]:
     Yields:
         Nothing; the sweep is installed for the body of the test.
     """
-    cli_hooks.train_shapes = lambda: CHEAP
+    measurement_hooks.train_shapes = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.train_shapes = cli_hooks._default_train_shapes
+        measurement_hooks.train_shapes = measurement_hooks._default_train_shapes
 
 
 cheap_train = pytest.fixture(_cheap_train)
@@ -361,7 +361,7 @@ class TestTheCommandLines:
             bench_cli.main(["--device", "cpu", "--out", str(tmp_path / "t.json"), "--steps", "3"])
 
     def test_the_production_hook_walks_the_whole_declared_sweep(self) -> None:
-        assert cli_hooks._default_train_shapes() == TRAIN_SHAPES
+        assert measurement_hooks._default_train_shapes() == TRAIN_SHAPES
 
     def test_the_report_reads_a_directory(self, tmp_path: pathlib.Path) -> None:
         directory = tmp_path / "train"

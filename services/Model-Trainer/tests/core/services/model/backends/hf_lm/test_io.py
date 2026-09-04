@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
@@ -26,7 +27,9 @@ from model_trainer.core.services.model.backends.hf_lm.io import (
     _encode_metadata,
     _get_model_max_seq_len,
     _require_strategy_name,
+    load_base_of_prepared_hf_lm,
     load_prepared_hf_lm_from_handle,
+    read_hf_lm_metadata,
     save_prepared_hf_lm,
 )
 from model_trainer.core.types import ConfigLike, LMModelProto
@@ -427,3 +430,127 @@ class TestLoadPreparedHFLMFromHandle:
             assert result.strategy_name == "full"
             assert result.hub_model_id == "test/base-model"
             assert result.is_peft is False
+
+
+class TestLoadingTheBaseOfASavedRun:
+    """The paired control for an adapter, which is not the same as a baseline.
+
+    :func:`load_prepared_hf_lm_from_hub` loads UNQUANTIZED weights, because a
+    baseline exists to be compared against and must carry no arm. The control
+    for one specific adapter is a different object: it deliberately carries
+    that adapter's quantization, because the question being asked is what the
+    adapter did, and an adapter trained against NF4 weights compared against
+    bfloat16 ones would be a comparison of two changes at once.
+    """
+
+    _QUANTIZED: ClassVar[QuantizationConfig] = {
+        "load_in_4bit": True,
+        "load_in_8bit": False,
+        "bnb_4bit_compute_dtype": "bfloat16",
+        "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_use_double_quant": True,
+    }
+
+    def _artifact(self, tmp_path: Path, *, quantized: bool) -> str:
+        """Write a saved run's metadata.
+
+        Args:
+            tmp_path: Directory to write into.
+            quantized: Whether the run recorded a quantization.
+
+        Returns:
+            The artifact directory, as a string.
+        """
+        from model_trainer.core.services.model.backends.hf_lm.io import _encode_metadata
+
+        metadata = HFLMMetadata(
+            strategy_name="qlora",
+            hub_model_id="Qwen/Qwen2.5-Coder-1.5B",
+            tokenizer_id=None,
+            is_peft=True,
+            quantization=self._QUANTIZED if quantized else None,
+        )
+        (tmp_path / "hf_lm_metadata.json").write_text(
+            dump_json_str(_encode_metadata(metadata)), encoding="utf-8"
+        )
+        return str(tmp_path)
+
+    def test_it_refuses_a_directory_that_is_not_a_saved_run(self, tmp_path: Path) -> None:
+        """Guessing the strategy would reconstruct a different model."""
+        with pytest.raises(FileNotFoundError, match="Metadata not found"):
+            _ = load_base_of_prepared_hf_lm(str(tmp_path))
+
+    def test_it_carries_the_runs_own_quantization(self, tmp_path: Path) -> None:
+        """This is the whole difference from the hub baseline."""
+        Hooks.load_hf_model = _FakeModelLoader()
+        Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
+
+        result = load_base_of_prepared_hf_lm(self._artifact(tmp_path, quantized=True))
+
+        assert result.quantization == self._QUANTIZED
+
+    def test_it_attaches_no_adapter(self, tmp_path: Path) -> None:
+        """Recorded rather than implied, so a record cannot mistake it for the arm."""
+        Hooks.load_hf_model = _FakeModelLoader()
+        Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
+
+        result = load_base_of_prepared_hf_lm(self._artifact(tmp_path, quantized=True))
+
+        assert result.is_peft is False
+        assert result.strategy_name is None
+
+    def test_it_names_the_base_the_adapter_was_trained_against(self, tmp_path: Path) -> None:
+        Hooks.load_hf_model = _FakeModelLoader()
+        Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
+
+        result = load_base_of_prepared_hf_lm(self._artifact(tmp_path, quantized=True))
+
+        assert result.hub_model_id == "Qwen/Qwen2.5-Coder-1.5B"
+
+    def test_an_unquantized_run_reloads_unquantized(self, tmp_path: Path) -> None:
+        """The control follows the run rather than assuming four-bit."""
+        Hooks.load_hf_model = _FakeModelLoader()
+        Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
+
+        result = load_base_of_prepared_hf_lm(self._artifact(tmp_path, quantized=False))
+
+        assert result.quantization is None
+
+    def test_metadata_reads_back_what_was_written(self, tmp_path: Path) -> None:
+        """Three readers now open this file; one decoder answers all of them."""
+        directory = self._artifact(tmp_path, quantized=True)
+
+        assert read_hf_lm_metadata(directory)["strategy_name"] == "qlora"
+
+    def test_the_control_and_the_arm_share_their_tokenizer_and_token_ids(
+        self, tmp_path: Path
+    ) -> None:
+        """Two spellings of these is how the pair silently stops being paired."""
+        from model_trainer.core.services.finetuning.strategies._test_hooks import (
+            Hooks as FtHooks,
+        )
+
+        Hooks.load_hf_model = _FakeModelLoader()
+        Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
+        FtHooks.load_full_model = _FakeFullModelLoader(name_prefix="loaded-")
+
+        full = tmp_path / "full"
+        full.mkdir()
+        (full / "hf_lm_metadata.json").write_text(
+            dump_json_str(
+                {
+                    "strategy_name": "full",
+                    "hub_model_id": "test/base-model",
+                    "tokenizer_id": "test-tok",
+                    "is_peft": False,
+                    "quantization": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        arm = load_prepared_hf_lm_from_handle(str(full), None)
+        control = load_base_of_prepared_hf_lm(str(full))
+
+        assert (arm.eos_id, arm.pad_id) == (control.eos_id, control.pad_id)
+        assert arm.max_seq_len == control.max_seq_len

@@ -15,6 +15,7 @@ import pathlib
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS
 
@@ -97,4 +98,4 @@ class TestReadCorpusDocuments:
 class TestCartridgePlansHook:
     def test_the_default_is_the_declared_table(self) -> None:
         """Identity, not equality: a copy would let the two drift apart."""
-        assert cli_hooks.cartridge_plans() is CARTRIDGE_PLANS
+        assert measurement_hooks.cartridge_plans() is CARTRIDGE_PLANS

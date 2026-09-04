@@ -91,8 +91,42 @@ PEFT_DISTRIBUTION = "peft"
 QUANTIZATION_DISTRIBUTION = "bitsandbytes"
 
 
+def model_distributions(
+    *, uses_transformers: bool, uses_peft: bool, uses_quantization: bool
+) -> tuple[str, ...]:
+    """Name the libraries a model's arithmetic depends on, from what it used.
+
+    The table itself lives here and nowhere else. Training reaches it through
+    :func:`training_distributions`, which knows how to read those three
+    answers off a prepared model; an evaluation sweep reaches it with the
+    answers read out of a saved run's metadata instead. Two copies of the
+    table would be two package axes that drift, and a fingerprint axis that
+    drifts is worse than one that is absent -- an absent one is obviously
+    unanswerable, while a drifted one answers wrongly.
+
+    Args:
+        uses_transformers: Whether the HuggingFace stack decided the model's
+            attention path.
+        uses_peft: Whether adapters were attached. PEFT decides which tensors
+            exist and how they are merged.
+        uses_quantization: Whether weights were quantized. bitsandbytes
+            chooses the NF4 kernels that do the arithmetic.
+
+    Returns:
+        The distribution names, without duplicates, in a stable order.
+    """
+    names = list(BASE_TRAINING_DISTRIBUTIONS)
+    if uses_transformers:
+        names.append(TRANSFORMERS_DISTRIBUTION)
+    if uses_peft:
+        names.append(PEFT_DISTRIBUTION)
+    if uses_quantization:
+        names.append(QUANTIZATION_DISTRIBUTION)
+    return tuple(names)
+
+
 def training_distributions(prepared: PreparedModelFacts, model_family: str) -> tuple[str, ...]:
-    """Name the libraries whose versions decide this run's numbers.
+    """Name the libraries whose versions decide this training run's numbers.
 
     Args:
         prepared: The model as it was prepared, which knows whether adapters
@@ -102,14 +136,11 @@ def training_distributions(prepared: PreparedModelFacts, model_family: str) -> t
     Returns:
         The distribution names, without duplicates, in a stable order.
     """
-    names = list(BASE_TRAINING_DISTRIBUTIONS)
-    if model_family != "char_lstm":
-        names.append(TRANSFORMERS_DISTRIBUTION)
-    if prepared.is_peft:
-        names.append(PEFT_DISTRIBUTION)
-    if prepared.quantization is not None:
-        names.append(QUANTIZATION_DISTRIBUTION)
-    return tuple(names)
+    return model_distributions(
+        uses_transformers=model_family != "char_lstm",
+        uses_peft=prepared.is_peft,
+        uses_quantization=prepared.quantization is not None,
+    )
 
 
 def training_observations(outcome: TrainOutcome) -> tuple[Observation, ...]:
@@ -284,6 +315,7 @@ __all__ = [
     "TRAINING_EXPERIMENT",
     "TRANSFORMERS_DISTRIBUTION",
     "PreparedModelFacts",
+    "model_distributions",
     "saved_model_digest",
     "training_distributions",
     "training_observations",

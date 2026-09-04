@@ -43,7 +43,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
@@ -179,7 +179,7 @@ def benchmark_run_record(device: str, out: pathlib.Path) -> RunRecord:
         device, probe_determinism(device, remove_split_k=False, math_attention=False)
     )
 
-    default = timing_observations(device, DEFAULT_CONDITION, _test_hooks.benchmark_shapes())
+    default = timing_observations(device, DEFAULT_CONDITION, _measurement_hooks.benchmark_shapes())
     child = run_child(device, out.with_name(f"{out.stem}-child{out.suffix}"))
 
     return run_record(
@@ -224,7 +224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             fingerprint=capture_run_fingerprint(
                 device, probe_determinism(device, remove_split_k=False, math_attention=False)
             ),
-            observations=timing_observations(device, condition, _test_hooks.benchmark_shapes()),
+            observations=timing_observations(
+                device, condition, _measurement_hooks.benchmark_shapes()
+            ),
             payload_digest=NO_PAYLOAD,
         )
 

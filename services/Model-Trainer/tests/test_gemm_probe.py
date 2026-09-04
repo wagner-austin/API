@@ -25,7 +25,7 @@ from platform_core.json_utils import load_json_str
 from platform_core.known_answer_registry import gate_record
 from platform_core.run_record import NO_PAYLOAD, RunRecord, decode_run_record
 
-from model_trainer.cli import _test_hooks as cli_hooks
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import gemm_probe as gemm_cli
 from model_trainer.core.services.model.deterministic_gemm import (
     CUBLAS_ARM,
@@ -80,11 +80,11 @@ def _cheap_probe() -> Generator[None, None, None]:
     Yields:
         Nothing; the table is installed for the body of the test.
     """
-    cli_hooks.probed_shapes_hook = lambda: CHEAP_PROBE
+    measurement_hooks.probed_shapes_hook = lambda: CHEAP_PROBE
     try:
         yield
     finally:
-        cli_hooks.probed_shapes_hook = cli_hooks._default_probed_shapes
+        measurement_hooks.probed_shapes_hook = measurement_hooks._default_probed_shapes
 
 
 cheap_probe = pytest.fixture(_cheap_probe)
@@ -328,7 +328,7 @@ class TestTheRecord:
         assert len(dims) > len(set(dims))
 
     def test_the_production_hook_walks_the_whole_declared_set(self) -> None:
-        assert cli_hooks._default_probed_shapes() == probed_shapes()
+        assert measurement_hooks._default_probed_shapes() == probed_shapes()
 
     def test_it_declares_its_own_experiment(self, cheap_probe: None) -> None:
         assert _record()["experiment"] == GEMM_EXPERIMENT

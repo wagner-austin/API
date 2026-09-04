@@ -36,7 +36,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
@@ -126,7 +126,7 @@ def benchmark_run_record(device: str) -> RunRecord:
     )
 
     observations: list[Observation] = []
-    for shape in _test_hooks.cost_shapes_hook():
+    for shape in _measurement_hooks.cost_shapes_hook():
         for key, backend in ((DEFAULT_KEY, None), (PINNED_KEY, BACKENDS[PINNED_KEY])):
             cost = time_sdpa(shape, device, backend)
             # Logged per point rather than only at the end: the sweep's last
@@ -182,7 +182,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _log.info(
         "sdpa cost over %d calls %s -> %s",
-        len(_test_hooks.cost_shapes_hook()),
+        len(_measurement_hooks.cost_shapes_hook()),
         describe_run_fingerprint(record["fingerprint"]),
         out,
     )

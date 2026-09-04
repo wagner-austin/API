@@ -25,7 +25,7 @@ from platform_core.json_utils import load_json_str
 from platform_core.known_answer_registry import entry_from_record, gate_record
 from platform_core.run_record import NO_PAYLOAD, decode_run_record
 
-from model_trainer.cli import _test_hooks as cli_hooks
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import known_answer_probe as probe_cli
 from model_trainer.cli import probe_ladder
 from model_trainer.core.services.model.known_answer_probe import probe_forward_loss
@@ -54,11 +54,11 @@ def _cheap_ladder() -> Generator[None, None, None]:
     Yields:
         Nothing; the ladder is installed for the body of the test.
     """
-    cli_hooks.ladder_shapes = lambda: CHEAP
+    measurement_hooks.ladder_shapes = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.ladder_shapes = cli_hooks._default_ladder_shapes
+        measurement_hooks.ladder_shapes = measurement_hooks._default_ladder_shapes
 
 
 cheap_ladder = pytest.fixture(_cheap_ladder)
@@ -190,7 +190,7 @@ class TestTheCommandLine:
     def test_the_production_hook_walks_the_whole_declared_ladder(self) -> None:
         # What the two-rung fixture would otherwise hide: that the deployed
         # command runs every rung, not the cheap pair these tests install.
-        assert cli_hooks._default_ladder_shapes() == PROBE_SHAPES
+        assert measurement_hooks._default_ladder_shapes() == PROBE_SHAPES
 
     def test_an_absent_device_is_refused_and_nothing_is_written(
         self, tmp_path: pathlib.Path

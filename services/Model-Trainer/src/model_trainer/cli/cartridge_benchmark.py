@@ -55,7 +55,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
@@ -266,7 +266,7 @@ def cartridge_run_record(
         AppError: Propagated from the arms when a corpus or a seed count
             cannot support the measurement.
     """
-    plan = require_cartridge_plan(_test_hooks.cartridge_plans(), plan_name)
+    plan = require_cartridge_plan(_measurement_hooks.cartridge_plans(), plan_name)
     fingerprint: RunFingerprint = capture_run_fingerprint(
         device, probe_determinism(device, remove_split_k=False, math_attention=False)
     )

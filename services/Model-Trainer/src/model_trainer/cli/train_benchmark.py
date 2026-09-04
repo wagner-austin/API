@@ -36,7 +36,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.cli.sdpa_benchmark import PINNED_KEY, cost_observations
 from model_trainer.core.run_fingerprint import (
@@ -136,7 +136,7 @@ def train_run_record(device: str) -> RunRecord:
     )
 
     observations: list[Observation] = []
-    for shape in _test_hooks.train_shapes():
+    for shape in _measurement_hooks.train_shapes():
         observations.extend(measure_row(shape, device))
         # The row's model goes out of scope when `measure_row` returns, and
         # only then can its blocks be handed back. Doing this between rows
@@ -179,7 +179,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _log.info(
         "training-step cost over %d rows %s -> %s",
-        len(_test_hooks.train_shapes()),
+        len(_measurement_hooks.train_shapes()),
         describe_run_fingerprint(record["fingerprint"]),
         out,
     )

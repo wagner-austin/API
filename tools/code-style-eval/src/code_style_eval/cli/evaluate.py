@@ -17,12 +17,17 @@ import sys
 from collections.abc import Sequence
 
 from platform_core.config import config_test_hooks
+from platform_core.continuation_task import (
+    EvalPrompt,
+    build_prompts,
+    generated_path,
+    item_root,
+)
 from platform_core.json_utils import dump_json_str
 
 from code_style_eval.cli import _test_hooks
 from code_style_eval.contracts.outcomes import ItemOutcome, encode_item_outcome
 from code_style_eval.core.checks import checker_environment, score_item
-from code_style_eval.core.prompts import EvalPrompt, build_prompts
 from code_style_eval.core.provenance import verify_scoring_environment
 
 _HOLDOUT_FLAG = "--holdout"
@@ -169,70 +174,6 @@ def parse_arguments(tokens: Sequence[str]) -> Arguments:
     )
 
 
-def flatten_item_id(item_id: str) -> str:
-    """Flatten a repository-relative item id into a single path segment.
-
-    The item id is a path, so it is flattened rather than joined: joining
-    would let an item id containing ``..`` write outside the directory, and
-    the flattened name stays readable in a listing.
-
-    Args:
-        item_id: The item's path within its repository.
-
-    Returns:
-        The single-segment name.
-
-    Raises:
-        ValueError: If the id does not name a Python file. The guards find
-            their work by globbing ``*.py``, so an item stored under any
-            other suffix would be invisible to them and score a vacuous
-            pass rather than a refusal.
-    """
-    if not item_id.endswith(".py"):
-        raise ValueError(f"item id '{item_id}' is not a Python file")
-    return item_id.replace("/", "__").replace("\\", "__")
-
-
-def item_root(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path:
-    """Locate the guard root for one item.
-
-    Every item gets its OWN root holding only its own generated file. The
-    monorepo guards are scoped to a tree rather than to a file -- they run
-    over ``<root>/src``, ``<root>/scripts`` and ``<root>/tests`` -- so a
-    single root shared by a whole sweep would return one verdict for all of
-    it. Every item would then carry the same guards column, the paired table
-    would compare two constants, and a sweep in which the adapter fixed real
-    violations would report no difference for a reason having nothing to do
-    with the models.
-
-    Args:
-        generated_dir: Directory of generated files.
-        item_id: The item's path within its repository.
-
-    Returns:
-        The directory the guards are pointed at for this item.
-    """
-    return generated_dir / flatten_item_id(item_id)
-
-
-def generated_path(generated_dir: pathlib.Path, item_id: str) -> pathlib.Path:
-    """Locate the generated file for one item.
-
-    The file sits under the item's own root at ``src/``, which is one of the
-    directories the guards scan. Placing it anywhere else in the root would
-    hide it from them and score every item as clean.
-
-    Args:
-        generated_dir: Directory of generated files.
-        item_id: The item's path within its repository.
-
-    Returns:
-        The path the generation is expected at.
-    """
-    flat = flatten_item_id(item_id)
-    return generated_dir / flat / "src" / flat
-
-
 def score_arm(arguments: Arguments, prompts: Sequence[EvalPrompt]) -> list[ItemOutcome]:
     """Score every prompt whose generation exists.
 
@@ -321,9 +262,6 @@ def entrypoint() -> None:
 __all__ = [
     "Arguments",
     "entrypoint",
-    "flatten_item_id",
-    "generated_path",
-    "item_root",
     "main",
     "parse_arguments",
     "score_arm",

@@ -16,13 +16,7 @@ import pytest
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
 from code_style_eval.cli import _test_hooks as cli_hooks
-from code_style_eval.cli.evaluate import (
-    entrypoint,
-    generated_path,
-    item_root,
-    main,
-    parse_arguments,
-)
+from code_style_eval.cli.evaluate import entrypoint, main, parse_arguments
 from code_style_eval.contracts.outcomes import decode_item_outcome
 from code_style_eval.core import _test_hooks as core_hooks
 from tests.conftest import _Recorder, _write_generation
@@ -141,47 +135,6 @@ class TestParsingArguments:
         """
         with pytest.raises(ValueError, match="positive integer"):
             _ = parse_arguments([*self._base(tmp_path), "--prompt-lines", bad])
-
-
-class TestLocatingGenerations:
-    """Item ids are repository paths, so they are flattened not joined."""
-
-    def test_a_nested_path_is_flattened(self, tmp_path: pathlib.Path) -> None:
-        """Joining would let '..' escape the directory."""
-        located = generated_path(tmp_path, "src/pkg/mod.py")
-
-        assert located == tmp_path / "src__pkg__mod.py" / "src" / "src__pkg__mod.py"
-
-    def test_a_windows_separator_is_flattened_too(self, tmp_path: pathlib.Path) -> None:
-        """The corpus is emitted on Windows as well as read there."""
-        located = generated_path(tmp_path, "src\\pkg\\mod.py")
-
-        assert located == tmp_path / "src__pkg__mod.py" / "src" / "src__pkg__mod.py"
-
-    def test_the_file_sits_under_the_items_own_root(self, tmp_path: pathlib.Path) -> None:
-        """The guards are pointed at the root, so the file must be inside it."""
-        located = generated_path(tmp_path, "src/pkg/mod.py")
-
-        assert located.parent.parent == item_root(tmp_path, "src/pkg/mod.py")
-
-    def test_the_file_sits_in_a_directory_the_guards_scan(self, tmp_path: pathlib.Path) -> None:
-        """The guards glob under src, scripts and tests, and nowhere else.
-
-        A file placed directly in the item root would be invisible to them,
-        and every item would score a guards pass for never being read.
-        """
-        located = generated_path(tmp_path, "src/pkg/mod.py")
-
-        assert located.parent.name == "src"
-
-    def test_two_items_get_separate_roots(self, tmp_path: pathlib.Path) -> None:
-        """One shared root would give every item the same guards verdict."""
-        assert item_root(tmp_path, "a.py") != item_root(tmp_path, "b.py")
-
-    def test_an_item_that_is_not_python_is_refused(self, tmp_path: pathlib.Path) -> None:
-        """The guards glob *.py, so anything else would pass by being unseen."""
-        with pytest.raises(ValueError, match="not a Python file"):
-            _ = generated_path(tmp_path, "README.md")
 
 
 class TestTheSweep:

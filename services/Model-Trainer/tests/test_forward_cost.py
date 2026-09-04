@@ -31,7 +31,7 @@ from platform_core.run_record import (
 from platform_core.testing import sample_run_fingerprint
 from torch.nn.attention import SDPBackend
 
-from model_trainer.cli import _test_hooks as cli_hooks
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import forward_benchmark as bench_cli
 from model_trainer.cli import forward_benchmark_report as report_cli
 from model_trainer.cli import sdpa_benchmark_report as shared_report
@@ -74,11 +74,11 @@ def _cheap_forward() -> Generator[None, None, None]:
     Yields:
         Nothing; the sweep is installed for the body of the test.
     """
-    cli_hooks.forward_shapes = lambda: CHEAP
+    measurement_hooks.forward_shapes = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.forward_shapes = cli_hooks._default_forward_shapes
+        measurement_hooks.forward_shapes = measurement_hooks._default_forward_shapes
 
 
 cheap_forward = pytest.fixture(_cheap_forward)
@@ -335,7 +335,7 @@ class TestTheCommandLines:
             bench_cli.main(["--device", "cpu", "--out", str(tmp_path / "f.json"), "--rows", "2"])
 
     def test_the_production_hook_walks_the_whole_declared_sweep(self) -> None:
-        assert cli_hooks._default_forward_shapes() == FORWARD_SHAPES
+        assert measurement_hooks._default_forward_shapes() == FORWARD_SHAPES
 
     def test_the_report_reads_a_directory(self, tmp_path: pathlib.Path) -> None:
         directory = tmp_path / "fwd"

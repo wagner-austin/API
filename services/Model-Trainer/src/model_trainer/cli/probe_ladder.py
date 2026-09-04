@@ -46,7 +46,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 
 # `probe_determinism` is imported from the gate CLI rather than re-derived.
 # The device-conditional pin, the thread count it applies on cpu and the
@@ -183,7 +183,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
     record = ladder_run_record(
-        cli_args.require_flag(parsed, DEVICE_FLAG), _test_hooks.ladder_shapes()
+        cli_args.require_flag(parsed, DEVICE_FLAG), _measurement_hooks.ladder_shapes()
     )
 
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))

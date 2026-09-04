@@ -30,6 +30,7 @@ from platform_ml.determinism import (
     SPLIT_K_SETTING,
 )
 
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import probe_trace
 from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM, RANK1_ARM
@@ -62,11 +63,11 @@ def _cheap_trace() -> Generator[None, None, None]:
     Yields:
         Nothing; the trace is installed for the body of the test.
     """
-    cli_hooks.trace_rungs = lambda: CHEAP
+    measurement_hooks.trace_rungs = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.trace_rungs = cli_hooks._default_trace_rungs
+        measurement_hooks.trace_rungs = measurement_hooks._default_trace_rungs
 
 
 cheap_trace = pytest.fixture(_cheap_trace)
@@ -351,7 +352,7 @@ class TestTheCommandLine:
         assert _out_path(tmp_path).is_file()
 
     def test_the_production_hook_walks_the_whole_declared_set(self) -> None:
-        assert cli_hooks._default_trace_rungs() == TRACE_RUNGS
+        assert measurement_hooks._default_trace_rungs() == TRACE_RUNGS
 
     def test_an_absent_device_is_refused_and_nothing_is_written(
         self, tmp_path: pathlib.Path

@@ -25,6 +25,7 @@ import pytest
 from platform_core.json_utils import load_json_str
 from platform_core.run_record import decode_run_record
 
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_benchmark as bench
 from model_trainer.core.contracts.model import QuantizationConfig
@@ -113,12 +114,12 @@ def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
 @pytest.fixture(name="wired", autouse=True)
 def _wired() -> Generator[None, None, None]:
     """Install the three fakes, and put the real hooks back afterwards."""
-    cli_hooks.cartridge_plans = _fake_plans
+    measurement_hooks.cartridge_plans = _fake_plans
     cli_hooks.read_corpus_documents = _fake_corpus_reader
     hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
     hf_hooks.Hooks.load_hf_model = _fake_model
     yield None
-    cli_hooks.cartridge_plans = cli_hooks._default_cartridge_plans
+    measurement_hooks.cartridge_plans = measurement_hooks._default_cartridge_plans
     cli_hooks.read_corpus_documents = cli_hooks._default_read_corpus_documents
     hf_hooks.Hooks.reset()
 

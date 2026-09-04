@@ -48,7 +48,7 @@ from platform_core.run_record import (
     run_record,
 )
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
@@ -139,7 +139,7 @@ def gemm_run_record(device: str, *, controls: str, kernel: str) -> RunRecord:
     # every line of this loop without digesting ninety-three shapes on a CPU
     # -- the reason `benchmark_shapes` is a hook. Production's default IS the
     # full table.
-    for name, shape in _test_hooks.probed_shapes_hook():
+    for name, shape in _measurement_hooks.probed_shapes_hook():
         digest, total = gemm_identity(shape, device, kernel=named_kernel)
         _log.info(
             "gemm %s M%d K%d N%d digest=%.0f sum=%.17g",
@@ -194,7 +194,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _log.info(
         "%d GEMMs %s %s -> %s",
-        len(_test_hooks.probed_shapes_hook()),
+        len(_measurement_hooks.probed_shapes_hook()),
         record["label"],
         describe_run_fingerprint(record["fingerprint"]),
         out,

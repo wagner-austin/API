@@ -32,7 +32,7 @@ from platform_core.run_record import (
 from platform_core.testing import sample_run_fingerprint
 from torch.nn.attention import SDPBackend
 
-from model_trainer.cli import _test_hooks as cli_hooks
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import sdpa_benchmark as bench_cli
 from model_trainer.cli import sdpa_benchmark_report as report_cli
 from model_trainer.core.services.model.sdpa_probe import forced_sdpa_output, sdpa_output
@@ -85,11 +85,11 @@ def _cheap_sweep() -> Generator[None, None, None]:
     Yields:
         Nothing; the sweep is installed for the body of the test.
     """
-    cli_hooks.cost_shapes_hook = lambda: CHEAP
+    measurement_hooks.cost_shapes_hook = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.cost_shapes_hook = cli_hooks._default_cost_shapes
+        measurement_hooks.cost_shapes_hook = measurement_hooks._default_cost_shapes
 
 
 cheap_sweep = pytest.fixture(_cheap_sweep)
@@ -271,7 +271,7 @@ class TestWhatOneRecordCarries:
     def test_the_production_hook_walks_the_whole_declared_sweep(self) -> None:
         # The tests install a one-call sweep; the cluster runs the real one,
         # and this is what keeps the two from drifting apart unnoticed.
-        assert cli_hooks._default_cost_shapes() == cost_shapes()
+        assert measurement_hooks._default_cost_shapes() == cost_shapes()
 
 
 def cost_record(

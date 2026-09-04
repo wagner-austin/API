@@ -16,9 +16,9 @@ import pathlib
 from collections.abc import Mapping
 
 import pytest
+from platform_core.continuation_task import generated_path
 
 from code_style_eval.cli import _test_hooks as cli_hooks
-from code_style_eval.cli.evaluate import generated_path
 from code_style_eval.core import _test_hooks as core_hooks
 
 

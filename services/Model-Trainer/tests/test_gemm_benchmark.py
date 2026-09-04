@@ -28,6 +28,7 @@ from platform_core.run_record import (
     run_record,
 )
 
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import gemm_benchmark as bench
 from model_trainer.core.run_fingerprint import capture_run_fingerprint
@@ -225,7 +226,7 @@ class TestTheCommandLine:
     def test_a_condition_run_writes_only_that_condition(self, tmp_path: pathlib.Path) -> None:
         out = tmp_path / "one.json"
 
-        cli_hooks.benchmark_shapes = _one_shape
+        measurement_hooks.benchmark_shapes = _one_shape
         try:
             assert (
                 bench.main(
@@ -234,7 +235,7 @@ class TestTheCommandLine:
                 == 0
             )
         finally:
-            cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
+            measurement_hooks.benchmark_shapes = measurement_hooks._default_benchmark_shapes
 
         decoded = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
         assert all(o["name"].endswith(bench.NOSPLITK_CONDITION) for o in decoded["observations"])
@@ -247,12 +248,12 @@ class TestTheCommandLine:
             return 0
 
         cli_hooks.run_benchmark_child = _spawn
-        cli_hooks.benchmark_shapes = _one_shape
+        measurement_hooks.benchmark_shapes = _one_shape
         try:
             assert bench.main(["--device", "cpu", "--out", str(out)]) == 0
         finally:
             cli_hooks.run_benchmark_child = cli_hooks._default_run_benchmark_child
-            cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
+            measurement_hooks.benchmark_shapes = measurement_hooks._default_benchmark_shapes
 
         decoded = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
         names = [o["name"] for o in decoded["observations"]]
@@ -275,7 +276,7 @@ class TestTheCommandLine:
         import sys
 
         saved = sys.argv
-        cli_hooks.benchmark_shapes = _one_shape
+        measurement_hooks.benchmark_shapes = _one_shape
         sys.argv = [
             "modeltrainer-gemm-benchmark",
             "--device",
@@ -290,7 +291,7 @@ class TestTheCommandLine:
                 bench.entrypoint()
         finally:
             sys.argv = saved
-            cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
+            measurement_hooks.benchmark_shapes = measurement_hooks._default_benchmark_shapes
 
         assert excinfo.value.code == 0
 
@@ -307,7 +308,7 @@ class TestTheCommandLine:
         # module in-process, so the real table would time an 84-GFLOP batched
         # matmul on the test runner's CPU and hang the suite rather than fail
         # it. It did, once.
-        cli_hooks.benchmark_shapes = _one_shape
+        measurement_hooks.benchmark_shapes = _one_shape
         sys.argv = [
             "modeltrainer-gemm-benchmark",
             "--device",
@@ -322,7 +323,7 @@ class TestTheCommandLine:
                 runpy.run_module(module_name, run_name="__main__", alter_sys=False)
         finally:
             sys.argv = saved_argv
-            cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
+            measurement_hooks.benchmark_shapes = measurement_hooks._default_benchmark_shapes
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
 
@@ -334,7 +335,7 @@ class TestTheProductionShapeTable:
     def test_the_deployed_benchmark_times_every_probed_shape(self) -> None:
         # What the one-shape fixture would otherwise hide: that the deployed
         # command measures the real table, not the cheap stand-in.
-        assert cli_hooks._default_benchmark_shapes() == timed_shapes()
+        assert measurement_hooks._default_benchmark_shapes() == timed_shapes()
 
 
 class TestTheBatchedTable:

@@ -11,10 +11,11 @@ of pure code tests the fake.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from platform_core.continuation_task import EvalPrompt
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.errors import (
     AppError,
@@ -33,26 +34,8 @@ from model_trainer.core._hook_protocols_ml import (
     PinTorchThreadsProto,
 )
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
+from model_trainer.core.contracts.continuation_sweep import Completion, ContinuationArm
 from model_trainer.core.contracts.model import PreparedLMModel
-
-# Safe at module scope for the same reason `probe_shapes` is: a table of
-# TypedDicts, a digest and a label formatter, importing no torch. The arms it
-# describes live in `cartridge_measurement`, which does.
-from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS, CartridgePlan
-from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
-
-# Safe at module scope where the others are not: `probe_shapes` is a table of
-# TypedDicts and a label formatter, and imports no torch. That separation is
-# the reason it is its own module -- see its docstring.
-from model_trainer.core.services.model.gemm_shapes import (
-    GemmShape,
-    probed_shapes,
-    timed_shapes,
-)
-from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES, ProbeShape
-from model_trainer.core.services.model.sdpa_shapes import SdpaCostShape, cost_shapes
-from model_trainer.core.services.model.trace_plan import TRACE_RUNGS
-from model_trainer.core.services.model.train_cost import TRAIN_SHAPES
 
 
 class LoadHubModelProto(Protocol):
@@ -63,24 +46,49 @@ class LoadHubModelProto(Protocol):
         ...
 
 
+class LoadContinuationArmProto(Protocol):
+    """Protocol for loading one arm of a continuation sweep.
+
+    Both arms come from the SAME saved run, which is why this takes an
+    artifact path and an arm name rather than a model id: the control for a
+    QLoRA adapter is that adapter's own base under that adapter's own
+    quantization, and reading both out of one metadata file is what makes
+    the pair impossible to mismatch by hand.
+    """
+
+    def __call__(self, artifact_path: str, arm: ContinuationArm, /) -> PreparedLMModel:
+        """Load the named arm of the saved run."""
+        ...
+
+
+class GenerateContinuationBatchProto(Protocol):
+    """Protocol for decoding one batch of continuations.
+
+    Keyword-only, matching the real signature: seven arguments of which four
+    are integers, and transposing two of them would produce a sweep that
+    runs and is wrong.
+    """
+
+    def __call__(
+        self,
+        *,
+        model: PreparedLMModel,
+        prompts: Sequence[EvalPrompt],
+        max_new_tokens: int,
+        max_prompt_tokens: int,
+        repetition_penalty: float,
+        device: str,
+        seed: int,
+    ) -> list[Completion]:
+        """Continue every prompt in one batch."""
+        ...
+
+
 class ReadCorpusDocumentsProto(Protocol):
     """Protocol for reading a measurement corpus off the filesystem."""
 
     def __call__(self, corpus_dir: Path, /) -> tuple[str, ...]:
         """Read every document in a corpus directory, in a fixed order."""
-        ...
-
-
-class CartridgePlansProto(Protocol):
-    """Protocol for the cartridge plan table.
-
-    Behind a hook for the same reason :data:`ladder_shapes` is: every plan in
-    the real table is minutes of GPU per arm, so a suite that could only reach
-    that table would either run it or leave the entry uncovered.
-    """
-
-    def __call__(self) -> Mapping[str, CartridgePlan]:
-        """Return every declared plan, in table order."""
         ...
 
 
@@ -101,106 +109,6 @@ class ScoreClozeProto(Protocol):
     ) -> ClozeEvalResult:
         """Score every item and report accuracy against the guessing baseline."""
         ...
-
-
-class LadderShapesProto(Protocol):
-    """Protocol for the probe ladder the report command walks.
-
-    Behind a hook for a different reason than the others: not because the real
-    thing needs a GPU, but because it needs one to be REASONABLE. The ladder
-    ends at a 1.5-billion-parameter model, which is the measurement's point
-    and is not something to construct on a test runner. Tests install a
-    two-rung ladder and exercise every line of the walk; the cluster runs the
-    real one.
-    """
-
-    def __call__(self) -> Mapping[str, ProbeShape]:
-        """Return the rungs to walk, in the order to walk them."""
-        ...
-
-
-class TraceRungsProto(Protocol):
-    """Protocol for the rungs the forward trace walks.
-
-    Behind a hook for the same reason the ladder's shapes are: the declared
-    set ends at a 1.5-billion-parameter model, and tracing it digests about a
-    hundred and seventy million floats. Tests install one tiny rung and walk
-    every line; the cluster walks the real four.
-    """
-
-    def __call__(self) -> tuple[str, ...]:
-        """Return the rung names to trace, in the order to trace them."""
-        ...
-
-
-class CostShapesProto(Protocol):
-    """Protocol for the attention calls the cost sweep times.
-
-    Behind a hook for the same reason the ladder's and the gemm benchmark's
-    tables are, and more urgently: the declared sweep ends at eight sequences
-    of 4096 tokens, where the math path allocates gigabytes and takes tens of
-    milliseconds per call. Timing that on a test runner's CPU would not fail,
-    it would HANG -- which is how a probe-ladder test once had to be killed
-    after ten minutes.
-    """
-
-    def __call__(self) -> tuple[SdpaCostShape, ...]:
-        """Return the calls to time, in order."""
-        ...
-
-
-def _default_cost_shapes() -> tuple[SdpaCostShape, ...]:
-    """Production attention-cost sweep - used as default hook.
-
-    Returns:
-        The batch-by-length grid, then the ladder's own calls.
-    """
-    return cost_shapes()
-
-
-class ForwardShapesProto(Protocol):
-    """Protocol for the forward passes the end-to-end benchmark times.
-
-    Behind a hook for the same reason the other sweeps are, and the reason
-    bites hardest here: the declared rows build models up to 774 million
-    parameters and run them over a 50,257-token vocabulary. On a test
-    runner's CPU that is not slow, it is unusable.
-    """
-
-    def __call__(self) -> tuple[ForwardCostShape, ...]:
-        """Return the passes to time, in order."""
-        ...
-
-
-def _default_forward_shapes() -> tuple[ForwardCostShape, ...]:
-    """Production forward sweep - used as default hook.
-
-    Returns:
-        Every declared row, in table order.
-    """
-    return FORWARD_SHAPES
-
-
-class TrainShapesProto(Protocol):
-    """Protocol for the training steps the step benchmark times.
-
-    Behind a hook for the same reason every other sweep is, and hardest here:
-    a training step holds parameters, gradients and two AdamW moments, so the
-    declared rows need about twelve gigabytes before a single activation.
-    """
-
-    def __call__(self) -> tuple[ForwardCostShape, ...]:
-        """Return the steps to time, in order."""
-        ...
-
-
-def _default_train_shapes() -> tuple[ForwardCostShape, ...]:
-    """Production training sweep - used as default hook.
-
-    Returns:
-        Every declared row, in table order.
-    """
-    return TRAIN_SHAPES
 
 
 class EnvCublasltWorkspaceProto(Protocol):
@@ -234,66 +142,6 @@ def _default_env_cublaslt_workspace() -> str | None:
 
     value = config_test_hooks.get_env(CUBLASLT_WORKSPACE_ENV_VAR)
     return value if value else None
-
-
-def _default_trace_rungs() -> tuple[str, ...]:
-    """Production trace rungs - used as default hook.
-
-    Returns:
-        The declared contrast: the rung split-K removal breaks, the one it
-        fails to fix, the one it fixes, and the one that never moves.
-    """
-    return TRACE_RUNGS
-
-
-class BenchmarkShapesProto(Protocol):
-    """Protocol for the shape table the split-K benchmark times.
-
-    Behind a hook for the same reason the ladder's is: the real table is a GPU
-    measurement. Timing is deliberately repetitive -- warmup plus several
-    batches of many calls each -- so walking all 43 shapes on a test runner's
-    CPU spent minutes producing numbers nobody will read.
-    """
-
-    def __call__(self) -> tuple[tuple[str, GemmShape], ...]:
-        """Return the shapes to time, in order."""
-        ...
-
-
-def _default_benchmark_shapes() -> tuple[tuple[str, GemmShape], ...]:
-    """Production benchmark shape table - used as default hook.
-
-    Returns:
-        The ladder's calls at one short sequence and again at a real batch.
-    """
-    return timed_shapes()
-
-
-class ProbedShapesProto(Protocol):
-    """Protocol for the shape table the digest probe walks.
-
-    Behind a hook since 2026-08-31, when the table grew the batched and
-    crossover shapes: a single batched call is cheap on a GPU and the probe
-    runs each twice, but ninety-three shapes at up to ``N=4096`` on a test
-    runner's CPU -- digested through a per-element ``tolist`` -- is minutes
-    per record, and the record tests build several. Tests install a
-    three-shape table and exercise every line of the walk; the cluster walks
-    the real one.
-    """
-
-    def __call__(self) -> tuple[tuple[str, GemmShape], ...]:
-        """Return the shapes to digest, in order."""
-        ...
-
-
-def _default_probed_shapes() -> tuple[tuple[str, GemmShape], ...]:
-    """Production digest-probe shape table - used as default hook.
-
-    Returns:
-        Every declared table: ladder, sweep grid, boundary bracket, batched
-        twins and the batch-size sweep.
-    """
-    return probed_shapes()
 
 
 class RunBenchmarkChildProto(Protocol):
@@ -341,22 +189,67 @@ def _default_run_benchmark_child(argv: list[str], variable: str, value: str, /) 
     return subprocess.run(argv, check=False).returncode
 
 
-def _default_cartridge_plans() -> Mapping[str, CartridgePlan]:
-    """Production cartridge plan table - used as default hook.
+def _default_load_continuation_arm(artifact_path: str, arm: ContinuationArm, /) -> PreparedLMModel:
+    """Production arm loader - used as default hook.
+
+    Imported inside the function for the same reason the hub loader's import
+    is: parsing a command line and printing a usage error must not pull torch
+    into the process.
+
+    Args:
+        artifact_path: The saved training run both arms are defined by.
+        arm: Which side to load. ``candidate`` reattaches the adapter;
+            ``base`` loads the weights it was trained against and attaches
+            nothing.
 
     Returns:
-        Every declared plan, in table order.
+        The prepared model.
     """
-    return CARTRIDGE_PLANS
+    from model_trainer.core.services.model.backends.hf_lm.io import (
+        load_base_of_prepared_hf_lm,
+        load_prepared_hf_lm_from_handle,
+    )
+
+    if arm == "candidate":
+        return load_prepared_hf_lm_from_handle(artifact_path, None)
+    return load_base_of_prepared_hf_lm(artifact_path)
 
 
-def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
-    """Production probe ladder - used as default hook.
+def _default_generate_continuation_batch(
+    *,
+    model: PreparedLMModel,
+    prompts: Sequence[EvalPrompt],
+    max_new_tokens: int,
+    max_prompt_tokens: int,
+    repetition_penalty: float,
+    device: str,
+    seed: int,
+) -> list[Completion]:
+    """Production batched decoder - used as default hook.
+
+    Args:
+        model: The loaded arm.
+        prompts: The batch, already composed.
+        max_new_tokens: Token budget for one completion.
+        max_prompt_tokens: How much of each prompt's tail is kept.
+        repetition_penalty: Penalty on tokens already emitted.
+        device: Where the tensors go.
+        seed: Seeds the generator before this batch.
 
     Returns:
-        Every declared rung, in table order.
+        One completion per prompt, in the order given.
     """
-    return PROBE_SHAPES
+    from model_trainer.core.services.model.continuations import generate_batch
+
+    return generate_batch(
+        model=model,
+        prompts=prompts,
+        max_new_tokens=max_new_tokens,
+        max_prompt_tokens=max_prompt_tokens,
+        repetition_penalty=repetition_penalty,
+        device=device,
+        seed=seed,
+    )
 
 
 def _default_load_hub_model(hub_model_id: str, /) -> PreparedLMModel:
@@ -536,9 +429,11 @@ def _default_read_corpus_documents(corpus_dir: Path, /) -> tuple[str, ...]:
 
 load_hub_model: LoadHubModelProto = _default_load_hub_model
 
-read_corpus_documents: ReadCorpusDocumentsProto = _default_read_corpus_documents
+load_continuation_arm: LoadContinuationArmProto = _default_load_continuation_arm
 
-cartridge_plans: CartridgePlansProto = _default_cartridge_plans
+generate_continuation_batch: GenerateContinuationBatchProto = _default_generate_continuation_batch
+
+read_corpus_documents: ReadCorpusDocumentsProto = _default_read_corpus_documents
 
 score_cloze: ScoreClozeProto = _default_score_cloze
 
@@ -546,53 +441,27 @@ apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
 
 pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
-ladder_shapes: LadderShapesProto = _default_ladder_shapes
-
-trace_rungs: TraceRungsProto = _default_trace_rungs
-
 env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_workspace
 
-cost_shapes_hook: CostShapesProto = _default_cost_shapes
-
-forward_shapes: ForwardShapesProto = _default_forward_shapes
-
-train_shapes: TrainShapesProto = _default_train_shapes
-
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
-
-benchmark_shapes: BenchmarkShapesProto = _default_benchmark_shapes
-
-probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
 
 
 __all__ = [
     "ApplyDeterminismProto",
-    "BenchmarkShapesProto",
-    "CartridgePlansProto",
-    "CostShapesProto",
     "EnvCublasltWorkspaceProto",
-    "ForwardShapesProto",
-    "LadderShapesProto",
+    "GenerateContinuationBatchProto",
+    "LoadContinuationArmProto",
     "LoadHubModelProto",
-    "ProbedShapesProto",
     "ReadCorpusDocumentsProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
-    "TraceRungsProto",
-    "TrainShapesProto",
     "apply_determinism_hook",
-    "benchmark_shapes",
-    "cartridge_plans",
-    "cost_shapes_hook",
     "env_cublaslt_workspace",
-    "forward_shapes",
-    "ladder_shapes",
+    "generate_continuation_batch",
+    "load_continuation_arm",
     "load_hub_model",
     "pin_torch_threads",
-    "probed_shapes_hook",
     "read_corpus_documents",
     "run_benchmark_child",
     "score_cloze",
-    "trace_rungs",
-    "train_shapes",
 ]
