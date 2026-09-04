@@ -231,6 +231,31 @@ def test_default_get_env_returns_real_environ() -> None:
     assert result is None
 
 
+def test_default_get_environment_returns_the_whole_real_environ() -> None:
+    """Test _default_get_environment answers the process question, not the
+    configuration one: what a CHILD should inherit.
+
+    ``subprocess`` replaces the environment wholesale when given one, so a
+    caller adding a single variable has to start from the parent's -- and this
+    module is the only one permitted to read it.
+    """
+    import os
+
+    from platform_core.config._test_hooks import _default_get_environment
+
+    assert _default_get_environment() == dict(os.environ)
+
+
+def test_default_get_environment_returns_a_copy() -> None:
+    """A caller's overlay must not reach back into this process's own
+    environment: it is building a child's, not editing its own."""
+    from platform_core.config._test_hooks import _default_get_environment
+
+    first = _default_get_environment()
+    first["__PLATFORM_CORE_TEST_ONLY__"] = "1"
+    assert "__PLATFORM_CORE_TEST_ONLY__" not in _default_get_environment()
+
+
 def test_fake_env_delete() -> None:
     """Test FakeEnv.delete removes a key."""
     env = make_fake_env({"KEY": "value"})
