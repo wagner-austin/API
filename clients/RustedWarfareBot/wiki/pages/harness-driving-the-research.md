@@ -20,7 +20,7 @@ source_git_blobs:
   "scripts/pairs.py": "18311147e3897a81608c1d551c83a488000176ed"
   "scripts/margin.py": "1b40454709d859c785bded3e3337b0ed06438736"
   "../../tools/hpc3/runs/hpc3-rusted.json": "6f97e362db8befa63107a201d3f9d25a2014ca1a"
-fact_checked: 2026-09-03
+fact_checked: 2026-09-04
 confidence: high
 hubs: [headless-harness]
 ---
@@ -70,8 +70,16 @@ zero-billing ruling stands.
   jobs instantly; `--requeue` is inert; `hpc3-campaign` re-run IS the
   requeue and never resubmits finished or running members.
 - **Seed disjointness is law.** Panels allocate below 200k, search
-  rounds at 200k+, evolution generations at 500k+ -- all mechanical.
-  Never hand-pick seeds.
+  rounds at 200k+, evolution generations at 500k+ (rng capped at 49),
+  and panels continue above 1,000,000 once the low region is spent --
+  it exhausted for real on 2026-09-04 after ~38 blocks, and RW-PANEL-001
+  fired once, did its job, and was retired by the high region. All
+  mechanical. Never hand-pick seeds.
+- **Evolution runs own their variant directories.**
+  `doctrines/evolve/<name>/` per run: evolve1 and evolve2 shared the
+  bare directory and overwrote each other's members all night --
+  survivable only because replays rewrite deterministically before
+  every submission. Bank a graduate the moment its finale names it.
 - **Selection evidence is not confirmation.** Cross-round or
   cross-generation consistency inside one search proved worthless twice
   in one night (strike5000, flame2). Only untouched-seed panels dispose,

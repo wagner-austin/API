@@ -19,7 +19,7 @@ provenance:
   - "runs/sweeps/imp48c6 + imp48c0f4 — 96 fresh scorecards, the control read"
   - "runs/sweeps/impden48 — 144 scorecards, raid 3/6/8 on 48 shared seeds, 2026-09-03"
   - "wiki/log.md entries 2026-08-08 (pre-cluster saving/withhold variants) through 2026-09-02"
-fact_checked: 2026-09-03
+fact_checked: 2026-09-04
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -89,5 +89,18 @@ paired margins flat (+-0.14 at sd ~0.65). Doubling and near-tripling
 the raid commitment does not dent the subsidy's compounding at ANY
 cost level the raid verb can express. Class 2 is dead at current
 mechanics; classes 1 (rebuild-under-fire) and 3 (strike-window
-economics) are the remaining roads, and both are policy code that does
-not exist yet.
+economics) are the remaining roads.
+
+## Class 1 exists as code now (2026-09-04) -- unmeasured
+
+Rebuild-under-fire shipped as the `rebuild` doctrine knob
+(RW-DOCTRINE-029, default 0 = prior behaviour exactly): a pool we HELD
+and lost is withheld from the pool survey until the rival's army value
+drops at least `rebuild` below its recent peak -- the same Momentum
+wave-break signal the strike release reads -- so the builder's walk back
+goes through the wave's gap instead of into its face. Virgin pools claim
+as always; the opening cannot slow. Mechanism: `policy/reclaim.py`
+(`Razed` tracker + embargo gate) -> `survey_pools`'s `embargoed` filter,
+threaded via the expander. NO measurement exists yet; the first arm
+waits on the learned composition's own Impossible transfer panel
+(`g4m2imp48`) to pick its base.
