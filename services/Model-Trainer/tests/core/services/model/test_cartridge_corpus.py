@@ -17,6 +17,7 @@ from model_trainer.core.services.model.cartridge_corpus import (
     MIN_HELD_OUT_STRIDE,
     build_windows,
     split_by_stride,
+    window_documents,
 )
 
 
@@ -91,6 +92,38 @@ class TestBuildWindows:
             build_windows([], window=5, device="cpu")
 
         assert "the longest is 0" in excinfo.value.message
+
+
+class TestWindowDocuments:
+    def test_it_names_one_document_per_window(self) -> None:
+        """Aligned with `build_windows`, which is what a question set needs back.
+
+        `build_windows` flattens the corpus and drops the boundaries; an
+        item's distractors must not be terms from its own page, and this is
+        what recovers "own page".
+        """
+        documents = [[1] * 5, [2] * 3, [3] * 9]
+
+        assert window_documents(documents, window=4) == [0, 2, 2]
+
+    def test_it_stays_aligned_with_build_windows(self) -> None:
+        """The two derive the count separately, so drift is the failure mode."""
+        documents = [[1] * 9, [2] * 4, [3] * 2, [4] * 13]
+
+        built = build_windows(documents, window=4, device="cpu")
+        owners = window_documents(documents, window=4)
+
+        assert len(owners) == len(built)
+
+    def test_a_document_shorter_than_one_window_names_nothing(self) -> None:
+        assert window_documents([[1] * 3], window=4) == []
+
+    def test_a_non_positive_window_is_refused(self) -> None:
+        """Matching `build_windows` rather than dividing by zero."""
+        with pytest.raises(AppError) as excinfo:
+            window_documents([[1, 2, 3]], window=0)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE
 
 
 class TestSplitByStride:

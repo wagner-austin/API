@@ -270,12 +270,22 @@ def test_running_it_as_a_module_actually_generates(tmp_path: pathlib.Path) -> No
     install(recorder)
     tokens = command_line(tmp_path, spec_file(tmp_path, paths=("src/a.py",)))
     saved = sys.argv
+    # The module is already imported by the time this runs, and `run_module`
+    # warns that executing an already-imported module "may result in
+    # unpredictable behaviour" -- it re-executes the body against a second
+    # module object while the first stays in `sys.modules`. Dropping it first
+    # is what the other module-execution tests here do, and it makes the run
+    # match what `python -m` actually does from a cold interpreter.
+    module_name = "model_trainer.cli.continuations"
+    saved_module = sys.modules.pop(module_name, None)
     sys.argv = ["modeltrainer-continuations", *tokens]
     try:
         with pytest.raises(SystemExit):
-            runpy.run_module("model_trainer.cli.continuations", run_name="__main__")
+            runpy.run_module(module_name, run_name="__main__", alter_sys=False)
     finally:
         sys.argv = saved
+        if saved_module is not None:
+            sys.modules[module_name] = saved_module
 
     out_dir = tmp_path / "generated" / "candidate"
     assert generated_path(out_dir, "src/a.py").is_file()

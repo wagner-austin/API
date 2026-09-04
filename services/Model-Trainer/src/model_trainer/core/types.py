@@ -83,6 +83,47 @@ class ForwardOutProto(Protocol):
     def loss(self: ForwardOutProto) -> torch.Tensor: ...
 
 
+class ScoreableLMProto(Protocol):
+    """The smallest surface a scoring pass needs: eval, and a forward.
+
+    :class:`LMModelProto` describes a model something TRAINS -- parameters, a
+    state dict, a device move, a save. A measurement that only reads
+    likelihoods needs none of that, and asking for it means every stand-in in
+    a test grows eight methods nobody calls, which is how a fake stops
+    resembling the thing it stands for.
+
+    Both real callers satisfy it: a bare base model and a
+    :class:`CartridgeModel` alike, so the arms differ in the argument and
+    nowhere else.
+    """
+
+    def eval(self: ScoreableLMProto) -> None: ...
+
+    def forward(
+        self: ScoreableLMProto, *, input_ids: torch.Tensor, labels: torch.Tensor
+    ) -> ForwardOutProto: ...
+
+
+@runtime_checkable
+class LogitsOutProto(ForwardOutProto, Protocol):
+    """A forward output that also carries per-token scores.
+
+    Separate from :class:`ForwardOutProto` rather than folded into it. Most
+    callers here want a loss and nothing else, and widening the base protocol
+    would oblige every fake output in the suite to grow a field none of them
+    are asked for.
+
+    What needs this is span scoring: a loss is a MEAN over predicted tokens,
+    so it cannot say what one token cost, and measuring whether a model finds
+    a particular answer surprising is exactly a question about a few tokens.
+    Runtime-checkable so a caller can establish the capability with
+    ``isinstance`` rather than assert it with a cast.
+    """
+
+    @property
+    def logits(self: LogitsOutProto) -> torch.Tensor: ...
+
+
 class NamedParameter(Protocol):
     """Protocol for named parameter tuples from named_parameters()."""
 

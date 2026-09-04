@@ -39,7 +39,7 @@ from model_trainer.worker.eval_job import process_eval_job
 
 
 # Type alias for manifest dict to avoid line length violations
-_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int | float | None]]
+_ManifestDict = dict[str, str | int | float | bool | dict[str, str | int | float | None] | None]
 
 
 class _FakeStoreForEval:

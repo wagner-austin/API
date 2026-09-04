@@ -104,6 +104,42 @@ def build_windows(
     return built
 
 
+def window_documents(documents: Sequence[Sequence[int]], *, window: int) -> list[int]:
+    """Name the document each window came from.
+
+    :func:`build_windows` flattens a corpus into one list and drops the
+    boundaries, which is all a trainer needs. A question set needs them back:
+    an item's distractors must not be terms from the item's own page, and
+    "own page" is exactly what this recovers.
+
+    Derived from the same arithmetic ``build_windows`` uses rather than
+    returned alongside its windows, so neither can drift from the other
+    without this function's own tests failing.
+
+    Args:
+        documents: Encoded token ids, one sequence per document.
+        window: Tokens per window.
+
+    Returns:
+        One document index per window, in the order
+        :func:`build_windows` emits them.
+
+    Raises:
+        AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` if the window is not
+            positive, matching :func:`build_windows` rather than dividing by
+            zero.
+    """
+    if window <= 0:
+        raise _refuse(
+            f"a window of {window} tokens describes nothing to score; the window is "
+            f"how much text each measured item carries and must be positive"
+        )
+    owners: list[int] = []
+    for index, ids in enumerate(documents):
+        owners.extend([index] * (len(ids) // window))
+    return owners
+
+
 def split_by_stride(
     windows: Sequence[torch.Tensor], *, held_out_stride: int
 ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
@@ -147,4 +183,5 @@ __all__ = [
     "MIN_HELD_OUT_STRIDE",
     "build_windows",
     "split_by_stride",
+    "window_documents",
 ]
