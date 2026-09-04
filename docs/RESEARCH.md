@@ -356,9 +356,33 @@ name appeared nowhere here — was mine, and another session bridged it.
   2026-09-03 a second sidecar per *training* run beside each checkpoint
 - **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
   one model's cross-entropy minus another's — with confidence intervals,
-  across seven languages and six arms (`pilot_a/b/c`, `variant_b`, `v3`,
-  `2026-02`, `rebuild_2026-08`). Files named `_forMoldir` and a commit
-  crediting a Finnish native reviewer indicate this is bound for publication.
+  across seven languages and nine arms (`pilot_a/b/c`, `variant_b`, `v3`,
+  `2026-02`, `rebuild_2026-08`, and as of 2026-09-04 `v5` and `v6`). Files
+  named `_forMoldir` and a commit crediting a Finnish native reviewer indicate
+  this is bound for publication.
+
+  **Arms before v4 are not subtractable from arms after it.** v4 corrected
+  ‹щ› from ɕː to ʃː in Kazakh, Kyrgyz and Uzbek-Cyrillic; the segment appears
+  in no evaluation snippet, so the error reached those models as readers and
+  not as targets, moving Kyrgyz-as-reader by 0.22 while every other language
+  stayed inside ±0.02. It was carrying about two thirds of one of the draft's
+  reported asymmetries. Measured and cited on the personal wiki at
+  `transcription-error-inflated-a-directional-asymmetry`.
+
+  **`v5` and `v6` also carry a second output**, `<results>_asymmetry.csv`, 21
+  unordered pairs against the CSV's 49 ordered ones. It bootstraps the
+  DIFFERENCE between the two directions directly rather than asking whether
+  two separately-bootstrapped intervals overlap. That matters: non-overlapping
+  intervals imply a difference, overlapping ones imply nothing, and the
+  az↔tr asymmetry that the overlap test called lost at v6 survives the
+  difference test at `+0.2253 [+0.0629, +0.3918]`.
+- **Eight languages as of 2026-09-03, seven of them scored.** Russian was
+  added as a second non-Turkic control — Finnish is the agglutinative control,
+  Russian the contact language the Cyrillic corpora borrow from. It is a base
+  (`best_val_loss` 1.1579525100506294, vocabulary 31, three epochs) and not a matrix member,
+  because no human intelligibility ratings were collected for it, so it has
+  neither a row nor a column to score against. `char_lstm.corpora` splits the
+  two sets explicitly as `LANGS` (8) and `PERCEPTION_LANGS` (7).
 - **Provenance:** a `RunRecord` sidecar as of 2026-08-28. Every
   `zero_shot_eval` run writes `<results>.csv.runrecord.json` beside its CSV:
   experiment `turkic-zero-shot-excess-ce`, the OOV regime as the label, one
@@ -444,7 +468,35 @@ name appeared nowhere here — was mine, and another session bridged it.
   |---|---|---|---|
   | `corpora_clean_2026-02/` | 10,215,670 | Uyghur | superseded |
   | `corpora_clean/` | 12,642,807 | Uzbek | superseded |
-  | `rebuild_2026-08/corpora_clean_v3/` | **11,658,775** | **Uzbek** | **current** |
+  | `rebuild_2026-08/corpora_clean_v3/` | 11,658,775 | Uzbek | superseded, and wrong |
+  | `rebuild_2026-09/corpora_clean_v4/` | 11,658,775 | Uzbek | seven languages |
+  | `rebuild_2026-09/corpora_clean_v5/` | 11,658,775 | Uzbek | eight, mixed provenance |
+  | `rebuild_2026-09/corpora_clean_v6/` | **11,658,775** | **Uzbek** | **current** |
+
+  **The last three rows are from 2026-09-03 and 2026-09-04**, and the budget
+  has not moved across any of them, which is why the paper's corpus sentence
+  survives all four generations. `LSTM/CORPORA.md` carries the per-generation
+  detail; the three facts that belong in an index are these.
+
+  **v3 is not merely superseded, it is wrong**, for the ‹щ› reason recorded
+  above. Anything computed on it can be compared with the earlier arms and
+  with nothing after it.
+
+  **v6 is the first generation where every language's manifest pins its own
+  `output_sha256`** and names the normaliser that produced it — a
+  `NormalizationRecord` carrying the Unicode version, the format-character
+  category stripped, and a digest of the fold table. Before that, a corpus
+  could be re-cleaned under a changed normaliser with nothing recording it.
+
+  **Five of the eight v6 corpora came out byte-identical to v5 through a
+  fresh download**, which is the evidence that the pipeline reproduces end to
+  end. The three that did not — fi, tr, kk — are archives that no longer
+  reproduce from their own recorded parameters: 0, 1 and 10 lines of 10,000
+  match a fresh pull. A line count cannot see that, because all three have
+  exactly the 10,000 lines their manifests claim, and a line count is how
+  this was first (wrongly) concluded to affect kk alone. Only those three
+  were retrained; the other five checkpoints are reused, which is sound only
+  because training here reproduces bitwise (below).
 
   `overleaf-tu-paper/LM_MI_LSA_template.tex` states 11,658,775 with Uzbek
   binding — v3, and `train_v3.log` used it too. Meanwhile
