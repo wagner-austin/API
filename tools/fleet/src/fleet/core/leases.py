@@ -55,7 +55,7 @@ def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
             be read is a file whose claims cannot be honoured, and treating
             it as empty would hand out a resource somebody holds.
     """
-    if not path.is_file():
+    if not _test_hooks.file_exists(path):
         return ()
     raw = load_json_str(_test_hooks.read_text(path))
     if not isinstance(raw, list):

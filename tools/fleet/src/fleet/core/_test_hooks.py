@@ -116,6 +116,23 @@ class AppendTextProtocol(Protocol):
         """
 
 
+class FileExistsProtocol(Protocol):
+    """Reports whether a path names an existing regular file."""
+
+    def __call__(self, path: pathlib.Path) -> bool:
+        """Test a path.
+
+        Args:
+            path: Absolute path to test.
+
+        Returns:
+            True when the path exists and is a regular file. A directory at
+            that path is False rather than an error: the caller's next act
+            would be to read it, and letting that fail with its own message
+            is better than inventing one here.
+        """
+
+
 class WriteTextProtocol(Protocol):
     """Replaces a file's whole contents, creating it if absent."""
 
@@ -194,6 +211,18 @@ def _default_append_text(path: pathlib.Path, line: str) -> None:
         handle.write(line + "\n")
 
 
+def _default_file_exists(path: pathlib.Path) -> bool:
+    """Report whether a real path names an existing file.
+
+    Args:
+        path: Absolute path to test.
+
+    Returns:
+        True when the path exists and is a regular file.
+    """
+    return path.is_file()
+
+
 def _default_write_text(path: pathlib.Path, text: str) -> None:
     """Replace a real file's contents.
 
@@ -208,6 +237,7 @@ def _default_write_text(path: pathlib.Path, text: str) -> None:
 run: RunProtocol = _default_run
 now: NowProtocol = _default_now
 read_text: ReadTextProtocol = _default_read_text
+file_exists: FileExistsProtocol = _default_file_exists
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
 
@@ -215,11 +245,13 @@ write_text: WriteTextProtocol = _default_write_text
 __all__ = [
     "AppendTextProtocol",
     "CommandResult",
+    "FileExistsProtocol",
     "NowProtocol",
     "ReadTextProtocol",
     "RunProtocol",
     "WriteTextProtocol",
     "append_text",
+    "file_exists",
     "now",
     "read_text",
     "run",

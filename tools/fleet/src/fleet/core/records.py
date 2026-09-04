@@ -44,7 +44,7 @@ def _read_lines(path: pathlib.Path) -> tuple[tuple[int, JSONValue], ...]:
             Blank lines are skipped because a trailing newline is normal;
             nothing else is.
     """
-    if not path.is_file():
+    if not _test_hooks.file_exists(path):
         return ()
     numbered: list[tuple[int, JSONValue]] = []
     for index, line in enumerate(_test_hooks.read_text(path).splitlines(), start=1):

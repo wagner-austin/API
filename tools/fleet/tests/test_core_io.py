@@ -136,6 +136,26 @@ class TestDefaultHooks:
 
         assert _test_hooks._default_read_text(path) == "line"
 
+    def test_file_exists_distinguishes_a_file_from_absence(self, tmp_path: pathlib.Path) -> None:
+        """The record files are created by their first write.
+
+        So "absent" is the ordinary first-run state and has to be
+        distinguishable from "present and empty" without reading anything.
+        """
+        present = tmp_path / "ledger.jsonl"
+        present.write_text("", encoding="utf-8")
+
+        assert _test_hooks._default_file_exists(present)
+        assert not _test_hooks._default_file_exists(tmp_path / "absent.jsonl")
+
+    def test_a_directory_is_not_a_file(self, tmp_path: pathlib.Path) -> None:
+        """A workspace pointing its ledger at a directory reads as absent here.
+
+        The failure then comes from the write, with its own message, rather
+        than from an invented one at the read.
+        """
+        assert not _test_hooks._default_file_exists(tmp_path)
+
 
 class TestLedgerRecords:
     def test_an_absent_ledger_is_empty(self, tmp_path: pathlib.Path) -> None:

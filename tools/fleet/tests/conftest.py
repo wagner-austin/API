@@ -20,7 +20,6 @@ the case that never breaks.
 
 from __future__ import annotations
 
-import pathlib
 from collections.abc import Generator, Sequence
 
 import pytest
@@ -144,18 +143,6 @@ def _restore() -> None:
     _test_hooks.run = _test_hooks._default_run
     _test_hooks.now = _test_hooks._default_now
     _test_hooks.read_text = _test_hooks._default_read_text
+    _test_hooks.file_exists = _test_hooks._default_file_exists
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text
-
-
-@pytest.fixture(name="workspace_dir")
-def _workspace_dir(tmp_path: pathlib.Path) -> pathlib.Path:
-    """A directory to hold a workspace document and its three records.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-
-    Returns:
-        The directory.
-    """
-    return tmp_path
