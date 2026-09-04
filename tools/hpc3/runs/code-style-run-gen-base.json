@@ -1,6 +1,10 @@
 {
   "project": "code-style",
   "name": "gen-v1-base",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
   "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 modeltrainer-continuations --spec /pub/wagnera3/code-style/specs/code-style-gen-v1-base.json --out-dir /pub/wagnera3/code-style/generated/base --record /pub/wagnera3/code-style/results/gen-v1-base.json",
   "artifact": "/pub/wagnera3/code-style/generated/base",
   "experiment": {
@@ -11,6 +15,8 @@
     "max_new_tokens": "1536",
     "batch_size": "32",
     "seed": "0",
-    "holdout": "code-corpus-v1.holdout-73b16b01"
+    "holdout": "code-corpus-v1.holdout-73b16b01",
+    "card": "A30",
+    "card_reason": "both-arms-must-share-a-card-model-or-the-pairing-is-confounded;free-gpu-has-8-A100s-against-64-A30s"
   }
 }
