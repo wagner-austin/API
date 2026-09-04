@@ -1,0 +1,71 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-me",
+  "files": [
+    {
+      "name": "api-monorepo.md",
+      "sha256": "cf6de2f23a4c53c487d907f46e106d058aa33b086b8916a1f7e3b4d9826f66c0",
+      "size_bytes": 4318
+    },
+    {
+      "name": "cleargbm.md",
+      "sha256": "09470455e98ad57c782e49edc0900c37e839950e6f355ed1e20e83e4243fa1c9",
+      "size_bytes": 4939
+    },
+    {
+      "name": "covenant-radar.md",
+      "sha256": "7336ae8134a5d4d1fe9b529d7a30d0d539c7066b2521dea3da5a4350eb47eb8a",
+      "size_bytes": 5060
+    },
+    {
+      "name": "hpc3-cli.md",
+      "sha256": "5b47c1929f38fbc878736644ef5b6909d82929a8890d1075e708c3958a1872bb",
+      "size_bytes": 5019
+    },
+    {
+      "name": "lightgbm-contributions.md",
+      "sha256": "499cc1cd7c3095a0f05e57cb96c3822109069f3ab8d910cdcf3df1aed2ba03d1",
+      "size_bytes": 4906
+    },
+    {
+      "name": "links.md",
+      "sha256": "1deff758639855bf952781ba9b9b050121cdd252536b53af50249c7d853a52e7",
+      "size_bytes": 6698
+    },
+    {
+      "name": "public-dashboards.md",
+      "sha256": "3ec3f37321f5ffd8bf861fbd41523dbb1173387bd06a4430533c93d7a24ffb30",
+      "size_bytes": 4206
+    },
+    {
+      "name": "rustedwarfarebot.md",
+      "sha256": "a0c268a4c22177772ac70eb929d3b9b2e262af053c18a064f277043cc9a33aa8",
+      "size_bytes": 5751
+    },
+    {
+      "name": "smaller-public-work.md",
+      "sha256": "b9ee1298bc4ac3ddfde667952bf0df8c659b62b73988c92513ffac60597a55e9",
+      "size_bytes": 3463
+    },
+    {
+      "name": "tankpitbot.md",
+      "sha256": "edb61b7e7d60b3484f29f70cce325d6d89f4ba3645202bfda0e83f5fc1ff2a60",
+      "size_bytes": 8232
+    },
+    {
+      "name": "turkic-mutual-intelligibility.md",
+      "sha256": "0be953ca9dda5f2efb8193af43acae29b29df6e460be11ff16bc28557f91a791",
+      "size_bytes": 7140
+    },
+    {
+      "name": "uci-phonotactic-calculator.md",
+      "sha256": "cf377b4ab2fbc1f060fc092d9b411f88a98f4af5e601a13098ac4f5966157ce5",
+      "size_bytes": 2454
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/me-wiki/pages",
+    "selection": "every page whose frontmatter carries visibility: public",
+    "why": "the corpus the cartridge is trained on and scored against",
+    "note": "PUBLIC pages only. The other 21 pages in that directory are not published and are deliberately absent."
+  }
+}

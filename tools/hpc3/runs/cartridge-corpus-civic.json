@@ -1,0 +1,51 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-civic",
+  "files": [
+    {
+      "name": "americans4hindus-pac.md",
+      "sha256": "f8e6e7dd69b863dade0a65a8997f9bed904151ed902bab9efe4fcfa0504b5d5c",
+      "size_bytes": 6322
+    },
+    {
+      "name": "anaheim-atid-worker-housing.md",
+      "sha256": "20ffe46720b90d5dfcd4b0745f7e180e160a398a8faeb6729339e93795457299",
+      "size_bytes": 15037
+    },
+    {
+      "name": "anaheim-beacon-economics-study.md",
+      "sha256": "6f85b3df53916744cfd6cbd024f33e1150e48df637f41a4746b00a72a3f1c5a6",
+      "size_bytes": 14342
+    },
+    {
+      "name": "anaheim-hotel-worker-protection-ordinance.md",
+      "sha256": "4c2c22b5c90cf998cb23b0925f3cbfc7cfb0ff7e9ec923399c6e4e7aa4bdde11",
+      "size_bytes": 11691
+    },
+    {
+      "name": "anaheim-measure-a-2023.md",
+      "sha256": "6944fb7a953bec40d110b3461e02f5737d53ef6a8f7d829769244af8d89eabaf",
+      "size_bytes": 15945
+    },
+    {
+      "name": "anaheim-measure-l-2018.md",
+      "sha256": "32d63555c93e842dedcbe08579a10b20837f3db6a2086ff70e5c514299a05759",
+      "size_bytes": 25834
+    },
+    {
+      "name": "anaheim-park-dedication-in-lieu.md",
+      "sha256": "f93e91062dba3f549d8de55e3b4e39be8697236055bb67bb74e6c2926f0c0637",
+      "size_bytes": 59899
+    },
+    {
+      "name": "bartholomew-v-parking-concepts-alpr.md",
+      "sha256": "798c1174aca929e20832454c654c18733c7f7840fd8214ce06ee1a88a19733b0",
+      "size_bytes": 9009
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/MCPs/brief-generator/wiki/pages",
+    "selection": "first 8 pages in filename order",
+    "why": "the UNRELATED second corpus the composition arm needs. Composing two cartridges trained on two halves of one corpus measured 94% retention and the number was an artifact -- each half already predicted the other.",
+    "note": "Municipal-government prose, a different domain from the me-wiki's software/ML career prose. Measured: each cartridge is HARMFUL on the other's held-out text, so the two corpora are genuinely disjoint."
+  }
+}

@@ -1,0 +1,32 @@
+# Published digests of the cartridge measurement corpora.
+#
+# Read by `hpc3-stage --expect-from`. Its job is to refuse a corpus
+# re-derived from a different wiki state: those bytes hash differently
+# and their digests are not in this file.
+#
+# Format is a sha256sum listing only by convention -- the reader takes
+# every 64-character lowercase-hex token it finds anywhere in the text.
+
+# me-wiki, pages with frontmatter `visibility: public`
+cf6de2f23a4c53c487d907f46e106d058aa33b086b8916a1f7e3b4d9826f66c0  api-monorepo.md
+09470455e98ad57c782e49edc0900c37e839950e6f355ed1e20e83e4243fa1c9  cleargbm.md
+7336ae8134a5d4d1fe9b529d7a30d0d539c7066b2521dea3da5a4350eb47eb8a  covenant-radar.md
+5b47c1929f38fbc878736644ef5b6909d82929a8890d1075e708c3958a1872bb  hpc3-cli.md
+499cc1cd7c3095a0f05e57cb96c3822109069f3ab8d910cdcf3df1aed2ba03d1  lightgbm-contributions.md
+1deff758639855bf952781ba9b9b050121cdd252536b53af50249c7d853a52e7  links.md
+3ec3f37321f5ffd8bf861fbd41523dbb1173387bd06a4430533c93d7a24ffb30  public-dashboards.md
+a0c268a4c22177772ac70eb929d3b9b2e262af053c18a064f277043cc9a33aa8  rustedwarfarebot.md
+b9ee1298bc4ac3ddfde667952bf0df8c659b62b73988c92513ffac60597a55e9  smaller-public-work.md
+edb61b7e7d60b3484f29f70cce325d6d89f4ba3645202bfda0e83f5fc1ff2a60  tankpitbot.md
+0be953ca9dda5f2efb8193af43acae29b29df6e460be11ff16bc28557f91a791  turkic-mutual-intelligibility.md
+cf377b4ab2fbc1f060fc092d9b411f88a98f4af5e601a13098ac4f5966157ce5  uci-phonotactic-calculator.md
+
+# brief-generator/wiki, first 8 pages in filename order
+f8e6e7dd69b863dade0a65a8997f9bed904151ed902bab9efe4fcfa0504b5d5c  americans4hindus-pac.md
+20ffe46720b90d5dfcd4b0745f7e180e160a398a8faeb6729339e93795457299  anaheim-atid-worker-housing.md
+6f85b3df53916744cfd6cbd024f33e1150e48df637f41a4746b00a72a3f1c5a6  anaheim-beacon-economics-study.md
+4c2c22b5c90cf998cb23b0925f3cbfc7cfb0ff7e9ec923399c6e4e7aa4bdde11  anaheim-hotel-worker-protection-ordinance.md
+6944fb7a953bec40d110b3461e02f5737d53ef6a8f7d829769244af8d89eabaf  anaheim-measure-a-2023.md
+32d63555c93e842dedcbe08579a10b20837f3db6a2086ff70e5c514299a05759  anaheim-measure-l-2018.md
+f93e91062dba3f549d8de55e3b4e39be8697236055bb67bb74e6c2926f0c0637  anaheim-park-dedication-in-lieu.md
+798c1174aca929e20832454c654c18733c7f7840fd8214ce06ee1a88a19733b0  bartholomew-v-parking-concepts-alpr.md
