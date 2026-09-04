@@ -1,7 +1,8 @@
 ---
 title: Step three at Impossible -- what a learned head may drive, and what it may not
 tags: [impossible, learning, design]
-related: [[impossible-economy-problem]], [[harness-population-search]], [[policy-exact-timing]]
+hubs: [bot-architecture]
+related: ["[[impossible-economy-problem]]", "[[harness-population-search]]", "[[policy-exact-timing]]"]
 sources: [wiki/log.md 2026-09-04, src/rw_bot/policy/doom.py, runs/sweeps/impstrike48, models/fleetdoom.ndjson]
 fact_checked: 2026-09-04
 confidence: high
