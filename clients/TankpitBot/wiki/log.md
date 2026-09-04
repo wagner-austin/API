@@ -6112,3 +6112,31 @@ Not a real gap either. The suspect was `browser/lifecycle.py`, which had just ga
 They are inert — each run reads only its own `COVERAGE_FILE`, so they cannot affect a number. But `run-tests.ps1` says "the pre-run sweep is the thing that cleans wreckage", and the pre-run sweep is `reap-test-processes.ps1`, which reaps **processes**. Nothing reaps coverage fragments, so the stated cleanup for them does not exist. Left in place rather than deleted — they are somebody's build output in a gitignored directory, and 72 MB is not urgent.
 
 Gate: 6938 passed, 100.00% statements AND branches, verified directly.
+
+## [2026-09-04] verification | The composition prior observed live, in the container, plus rows 1-13 holding
+
+First live observation of the 2026-09-03 frontier composition prior,
+from the fleet container's own artifact (`demo-1`, Artax, Practice,
+23 min, release `v0.1.0-76a0f62b`, the first release whose container
+bots actually play after `06c59cf0`). Instrumented with the same
+script as the earlier validations:
+
+- **26 frontier journeys → 26 unique blocks, zero re-targets** — the
+  staleness circuit intact under the new ranking.
+- **Equipment fraction of post-frontier gains 0.45**, against 0.39
+  (16-min) and 0.24 (7-min) in the two pre-prior September runs.
+  Directionally what the prior buys; single runs, so
+  consistent-with, not proof.
+- Rows 1-13 held in the container: radar redundancy 6% (baseline
+  49%), `progress_stalled` 0, scope reversals 2/24, 10 kills,
+  teardown clean (returncode 0), and the enumerated releases
+  (`relocated` 2, `superior_candidate` 7) live on the wire.
+- **Two breaks at 1100 fuel are the law WORKING, not the 2026-09-01
+  regression shape**: measured 72/tick over 8 confirmed in-window
+  hits projected 272 and −96 against floor 379 — an unwinnable-rate
+  fight walked away from, where the flagged break was a winnable
+  fight (rate 54, projection above the correctly-scaled floor)
+  killed by a lieutenant-tuned floor at private.
+
+Artifact: `tankpit-releases/v0.1.0-76a0f62b/clients/TankpitBot/`
+`runs/bot/demo-1/bot-20260904-022739.events.jsonl`.
