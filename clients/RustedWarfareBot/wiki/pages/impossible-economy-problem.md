@@ -129,7 +129,24 @@ identical to control in every match that ever carried them. Five
 thousand opens in 9 of 12 matches but only for slivers (0-39 open
 samples of thousands; zero in a quarter of matches), which reframes
 strike5000's refutation as substantially "the window barely ever
-opened". The calibrated band no arm has ever tested is **2,000-3,000**:
+opened". The calibrated band no arm had ever tested was **2,000-3,000**:
 open in every match, with real dwell time. Rebuild stays closed -- its
 flat brackets (always-open 0 and mostly-shut 5000) pin the band between
-them -- but the strike release gets its first in-band arm.
+them.
+
+## Class 3 measured closed WITH the mechanism firing (impstrike48)
+
+The in-band arms ran the same day: strike 2500 and 4000 vs the
+champion's 0 on 48 shared fresh seeds. This time the release provably
+happened -- the traces carry `S` events in **48 of 48** s2500 matches
+(window open 100-189 samples in the deepest), 33 of 48 at s4000, zero
+in control -- and the outcome did not move: **paired margins +0.075 /
++0.080 (sd ~0.65), survival medians 3,165/3,028/3,286, zero wins
+anywhere.** Releasing the horde into a genuinely broken wave neither
+extends survival nor converts anything: the wave that broke is replaced
+faster than the release can spend the gap. All three named roads --
+denial, rebuild-as-designed, strike-window -- are now closed on
+measurements where each mechanism verifiably engaged. What remains is
+not a knob: the subsidy's compounding outruns every single-verb answer
+the current vocabulary can express, and the next road must be a
+structurally different way to play the rung.
