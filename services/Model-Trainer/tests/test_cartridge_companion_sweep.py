@@ -29,6 +29,7 @@ from model_trainer.core.services.model.cartridge_plans import (
     COMPANION_SWEEP_EXPERIMENT,
     COMPANION_SWEEP_PLANS,
     CompanionSweepPlan,
+    companion_sweep_label,
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
@@ -304,6 +305,34 @@ class TestRunRecord:
 class TestHookDefault:
     def test_the_production_hook_serves_the_declared_table(self) -> None:
         assert measurement_hooks._default_companion_sweep_plans() is COMPANION_SWEEP_PLANS
+
+
+class TestProductionPlans:
+    def test_the_n8_plan_matches_the_recorded_grid_on_every_shared_field(self) -> None:
+        """The n8 row subtracts against the recorded grid only if the shared
+        fields are identical -- a drifted window or schedule would compare
+        numbers no run produced."""
+        base = COMPANION_SWEEP_PLANS["gpt2-companions"]
+        extended = COMPANION_SWEEP_PLANS["gpt2-companions-n8"]
+        assert extended["compartment_counts"] == (8,)
+        assert extended["probabilities"] == (0.25, 0.5)
+        assert extended["model_id"] == base["model_id"]
+        assert extended["window"] == base["window"]
+        assert extended["held_out_stride"] == base["held_out_stride"]
+        assert extended["slots"] == base["slots"]
+        assert extended["seeds"] == base["seeds"]
+        assert extended["epochs"] == base["epochs"]
+        assert extended["learning_rate"] == base["learning_rate"]
+
+    def test_the_n8_label_cannot_collide_with_the_recorded_one(self) -> None:
+        label = companion_sweep_label(
+            "gpt2-companions-n8",
+            COMPANION_SWEEP_PLANS["gpt2-companions-n8"],
+            digest="0" * 64,
+        )
+        assert label.startswith(
+            "gpt2-companions-n8-gpt2-w256-s4-e12-lr0.01-n8-c64-p0.25.0.5-seeds7.8.9-"
+        )
 
 
 def _argv(tmp_path: pathlib.Path, *, others: str) -> list[str]:

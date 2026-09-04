@@ -252,6 +252,26 @@ COMPANION_SWEEP_PLANS: Final[dict[str, CompanionSweepPlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # ``gpt2-companions-n8`` asks the question the recorded grid cannot: the
+    # recipe trains every cartridge beside ONE companion, and at eight
+    # compartments each cartridge meets SEVEN strangers at deployment, so
+    # retention here measures whether single-companion exposure generalises
+    # past the counts it was tuned on. Every shared field matches
+    # ``gpt2-companions`` so its cells subtract against that record and
+    # against ``gpt2-compartments``' naive n8 baseline; p=1.0 is not a row
+    # because the overdose endpoint is already recorded in both kinds and
+    # its solo collapse carries no retention to compare.
+    "gpt2-companions-n8": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (8,),
+        "slots": 64,
+        "probabilities": (0.25, 0.5),
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 
