@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-metabolomics",
+  "files": [
+    {
+      "name": "allwood-2021-targeted-untargeted-plant-metabolomics.md",
+      "sha256": "81f894511de4edae5749e3129fd360811ce2bcaee1af02a867b373059c636df2",
+      "size_bytes": 6690
+    },
+    {
+      "name": "anderson-2001-permanova.md",
+      "sha256": "1c08f61ea390db6f0ab91ac62a73431f0e69db70b37548018b9c2a3e8e5e8ac6",
+      "size_bytes": 9853
+    },
+    {
+      "name": "benjamini-hochberg-1995-fdr.md",
+      "sha256": "45a158335081f9c688de20cf8f193b15da2ada69620c10caf46871563b3a12f7",
+      "size_bytes": 6197
+    },
+    {
+      "name": "bora-sharma-2010-artemisia-genus-review.md",
+      "sha256": "b1dbd09fca5a1968649d0d1ffb2c0abfe4f0b2a63d1cd51a59cf2262078f78ba",
+      "size_bytes": 3091
+    },
+    {
+      "name": "bouvier-brown-2009-bearpex-monoterpenes-sesquiterpenes.md",
+      "sha256": "7592c6140a59e2f75950d25e015b8120c407c1f49e5a77966ed0f3031116181a",
+      "size_bytes": 6209
+    },
+    {
+      "name": "chemodiversity-metrics.md",
+      "sha256": "ae9d0bdd356e793c60627347e6fce57b7c679d3017801114c51a95623e1eb5af",
+      "size_bytes": 5946
+    },
+    {
+      "name": "dejonge-2022-good-practices-annotation-tools.md",
+      "sha256": "bff0e2a6a2d56efbb87ced354b1758c0d8935d1c3dd6c209ecd7d606dd8df791",
+      "size_bytes": 8686
+    },
+    {
+      "name": "dieterle-2006-pqn.md",
+      "sha256": "af3b5d546a2a6098a84a506f1c6fa2e006887647c649a34c566c84c3fb995d48",
+      "size_bytes": 9780
+    },
+    {
+      "name": "duhrkop-2015-csi-fingerid.md",
+      "sha256": "a749f467943de28efd0000a01d58c648532b7576ae010eec7707de9dcf86811e",
+      "size_bytes": 6199
+    },
+    {
+      "name": "duhrkop-2019-sirius4.md",
+      "sha256": "bcd682c5f4ba7cf74686dfca33a2ddb8668197a97fda2fb0e7665c2dd3bfd500",
+      "size_bytes": 10696
+    },
+    {
+      "name": "duhrkop-2021-canopus-compound-classes.md",
+      "sha256": "d64569fc7738be63f0f60f7388d1cd10aa5e0b6972f9df9c547bb1cff92ec7e6",
+      "size_bytes": 5721
+    },
+    {
+      "name": "emily-truong-uci-css-metabolomics.md",
+      "sha256": "8b71469a3a7fffc9001b294dad08cf5c33decf41ef7ede39237cc2e1be63d21b",
+      "size_bytes": 101685
+    },
+    {
+      "name": "faiola-2012-bvoc-fid-quantification.md",
+      "sha256": "64ab2d9dae44b9fea9b5b1a0570ff1af86f0cd29fe2db4376f248795d05337ed",
+      "size_bytes": 7044
+    },
+    {
+      "name": "faiola-2013-soa-soil-leaf-litter.md",
+      "sha256": "b3ffb697461d5a218c439130716828db8b47a21470d25a67541b87af676e2583",
+      "size_bytes": 9618
+    },
+    {
+      "name": "faiola-2015-biogenic-soa-baseline-herbivory.md",
+      "sha256": "03c3b20b38200d3a2afbf3570c6a84cbd9645b89274771f29655481f91a638a4",
+      "size_bytes": 7741
+    },
+    {
+      "name": "faiola-2015-simulated-herbivory-voc-profiles.md",
+      "sha256": "d9caa8803014c63dc8d19042e4f97594dafff6f27ec6912aba513089a01365b7",
+      "size_bytes": 7489
+    },
+    {
+      "name": "faiola-2018-ptr-tofms-bvoc.md",
+      "sha256": "e90dfc4ea5b873dd273bb8d3bd04739f00e7ac010b7e27896b137d7ebc5b2816",
+      "size_bytes": 6410
+    },
+    {
+      "name": "faiola-2020-insect-herbivory-stress-volatiles-synthesis.md",
+      "sha256": "5bb63c21294cdb77a56eaf516b8372d340108699777469b8ca93c4fb2fc56e4a",
+      "size_bytes": 14789
+    },
+    {
+      "name": "faiola-2022-herbivory-radiative-forcing.md",
+      "sha256": "7d4177f35778045fafdc7dbcd1f3fc4b2c0bd2a100e1602eb14cd2758c057b03",
+      "size_bytes": 9568
+    },
+    {
+      "name": "faiola-2024-soa-photooxidation.md",
+      "sha256": "55c43760e34c14b131fd8a2cfd7de4b73351475bf410f0d422309baeec7ce795",
+      "size_bytes": 7774
+    },
+    {
+      "name": "finks-2021-loma-ridge-plant-community.md",
+      "sha256": "7fd6849c7c985948c0913e4d8dbf61d2b70cc83622a2b11d1bd36049fa951242",
+      "size_bytes": 7341
+    },
+    {
+      "name": "hoffmann-2022-cosmic-confidence.md",
+      "sha256": "fbaf20f84e10f61e31776b30c9a26d0c5efcfbfb980adf38baaa50ea61c98843",
+      "size_bytes": 6847
+    },
+    {
+      "name": "ivanescu-2015-artemisia-sesquiterpene-lactones.md",
+      "sha256": "42aae8ec9b312163c5ce41e8cb35c8c0b6ddc06fae69f583d378e3ad3618a742",
+      "size_bytes": 3682
+    },
+    {
+      "name": "jasmine-uci-tropical-bvoc-thermal-stress.md",
+      "sha256": "d8c13b97b0b16963766bc7b01dd515074aee21213db509ed890a3ce7e638f38e",
+      "size_bytes": 15139
+    },
+    {
+      "name": "kimball-2014-lrgce-css-succession.md",
+      "sha256": "7275dafd78705d9b6674a24ce9f7fbccd4def59303f30f846efa6e5e521d3281",
+      "size_bytes": 6352
+    },
+    {
+      "name": "kind-2013-lipidblast-lipidomics-library.md",
+      "sha256": "93bc888030cd851049d1f1a2201aa72475d4e5c7b43c0a442bd02d438713712c",
+      "size_bytes": 6988
+    },
+    {
+      "name": "li-2013-mummichog-pathway-prediction.md",
+      "sha256": "250217818dc9f0c2782b0d6f0c8033a99e120bf0538583566c01b6a7da92a2d4",
+      "size_bytes": 5357
+    },
+    {
+      "name": "malik-2020-drought-plant-litter-microbial-metabolites.md",
+      "sha256": "dc21f210064989706e551a69fa3229e0c0879be8e1b4592b91e3f1cc982f6a91",
+      "size_bytes": 9451
+    },
+    {
+      "name": "mcdonald-2018-volatile-chemical-products-urban-emissions.md",
+      "sha256": "20576fdf09fae78278bc9adfc9fef8231b7b0b3d9dac1aa9322b2bb8f0648b53",
+      "size_bytes": 7127
+    },
+    {
+      "name": "nault-2021-anthropogenic-voc-soa-mortality.md",
+      "sha256": "c8f8e272518a697e0cc5533cf7ca871555aa74e54c35ff58637c481f647b98d2",
+      "size_bytes": 7440
+    },
+    {
+      "name": "oburger-jones-2018-sampling-root-exudates.md",
+      "sha256": "d447934ea478ccba4197a1bf3329adff777c16bad0b21276c7d75be6566eef45",
+      "size_bytes": 9278
+    },
+    {
+      "name": "pca-fundamentals-for-omics.md",
+      "sha256": "98a856ace95e93b8459e9f9cb2035148e8123cbbd5aef5ceeb7280bc59085b68",
+      "size_bytes": 12628
+    },
+    {
+      "name": "petren-2024-chemodiversity-quantification.md",
+      "sha256": "d467337284786ec9a6a5a32ad4be996fa418bbe7e70987d62b0db9e58818bfdf",
+      "size_bytes": 12024
+    },
+    {
+      "name": "piasecka-2019-plant-metabolomes-stress.md",
+      "sha256": "9837d97cedc86f992074321372d7df798aded7d55304c355c42d8fb06e8a20c4",
+      "size_bytes": 11786
+    },
+    {
+      "name": "pratt-2014-artemisia-californica-latitudinal-chemistry.md",
+      "sha256": "303a51ee90a8875eb1a5d1e8cad78a39d846e06e72e252cdbe3d1b86fe466b17",
+      "size_bytes": 4758
+    },
+    {
+      "name": "riordan-rundel-2009-css-modeling.md",
+      "sha256": "5e8a34869b49c3700feb33d1e9906af2e7d8b39462e32c62092cb49eb09c638c",
+      "size_bytes": 8077
+    },
+    {
+      "name": "schymanski-2014-msi-identification-confidence.md",
+      "sha256": "5eff5c9163a747e038e8d7070ce2a5f0c818b559f798804835de042244f08d00",
+      "size_bytes": 5854
+    },
+    {
+      "name": "shanker-2014-drought-stress-responses-crops.md",
+      "sha256": "24eb92884063297f2c5fc7378f057b287b3b6ffd03d94fbe08887b9e7c1a1d24",
+      "size_bytes": 9012
+    },
+    {
+      "name": "smyth-2004-limma.md",
+      "sha256": "969ee00ec6b7dc5f8e1bfb6ced66a16098e108941b26a945f47908b529ff1b96",
+      "size_bytes": 10677
+    },
+    {
+      "name": "trygg-wold-2002-opls.md",
+      "sha256": "c5570af145f7b7c22fecc794bdd808c07f1a451dbf1f91d3713c09a2210888f2",
+      "size_bytes": 5833
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include metabolomics, sorted by filename, first 40",
+    "why": "diverse-pool member 1 for the content-diverse companion sweep (d2c03dd4); domain disjoint from the primary and every partner; its cleanliness against the primary is MEASURED in-record by the new companion-cross arm, not assumed",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}

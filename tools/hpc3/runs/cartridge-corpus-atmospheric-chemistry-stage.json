@@ -1,0 +1,211 @@
+{
+  "destination": "/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry",
+  "files": [
+    {
+      "name": "abbatt-2019-arctic-aerosol-climate-overview.md",
+      "sha256": "21ba777ae777962961e1eed052703e83192c35ad44c231cbb7f8de20ac5e9d9d",
+      "size_bytes": 6221
+    },
+    {
+      "name": "atkinson-arey-2003-atmospheric-voc-degradation.md",
+      "sha256": "a7e253d4cbdf302727d6c98e10d2336a6abe8c042ab3c9e0fec88103f2756b0e",
+      "size_bytes": 8210
+    },
+    {
+      "name": "bellouin-2019-global-aerosol-radiative-forcing.md",
+      "sha256": "568cad4685bad826ff0d6faf2cc80e013fc5861f269ed0b8fa6586fc2116a28e",
+      "size_bytes": 6791
+    },
+    {
+      "name": "bruggemann-2020-organosulfates-review.md",
+      "sha256": "092cbb09c604a75ea576af2258e2fe679e0a70f9a6b5f2cf48f3f8ad3a10d2e1",
+      "size_bytes": 11635
+    },
+    {
+      "name": "bryant-2020-beijing-anthropogenic-isoprene-soa.md",
+      "sha256": "9313b13f221c110f094dfd6ba2a4a27e94d5b2e359bb51c73de89367968e357a",
+      "size_bytes": 4616
+    },
+    {
+      "name": "cappa-wilson-2011-soa-volatility-evaporation.md",
+      "sha256": "d041f6148a25e49d6d37c35c4deb7891849e958b0319f2992bffff0e4499a396",
+      "size_bytes": 7397
+    },
+    {
+      "name": "chang-2010-kappa-ambient-organic.md",
+      "sha256": "1be1a1ab367ba68a4694209e2a3c6d1ec5fdcd62be698105a5772672684e334d",
+      "size_bytes": 9968
+    },
+    {
+      "name": "coggon-2021-nyc-vcp-dominance.md",
+      "sha256": "f91b479bc57b64f7c51fd598f819b1fbe2096e9fe48757c57f1320fde480b8ec",
+      "size_bytes": 8255
+    },
+    {
+      "name": "croft-2019-arctic-marine-soa.md",
+      "sha256": "72fc7dc494ff17eb837553fdd4add410dc011e57fb488919d8f64847f727a2d9",
+      "size_bytes": 7674
+    },
+    {
+      "name": "ehn-2014-highly-oxidized-multifunctional-soa.md",
+      "sha256": "5e4eae30cedb028e4d4bec72240da103571097e70c91b7957e58ec1286ecaf72",
+      "size_bytes": 6419
+    },
+    {
+      "name": "gao-1989-canopy-turbulent-organized-structure.md",
+      "sha256": "6390e53a37c7edcae51355d8136dc8956a9cfbfe00d910c55d0df641742580da",
+      "size_bytes": 4994
+    },
+    {
+      "name": "gkatzelis-2021-vcp-vs-mobile-soa.md",
+      "sha256": "a3d24400612f46ec822e0cd5e4f93c064be134ba818d2bb2b84410e2e6b0fb09",
+      "size_bytes": 8732
+    },
+    {
+      "name": "gunthe-2009-amazon-ccn.md",
+      "sha256": "d7318f83ff9115e39833a1b8ad1c3013e4053a549d117289ba578a0a7bdb94ed",
+      "size_bytes": 5278
+    },
+    {
+      "name": "hallquist-2009-soa-mechanism-review.md",
+      "sha256": "00b91ed318f397e58bb4dedf3d86c27a2e1dac7c4a52309d7879f274f57155d2",
+      "size_bytes": 7333
+    },
+    {
+      "name": "haywood-boucher-2000-aerosol-radiative-forcing-review.md",
+      "sha256": "afba712bcca04c54a56a7f43a33db58d8d50ab5971c7d852dfe710e77badeb4c",
+      "size_bytes": 4445
+    },
+    {
+      "name": "kenseth-2023-pinene-dimer-esters.md",
+      "sha256": "8ff63f4242d3c2535207eabaec8ea6cdbecb1cde27452302c956949bff589cb8",
+      "size_bytes": 10607
+    },
+    {
+      "name": "khare-2020-asphalt-soa-precursor.md",
+      "sha256": "cd63b9ea5794fc03fff6bf57e7fe8450cb10446b73400832ac6be6d60bc1c4be",
+      "size_bytes": 6511
+    },
+    {
+      "name": "koop-2011-organic-glass-transition-soa.md",
+      "sha256": "c9bb614db0cb56dc59c02cd87a5da28b5a1b47c52684a8cd45eed4d04b802de2",
+      "size_bytes": 7776
+    },
+    {
+      "name": "kroll-seinfeld-2008-soa-review.md",
+      "sha256": "cd271be96fd0099ad43c404d0ef0a1629cbbc8b01a35e213b32fba6fc677be34",
+      "size_bytes": 7106
+    },
+    {
+      "name": "lambe-2011-ccn-chamber-soa.md",
+      "sha256": "bdacf6975e2e77da5cdb42d3d7dc8108622b9827939b80c2901812e2d4713ae8",
+      "size_bytes": 7632
+    },
+    {
+      "name": "laothawornkitkul-2009-bvoc-earth-system.md",
+      "sha256": "999ad8f9e0501e85fcf76b5c96026b1acddcb82bac31b65066548b249212d1b3",
+      "size_bytes": 7105
+    },
+    {
+      "name": "massoli-2010-soa-oxidation-hygroscopicity.md",
+      "sha256": "f32209d9e9c3fdbb6b0332d9937bbe2a198efc78a06289a02e4771b779cca47d",
+      "size_bytes": 6903
+    },
+    {
+      "name": "mcfiggans-2019-mixture-suppresses-soa.md",
+      "sha256": "39b309c0b2dacd63ab9f3c476e73d54118788dc811a7e2e6186f6b5ad42f8ad6",
+      "size_bytes": 5569
+    },
+    {
+      "name": "mcfiggans-2022-nonlinear-mixture-soa.md",
+      "sha256": "ac5339fc15614518a9b141310e2efbce10f2c9197def3c9711bad0eb002a6e4a",
+      "size_bytes": 6190
+    },
+    {
+      "name": "mei-2022-uncrewed-systems-sgp-data.md",
+      "sha256": "c296664721c955d18de1da943c697ae5286c735cabfde8598413f78cba6002e9",
+      "size_bytes": 6472
+    },
+    {
+      "name": "nazaroff-weschler-2004-fragrance-cleaning-indoor.md",
+      "sha256": "a959260a3a9f76b3204a2b03036e9df4cd194d6bcd8ae5a83b5e5ac0bccc4b18",
+      "size_bytes": 9709
+    },
+    {
+      "name": "pajunoja-2023-global-aerosol-hygroscopicity.md",
+      "sha256": "c0b939a6ec87a4340998066c20d5e8706a92f1ad9346495ced6eb484107dc0e1",
+      "size_bytes": 5387
+    },
+    {
+      "name": "petters-kreidenweis-2007-kappa-single-param.md",
+      "sha256": "18ed135036fb5797b8c5ebb4a8a1ddae2e37d4ecc84b48e27265df8eb7377989",
+      "size_bytes": 10398
+    },
+    {
+      "name": "rai-2015-ozone-clothing-ultrafine-particles.md",
+      "sha256": "b1c2d8da3be2973fb078bc26e458cfbf4dc1c556d18b8dd8faf034866b490380",
+      "size_bytes": 7021
+    },
+    {
+      "name": "rickards-2013-kappa-oc-ratio.md",
+      "sha256": "d38e302538407667cb55c6eff83039ac053c4adde73e2f352f95d35e13d1c2be",
+      "size_bytes": 7832
+    },
+    {
+      "name": "rissanen-2014-cyclohexene-ozonolysis-highly-oxidized.md",
+      "sha256": "3fc4c83645828cd944834744ed8ffcb8032eff32e49ef7cde19dd3e1a7ea9d20",
+      "size_bytes": 8149
+    },
+    {
+      "name": "rosenfeld-2014-aerosol-cloud-precipitation.md",
+      "sha256": "1b80df7b37b623a3ea8f7e7b2ec06f2b72f36f0153879f2bed9733d0e92d5c73",
+      "size_bytes": 5588
+    },
+    {
+      "name": "steinemann-2016-fragranced-consumer-products.md",
+      "sha256": "5aaad7736b08921c91c4e8bb023825deb72af3ab70ff6f71b95ee6b6d7f9e6cf",
+      "size_bytes": 8896
+    },
+    {
+      "name": "suda-2014-functional-groups-ccn.md",
+      "sha256": "6bb49c4e49046a951536da2b1e3da52131458b0066cf78d84d7f4d1cbfadf3df",
+      "size_bytes": 8313
+    },
+    {
+      "name": "surratt-2010-iepox-isoprene-soa.md",
+      "sha256": "2f03bf7e02920cc6d25a11ebc215a8f6de795b8a2138acb056a635bd7b033f52",
+      "size_bytes": 8449
+    },
+    {
+      "name": "tham-2016-indoor-air-quality-30-years-review.md",
+      "sha256": "c2673cf22c27d3dfd3e29bef90b5c617464f93f10361c9012607d4027de53582",
+      "size_bytes": 4502
+    },
+    {
+      "name": "wang-2024-bvoc-emissions-2001-2020.md",
+      "sha256": "aefcb29110549c16640481ff60aff4173b0c9b4ebcd5fa1c44e22b659f82e22a",
+      "size_bytes": 6712
+    },
+    {
+      "name": "weschler-nazaroff-2008-semivolatile-indoor.md",
+      "sha256": "808f932c0dfa18495190df8ded8f736de500ca7edf0d4aa462e3338debc63c17",
+      "size_bytes": 7513
+    },
+    {
+      "name": "willis-2017-arctic-marine-aerosol.md",
+      "sha256": "652522b911cbf58896ed9d17649834ffce65b9b7c2969db7824fc7c65fe2989c",
+      "size_bytes": 8757
+    },
+    {
+      "name": "wisthaler-weschler-2010-ozone-skin-oil.md",
+      "sha256": "f5f350e4d057736322f03b2130ba23035023459596751183ec0385186f7fbe2c",
+      "size_bytes": 7816
+    }
+  ],
+  "provenance": {
+    "source": "~/PROJECTS/wiki/pages",
+    "selection": "~/PROJECTS/wiki/pages, every page whose frontmatter hubs include atmospheric-chemistry, sorted by filename, first 40",
+    "why": "diverse-pool member 2 for the content-diverse companion sweep (d2c03dd4); domain disjoint from the primary and every partner; its cleanliness against the primary is MEASURED in-record by the new companion-cross arm, not assumed",
+    "note": "personal research wiki pages; all cited primary sources are published papers, nothing operator-private"
+  }
+}
