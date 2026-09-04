@@ -22,6 +22,23 @@
 #    between spawning a child and assigning it, during which a grandchild could
 #    escape the job.
 #
+#    KNOWN GAP, deliberately left open: this process surviving while the process
+#    that LAUNCHED it is killed. Such a run is above the job, so nothing tears
+#    it down, and the stale sweep's idle gate excludes it because it is still
+#    working -- it simply runs to completion with nobody reading the output.
+#    Seen 2026-09-04: an agent session's wrapper was killed mid-run and 133
+#    processes / 19.2 GB carried on.
+#
+#    Not fixed here, on purpose. A watchdog was built and then removed. It could
+#    not decide on its own WHICH ancestor's death means "abandoned" -- a
+#    synchronous run keeps every ancestor alive until it exits, a deliberately
+#    detached one has a parent that exits immediately by design -- so it had to
+#    be told, which makes it a caller-configured process-killer living inside a
+#    launcher 41 projects share. The cost it was guarding against is also mostly
+#    gone: the harm in that incident came from the run being HUNG, and per-test
+#    timeouts now bound that (see the pytest-timeout blocks in the projects'
+#    pyproject.toml). An abandoned run costs its normal duration, then exits.
+#
 # 2. PRE-RUN SWEEP. Reaps a previous run's wreckage before starting, so a wedged
 #    run cannot silently starve the next one. Gated on age AND on an aggregate CPU
 #    idle check so it can never kill a live run (see reap-test-processes.ps1).
