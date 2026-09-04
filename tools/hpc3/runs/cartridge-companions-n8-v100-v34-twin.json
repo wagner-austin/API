@@ -1,0 +1,34 @@
+{
+  "project": "mi",
+  "name": "cartridge-companions-n8-v100-v34-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v34/abl.sif",
+    "sha256": "cdd1341b58c35f4104fd99a667d21874224f2814eede94d301da99f26025ef07",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 180,
+  "mem_gb": 24,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_companion_sweep --plan gpt2-companions-n8 --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --companion-corpus /pub/wagnera3/mi/cartridge/corpus-epi --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-companions-n8-v100-v34-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-companions-n8-v100-v34-twin.json",
+  "experiment": {
+    "measurement": "cartridge-companioned-composition",
+    "plan": "gpt2-companions-n8",
+    "base_model": "gpt2",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "companion_corpus": "epi-held-out-from-all-partners",
+    "seeds": "7.8.9",
+    "image_commit": "acaedbb33695af6933ee4760098d8e5ef3fb6c9a",
+    "local_baseline_n4_trained_p05_composed": "0.3772",
+    "local_baseline_n4_trained_p05_retention": "0.446",
+    "naive_n8_fixed64_retention": "-0.070",
+    "why": "does-single-companion-training-survive-seven-stranger-deployment"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}
