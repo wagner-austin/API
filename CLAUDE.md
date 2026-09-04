@@ -181,10 +181,20 @@ plan doc.
 ## Wiki page discipline (both `code-paths` wikis in this repo)
 
 Enforced by `packages/wiki-check` in the MCPs workspace via `wiki_audit_run` /
-`wiki_audit_page`. Six rules are specific to this contract, five of them fatal:
+`wiki_audit_page`. Seven rules are specific to this contract, six of them fatal:
 `source-path-exists`, `source-path-line-anchor`, `git-blob-hash-pin`,
-`claude-md-anchor-exists`, `memory-file-exists` (errors) and
-`code-citation-symbol-at-line` (warning). ~40 universal rules run too.
+`claude-md-anchor-exists`, `memory-file-exists`, `doc-citation-section-at-line`
+(errors) and `code-citation-symbol-at-line` (warning). ~40 universal rules run
+too.
+
+Two of those govern citations in the page BODY, not the frontmatter, and
+between them they are what stops a footnote from quietly going stale:
+`code-citation-symbol-at-line` checks a citation naming a CODE file, a line and
+a symbol; `doc-citation-section-at-line` (added 2026-09-04) checks one naming a
+MARKDOWN file, a line and a `§ "Section"`. Prefer citing a section by name over
+a bare line number — a line number in a document several hands edit is
+invalidated by any insert above it, and the section name is what makes the
+citation checkable at all.
 
 - **Every page declares `source_paths:`** — repo paths relative to that
   wiki's `workspaceRoot`, which must resolve at audit time.
