@@ -114,6 +114,24 @@ class CudaDriverVersionProto(Protocol):
         ...
 
 
+class SdpaCudaEligibilityProto(Protocol):
+    """Protocol for the sdpa_cuda_eligibility hook.
+
+    A seam rather than a direct call because asking is not free of side
+    effects: torch 2.7's ``can_use_cudnn_attention`` initializes the CUDA
+    context even when the operands live on the CPU, which is fatal on a
+    host whose driver cannot satisfy the runtime. Callers gate on the
+    operands being CUDA tensors; the hook exists so a test can prove the
+    gate holds without owning such a host.
+    """
+
+    def __call__(
+        self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+    ) -> dict[str, bool]:
+        """Ask torch which fused CUDA backends could serve this call."""
+        ...
+
+
 class ModelDirProto(Protocol):
     """Protocol for model_dir hook."""
 

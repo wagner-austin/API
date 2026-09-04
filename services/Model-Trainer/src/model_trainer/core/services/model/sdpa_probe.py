@@ -30,12 +30,13 @@ from contextlib import AbstractContextManager
 from typing import Final
 
 import torch
-import torch.backends.cuda as backends_cuda
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from typing_extensions import TypedDict
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.services.model.sdpa_shapes import (
     BACKEND_KEYS,
+    ELIGIBLE_KEYS,
     SDPA_SEED,
     SdpaShape,
 )
@@ -200,12 +201,14 @@ def sdpa_eligibility(
     Returns:
         One entry per key in :data:`~sdpa_shapes.ELIGIBLE_KEYS`.
     """
-    params = backends_cuda.SDPAParams(query, key, value, None, 0.0, True, False)
-    return {
-        "flash": backends_cuda.can_use_flash_attention(params),
-        "efficient": backends_cuda.can_use_efficient_attention(params),
-        "cudnn": backends_cuda.can_use_cudnn_attention(params),
-    }
+    if not query.is_cuda:
+        # Answered without asking: the fused backends serve CUDA tensors
+        # only, and under torch 2.7 ``can_use_cudnn_attention`` initialises
+        # a CUDA context even for CPU operands -- fatal on a host whose
+        # driver cannot satisfy the runtime, such as the CPU nodes that
+        # build and smoke-test images.
+        return dict.fromkeys(ELIGIBLE_KEYS, False)
+    return _test_hooks.sdpa_cuda_eligibility(query, key, value)
 
 
 def default_digest(

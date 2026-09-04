@@ -19,6 +19,8 @@ import pytest
 import torch
 from torch.nn.attention import SDPBackend
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._hook_defaults_cuda import _default_sdpa_cuda_eligibility
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.services.model.sdpa_probe import (
     BACKENDS,
@@ -210,6 +212,65 @@ class TestEligibility:
             "efficient": False,
             "cudnn": False,
         }
+
+    def test_cpu_operands_never_reach_the_cuda_eligibility_apis(self) -> None:
+        """torch 2.7's can_use_cudnn_attention initialises CUDA even for CPU
+        operands, so on a driverless host the consultation itself is the
+        crash. Measured 2026-09-04: image build 55747880 (torch 2.7.1+cu128)
+        died with "CUDA driver version is insufficient" inside this exact
+        call, on a CPU probe that torch 2.6 answered quietly."""
+        consulted: list[str] = []
+
+        def raising_eligibility(
+            query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+        ) -> dict[str, bool]:
+            consulted.append("consulted")
+            raise AssertionError("CUDA eligibility consulted for CPU operands")
+
+        original = _test_hooks.sdpa_cuda_eligibility
+        _test_hooks.sdpa_cuda_eligibility = raising_eligibility
+        try:
+            query, key, value = sdpa_operands(TINY, "cpu")
+            answered = sdpa_eligibility(query, key, value)
+        finally:
+            _test_hooks.sdpa_cuda_eligibility = original
+
+        assert consulted == []
+        assert answered == dict.fromkeys(ELIGIBLE_KEYS, False)
+
+    def test_cuda_operands_are_answered_by_the_consultation(self) -> None:
+        """The gate's other arm, on the GPU this suite runs beside: CUDA
+        operands reach the consultation hook, and its answer passes through
+        unchanged."""
+        sentinel = {"flash": True, "efficient": False, "cudnn": True}
+        seen: list[tuple[bool, bool, bool]] = []
+
+        def recording_eligibility(
+            query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+        ) -> dict[str, bool]:
+            seen.append((query.is_cuda, key.is_cuda, value.is_cuda))
+            return dict(sentinel)
+
+        original = _test_hooks.sdpa_cuda_eligibility
+        _test_hooks.sdpa_cuda_eligibility = recording_eligibility
+        try:
+            query, key, value = sdpa_operands(TINY, "cuda")
+            answered = sdpa_eligibility(query, key, value)
+        finally:
+            _test_hooks.sdpa_cuda_eligibility = original
+
+        assert seen == [(True, True, True)]
+        assert answered == sentinel
+
+    def test_the_production_consultation_answers_false_for_cpu_operands(self) -> None:
+        """The gate does not change the answer, only who computes it: asked
+        directly (as CUDA operands would ask it), torch itself rules every
+        fused backend out for CPU tensors on a host whose driver works."""
+        query, key, value = sdpa_operands(TINY, "cpu")
+
+        assert _default_sdpa_cuda_eligibility(query, key, value) == dict.fromkeys(
+            ELIGIBLE_KEYS, False
+        )
 
 
 class TestOneWholeMeasurement:

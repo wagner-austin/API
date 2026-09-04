@@ -546,7 +546,7 @@ def test_default_torch_cuda_max_memory_allocated_direct() -> None:
     The function has a guard that checks torch.cuda.is_available() directly,
     so it's safe to call regardless of CUDA hardware presence.
     """
-    from model_trainer.core._hook_defaults import (
+    from model_trainer.core._hook_defaults_cuda import (
         _default_torch_cuda_max_memory_allocated,
     )
 
@@ -561,7 +561,7 @@ def test_default_torch_cuda_reset_peak_memory_stats_direct() -> None:
     The function has a guard that checks torch.cuda.is_available() directly,
     so it's safe to call regardless of CUDA hardware presence.
     """
-    from model_trainer.core._hook_defaults import (
+    from model_trainer.core._hook_defaults_cuda import (
         _default_torch_cuda_reset_peak_memory_stats,
     )
 
@@ -578,7 +578,7 @@ def test_default_torch_cuda_memory_hooks_run_against_real_torch() -> None:
     """
     import torch
 
-    from model_trainer.core._hook_defaults import (
+    from model_trainer.core._hook_defaults_cuda import (
         _default_torch_cuda_max_memory_allocated,
         _default_torch_cuda_reset_peak_memory_stats,
     )

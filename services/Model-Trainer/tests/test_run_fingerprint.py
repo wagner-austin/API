@@ -30,10 +30,10 @@ from platform_ml import TORCH_STACK
 
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_defaults import (
-    _default_cuda_driver_version,
     _default_host_probe,
     _default_installed_version,
 )
+from model_trainer.core._hook_defaults_cuda import _default_cuda_driver_version
 from model_trainer.core.run_fingerprint import (
     CUDA_DEVICE,
     FINGERPRINT_DISTRIBUTIONS,

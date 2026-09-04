@@ -20,9 +20,6 @@ from model_trainer.core._hook_defaults import (
     _default_corpus_cache_cleanup_service_factory,
     _default_corpus_fetcher_factory,
     _default_count_model_parameters,
-    _default_cuda_device_name,
-    _default_cuda_driver_version,
-    _default_cuda_is_available,
     _default_datetime_utcnow_iso,
     _default_dump_json_str,
     _default_env_git_commit,
@@ -65,6 +62,12 @@ from model_trainer.core._hook_defaults import (
     _default_time_wall_clock,
     _default_tokenizer_cleanup_service_factory,
     _default_tokenizer_enqueue,
+)
+from model_trainer.core._hook_defaults_cuda import (
+    _default_cuda_device_name,
+    _default_cuda_driver_version,
+    _default_cuda_is_available,
+    _default_sdpa_cuda_eligibility,
     _default_torch_cuda_get_rng_state_all,
     _default_torch_cuda_max_memory_allocated,
     _default_torch_cuda_reset_peak_memory_stats,
@@ -124,6 +127,7 @@ from model_trainer.core._hook_protocols_ml import (
     PinTorchThreadsProto,
     ReloadShippedWeightsProto,
     SampleTokenProto,
+    SdpaCudaEligibilityProto,
     SplitCorpusProto,
     SpmDecodeIdsProto,
     SpmEncodeIdsProto,
@@ -270,6 +274,8 @@ cuda_is_available: CudaIsAvailableProto = _default_cuda_is_available
 cuda_device_name: CudaDeviceNameProto = _default_cuda_device_name
 
 cuda_driver_version: CudaDriverVersionProto = _default_cuda_driver_version
+
+sdpa_cuda_eligibility: SdpaCudaEligibilityProto = _default_sdpa_cuda_eligibility
 
 env_git_commit: EnvGitCommitProto = _default_env_git_commit
 

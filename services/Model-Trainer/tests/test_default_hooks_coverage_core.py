@@ -13,14 +13,16 @@ from platform_workers.testing import FakeRedisBytesClient
 from model_trainer.core._hook_defaults import (
     _default_artifact_store,
     _default_corpus_fetcher_factory,
-    _default_cuda_device_name,
-    _default_cuda_is_available,
     _default_env_git_commit,
     _default_httpx_client_factory,
     _default_load_settings,
     _default_rq_queue,
     _default_rq_retry,
     _default_service_container_from_settings,
+)
+from model_trainer.core._hook_defaults_cuda import (
+    _default_cuda_device_name,
+    _default_cuda_is_available,
 )
 from model_trainer.core._hook_protocols import ArtifactStoreProto, ServiceContainerProto
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
