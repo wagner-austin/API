@@ -56,8 +56,8 @@ from rw_bot.policy.dispatching import (
     send_tech,
 )
 from rw_bot.policy.doctrine import NAVTILT_OFF, NAVTILT_PREDICTED
-from rw_bot.policy.doom import DoomLatch, DoomModel
 from rw_bot.policy.expander import Expander
+from rw_bot.policy.head import HeadModel
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
 from rw_bot.policy.lurk import Lurker
@@ -70,9 +70,9 @@ from rw_bot.policy.reclaim import Razed
 from rw_bot.policy.recorder import Recorder
 from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, OrderTracker
 from rw_bot.policy.rush import Rusher
-from rw_bot.policy.scoreboard import local_player, rival_income
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
+from rw_bot.policy.sentries import Sentries
 from rw_bot.policy.situation import Closer, Momentum
 from rw_bot.policy.spending import (
     build_plan,
@@ -98,7 +98,8 @@ def play(
     max_workers: int = DEFAULT_MAX_WORKERS,
     counter: bool = False,
     navtilt: int = NAVTILT_OFF,
-    doom: DoomModel | None = None,
+    doom: HeadModel | None = None,
+    brace_model: HeadModel | None = None,
     cover: bool = True,
     intercept: bool = False,
     guard_cap: int = 0,
@@ -222,6 +223,9 @@ def play(
         ladder: How many units each successive wave waits for. Defaults to the
             shipped AI's ([[engine-ai-triggers]]).
         trace: Where to write the per-sample record, or None to keep none.
+        brace_model: The fitted razing head, or None to play unbraced.
+            Armed once, it zeroes the reserve and stands expansion down
+            for the rest of the match. See Doctrine (``brace``).
 
     Returns:
         The match report.
@@ -242,10 +246,9 @@ def play(
     # consumed by recorder.step, so each row carries what was decided in
     # the window it closes (log 2026-08-09).
     pending_events: set[str] = set()
-    # The doom latch: fed the recorder's own figures, scored once at the
-    # model's window, holding its answer for the match (law eight: one
-    # decision for a match-reshaping response). None when mode 3 is off.
-    doom_latch = DoomLatch(doom) if doom is not None and navtilt == NAVTILT_PREDICTED else None
+    # Both prediction latches behind one feed; the navtilt gate on doom
+    # stays here because which modes exist is the doctrine's business.
+    sentries = Sentries(doom if navtilt == NAVTILT_PREDICTED else None, brace_model, profiles)
     waves = WaveController(
         ladder,
         intercept=intercept,
@@ -260,8 +263,7 @@ def play(
     lurkers = Lurker()
     scatter = Decoys()
     momentum = Momentum()
-    # Pools taken from us, read by the expander's rebuild gate; observed
-    # unconditionally like momentum (:mod:`rw_bot.policy.reclaim`).
+    # Pools taken from us, for the rebuild gate (:mod:`rw_bot.policy.reclaim`).
     razed_pools = Razed()
     quartermaster = Quartermaster(
         medics=medics, navy=navy, bunkers=bunkers, flame=flame, guns=guns, battery=battery
@@ -335,7 +337,10 @@ def play(
             # never reach a decision.
             free = workforce.free(sample)
 
-            budget = Budget(sample["credits"], reserve)
+            # Braced, the reserve floor is zero: the razing is predicted,
+            # so credits stop being long-run money (law eight;
+            # [[impossible-step-three-design]]).
+            budget = Budget(sample["credits"], 0 if sentries.braced else reserve)
 
             plan_step = build_plan(
                 sample,
@@ -383,7 +388,7 @@ def play(
                 # read bloodied -- the two-panel calibration's whole point.
                 fleet_seen.update(fleet_types(threats))
                 bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
-                predicted = doom_latch is not None and doom_latch.armed
+                predicted = sentries.predicted
                 untilted = composition_now
                 composition_now = counter_composition(
                     composition_now, threats, profiles, navtilt, bloodied, predicted
@@ -477,32 +482,28 @@ def play(
             fleet_seen.update(fleet_types(tuple(targets)))
             navy_seen, air_seen = layer_counts(tuple(targets))
             navy_blood = scores.deaths_to(fleet_seen)
-            if doom_latch is not None:
-                pilot = local_player(sample)
-                # The trace's numeric columns, in doom.COLUMNS order: what
-                # the model was fitted on is what the latch is fed, by the
-                # same figures the recorder writes.
-                doom_latch.feed(
-                    (
-                        scores.army_end,
-                        sample["credits"],
-                        scores.targets_end,
-                        scores.extractors_end,
-                        scores.losses_now,
-                        len(capable),
-                        queues_open,
-                        ordered_now,
-                        refused_now,
-                        scores.worth_end,
-                        scores.rival_worth_end,
-                        0 if pilot is None else pilot["income"],
-                        rival_income(sample),
-                        workforce.size(sample),
-                        navy_seen,
-                        air_seen,
-                        navy_blood,
-                    )
-                )
+            if sentries.observe(
+                sample,
+                army=scores.army_end,
+                enemies=scores.targets_end,
+                extractors=scores.extractors_end,
+                losses=scores.losses_now,
+                producers=len(capable),
+                idle=queues_open,
+                orders=ordered_now,
+                refused=refused_now,
+                worth=scores.worth_end,
+                rival_worth=scores.rival_worth_end,
+                workers=workforce.size(sample),
+                navy_seen=navy_seen,
+                air_seen=air_seen,
+                navy_blood=navy_blood,
+            ):
+                # The brace arming edge, once per match; the event lands
+                # in the trace as its own code.
+                expander.enabled = False
+                expander.reason = "braced: razing predicted, expansion stood down"
+                pending_events.add("B")
             recorder.step(
                 sample,
                 scores.army_end,

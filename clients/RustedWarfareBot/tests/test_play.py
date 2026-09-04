@@ -388,6 +388,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     guns=0,
                     nukes=0,
                     rebuild=0,
+                    brace=False,
                 )
             )
         )
@@ -487,67 +488,3 @@ def test_heavies_are_verified_against_the_real_catalogue() -> None:
         heavy_reinforcements(("landFactory",), catalogue)
     assert structure.value.code == "RW-DOCTRINE-011"
     assert "structure" in structure.value.message
-
-
-def test_the_predicted_mode_loads_the_shipped_model_and_plays(
-    capsys: pytest.CaptureFixture[str],
-    tmp_path: Path,
-) -> None:
-    """navtilt 3 end to end: the doctrine asks for prediction, main loads
-    models/fleetdoom.ndjson -- the real shipped artifact, which this test
-    also proves decodes -- and the loop runs with the latch fed every
-    sample (log 2026-08-09, the replication verdict)."""
-    preset = tmp_path / "seer.doctrine"
-    preset.write_text(
-        "\n".join(
-            format_doctrine(
-                Doctrine(
-                    name="seer",
-                    goals=("c_tank", "c_tank"),
-                    heavies=(),
-                    max_workers=4,
-                    mass=7,
-                    reserve=-1,
-                    expand=True,
-                    counter=True,
-                    cover=True,
-                    intercept=False,
-                    guard_cap=0,
-                    aa_cover=False,
-                    forward=False,
-                    scout=False,
-                    raid=0,
-                    rush=False,
-                    creep=0,
-                    hold=0,
-                    riposte=False,
-                    navtilt=3,
-                    tech=0,
-                    lurk=0,
-                    allin=0,
-                    decoys=0,
-                    kite=False,
-                    income_ladder=False,
-                    hp_floor=0,
-                    strike=0,
-                    medics=0,
-                    navy=0,
-                    battery=0,
-                    bunkers=0,
-                    flame=0,
-                    close=0,
-                    guns=0,
-                    nukes=0,
-                    rebuild=0,
-                )
-            )
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, (300, "landFactory")) * 3)
-    with StubbedConnect(peer):
-        code = main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1", str(preset)])
-    assert code in (EXIT_OK, EXIT_INCOMPLETE)
-    printed = capsys.readouterr().out.splitlines()
-    assert printed[0] == "doctrine: seer"

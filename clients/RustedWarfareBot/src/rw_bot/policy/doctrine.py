@@ -98,6 +98,7 @@ FLAG_FIELDS: Final = (
     "riposte",
     "kite",
     "income_ladder",
+    "brace",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -314,6 +315,15 @@ class Doctrine(TypedDict):
             never waits -- on the same wave-break signal the strike
             release reads, because the wave being broken is what makes
             the walk survivable ([[policy-situation]]).
+        brace: Whether the razing head plays. On, the loop scores the
+            fitted model in ``models/razebrace.ndjson`` on a sliding
+            window of the match's own shape and, ONCE, when the razing
+            is predicted, zeroes the reserve and stands expansion down --
+            the credits stop being long-run money because the long run
+            was just foreclosed. The first learned RESPONSE rather than
+            a learned trigger on an existing verb
+            ([[impossible-step-three-design]]); every arm measured
+            before 2026-09-04 played with this off.
         income_ladder: Whether a refused extractor conversion saves toward
             itself. Off is the Impossible measurement: unconditional saving
             doubled income and lost, because the army pauses let the enemy's
@@ -373,6 +383,7 @@ class Doctrine(TypedDict):
     decoys: int
     kite: bool
     income_ladder: bool
+    brace: bool
     hp_floor: int
     strike: int
     medics: int
@@ -428,6 +439,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     decoys=0,
     kite=False,
     income_ladder=False,
+    brace=False,
     hp_floor=0,
     strike=0,
     medics=0,

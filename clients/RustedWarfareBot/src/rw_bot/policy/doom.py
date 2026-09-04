@@ -9,11 +9,14 @@ standardized logistic model over the first 2,000 samples' shape statistics
 reads a fresh tree's matches at AUC 0.75 with precision saturating near
 0.7 (log 2026-08-09, the replication verdict).
 
-This module is that model's whole deployment surface: the file format the
-coefficients ride in, and the watch that recomputes the training features
-in-match. **Train/serve parity is by construction, not by discipline** --
-the exporter that fits the model computes its features through this same
-class, so the arithmetic cannot drift between the dataset and the loop.
+This module is that model's watch: the class that recomputes the training
+features in-match, and the latch that scores once at the window. The file
+format and the scoring rule moved to :mod:`rw_bot.policy.head` when the
+second head arrived -- one decoder for every head, so two deployments
+cannot drift into parallel copies of the same arithmetic. **Train/serve
+parity is by construction, not by discipline**: the exporter that fits the
+model computes its features through this same class, so the arithmetic
+cannot drift between the dataset and the loop.
 
 Pure throughout: values in, a score out. The loop feeds the watch the same
 figures it hands the recorder, which are the same figures the trace files
@@ -23,14 +26,12 @@ carry, which are what the model was fitted on.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
-from typing import Final, TypedDict
+from collections.abc import Sequence
+from typing import Final
 
 from rw_bot import RwBotError
-from rw_bot.validation import require_finite_float, require_int, require_non_empty_str
-from rw_bot.wire.ndjson import parse_object
+from rw_bot.policy.head import HeadModel, score_features
 
-_BAD_SHAPE = "RW-DOOM-001"
 _BAD_FEATURE = "RW-DOOM-002"
 
 #: The per-sample figures the watch consumes, in feed order -- the trace's
@@ -57,73 +58,15 @@ COLUMNS: Final = (
 
 
 class DoomError(RwBotError):
-    """The doom model file could not be read, or the features disagree.
+    """The doom watch was fed or read wrongly.
 
     Args:
-        code: Stable machine-readable identifier.
+        code: ``RW-DOOM-002``, the module's one remaining code: a wrong
+            figure count, or features read before the window closes.
+            Model-file errors moved to :class:`~rw_bot.policy.head.HeadError`
+            with the decoder.
         message: Human-readable description of what was malformed.
     """
-
-
-class DoomModel(TypedDict):
-    """One fitted standardized-logistic model, complete.
-
-    Attributes:
-        window: Samples the watch accumulates before scoring -- the
-            prediction moment the model was fitted at.
-        threshold: Probability at or above which the prediction arms.
-        intercept: The logistic intercept.
-        features: Feature name -> ``(mean, std, coefficient)``, the
-            standardization and weight for each input. Order never
-            matters; features join by name.
-    """
-
-    window: int
-    threshold: float
-    intercept: float
-    features: Mapping[str, tuple[float, float, float]]
-
-
-def decode_doom_model(lines: Sequence[str]) -> DoomModel:
-    """Decode a doom model from its NDJSON lines.
-
-    The first line carries the scalars, every later line one feature.
-
-    Args:
-        lines: The model file's lines, without newline terminators.
-
-    Returns:
-        The validated model.
-
-    Raises:
-        DoomError: ``RW-DOOM-001`` when the head line is malformed or no
-            feature lines follow.
-    """
-    if not lines:
-        raise DoomError(_BAD_SHAPE, "a doom model file cannot be empty")
-    head = parse_object(lines[0])
-    window = require_int(head, "window")
-    if window <= 0:
-        raise DoomError(_BAD_SHAPE, f"the window must be positive, got {window}")
-    threshold = require_finite_float(head, "threshold")
-    intercept = require_finite_float(head, "intercept")
-    features: dict[str, tuple[float, float, float]] = {}
-    for line in lines[1:]:
-        record = parse_object(line)
-        name = require_non_empty_str(record, "name")
-        std = require_finite_float(record, "std")
-        if std <= 0.0:
-            raise DoomError(_BAD_SHAPE, f"feature {name} carries a non-positive std: {std}")
-        features[name] = (
-            require_finite_float(record, "mean"),
-            std,
-            require_finite_float(record, "coef"),
-        )
-    if not features:
-        raise DoomError(_BAD_SHAPE, "a doom model carries at least one feature line")
-    return DoomModel(
-        window=window, threshold=float(threshold), intercept=float(intercept), features=features
-    )
 
 
 class DoomWatch:
@@ -231,7 +174,7 @@ class DoomWatch:
         feats["navy_pressure"] = self._sums[COLUMNS.index("navy_seen")] / n
         return feats
 
-    def score(self, model: DoomModel) -> float:
+    def score(self, model: HeadModel) -> float:
         """Return the doom probability under one model.
 
         Args:
@@ -241,16 +184,12 @@ class DoomWatch:
             The logistic probability of doom.
 
         Raises:
-            DoomError: ``RW-DOOM-002`` before the window closes, or when
-                the model names a feature the watch does not compute.
+            DoomError: ``RW-DOOM-002`` before the window closes.
+            HeadError: ``RW-HEAD-002`` through
+                :func:`~rw_bot.policy.head.score_features` when the model
+                names a feature the watch does not compute.
         """
-        feats = self.features()
-        z = model["intercept"]
-        for name, (mean, std, coef) in model["features"].items():
-            if name not in feats:
-                raise DoomError(_BAD_FEATURE, f"the model names an unknown feature: {name}")
-            z += coef * ((feats[name] - mean) / std)
-        return 1.0 / (1.0 + math.exp(-z))
+        return score_features(model, self.features())
 
 
 class DoomLatch:
@@ -264,7 +203,7 @@ class DoomLatch:
     must be one decision).
     """
 
-    def __init__(self, model: DoomModel) -> None:
+    def __init__(self, model: HeadModel) -> None:
         """Open a latch over one model.
 
         Args:
@@ -294,7 +233,5 @@ __all__ = [
     "COLUMNS",
     "DoomError",
     "DoomLatch",
-    "DoomModel",
     "DoomWatch",
-    "decode_doom_model",
 ]

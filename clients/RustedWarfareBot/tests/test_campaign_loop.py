@@ -12,6 +12,7 @@ from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
 from rw_bot.policy.floor import economy_floor
+from rw_bot.policy.head import decode_head_model
 from rw_bot.policy.match_report import format_report
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.wire.state import Sample
@@ -232,6 +233,27 @@ def test_expansion_can_be_switched_off_entirely() -> None:
     report, peer = run_campaign(world, times=1, expand=False)
     assert verb(peer, "build") == []
     assert report["expand_reason"] == "expansion disabled"
+
+
+def test_the_brace_arming_edge_stands_expansion_down_and_says_so() -> None:
+    """The razing head's response, end to end in miniature: a window-2
+    model with a clearing intercept arms as soon as its photograph fills,
+    and from the edge on the pool is never claimed, the report carries
+    the braced reason, and the reserve floor is zero
+    ([[impossible-step-three-design]]). The world is the held-back race
+    world -- above the derived floor, where a 400 reserve already holds
+    expansion -- so every tick's silence has exactly one owner: the
+    reserve before the edge, the stand-down after it."""
+    always_arms = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": 6.0}',
+            '{"name": "credits_last", "mean": 4000.0, "std": 1000.0, "coef": 0.0}',
+        ]
+    )
+    held_back = _race_world(extractors=7, pools_visible=9)
+    report, peer = run_campaign(held_back, times=4, reserve=400, brace_model=always_arms)
+    assert verb(peer, "build") == []
+    assert report["expand_reason"] == "braced: razing predicted, expansion stood down"
 
 
 def test_losing_the_army_no_longer_ends_the_match() -> None:

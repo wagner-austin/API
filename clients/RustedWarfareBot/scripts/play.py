@@ -28,8 +28,8 @@ from rw_bot.policy.doctrine import (
     DoctrineError,
 )
 from rw_bot.policy.doctrine_file import parse_doctrine_lines
-from rw_bot.policy.doom import DoomModel, decode_doom_model
 from rw_bot.policy.expand import expand
+from rw_bot.policy.head import HeadModel, decode_head_model
 from rw_bot.policy.match_report import format_report
 
 #: What the default doctrine asks for -- goals, not a build order.
@@ -302,20 +302,21 @@ def load_doctrine(path: Path) -> Doctrine:
     return parse_doctrine_lines(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
-def load_doom_model(path: Path) -> DoomModel:
-    """Read the fitted doom model the predicted mode scores with.
+def load_head_model(path: Path) -> HeadModel:
+    """Read one fitted head model -- doom, razing, whichever file is named.
 
     Args:
-        path: The model file, e.g. ``models/fleetdoom.ndjson``.
+        path: The model file, e.g. ``models/fleetdoom.ndjson`` or
+            ``models/razebrace.ndjson``.
 
     Returns:
         The validated model.
 
     Raises:
-        DoomError: ``RW-DOOM-001`` when the file is malformed.
+        HeadError: ``RW-HEAD-001`` when the file is malformed.
         OSError: When the file cannot be read.
     """
-    return decode_doom_model(path.read_text(encoding="utf-8", errors="strict").splitlines())
+    return decode_head_model(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -445,9 +446,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # The doom model rides its own file, loaded only when the doctrine asks
     # for the predicted mode: a knob that is off must cost nothing, not
     # even a read ([[policy-doctrine]]; log 2026-08-09).
-    doom: DoomModel | None = None
+    doom: HeadModel | None = None
     if doctrine["navtilt"] == NAVTILT_PREDICTED:
-        doom = load_doom_model(Path("models/fleetdoom.ndjson"))
+        doom = load_head_model(Path("models/fleetdoom.ndjson"))
+    # The razing head rides the same convention: its own file, read only
+    # when the doctrine's brace flag asks for it.
+    brace_model: HeadModel | None = None
+    if doctrine["brace"]:
+        brace_model = load_head_model(Path("models/razebrace.ndjson"))
     report = play(
         channel,
         plan,
@@ -462,6 +468,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         counter=doctrine["counter"],
         navtilt=doctrine["navtilt"],
         doom=doom,
+        brace_model=brace_model,
         cover=doctrine["cover"],
         intercept=doctrine["intercept"],
         guard_cap=doctrine["guard_cap"],

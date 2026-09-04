@@ -16,6 +16,7 @@ from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
+from rw_bot.policy.head import HeadModel
 from rw_bot.policy.match_report import MatchReport
 from rw_bot.policy.runner import AFFORD_STALL_SAMPLES
 from rw_bot.wire.state import Sample
@@ -145,6 +146,7 @@ def run_campaign(
     stop_when_plan_done: bool = False,
     afford_samples: int = AFFORD_STALL_SAMPLES,
     trace: Path | None = None,
+    brace_model: HeadModel | None = None,
 ) -> tuple[MatchReport, ScriptedPeer]:
     """Play one scripted world for a fixed number of observations."""
     peer = ScriptedPeer(lines(*(world for _ in range(times))))
@@ -161,6 +163,7 @@ def run_campaign(
         stop_when_plan_done=stop_when_plan_done,
         afford_samples=afford_samples,
         trace=trace,
+        brace_model=brace_model,
     )
     return report, peer
 
