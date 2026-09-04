@@ -41,7 +41,8 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | 0 |
 | `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | 0 |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
-| `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
+| `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 0 |
+| `mi-cu128` | free-gpu32 | `RTX6000` x1 | 8 | 64 | 55 | `6d9ba0baac40` | yes | 0 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
 | `tankpit` | free | cpu | 2 | 2 | 60 | `0cfdd5592a1a` | yes | 0 |
 | `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | 27344 |
@@ -195,16 +196,66 @@ and controls as the baseline sweep.
   non-gain has no reading; the raw arm means always carry the verdict.
   That rule exists because the p=1.0 collapse is a real cell every full
   grid hits, and the first version of the CLI died on it.
-- **No run document is committed yet:** the newest cluster image (v33,
-  `5dfd78a7…`) predates commit `05108c8f`, whose ratio-absence handling
-  the full grid requires — the third live catch for the image-freshness
-  gap task `2c8161a3` names. A v34 built from ≥ `05108c8f` unblocks the
-  V100 replication; the request stands on the board.
-- **Open extensions, filed rather than implied:** n8 and varied-count
-  companion exposure (does the p=0.5 recipe hold when deployment count
-  exceeds training exposure), the budget slot policy, and the scale rung
-  (`gpt2-medium` locally, a 7B base on A100 — cheap for cartridges, since
-  only slots carry optimizer state).
+- **The n8 extension ran ON THE CLUSTER 2026-09-04** (board task
+  `684492dd`, plan `gpt2-companions-n8` added in `acaedbb3`, image v34
+  `cdd1341b…` built from that commit with the plan asserted by the image's
+  own smoke, job 55753007, V100, run document
+  `tools/hpc3/runs/cartridge-companions-n8-v100-v34.json`, 0 SU): **the
+  recipe survives seven-stranger deployment after single-companion
+  training.** Trained-p0.5 puts eight-compartment retention at **+26.5%**
+  (composed +0.2243, spread 0.0562) where the naive baseline was −7.0%
+  (composed −0.062) — a +0.29 swing, ~5× the cell floor — at the same
+  four-hundredths solo cost. Trained-p0.25 reads +22.2%. Noise
+  companionship's n4 break-even VANISHES at n8 (−4.4/−4.6%,
+  indistinguishable from naive): content is the load-bearing ingredient,
+  and at n8 the trained cells' composed arms match their untrained-composed
+  controls (+0.02) — content interference erased, while noise-trained
+  cartridges lose −0.39/−0.46 to real content. plant-eco (the seventh
+  partner) measured +0.05 cross-gain against a 0.048 spread — clean,
+  verified in-run. Dose ordering (p0.5 > p0.25, trained > noise)
+  replicates from the n2/n4 grid.
+- **The retention observation is conditional by design:** absent where a
+  cell's alone arm did not improve on the base, because a ratio against a
+  non-gain has no reading; the raw arm means always carry the verdict.
+  That rule exists because the p=1.0 collapse is a real cell every full
+  grid hits, and the first version of the CLI died on it.
+- **Open extensions, filed rather than implied:** varied-count companion
+  exposure is now MOTIVATED, not speculative — the n4→n8 retention decay
+  (44.6% → 26.5%) is the gap it exists to close, and the n8 record is its
+  baseline; the budget slot policy under companioned training; the scale
+  rung (`gpt2-medium` locally, a 7B base on A100 — cheap for cartridges,
+  since only slots carry optimizer state); the V100 replication of the
+  original n2/n4 grid, unblocked now that v34 exists.
+
+### `mi-cu128` — the Blackwell determinism baseline
+
+Registered 2026-09-04 by `opus-hpc3-survey-0822` (board task `9e4db632`,
+commit `3400be03`). **This section was written by a different session to
+close a red `make check`, from that session's own board posts and committed
+spec rather than from its work; the owner should correct or replace it.**
+`test_committed_runs.py` fails when a registered project's name does not
+appear in this file, and the workspace document landed without it.
+
+- **Repo:** this one, `services/Model-Trainer`
+- **Why it exists:** the `RTX6000` GRES on `free-gpu32` is 96 GB RTX PRO 6000
+  Blackwell hardware, `sm_120`, which the cu124 image cannot drive — its CUDA
+  runtime enumerates zero devices there. The blocker was software, not
+  billing: those nodes are free, and nine jobs had already run on them
+  unbilled.
+- **Stack:** torch 2.7.1+cu128 / CUDA 12.8, image `6d9ba0baac40` (cu128-v1,
+  38/38 smokes green). `transformers` is held at 4.46.3, the same version the
+  cu124 line pins, so the model code is constant and only the numerical stack
+  moves.
+- **Verified on hardware:** arch probe 55751296 on `hpc3-gpu-n54-03` reports
+  capability `[12, 0]` and `sm_120` in the arch list.
+- **Provenance posture, and the boundary that matters:** this starts a NEW
+  baseline. **Cross-stack digests are not comparable** — a cu128 record cannot
+  be differenced against the cu124 corpus. Its claims are arm-versus-arm and
+  card-versus-card WITHIN the cu128 stack, which is why the battery re-runs a
+  known card (the L40S) as a comparison partner.
+- **One toolchain finding already banked:** torch 2.7.1's SDPA eligibility
+  APIs initialise CUDA even for a CPU-device probe, so a smoke that passed on
+  every cu124 build fails on a driverless build node. Root fix `d6363b9b`.
 
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
