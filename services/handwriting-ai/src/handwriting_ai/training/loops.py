@@ -9,6 +9,7 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
 from handwriting_ai import _test_hooks
+from handwriting_ai._hook_protocols_training import GradScalerProtocol
 
 from .memory_diagnostics import log_memory_diagnostics
 from .safety import get_memory_guard_config
@@ -43,6 +44,45 @@ def evaluate(model: Module, loader: _BatchLoader, device: torch.device) -> float
             correct += int((preds.cpu() == y).sum().item())
             total += y.size(0)
     return (correct / total) if total > 0 else 0.0
+
+
+def apply_gradient(
+    *,
+    scaler: GradScalerProtocol | None,
+    optimizer: Optimizer,
+    loss: Tensor,
+) -> None:
+    """Backpropagate and step, through the loss scaler when there is one.
+
+    EXTRACTED SO IT CAN BE REACHED WITHOUT A GPU. Inline, these two arms sat
+    behind ``scaler is not None``, and a scaler exists only when
+    ``precision == "fp16" and device.type == "cuda"`` -- so the fp16 half was
+    executable on a machine with a CUDA device and nowhere else. This
+    service's 100% coverage gate was met on a desk and missed in CI by
+    exactly these lines.
+
+    Taking the three pieces as arguments makes both arms reachable with a
+    fake scaler and real CPU tensors. What that verifies is the ORDER, which
+    is the part worth pinning: ``unscale_`` before ``step``, and the
+    optimiser stepped through the scaler rather than also directly. It does
+    not verify fp16 numerics -- the real CUDA training path does that.
+
+    Args:
+        scaler: The run's gradient scaler, or None outside fp16-on-CUDA.
+        optimizer: The optimiser to step.
+        loss: The batch loss.
+    """
+    if scaler is None:
+        torch.autograd.backward((loss,))
+        optimizer.step()
+        return
+    torch.autograd.backward((scaler.scale(loss),))
+    # unscale_ BEFORE step: the scaler multiplied the loss to keep fp16
+    # gradients off the floor of the format, and the optimiser must see the
+    # true magnitudes. Stepping first would apply the scaled gradient.
+    scaler.unscale_(optimizer)
+    scaler.step(optimizer)
+    scaler.update()
 
 
 def train_epoch(
@@ -83,20 +123,7 @@ def train_epoch(
             logits: Tensor = model(x)
             loss: Tensor = functional.cross_entropy(logits, y)
 
-        # Backward pass: scaled for fp16, standard for fp32/bf16
-        if scaler is not None:
-            scaled_loss = scaler.scale(loss)
-            torch.autograd.backward((scaled_loss,))
-            scaler.unscale_(optimizer)
-        else:
-            torch.autograd.backward((loss,))
-
-        # Optimizer step: through scaler for fp16, standard otherwise
-        if scaler is not None:
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            optimizer.step()
+        apply_gradient(scaler=scaler, optimizer=optimizer, loss=loss)
         # Proactive memory guard: check every batch (not only on log cadence)
         if _test_hooks.on_batch_check():
             log.info("mem_guard_abort e=%s b=%s", ep, (batch_idx + 1))
