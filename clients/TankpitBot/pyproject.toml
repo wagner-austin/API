@@ -73,12 +73,12 @@ tankpit-engagements = "tankpit_bot.diagnostics.engagement_ledger:main"
 tankpit-forage-economy = "tankpit_bot.diagnostics.forage_economy:main"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.0"
-pytest-asyncio = "^1.3.0"
-pytest-cov = "^7.0.0"
-pytest-xdist = "^3.8"
-ruff = "^0.14.4"
-mypy = "^1.19"
+pytest = "^9.1.1"
+pytest-asyncio = "^1.4.0"
+pytest-cov = "^7.1.0"
+pytest-xdist = "^3.8.0"
+ruff = "^0.16.6"
+mypy = "^2.3.1"
 types-psutil = "^7.0"
 
 [tool.mypy]

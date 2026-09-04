@@ -32,11 +32,11 @@ typing-extensions = "^4.12.0"
 wandb = ["wandb"]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.0"
-pytest-xdist = "^3.6.1"
-pytest-cov = "^7.0.0"
-mypy = "^1.13.0"
-ruff = "^0.14.4"
+pytest = "^9.1.1"
+pytest-xdist = "^3.8.0"
+pytest-cov = "^7.1.0"
+mypy = "^2.3.1"
+ruff = "^0.16.6"
 typing-extensions = "^4.12.0"
 wandb = "^0.18"
 scikit-learn = "^1.8"

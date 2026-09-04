@@ -44,8 +44,21 @@ def is_wsl_launcher(bash_path: str) -> bool:
         thing that identifies the launcher anyway. Both spellings are
         checked: a 32-bit process, which is what ``make`` recipes run in
         here, sees the same launcher through ``SysWOW64``.
+
+        Split with ``PureWindowsPath`` rather than ``Path``. ``Path`` takes
+        the flavour of the machine it runs on, and on Linux a backslash is an
+        ordinary character -- so ``C:\\Windows\\System32\\bash.exe`` parses to
+        ONE part, no component equals ``system32``, and this answered False
+        for the launcher it exists to recognise. The three tests below caught
+        that the first time this package's suite was run in CI on 2026-09-04.
+        The argument is a Windows path by definition (the WSL launcher exists
+        nowhere else), so parsing it with Windows rules is right on every
+        platform, and a POSIX path still splits correctly because
+        ``PureWindowsPath`` accepts ``/`` as a separator too.
     """
-    return any(part.lower() in _WINDOWS_SYSTEM_DIRS for part in pathlib.Path(bash_path).parts)
+    return any(
+        part.lower() in _WINDOWS_SYSTEM_DIRS for part in pathlib.PureWindowsPath(bash_path).parts
+    )
 
 
 def bash_beside_git(git_path: str) -> str | None:

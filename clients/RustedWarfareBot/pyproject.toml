@@ -25,11 +25,11 @@ rw-boot-log = "rw_bot.harness.boot_log_cli:main"
 rw-fleet = "rw_bot.harness.fleet_http:main"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.0"
-pytest-cov = "^7.0.0"
-pytest-xdist = "^3.8"
-ruff = "^0.14.4"
-mypy = "^1.19"
+pytest = "^9.1.1"
+pytest-cov = "^7.1.0"
+pytest-xdist = "^3.8.0"
+ruff = "^0.16.6"
+mypy = "^2.3.1"
 
 [tool.mypy]
 python_version = "3.11"

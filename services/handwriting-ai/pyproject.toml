@@ -42,11 +42,11 @@ platform-ml = { path = "../../libs/platform_ml", develop = true }
 handwriting-rq-worker = "handwriting_ai.worker_entry:main"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.0"
-pytest-cov = "^7.0.0"
-pytest-xdist = "^3.6.1"
-mypy = "^1.13.0"
-ruff = "^0.14.4"
+pytest = "^9.1.1"
+pytest-cov = "^7.1.0"
+pytest-xdist = "^3.8.0"
+mypy = "^2.3.1"
+ruff = "^0.16.6"
 yamllint = "^1.37.1"
 types-psutil = "^7.0.0.20251111"
 

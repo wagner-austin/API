@@ -19,12 +19,12 @@ typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.0"
-pytest-timeout = "^2.3.1"
-mypy = "^1.13.0"
-ruff = "^0.14.4"
-pytest-cov = "^7.0.0"
-pytest-xdist = "^3.6.1"
+pytest = "^9.1.1"
+pytest-timeout = "^2.4.0"
+mypy = "^2.3.1"
+ruff = "^0.16.6"
+pytest-cov = "^7.1.0"
+pytest-xdist = "^3.8.0"
 
 [tool.poetry.scripts]
 code-corpus-emit = "code_corpus.cli.emit_corpus:entrypoint"
