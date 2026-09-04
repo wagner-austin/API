@@ -9,17 +9,43 @@ source_paths:
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/live_view.py"
 source_git_blobs:
-  "src/tankpit_bot/service": "c5634239f76832823a40be0518bb66f20cb6cd2c"
+  "src/tankpit_bot/service": "1960dc175ef63744338161a8d30dc02ec128669f"
   "src/tankpit_bot/bot/config.py": "73f00effaaba3a60107229f12ba7743ecd2f16cf"
   "src/tankpit_bot/browser/live_view.py": "e7e18cb9ca4092ed4cbc2ab2762ef934ab909282"
-fact_checked: "2026-08-06"
+fact_checked: "2026-09-03"
 confidence: medium
 hubs: [architecture]
 ---
 
 # Bot Service Architecture
 
-The bot service (`tankpit-bot-service`) is the long-running Python process that lets the phone SPA drive live tankpit sessions over HTTP. It hosts an aiohttp server on `127.0.0.1:27100`; the fiesta docker container's nginx proxies `/api/tankbot/*` to it. Landed 2026-07-12 as Phase A of the SPA-driven bot design.[^1]
+> **STATUS 2026-09-03 — READ THIS FIRST. The SPA that this page is
+> written around no longer exists, and neither does the console script
+> in the sentence below.** Tankpit was decoupled from fiesta in MCPs
+> `02cfd967`: no tankpit profile, no bot overlay, no `/api/tankbot/`
+> nginx proxy, no `botCommand` / `botVideoUrl` /
+> `botServerLaunchCommand`. The `tankpit-bot-service` console script and
+> the `make service` target were deleted in `10f97042`.
+>
+> WHAT IS TRUE NOW. The same `service_main.main()` still runs, and the
+> HTTP surface below is still accurate as a route table — what changed
+> is who reaches it. Every FLEET CHILD runs this service (spawned by the
+> fleet manager, one per instance, on a port from
+> `FLEET_CHILD_PORT_BASE`), and the manager relays their video. A PUBLIC
+> DEMO reaches exactly three routes (`/demo/fleet`, `/demo/spawn`,
+> `/demo/video/{slot}`) through `tankpit-public`, an nginx filter that
+> forwards `/demo/` and 404s everything else so the operator surface on
+> the same port stays unpublished (MCPs `54925b6d`).[^7]
+>
+> Sections below marked with a date are kept as history. Where a
+> paragraph describes the SPA in the present tense, read it as "was true
+> until 2026-09-03".[^7]
+
+The bot service was the long-running Python process that let the phone
+SPA drive live tankpit sessions over HTTP. It hosts an aiohttp server on
+`127.0.0.1:27100`; the fiesta docker container's nginx proxied
+`/api/tankbot/*` to it until 2026-09-03. Landed 2026-07-12 as Phase A of
+the SPA-driven bot design.[^1]
 
 ## The three shared primitives
 
@@ -133,6 +159,34 @@ strip. `botServerLaunchCommand` stays in the profile for the
 games-hub hash-swap cold chain (a Vibeshine session from the games
 host CAN still fire `make service` via run_command).[^3]
 
+**THE ENTIRE SPA CONTROL PLANE WAS DELETED 2026-09-03, AND SO WAS
+`make service`.** Everything in the paragraph above is history. Tankpit
+was decoupled from fiesta in MCPs commit `02cfd967`, which removed
+`src/tankbot/` (the HTTP client, controller and overlay view-model),
+`boot/bot-overlay.ts`, `profiles/tankpit.json`, the nginx
+`location /api/tankbot/` proxy, and every profile field that fed them:
+`botCommand`, `botVideoUrl`, `botServerLaunchCommand`, `BOT_COMMANDS`.
+There are no bot buttons, no mode buttons, no stats strip and no
+`run_command` cold chain, because there is no tankpit profile. The
+`make service` target and the `tankpit-bot-service` console script went
+with them in `10f97042`.[^7]
+
+**What replaced it.** The service is now reached two ways only. The
+FLEET runs it: every fleet child executes `service_main.main()` through
+the child bootstrap, which is why the service's own defaults are now
+fleet defaults. And a PUBLIC DEMO reaches three narrow routes through
+`tankpit-public`, an nginx filter that forwards `/demo/` and 404s
+everything else, so the operator surface on the same port is not
+published (MCPs `54925b6d`).[^7]
+
+**The idle pin is gone (`ff1ac1be`).** A service session used to submit
+`"UNSET"` to the mode bridge before running the bot, pinning the AI to
+idle so an operator could release it from the SPA overlay. With the
+overlay deleted and the fleet running this entry point for every child,
+that pin had no UI left to lift it: bots entered the game and logged
+`reason=manual_hold` forever. Sessions now start in auto-arbitration
+like `make run`; `POST /mode` still pins deliberately.[^7]
+
 **Always-on service (2026-07-29).** With the SPA's video served by
 this process, the phone expects the URL to answer at any hour:
 `TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS` (resolver
@@ -143,9 +197,11 @@ the service no longer starts at logon and `tankpit.austinwagner.org` only
 answers while `make service` is running.** Default behavior (no env) is
 unchanged.[^3]
 
-To restore always-on, recreate
-`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\tankpit-bot-service.cmd`
-with[^4]:
+The restore recipe below is DEAD as written (2026-09-03): it invokes
+`make service`, a target that no longer exists. Always-on today is
+`make up`, which runs the fleet manager from the newest release
+snapshot as a container with `restart` policy and a 10-minute drain on
+stop. The historical launcher, for the record only[^4]:
 
 ```bat
 @echo off
@@ -154,8 +210,8 @@ set TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS=0
 start "TankpitBotService" /min cmd /c "make service"
 ```
 
-It runs `make service` minimized at logon with the idle self-exit disabled;
-`make service`'s own respawn loop covers crashes[^4].
+It ran `make service` minimized at logon with the idle self-exit
+disabled; that target's own respawn loop covered crashes[^4].
 
 No input path exists anywhere in this surface — the buttons are HTTP
 POSTs to the bot service; nothing can touch the host mouse, in the
@@ -263,6 +319,18 @@ Landed 2026-07-12. The last plumbing step that stitches Phases A + B into a work
 
 **Launcher (`make service` in `tankpitbot/`)** — a Makefile target that respawns `poetry run tankpit-bot-service` on crash with a 5-second cooldown. Lives next to `make bot` / `make sniff` / `make run` so the mental model stays "there's one Makefile for everything tankpit-adjacent." The operator opens a terminal, runs `make service`, and leaves the window open. Ctrl+C exits the respawn loop cleanly.[^2]
 
+> **SUPERSEDED 2026-09-03.** `make service` and the
+> `tankpit-bot-service` console script were deleted in `10f97042`: the
+> target's only consumer was the fiesta SPA, and the service's other job
+> — serving video — is now done by fleet children, which run
+> `service_main.main()` through the child bootstrap in
+> `service/_test_hooks/processes.py`. The two decisions below are
+> preserved as the reasoning of the time. The launcher question is now
+> answered by `make up`, which runs the fleet manager from the newest
+> release snapshot as a container; crash recovery is the container's
+> restart policy rather than a Makefile respawn loop, and `make down`
+> is a drain rather than a kill.[^7]
+
 Chose `make service` over a `shell:startup` `.cmd` after weighing both:[^2]
 
 | Trade-off | `make service` (chosen) | `shell:startup` .cmd |
@@ -304,7 +372,8 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 
 [^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
 [^2]: cross-repo truth in `~/PROJECTS/MCPs`: `fiesta/src/tankbot/` and `fiesta/nginx.conf`; Phase B/C landing commit `6c78deff` ("fiesta: bot-controls SPA panel + /api/tankbot proxy"), later reworked by `88fc8ae5` ("bot-controls view replaced by overlay viewmodel") — see the staleness note; file inventory re-verified against that repo 2026-07-23.
-[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/live_view.py`, `src/tankpit_bot/bus/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes` at `:236`, `_latest_frame_snapshot` at `:378`, `_drain_frame_bus_to_response` at `:407`), `bot/tick_body.py` (`_sync_live_view_demand` at `:421`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). **Repinned 2026-08-07:** this footnote named `browser/screencast.py` and `bot/tick_loop.py::_sync_screencast_demand`, neither of which exists. The CDP screencast relay was replaced 2026-07-29 by in-page capture over a `Runtime.addBinding` channel (`live_view.py:1-34` records why: the relay shared the tick thread, so Chrome's ACK-gated frame pacing stalled the stream through every map open and teleport, and a loopback HTTP POST is unusable because Chrome's Local Network Access gate hangs the fetch forever). The demand wiring survived the swap unchanged in shape — subscribers on the frame bus call `ensure` every tick, zero subscribers call `stop` — and moved to `tick_body.py` with the tick-loop split. Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`). SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) and this repo commit `59201238` (`service/config.py::resolve_idle_exit_seconds` (moved out of `bot/config.py` 2026-08-07 — it is a service concern, and while it sat in bot config it was the last function-level import forcing a `bot` -> `service` edge, see [[package-layering]]), `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
+[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/live_view.py`, `src/tankpit_bot/bus/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes` at `:236`, `_latest_frame_snapshot` at `:378`, `_drain_frame_bus_to_response` at `:407`), `bot/tick_body.py` (`_sync_live_view_demand` at `:421`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). **Repinned 2026-08-07:** this footnote named `browser/screencast.py` and `bot/tick_loop.py::_sync_screencast_demand`, neither of which exists. The CDP screencast relay was replaced 2026-07-29 by in-page capture over a `Runtime.addBinding` channel (`live_view.py:1-34` records why: the relay shared the tick thread, so Chrome's ACK-gated frame pacing stalled the stream through every map open and teleport, and a loopback HTTP POST is unusable because Chrome's Local Network Access gate hangs the fetch forever). The demand wiring survived the swap unchanged in shape — subscribers on the frame bus call `ensure` every tick, zero subscribers call `stop` — and moved to `tick_body.py` with the tick-loop split. Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`) **-- DELETED 2026-09-03 in MCPs `02cfd967`; the public path is now `tankpit-public` (MCPs `54925b6d`), an nginx filter that forwards only `/demo/` and 404s the operator surface**. SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) **-- every one of those paths was DELETED 2026-09-03 in MCPs `02cfd967`; cited here as the historical record of the SPA-served era, not as live code** and this repo commit `59201238` (`service/config.py::resolve_idle_exit_seconds` (moved out of `bot/config.py` 2026-08-07 — it is a service concern, and while it sat in bot config it was the last function-level import forcing a `bot` -> `service` edge, see [[package-layering]]), `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
 [^5]: code truth on disk: `src/tankpit_bot/service/fleet.py` (FleetManager, routes, `resolve_fleet_port`), `service/_test_hooks.py` (`_CHILD_BOOTSTRAP`, `spawn_bot_process`, `run_web_app` seams), `tests/service/test_fleet.py`; `make fleet` target; landed 2026-08-06.
 [^6]: code truth on disk: `src/tankpit_bot/types/rooms.py` (`LOBBY_ROOMS`, `DEFAULT_LOBBY_ROOM`), `service/fleet_manager.py::FleetManager.rooms`, `service/fleet_routes.py` (`GET /rooms`), `service/fleet_page.py` (`<select id="room">` + `fillSelect`), `browser/room_join.py::_resolve_room_entry` (prefix match). Ground truth for the two-room lobby is the ROOM_LIST capture in `runs/bot/arterial/bot-20260813-212329.log`: `+1|Practice|1|0,0,0,0,0,0,0|-1|p|field01.gif|2026` and `5=World (Desert)` — the same capture [[game-rules]] cites. Selector-to-resolver coupling is pinned by `tests/login/test_join.py::test_every_offered_room_selector_resolves_against_a_live_lobby`.
 [^4]: `Makefile:265-268` — the `service` target (`service: install`) starts the "long-running SPA-driven HTTP + SSE server", listening on `0.0.0.0:27100`. The Startup-folder `.cmd` described here is machine state on the operator's workstation, not a repo artifact, so it is not verifiable from this checkout; only the `make service` entry point it invokes is.
+[^7]: this repo, 2026-09-03: `10f97042` deleted the `service` Makefile target and the `tankpit-bot-service` console script; `ff1ac1be` removed the `_mode_bridge.submit("UNSET")` idle pin from `service/session_runner.py`; `dfdbf310` added `service/demo.py` + `service/demo_routes.py` (the three `/demo/` routes). Cross-repo in `~/PROJECTS/MCPs`: `02cfd967` deleted `fiesta/src/tankbot/`, `fiesta/src/boot/bot-overlay.ts`, `fiesta/profiles/tankpit.json`, the `location /api/tankbot/` block in `fiesta/nginx.conf`, and the `botCommand` / `botVideoUrl` / `botServerLaunchCommand` profile fields; `54925b6d` added `tankpit-public/nginx.conf` (forwards `/demo/`, returns 404 otherwise) and the `tankpit.austinwagner.org` ingress. Fleet children run this service via the child bootstrap in `service/_test_hooks/processes.py`.
