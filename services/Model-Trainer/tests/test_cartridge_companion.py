@@ -24,11 +24,14 @@ from model_trainer.core.services.finetuning.strategies.cartridge_model import (
     CartridgeModel,
     CompanionedCartridgeModel,
 )
-from model_trainer.core.services.finetuning.strategies.cartridge_slots import initialise_slots
-from model_trainer.core.services.model.cartridge_measurement import (
-    train_cartridge,
+from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
+    CartridgeSlots,
+    initialise_slots,
+)
+from model_trainer.core.services.model.cartridge_companioned import (
     train_cartridge_with_companion,
 )
+from model_trainer.core.services.model.cartridge_measurement import train_cartridge
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import CacheCapableLMProto
@@ -202,6 +205,52 @@ class TestForward:
             companion_probability=1.0,
         )
         assert model.to("cpu") is model
+
+
+class TestCompanionedScalingDegenerate:
+    def test_no_other_cartridges_composes_the_first_alone(self) -> None:
+        """The empty companioned composition is the companioned first, exactly.
+
+        No plan asks for a one-compartment composition; this covers the
+        zero-others branch directly so it is measured rather than dead.
+        """
+        from model_trainer.core.services.model.cartridge_companioned import (
+            measure_companioned_scaling,
+        )
+
+        base = _base()
+        geometry = measure_geometry(base, num_slots=2)
+        companion = initialise_slots(geometry, seed=5)
+
+        def fixed_companion(seed: int) -> CartridgeSlots:
+            """The same frozen companion for every replicate.
+
+            Args:
+                seed: Ignored; the degenerate case needs no per-seed draw.
+
+            Returns:
+                The one companion.
+            """
+            return companion
+
+        alone, composed, untrained_composed, cross = measure_companioned_scaling(
+            base,
+            first_train=_corpus(seed=41, rows=4),
+            other_trains=(),
+            held_out=_corpus(seed=42, rows=3),
+            arm="solo-n1",
+            num_slots=2,
+            seeds=(7, 8, 9),
+            epochs=1,
+            learning_rate=0.05,
+            companion_for_seed=fixed_companion,
+            companion_probability=1.0,
+        )
+
+        assert cross == ()
+        assert composed["gains"] == alone["gains"]
+        assert untrained_composed["gains"] == alone["gains"]
+        assert alone["arm"] == "solo-n1-alone"
 
 
 class TestTraining:

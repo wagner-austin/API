@@ -25,8 +25,10 @@ from typing import Protocol
 # describes live in `cartridge_measurement`, which does.
 from model_trainer.core.services.model.cartridge_plans import (
     CARTRIDGE_PLANS,
+    COMPANION_SWEEP_PLANS,
     COMPOSITION_SWEEP_PLANS,
     CartridgePlan,
+    CompanionSweepPlan,
     CompositionSweepPlan,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
@@ -79,6 +81,20 @@ class CompositionSweepPlansProto(Protocol):
     """
 
     def __call__(self) -> Mapping[str, CompositionSweepPlan]:
+        """Return every declared plan, in table order."""
+        ...
+
+
+class CompanionSweepPlansProto(Protocol):
+    """Protocol for the companion-sweep plan table.
+
+    Behind a hook for the reason :class:`CompositionSweepPlansProto` is: the
+    real table's one plan trains over a hundred cartridges over a real
+    GPT-2, so a suite that could only reach it would either run it or leave
+    the entry uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, CompanionSweepPlan]:
         """Return every declared plan, in table order."""
         ...
 
@@ -283,6 +299,18 @@ cartridge_plans: CartridgePlansProto = _default_cartridge_plans
 
 composition_sweep_plans: CompositionSweepPlansProto = _default_composition_sweep_plans
 
+
+def _default_companion_sweep_plans() -> Mapping[str, CompanionSweepPlan]:
+    """Production companion-sweep plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return COMPANION_SWEEP_PLANS
+
+
+companion_sweep_plans: CompanionSweepPlansProto = _default_companion_sweep_plans
+
 qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -303,6 +331,7 @@ probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
 __all__ = [
     "BenchmarkShapesProto",
     "CartridgePlansProto",
+    "CompanionSweepPlansProto",
     "CompositionSweepPlansProto",
     "CostShapesProto",
     "ForwardShapesProto",
@@ -313,6 +342,7 @@ __all__ = [
     "TrainShapesProto",
     "benchmark_shapes",
     "cartridge_plans",
+    "companion_sweep_plans",
     "composition_sweep_plans",
     "cost_shapes_hook",
     "forward_shapes",

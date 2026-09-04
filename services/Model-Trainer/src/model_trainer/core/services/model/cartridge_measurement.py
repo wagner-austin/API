@@ -52,10 +52,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     replicate,
 )
 from model_trainer.core.services.finetuning.strategies.cartridge import measure_geometry
-from model_trainer.core.services.finetuning.strategies.cartridge_model import (
-    CartridgeModel,
-    CompanionedCartridgeModel,
-)
+from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     CartridgeSlots,
     compose,
@@ -85,8 +82,12 @@ def fresh_cartridge(base: CacheCapableLMProto, *, num_slots: int, seed: int) -> 
     return model
 
 
-def _gain(model: CartridgeModel, held_out: Sequence[torch.Tensor]) -> float:
+def held_out_gain(model: CartridgeModel, held_out: Sequence[torch.Tensor]) -> float:
     """Score held-out items with a prefix and without it, and take the difference.
+
+    Public because it is the one number every cartridge arm reports, here
+    and in :mod:`cartridge_companioned`: two modules computing "the gain" two
+    ways would let their results drift apart silently.
 
     Args:
         model: The cartridge-wrapped model. Its own base is the control.
@@ -149,65 +150,6 @@ def train_cartridge(
     return model.slots
 
 
-def train_cartridge_with_companion(
-    base: CacheCapableLMProto,
-    corpus: Sequence[torch.Tensor],
-    *,
-    num_slots: int,
-    seed: int,
-    epochs: int,
-    learning_rate: float,
-    companion: CartridgeSlots,
-    companion_probability: float,
-) -> CartridgeSlots:
-    """Draw a cartridge and train it with a frozen stranger sometimes present.
-
-    The composition-aware variant of :func:`train_cartridge` (board task
-    ``bc29dc3e``): identical draw, identical seeding discipline, and the one
-    difference is that training forwards run through
-    :class:`CompanionedCartridgeModel`, which concatenates the companion's
-    detached blocks in front of the trainee's with the given per-step
-    probability. Whether this lifts composed retention is the measurement;
-    nothing here asserts that it does.
-
-    THE SEED COVERS THE PRESENCE DRAWS TOO. The companion-presence draw
-    consumes the same process-wide generator dropout does, and the seed is
-    set at the same point :func:`train_cartridge` sets it -- after the
-    geometry probe -- so a run remains a function of its seed with the
-    companion machinery included.
-
-    Args:
-        base: The frozen base to train in front of.
-        corpus: Training windows.
-        num_slots: Prefix positions for the trainee.
-        seed: Seed for the draw, the dropout stream, and the presence draws.
-        epochs: Passes over the corpus.
-        learning_rate: Step size for AdamW.
-        companion: The frozen stranger's slots. Not updated: gradients cannot
-            reach it by construction.
-        companion_probability: Chance per training forward that the companion
-            is present, in (0, 1].
-
-    Returns:
-        The trained slots, detached from any model.
-
-    Raises:
-        ValueError: If the probability is outside (0, 1].
-        AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if the companion was
-            cut for a differently shaped model.
-    """
-    drawn = fresh_cartridge(base, num_slots=num_slots, seed=seed)
-    model = CompanionedCartridgeModel(
-        base=base,
-        slots=drawn.slots,
-        companion=companion,
-        companion_probability=companion_probability,
-    )
-    torch.manual_seed(seed)
-    _losses = train_on(model, corpus, epochs=epochs, learning_rate=learning_rate)
-    return model.slots
-
-
 def measure_untrained(
     base: CacheCapableLMProto,
     held_out: Sequence[torch.Tensor],
@@ -240,7 +182,7 @@ def measure_untrained(
     return replicate(
         f"untrained-slots-{num_slots}",
         [
-            (seed, _gain(fresh_cartridge(base, num_slots=num_slots, seed=seed), held_out))
+            (seed, held_out_gain(fresh_cartridge(base, num_slots=num_slots, seed=seed), held_out))
             for seed in seeds
         ],
     )
@@ -284,7 +226,7 @@ def measure_slot_count(
             epochs=epochs,
             learning_rate=learning_rate,
         )
-        results.append((seed, _gain(CartridgeModel(base=base, slots=slots), held_out)))
+        results.append((seed, held_out_gain(CartridgeModel(base=base, slots=slots), held_out)))
     return replicate(f"slots-{num_slots}", results)
 
 
@@ -352,9 +294,9 @@ def measure_composition(
             epochs=epochs,
             learning_rate=learning_rate,
         )
-        alone.append((seed, _gain(CartridgeModel(base=base, slots=first), held_out)))
+        alone.append((seed, held_out_gain(CartridgeModel(base=base, slots=first), held_out)))
         composed.append(
-            (seed, _gain(CartridgeModel(base=base, slots=compose(first, second)), held_out))
+            (seed, held_out_gain(CartridgeModel(base=base, slots=compose(first, second)), held_out))
         )
     return replicate(f"{arm}-alone", alone), replicate(f"{arm}-composed", composed)
 
@@ -465,13 +407,15 @@ def measure_composition_scaling(
             for position in range(len(other_trains))
         ]
         untrained_joined = functools.reduce(compose, untrained_others, first)
-        alone.append((seed, _gain(CartridgeModel(base=base, slots=first), held_out)))
-        composed.append((seed, _gain(CartridgeModel(base=base, slots=joined), held_out)))
+        alone.append((seed, held_out_gain(CartridgeModel(base=base, slots=first), held_out)))
+        composed.append((seed, held_out_gain(CartridgeModel(base=base, slots=joined), held_out)))
         untrained_composed.append(
-            (seed, _gain(CartridgeModel(base=base, slots=untrained_joined), held_out))
+            (seed, held_out_gain(CartridgeModel(base=base, slots=untrained_joined), held_out))
         )
         for position, other in enumerate(others):
-            cross[position].append((seed, _gain(CartridgeModel(base=base, slots=other), held_out)))
+            cross[position].append(
+                (seed, held_out_gain(CartridgeModel(base=base, slots=other), held_out))
+            )
     return (
         replicate(f"{arm}-alone", alone),
         replicate(f"{arm}-composed", composed),
@@ -484,10 +428,10 @@ def measure_composition_scaling(
 
 __all__ = [
     "fresh_cartridge",
+    "held_out_gain",
     "measure_composition",
     "measure_composition_scaling",
     "measure_slot_count",
     "measure_untrained",
     "train_cartridge",
-    "train_cartridge_with_companion",
 ]

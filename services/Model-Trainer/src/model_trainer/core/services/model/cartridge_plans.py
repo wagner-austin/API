@@ -195,6 +195,99 @@ def composition_sweep_label(name: str, plan: CompositionSweepPlan, *, digest: st
     )
 
 
+class CompanionSweepPlan(TypedDict):
+    """One complete, reproducible composition-aware-training measurement.
+
+    The intervention grid over the composition ceiling: at each compartment
+    count, every cartridge is trained with a frozen companion present at
+    each swept probability, and the composed retention is compared against
+    the plain-trained baseline recorded under
+    :data:`COMPOSITION_SWEEP_PLANS`. Probability zero is deliberately not a
+    row: p=0 IS the baseline record, and re-running it here would register a
+    second copy of those numbers under a different label.
+
+    Attributes:
+        model_id: HuggingFace id of the base to measure against.
+        window: Tokens per scored item.
+        held_out_stride: One window in this many is held out.
+        compartment_counts: How many cartridges to compose, in increasing
+            order.
+        slots: Prefix positions per cartridge, fixed across the grid so the
+            probability is the only knob a row varies.
+        probabilities: Companion-presence probabilities to sweep, each in
+            (0, 1], in increasing order.
+        seeds: Initialisation seeds. Every arm runs once per seed.
+        epochs: Passes over each corpus.
+        learning_rate: Step size for AdamW.
+    """
+
+    model_id: str
+    window: int
+    held_out_stride: int
+    compartment_counts: tuple[int, ...]
+    slots: int
+    probabilities: tuple[float, ...]
+    seeds: tuple[int, ...]
+    epochs: int
+    learning_rate: float
+
+
+#: Fixed for the reason the other experiment names are.
+COMPANION_SWEEP_EXPERIMENT = "cartridge-companioned-composition"
+
+
+#: The companion-sweep plans. ``gpt2-companions`` matches ``gpt2-compartments``
+#: on every shared field (window, stride, seeds, schedule) and fixes the slot
+#: count at that plan's fixed policy, so its numbers subtract against the
+#: recorded baseline: fixed-64 retention 62.8% at n2 and -45.4% at n4.
+COMPANION_SWEEP_PLANS: Final[dict[str, CompanionSweepPlan]] = {
+    "gpt2-companions": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (2, 4),
+        "slots": 64,
+        "probabilities": (0.25, 0.5, 1.0),
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+}
+
+
+def companion_sweep_label(name: str, plan: CompanionSweepPlan, *, digest: str) -> str:
+    """Build the label identifying one companion sweep on one primary corpus.
+
+    Args:
+        name: The plan's name.
+        plan: The plan.
+        digest: Digest of the PRIMARY corpus, from :func:`corpus_digest`.
+
+    Returns:
+        The label, e.g.
+        ``gpt2-companions-gpt2-w256-s4-e12-lr0.01-n2.4-c64-p0.25.0.5.1.0-seeds7.8.9-1a2b3c4d5e6f``.
+        The per-cartridge slot count takes the ``c`` prefix
+        :func:`plan_label` already uses for a slot width, because ``s``
+        is taken by the stride.
+    """
+    counts = ".".join(str(count) for count in plan["compartment_counts"])
+    probabilities = ".".join(str(probability) for probability in plan["probabilities"])
+    seeds = ".".join(str(seed) for seed in plan["seeds"])
+    return (
+        f"{name}"
+        f"-{plan['model_id']}"
+        f"-w{plan['window']}"
+        f"-s{plan['held_out_stride']}"
+        f"-e{plan['epochs']}"
+        f"-lr{plan['learning_rate']}"
+        f"-n{counts}"
+        f"-c{plan['slots']}"
+        f"-p{probabilities}"
+        f"-seeds{seeds}"
+        f"-{digest[:12]}"
+    )
+
+
 def require_cartridge_plan(plans: Mapping[str, _PlanT], name: str) -> _PlanT:
     """Look up a plan by name in a supplied table.
 
@@ -283,10 +376,14 @@ def plan_label(name: str, plan: CartridgePlan, *, digest: str) -> str:
 __all__ = [
     "CARTRIDGE_EXPERIMENT",
     "CARTRIDGE_PLANS",
+    "COMPANION_SWEEP_EXPERIMENT",
+    "COMPANION_SWEEP_PLANS",
     "COMPOSITION_SWEEP_EXPERIMENT",
     "COMPOSITION_SWEEP_PLANS",
     "CartridgePlan",
+    "CompanionSweepPlan",
     "CompositionSweepPlan",
+    "companion_sweep_label",
     "composition_sweep_label",
     "corpus_digest",
     "plan_label",

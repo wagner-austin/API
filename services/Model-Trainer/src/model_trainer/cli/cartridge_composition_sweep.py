@@ -123,7 +123,7 @@ def policy_slots(plan: CompositionSweepPlan, policy: str, count: int) -> int:
     return budget // count
 
 
-def _matched_other_train(
+def matched_other_train(
     name: str,
     windows: Sequence[torch.Tensor],
     *,
@@ -222,7 +222,7 @@ def measure_sweep(
         other_documents = _test_hooks.read_corpus_documents(other)
         other_encoded = [tokenizer.encode(document) for document in other_documents]
         other_trains.append(
-            _matched_other_train(
+            matched_other_train(
                 str(other),
                 build_windows(other_encoded, window=plan["window"], device=device),
                 held_out_stride=plan["held_out_stride"],
@@ -395,6 +395,7 @@ __all__ = [
     "composition_sweep_run_record",
     "entrypoint",
     "main",
+    "matched_other_train",
     "measure_sweep",
     "policy_slots",
 ]
