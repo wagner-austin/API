@@ -225,6 +225,11 @@ TREE_SOURCES = (
     "scripts",
     "doctrines",
     "sweeps",
+    # The fitted heads ride with the code that scores them: a braced arm
+    # on a cluster node reads models/razebrace.ndjson out of the payload,
+    # and a tree without it would fail at model load, member by member
+    # ([[impossible-step-three-design]]).
+    "models",
     "agent/build/rw-agent.jar",
     CATALOGUE,
     TYPE_DUMP,
@@ -251,6 +256,7 @@ FROZEN_ENTRIES = (
     "doctrines",
     "scripts",
     "sweeps",
+    "models",
     FROZEN_AGENT_JAR,
     FROZEN_CATALOGUE,
     FROZEN_TYPE_DUMP,
