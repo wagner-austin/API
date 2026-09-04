@@ -26,7 +26,7 @@ from hpc3.contracts.dependency import describe_dependency
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.preflight import PreflightResult, decode_preflight_result
-from hpc3.core import env_probe, image_exec, remote, sbatch
+from hpc3.core import env_probe, gpu_supply, image_exec, remote, sbatch
 
 _START_ANCHOR = " to start at "
 _USING_ANCHOR = " using "
@@ -240,15 +240,24 @@ def preflight(
         AppError: With ``ENV_PATH_MISSING`` if the environment is absent,
             ``ENV_PACKAGE_MISMATCH`` if it exists but does not contain what
             the project pinned, ``ENV_PROBE_UNREADABLE`` if it cannot say what
-            it contains, ``PREFLIGHT_REJECTED`` if Slurm refuses the job --
-            carrying its own reason, which is the diagnostic -- or
-            ``PREFLIGHT_UNPARSABLE`` if the verdict cannot be read.
+            it contains, ``GPU_MODEL_EXHAUSTED`` if the job pins a GPU model
+            the partition has none of free while another model idles,
+            ``PREFLIGHT_REJECTED`` if Slurm refuses the job -- carrying its
+            own reason, which is the diagnostic -- or ``PREFLIGHT_UNPARSABLE``
+            if the verdict cannot be read.
     """
     check_env_path(host, spec)
     # Existence, then identity. The path check catches a typo; this catches
     # the more expensive mistake of a real environment that is the wrong one.
     env_probe.verify_env_packages(
         host, spec["env_path"], spec["pinned_packages"], image=spec["image"]
+    )
+    # Then whether the card it pinned exists free. `sbatch --test-only` below
+    # answers "would this be ADMITTED", and a job queued behind an exhausted
+    # GPU model is admitted -- it just does not run. That gap cost five hours
+    # on 2026-09-04; see `hpc3.core.gpu_supply`.
+    gpu_supply.check_requested_gpu_available(
+        spec, gpu_supply.read_gpu_supply(host, spec["partition"])
     )
 
     remote.make_directory(host, script_dir)

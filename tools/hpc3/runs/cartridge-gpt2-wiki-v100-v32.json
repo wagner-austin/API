@@ -1,6 +1,6 @@
 {
   "project": "mi",
-  "name": "cartridge-gpt2-wiki-a100-v32",
+  "name": "cartridge-gpt2-wiki-v100-v32",
   "image": {
     "path": "/pub/wagnera3/images/v32/abl.sif",
     "sha256": "65762bbd4d30c27eab374d30785d2cffc32d159c5f91e57585bcbda2c6a915a7",
@@ -10,8 +10,8 @@
   },
   "minutes": 30,
   "mem_gb": 16,
-  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_benchmark --plan gpt2-wiki --corpus /pub/wagnera3/mi/cartridge/corpus-me --second-corpus /pub/wagnera3/mi/cartridge/corpus-civic --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-wiki-a100-v32.json",
-  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-wiki-a100-v32.json",
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_benchmark --plan gpt2-wiki --corpus /pub/wagnera3/mi/cartridge/corpus-me --second-corpus /pub/wagnera3/mi/cartridge/corpus-civic --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-wiki-v100-v32.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-wiki-v100-v32.json",
   "experiment": {
     "measurement": "cartridge-capacity-and-composition",
     "plan": "gpt2-wiki",
@@ -24,6 +24,10 @@
     "local_sweep_noise_floor": "0.0202",
     "local_slots_512_mean": "0.9381",
     "local_composition_retention": "0.5926",
-    "why": "cross-card-check-do-separation-verdicts-survive-a100"
+    "why": "cross-card-check-do-separation-verdicts-survive-v100"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
   }
 }
