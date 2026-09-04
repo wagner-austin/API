@@ -12,4 +12,6 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [A declared batch size trained at four times itself](../pages/model-trainer-declared-config-is-not-a-suggestion.md) -- the worker silently rewrote any declared batch of 4 or less on CUDA, and every record kept saying what the payload declared
 
+[Companioned training recipe](../pages/model-trainer-companioned-training-recipe.md) -- the intervention that moves the composition ceiling: train every cartridge with a frozen held-out companion at p=0.5 and four-compartment retention goes from -45.4% to +44.6% (bit-identical record, 15x its floor) for a solo cost of four hundredths, with a dose curve and an overdose endpoint in both companion kinds
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

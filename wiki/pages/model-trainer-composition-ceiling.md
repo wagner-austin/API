@@ -2,6 +2,7 @@
 title: Cartridge composition has a ceiling of two compartments, measured with its own artifact detectors
 tags: [ml, model-trainer, cartridges, composition, measurement]
 related:
+  - "[[model-trainer-companioned-training-recipe]]"
   - "[[monorepo-discipline]]"
   - "[[service-port-map]]"
 source_paths:
@@ -65,14 +66,15 @@ comma-joined argument, and the mangled remainder reached the corpus reader
 as a directory that globs empty, which the reader refused loudly rather
 than training on nothing.
 
-## What this binds, and the way past it
+## What this binds, and the way past it, which has since been measured
 
-For the compartmental serving design the practical limit at this scale and
-training recipe is two simultaneously wired compartments, with compartment
-selection mattering less than count. The escape route the literature names
-is composition-aware training -- the ICAE multi-span finding that
-concatenation of separately compressed spans works only when trained for --
-which is delegated to the amortized-encoder arm (board task 292c3272).
-`docs/RESEARCH.md` carries the run summary under the `mi` project, and no
-run document is committed because the registered `mi` image predates the
-command.
+For the compartmental serving design the practical limit at this scale
+UNDER NAIVE TRAINING is two simultaneously wired compartments, with
+compartment selection mattering less than count. The escape route the
+literature names -- composition-aware training, the ICAE multi-span
+finding that concatenation works only when trained for -- was measured the
+following day and MOVES this ceiling: see
+[[model-trainer-companioned-training-recipe]], where the trained-p0.5
+recipe puts n4 retention at +44.6% against this page's -45.4%. This page's
+numbers stand as the naive baseline that recipe is judged against.
+`docs/RESEARCH.md` carries both run summaries under the `mi` project.
