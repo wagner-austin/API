@@ -139,6 +139,16 @@ tools/hpc3/runs/*
 # because someone force-added them, which is the shape the note above
 # warns about — the next one would have gone missing silently.
 !tools/hpc3/runs/*-digests.txt
+# Stage manifests are the other half of that provenance: the digests record
+# says which bytes the work published, and the manifest says where they were
+# put and why that selection. Committing one and ignoring the other leaves a
+# record that can prove a file arrived intact and cannot say what it is.
+#
+# Named `*-stage.json` rather than force-added, which is what the first pair
+# of these got until it was noticed. A negation is the fix and a `git add -f`
+# is not: forcing works for whoever runs it and silently drops the file for
+# the next person, which is exactly the failure the note above records.
+!tools/hpc3/runs/*-stage.json
 **/corpus/
 
 # But allow source code directories named "data"
