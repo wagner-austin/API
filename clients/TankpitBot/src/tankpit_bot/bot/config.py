@@ -128,9 +128,29 @@ def resolve_human_rank_window() -> tuple[int, int]:
 def resolve_video_fps() -> float:
     """Return the live-view capture rate from ``TANKPIT_BOT_VIDEO_FPS``.
 
-    Default 12 fps — steady motion for phone monitoring at roughly
-    0.5-1 MB/s of JPEG through the tunnel (2026-07-29 page-push live
-    view, [[bot-service-architecture]]).
+    Default 30 fps, raised from 12 on 2026-09-03 because 12 was
+    UNDERSAMPLING THE GAME'S ANIMATIONS. Walking, a radar sweep and a
+    projectile's travel are each many frames, and a histogram of frame
+    arrivals from a live playing bot showed 71 of 148 inter-frame gaps
+    sitting in the 50-100 ms bucket — clustered on the 83 ms sampling
+    interval itself. That is the caster's own floor, not the game's
+    rate: nearly half the samples were taken as fast as the caster was
+    allowed to take them, so whatever happened in between was thrown
+    away and the motion arrived stepped.
+
+    30 is affordable rather than aspirational. Measured in this
+    workspace's own container against six stacked 384x256 canvases all
+    repainting every frame (the worst case the real client can present):
+    the caster achieved 30.3/s and the page's own requestAnimationFrame
+    stayed at 59.8/s, versus a 60.0/s baseline with no caster at all. It
+    costs the page nothing. 60 fps was equally free on CPU and was not
+    taken because its worst case is 584 KB/s through a Cloudflare
+    tunnel, against 301 KB/s at 30.
+
+    The real cost is lower than either number because unchanged frames
+    are no longer sent at all (see
+    :mod:`tankpit_bot.browser.live_view`), so a still game bills
+    nothing for the higher rate and only motion spends it.
 
     Returns:
         Frames per second the in-page caster targets.
@@ -139,7 +159,7 @@ def resolve_video_fps() -> float:
         ValueError: If the env value is set but not a number.
     """
     raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_FPS")
-    return float(raw) if raw is not None else 12.0
+    return float(raw) if raw is not None else 30.0
 
 
 def resolve_video_quality() -> float:
