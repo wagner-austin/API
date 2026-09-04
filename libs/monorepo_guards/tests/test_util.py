@@ -21,6 +21,7 @@ def test_iter_py_files_excludes_cache_and_handles_missing_dirs(tmp_path: Path) -
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src", "missing"),  # 'missing' directory does not exist
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,

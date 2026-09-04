@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Final
 
 from monorepo_guards import Violation
+from monorepo_guards.config import GuardConfig
 from monorepo_guards.util import parse_source
 
 
@@ -120,6 +121,34 @@ STRATEGY_NAME_SET: Final = LiteralSet(
         "checkpoint's metadata, depending on which copy was stale"
     ),
 )
+
+
+RISK_TIER_SET: Final = LiteralSet(
+    subject="risk-tier",
+    defining_module="covenant_domain/features.py",
+    tuple_name="RISK_TIERS",
+    field_names=frozenset({"risk_tier"}),
+    consequence=(
+        "the classifier, the streaming decoder, the Datadog tags and the Google AI "
+        "schema would accept different sets, so a prediction would be filed under a "
+        "tier one of them cannot name -- and because each Literal is its own "
+        "annotation, widening any one of them type-checks on its own"
+    ),
+)
+
+
+REGISTERED_SETS: Final[tuple[LiteralSet, ...]] = (
+    CORPUS_FORMAT_SET,
+    RISK_TIER_SET,
+    STRATEGY_NAME_SET,
+)
+"""Every set this rule is registered for, listed once.
+
+The orchestrator builds one rule per entry rather than naming them again, so
+adding a set here is the whole registration. Tests that have to materialise a
+declaring module read this too, which is why a fourth set does not break
+them.
+"""
 
 
 def _literal_members(node: ast.expr) -> frozenset[str] | None:
@@ -218,20 +247,54 @@ def _annotation_sites(tree: ast.Module, field_names: frozenset[str]) -> list[tup
     return sites
 
 
+PACKAGE_SOURCE_GLOB = "*/*/src"
+"""Where a package's importable modules live, relative to the monorepo root.
+
+Packages sit exactly two levels down (``libs/x``, ``services/x``) and every
+one of them is src-layout, so a declaring module is reachable from the
+monorepo root without walking the tree.
+"""
+
+
 class LiteralSetRule:
     """Guard rule keeping one set's inline Literals in step with its tuple."""
 
     name: str
     _declared_set: LiteralSet
+    _config: GuardConfig
 
-    def __init__(self, declared_set: LiteralSet) -> None:
+    def __init__(self, declared_set: LiteralSet, config: GuardConfig) -> None:
         """Bind the rule to one declared set.
 
         Args:
             declared_set: The set this instance checks.
+            config: The run's configuration, read for its monorepo root.
         """
         self._declared_set = declared_set
+        self._config = config
         self.name = f"{declared_set.subject}-literal"
+
+    def _declaring_modules(self) -> list[Path]:
+        """Find the module that declares this set, anywhere in the monorepo.
+
+        Resolved from the monorepo root rather than from the files being
+        checked. THIS IS THE WHOLE POINT OF THE CHANGE: the previous version
+        looked only among the checked package's own files and returned no
+        findings when the declaring module was not among them. That made it
+        inert for every set whose users live outside the package that owns it
+        -- which is every set shared through a library. It reported "0
+        violations" and read as checked.
+
+        Returns:
+            Every module matching the declared suffix, sorted. More than one
+            is an ambiguity the caller reports rather than resolves.
+        """
+        source_roots = sorted(self._config.monorepo_root.glob(PACKAGE_SOURCE_GLOB))
+        return [
+            module
+            for root in source_roots
+            if (module := root / self._declared_set.defining_module).is_file()
+        ]
 
     def run(self, files: list[Path]) -> list[Violation]:
         """Compare every watched Literal against the declared tuple.
@@ -240,14 +303,26 @@ class LiteralSetRule:
             files: Python source files to check.
 
         Returns:
-            Every disagreement found, in file order. Empty when the package
-            being checked does not declare the tuple at all, which is every
-            package except the one that owns it.
+            Every disagreement found, in file order. A declaring module that
+            cannot be located, or that no longer binds the tuple, is itself a
+            violation: this rule has no silent state.
         """
         declared_set = self._declared_set
-        declaring = [f for f in files if f.as_posix().endswith(declared_set.defining_module)]
-        if not declaring:
-            return []
+        declaring = self._declaring_modules()
+        if len(declaring) != 1:
+            return [
+                Violation(
+                    file=self._config.monorepo_root / declared_set.defining_module,
+                    line_no=1,
+                    kind=f"{declared_set.subject}-declaration-unresolved",
+                    line=(
+                        f"{len(declaring)} modules under {PACKAGE_SOURCE_GLOB} end with "
+                        f"{declared_set.defining_module}, expected exactly one; the "
+                        f"{declared_set.subject} guard cannot read its accepted set and "
+                        "would otherwise check nothing while reporting no violations"
+                    ),
+                )
+            ]
         declared = _declared_members(parse_source(declaring[0]), declared_set.tuple_name)
         if declared is None:
             return [
@@ -289,6 +364,9 @@ class LiteralSetRule:
 
 __all__ = [
     "CORPUS_FORMAT_SET",
+    "PACKAGE_SOURCE_GLOB",
+    "REGISTERED_SETS",
+    "RISK_TIER_SET",
     "STRATEGY_NAME_SET",
     "LiteralSet",
     "LiteralSetRule",

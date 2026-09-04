@@ -18,6 +18,7 @@ def _config(root: Path) -> GuardConfig:
     """Build a configuration rooted at one project."""
     return GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src",),
         exclude_parts=(),
         forbid_pyi=True,

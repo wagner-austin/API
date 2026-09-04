@@ -38,6 +38,7 @@ def _make_config(root: Path) -> GuardConfig:
     """
     return GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src",),
         exclude_parts=(".venv", "__pycache__", "target"),
         forbid_pyi=False,

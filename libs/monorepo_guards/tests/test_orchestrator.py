@@ -4,6 +4,7 @@ from pathlib import Path
 
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.orchestrator import _run_with_config
+from tests._literal_set_support import write_declared_sets
 
 
 def _write(path: Path, text: str) -> None:
@@ -32,6 +33,7 @@ def test_orchestrator_reports_violations_and_nonzero(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("server/model_trainer",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,
@@ -43,9 +45,14 @@ def test_orchestrator_reports_violations_and_nonzero(tmp_path: Path) -> None:
 
 
 def test_orchestrator_pass_no_files(tmp_path: Path) -> None:
-    # No configured directories exist; should pass with zero violations
+    # No configured directories exist; should pass with zero violations.
+    # The declared sets are written because LiteralSetRule resolves them from
+    # the monorepo root, and a tree missing them is a tree where that rule
+    # genuinely cannot check anything.
+    write_declared_sets(tmp_path)
     cfg = GuardConfig(
         root=tmp_path,
+        monorepo_root=tmp_path,
         directories=("nonexistent",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,
@@ -67,6 +74,7 @@ def test_orchestrator_truncates_long_line(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,

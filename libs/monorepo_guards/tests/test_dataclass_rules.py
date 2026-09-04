@@ -19,6 +19,7 @@ def test_dataclass_rule_flags_banned_paths(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("server/model_trainer",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=False,
@@ -40,6 +41,7 @@ def test_dataclass_rule_non_banned_path_noop(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("feature",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=False,

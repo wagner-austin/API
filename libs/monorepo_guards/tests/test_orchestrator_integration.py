@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from monorepo_guards.orchestrator import run_for_project
+from tests._literal_set_support import write_declared_sets
 
 
 def test_run_for_project_with_config_file(tmp_path: Path) -> None:
@@ -21,6 +22,7 @@ dataclass_ban_segments = []
 """,
         encoding="utf-8",
     )
+    write_declared_sets(monorepo_root)
 
     # Create a project
     project_root = monorepo_root / "services" / "test-service"

@@ -23,11 +23,7 @@ from monorepo_guards.hook_dispatch_rules import HookDispatchRule, NullableHookRu
 from monorepo_guards.httpx_rules import HttpxRule
 from monorepo_guards.imports_rules import ImportsRule
 from monorepo_guards.json_rules import JsonRule
-from monorepo_guards.literal_set_rules import (
-    CORPUS_FORMAT_SET,
-    STRATEGY_NAME_SET,
-    LiteralSetRule,
-)
+from monorepo_guards.literal_set_rules import REGISTERED_SETS, LiteralSetRule
 from monorepo_guards.logging_rules import LoggingRule
 from monorepo_guards.ml_test_quality_rules import MLTestQualityRule
 from monorepo_guards.mock_rules import MockBanRule
@@ -93,8 +89,7 @@ def _run_with_config(config: GuardConfig) -> int:
         FakeRedisRule(),
         RunFingerprintLiteralRule(),
         RunRecordRule(),
-        LiteralSetRule(CORPUS_FORMAT_SET),
-        LiteralSetRule(STRATEGY_NAME_SET),
+        *(LiteralSetRule(declared, config) for declared in REGISTERED_SETS),
         FileSizeRule(),
         GuardShimRule(),
         ShimRule(),

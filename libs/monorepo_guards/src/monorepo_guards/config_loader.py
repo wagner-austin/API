@@ -84,7 +84,8 @@ def _decode_monorepo_guard_config(monorepo_root: Path) -> GuardConfig:
     )
 
     return GuardConfig(
-        root=monorepo_root,  # Temporarily, this will be overwritten
+        root=monorepo_root,  # Replaced with the project root by run_for_project
+        monorepo_root=monorepo_root,
         directories=directories,
         exclude_parts=exclude_parts,
         forbid_pyi=forbid_pyi,

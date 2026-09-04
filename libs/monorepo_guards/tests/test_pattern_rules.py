@@ -35,6 +35,7 @@ def test_pattern_rule_flags_drifts_and_noqa(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,
@@ -60,6 +61,7 @@ def test_pattern_rule_flags_pyi_when_forbidden(tmp_path: Path) -> None:
 
     cfg = GuardConfig(
         root=root,
+        monorepo_root=root,
         directories=("src",),
         exclude_parts=(".venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"),
         forbid_pyi=True,

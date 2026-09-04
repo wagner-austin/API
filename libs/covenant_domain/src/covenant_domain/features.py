@@ -19,6 +19,22 @@ Thresholds:
 - CRITICAL: probability >= 0.80
 """
 
+RISK_TIERS: tuple[RiskTier, ...] = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
+"""The accepted tiers, declared so something can check the copies.
+
+This set was spelled SEVEN ways: ``RiskTier`` here and again in
+``platform_core.covenant_metrics_events``, ``RiskTierValue`` in
+covenant-radar-api, four inline ``Literal[...]`` on fields and parameters,
+and a ``VALID_RISK_TIERS`` tuple beside one of them. Widening any one of them
+type-checks, because they are independent annotations and mypy has no reason
+to relate them -- so a decoder would come to accept a tier the classifier
+never produces, and the failure would surface as a prediction filed under a
+tier nothing reads.
+
+``monorepo_guards.literal_set_rules.RISK_TIER_SET`` reads this tuple and
+requires every ``risk_tier`` annotation in the monorepo to name exactly it.
+"""
+
 
 def classify_risk_tier(probability: float) -> RiskTier:
     """Classify probability into risk tier.

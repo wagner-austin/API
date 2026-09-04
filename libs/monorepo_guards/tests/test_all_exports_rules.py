@@ -16,6 +16,7 @@ import pytest
 
 from monorepo_guards.all_exports_rules import AllExportsRule
 from monorepo_guards.orchestrator import run_for_project
+from tests._literal_set_support import write_declared_sets
 
 
 def _write(path: Path, text: str) -> None:
@@ -211,6 +212,7 @@ def test_the_orchestrator_actually_runs_this_rule(tmp_path: Path) -> None:
         "dataclass_ban_segments = []\n",
         encoding="utf-8",
     )
+    write_declared_sets(monorepo_root)
     project_root = monorepo_root / "services" / "svc"
     _write(project_root / "src" / "pkg" / "__init__.py", '__all__ = ["create_app"]\n')
 
