@@ -6,6 +6,27 @@ from pathlib import Path
 from monorepo_guards import Violation
 from monorepo_guards.util import parse_source, read_lines
 
+CENTRAL_ERROR_MODULES = frozenset({"errors.py", "error_codes.py"})
+"""The files inside ``platform_core`` that ARE the central error vocabulary.
+
+Two rather than one since 2026-09-04, and this is a corrected predicate rather
+than an exemption. The rule's subject is where error types are DEFINED --
+centrally, or locally where they can drift. It was written when the whole
+vocabulary lived in one file, so it spelled "central" as ``errors.py``, and
+that spelling silently made "one file" part of the rule.
+
+``errors.py`` then hit the monorepo's 600-line ceiling by accumulating eight
+service enums beside machinery that does not grow, and the file-size guard
+correctly demanded a split by role. Splitting it moved ``ErrorCode`` into
+``platform_core/error_codes.py`` -- still central, still the one vocabulary,
+still imported through ``platform_core.errors`` by every one of its 304
+callers -- and this rule flagged it as a LOCAL error type, which it is not.
+
+So the set names the vocabulary's home. It is not a list of files allowed to
+break the rule; adding a per-service file here would defeat the rule and is
+the thing to refuse.
+"""
+
 
 class ErrorsRule:
     """Enforce centralized error handling by forbidding local error modules and types."""
@@ -13,7 +34,7 @@ class ErrorsRule:
     name = "errors"
 
     def _is_platform_core_errors_module(self, path: Path) -> bool:
-        return path.name == "errors.py" and "platform_core" in path.parts
+        return path.name in CENTRAL_ERROR_MODULES and "platform_core" in path.parts
 
     def _is_local_error_module(self, path: Path) -> bool:
         if self._is_platform_core_errors_module(path):
@@ -82,4 +103,4 @@ class ErrorsRule:
         return out
 
 
-__all__ = ["ErrorsRule"]
+__all__ = ["CENTRAL_ERROR_MODULES", "ErrorsRule"]
