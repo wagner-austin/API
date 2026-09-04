@@ -9,6 +9,69 @@ Typed Python monorepo: ML training, NLP, media services, quant-ML risk
 modeling. Strict mypy (no `Any`, no `cast`, no `type: ignore`), 100%
 statement + branch coverage, FastAPI + RQ + Redis + Kafka.
 
+## Corvis: the tools this session actually has
+
+`corvis` is Austin's own MCP fleet — ~27 backends, 250+ tools behind a proxy
+— and it is configured **globally**, so it is live in this repo even though
+its code lives in `~/PROJECTS/MCPs`. Only four discovery tools appear in the
+tool list; everything else is reached through them:
+
+```
+search_tools(query)       rank the registry — ORDERS results, never proves absence
+tool_list(backend?)       the exhaustive inventory — the only way to prove absence
+get_tool_schema(name)     the full input schema, before calling
+execute_tool(name, args)  invoke anything the two above found
+```
+
+**Never conclude a tool does not exist from a weak `search_tools` score** —
+that is what `tool_list` is for. What matters most from this repo:
+
+- `wiki_search_query` / `wiki_search_list_wikis` / `wiki_search_reindex` /
+  `wiki_search_index_status` — hybrid search (dense HNSW fused with BM25) over
+  all registered wikis, `api-codebase` and `hpc3` included. Search before you
+  write; the page may exist.
+- `wiki_audit_run` / `wiki_audit_page` / `wiki_audit_status` — the
+  `packages/wiki-check` auditor that enforces the page discipline below. Run
+  `wiki_audit_page` on every page you touch, before committing. `wiki_audit_page`
+  defaults to `mode='async'`; `wiki_audit_run` defaults to `mode='sync'` and
+  will exceed the RPC deadline on a large wiki — pass `mode='async'` and poll
+  `wiki_audit_status(job_id)` there.
+- `task_*` — the agent board (see below).
+- `skill_get(name)` — pull any registered skill's `SKILL.md`, including
+  `/ml-research` and `agent-board`, from any corvis session.
+
+Corvis's own architecture, deployment and rules are NOT this file's business:
+`~/PROJECTS/MCPs/CLAUDE.md` governs sessions there. Do not edit MCPs-workspace
+code from an API session — the rebuild cascades and migration ordering that
+make such a change safe are documented there and enforced there.
+
+## The board is how AI sessions coordinate
+
+**The agent task board (`task_*` tools) is the shared coordination surface for
+every AI session on Austin's machines** — this repo, the MCPs workspace, the
+phone, claude.ai. It is where a session says what it is doing, claims shared
+work, and hands off. Read the `agent-board` skill (`skill_get("agent-board")`)
+before your first board write.
+
+- **Session start, whenever the work is shared or long-running:**
+  `task_feed(sinceMinutes=…, maxBodyChars=300)` → `task_list(status="outstanding")`
+  → `task_post(kind="checkin", …)`. An unfiltered feed is the board; a filtered
+  read is not.
+- **Claim before working** (`task_claim`, with a `leaseSeconds` if you might not
+  finish). Only the claimant may `task_update`.
+- **Identity is ENFORCED:** `agent` = kebab-case `<model>-<topic>-<MMDD>`,
+  `sessionId` = this session's real UUID. One session keeps one label forever.
+- **Closures are ENFORCED:** `done` / `failed` require a non-empty `result` —
+  the next reader acts on that summary.
+- **Status alone never means unanswered.** `task_feed(query=…)` is the only
+  surface that searches post bodies; `task_list`'s query covers title + spec.
+- **The board is coordination, not storage.** A durable finding goes to the
+  wiki its contract fits; post the pointer.
+
+A long cluster job is exactly the case the board exists for: submit through the
+hpc3 CLI, post the job id, and let whichever session is awake when it lands
+pick it up.
+
 ## Research: read the index before producing a number
 
 **`docs/RESEARCH.md` is the canonical index of every body of work on this
@@ -21,10 +84,17 @@ file, not an oversight in it.
 It is enforced, not decorative: the machine-readable half is the `projects`
 table in the hpc3 workspace documents (`tools/hpc3/runs/hpc3*.json`), and
 `tools/hpc3/tests/test_committed_runs.py` fails when a registered project is
-missing from `RESEARCH.md`. Registered today: `mi` (Model-Trainer probes),
-`cleargbm`, `floor` (cloze floor scoring), `turkic-lstm` (`~/PROJECTS/LSTM`),
-`rusted` (RustedWarfareBot). `sirius` is deliberately NOT registered and the
-file explains why — do not "fix" it by registering it.
+missing from `RESEARCH.md`. Registered today, one per workspace document:
+`cleargbm`, `mi` (Model-Trainer probes), `floor` (cloze floor scoring),
+`turkic-lstm` (`~/PROJECTS/LSTM`), `rusted` (RustedWarfareBot), `tankpit`
+(TankpitBot), `code-style`. Enumerate rather than trust this line —
+`python -c "import json,glob; [print(list(json.load(open(f))['projects']))
+for f in glob.glob('tools/hpc3/runs/hpc3*.json')]"` — and regenerate the
+`RESEARCH.md` table with `hpc3-research-index --check` / `--write` (a bare
+invocation refuses by design; neither form is the default).
+
+`sirius` is deliberately NOT registered and `RESEARCH.md` explains why — do
+not "fix" it by registering it.
 
 **Adding a research project** — the procedure is at the bottom of
 `RESEARCH.md`. In one line: register it in a `tools/hpc3/runs/` workspace
@@ -84,6 +154,11 @@ hpc3-chain       stages, each after the last
 hpc3-trace       which job trained this?
 hpc3-cancel      stop it, and say what actually stopped
 ```
+
+Seven more exist (`bootstrap`, `campaign`, `image`, `image-build`,
+`image-capture`, `stage`, `research-index`) — `hpc3-<tab>` or the README
+enumerates them. Every command refuses a bare invocation: you name the action
+or you get nothing.
 
 `tools/hpc3/README.md` is the command reference. **The reasoning — every
 rule's incident, every measured fact's measurement — is in
