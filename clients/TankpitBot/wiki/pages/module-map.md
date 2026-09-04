@@ -7,8 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "84cbcda90e100889c9d16e40960b053388c0a9bb"
-fact_checked: "2026-08-07"
+  "src/tankpit_bot": "0c8b596c7022a130d131f51e210c6945bbb59cd8"
+fact_checked: "2026-09-03"
 confidence: high
 hubs: [codebase]
 ---
@@ -30,13 +30,13 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `container/` | The container message family, decoded from inside `protocol/decoders/tank.py` | `types.py`, `decoders/`, `encoders.py`. Imports `wire` and nothing else |
 | `types/` | The shared vocabulary every layer names — a true leaf, imports nothing from this codebase | `constants.py` (terrain/team/damage codes, ASCII glyphs — was `state/types/constants.py`, where it made `physics` and `state` mutually dependent), `modes.py` (`BehaviorMode` — was `bot/ai/modes.py`, the one file forcing `service` to import `bot`), `literals.py`, `message.py`, `session.py`, `cdp.py`, `config.py`, `probe.py` ([[package-layering]]) |
 | `analysis/` | The typed capture-scan owner — one load-XOR-split-decode pipeline instead of forty | `scan.py` (`scan_session`, direction-tagged frames), `types.py`, `_test_hooks.py`. Thirty of the forty `analysis_scripts/` each wrote this pipeline for themselves; every step now delegates to the module that already owned it ([[capture-differ]]) |
-| `sniffer/` | Passive WebSocket sniffer — captures traffic without playing | `core.py` (entry point), `world_service.py` + `world_service_beliefs/movement/radar.py` (the service each session now owns), `world_state_*.py` (the state machine — `world_state_dispatch*.py` plus one module per subject: combat, containers, inventory, radar, tanks, tiles). The singleton module `world_state.py` that this row used to name **no longer exists**; see [[services]] [^4] and [[session-state-deglobalisation]] step 8 |
+| `sniffer/` | Passive WebSocket sniffer — captures traffic without playing | `core.py` (entry point), `world_service.py` + `world_service_beliefs.py` / `world_service_movement.py` / `world_service_radar.py` (the service each session now owns — three sibling modules, not a `world_service_beliefs/` package as this row read until 2026-09-03), `world_state_*.py` (the state machine — `world_state_dispatch*.py` plus one module per subject: combat, containers, inventory, radar, tanks, tiles). The singleton module `world_state.py` that this row used to name **no longer exists**; see [[services]] [^4] and [[session-state-deglobalisation]] step 8 |
 | `capture/` | Post-hoc capture analysis — shot correlation, viewport analysis | `stats.py`, `viewport_analysis.py`, `trackers/` |
 | `action_lab/` | Live probes — isolated experiments against the real server | `probe_base.py` (ProbeBase), `probe_factory.py` (DI), teleport/fuel/equipment/movement probes |
 | `diagnostics/` | Runtime + offline diagnostics — issue reports, alignment checks | `issue_report.py`, `entity_alignment.py`, `self_alignment.py`, `session_stats.py` |
 | `replay/` | Replay engine — re-runs captures through bot decision logic | `engine.py`, used by `tests/replay/` regression tests |
 | `physics/` | The game's measured laws, one symbol per machine-checked wiki claim | `costs.py`, `capacity.py`, `damage.py`, `combat.py`, `map.py` (see [[physics-module-roadmap]] Phase 1) |
-| `sim/` | The server twin — laws, world, transport, practice room | `server.py` (routing/orchestration), `viewport_window.py` (stored 0x5A window + patch memory + visibility), `combat_emissions.py` (shots, mercy bundle, deferred debits, corpse windows), `emissions.py` (per-command wire emission), `wire_statements.py` (pure builders), `world.py` + `world_seed.py` (static population + mined layouts), `bot_policy.py` + `practice_room.py` (certified bot minds), `opponent.py` (scripted harness) |
+| `sim/` | The server twin — laws, world, transport, practice room | `server.py` (routing/orchestration), `viewport_window.py` (stored 0x5A window + patch memory + visibility), `narrate/` (the emission side, split out of the former `combat_emissions.py` + `emissions.py`: `combat.py`, `movement.py`, `resources.py`, `world.py` — pure narration taking a resolved outcome plus an `observer_id`, so the law modules own every mutation and calling narration once per observer no longer applies each effect N times), `wire_statements.py` (pure builders), `world.py` + `world_seed.py` (static population + mined layouts), `bot_policy.py` + `practice_room.py` (certified bot minds), `opponent.py` (scripted harness) |
 | `validate/` | Archive-priced law validators — `make audit` / `make shadow` / roundtrip | `audit.py`, `shadow*.py`, `roundtrip.py`, `wire_timeline.py` |
 | `ledger/` | Live physics bookkeeping — fuel, ammo, and per-enemy damage books, divergence verdicts | `fuel_book.py` (windows + per-kind session totals), `ammo_book.py`, `damage_book.py` (dealt/taken per enemy by weapon), `outcome/` (per-command outcome resolvers) |
 | `facts/` | The belief VOCABULARY — provenance and confidence, the Facts layer of [[self-observing-architecture]] | `fact.py`, `provenance.py`, `confidence.py`, `source.py`. A leaf: the `Fact[T]` projections that read world state back live in `state/projections/`, because keeping them here made `facts` and `state` mutually dependent |
@@ -49,7 +49,7 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | Module | Purpose |
 |--------|---------|
 | `_test_hooks/` | Protocol interfaces for DI — 8 submodules by domain (bot, browser, cdp, env, fs, etc.) |
-| `_hooks_guard.py` | MonkeyPatchBanRule enforcement |
+| ~~`_hooks_guard.py`~~ | **Gone** (deleted in `8c6453da`). It never enforced anything, and `MonkeyPatchBanRule` lives in the shared guards library at `libs/monorepo_guards/src/monorepo_guards/monkey_patch_rules.py` — see [[testing-patterns]], whose footnote was corrected for this same misattribution on 2026-08-07 while this row was missed |
 | `_pillow.py` | Typed Pillow boundary — `PillowImageProtocol` / `PillowImageModuleProtocol` + `load_pillow_image_module()`, so the dynamic PIL import stays strict-typed without a mypy import exception (consumed by `terrain.py`) |
 | `protocol/` | Wire constants, framing, encode/decode |
 | `parser.py` + `parser_messages.py` | CDP message parsing |

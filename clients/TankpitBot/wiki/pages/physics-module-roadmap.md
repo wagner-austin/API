@@ -18,9 +18,9 @@ source_paths:
   - "src/tankpit_bot/validate"
 source_git_blobs:
   "src/tankpit_bot/physics": "c7425148961158380776c7c1b63191af18e37afa"
-  "src/tankpit_bot/sim": "3d76aec1a8e82838e6b80e39be63e5c1e949cbba"
+  "src/tankpit_bot/sim": "dfb638088dfdd6387b6dfe59031a5ba4baf00ebe"
   "src/tankpit_bot/validate": "9b9f0b46adcdf9732c714cc5f69c48d563d14ada"
-fact_checked: "2026-08-07"
+fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
 ---
@@ -166,7 +166,9 @@ Implemented exactly as designed with these recorded deviations:[^2]
   **Added since (2026-08-03): `physics/supervisor.py`** — the 0x52
   refusal laws, the one physics module with two consumers rather than
   one. The sim server uses the predicates to EMIT a refusal
-  (`sim/emissions.py`, `sim/equipment.py`, `sim/actions.py`); the
+  (`sim/narrate/`, `sim/equipment.py`, `sim/actions.py` — this line read
+  `sim/emissions.py` until 2026-09-03, a module the 2026-09-01 narrate
+  split replaced); the
   production bot uses the same predicates to PREDICT it before
   dispatch (`bot/executor.py`) and to steer target choice
   (`bot/ai/combat_strategy.py`). Until then the laws lived inline at

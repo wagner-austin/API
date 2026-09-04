@@ -21,7 +21,7 @@ source_git_blobs:
   "src/tankpit_bot/sim/run_boot.py": "d28a3b5cc5f86b77fb04f4095696b389e86bb713"
   "tests/test_resources.py": "01f6d2dbedc0608bac6752ec2427554e88a9b4fa"
   "scripts/download_fields.py": "267d3f5ddb0c22e4a2987aff1edbd5f87644f013"
-  "pyproject.toml": "99aa1e0b69ac61fe246e3a78735e3aaa4acb4649"
+  "pyproject.toml": "e366ce3f8cdcda1fcbcaa53a4f72fde26e8fc051"
   "Dockerfile": "e41a1035df86e034f28ae521db5a2124908861ae"
 provenance:
   - "HPC3 job 55715554 failed on field01_r.gif not found, 2026-09-03"

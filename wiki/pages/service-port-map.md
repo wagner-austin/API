@@ -12,7 +12,7 @@ source_paths:
 source_git_blobs:
   "README.md": a5bbc13914ac4cd4428f57ad76b987502990bfe7
   "docker-compose.yml": 3e57145cb052407cedd701354dc58c44d56b22d6
-  "services/data-bank-api/README.md": 49db4ef01f97328ac723f8e7015127091228e778
+  "services/data-bank-api/README.md": 3a0de6247646a38e3fff8029ae01e4b673e470fe
   "services/data-bank-api/docker-compose.yml": 6ee313dc9ea01b0457cb348dc262c961383ac778
   "services/covenant-radar-api/docs/configuration.md": 79c9a943f34890feffc9ee4df290d147433b0da5
 fact_checked: "2026-07-31"

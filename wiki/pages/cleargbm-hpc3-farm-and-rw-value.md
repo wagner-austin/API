@@ -14,8 +14,8 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
 source_git_blobs:
-  "tools/hpc3/runs/hpc3.json": 472076c61e75506c84445e50da676b88112be155
-  "tools/hpc3/runs/sweep-cleargbm-p6-rung1.json": f65a308e0f8be1b6cab87c5a80d53c1ef42ca2b4
+  "tools/hpc3/runs/hpc3.json": b9c7f77d605417ca0b1afb0a99c75d70f35e3d1c
+  "tools/hpc3/runs/sweep-cleargbm-p6-rung1.json": 3a10d80f404ce7dce29abb754f309178052ad8ff
   "libs/covenant_ml/scripts/derive_rw_value.py": ea009dd9bbe34ff6786df7b9af24e9e4a51469e1
   "libs/covenant_ml/scripts/build_metab_corpus.py": 3b7eb28d5db3e72dded3d3092fc96e590416e2f7
   "libs/covenant_ml/scripts/build_voc_corpus.py": fbc511ae75148199c2ed706d154a2d67bb4ee8a3

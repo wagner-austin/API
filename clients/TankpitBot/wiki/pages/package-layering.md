@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot"
   - "scripts/layer_rules.py"
 source_git_blobs:
-  "src/tankpit_bot": "84cbcda90e100889c9d16e40960b053388c0a9bb"
+  "src/tankpit_bot": "0c8b596c7022a130d131f51e210c6945bbb59cd8"
   "scripts/layer_rules.py": "d9e06727911f946d18b184ba2e5625447dba98c6"
 fact_checked: "2026-08-07"
 confidence: high

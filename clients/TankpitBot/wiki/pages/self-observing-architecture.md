@@ -8,8 +8,8 @@ related:
 source_paths:
   - "docs/handoffs/self-observing-bot-architecture.md"
 source_git_blobs:
-  "docs/handoffs/self-observing-bot-architecture.md": "e56a608cef109009be41d9c149a67068fba4d7f1"
-fact_checked: "2026-07-18"
+  "docs/handoffs/self-observing-bot-architecture.md": "4f8a51ccb728e9e9af2e52ec663a70563ceab65e"
+fact_checked: "2026-09-03"
 confidence: high
 hubs: [architecture]
 ---
@@ -173,9 +173,9 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 | 0 | Immediate deadlock fix: delete executor position-check | 200 | 1 |
 | 1 | `contracts/` + `facts/` foundation | 800 | 2-3 |
 | 1a | ✅ landed 2026-07-18: `contracts/` (error hierarchy, `require`, `@enforce_contract`) + `facts/` core (`Fact[T]`, `FactSource`, provenance, confidence ops) + guard rule in `scripts/contract_rules.py` | — | — |
-| 1b | ✅ landed 2026-07-18: `ContainerStateDict` carries `confidence` + `provenance` (origin derived from `refresh_kind`); `facts/container_facts.py` projects `Fact[ContainerValueDict]` | — | — |
-| 1c | ✅ landed 2026-07-18: `TankStateDict` carries `confidence` + `provenance`; `TankObservation.fact_source` records the exact wire channel at all 12 dispatch sites; `facts/tank_facts.py` projects `Fact[TankValueDict]` | — | — |
-| 1d | ✅ landed 2026-07-18: `SelfStateDict`/`MineStateDict`/`TerrainTileDict`/`ViewportStateDict` carry the fact metadata flat (self/viewport/terrain also gained `observed_ms`); `FactSource` 18 → 23 (0x2B promotion, 0x44 fuel gain, 0x4A terrain update, 0x4B mine placement, 0x64 fuel total); `facts/world_facts.py` projects all four | — | — |
+| 1b | ✅ landed 2026-07-18: `ContainerStateDict` carries `confidence` + `provenance` (origin derived from `refresh_kind`); `state/projections/container.py` projects `Fact[ContainerValueDict]` (cited as `facts/container_facts.py` until 2026-09-03; the projections moved to `state/projections/` because keeping them in `facts/` made `facts` and `state` mutually dependent) | — | — |
+| 1c | ✅ landed 2026-07-18: `TankStateDict` carries `confidence` + `provenance`; `TankObservation.fact_source` records the exact wire channel at all 12 dispatch sites; `state/projections/tank.py` projects `Fact[TankValueDict]` (was cited as `facts/tank_facts.py`) | — | — |
+| 1d | ✅ landed 2026-07-18: `SelfStateDict`/`MineStateDict`/`TerrainTileDict`/`ViewportStateDict` carry the fact metadata flat (self/viewport/terrain also gained `observed_ms`); `FactSource` 18 → 23 (0x2B promotion, 0x44 fuel gain, 0x4A terrain update, 0x4B mine placement, 0x64 fuel total); `state/projections/world.py` (was cited as `facts/world_facts.py`) projects all four | — | — |
 | 2 | ✅ landed 2026-07-18: `ledger/` core — unified outcome fabric (31+ typed outcomes incl. executor discards + `superseded`), typed `ReasonKind` decisions, Decision↔Outcome correlation via pending-pairing (`caused_by` on every outcome), `verify_outcome_invariant` session sweep, first-class mode transitions, scorecard per-outcome counters | 2500 | 4-6 |
 | 2b | ✅ landed 2026-07-19: deterministic run audit (`tankpit-run-audit` in `make analyze`) — typed findings with severity + evidence over the ledger (kill uniqueness, unresolved decisions, retry loops, stalls, cadence gaps, exit forensics) plus capture replay cross-validation (current-decoder re-decode of every received frame, wire-vs-ledger channel diffs, undecoded-subtype canary, DOM-witness diff). The ratchet rule: any hand interpretation of a run becomes a check here or is explicitly rejected — same artifacts always produce the same verdicts | — | — |
 | 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
