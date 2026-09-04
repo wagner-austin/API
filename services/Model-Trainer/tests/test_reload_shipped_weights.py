@@ -30,6 +30,11 @@ from model_trainer.core.contracts.cartridge import (
 )
 from model_trainer.core.contracts.model import CartridgeConfig, ModelTrainConfig, PreparedLMModel
 from model_trainer.core.encoding import Encoder, ListEncoded
+from model_trainer.core.services.finetuning.strategies._hook_protocols import (
+    _GetPeftModelFn,
+    _LoraConfigClassProto,
+    _LoraConfigProto,
+)
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     _default_reload_adapter_weights,
 )
@@ -200,53 +205,17 @@ def _first_adapter_tensor(model: LMModelProto) -> torch.Tensor:
     return state[lora_keys[0]]
 
 
-class _LoraConfigProto(Protocol):
-    """Protocol for a constructed peft LoraConfig."""
-
-    r: int
-
-
-class _LoraConfigClassProto(Protocol):
-    """Protocol for the peft.LoraConfig class."""
-
-    def __call__(
-        self,
-        *,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        target_modules: list[str],
-        bias: str,
-    ) -> _LoraConfigProto:
-        """Build a LoRA configuration.
-
-        Args:
-            r: Adapter rank.
-            lora_alpha: Scaling factor.
-            lora_dropout: Dropout probability.
-            target_modules: Module names to wrap.
-            bias: Bias handling mode.
-
-        Returns:
-            The configuration.
-        """
-        ...
-
-
-class _GetPeftModelProto(Protocol):
-    """Protocol for peft.get_peft_model."""
-
-    def __call__(self, model: LMModelProto, config: _LoraConfigProto) -> LMModelProto:
-        """Wrap a base model with adapters.
-
-        Args:
-            model: Base model to wrap.
-            config: Adapter configuration.
-
-        Returns:
-            The wrapped model.
-        """
-        ...
+# THE PEFT PROTOCOLS ARE IMPORTED, NOT REDECLARED. This file used to carry its
+# own `_LoraConfigClassProto`, and the copy had drifted: it omitted both
+# `task_type` and `fan_in_fan_out`, so the fixture below built an adapter the
+# strategy would never produce and the type checker was satisfied.
+#
+# What that cost was a three-per-run PEFT warning nobody could act on --
+# "fan_in_fan_out is set to False but the target module is `Conv1D`" -- and,
+# behind it, a reload contract exercised against a differently-shaped object.
+# A protocol whose whole job is to describe a third-party signature is worth
+# exactly as much as its agreement with that signature, and two copies is how
+# the agreement is lost.
 
 
 class _SafetensorsProto(Protocol):
@@ -282,8 +251,29 @@ def _real_peft_model() -> LMModelProto:
     base = _default_load_hf_model(_TINY_GPT2, None)
     peft = __import__("peft", fromlist=["LoraConfig", "get_peft_model"])
     config_cls: _LoraConfigClassProto = peft.LoraConfig
-    get_peft_model: _GetPeftModelProto = peft.get_peft_model
-    config = config_cls(r=4, lora_alpha=8, lora_dropout=0.0, target_modules=["c_attn"], bias="none")
+    get_peft_model: _GetPeftModelFn = peft.get_peft_model
+    # `fan_in_fan_out=True` because GPT-2's `c_attn` is a `Conv1D`, which
+    # stores its weight as (fan_in, fan_out) where a `Linear` stores the
+    # transpose. Omitting it built an adapter the strategy would never
+    # produce: `_default_create_peft_model` passes True, so this fixture was
+    # testing the reload contract against a differently-shaped object, and
+    # PEFT papered over the difference by correcting the flag itself and
+    # warning -- three times per run, which is how the mismatch stayed
+    # invisible.
+    config: _LoraConfigProto = config_cls(
+        r=4,
+        lora_alpha=8,
+        lora_dropout=0.0,
+        target_modules=["c_attn"],
+        bias="none",
+        task_type="CAUSAL_LM",
+        # True because GPT-2's `c_attn` is a `Conv1D`, which stores its weight
+        # as (fan_in, fan_out) where a `Linear` stores the transpose. This
+        # mirrors `_default_create_peft_model` exactly: a fixture that builds
+        # the adapter differently from the strategy is testing the reload
+        # contract against an object the strategy never produces.
+        fan_in_fan_out=True,
+    )
     return get_peft_model(base, config)
 
 
