@@ -8,7 +8,7 @@ related:
 source_paths:
   - "tpclient.js:25"
   - "tpclient.js:6"
-fact_checked: "2026-07-27"
+fact_checked: "2026-09-03"
 confidence: high
 verified: 2026-06-19 (every command class traced through JS source)
 hubs: [js-client]
@@ -47,7 +47,7 @@ These are sent during active gameplay. Each starts with a length byte, then the 
 | 0x6A | `j` | 4 | Ub | **Pick up item** (obstacle at tile) | `[4, 'j', x, y]` |
 | 0x64 | `d` | 4 | Vb | **Drop obstacle** | `[4, 'd', x, y]` |
 | 0x62 | `b` | 4 | Tb | **Build/pickup obstacle** | `[4, 'b', x, y]` |
-| 0x44 | `D` | 6 | Wb | **Deposit fuel** | `[6, 'D', amount_lo, amount_hi, x, y]` — amount is LE u16 |
+| 0x44 | `D` | 6 | Wb | **Deposit fuel** (`CMD_DEPOSIT_FUEL`). Long press over a tile; moves fuel from the tank INTO that tile's cache. The server keeps a floor: at most `fuel - 100` leaves the tank ([[fuel-system]]). Answered with `0x2E` + `0x64` + `0x43`, six for six, and with no `0x52` close and no `0x3F` sync. Modelled 2026-09-03. | `[6, 'D', amount_lo, amount_hi, x, y]` — amount is LE u16, and it leads the TILE. `06442601ae31` = deposit 294 at (174, 49) |
 
 ### Scanning & Info
 
@@ -93,11 +93,36 @@ map programmatically and never key-closed it).[^3]
 | 0x21 | `!` | 2 | dc | **Keep-alive**. Cadence REFINED 2026-09-03 from 11,871 archived sends: p10 1,999 ms, **median 2,006 ms**, p90 30,070 ms — the "every 30s idle" figure is the idle TAIL; the common case is one per 2-second tick. The server never answers it: 9,746 windows wholly silent, and every self-caused token in the other 2,125 belongs to another command whose answer arrived late. **Our bot never sends one**, which is why the sim had no law for it until 2026-09-03 and a real client's first keep-alive crashed the server ([[capture-differ]]). | `[2, '!']` |
 | 0x72 | `r` | 3 | cc | **Hotkey action** (equipment toggle) | `[3, 'r', key_code]` — codes 49-53 (ASCII '1'-'5') toggle slots in inventory order: 1 armor, 2 dual, 3 missile, 4 homing, 5 radar (user contract + JS trace 2026-07-24; the server holds the enabled state — a scan with extras disabled consumes nothing) |
 
-### Observed but NOT modelled
+### Nothing observed is unmodelled
 
-| Code | Bytes | Sends | Why not |
-|------|-------|------:|---------|
-| 0x44 | 6, type 6 | 7 | Payloads differ every send (`06446400aaae`, `06442003ae2f`, `06442601ae31`, `06449001b236`). Type 6 is combat and the shape is shoot-like — coordinates plus a two-byte tail — but seven samples with four distinct payloads support no law. Every one IS answered (tokens `pickup`, `64`, `47self`), so silence would be as wrong as a guess. `CMD_UNMODELLED_COMBAT` names the byte; the sim REFUSES it by name rather than inventing a response.
+This section used to be a table with one row in it — 0x44, "payloads
+differ every send, seven samples support no law". It is empty now, and
+the way it emptied is the point.
+
+The byte was never unmodellable. It was misread. The four "distinct
+payloads" were read as `[x][y][tail]` because type 6 is the combat
+type and the shot is the only other type-6 command, so `06446400aaae`
+parsed as a click at (100, 0) with a two-byte tail — arbitrary, and
+arbitrary four times over. `Wb.prototype.h` in the client writes the
+AMOUNT first and the tile last, and under that layout the same bytes
+say **deposit 100 at (170, 174)**, which is what the answering
+`0x43 CacheUpdate` had been reporting all along.
+
+Two lessons worth keeping. The first: *"varies every send"* is a claim
+about a parse, not about a protocol — four samples that disagree under
+one layout are four samples that agree under the right one.
+
+The second is worse and more useful. The correct byte layout was
+**already written down in the Resources table fifty-five lines above
+this section**, and had been since the JS walk: `[6, 'D', amount_lo,
+amount_hi, x, y]`. Two rows of the same page disagreed about the same
+byte for months — one describing it exactly, the other declaring it
+unmodellable — because the sim work searched for `0x44` and stopped at
+the first plausible hit, which was the SERVER message table's
+`FuelGain`. Client and server tables share a byte space and share
+nothing else. **Grep the page you are about to contradict.**
+
+The law itself is in [[fuel-system]].
 
 **Constants defined and never once sent** in 342 archived sessions:
 `CMD_PING` (0x2E), `CMD_TOP10` (0x31), `CMD_ACTIVE_FORCES` (0x2A),
@@ -177,7 +202,13 @@ same tile** (`bb` release handler, tpclient.js): the client checks the
 held tile and dispatches the matching action — obstacle → "PICK UP
 OBST." (action 7), tile ``cache > 0`` → "GET FUEL" (action 5), ``cache
 < 0`` → "GET EQUIPMENT" (action 6), deposit context → "DEPOSIT FUEL"
-(action 10). The long-press is UI disambiguation from movement only:
+(action 10). **How long you hold sets the AMOUNT** on the deposit arm:
+`da = 100 * floor(hold_ms / 500)` (`tpclient.js` line 1629), then
+clamped to the tank's own fuel (`a.da > a.v.j && (a.da = a.v.j)`, line
+1790). That is why five of the six archived deposits request a
+multiple of 100 and the sixth requests 294 — the clamp fired, which is
+what makes that window a measurement of the server's floor
+([[fuel-system]]). The long-press is UI disambiguation from movement only:
 the wire command is the same action code the bot already sends
 programmatically — there is no separate long-press command. Probe
 answer (2026-07-27, `make larder-probe`): the server DOES honor an
@@ -319,10 +350,10 @@ reverse-engineering.
       "means": "spacebar - fire at a target position"
     },
     {
-      "id": "cmd-unmodelled-combat",
-      "code": "tankpit_bot.protocol.commands:CMD_UNMODELLED_COMBAT",
+      "id": "cmd-deposit-fuel",
+      "code": "tankpit_bot.protocol.commands:CMD_DEPOSIT_FUEL",
       "value": 68,
-      "means": "0x44 -- observed live and deliberately NOT modelled. Seven archived sends, type 6 (combat), four DISTINCT payloads (06446400aaae, 06442003ae2f, 06442601ae31, 06449001b236) whose shape is shoot-like: coordinates plus a two-byte tail. Every send IS answered (self-caused tokens pickup, 64, 47self), so silence would be as wrong as a guess, and seven samples across four payloads support no law. The constant exists so the sim can REFUSE the byte by name instead of by build phase; modelling it needs either more archive or a live probe."
+      "means": "0x44 / 'D' -- long press over a tile, deposit fuel from the tank into that tile's cache. Client class Wb. Payload [type][0x44][amount_lo][amount_hi][x][y]: the AMOUNT leads and the tile follows, which is the opposite of every other coordinate command and the reason the byte read as shoot-shaped (coords plus a two-byte tail) for months. Cracked 2026-09-03 from Wb.prototype.h plus six archived deposits; 06442601ae31 is 'deposit 294 at (174,49)', not four arbitrary bytes."
     },
     {
       "id": "cmd-keepalive",
@@ -484,6 +515,11 @@ reverse-engineering.
       "law": "Length-prefixed block pick-up / drop frame for a cardinally adjacent tile."
     },
     {
+      "id": "build-deposit-fuel-command",
+      "code": "tankpit_bot.protocol.command_builders:build_deposit_fuel_command",
+      "law": "Length-prefixed DEPOSIT_FUEL frame carrying the amount FIRST, then the destination tile."
+    },
+    {
       "id": "build-move-command",
       "code": "tankpit_bot.protocol.command_builders:build_move_command",
       "law": "Length-prefixed MOVE frame for a destination tile."
@@ -580,4 +616,4 @@ reverse-engineering.
 [^1]: tpclient.js lines 25-31 (K subclasses) and 6-10 (va subclasses) — every command class traced 2026-06-19; file pinned via `source_paths` line anchors
 [^2]: tpclient.js Lb class + Cb dispatch + toolbar click handler — same 2026-06-19 trace; target_id semantics wire-confirmed via the id-targeted reroute law ([[shoot-event-format]])
 [^3]: user (Austin), 2026-07-24 — quoted verbatim above; corroborating captures on disk: `bot_watch_probe.capture_session.json` and companions at repo root (the three designed watch runs), recorded in the wiki-log entries of 2026-07-24 ("bot-watch run 1" through "push-on-activity stream discovered")
-[^guard]: `scripts/physics_claims.py:305` — `run_physics_claim_rules`, the `physics_claims` guard stage wired into `scripts/guard.py:16`; it imports each claim's `code` address and compares the value. Reverse coverage is `_reverse_coverage_violations` at `:281`, called at `:331`, which is what makes an unclaimed public symbol a build failure rather than a silent gap. Verified present 2026-08-07.
+[^guard]: `scripts/physics_claims.py:314` — `run_physics_claim_rules`, which imports each claim's `code` address and compares the value; reverse coverage is `_reverse_coverage_violations` at `:290`, called at `:340`. **Two claims withdrawn 2026-09-03.** It is not "wired into `scripts/guard.py:16`": that file is a 49-line bootstrap shim, byte-identical across all 41 packages and generated from `monorepo_guards.guard_shim_template`, which wires nothing package-specific — line 16 is a sentence in its docstring. And it does NOT make an unclaimed public symbol a build failure. `physics_claims` is registered in no guard rule set (`grep physics_claim libs/monorepo_guards/src/` is empty), is invoked nowhere in the Makefile or CI, and `run_physics_claim_rules` is called only from `tests/scripts/`, where every case builds a synthetic wiki under `tmp_path`. The machinery is real and unit-tested; nothing runs it against this wiki. The docstrings at `src/tankpit_bot/physics/costs.py:8` and `src/tankpit_bot/physics/__init__.py:7` assert the same "on every `make check`" and are the likely origin of the claim. The old line anchors were each off by nine.
