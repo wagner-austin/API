@@ -49,9 +49,23 @@ to answer one question.
 fleet-nodes     --config runs/fleet.json                 # what is free right now
 fleet-preflight --config runs/fleet.json --project P     # would it run, and where
 fleet-preflight --config runs/fleet.json --project P --node lavender
+fleet-run       --config runs/fleet.json --project P \
+                --agent <label> --session <uuid> --repo-root <path>
 fleet-watch     --config runs/fleet.json                 # the event stream
 fleet-watch     --config runs/fleet.json --run <run-id>
+fleet-cancel    --config runs/fleet.json --run <run-id>
 ```
+
+`fleet-run` returns as soon as the suite is running and does **not** wait for
+it. The build outlives the command because it is launched through the node's
+task scheduler rather than as a child of the ssh call — Windows OpenSSH puts
+that child in a job object that dies with the connection. The result arrives
+on the feed, so follow it with `fleet-watch --run <the printed id>`.
+
+`--agent` and `--session` are required and are the board's own identity
+fields, so a ledger row and a board post can be matched by whoever reads both.
+A default would be one label shared by every session, which is the same as
+having none.
 
 ## Subscribing from a Claude session
 
@@ -94,6 +108,38 @@ remembering. Different projects on one node run concurrently.
 Expiry is required and has no "forever" spelling: the failure being designed
 against is a wedge, and a wedge holding an unexpiring lease turns one stuck
 suite into a project nobody can ever build again.
+
+## How a dispatch is put on a node
+
+Tar, because no node has `rsync` and all three have `tar`. Not git: uncommitted
+work is the normal state here and the standing rule is no branches, so "push
+and pull" would refuse to dispatch the thing you are actually working on.
+
+The archive crosses as **base64**. Raw bytes do not survive ssh into
+PowerShell — the stream is decoded as text at more than one layer, and one
+mangled byte is a corrupt gzip that extracts partially. Base64 costs a third
+more bytes and removes the failure mode instead of making it rarer.
+
+The node reassembles the archive, digests it, and reports. **Only then is it
+told to unpack.** Verifying after extraction would mean an unverified tree had
+already landed where the build looks, and a truncated tree builds and fails in
+a way that reads as the code's fault.
+
+`.venv` leads the exclusion list, and not for tidiness: it is the thing this
+package exists to stop two dispatches sharing, and one machine's has absolute
+paths baked into it. The node builds its own from the lockfile that is sent.
+
+## Cancelling
+
+`fleet-cancel` is the only command that kills anything, and it kills exactly
+one dispatch by name. There is no sweep, no "cancel everything on this node",
+and no age heuristic — a direct response to what this fleet is for, since the
+incident behind it was work destroyed by something that was not trying to
+destroy it.
+
+It **will** cancel a run whose lease has already lapsed. That is precisely the
+wedge case, and refusing because the lease is gone would leave the only tool
+that can stop it unable to.
 
 ## Why this is not `tools/hpc3`
 
