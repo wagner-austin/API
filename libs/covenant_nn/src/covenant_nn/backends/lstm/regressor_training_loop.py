@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from contextlib import nullcontext
 from pathlib import Path
 from typing import TypedDict
 
@@ -23,9 +22,8 @@ from platform_ml.torch_types import (
     _import_torch,
 )
 
+from covenant_nn.backends import _amp
 from covenant_nn.backends.lstm.regressor_protocols import (
-    _AutocastFactory,
-    _GradScalerProto,
     _LossProto,
     _OptimizerProto,
 )
@@ -39,7 +37,7 @@ class _RegressorTrainComponents(TypedDict):
     model: TrainableModel
     optimizer: _OptimizerProto
     loss_fn: _LossProto
-    scaler: _GradScalerProto | None
+    scaler: _amp.GradScalerProto | None
 
 
 def _reshape_to_sequence(x: NDArray[np.float64], sequence_length: int) -> NDArray[np.float64]:
@@ -52,7 +50,7 @@ def _train_one_epoch_regression(
     model: TrainableModel,
     optimizer: _OptimizerProto,
     loss_fn: _LossProto,
-    scaler: _GradScalerProto | None,
+    scaler: _amp.GradScalerProto | None,
     x_train: NDArray[np.float64],
     y_train: NDArray[np.float64],
     batch_size: int,
@@ -91,29 +89,17 @@ def _train_one_epoch_regression(
         batch_len: int = end - start
         xb: TensorProtocol = torch_mod.tensor(x_seq[start:end], dtype=torch_mod.float32)
         yb: TensorProtocol = torch_mod.tensor(y_train[start:end], dtype=torch_mod.float32)
-        if device == "cuda":
-            xb = xb.cuda()
-            yb = yb.cuda()
+        xb = xb.to(device)
+        yb = yb.to(device)
 
         optimizer.zero_grad()
-        if scaler is not None:
-            amp_mod = __import__("torch.amp", fromlist=["autocast"])
-            autocast: _AutocastFactory = amp_mod.autocast
-            with autocast("cuda", dtype=torch_mod.float16):
-                logits: TensorProtocol = model(xb)
-                preds: TensorProtocol = logits.select(1, 0)
-                loss: TensorProtocol = loss_fn(preds, yb)
-            scaled: TensorProtocol = scaler.scale(loss * float(train_scale))
-            scaled.backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            with nullcontext():
-                logits = model(xb)
-                preds = logits.select(1, 0)
-                loss = loss_fn(preds, yb)
-                (loss * float(train_scale)).backward()
-                optimizer.step()
+        # One forward pass, in whichever context this run calls for -- it was
+        # written twice, identically, so the fp16 copy only ever ran on a GPU.
+        with _amp.amp_context(scaler, torch_mod.float16):
+            logits: TensorProtocol = model(xb)
+            preds: TensorProtocol = logits.select(1, 0)
+            loss: TensorProtocol = loss_fn(preds, yb)
+        _amp.backward_step(scaler=scaler, optimizer=optimizer, loss=loss, train_scale=train_scale)
 
         total_loss += float(loss.item()) * batch_len
         total_count += batch_len
@@ -162,9 +148,8 @@ def _validate_regression_model(
             batch_len: int = end - start
             xb: TensorProtocol = torch_mod.tensor(x_seq[start:end], dtype=torch_mod.float32)
             yb: TensorProtocol = torch_mod.tensor(y_val[start:end], dtype=torch_mod.float32)
-            if device == "cuda":
-                xb = xb.cuda()
-                yb = yb.cuda()
+            xb = xb.to(device)
+            yb = yb.to(device)
 
             logits: TensorProtocol = model(xb)
             preds: TensorProtocol = logits.select(1, 0)

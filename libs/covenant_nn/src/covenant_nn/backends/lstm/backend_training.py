@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Protocol, TypedDict
 
@@ -28,6 +28,7 @@ from platform_ml.torch_types import (
     set_manual_seed,
 )
 
+from covenant_nn.backends import _amp
 from covenant_nn.backends.lstm.backend_protocols import (
     _LinearLayerProto,
     _LSTMLayerProto,
@@ -153,9 +154,7 @@ def _build_model(
     # Build wrapper
     model: TrainableModel = _LSTMClassifierWrapper(lstm, fc)
 
-    if device == "cuda":
-        model = model.to("cuda")
-    return model
+    return model.to(device)
 
 
 class _OptimizerProto(Protocol):
@@ -171,21 +170,13 @@ class _LossProto(Protocol):
     def __call__(self, logits: TensorProtocol, targets: TensorProtocol) -> TensorProtocol: ...
 
 
-class _GradScalerProto(Protocol):
-    """Protocol for gradient scaler."""
-
-    def scale(self, loss: TensorProtocol) -> TensorProtocol: ...
-    def step(self, optimizer: _OptimizerProto) -> None: ...
-    def update(self) -> None: ...
-
-
 class _TrainComponents(TypedDict):
     """Components needed for training."""
 
     model: TrainableModel
     optimizer: _OptimizerProto
     loss_fn: _LossProto
-    scaler: _GradScalerProto | None
+    scaler: _amp.GradScalerProto | None
     scale_pos_weight_computed: float
 
 
@@ -244,23 +235,21 @@ def _prepare_components(
     class_weights: TensorProtocol = torch_mod.tensor(
         [1.0, scale_pos_weight], dtype=torch_mod.float32
     )
-    if device == "cuda":
-        class_weights = class_weights.cuda()
+    class_weights = class_weights.to(device)
 
     # Seed PyTorch RNG
     set_manual_seed(int(cfg["random_state"]))
 
-    # Enable deterministic CUDA algorithms
-    if device == "cuda":
-        backends_mod = __import__("torch.backends", fromlist=["cudnn"])
-        cudnn: _CudnnConfigProto = backends_mod.cudnn
-        cudnn.deterministic = True
-        cudnn.benchmark = False
-
-    scaler: _GradScalerProto | None = None
-    if device == "cuda" and precision != "fp32":
-        amp_mod = __import__("torch.amp", fromlist=["GradScaler"])
-        scaler = amp_mod.GradScaler("cuda")
+    # Guarded on the device, and it has to be. Setting these looks like it
+    # should be a no-op without a GPU -- they are module-level flags and no
+    # CPU kernel consults them -- but torch resolves the cuDNN version on
+    # assignment, and with a CUDA build and no visible device that raises
+    # `ValueError: min() arg is an empty sequence` out of
+    # torch/backends/cudnn/__init__.py. Measured, not assumed: making these
+    # unconditional turned two passing tests red under
+    # CUDA_VISIBLE_DEVICES="".
+    _amp.configure_cudnn_determinism(device)
+    scaler = _amp.make_grad_scaler(device, precision)
 
     model = _build_model(
         input_size=features_per_step,
@@ -303,7 +292,7 @@ def _train_one_epoch(
     model: TrainableModel,
     optimizer: _OptimizerProto,
     loss_fn: _LossProto,
-    scaler: _GradScalerProto | None,
+    scaler: _amp.GradScalerProto | None,
     x_train: NDArray[np.float64],
     y_train: NDArray[np.int64],
     batch_size: int,
@@ -327,27 +316,17 @@ def _train_one_epoch(
         batch_len = end - start
         xb: TensorProtocol = torch_mod.tensor(x_seq[start:end], dtype=torch_mod.float32)
         yb: TensorProtocol = torch_mod.tensor(y_train[start:end], dtype=torch_mod.long)
-        if device == "cuda":
-            xb = xb.cuda()
-            yb = yb.cuda()
+        xb = xb.to(device)
+        yb = yb.to(device)
 
         optimizer.zero_grad()
-        if scaler is not None:
-            amp_mod = __import__("torch.amp", fromlist=["autocast"])
-            autocast: _AutocastFactory = amp_mod.autocast
-            with autocast("cuda", dtype=torch_mod.float16):
-                logits: TensorProtocol = model(xb)
-                loss: TensorProtocol = loss_fn(logits, yb)
-            scaled: TensorProtocol = scaler.scale(loss * float(train_scale))
-            scaled.backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            with nullcontext():
-                logits = model(xb)
-                loss = loss_fn(logits, yb)
-                (loss * float(train_scale)).backward()
-                optimizer.step()
+        # One forward pass, in whichever context this run calls for. It used
+        # to be written twice -- identically -- under `autocast` and under
+        # `nullcontext`, which made the fp16 copy reachable only on a GPU.
+        with _amp.amp_context(scaler, torch_mod.float16):
+            logits: TensorProtocol = model(xb)
+            loss: TensorProtocol = loss_fn(logits, yb)
+        _amp.backward_step(scaler=scaler, optimizer=optimizer, loss=loss, train_scale=train_scale)
 
         batch_loss: float = float(loss.item())
         total_loss += batch_loss * batch_len
@@ -387,9 +366,8 @@ def _validate_model(
             batch_len = end - start
             xb: TensorProtocol = torch_mod.tensor(x_seq[start:end], dtype=torch_mod.float32)
             yb: TensorProtocol = torch_mod.tensor(y_val[start:end], dtype=torch_mod.long)
-            if device == "cuda":
-                xb = xb.cuda()
-                yb = yb.cuda()
+            xb = xb.to(device)
+            yb = yb.to(device)
 
             logits: TensorProtocol = model(xb)
             loss_val: TensorProtocol = loss_fn(logits, yb)
@@ -527,8 +505,7 @@ def _finalize_metrics(
         x_seq: NDArray[np.float64] = _reshape_to_sequence(x, sequence_length)
         with torch_mod.no_grad():
             xb: TensorProtocol = torch_mod.tensor(x_seq, dtype=torch_mod.float32)
-            if device == "cuda":
-                xb = xb.cuda()
+            xb = xb.to(device)
             logits: TensorProtocol = model(xb)
             softmax_out: TensorProtocol = softmax(logits)
             proba: NDArray[np.float64] = softmax_out.detach().cpu().numpy().astype(np.float64)

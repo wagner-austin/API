@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Final, TypedDict
 
@@ -27,10 +26,8 @@ from platform_ml.torch_types import (
     set_manual_seed,
 )
 
+from covenant_nn.backends import _amp
 from covenant_nn.backends.mlp.backend_protocols import (
-    _AutocastFactory,
-    _CudnnConfigProto,
-    _GradScalerProto,
     _LossProto,
     _NNBatchNorm1dCtor,
     _NNDropoutCtor,
@@ -76,9 +73,11 @@ def _build_model(n_in: int, hidden: tuple[int, ...], dropout: float, device: str
         in_f = int(width)
     parts.append(linear(in_f, 2))
     model = sequential(*parts)
-    if device == "cuda":
-        # to("cuda") exists at runtime; TrainableModel Protocol does not include it intentionally
-        _ = model.to("cuda")
+    # to() exists at runtime; the TrainableModel Protocol does not include it
+    # intentionally, hence the discard. `device` rather than a "cuda"
+    # literal: to("cpu") on a CPU model is a no-op, so the branch bought
+    # nothing except a line only a GPU could execute.
+    _ = model.to(device)
     return model
 
 
@@ -95,8 +94,7 @@ class _TrainComponents(TypedDict):
     model: TrainableModel
     optimizer: _OptimizerProto
     loss_fn: _LossProto
-    autocast: _AutocastFactory
-    scaler: _GradScalerProto | None
+    scaler: _amp.GradScalerProto | None
     scale_pos_weight_computed: float
 
 
@@ -148,25 +146,21 @@ def _prepare_components(
     scale_pos_weight = _compute_class_weight(y_train)
     # CrossEntropyLoss weight tensor: [class_0_weight, class_1_weight]
     class_weights = torch.tensor([1.0, scale_pos_weight], dtype=torch.float32)
-    if device == "cuda":
-        class_weights = class_weights.cuda()
+    class_weights = class_weights.to(device)
 
     # Seed PyTorch RNG deterministically for reproducible training runs
     set_manual_seed(int(cfg["random_state"]))
 
-    # Enable deterministic CUDA algorithms when using GPU
-    if device == "cuda":
-        backends_mod = __import__("torch.backends", fromlist=["cudnn"])
-        cudnn: _CudnnConfigProto = backends_mod.cudnn
-        cudnn.deterministic = True
-        cudnn.benchmark = False
-
-    amp = __import__("torch.amp", fromlist=["autocast", "GradScaler"])
-    autocast: _AutocastFactory = amp.autocast
-    scaler: _GradScalerProto | None = None
-    if device == "cuda" and precision != "fp32":
-        grad_scaler: _GradScalerProto = amp.GradScaler()
-        scaler = grad_scaler
+    # Guarded on the device, and it has to be. Setting these looks like it
+    # should be a no-op without a GPU -- they are module-level flags and no
+    # CPU kernel consults them -- but torch resolves the cuDNN version on
+    # assignment, and with a CUDA build and no visible device that raises
+    # `ValueError: min() arg is an empty sequence` out of
+    # torch/backends/cudnn/__init__.py. Measured, not assumed: making these
+    # unconditional turned two passing tests red under
+    # CUDA_VISIBLE_DEVICES="".
+    _amp.configure_cudnn_determinism(device)
+    scaler = _amp.make_grad_scaler(device, precision)
 
     model = _build_model(
         n_in=int(n_features),
@@ -179,7 +173,6 @@ def _prepare_components(
         "model": model,
         "optimizer": opt,
         "loss_fn": loss_ctor(weight=class_weights),
-        "autocast": autocast,
         "scaler": scaler,
         "scale_pos_weight_computed": scale_pos_weight,
     }
@@ -190,8 +183,7 @@ def _train_one_epoch(
     model: TrainableModel,
     optimizer: _OptimizerProto,
     loss_fn: _LossProto,
-    autocast: _AutocastFactory,
-    scaler: _GradScalerProto | None,
+    scaler: _amp.GradScalerProto | None,
     x_train: NDArray[np.float64],
     y_train: NDArray[np.int64],
     batch_size: int,
@@ -215,27 +207,18 @@ def _train_one_epoch(
         batch_len: int = end - start
         xb = tensor(x_train[start:end], dtype=float32)
         yb = tensor(y_train[start:end], dtype=long_dtype)
-        if device == "cuda":
-            xb = xb.cuda()
-            yb = yb.cuda()
+        xb = xb.to(device)
+        yb = yb.to(device)
 
         optimizer.zero_grad()
-        if scaler is not None:
-            with autocast(device_type="cuda", dtype=fp16):
-                logits = model(xb)
-                loss = loss_fn(logits, yb)
-            # Apply training scale by scaling loss (equivalent to scaling LR)
-            scaled = scaler.scale(loss * float(train_scale))
-            scaled.backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            with nullcontext():
-                logits = model(xb)
-                loss = loss_fn(logits, yb)
-                # Apply training scale by scaling loss (equivalent to scaling LR)
-                (loss * float(train_scale)).backward()
-                optimizer.step()
+        # One forward pass, in whichever context this run calls for -- it was
+        # written twice, identically, so the fp16 copy only ever ran on a GPU.
+        # The training scale is applied to the loss on both paths, which is
+        # equivalent to scaling the learning rate.
+        with _amp.amp_context(scaler, fp16):
+            logits = model(xb)
+            loss = loss_fn(logits, yb)
+        _amp.backward_step(scaler=scaler, optimizer=optimizer, loss=loss, train_scale=train_scale)
 
         total_loss += float(loss.item()) * batch_len
         total_count += batch_len
@@ -272,9 +255,8 @@ def _validate_model(
             batch_len: int = end - start
             xb = tensor(x_val[start:end], dtype=float32)
             yb = tensor(y_val[start:end], dtype=long_dtype)
-            if device == "cuda":
-                xb = xb.cuda()
-                yb = yb.cuda()
+            xb = xb.to(device)
+            yb = yb.to(device)
 
             logits = model(xb)
             v_loss_total += float(loss_fn(logits, yb).item()) * batch_len
@@ -344,7 +326,6 @@ def _run_training_loop(
             model=model,
             optimizer=components["optimizer"],
             loss_fn=components["loss_fn"],
-            autocast=components["autocast"],
             scaler=components["scaler"],
             x_train=splits.x_train,
             y_train=splits.y_train,
@@ -411,8 +392,7 @@ def _finalize_metrics(
     def _predict_prob(x: NDArray[np.float64]) -> NDArray[np.float64]:
         with no_grad():
             xb = tensor(x, dtype=float32)
-            if device == "cuda":
-                xb = xb.cuda()
+            xb = xb.to(device)
             logits = model(xb)
             return softmax(dim=1)(logits).detach().cpu().numpy().astype(np.float64)[:, 1]
 

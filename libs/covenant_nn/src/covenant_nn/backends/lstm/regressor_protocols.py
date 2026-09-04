@@ -106,14 +106,6 @@ class _LossCtor(Protocol):
     def __call__(self) -> _LossProto: ...
 
 
-class _GradScalerProto(Protocol):
-    """Protocol for gradient scaler."""
-
-    def scale(self, loss: TensorProtocol) -> TensorProtocol: ...
-    def step(self, optimizer: _OptimizerProto) -> None: ...
-    def update(self) -> None: ...
-
-
 class _AutocastFactory(Protocol):
     """Protocol for autocast context manager factory."""
 

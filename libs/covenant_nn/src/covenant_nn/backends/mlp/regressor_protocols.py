@@ -49,14 +49,6 @@ class _AutocastFactory(Protocol):
     ) -> AbstractContextManager[None]: ...
 
 
-class _GradScalerProto(Protocol):
-    """Protocol for torch.amp.GradScaler."""
-
-    def scale(self, loss: TensorProtocol) -> TensorProtocol: ...
-    def step(self, optimizer: _OptimizerProto) -> None: ...
-    def update(self) -> None: ...
-
-
 class _NNLinearCtor(Protocol):
     """Protocol for nn.Linear constructor."""
 

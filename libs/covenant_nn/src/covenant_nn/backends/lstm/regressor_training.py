@@ -22,9 +22,8 @@ from platform_ml.torch_types import (
     set_manual_seed,
 )
 
+from covenant_nn.backends import _amp
 from covenant_nn.backends.lstm.regressor_protocols import (
-    _CudnnConfigProto,
-    _GradScalerProto,
     _LinearLayerProto,
     _LossCtor,
     _LossProto,
@@ -153,9 +152,7 @@ def _build_regressor_model(
 
     model: TrainableModel = _LSTMRegressorWrapper(lstm, fc)
 
-    if device == "cuda":
-        model = model.to("cuda")
-    return model
+    return model.to(device)
 
 
 # =============================================================================
@@ -228,16 +225,16 @@ def _prepare_regression_components(
 
     set_manual_seed(int(cfg["random_state"]))
 
-    if device == "cuda":
-        backends_mod = __import__("torch.backends", fromlist=["cudnn"])
-        cudnn: _CudnnConfigProto = backends_mod.cudnn
-        cudnn.deterministic = True
-        cudnn.benchmark = False
-
-    scaler: _GradScalerProto | None = None
-    if device == "cuda" and precision != "fp32":
-        amp_mod = __import__("torch.amp", fromlist=["GradScaler"])
-        scaler = amp_mod.GradScaler("cuda")
+    # Guarded on the device, and it has to be. Setting these looks like it
+    # should be a no-op without a GPU -- they are module-level flags and no
+    # CPU kernel consults them -- but torch resolves the cuDNN version on
+    # assignment, and with a CUDA build and no visible device that raises
+    # `ValueError: min() arg is an empty sequence` out of
+    # torch/backends/cudnn/__init__.py. Measured, not assumed: making these
+    # unconditional turned two passing tests red under
+    # CUDA_VISIBLE_DEVICES="".
+    _amp.configure_cudnn_determinism(device)
+    scaler = _amp.make_grad_scaler(device, precision)
 
     model = _build_regressor_model(
         input_size=features_per_step,
@@ -300,8 +297,7 @@ def _finalize_regression_metrics(
         x_seq: NDArray[np.float64] = _reshape_to_sequence(x, sequence_length)
         with torch_mod.no_grad():
             xb: TensorProtocol = torch_mod.tensor(x_seq, dtype=torch_mod.float32)
-            if device == "cuda":
-                xb = xb.cuda()
+            xb = xb.to(device)
             logits: TensorProtocol = model(xb)
             preds: TensorProtocol = logits.select(1, 0)
             return preds.detach().cpu().numpy().astype(np.float64)
