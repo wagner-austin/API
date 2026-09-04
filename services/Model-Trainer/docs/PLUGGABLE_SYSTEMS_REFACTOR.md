@@ -1091,6 +1091,7 @@ __all__ = [
 ```python
 # Add to existing contracts/model.py
 
+
 class WarmStartConfig(TypedDict):
     """Configuration for warm-starting from checkpoints.
 
@@ -1199,6 +1200,7 @@ from model_trainer.core.services.optimizer._test_hooks import (
 from model_trainer.core.services.scheduler._test_hooks import (
     init_production_hooks as init_scheduler_hooks,
 )
+
 
 def init_all_hooks() -> None:
     """Initialize all production hooks at application startup."""

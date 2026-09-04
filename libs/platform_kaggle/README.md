@@ -66,10 +66,10 @@ Filter competitions by tags, categories, and reward amounts:
 from platform_kaggle import make_interest_filter, filter_competitions
 
 interests = make_interest_filter(
-    include_tags=("tabular", "nlp"),       # Must have at least one
-    exclude_tags=("computer-vision",),     # Must not have any
-    min_reward=1000,                       # Minimum prize (None = include Knowledge)
-    categories=("Featured", "Research"),   # None = all categories
+    include_tags=("tabular", "nlp"),  # Must have at least one
+    exclude_tags=("computer-vision",),  # Must not have any
+    min_reward=1000,  # Minimum prize (None = include Knowledge)
+    categories=("Featured", "Research"),  # None = all categories
 )
 
 filtered = filter_competitions(competitions, interests)
@@ -141,8 +141,8 @@ services = scan_services_from_github(client, "owner", "repo")
 profile = build_profile(libs, services)
 
 # Same profile structure as get_codebase_profile()
-print(profile.ml_backends)    # ("xgboost", "lightgbm", "pytorch")
-print(profile.capabilities)   # Detected capabilities
+print(profile.ml_backends)  # ("xgboost", "lightgbm", "pytorch")
+print(profile.capabilities)  # Detected capabilities
 ```
 
 This separation allows capability detection to work with data from any source (local filesystem, GitHub API, etc.).
@@ -194,11 +194,7 @@ from platform_kaggle import (
 )
 
 # Create fake client with test data
-fake_client = FakeKaggleClient(
-    competitions=(
-        make_fake_competition(ref="test-comp", title="Test"),
-    )
-)
+fake_client = FakeKaggleClient(competitions=(make_fake_competition(ref="test-comp", title="Test"),))
 
 # Install via hooks
 hooks.kaggle_client = lambda: fake_client
@@ -295,6 +291,7 @@ from platform_kaggle import (
     encode_match,
 )
 
+
 def main() -> None:
     # Define what you're interested in
     interests = make_interest_filter(
@@ -319,6 +316,7 @@ def main() -> None:
         print(f"  Deadline: {match.competition.deadline}")
         print()
 
+
 if __name__ == "__main__":
     main()
 ```
@@ -341,9 +339,9 @@ pages = fetcher.fetch_pages(comp_id)
 
 # Access structured content
 print(pages.description)  # Full description markdown
-print(pages.evaluation)   # Evaluation criteria
-print(pages.timeline)     # Competition timeline
-print(pages.rules)        # Competition rules
+print(pages.evaluation)  # Evaluation criteria
+print(pages.timeline)  # Competition timeline
+print(pages.rules)  # Competition rules
 
 # Access individual pages
 for page in pages.pages:
@@ -414,6 +412,7 @@ from platform_kaggle import (
 
 app = FastAPI()
 
+
 @app.get("/competitions")
 def list_competitions(
     tags: list[str] = Query(default=["tabular"]),
@@ -460,11 +459,13 @@ from platform_kaggle import (
     make_fake_competition,
 )
 
+
 @pytest.fixture(autouse=True)
 def reset_kaggle_hooks():
     """Reset hooks after each test."""
     yield
     reset_hooks()
+
 
 def test_my_competition_endpoint():
     # Set up fake data
@@ -478,6 +479,7 @@ def test_my_competition_endpoint():
 
     # Test your code
     from myapp import list_competitions
+
     result = list_competitions(tags=["tabular"])
 
     assert len(result) == 1

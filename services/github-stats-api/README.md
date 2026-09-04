@@ -165,19 +165,23 @@ The service uses dependency injection via a `_test_hooks.py` module for testabil
 # In _test_hooks.py
 _build_client_hook: Callable[[float], HttpxAsyncClient] = _default_build_client
 
+
 def get_client_hook() -> Callable[[float], HttpxAsyncClient]:
     """Get current client builder hook."""
     return _build_client_hook
+
 
 def set_client_hook(hook: Callable[[float], HttpxAsyncClient]) -> None:
     """Set client builder hook for testing."""
     global _build_client_hook
     _build_client_hook = hook
 
+
 def reset_client_hook() -> None:
     """Reset client builder hook to default."""
     global _build_client_hook
     _build_client_hook = _default_build_client
+
 
 # In routes/stats.py
 build_client = get_client_hook()

@@ -61,6 +61,7 @@ Dependency injection container for API routes:
 ```python
 class ServiceContainer:
     """Container for service dependencies."""
+
     __slots__ = (
         "monorepo_root",
         "_kaggle_client_factory",
@@ -107,17 +108,22 @@ Following the model-trainer pattern, production code uses hooks for testability:
 class FindMonorepoRootProto(Protocol):
     def __call__(self, start: Path) -> Path: ...
 
+
 class RunForProjectProto(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+
 
 class LoadOrchestratorProto(Protocol):
     def __call__(self, monorepo_root: Path) -> RunForProjectProto: ...
 
+
 class IsDirProto(Protocol):
     def __call__(self, path: Path) -> bool: ...
 
+
 class ContainerFindMonorepoRootProto(Protocol):
     def __call__(self) -> Path: ...
+
 
 # Hooks - None means use default behavior (production implementation)
 guard_find_monorepo_root: FindMonorepoRootProto | None = None
@@ -238,9 +244,7 @@ def build_router(container: ServiceContainer) -> APIRouter:
         # ... filtering and matching logic
         return [encode_match(m) for m in matches]
 
-    router.add_api_route(
-        "/competitions", _list_competitions, methods=["GET"], response_model=None
-    )
+    router.add_api_route("/competitions", _list_competitions, methods=["GET"], response_model=None)
     return router
 ```
 
@@ -268,6 +272,7 @@ def _make_fake_container(
         services_scanner=lambda root: (fake_service_info,),
     )
 
+
 fake_container = pytest.fixture(_make_fake_container)
 ```
 
@@ -294,6 +299,7 @@ def _make_fake_competition() -> Competition:
         category="Playground",
         tags=("tabular", "classification"),
     )
+
 
 fake_competition = pytest.fixture(_make_fake_competition)
 ```

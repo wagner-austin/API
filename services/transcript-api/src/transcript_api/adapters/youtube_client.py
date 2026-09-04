@@ -71,9 +71,9 @@ def _coerce_items(raw_items: list[dict[str, JSONValue]]) -> list[RawTranscriptIt
 
         if not isinstance(text, str):
             raise JSONTypeError("Expected string for 'text' in transcript item")
-        if not isinstance(start, int | float):
+        if not isinstance(start, (int, float)):
             raise JSONTypeError("Expected int or float for 'start' in transcript item")
-        if not isinstance(duration, int | float):
+        if not isinstance(duration, (int, float)):
             raise JSONTypeError("Expected int or float for 'duration' in transcript item")
 
         coerced.append({"text": text, "start": float(start), "duration": float(duration)})

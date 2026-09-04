@@ -267,10 +267,12 @@ Production code uses hooks for testability without mocks:
 class ContainerFindMonorepoRootProto(Protocol):
     def __call__(self) -> Path: ...
 
+
 container_find_monorepo_root: ContainerFindMonorepoRootProto | None = None
 guard_is_dir: IsDirProto | None = None
 guard_find_monorepo_root: FindMonorepoRootProto | None = None
 guard_load_orchestrator: LoadOrchestratorProto | None = None
+
 
 # In production code
 def _find_monorepo_root() -> Path:

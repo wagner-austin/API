@@ -170,7 +170,7 @@ def test_format_saved_path() -> None:
 
 
 def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hooks: None) -> None:
-    captured: list[str | bool | int | None | list[TeleportTargetDict]] = []
+    captured: list[str | bool | int | list[TeleportTargetDict] | None] = []
     factory_calls: list[str] = []
     logging_levels: list[str] = []
 
@@ -246,7 +246,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
 
 
 def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
-    recorded: list[str | bool | int | None | list[TeleportTargetDict]] = []
+    recorded: list[str | bool | int | list[TeleportTargetDict] | None] = []
 
     script_hooks.setup_rich_logging = lambda level: None
     env = {

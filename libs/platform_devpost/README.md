@@ -66,9 +66,9 @@ from platform_devpost import make_interest_filter, filter_hackathons
 
 interests = make_interest_filter(
     include_themes=("AI", "Machine Learning"),  # Must have at least one
-    exclude_themes=("Gaming",),                  # Must not have any
-    states=("open", "upcoming"),                 # None = all states
-    featured_only=True,                          # Only featured hackathons
+    exclude_themes=("Gaming",),  # Must not have any
+    states=("open", "upcoming"),  # None = all states
+    featured_only=True,  # Only featured hackathons
 )
 
 filtered = filter_hackathons(hackathons, interests)
@@ -129,11 +129,7 @@ from platform_devpost import (
 )
 
 # Create fake client with test data
-fake_client = FakeDevpostClient(
-    hackathons=(
-        make_fake_hackathon(id=1, title="Test Hackathon"),
-    )
-)
+fake_client = FakeDevpostClient(hackathons=(make_fake_hackathon(id=1, title="Test Hackathon"),))
 
 # Install via hooks
 hooks.devpost_client = lambda: fake_client
@@ -224,6 +220,7 @@ from platform_devpost import (
     encode_match,
 )
 
+
 def main() -> None:
     # Define what you're interested in
     interests = make_interest_filter(
@@ -249,6 +246,7 @@ def main() -> None:
         print(f"  Prize: {match.hackathon.prize_amount}")
         print()
 
+
 if __name__ == "__main__":
     main()
 ```
@@ -267,6 +265,7 @@ from platform_devpost import (
 )
 
 app = FastAPI()
+
 
 @app.get("/hackathons")
 def list_hackathons(
@@ -324,11 +323,13 @@ from platform_devpost import (
     make_fake_profile,
 )
 
+
 @pytest.fixture(autouse=True)
 def reset_devpost_hooks():
     """Reset hooks after each test."""
     yield
     reset_hooks()
+
 
 def test_my_hackathon_endpoint():
     # Set up fake data
@@ -348,6 +349,7 @@ def test_my_hackathon_endpoint():
 
     # Test your code
     from myapp import list_hackathons
+
     result = list_hackathons(states=["open"])
 
     assert len(result) == 1

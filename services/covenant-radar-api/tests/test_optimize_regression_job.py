@@ -345,12 +345,12 @@ class TestProcessRegressionOptimizeJob:
         fake_backend = _FakeRegressorBackend()
         fake_optimizer = _FakeOptimizer()
 
-        regression_hooks.regressor_registry_factory = (
-            lambda b=fake_backend: _make_fake_regressor_registry(b)
+        regression_hooks.regressor_registry_factory = lambda b=fake_backend: (
+            _make_fake_regressor_registry(b)
         )
         regression_hooks.regressor_objective_factory = _make_fake_objective_factory
-        worker_hooks.optimizer_registry_factory = (
-            lambda o=fake_optimizer: _make_fake_optimizer_registry(o)
+        worker_hooks.optimizer_registry_factory = lambda o=fake_optimizer: (
+            _make_fake_optimizer_registry(o)
         )
 
         fake_env = FakeEnv(

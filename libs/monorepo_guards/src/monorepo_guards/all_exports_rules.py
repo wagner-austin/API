@@ -52,7 +52,7 @@ def _binds_from_statement(node: ast.stmt) -> list[str]:
         return [alias.asname if alias.asname else alias.name.split(".")[0] for alias in node.names]
     if isinstance(node, ast.ImportFrom):
         return [alias.asname if alias.asname else alias.name for alias in node.names]
-    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return [node.name]
     if isinstance(node, ast.Assign):
         return [t.id for t in node.targets if isinstance(t, ast.Name)]
@@ -76,9 +76,9 @@ def _module_level_bindings(body: list[ast.stmt]) -> set[str]:
     bound: set[str] = set()
     for node in body:
         bound.update(_binds_from_statement(node))
-        if isinstance(node, ast.If | ast.For | ast.While | ast.With):
+        if isinstance(node, (ast.If, ast.For, ast.While, ast.With)):
             bound.update(_module_level_bindings(node.body))
-        if isinstance(node, ast.If | ast.For | ast.While):
+        if isinstance(node, (ast.If, ast.For, ast.While)):
             # ``With`` has no ``orelse``; the other three do.
             bound.update(_module_level_bindings(node.orelse))
     return bound
@@ -206,7 +206,7 @@ def _literal_names(node: ast.expr) -> list[str] | None:
         The exported names, or None when the value is not a list or tuple of
         plain string literals and therefore cannot be read statically.
     """
-    if not isinstance(node, ast.List | ast.Tuple):
+    if not isinstance(node, (ast.List, ast.Tuple)):
         return None
     names: list[str] = []
     for element in node.elts:

@@ -34,10 +34,10 @@ Only use this library directly when:
 
 ```python
 from platform_codebase import (
-    scan_libs,           # Scan libs/ directory -> tuple[LibInfo, ...]
-    scan_services,       # Scan services/ directory -> tuple[ServiceInfo, ...]
+    scan_libs,  # Scan libs/ directory -> tuple[LibInfo, ...]
+    scan_services,  # Scan services/ directory -> tuple[ServiceInfo, ...]
     collect_all_dependencies,  # Get all deps from libs+services
-    has_dependency,      # Check if a dependency exists
+    has_dependency,  # Check if a dependency exists
 )
 ```
 

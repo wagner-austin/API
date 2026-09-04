@@ -14,8 +14,14 @@ No external dependencies - this is a pure domain library.
 
 ```python
 from covenant_domain import (
-    Deal, DealId, Covenant, CovenantId, Measurement, CovenantResult,
-    evaluate_covenant_for_period, classify_status,
+    Deal,
+    DealId,
+    Covenant,
+    CovenantId,
+    Measurement,
+    CovenantResult,
+    evaluate_covenant_for_period,
+    classify_status,
 )
 
 # Evaluate a covenant

@@ -89,10 +89,8 @@ class FakeDataBankClientSuccess:
 def test_upload_success_records_file_id(tmp_path: Path) -> None:
     """Test that successful upload records file metadata."""
     _setup_processing_hooks(tmp_path)
-    _test_hooks.data_bank_client_factory = (
-        lambda api_url, api_key, timeout_seconds: FakeDataBankClientSuccess(
-            api_url, api_key, timeout_seconds=timeout_seconds
-        )
+    _test_hooks.data_bank_client_factory = lambda api_url, api_key, timeout_seconds: (
+        FakeDataBankClientSuccess(api_url, api_key, timeout_seconds=timeout_seconds)
     )
 
     redis = FakeRedis()

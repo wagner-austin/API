@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TypedDict
 
@@ -10,7 +10,7 @@ from handwriting_ai.training.calibration.cache import _decode_float, _decode_int
 from handwriting_ai.training.calibration.measure import CalibrationResult
 
 
-class CalibrationStage(str, Enum):
+class CalibrationStage(StrEnum):
     A = "A"
     B = "B"
 

@@ -140,10 +140,8 @@ def test_progress_updates_every_50(tmp_path: Path) -> None:
         return tmp_path / "corpus" / "oscar_kk.txt"
 
     _test_hooks.ensure_corpus_file = _fake_ensure_corpus
-    _test_hooks.data_bank_client_factory = (
-        lambda api_url, api_key, timeout_seconds: FakeDataBankClient(
-            api_url, api_key, timeout_seconds=timeout_seconds
-        )
+    _test_hooks.data_bank_client_factory = lambda api_url, api_key, timeout_seconds: (
+        FakeDataBankClient(api_url, api_key, timeout_seconds=timeout_seconds)
     )
 
     params: JobParams = {

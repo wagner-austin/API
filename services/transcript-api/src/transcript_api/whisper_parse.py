@@ -11,10 +11,10 @@ from .types import (
     VerboseSegmentTD,
 )
 
-RawVerboseBase = dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]
+RawVerboseBase = dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]
 RawVerboseExtended = dict[
     str,
-    str | int | float | bool | None | list[dict[str, str | int | float | dict[str, int]] | int],
+    str | int | float | bool | list[dict[str, str | int | float | dict[str, int]] | int] | None,
 ]
 RawVerboseAny = RawVerboseBase | RawVerboseExtended
 
@@ -40,9 +40,9 @@ def _coerce_verbose_response(raw: RawVerboseAny) -> VerboseResponseTD:
         end_any = it.get("end")
         if start_any is None or end_any is None:
             raise JSONTypeError("segment missing start/end")
-        if not isinstance(start_any, int | float | str):
+        if not isinstance(start_any, (int, float, str)):
             raise JSONTypeError("segment start must be numeric")
-        if not isinstance(end_any, int | float | str):
+        if not isinstance(end_any, (int, float, str)):
             raise JSONTypeError("segment end must be numeric")
         start = _as_float(start_any)
         end = _as_float(end_any)
@@ -83,7 +83,7 @@ def convert_verbose_to_segments(data: VerboseResponseTD) -> list[TranscriptSegme
 
 
 def _as_float(val: int | float | str | None) -> float:
-    if isinstance(val, int | float):
+    if isinstance(val, (int, float)):
         return float(val)
     if isinstance(val, str):
         s = val.strip()

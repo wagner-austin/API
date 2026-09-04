@@ -135,8 +135,13 @@ jobs:
           poetry run ruff check .
           poetry run ruff format --check .
 
+      # Bare `mypy`, with no paths. Every one of the 43 packages declares
+      # `files = [...]` in its own `[tool.mypy]`, and naming paths here
+      # OVERRIDES that -- which broke libs/cleargbm_rs, whose `src/` is Rust
+      # and which correctly declares `files = ["tests", "scripts"]`. The
+      # package knows what it type-checks; this job should not second-guess it.
       - name: Types
-        run: poetry run mypy src tests scripts
+        run: poetry run mypy
 
       - name: Tests
         run: >

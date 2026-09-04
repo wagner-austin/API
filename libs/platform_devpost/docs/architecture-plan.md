@@ -99,44 +99,77 @@ All domain types use `__slots__` for immutability and memory efficiency:
 ```python
 class Theme:
     """A hackathon theme/category."""
+
     __slots__ = ("id", "name")
+
 
 class DisplayedLocation:
     """Location information for a hackathon."""
+
     __slots__ = ("icon", "location")
+
 
 class Hackathon:
     """Devpost hackathon metadata."""
+
     __slots__ = (
-        "id", "title", "url", "thumbnail_url", "organization_name",
-        "displayed_location", "open_state", "time_left_to_submission",
-        "submission_period_dates", "themes", "prize_amount",
-        "registrations_count", "featured", "winners_announced", "invite_only",
+        "id",
+        "title",
+        "url",
+        "thumbnail_url",
+        "organization_name",
+        "displayed_location",
+        "open_state",
+        "time_left_to_submission",
+        "submission_period_dates",
+        "themes",
+        "prize_amount",
+        "registrations_count",
+        "featured",
+        "winners_announced",
+        "invite_only",
     )
+
 
 class CodebaseCapability:
     """A capability the codebase has."""
+
     __slots__ = ("name", "strength", "tags", "description")
+
 
 class CodebaseProfile:
     """Full profile of codebase capabilities."""
+
     __slots__ = ("capabilities", "technologies", "frameworks")
+
 
 class HackathonMatch:
     """A hackathon scored against codebase capabilities."""
-    __slots__ = ("hackathon", "match_score", "matched_capabilities",
-                 "missing_capabilities", "recommendation")
+
+    __slots__ = (
+        "hackathon",
+        "match_score",
+        "matched_capabilities",
+        "missing_capabilities",
+        "recommendation",
+    )
+
 
 class InterestFilter:
     """User interest filter for hackathons."""
+
     __slots__ = ("include_themes", "exclude_themes", "states", "featured_only")
+
 
 class HackathonListMeta:
     """Metadata for hackathon list response."""
+
     __slots__ = ("total_count", "per_page")
+
 
 class HackathonListResponse:
     """Response from hackathon list API."""
+
     __slots__ = ("hackathons", "meta")
 ```
 
@@ -145,12 +178,15 @@ class HackathonListResponse:
 ```python
 class DevpostApiProtocol(Protocol):
     """Protocol for low-level Devpost API client."""
+
     def fetch_hackathons(
         self, *, page: int = 1, search: str | None = None
     ) -> HackathonListResponse: ...
 
+
 class DevpostClientProtocol(Protocol):
     """Protocol for high-level Devpost client."""
+
     def list_hackathons(
         self, *, search: str | None = None, state: HackathonState | None = None
     ) -> tuple[Hackathon, ...]: ...
@@ -193,15 +229,18 @@ from platform_core.http_client import HttpxClient, SyncTransport, build_client
 HttpClientBuilder = Callable[[float, SyncTransport | None], HttpxClient]
 _http_client_builder: HttpClientBuilder = build_client
 
+
 def _set_http_client_builder(builder: HttpClientBuilder) -> None:
     """Set HTTP client builder for testing."""
     global _http_client_builder
     _http_client_builder = builder
 
+
 def _reset_http_client_builder() -> None:
     """Reset HTTP client builder to production implementation."""
     global _http_client_builder
     _http_client_builder = build_client
+
 
 class _HttpDevpostApi:
     """Production HTTP-based Devpost API."""
@@ -229,15 +268,15 @@ Uses `platform_codebase` for scanning:
 from platform_codebase import scan_libs, scan_services
 from platform_codebase.types import LibInfo, ServiceInfo
 
+
 def scan_codebase(root: Path) -> CodebaseProfile:
     """Scan codebase and return capability profile."""
     libs = scan_libs(root)
     services = scan_services(root)
     return _build_profile(libs, services)
 
-def _build_profile(
-    libs: tuple[LibInfo, ...], services: tuple[ServiceInfo, ...]
-) -> CodebaseProfile:
+
+def _build_profile(libs: tuple[LibInfo, ...], services: tuple[ServiceInfo, ...]) -> CodebaseProfile:
     """Build capability profile from scanned libs/services."""
     # Detects capabilities based on dependencies:
     # - xgboost/lightgbm -> tabular ML
@@ -256,6 +295,7 @@ def match_hackathon(hackathon: Hackathon, profile: CodebaseProfile) -> Hackathon
     """Score a hackathon against codebase capabilities."""
     # Matches hackathon themes to profile technologies/frameworks
     # Returns match_score (0.0-1.0) and recommendation
+
 
 def match_hackathons(
     hackathons: tuple[Hackathon, ...], profile: CodebaseProfile
@@ -284,17 +324,21 @@ def filter_hackathons(
 ```python
 class HooksContainer:
     """Container for dependency injection hooks."""
+
     devpost_api_factory: DevpostApiFactoryProtocol
     devpost_client: DevpostClientHook
     profile_scanner: ProfileScannerHook
 
+
 hooks = HooksContainer()
+
 
 def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
     hooks.devpost_api_factory = create_devpost_api
     hooks.devpost_client = make_devpost_client
     hooks.profile_scanner = scan_codebase
+
 
 def reset_hooks() -> None:
     """Reset hooks to production implementations."""
@@ -306,12 +350,15 @@ def reset_hooks() -> None:
 ```python
 class FakeDevpostApi:
     """Fake Devpost API for testing."""
+
     def __init__(self, hackathons: tuple[Hackathon, ...] = ()) -> None:
         self._hackathons = hackathons
         self._fetch_calls: list[dict[str, int | str | None]] = []
 
+
 class FakeDevpostClient:
     """Fake Devpost client for testing."""
+
     def __init__(self, hackathons: tuple[Hackathon, ...] = ()) -> None:
         self._hackathons = hackathons
         self._list_calls: list[dict[str, str | HackathonState | None]] = []
@@ -348,6 +395,7 @@ class FakeHttpTransport(httpx.BaseTransport):
             request=request,
         )
 
+
 # In tests:
 def test_fetch_hackathons() -> None:
     fake_transport = FakeHttpTransport(response_json)
@@ -369,34 +417,60 @@ def test_fetch_hackathons() -> None:
 ```python
 # Main functions
 def find_hackathons(
-    *, interests: InterestFilter | None = None,
+    *,
+    interests: InterestFilter | None = None,
     match_codebase: bool = True,
     min_match_score: float = 0.0,
     root: Path | None = None,
 ) -> tuple[HackathonMatch, ...]: ...
 
+
 def get_codebase_profile(root: Path | None = None) -> CodebaseProfile: ...
+
 
 # Re-exported types
 from platform_devpost.types import (
-    CapabilityStrength, CodebaseCapability, CodebaseProfile,
-    DevpostApiProtocol, DevpostClientProtocol, DisplayedLocation,
-    Hackathon, HackathonMatch, HackathonState, InterestFilter,
-    MatchRecommendation, Theme,
+    CapabilityStrength,
+    CodebaseCapability,
+    CodebaseProfile,
+    DevpostApiProtocol,
+    DevpostClientProtocol,
+    DisplayedLocation,
+    Hackathon,
+    HackathonMatch,
+    HackathonState,
+    InterestFilter,
+    MatchRecommendation,
+    Theme,
 )
 
 # Testing utilities
 from platform_devpost.testing import (
-    FakeDevpostApi, FakeDevpostClient, hooks,
-    make_fake_capability, make_fake_hackathon, make_fake_profile,
-    make_fake_theme, make_interest_filter, reset_hooks,
+    FakeDevpostApi,
+    FakeDevpostClient,
+    hooks,
+    make_fake_capability,
+    make_fake_hackathon,
+    make_fake_profile,
+    make_fake_theme,
+    make_interest_filter,
+    reset_hooks,
 )
 
 # Encode/decode functions
 from platform_devpost.types import (
-    decode_capability, decode_filter, decode_hackathon, decode_match,
-    decode_profile, decode_theme, encode_capability, encode_filter,
-    encode_hackathon, encode_match, encode_profile, encode_theme,
+    decode_capability,
+    decode_filter,
+    decode_hackathon,
+    decode_match,
+    decode_profile,
+    decode_theme,
+    encode_capability,
+    encode_filter,
+    encode_hackathon,
+    encode_match,
+    encode_profile,
+    encode_theme,
 )
 ```
 

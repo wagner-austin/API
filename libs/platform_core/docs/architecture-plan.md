@@ -70,21 +70,27 @@ The OAuth module provides reusable, provider-agnostic OAuth 2.0 utilities.
 ```python
 TokenType = Literal["Bearer"]
 
+
 class OAuthCredentials(TypedDict):
     """OAuth 2.0 client credentials."""
+
     client_id: str
     client_secret: str
     redirect_uri: str
 
+
 class OAuthTokens(TypedDict):
     """OAuth 2.0 access and refresh tokens."""
+
     access_token: str
     refresh_token: str
     expires_at: int
     token_type: TokenType
 
+
 class OAuthTokenResponse(TypedDict):
     """Response from OAuth token endpoint."""
+
     access_token: str
     refresh_token: str | None  # Only on initial auth
     expires_in: int
@@ -100,33 +106,51 @@ Each TypedDict has corresponding `encode_*` and `decode_*` functions with `requi
 HttpPostHook = Callable[[str, dict[str, str], str], str]
 CurrentTimeHook = Callable[[], int]
 
+
 # PKCE (Proof Key for Code Exchange)
 def generate_code_verifier(*, length: int = 64) -> str: ...
 def generate_code_challenge(verifier: str) -> str: ...
 def generate_state() -> str: ...
+
 
 # Token utilities
 def is_token_expired(
     tokens: OAuthTokens, current_time: int, *, buffer_seconds: int = 60
 ) -> bool: ...
 
+
 def build_authorization_url(
-    auth_endpoint: str, client_id: str, redirect_uri: str, *,
-    code_challenge: str, state: str, scopes: tuple[str, ...],
-    access_type: str = "offline", prompt: str = "consent",
+    auth_endpoint: str,
+    client_id: str,
+    redirect_uri: str,
+    *,
+    code_challenge: str,
+    state: str,
+    scopes: tuple[str, ...],
+    access_type: str = "offline",
+    prompt: str = "consent",
 ) -> str: ...
+
 
 # Token exchange
 def exchange_authorization_code(
-    token_endpoint: str, credentials: OAuthCredentials,
-    code: str, code_verifier: str, *,
-    http_post: HttpPostHook, current_time: int,
+    token_endpoint: str,
+    credentials: OAuthCredentials,
+    code: str,
+    code_verifier: str,
+    *,
+    http_post: HttpPostHook,
+    current_time: int,
 ) -> OAuthTokens: ...
 
+
 def refresh_access_token(
-    token_endpoint: str, credentials: OAuthCredentials,
-    refresh_token: str, *,
-    http_post: HttpPostHook, current_time: int,
+    token_endpoint: str,
+    credentials: OAuthCredentials,
+    refresh_token: str,
+    *,
+    http_post: HttpPostHook,
+    current_time: int,
 ) -> OAuthTokens: ...
 ```
 
@@ -188,7 +212,7 @@ tokens = exchange_authorization_code(
     credentials=creds,
     code=code,
     code_verifier=verifier,
-    http_post=hooks.http_post,      # Injected
+    http_post=hooks.http_post,  # Injected
     current_time=hooks.current_time(),  # Injected
 )
 

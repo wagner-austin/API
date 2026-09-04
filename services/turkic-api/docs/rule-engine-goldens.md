@@ -60,9 +60,7 @@ digests: dict[str, str] = {}
 mismatches = 0
 for path in sorted(RULES.glob("*.rules")):
     ruleset = load_rules(path.name)
-    reference = icu.Transliterator.createFromRules(
-        path.name, path.read_text(encoding="utf-8"), 0
-    )
+    reference = icu.Transliterator.createFromRules(path.name, path.read_text(encoding="utf-8"), 0)
     digest = hashlib.sha256()
     for probe in sweep_probes(ruleset):
         ours = apply_rules(probe, ruleset)

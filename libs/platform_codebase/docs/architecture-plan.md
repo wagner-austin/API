@@ -56,37 +56,48 @@ All types use `__slots__` for immutability and memory efficiency:
 ```python
 class CodebaseCapability:
     """A capability the codebase has."""
+
     __slots__ = ("description", "name", "strength", "tags")
 
-    name: str                    # e.g., "tabular_classification"
+    name: str  # e.g., "tabular_classification"
     strength: CapabilityStrength
-    tags: tuple[str, ...]        # e.g., ("tabular", "classification")
+    tags: tuple[str, ...]  # e.g., ("tabular", "classification")
     description: str
+
 
 class CodebaseProfile:
     """Full profile of codebase capabilities."""
+
     __slots__ = (
-        "capabilities", "data_formats", "frameworks",
-        "ml_backends", "task_types", "technologies",
+        "capabilities",
+        "data_formats",
+        "frameworks",
+        "ml_backends",
+        "task_types",
+        "technologies",
     )
 
     capabilities: tuple[CodebaseCapability, ...]
-    technologies: tuple[str, ...]   # e.g., ("python", "javascript")
-    frameworks: tuple[str, ...]     # e.g., ("fastapi", "django")
-    ml_backends: tuple[str, ...]    # e.g., ("xgboost", "lightgbm")
-    data_formats: tuple[str, ...]   # e.g., ("csv", "parquet")
-    task_types: tuple[str, ...]     # e.g., ("binary_classification",)
+    technologies: tuple[str, ...]  # e.g., ("python", "javascript")
+    frameworks: tuple[str, ...]  # e.g., ("fastapi", "django")
+    ml_backends: tuple[str, ...]  # e.g., ("xgboost", "lightgbm")
+    data_formats: tuple[str, ...]  # e.g., ("csv", "parquet")
+    task_types: tuple[str, ...]  # e.g., ("binary_classification",)
+
 
 class LibInfo:
     """Information about a scanned library."""
+
     __slots__ = ("dependencies", "name", "path")
 
     name: str
     path: Path
     dependencies: tuple[str, ...]
 
+
 class ServiceInfo:
     """Information about a scanned service."""
+
     __slots__ = ("dependencies", "has_rules_files", "name", "path")
 
     name: str
@@ -106,11 +117,13 @@ def extract_poetry_name(content: str) -> str:
     Returns empty string if not found.
     """
 
+
 def extract_poetry_dependencies(content: str) -> list[str]:
     """Extract dependencies from [tool.poetry.dependencies] section.
 
     Returns list of dependency names (strips extras like [dev]).
     """
+
 
 def parse_pyproject(path: Path) -> tuple[str, tuple[str, ...]]:
     """Parse pyproject.toml and extract name and dependencies.
@@ -130,10 +143,10 @@ def parse_pyproject(path: Path) -> tuple[str, tuple[str, ...]]:
 NAME_PATTERN = r'\[tool\.poetry\][^\[]*name\s*=\s*"([^"]+)"'
 
 # Extract [tool.poetry.dependencies] section
-DEPS_SECTION_PATTERN = r'\[tool\.poetry\.dependencies\](.*?)(?:\[|$)'
+DEPS_SECTION_PATTERN = r"\[tool\.poetry\.dependencies\](.*?)(?:\[|$)"
 
 # Extract individual dependency names
-DEP_NAME_PATTERN = r'^([a-zA-Z][a-zA-Z0-9_-]*)'
+DEP_NAME_PATTERN = r"^([a-zA-Z][a-zA-Z0-9_-]*)"
 ```
 
 ## Scanner (scanner.py)
@@ -145,6 +158,7 @@ def scan_libs(root: Path) -> tuple[LibInfo, ...]:
     Skips directories without pyproject.toml.
     Returns LibInfo for each valid library.
     """
+
 
 def scan_services(root: Path) -> tuple[ServiceInfo, ...]:
     """Scan services/ directory for pyproject.toml files.
@@ -175,6 +189,7 @@ def make_fake_capability(
     description: str = "Test capability",
 ) -> CodebaseCapability: ...
 
+
 def make_fake_profile(
     *,
     capabilities: tuple[CodebaseCapability, ...] = (),
@@ -185,12 +200,14 @@ def make_fake_profile(
     task_types: tuple[str, ...] = ("binary_classification",),
 ) -> CodebaseProfile: ...
 
+
 def make_fake_lib_info(
     *,
     name: str = "test-lib",
     path: Path | None = None,
     dependencies: tuple[str, ...] = (),
 ) -> LibInfo: ...
+
 
 def make_fake_service_info(
     *,
@@ -209,10 +226,12 @@ def make_fake_service_info(
 from platform_codebase import scan_libs, scan_services, CodebaseProfile
 from platform_codebase.types import LibInfo, ServiceInfo
 
+
 def scan_codebase(root: Path) -> CodebaseProfile:
     libs = scan_libs(root)
     services = scan_services(root)
     return _build_profile(libs, services)
+
 
 # Uses: capabilities, ml_backends, data_formats, task_types
 ```
@@ -222,10 +241,12 @@ def scan_codebase(root: Path) -> CodebaseProfile:
 ```python
 from platform_codebase import scan_libs, scan_services, CodebaseProfile
 
+
 def scan_codebase(root: Path) -> CodebaseProfile:
     libs = scan_libs(root)
     services = scan_services(root)
     return _build_profile(libs, services)
+
 
 # Uses: capabilities, technologies, frameworks
 ```

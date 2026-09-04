@@ -88,7 +88,7 @@ backend = create_mlp_regressor_backend()
 
 outcome = backend.train(
     x_features=X,
-    y_targets=y,            # float64 continuous targets
+    y_targets=y,  # float64 continuous targets
     feature_names=names,
     config=config,
     output_dir=output_dir,
@@ -118,7 +118,7 @@ backend = create_lstm_regressor_backend()
 
 outcome = backend.train(
     x_features=X,
-    y_targets=y,            # float64 continuous targets
+    y_targets=y,  # float64 continuous targets
     feature_names=names,
     config=config,
     output_dir=output_dir,

@@ -324,7 +324,7 @@ class SupportsToDictRecursive(Protocol):
 
     def to_dict_recursive(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
         """Convert to dictionary recursively."""
         ...
 
@@ -335,10 +335,10 @@ class SupportsModelDump(Protocol):
 
     def model_dump(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
         """Dump model to dictionary."""
         ...
 
 
 # Type alias for raw verbose response from SDK
-RawVerboseDict = dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]
+RawVerboseDict = dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]

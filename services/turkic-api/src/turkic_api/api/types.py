@@ -10,7 +10,7 @@ from platform_workers.rq_harness import RQJobLike, RQRetryLike
 __all__ = ["JSONValue", "JsonDict", "LoggerProtocol", "QueueProtocol", "RQJobLike", "RQRetryLike"]
 
 # Public JSON type for API boundaries - non-recursive, one-level deep
-JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
+JsonDict = dict[str, str | int | float | bool | list[str | int | float | bool | None] | None]
 
 
 class _EnqCallable(Protocol):

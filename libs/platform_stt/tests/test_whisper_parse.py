@@ -193,7 +193,7 @@ class TestToVerboseResponseWithProtocol:
         class FakeResponse:
             def to_dict_recursive(
                 self,
-            ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+            ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
                 return {
                     "text": "Test",
                     "segments": [{"text": "Test", "start": 0.0, "end": 1.0}],
@@ -208,7 +208,7 @@ class TestToVerboseResponseWithProtocol:
         class FakePydanticResponse:
             def model_dump(
                 self,
-            ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+            ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
                 return {
                     "text": "Pydantic",
                     "segments": [{"text": "Pydantic", "start": 0.0, "end": 2.0}],

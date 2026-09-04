@@ -122,9 +122,9 @@ class LoraConfig(TypedDict):
     """Configuration for LoRA fine-tuning."""
 
     enabled: bool
-    r: int                    # LoRA rank (8, 16, 32, 64)
-    lora_alpha: int           # Scaling factor
-    lora_dropout: float       # Dropout probability
+    r: int  # LoRA rank (8, 16, 32, 64)
+    lora_alpha: int  # Scaling factor
+    lora_dropout: float  # Dropout probability
     target_modules: tuple[str, ...]  # Modules to apply LoRA
     bias: Literal["none", "all", "lora_only"]
 
@@ -299,6 +299,7 @@ if TYPE_CHECKING:
 
 # === Unsloth Hooks ===
 
+
 def _real_unsloth_from_pretrained(
     model_name: str,
     max_seq_length: int,
@@ -344,6 +345,7 @@ unsloth_get_peft_model = _real_unsloth_get_peft_model
 
 # === PEFT Hooks (fallback when Unsloth unavailable) ===
 
+
 def _real_peft_get_peft_model(
     model: LMModelProto,
     peft_config: object,
@@ -384,6 +386,7 @@ peft_lora_config = _real_peft_lora_config
 
 # === HuggingFace Model Hooks ===
 
+
 def _real_load_ernie_model(model_id: str) -> LMModelProto:
     """Load ERNIE model from HuggingFace."""
     transformers_mod = __import__("transformers", fromlist=["AutoModelForCausalLM"])
@@ -405,6 +408,7 @@ load_ernie_tokenizer = _real_load_ernie_tokenizer
 
 
 # === Availability Check Hooks ===
+
 
 def _real_unsloth_available() -> bool:
     """Check if Unsloth is installed and importable."""
@@ -481,16 +485,12 @@ def prepare_ernie_with_handle(
 
     # Determine loading strategy
     use_unsloth = (
-        unsloth_cfg is not None
-        and unsloth_cfg["enabled"]
-        and _test_hooks.unsloth_available()
+        unsloth_cfg is not None and unsloth_cfg["enabled"] and _test_hooks.unsloth_available()
     )
     use_lora = lora_cfg is not None and lora_cfg["enabled"]
 
     if use_unsloth:
-        model, ernie_tokenizer = _prepare_with_unsloth(
-            hub_model_id, unsloth_cfg, lora_cfg
-        )
+        model, ernie_tokenizer = _prepare_with_unsloth(hub_model_id, unsloth_cfg, lora_cfg)
     elif use_lora:
         model = _prepare_with_peft(hub_model_id, lora_cfg, quant_cfg)
         ernie_tokenizer = _test_hooks.load_ernie_tokenizer(hub_model_id)
@@ -800,15 +800,11 @@ def save_prepared_ernie(
         prepared.model.save_pretrained(out_dir)
         # Write metadata
         metadata = {"is_lora": True, "tokenizer_id": prepared.tokenizer_id}
-        Path(out_dir, "ernie_metadata.json").write_text(
-            dump_json_str(metadata), encoding="utf-8"
-        )
+        Path(out_dir, "ernie_metadata.json").write_text(dump_json_str(metadata), encoding="utf-8")
     else:
         prepared.model.save_pretrained(out_dir)
         metadata = {"is_lora": False, "tokenizer_id": prepared.tokenizer_id}
-        Path(out_dir, "ernie_metadata.json").write_text(
-            dump_json_str(metadata), encoding="utf-8"
-        )
+        Path(out_dir, "ernie_metadata.json").write_text(dump_json_str(metadata), encoding="utf-8")
 
 
 def load_prepared_ernie_from_handle(
@@ -1002,8 +998,10 @@ class FakeERNIEModel:
         labels: object | None = None,
     ) -> object:
         """Fake forward pass."""
+
         class FakeOutput:
             loss = 0.5
+
         return FakeOutput()
 
     def parameters(self) -> list[object]:
@@ -1027,6 +1025,7 @@ class FakeERNIEModel:
     def config(self) -> object:
         class FakeConfig:
             max_position_embeddings = 2048
+
         return FakeConfig()
 
 

@@ -67,8 +67,7 @@ The library wraps the official Kaggle Python API (`kaggle.api`):
 
 ```python
 CompetitionCategory = Literal[
-    "Featured", "Research", "Playground",
-    "Getting Started", "Masters", "Kudos"
+    "Featured", "Research", "Playground", "Getting Started", "Masters", "Kudos"
 ]
 CapabilityStrength = Literal["strong", "moderate", "basic"]
 MatchRecommendation = Literal["strong_fit", "good_fit", "stretch", "new_territory"]
@@ -81,20 +80,35 @@ All domain types use `__slots__` for immutability and memory efficiency:
 ```python
 class Competition:
     """Kaggle competition metadata."""
+
     __slots__ = (
-        "ref", "title", "category", "reward", "deadline",
-        "team_count", "tags", "description", "url",
+        "ref",
+        "title",
+        "category",
+        "reward",
+        "deadline",
+        "team_count",
+        "tags",
+        "description",
+        "url",
     )
+
 
 class CompetitionMatch:
     """A competition scored against codebase capabilities."""
+
     __slots__ = (
-        "competition", "match_score", "matched_capabilities",
-        "missing_capabilities", "recommendation",
+        "competition",
+        "match_score",
+        "matched_capabilities",
+        "missing_capabilities",
+        "recommendation",
     )
+
 
 class InterestFilter:
     """User interest filter for competitions."""
+
     __slots__ = ("include_tags", "exclude_tags", "min_reward", "categories")
 ```
 
@@ -103,20 +117,25 @@ class InterestFilter:
 ```python
 class KaggleApiProtocol(Protocol):
     """Protocol for low-level Kaggle API."""
+
     def competitions_list(
         self, *, search: str = "", category: str = ""
     ) -> tuple[KaggleCompetition, ...]: ...
 
+
 class KaggleClientProtocol(Protocol):
     """Protocol for high-level Kaggle client."""
+
     def list_competitions(
         self, *, search: str | None = None, category: CompetitionCategory | None = None
     ) -> tuple[Competition, ...]: ...
 
     def get_competition(self, ref: str) -> Competition | None: ...
 
+
 class KaggleModuleProtocol(Protocol):
     """Protocol for Kaggle module wrapper."""
+
     @property
     def api(self) -> KaggleApiProtocol: ...
 ```
@@ -153,9 +172,11 @@ def create_kaggle_api() -> KaggleApiProtocol:
     module.api.authenticate()
     return module.api
 
+
 def default_kaggle_api_factory() -> KaggleApiProtocol:
     """Default factory using real Kaggle module."""
     return create_kaggle_api()
+
 
 def make_kaggle_client() -> KaggleClientProtocol:
     """Production factory for KaggleClient."""
@@ -170,15 +191,15 @@ Uses `platform_codebase` for scanning:
 from platform_codebase import scan_libs, scan_services
 from platform_codebase.types import LibInfo, ServiceInfo
 
+
 def scan_codebase(root: Path) -> CodebaseProfile:
     """Scan codebase and return capability profile."""
     libs = scan_libs(root)
     services = scan_services(root)
     return _build_profile(libs, services)
 
-def _build_profile(
-    libs: tuple[LibInfo, ...], services: tuple[ServiceInfo, ...]
-) -> CodebaseProfile:
+
+def _build_profile(libs: tuple[LibInfo, ...], services: tuple[ServiceInfo, ...]) -> CodebaseProfile:
     """Build capability profile from scanned libs/services."""
     # Detects capabilities based on dependencies:
     # - xgboost/lightgbm -> tabular ML
@@ -192,12 +213,11 @@ def _build_profile(
 Scores competitions against codebase capabilities:
 
 ```python
-def match_competition(
-    competition: Competition, profile: CodebaseProfile
-) -> CompetitionMatch:
+def match_competition(competition: Competition, profile: CodebaseProfile) -> CompetitionMatch:
     """Score a competition against codebase capabilities."""
     # Matches competition tags to profile ml_backends/task_types
     # Returns match_score (0.0-1.0) and recommendation
+
 
 def match_competitions(
     competitions: tuple[Competition, ...], profile: CodebaseProfile
@@ -226,12 +246,15 @@ def filter_competitions(
 ```python
 class HooksContainer:
     """Container for dependency injection hooks."""
+
     kaggle_api_factory: KaggleApiFactoryProtocol
     kaggle_client: KaggleClientHook
     kaggle_module: KaggleModuleHook
     profile_scanner: ProfileScannerHook
 
+
 hooks = HooksContainer()
+
 
 def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
@@ -239,6 +262,7 @@ def _init_production_hooks() -> None:
     hooks.kaggle_client = make_kaggle_client
     hooks.kaggle_module = _default_kaggle_module
     hooks.profile_scanner = scan_codebase
+
 
 def reset_hooks() -> None:
     """Reset hooks to production implementations."""
@@ -250,6 +274,7 @@ def reset_hooks() -> None:
 ```python
 class FakeKaggleApi:
     """Fake Kaggle API for testing."""
+
     def __init__(self, competitions: tuple[KaggleCompetition, ...] = ()) -> None:
         self._competitions = competitions
         self._authenticated = False
@@ -262,15 +287,19 @@ class FakeKaggleApi:
         self, *, search: str = "", category: str = ""
     ) -> tuple[KaggleCompetition, ...]: ...
 
+
 class FakeKaggleClient:
     """Fake Kaggle client for testing."""
+
     def __init__(self, competitions: tuple[Competition, ...] = ()) -> None:
         self._competitions = competitions
         self._list_calls: list[dict[str, str | CompetitionCategory | None]] = []
         self._get_calls: list[str] = []
 
+
 class FakeKaggleModule:
     """Fake Kaggle module for testing."""
+
     def __init__(self, api: KaggleApiProtocol | None = None) -> None:
         self._api = api or FakeKaggleApi()
 ```
@@ -290,34 +319,57 @@ def make_interest_filter(...) -> InterestFilter
 ```python
 # Main functions
 def find_competitions(
-    *, interests: InterestFilter | None = None,
+    *,
+    interests: InterestFilter | None = None,
     match_codebase: bool = True,
     min_match_score: float = 0.0,
     root: Path | None = None,
 ) -> tuple[CompetitionMatch, ...]: ...
 
+
 def get_codebase_profile(root: Path | None = None) -> CodebaseProfile: ...
+
 
 # Re-exported types
 from platform_kaggle.types import (
-    CapabilityStrength, CodebaseCapability, CodebaseProfile,
-    Competition, CompetitionCategory, CompetitionMatch,
-    InterestFilter, KaggleApiProtocol, KaggleClientProtocol,
+    CapabilityStrength,
+    CodebaseCapability,
+    CodebaseProfile,
+    Competition,
+    CompetitionCategory,
+    CompetitionMatch,
+    InterestFilter,
+    KaggleApiProtocol,
+    KaggleClientProtocol,
     MatchRecommendation,
 )
 
 # Testing utilities
 from platform_kaggle.testing import (
-    FakeKaggleApi, FakeKaggleClient, FakeKaggleModule, hooks,
-    make_fake_capability, make_fake_competition, make_fake_kaggle_competition,
-    make_fake_profile, make_interest_filter, reset_hooks,
+    FakeKaggleApi,
+    FakeKaggleClient,
+    FakeKaggleModule,
+    hooks,
+    make_fake_capability,
+    make_fake_competition,
+    make_fake_kaggle_competition,
+    make_fake_profile,
+    make_interest_filter,
+    reset_hooks,
 )
 
 # Encode/decode functions
 from platform_kaggle.types import (
-    decode_capability, decode_competition, decode_filter, decode_match,
-    decode_profile, encode_capability, encode_competition, encode_filter,
-    encode_match, encode_profile,
+    decode_capability,
+    decode_competition,
+    decode_filter,
+    decode_match,
+    decode_profile,
+    encode_capability,
+    encode_competition,
+    encode_filter,
+    encode_match,
+    encode_profile,
 )
 ```
 

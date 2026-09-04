@@ -14,6 +14,9 @@ from typing_extensions import TypedDict
 from turkic_api.core.langid import LangIdModel, build_lang_script_filter
 from turkic_api.core.models import ProcessSpec
 
+_XML_CHUNK_BYTES: Final[int] = 1 << 20
+"""How much decompressed XML is fed to the parser at a time (1 MiB)."""
+
 # NOTE: We deliberately avoid Any/casts/ignores. External library usage is
 # narrowed to typed access patterns.
 
@@ -105,17 +108,57 @@ def stream_wikipedia_xml(lang: str) -> Generator[str, None, None]:
     with _test_hooks.wikipedia_requests_get(url, stream=True, timeout=30) as resp:
         resp.raise_for_status()
         bz_stream = bz2.BZ2File(resp.raw)
-        for _, elem in ET.iterparse(bz_stream, events=("end",)):
-            if (elem.tag.endswith("}text") or elem.tag == "text") and elem.text:
-                etxt = "" if elem.text is None else str(elem.text)
-                txt = html.unescape(re.sub(r"(?s)<.*?>", " ", etxt))
-                for s in re.split(r"[.!?]", txt):
-                    s_str: str = s.strip()
-                    if s_str:
-                        yield s_str
-                elem.clear()
-            else:
-                elem.clear()
+        # XMLPullParser, not iterparse. typeshed types iterparse's elements as
+        # Any, and the note at the top of this file is the rule: no Any, no
+        # casts, no ignores. The pull parser is parameterised by its EVENT
+        # PAYLOAD -- only "end" is requested, so every payload is an Element --
+        # and `read_events` yields tuples of differing arity, so the payload is
+        # taken from the end and narrowed rather than unpacked.
+        parser: ET.XMLPullParser[ET.Element[str] | tuple[str, str]] = ET.XMLPullParser(
+            events=("end",)
+        )
+        while True:
+            chunk = bz_stream.read(_XML_CHUNK_BYTES)
+            if not chunk:
+                break
+            parser.feed(chunk)
+            yield from _drain(parser)
+        parser.close()
+        yield from _drain(parser)
+
+
+def _drain(
+    parser: ET.XMLPullParser[ET.Element[str] | tuple[str, str]],
+) -> Generator[str, None, None]:
+    """Yield the sentences in whatever the parser has finished parsing.
+
+    Args:
+        parser: The pull parser being fed the dump.
+
+    Yields:
+        One stripped sentence at a time.
+
+    Every element is cleared once read, which is what bounds memory on a dump
+    far larger than RAM -- the same reason the iterparse version this replaced
+    called ``clear()`` on both branches of its condition.
+    """
+    for event in parser.read_events():
+        # read_events yields tuples of differing arity, so the payload is taken
+        # from the end rather than unpacked. It is an Element for every event
+        # this code subscribes to; typeshed also admits the namespace tuple a
+        # "start-ns" subscription would give, which is what the guard is for
+        # and what test_drain_skips_a_namespace_event feeds it.
+        elem = event[-1]
+        if not isinstance(elem, ET.Element):
+            continue
+        if (elem.tag.endswith("}text") or elem.tag == "text") and elem.text:
+            etxt = "" if elem.text is None else str(elem.text)
+            txt = html.unescape(re.sub(r"(?s)<.*?>", " ", etxt))
+            for s in re.split(r"[.!?]", txt):
+                s_str: str = s.strip()
+                if s_str:
+                    yield s_str
+        elem.clear()
 
 
 def _write_lines(dest: Path, lines: Generator[str, None, None], limit: int) -> int:

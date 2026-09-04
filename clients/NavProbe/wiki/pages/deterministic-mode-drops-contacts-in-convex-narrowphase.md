@@ -100,7 +100,7 @@ Broadphase agrees. The CCD slot reservation agrees. **The EPA distance agrees bi
    ```python
    dist, ncollision, w1, w2, multiccd_idx = epa_phase(...)
    if dist >= gap and not is_collision_sensor:
-     return
+       return
    ```
    `dist` is the EPA result. On the counting pass EPA runs against suppressed scratch, `dist` is meaningless, and the thread **leaves the kernel** — reaching neither of the gates below. This is the blocking one.
 2. **The contact loop's trip count is the EPA contact count.** `for i in range(ncollision)` at the `write_contact` call site, where `ncollision` comes from `epa_phase` and `multicontact`.

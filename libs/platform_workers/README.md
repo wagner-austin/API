@@ -34,8 +34,8 @@ Typed Redis client factories that avoid module-level imports:
 
 ```python
 from platform_workers.redis import (
-    redis_for_kv,      # String key-value operations
-    redis_for_rq,      # Binary client for RQ
+    redis_for_kv,  # String key-value operations
+    redis_for_rq,  # Binary client for RQ
     redis_raw_for_rq,  # Raw client for RQ (full API)
     redis_for_pubsub,  # Async client for pub/sub
 )
@@ -62,13 +62,13 @@ run_rq_worker(config)
 
 ```python
 from platform_workers.redis import (
-    RedisStrProto,     # String client protocol
-    RedisBytesProto,   # Binary client protocol
-    RedisAsyncProto,   # Async client protocol
+    RedisStrProto,  # String client protocol
+    RedisBytesProto,  # Binary client protocol
+    RedisAsyncProto,  # Async client protocol
     RedisPubSubProto,  # Pub/sub protocol
-    RedisError,        # Platform Redis error
-    is_redis_error,    # Type-safe error check
-    PubSubMessage,     # Pub/sub message TypedDict
+    RedisError,  # Platform Redis error
+    is_redis_error,  # Type-safe error check
+    PubSubMessage,  # Pub/sub message TypedDict
 )
 
 # Type-safe error handling
@@ -94,6 +94,7 @@ from platform_workers.rq_harness import (
 
 # Create queue client
 from platform_workers.redis import redis_raw_for_rq
+
 conn = redis_raw_for_rq("redis://localhost:6379")
 queue = rq_queue("my-queue", conn)
 
@@ -176,10 +177,12 @@ from platform_workers.redis import redis_for_kv
 
 redis = redis_for_kv("redis://localhost:6379")
 
+
 # Basic Redis check
 @app.get("/readyz")
 def ready() -> ReadyResponse:
     return readyz_redis(redis)
+
 
 # Redis + worker presence check
 @app.get("/readyz")

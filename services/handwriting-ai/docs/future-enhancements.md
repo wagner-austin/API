@@ -29,10 +29,12 @@ DIGITS__ACTIVE_MODEL=mnist_resnet18_v1,mnist_resnet18_v2,mnist_wideresnet_v1
 self._model: TorchModel | None = None
 self._manifest: ModelManifest | None = None
 
+
 # Proposed: list of loaded models
 class _LoadedModel(NamedTuple):
     model: TorchModel
     manifest: ModelManifest
+
 
 self._models: list[_LoadedModel] = []
 ```

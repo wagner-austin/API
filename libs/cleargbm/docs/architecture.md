@@ -64,6 +64,7 @@ class _TrainProto(Protocol):
         feature_names: list[str],
     ) -> PyGbmModelProto: ...
 
+
 _native_mod = __import__("cleargbm_rs")
 train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
 ```

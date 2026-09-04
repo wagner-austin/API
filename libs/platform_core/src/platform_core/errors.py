@@ -9,18 +9,21 @@ and it has no business pulling in ``fastapi.responses`` to define an enum.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Generic, TypeVar
 
 
-class ErrorCodeBase(str, Enum):
+class ErrorCodeBase(StrEnum):
     """Base class for service error codes.
 
-    This is a string enum where each member is both an Enum and a str.
-    To get the string value, use: code if isinstance(code, str) else str(code)
+    A :class:`enum.StrEnum`, so a member IS its own string value: ``str(code)``
+    and any f-string render the code itself rather than
+    ``ClassName.MEMBER``. Under the older ``(str, Enum)`` spelling those two
+    disagreed -- concatenation gave the value while ``str()`` gave the
+    qualified name -- which is why the previous docstring had to tell callers
+    to write ``code if isinstance(code, str) else str(code)``. They can now
+    just use it.
     """
-
-    value: str
 
 
 class ErrorCode(ErrorCodeBase):

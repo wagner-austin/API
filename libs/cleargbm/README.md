@@ -40,8 +40,10 @@ config: GradientBoostingConfig = {
 }
 
 model = train_gradient_boosting(
-    x_train=x_train, y_train=y_train,
-    x_val=None, y_val=None,
+    x_train=x_train,
+    y_train=y_train,
+    x_val=None,
+    y_val=None,
     config=config,
     feature_names=("f0", "f1", "f2"),
 )

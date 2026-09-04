@@ -79,10 +79,10 @@ Device and precision resolution uses the centralized `platform_ml` library to en
 
 ```python
 from platform_ml import (
-    RequestedDevice,      # "cpu", "cuda", "auto"
-    ResolvedDevice,       # "cpu", "cuda"
-    RequestedPrecision,   # "fp32", "fp16", "bf16", "auto"
-    ResolvedPrecision,    # "fp32", "fp16", "bf16"
+    RequestedDevice,  # "cpu", "cuda", "auto"
+    ResolvedDevice,  # "cpu", "cuda"
+    RequestedPrecision,  # "fp32", "fp16", "bf16", "auto"
+    ResolvedPrecision,  # "fp32", "fp16", "bf16"
     resolve_device,
     resolve_precision,
     recommended_batch_size,
@@ -598,6 +598,7 @@ class TokenizerBackend(Protocol):
     def encode(self, handle: TokenizerHandle, text: str) -> list[int]: ...
     def decode(self, handle: TokenizerHandle, ids: list[int]) -> str: ...
 
+
 class ModelBackend(Protocol):
     def prepare(self, config: ModelConfig) -> PreparedModel: ...
     def train(self, model: PreparedModel, data: DataConfig) -> TrainingResult: ...
@@ -613,14 +614,17 @@ Each backend uses dependency injection via a `_test_hooks.py` module for testabi
 # In _test_hooks.py
 class Hooks:
     """Production code sets to real implementations; tests set to fakes."""
+
     load_hf_model: Callable[[str], LMModelProto] | None = None
     load_hf_tokenizer: Callable[[str], TokenizerProto] | None = None
     create_trainer: TrainerCreator | None = None
+
 
 def reset_hooks() -> None:
     """Reset all hooks to None (for test cleanup)."""
     Hooks.load_hf_model = None
     # ...
+
 
 # In production code
 def prepare_hf_lm(cfg: ModelTrainConfig) -> PreparedLMModel:

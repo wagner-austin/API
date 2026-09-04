@@ -134,7 +134,7 @@ config = TranslatorConfig(
 ```python
 from platform_translate import (
     DEFAULT_BACKEND,  # "anthropic"
-    DEFAULT_MODEL,    # "claude-3-haiku-20240307"
+    DEFAULT_MODEL,  # "claude-3-haiku-20240307"
 )
 ```
 

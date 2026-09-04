@@ -195,8 +195,10 @@ All models use **TypedDict** for strict, structural typing:
 from typing_extensions import TypedDict
 from typing import Literal, NotRequired
 
+
 class JobCreate(TypedDict):
     """Job creation request (validated at API boundary)."""
+
     source: Literal["oscar", "wikipedia"]
     language: Literal["kk", "ky", "uz", "tr", "ug", "fi", "az"]
     script: Literal["Latn", "Cyrl", "Arab"] | None
@@ -204,8 +206,10 @@ class JobCreate(TypedDict):
     transliterate: bool
     confidence_threshold: float
 
+
 class JobStatus(TypedDict):
     """Job status response."""
+
     job_id: str
     status: Literal["queued", "processing", "completed", "failed"]
     progress: int
@@ -224,18 +228,11 @@ Type-safe handling of untyped JSON at system boundaries:
 
 ```python
 # core/models.py
-UnknownJson = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | list["UnknownJson"]
-    | dict[str, "UnknownJson"]
-)
+UnknownJson = None | bool | int | float | str | list["UnknownJson"] | dict[str, "UnknownJson"]
 
 # api/types.py
 JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
+
 
 # Usage: Parse untrusted input
 def parse_job_create(payload: JsonDict) -> JobCreate:
@@ -256,21 +253,27 @@ Type-safe interfaces without concrete dependencies:
 from typing import Protocol
 from collections.abc import Mapping
 
+
 class LoggerProtocol(Protocol):
     """Minimal logger interface (compatible with platform_core.logging)."""
+
     def info(
         self,
         msg: str,
         *args: UnknownJson,
         extra: Mapping[str, UnknownJson] | None = None,
     ) -> None: ...
+
     # debug, warning, error...
+
 
 class QueueProtocol(Protocol):
     """Minimal queue interface (compatible with RQ)."""
+
     def enqueue(
         self, func: str | _EnqCallable, *args: UnknownJson, **kwargs: UnknownJson
     ) -> JobLike: ...
+
 
 # Usage: Inject protocols, not concrete types
 class JobService:
@@ -298,6 +301,7 @@ class JobService:
 # All modules use platform_core logging
 from platform_core.logging import get_logger, setup_logging
 
+
 # API initialization (main.py)
 def _init_logging() -> None:
     setup_logging(
@@ -307,6 +311,7 @@ def _init_logging() -> None:
         instance_id=None,
         extra_fields=[],
     )
+
 
 # Worker initialization (worker_entry.py)
 def main() -> None:
@@ -337,6 +342,7 @@ from platform_workers.job_context import JobContext, make_job_context
 
 TURKIC_DOMAIN: JobDomain = "turkic"
 
+
 # jobs.py - Publishing events via generic context
 def _make_ctx(redis: RedisStrProto, job_id: str, user_id: int, queue: str) -> JobContext:
     return make_job_context(
@@ -348,8 +354,10 @@ def _make_ctx(redis: RedisStrProto, job_id: str, user_id: int, queue: str) -> Jo
         queue_name=queue,
     )
 
+
 def publish_started(redis: RedisStrProto, job_id: str, user_id: int, queue: str) -> None:
     _make_ctx(redis, job_id, user_id, queue).publish_started()
+
 
 def publish_completed(
     redis: RedisStrProto, job_id: str, user_id: int, queue: str, file_id: str, size: int
@@ -367,9 +375,11 @@ Centralized settings from environment:
 from platform_core.config import TurkicApiSettings as Settings
 from platform_core.config import load_turkic_api_settings
 
+
 def settings_from_env() -> Settings:
     """Load settings via shared platform_core config helpers."""
     return load_turkic_api_settings()
+
 
 # Settings TypedDict (from platform_core)
 # - redis_url: str
@@ -389,6 +399,7 @@ from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 from platform_core.job_events import default_events_channel
 from platform_core.queues import TURKIC_QUEUE
 
+
 def _build_config() -> WorkerConfig:
     settings = settings_from_env()
     return {
@@ -396,6 +407,7 @@ def _build_config() -> WorkerConfig:
         "queue_name": TURKIC_QUEUE,
         "events_channel": default_events_channel("turkic"),
     }
+
 
 def main() -> None:
     setup_logging(...)
@@ -490,7 +502,9 @@ Stream result file from data-bank-api.
 # Proxies to data-bank-api GET /files/{file_id} using DataBankClient
 from platform_core.data_bank_client import DataBankClient
 
-client = DataBankClient(settings["data_bank_api_url"], settings["data_bank_api_key"], timeout_seconds=120.0)
+client = DataBankClient(
+    settings["data_bank_api_url"], settings["data_bank_api_key"], timeout_seconds=120.0
+)
 head = client.head(file_id, request_id=job_id)
 resp = client.stream_download(file_id, request_id=job_id)
 try:
@@ -670,8 +684,10 @@ Rules enforced:
 # ❌ FAILS guard check
 from typing import Any
 
+
 def process(data: Any) -> dict:  # Any type
     return {}
+
 
 # ✅ PASSES guard check
 def process(data: UnknownJson) -> dict[str, str]:
@@ -751,9 +767,7 @@ def test_transliteval_edge_cases_and_rule_files(tmp_path: Path) -> None:
     assert out2 == ["abc", "def"]
 
     # Verify all production rules parse
-    production_files: tuple[Path, ...] = tuple(
-        p for p in rule_dir.glob("*.rules") if "_" in p.stem
-    )
+    production_files: tuple[Path, ...] = tuple(p for p in rule_dir.glob("*.rules") if "_" in p.stem)
     for path in production_files:
         rules = te.load_rules(path.name)
         te.apply_rules("test", rules)

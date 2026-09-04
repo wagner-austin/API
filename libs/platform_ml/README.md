@@ -20,7 +20,9 @@ store = ArtifactStore(base_url="http://data-bank-api:8000", api_key="secret")
 resp = store.upload_artifact(Path("./model-output"), artifact_name="model-v1", request_id="req-123")
 
 # Download and extract
-root = store.download_artifact(file_id="model-v1.tar.gz", dest_dir=Path("./downloaded"), request_id="req-456")
+root = store.download_artifact(
+    file_id="model-v1.tar.gz", dest_dir=Path("./downloaded"), request_id="req-456"
+)
 ```
 
 ## ArtifactStore
@@ -79,9 +81,9 @@ manifest = from_json_manifest_v2('{"schema_version": "v2.0", ...}')
 manifest = from_path_manifest_v2(Path("manifest.json"))
 
 # Access typed fields
-print(manifest["model_type"])      # Literal["resnet18", "gpt2"]
-print(manifest["file_id"])         # Remote artifact file ID
-print(manifest["file_sha256"])     # SHA256 hash for integrity
+print(manifest["model_type"])  # Literal["resnet18", "gpt2"]
+print(manifest["file_id"])  # Remote artifact file ID
+print(manifest["file_sha256"])  # SHA256 hash for integrity
 print(manifest["training"]["epochs"])  # Training run config
 ```
 
@@ -150,37 +152,45 @@ except WandbUnavailableError:
 
 # Log training config at start
 if publisher:
-    publisher.log_config({
-        "model_family": "gpt2",
-        "batch_size": 8,
-        "learning_rate": 0.001,
-    })
+    publisher.log_config(
+        {
+            "model_family": "gpt2",
+            "batch_size": 8,
+            "learning_rate": 0.001,
+        }
+    )
 
 # Log per-step metrics during training
 if publisher:
-    publisher.log_step({
-        "global_step": step,
-        "train_loss": loss,
-        "train_ppl": ppl,
-        "grad_norm": grad_norm,
-    })
+    publisher.log_step(
+        {
+            "global_step": step,
+            "train_loss": loss,
+            "train_ppl": ppl,
+            "grad_norm": grad_norm,
+        }
+    )
 
 # Log epoch-end validation metrics
 if publisher:
-    publisher.log_epoch({
-        "epoch": epoch,
-        "val_loss": val_loss,
-        "val_ppl": val_ppl,
-        "best_val_loss": best_val_loss,
-    })
+    publisher.log_epoch(
+        {
+            "epoch": epoch,
+            "val_loss": val_loss,
+            "val_ppl": val_ppl,
+            "best_val_loss": best_val_loss,
+        }
+    )
 
 # Log final test metrics
 if publisher:
-    publisher.log_final({
-        "test_loss": test_loss,
-        "test_ppl": test_ppl,
-        "early_stopped": early_stopped,
-    })
+    publisher.log_final(
+        {
+            "test_loss": test_loss,
+            "test_ppl": test_ppl,
+            "early_stopped": early_stopped,
+        }
+    )
 
 # Log summary table
 if publisher:
@@ -249,7 +259,7 @@ from platform_ml import (
 # Resolve device: "auto" detects CUDA availability
 device: ResolvedDevice = resolve_device("auto")  # "cuda" or "cpu"
 device: ResolvedDevice = resolve_device("cuda")  # passthrough
-device: ResolvedDevice = resolve_device("cpu")   # passthrough
+device: ResolvedDevice = resolve_device("cpu")  # passthrough
 
 # Resolve precision based on device
 precision: ResolvedPrecision = resolve_precision("auto", device)
@@ -259,8 +269,8 @@ precision: ResolvedPrecision = resolve_precision("fp16", "cuda")  # OK
 
 # Recommended batch size (bumps small batches on CUDA)
 batch_size = recommended_batch_size(4, "cuda")  # 8
-batch_size = recommended_batch_size(4, "cpu")   # 4
-batch_size = recommended_batch_size(16, "cuda") # 16 (preserved)
+batch_size = recommended_batch_size(4, "cpu")  # 4
+batch_size = recommended_batch_size(16, "cuda")  # 16 (preserved)
 ```
 
 ### Device Types
@@ -291,8 +301,12 @@ from platform_ml.torch_types import _TorchModuleProtocol
 
 # Test CUDA available path
 fake_torch = FakeTorchModule(cuda_available=True)
+
+
 def _fake_import() -> _TorchModuleProtocol:
     return fake_torch
+
+
 torch_types._import_torch = _fake_import
 assert resolve_device("auto") == "cuda"
 
@@ -339,10 +353,10 @@ explainer = create_permutation_explainer(config)
 
 # Compute feature importance
 importance: list[FeatureImportanceScore] = explainer.compute_importance(
-    model=model,           # Any model with predict_proba()
-    x_data=x_test,         # NDArray[np.float64]
+    model=model,  # Any model with predict_proba()
+    x_data=x_test,  # NDArray[np.float64]
     feature_names=["age", "income", "score"],
-    target_class=1,        # Class index for importance
+    target_class=1,  # Class index for importance
 )
 
 # Results are ranked by importance
@@ -362,8 +376,8 @@ from platform_ml.explainers import (
 )
 
 config: PermutationConfig = {
-    "n_repeats": 10,      # Number of shuffle repeats
-    "random_state": 42,   # For reproducibility
+    "n_repeats": 10,  # Number of shuffle repeats
+    "random_state": 42,  # For reproducibility
 }
 explainer = PermutationExplainer(config)
 
@@ -385,8 +399,8 @@ from platform_ml.explainers import (
 )
 
 config: GradientConfig = {
-    "multiply_by_input": True,   # Gradient * input attribution
-    "absolute_value": True,      # Use absolute gradients
+    "multiply_by_input": True,  # Gradient * input attribution
+    "absolute_value": True,  # Use absolute gradients
 }
 explainer = GradientExplainer(config)
 
@@ -408,8 +422,8 @@ from platform_ml.explainers import (
 )
 
 config: IntegratedGradientsConfig = {
-    "n_steps": 50,              # Integration steps (more = accurate)
-    "baseline_mode": "zeros",   # "zeros" or "mean"
+    "n_steps": 50,  # Integration steps (more = accurate)
+    "baseline_mode": "zeros",  # "zeros" or "mean"
 }
 explainer = IntegratedGradientsExplainer(config)
 
@@ -427,20 +441,19 @@ Models must implement the appropriate protocol:
 ```python
 from platform_ml.explainers import PredictorProtocol, GradientModelProtocol
 
+
 # For PermutationExplainer - any model with predict_proba
 class MyClassifier:
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         # Return shape (n_samples, n_classes)
         ...
 
+
 # For GradientExplainer/IntegratedGradientsExplainer - neural networks
 class MyNeuralNet:
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        ...
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
 
-    def compute_gradients(
-        self, x: NDArray[np.float64], target_class: int
-    ) -> NDArray[np.float64]:
+    def compute_gradients(self, x: NDArray[np.float64], target_class: int) -> NDArray[np.float64]:
         # Return gradients with shape (n_samples, n_features)
         ...
 ```
@@ -499,9 +512,9 @@ explanations: list[LocalExplanation] = wrapper.explain_local(x_test, feature_nam
 
 # Each explanation contains:
 for expl in explanations:
-    print(f"Base value: {expl['base_value']}")      # Model's expected output
-    print(f"Features: {expl['feature_names']}")     # Feature names
-    print(f"SHAP values: {expl['values']}")         # Per-feature contributions
+    print(f"Base value: {expl['base_value']}")  # Model's expected output
+    print(f"Features: {expl['feature_names']}")  # Feature names
+    print(f"SHAP values: {expl['values']}")  # Per-feature contributions
 ```
 
 #### TreeModelProtocol
@@ -510,6 +523,7 @@ Models must implement `predict_proba` returning class probabilities:
 
 ```python
 from platform_ml import TreeModelProtocol
+
 
 class MyTreeModel:
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -531,9 +545,9 @@ from platform_ml import LocalExplanation
 
 # TypedDict structure
 explanation: LocalExplanation = {
-    "base_value": 0.5,                    # float: model's expected output
-    "feature_names": ["a", "b", "c"],     # list[str]: feature names
-    "values": [0.1, -0.2, 0.15],          # list[float]: SHAP values per feature
+    "base_value": 0.5,  # float: model's expected output
+    "feature_names": ["a", "b", "c"],  # list[str]: feature names
+    "values": [0.1, -0.2, 0.15],  # list[float]: SHAP values per feature
 }
 ```
 

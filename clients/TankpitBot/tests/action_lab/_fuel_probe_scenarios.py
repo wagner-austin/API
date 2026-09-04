@@ -374,9 +374,7 @@ def _resolve_with_tracked_reposition(
                 y=target_y,
             ),
             wait_for_teleport_outcome=_unused_teleport_outcome_waiter,
-            teleport_strategy_requires_map_sync=lambda strategy: (
-                strategy == "sync_before_teleport"
-            ),
+            teleport_strategy_requires_map_sync=lambda strategy: strategy == "sync_before_teleport",
             no_landing_tile_error=FuelProbeError,
             dispatch_failure_error=FuelProbeError,
             unavailable_error=FuelProbeError,

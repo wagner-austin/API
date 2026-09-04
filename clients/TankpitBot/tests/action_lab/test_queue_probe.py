@@ -206,8 +206,8 @@ def test_run_queue_probe_writes_session_json(fake_fs: FakeFileSystem) -> None:
     from tankpit_bot.action_lab.queue_probe_types import decode_queue_probe_session
 
     original_factory = queue_probe_module._create_queue_probe
-    queue_probe_module._create_queue_probe = (
-        lambda target_url, *, headless, prefer_account: _FakeQueueProbeForRunner(
+    queue_probe_module._create_queue_probe = lambda target_url, *, headless, prefer_account: (
+        _FakeQueueProbeForRunner(
             target_url,
             headless=headless,
             prefer_account=prefer_account,

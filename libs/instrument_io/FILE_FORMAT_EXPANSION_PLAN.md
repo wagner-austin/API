@@ -59,6 +59,7 @@ Based on scan of `C:\Users\austi\PROJECTS\UC Irvine\Celia Louise Braun Faiola - 
 # _exceptions.py
 class TXTReadError(InstrumentIOError): ...
 
+
 # readers/txt.py
 class TXTReader:
     def read_text(self, path: Path) -> str: ...
@@ -104,6 +105,7 @@ class SMPSMetadata(TypedDict):
     temperature: float
     pressure: float
 
+
 class SMPSData(TypedDict):
     metadata: SMPSMetadata
     data: list[dict[str, CellValue]]
@@ -114,9 +116,11 @@ class SMPSData(TypedDict):
 # _exceptions.py
 class SMPSReadError(InstrumentIOError): ...
 
+
 # _decoders/smps.py
 def _decode_smps_metadata(lines: list[str]) -> SMPSMetadata: ...
 def _decode_smps_data(lines: list[str]) -> list[dict[str, CellValue]]: ...
+
 
 # readers/smps.py
 class SMPSReader:
@@ -274,12 +278,15 @@ class PPTXReader:
 # _exceptions.py
 class MATReadError(InstrumentIOError): ...
 
+
 # _protocols/scipy_io.py
 # scipy.io.loadmat returns dict, so may not need Protocol wrapper
+
 
 # _decoders/mat.py
 def _decode_mat_array(arr: np.ndarray) -> list[Any]: ...
 def _decode_mat_struct(struct: Any) -> dict[str, Any]: ...
+
 
 # readers/mat.py
 class MATReader:
@@ -329,9 +336,17 @@ python-pptx = "^1.0.2"      # PowerPoint
 ```python
 # _exceptions.py
 class TXTReadError(InstrumentIOError): ...
+
+
 class SMPSReadError(InstrumentIOError): ...
+
+
 class DOCXReadError(InstrumentIOError): ...
+
+
 class PPTXReadError(InstrumentIOError): ...
+
+
 class MATReadError(InstrumentIOError): ...
 ```
 

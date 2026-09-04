@@ -45,9 +45,10 @@ Example pattern (this shape recurs throughout `tests/` — enforced by the guard
 ```python
 class FakeBot:
     """Protocol-matching test implementation."""
+
     def __init__(self) -> None:
         self.commands_sent: list[BotCommand] = []
-    
+
     def shoot_at(self, x: int, y: int, target_id: int) -> None:
         self.commands_sent.append(make_shoot_command(x, y, target_id))
 ```

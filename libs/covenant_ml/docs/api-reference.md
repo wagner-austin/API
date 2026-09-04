@@ -727,7 +727,13 @@ RegressorBackendName = Literal["xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_r
 
 ```python
 ClassifierTrainConfig = (
-    TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig | LogRegConfig | RandomForestConfig
+    TrainConfig
+    | MLPConfig
+    | LSTMConfig
+    | LightGBMConfig
+    | ClearGBMConfig
+    | LogRegConfig
+    | RandomForestConfig
 )
 ```
 

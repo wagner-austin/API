@@ -137,7 +137,12 @@ from instrument_io import PDFWriter, DocumentContent
 content: DocumentContent = [
     {"type": "heading", "text": "Analysis Results", "level": 1},
     {"type": "paragraph", "text": "Summary of findings.", "bold": False, "italic": False},
-    {"type": "table", "headers": ["Compound", "Concentration"], "rows": [{"Compound": "Caffeine", "Concentration": 125.4}], "caption": ""},
+    {
+        "type": "table",
+        "headers": ["Compound", "Concentration"],
+        "rows": [{"Compound": "Caffeine", "Concentration": 125.4}],
+        "caption": "",
+    },
 ]
 
 writer = PDFWriter(page_size="letter", margin_inches=1.0)
@@ -155,7 +160,12 @@ content: DocumentContent = [
     {"type": "paragraph", "text": "Introduction to the study.", "bold": False, "italic": False},
     {"type": "heading", "text": "Methods", "level": 2},
     {"type": "list", "items": ["Step 1", "Step 2", "Step 3"], "ordered": True},
-    {"type": "table", "headers": ["Sample", "Result"], "rows": [{"Sample": "A", "Result": 1.5}], "caption": "Table 1"},
+    {
+        "type": "table",
+        "headers": ["Sample", "Result"],
+        "rows": [{"Sample": "A", "Result": 1.5}],
+        "caption": "Table 1",
+    },
     {"type": "page_break"},
     {"type": "heading", "text": "Conclusions", "level": 2},
     {"type": "paragraph", "text": "Key findings summarized.", "bold": True, "italic": False},
@@ -172,10 +182,14 @@ from pathlib import Path
 from instrument_io import ExcelWriter
 
 writer = ExcelWriter()
-writer.write_sheet(Path("output.xlsx"), "Results", rows=[
-    {"Sample": "A", "Value": 1.5},
-    {"Sample": "B", "Value": 2.3},
-])
+writer.write_sheet(
+    Path("output.xlsx"),
+    "Results",
+    rows=[
+        {"Sample": "A", "Value": 1.5},
+        {"Sample": "B", "Value": 2.3},
+    ],
+)
 ```
 
 ### Document Content Types
@@ -298,7 +312,7 @@ Each reader has a dedicated exception type:
 
 ```python
 from instrument_io import (
-    InstrumentIOError,      # Base exception
+    InstrumentIOError,  # Base exception
     AgilentReadError,
     WatersReadError,
     ThermoReadError,

@@ -254,14 +254,15 @@ class QRPayload(TypedDict, total=False):
     fill_color: str
     back_color: str
 
+
 # Validated options (all fields required)
 class QROptions(TypedDict, total=True):
     url: str
-    ecc: ECCLevel        # Literal["L", "M", "Q", "H"]
-    box_size: int        # 5-20
-    border: int          # 1-10
-    fill_color: str      # #RGB or #RRGGBB
-    back_color: str      # #RGB or #RRGGBB
+    ecc: ECCLevel  # Literal["L", "M", "Q", "H"]
+    box_size: int  # 5-20
+    border: int  # 1-10
+    fill_color: str  # #RGB or #RRGGBB
+    back_color: str  # #RGB or #RRGGBB
 ```
 
 ---

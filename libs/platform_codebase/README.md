@@ -131,7 +131,7 @@ Represents a capability the codebase has:
 ```python
 cap = CodebaseCapability(
     name="tabular_classification",
-    strength="strong",           # "strong" | "moderate" | "basic"
+    strength="strong",  # "strong" | "moderate" | "basic"
     tags=("tabular", "xgboost"),
     description="XGBoost for tabular data",
 )
@@ -268,6 +268,7 @@ from platform_codebase import (
     CodebaseProfile,
 )
 
+
 def build_my_profile(root: Path) -> CodebaseProfile:
     """Build a capability profile for your specific needs."""
     libs = scan_libs(root)
@@ -284,20 +285,24 @@ def build_my_profile(root: Path) -> CodebaseProfile:
     capabilities: list[CodebaseCapability] = []
 
     if "xgboost" in all_deps:
-        capabilities.append(CodebaseCapability(
-            name="gradient_boosting",
-            strength="strong",
-            tags=("ml", "tabular", "xgboost"),
-            description="XGBoost gradient boosting",
-        ))
+        capabilities.append(
+            CodebaseCapability(
+                name="gradient_boosting",
+                strength="strong",
+                tags=("ml", "tabular", "xgboost"),
+                description="XGBoost gradient boosting",
+            )
+        )
 
     if "fastapi" in all_deps:
-        capabilities.append(CodebaseCapability(
-            name="rest_api",
-            strength="strong",
-            tags=("web", "api", "fastapi"),
-            description="FastAPI REST services",
-        ))
+        capabilities.append(
+            CodebaseCapability(
+                name="rest_api",
+                strength="strong",
+                tags=("web", "api", "fastapi"),
+                description="FastAPI REST services",
+            )
+        )
 
     return CodebaseProfile(
         capabilities=tuple(capabilities),
@@ -316,6 +321,7 @@ from fastapi import FastAPI
 from platform_codebase import scan_libs, encode_lib_info
 
 app = FastAPI()
+
 
 @app.get("/codebase/libs")
 def list_libs():

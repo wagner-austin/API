@@ -230,8 +230,7 @@ def test_used_seeds_read_the_pre_doctrine_era_too(tmp_path: Path) -> None:
     jobs_dir = tmp_path / "sweeps"
     jobs_dir.mkdir()
     (jobs_dir / "aggression.txt").write_text(
-        "# the 2026-07 era\n"
-        "attack|12345|extractorT1,c_tank,c_tank|99|4000|25|-1\n",
+        "# the 2026-07 era\nattack|12345|extractorT1,c_tank,c_tank|99|4000|25|-1\n",
         encoding="utf-8",
     )
     _write_sweep(jobs_dir / "modern.txt", [10001])

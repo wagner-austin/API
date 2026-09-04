@@ -139,6 +139,7 @@ Tests use dependency injection via `_test_hooks.py`:
 ```python
 from covenant_radar_api.integrations.datadog import _test_hooks
 
+
 class FakeMetricsSink:
     def __init__(self, host: str, port: int, namespace: str) -> None:
         self.calls: list[tuple[str, str, list[str]]] = []
@@ -146,8 +147,10 @@ class FakeMetricsSink:
     def increment(self, name: str, tags: list[str]) -> None:
         self.calls.append(("increment", name, tags))
 
+
 def fake_factory(host: str, port: int, namespace: str) -> FakeMetricsSink:
     return FakeMetricsSink(host, port, namespace)
+
 
 _test_hooks.metrics_sink_factory = fake_factory
 ```
@@ -157,6 +160,7 @@ _test_hooks.metrics_sink_factory = fake_factory
 ```python
 def fake_tracing_setup(service: str, env: str, version: str) -> bool:
     return True  # Pretend tracing is configured
+
 
 _test_hooks.tracing_setup = fake_tracing_setup
 ```

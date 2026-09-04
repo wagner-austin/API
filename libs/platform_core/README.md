@@ -12,9 +12,12 @@ poetry add platform-core
 
 ```python
 from platform_core import (
-    AppError, ErrorCode,
-    validate_str, validate_int_range,
-    get_logger, setup_logging,
+    AppError,
+    ErrorCode,
+    validate_str,
+    validate_int_range,
+    get_logger,
+    setup_logging,
     healthz,
 )
 
@@ -36,14 +39,11 @@ logger = get_logger("my-service")
 from platform_core import AppError, ErrorCode, install_exception_handlers
 
 # Raise structured errors
-raise AppError(
-    code=ErrorCode.NOT_FOUND,
-    message="User not found",
-    http_status=404
-)
+raise AppError(code=ErrorCode.NOT_FOUND, message="User not found", http_status=404)
 
 # Install FastAPI exception handlers
 from fastapi import FastAPI
+
 app = FastAPI()
 install_exception_handlers(app, logger_name="my-api")
 ```
@@ -106,10 +106,12 @@ config = load_json_dict(json_string, "config")
 ```python
 from platform_core import healthz, HealthResponse, ReadyResponse
 
+
 # Liveness probe (always returns ok)
 @app.get("/healthz")
 def health() -> HealthResponse:
     return healthz()
+
 
 # For readiness probes with Redis, use platform_workers.health
 ```
@@ -144,6 +146,7 @@ rid = request_id_var.get()
 from platform_core import create_api_key_dependency
 
 api_key_dep = create_api_key_dependency(expected_key="secret")
+
 
 @app.get("/protected")
 def protected(key: str = Depends(api_key_dep)):

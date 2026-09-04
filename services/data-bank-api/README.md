@@ -147,10 +147,7 @@ from pathlib import Path
 import os
 
 # Create client
-client = DataBankClient(
-    base_url=os.environ["DATA_BANK_URL"],
-    api_key=os.environ["DATA_BANK_KEY"]
-)
+client = DataBankClient(base_url=os.environ["DATA_BANK_URL"], api_key=os.environ["DATA_BANK_KEY"])
 
 # Upload
 with open("corpus.txt", "rb") as f:
@@ -161,8 +158,8 @@ with open("corpus.txt", "rb") as f:
 client.download_to_path(
     file_id,
     Path("local.txt"),
-    resume=True,        # Resume partial downloads
-    verify_etag=True    # Verify SHA256 after download
+    resume=True,  # Resume partial downloads
+    verify_etag=True,  # Verify SHA256 after download
 )
 
 # Probe metadata
@@ -319,8 +316,7 @@ docker run -p 8000:8000 \
 from data_bank_api.client import DataBankClient
 
 client = DataBankClient(
-    base_url=settings["data_bank_api_url"],
-    api_key=settings["data_bank_api_key"]
+    base_url=settings["data_bank_api_url"], api_key=settings["data_bank_api_key"]
 )
 
 # After job completion, upload result

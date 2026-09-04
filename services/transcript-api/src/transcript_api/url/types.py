@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from platform_core.json_utils import JSONTypeError, JSONValue
 from typing_extensions import TypedDict
 
 
-class URLSource(str, Enum):
+class URLSource(StrEnum):
     """Video source platform identifier."""
 
     YOUTUBE = "youtube"

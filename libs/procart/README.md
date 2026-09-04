@@ -31,7 +31,14 @@ neon_cfg = {
 }
 
 layer = Layer(id="orbs", module=build_module(neon_cfg), opacity=1.0, parallax_depth=1.0)
-scene = Scene(id="demo", description="neon demo", resolution=res, timing=timing, tone_mapping=tone, layers=[layer])
+scene = Scene(
+    id="demo",
+    description="neon demo",
+    resolution=res,
+    timing=timing,
+    tone_mapping=tone,
+    layers=[layer],
+)
 
 rgba_hdr = scene.render_frame(0)
 write_frame_png("frame_000.png", rgba_hdr)

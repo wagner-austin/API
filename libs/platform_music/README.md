@@ -116,6 +116,7 @@ Protocol for music service integrations (Last.fm-first design):
 ```python
 from platform_music import MusicServiceProto
 
+
 class MyMusicService(MusicServiceProto):
     def fetch_history(self, year: int) -> ListeningHistory:
         # Fetch listening history for year

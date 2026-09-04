@@ -47,6 +47,7 @@ In `scripts/my_probe.py` (mirrors the six existing probe scripts[^3]):
 from tankpit_bot.action_lab.probe_factory import create_probe
 from tankpit_bot.action_lab.my_probe import MyProbe
 
+
 def main() -> None:
     probe = create_probe(MyProbe, "https://tankpit.com")
     probe.run()

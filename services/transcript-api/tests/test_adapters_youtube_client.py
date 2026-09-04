@@ -194,7 +194,7 @@ def test_get_transcript_rejects_invalid_field_types(
     """Wrong-shaped vendor data raises rather than degrades."""
     out_dict: dict[str, JSONValue] = {}
     for k, v in payload.items():
-        if isinstance(v, str | int | float):
+        if isinstance(v, (str, int, float)):
             out_dict[k] = v
 
     class _BadAPI:

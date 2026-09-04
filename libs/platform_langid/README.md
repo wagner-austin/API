@@ -16,9 +16,9 @@ from platform_langid import detect_spoken_language, SpokenLanguageResult
 
 # Detect language from audio bytes (16-bit PCM)
 result = detect_spoken_language(audio_bytes, sample_rate=16000)
-print(result["language"])    # "vi"
+print(result["language"])  # "vi"
 print(result["confidence"])  # 0.94
-print(result["model_id"])    # "facebook/mms-lid-4017"
+print(result["model_id"])  # "facebook/mms-lid-4017"
 ```
 
 ### Repeated Detection
@@ -115,10 +115,10 @@ audio = AudioInput(
 
 ```python
 from platform_langid import (
-    DEFAULT_MODEL_ID,           # "facebook/mms-lid-4017"
-    DEFAULT_DEVICE,             # "cpu"
+    DEFAULT_MODEL_ID,  # "facebook/mms-lid-4017"
+    DEFAULT_DEVICE,  # "cpu"
     DEFAULT_CONFIDENCE_THRESHOLD,  # 0.0
-    TARGET_SAMPLE_RATE,         # 16000
+    TARGET_SAMPLE_RATE,  # 16000
 )
 ```
 

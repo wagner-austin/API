@@ -10,7 +10,7 @@ from platform_workers.rq_harness import RQJobLike, RQRetryLike
 from typing_extensions import TypedDict
 
 # Public JSON type for API boundaries - non-recursive, one-level deep
-JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
+JsonDict = dict[str, str | int | float | bool | list[str | int | float | bool | None] | None]
 
 
 class _EnqCallable(Protocol):
@@ -221,14 +221,14 @@ class TranscriptOut(TypedDict):
 class SupportsToDictRecursive(Protocol):
     def to_dict_recursive(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]: ...
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]: ...
 
 
 @runtime_checkable
 class SupportsModelDump(Protocol):
     def model_dump(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]: ...
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]: ...
 
 
 @runtime_checkable

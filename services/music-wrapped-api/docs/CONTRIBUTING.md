@@ -96,6 +96,7 @@ make test       # Run pytest with coverage
 ```python
 from typing import TypedDict
 
+
 class SpotifyCredentials(TypedDict):
     access_token: str
     refresh_token: str
@@ -106,6 +107,7 @@ class SpotifyCredentials(TypedDict):
 
 ```python
 from typing import Protocol
+
 
 class RedisStrProto(Protocol):
     def get(self, key: str) -> str | None: ...
@@ -138,6 +140,7 @@ This project uses **test hooks** for dependency injection instead of mocks or mo
 # src/music_wrapped_api/api/routes/wrapped.py
 from music_wrapped_api import _test_hooks
 
+
 def get_job_status(job_id: str) -> dict[str, str]:
     conn = _test_hooks.rq_conn(redis_url)
     job = _test_hooks.get_job(job_id, conn)
@@ -151,9 +154,11 @@ def get_job_status(job_id: str) -> dict[str, str]:
 from music_wrapped_api import _test_hooks
 from platform_workers.testing import FakeRedisBytesClient
 
+
 class _FakeJob:
     def get_status(self) -> str:
         return "finished"
+
 
 def test_get_job_status() -> None:
     def _fake_get_job(job_id: str, connection: _RedisBytesClient) -> _FakeJob:
@@ -200,11 +205,13 @@ The `tests/conftest.py` includes an autouse fixture that:
 @pytest.fixture(autouse=True)
 def _default_test_env() -> None:
     """Set up default test environment and hooks."""
-    env = make_fake_env({
-        "REDIS_URL": "redis://test-redis:6379/0",
-        "SPOTIFY_CLIENT_ID": "test-spotify-id",
-        # ... other test values
-    })
+    env = make_fake_env(
+        {
+            "REDIS_URL": "redis://test-redis:6379/0",
+            "SPOTIFY_CLIENT_ID": "test-spotify-id",
+            # ... other test values
+        }
+    )
     config_test_hooks.get_env = env
     # ... configure other hooks
 ```

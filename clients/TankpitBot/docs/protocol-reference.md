@@ -67,7 +67,7 @@ xor_table[i] = static_key[i] ^ magic[i % len(magic)]
 **XOR Decoding (offset0):**
 ```python
 decrypted[0] = body[0]  # '!' prefix unchanged
-decrypted[i] = body[i] ^ xor_table[i-1]  # for i >= 1
+decrypted[i] = body[i] ^ xor_table[i - 1]  # for i >= 1
 ```
 
 **Command structure:**
@@ -181,6 +181,7 @@ Two decoder packages handle different message types:
 ```python
 from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.container import decode_container_message, identify_container_type
+
 result = decode_container_message(xor_decoded_body)  # For 0x2E messages
 ```
 

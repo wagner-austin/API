@@ -138,9 +138,18 @@ query userLanguages($login: String!) {
 ```python
 # Theme literal type for all requests
 ThemeName = Literal[
-    "default", "dark", "dracula", "github_dark", "transparent",
-    "cyberpunk", "synthwave", "neon", "aurora", "radical",
+    "default",
+    "dark",
+    "dracula",
+    "github_dark",
+    "transparent",
+    "cyberpunk",
+    "synthwave",
+    "neon",
+    "aurora",
+    "radical",
 ]
+
 
 class StatsRequest(TypedDict, total=True):
     username: str
@@ -150,6 +159,7 @@ class StatsRequest(TypedDict, total=True):
     include_all_commits: bool
     hide: tuple[str, ...]  # stats to hide
     disable_animations: bool
+
 
 class LangsRequest(TypedDict, total=True):
     username: str
@@ -175,6 +185,7 @@ class UserStats(TypedDict, total=True):
     rank: Literal["S+", "S", "A+", "A", "B+", "B", "C"]
     rank_percentile: float
 
+
 class LanguageStats(TypedDict, total=True):
     name: str
     size: int
@@ -194,6 +205,7 @@ Defines the protocol and GraphQL query strings:
 class GitHubClientProto(Protocol):
     async def fetch_user_stats(self, username: str) -> GitHubUserData: ...
     async def fetch_languages(self, username: str) -> list[GitHubLanguageData]: ...
+
 
 _USER_STATS_QUERY = """..."""
 _LANGUAGES_QUERY = """..."""
@@ -267,14 +279,16 @@ Defines SVG icon paths for the skills card using a multi-path format with embedd
 
 ```python
 class IconPath(TypedDict, total=True):
-    d: str      # SVG path data
-    fill: str   # Hex color for this path
+    d: str  # SVG path data
+    fill: str  # Hex color for this path
+
 
 class MultiPathIcon(TypedDict, total=True):
-    viewbox_width: int                  # SVG viewBox width
-    viewbox_height: int                 # SVG viewBox height
-    paths: tuple[IconPath, ...]         # One or more path elements
-    transform: str                      # Optional transform (e.g., "rotate(45)")
+    viewbox_width: int  # SVG viewBox width
+    viewbox_height: int  # SVG viewBox height
+    paths: tuple[IconPath, ...]  # One or more path elements
+    transform: str  # Optional transform (e.g., "rotate(45)")
+
 
 def get_skill_icon(skill: str) -> MultiPathIcon | None:
     """Get icon data for a skill name (case-insensitive)."""
@@ -412,21 +426,26 @@ The service uses dependency injection via a `_test_hooks.py` module for testabil
 from collections.abc import Callable
 from platform_core.http_client import HttpxAsyncClient, build_async_client
 
+
 def _default_build_client(timeout_seconds: float) -> HttpxAsyncClient:
     """Default client builder using real httpx."""
     return build_async_client(timeout_seconds=timeout_seconds)
 
+
 # Hook for building HTTP clients - tests can replace with fake
 _build_client_hook: Callable[[float], HttpxAsyncClient] = _default_build_client
+
 
 def get_client_hook() -> Callable[[float], HttpxAsyncClient]:
     """Get current client builder hook."""
     return _build_client_hook
 
+
 def set_client_hook(hook: Callable[[float], HttpxAsyncClient]) -> None:
     """Set client builder hook for testing."""
     global _build_client_hook
     _build_client_hook = hook
+
 
 def reset_client_hook() -> None:
     """Reset client builder hook to default."""
@@ -454,10 +473,12 @@ async def get_stats(request: Request, ...) -> Response:
 from github_stats_api._test_hooks import reset_client_hook, set_client_hook
 from platform_core.testing import FakeHttpxAsyncClient, FakeHttpxResponse
 
+
 @pytest.fixture(autouse=True)
 def _reset_hooks() -> Generator[None, None, None]:
     yield
     reset_client_hook()
+
 
 async def test_get_stats_returns_svg() -> None:
     fake_response = FakeHttpxResponse(200, _make_fake_user_response())
@@ -496,7 +517,7 @@ percentile = 100 - (log10(score + 1) * 15)
 Responses include cache headers to reduce GitHub API load:
 
 ```python
-headers={
+headers = {
     "Cache-Control": f"max-age={settings['cache_ttl_seconds']}, s-maxage={settings['cache_ttl_seconds']}",
 }
 ```

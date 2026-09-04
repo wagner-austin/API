@@ -25,8 +25,8 @@ RawVerboseExtended = dict[
     | int
     | float
     | bool
-    | None
-    | list[dict[str, str | int | float | dict[str, int] | list[int]] | int],
+    | list[dict[str, str | int | float | dict[str, int] | list[int]] | int]
+    | None,
 ]
 RawVerboseInput = RawVerboseDict | RawVerboseExtended
 

@@ -313,11 +313,11 @@ from covenant_radar_api.streaming.consumer import ConsumedMeasurement
 
 # Poll returns ConsumedMeasurement with metadata
 result: ConsumedMeasurement = {
-    "event": {...},      # MeasurementEvent
+    "event": {...},  # MeasurementEvent
     "topic": "covenant.measurements.v1",
     "partition": 2,
     "offset": 12345,
-    "key": "deal-123",   # Optional message key
+    "key": "deal-123",  # Optional message key
 }
 ```
 
@@ -384,6 +384,7 @@ class KafkaProducerProtocol(Protocol):
     def produce(self, topic: str, value: bytes, key: bytes | None = None) -> None: ...
     def poll(self, timeout: float = 0) -> int: ...
     def flush(self, timeout: float | None = None) -> int: ...
+
 
 class KafkaConsumerProtocol(Protocol):
     def subscribe(self, topics: list[str]) -> None: ...

@@ -287,7 +287,7 @@ class _AssertVisitor(ast.NodeVisitor):
             if not isinstance(child, ast.Compare):
                 continue
             for op in child.ops:
-                if not isinstance(op, ast.Lt | ast.LtE | ast.Gt | ast.GtE):
+                if not isinstance(op, (ast.Lt, ast.LtE, ast.Gt, ast.GtE)):
                     continue
                 left_kw = self._get_comparison_keywords(child.left)
                 right_kws = [self._get_comparison_keywords(c) for c in child.comparators]

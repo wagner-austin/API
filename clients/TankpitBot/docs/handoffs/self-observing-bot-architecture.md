@@ -879,7 +879,7 @@ Fires from the same 0x52 code=5 handler; the discriminator is "did fuel/inventor
 
 ```python
 if ctx.fuel > ctx.config["fuel_low_threshold"]:
-    return None    # yield to hunt
+    return None  # yield to hunt
 ```
 
 The check was added 2026-07-06 for a different scenario (bot stuck in COLLECT with nothing to do at full fuel + full ammo). It fires here at full fuel + partial ammo, which is not the intended condition.

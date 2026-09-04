@@ -281,19 +281,13 @@ class EmailClientProtocol(Protocol):
         page_token: str | None = None,
     ) -> EmailListResult: ...
 
-    def search_emails(
-        self, *, query: str, max_results: int = 50
-    ) -> tuple[Email, ...]: ...
+    def search_emails(self, *, query: str, max_results: int = 50) -> tuple[Email, ...]: ...
 
-    def create_draft(
-        self, *, to: tuple[str, ...], subject: str, body: str
-    ) -> Email: ...
+    def create_draft(self, *, to: tuple[str, ...], subject: str, body: str) -> Email: ...
 
     def send_draft(self, *, draft_id: str) -> Email: ...
 
-    def reply_to_email(
-        self, *, email_id: str, body: str, reply_all: bool = False
-    ) -> Email: ...
+    def reply_to_email(self, *, email_id: str, body: str, reply_all: bool = False) -> Email: ...
 
     def delete_email(self, *, email_id: str, permanent: bool = False) -> None: ...
 
@@ -301,9 +295,7 @@ class EmailClientProtocol(Protocol):
 
     def list_folders(self) -> tuple[Folder, ...]: ...
 
-    def get_attachment(
-        self, *, email_id: str, attachment_id: str
-    ) -> Attachment: ...
+    def get_attachment(self, *, email_id: str, attachment_id: str) -> Attachment: ...
 ```
 
 ## Testing
@@ -324,11 +316,13 @@ from platform_email import (
 # Use fake client for testing
 client = FakeEmailClient()
 client.add_folder(make_fake_folder(folder_id="inbox", name="Inbox"))
-client.add_email(make_fake_email(
-    email_id="msg1",
-    subject="Test Email",
-    from_address={"address": "sender@example.com", "name": "Sender"},
-))
+client.add_email(
+    make_fake_email(
+        email_id="msg1",
+        subject="Test Email",
+        from_address={"address": "sender@example.com", "name": "Sender"},
+    )
+)
 
 # List emails with fake client
 result = client.list_emails(folder_id="inbox")

@@ -206,8 +206,8 @@ CI/CD: Railway auto-deploy from git
        redis_url: str
        data_dir: str
        environment: str
-       data_bank_api_url: str      # NEW
-       data_bank_api_key: str      # NEW
+       data_bank_api_url: str  # NEW
+       data_bank_api_key: str  # NEW
 
        @staticmethod
        def from_env() -> Settings:
@@ -215,7 +215,9 @@ CI/CD: Railway auto-deploy from git
            # ... existing fields ...
            data_bank_api_url = os.getenv(f"{prefix}DATA_BANK_API_URL", "").strip()
            data_bank_api_key = os.getenv(f"{prefix}DATA_BANK_API_KEY", "").strip()
-           return Settings(..., data_bank_api_url=data_bank_api_url, data_bank_api_key=data_bank_api_key)
+           return Settings(
+               ..., data_bank_api_url=data_bank_api_url, data_bank_api_key=data_bank_api_key
+           )
    ```
 
 2. **`api/jobs.py`** - Upload after job completion (after line 127):
@@ -225,6 +227,7 @@ CI/CD: Railway auto-deploy from git
    if settings.data_bank_api_url and settings.data_bank_api_key:
        try:
            import httpx
+
            with out_path.open("rb") as f:
                resp = httpx.post(
                    f"{settings.data_bank_api_url}/files",
@@ -237,7 +240,9 @@ CI/CD: Railway auto-deploy from git
                file_id = data["file_id"]
                logger.info("Uploaded to data-bank-api", extra={"job_id": job_id, "file_id": file_id})
        except Exception as exc:
-           logger.error("Failed to upload to data-bank-api", extra={"job_id": job_id, "error": str(exc)})
+           logger.error(
+               "Failed to upload to data-bank-api", extra={"job_id": job_id, "error": str(exc)}
+           )
            # Don't fail the job - file is still available locally
 
    # Store file_id in Redis job hash
@@ -300,8 +305,8 @@ TURKIC_DATA_BANK_API_KEY="dbapi_turkic_74469347850f4a9a2f431f358692899d392e21a37
        artifacts_root: str = "/data/artifacts"
        runs_root: str = "/data/runs"
        logs_root: str = "/data/logs"
-       data_bank_api_url: str = ""      # NEW
-       data_bank_api_key: str = ""      # NEW
+       data_bank_api_url: str = ""  # NEW
+       data_bank_api_key: str = ""  # NEW
        # ... existing fields ...
    ```
 
@@ -334,6 +339,7 @@ TURKIC_DATA_BANK_API_KEY="dbapi_turkic_74469347850f4a9a2f431f358692899d392e21a37
    from pathlib import Path
    import httpx
    import hashlib
+
 
    class CorpusFetcher:
        def __init__(self, api_url: str, api_key: str, cache_dir: Path) -> None:
@@ -376,7 +382,9 @@ TURKIC_DATA_BANK_API_KEY="dbapi_turkic_74469347850f4a9a2f431f358692899d392e21a37
 
            # Verify size
            if temp_path.stat().st_size != expected_size:
-               raise RuntimeError(f"Size mismatch: expected {expected_size}, got {temp_path.stat().st_size}")
+               raise RuntimeError(
+                   f"Size mismatch: expected {expected_size}, got {temp_path.stat().st_size}"
+               )
 
            # Atomic rename
            temp_path.rename(cache_path)

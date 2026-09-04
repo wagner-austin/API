@@ -62,7 +62,7 @@ backend = create_xgboost_regressor_backend()
 
 outcome = backend.train(
     x_features=X,
-    y_targets=y,            # float64 continuous targets
+    y_targets=y,  # float64 continuous targets
     feature_names=names,
     config=config,
     output_dir=Path("/models"),
@@ -138,8 +138,12 @@ config: LogRegConfig = {
 }
 backend = create_logreg_backend()
 outcome = backend.train(
-    x_features=X, y_labels=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_labels=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 
@@ -168,8 +172,12 @@ config: RandomForestConfig = {
 }
 backend = create_random_forest_backend()
 outcome = backend.train(
-    x_features=X, y_labels=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_labels=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 
@@ -184,8 +192,12 @@ from covenant_ml.testing import make_xgboost_regressor_config
 config = make_xgboost_regressor_config(n_estimators=100, learning_rate=0.1)
 backend = create_xgboost_regressor_backend()
 outcome = backend.train(
-    x_features=X, y_targets=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_targets=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 
@@ -198,8 +210,12 @@ from covenant_ml.testing import make_lightgbm_regressor_config
 config = make_lightgbm_regressor_config(n_estimators=100, learning_rate=0.1)
 backend = create_lightgbm_regressor_backend()
 outcome = backend.train(
-    x_features=X, y_targets=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_targets=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 
@@ -212,8 +228,12 @@ from covenant_ml.testing import make_mlp_regressor_config
 config = make_mlp_regressor_config(hidden_sizes=(64, 32), n_epochs=50)
 backend = create_mlp_regressor_backend()
 outcome = backend.train(
-    x_features=X, y_targets=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_targets=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 
@@ -226,8 +246,12 @@ from covenant_ml.testing import make_lstm_regressor_config
 config = make_lstm_regressor_config(hidden_size=64, num_layers=2, sequence_length=5)
 backend = create_lstm_regressor_backend()
 outcome = backend.train(
-    x_features=X, y_targets=y, feature_names=names,
-    config=config, output_dir=output_dir, progress=None,
+    x_features=X,
+    y_targets=y,
+    feature_names=names,
+    config=config,
+    output_dir=output_dir,
+    progress=None,
 )
 ```
 

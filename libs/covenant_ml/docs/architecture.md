@@ -141,11 +141,15 @@ class ClassifierBackend(Protocol):
     def capabilities(self) -> BackendCapabilities: ...
 
     def prepare(
-        self, *, n_features: int, feature_names: list[str] | None,
+        self,
+        *,
+        n_features: int,
+        feature_names: list[str] | None,
     ) -> PreparedClassifier: ...
 
     def train(
-        self, *,
+        self,
+        *,
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str] | None,
@@ -155,15 +159,21 @@ class ClassifierBackend(Protocol):
     ) -> TrainOutcome: ...
 
     def evaluate(
-        self, *, model: PreparedClassifier,
-        x: NDArray[np.float64], y: NDArray[np.int64],
+        self,
+        *,
+        model: PreparedClassifier,
+        x: NDArray[np.float64],
+        y: NDArray[np.int64],
     ) -> EvalMetrics: ...
 
     def save(self, *, model: PreparedClassifier, path: str) -> None: ...
     def load(self, *, path: str) -> PreparedClassifier: ...
 
     def get_feature_importances(
-        self, *, model: PreparedClassifier, feature_names: list[str] | None,
+        self,
+        *,
+        model: PreparedClassifier,
+        feature_names: list[str] | None,
     ) -> list[FeatureImportance] | None: ...
 ```
 
@@ -177,13 +187,17 @@ class RegressorBackend(Protocol):
     def capabilities(self) -> BackendCapabilities: ...
 
     def prepare(
-        self, *, n_features: int, feature_names: list[str] | None,
+        self,
+        *,
+        n_features: int,
+        feature_names: list[str] | None,
     ) -> PreparedRegressor: ...
 
     def train(
-        self, *,
+        self,
+        *,
         x_features: NDArray[np.float64],
-        y_targets: NDArray[np.float64],    # float64 continuous targets
+        y_targets: NDArray[np.float64],  # float64 continuous targets
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
@@ -191,15 +205,21 @@ class RegressorBackend(Protocol):
     ) -> RegressionTrainOutcome: ...
 
     def evaluate(
-        self, *, model: PreparedRegressor,
-        x: NDArray[np.float64], y: NDArray[np.float64],
+        self,
+        *,
+        model: PreparedRegressor,
+        x: NDArray[np.float64],
+        y: NDArray[np.float64],
     ) -> RegressionMetrics: ...
 
     def save(self, *, model: PreparedRegressor, path: str) -> None: ...
     def load(self, *, path: str) -> PreparedRegressor: ...
 
     def get_feature_importances(
-        self, *, model: PreparedRegressor, feature_names: list[str] | None,
+        self,
+        *,
+        model: PreparedRegressor,
+        feature_names: list[str] | None,
     ) -> list[FeatureImportance] | None: ...
 ```
 
@@ -220,6 +240,7 @@ class RegressorBackend(Protocol):
 ```python
 class PreparedClassifier(Protocol):
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
 
 class PreparedRegressor(Protocol):
     def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
@@ -306,7 +327,9 @@ Registry-based explainer system with backend compatibility:
 class ExplainerRegistry:
     def get(self, name: SupportedExplainer) -> ExplainerAdapter: ...
     def list_explainers(self) -> tuple[SupportedExplainer, ...]: ...
-    def list_compatible_explainers(self, backend: BackendName) -> tuple[SupportedExplainer, ...]: ...
+    def list_compatible_explainers(
+        self, backend: BackendName
+    ) -> tuple[SupportedExplainer, ...]: ...
     def is_compatible(self, explainer: SupportedExplainer, backend: BackendName) -> bool: ...
 ```
 

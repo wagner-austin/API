@@ -455,9 +455,9 @@ Map snapshot sent on game join. Contains terrain, containers, and all tank posit
 
 **Info byte extraction:**
 ```python
-team = info_byte & 0x03           # bits 0-1 (0-3)
+team = info_byte & 0x03  # bits 0-1 (0-3)
 damage_state = (info_byte >> 2) & 0x03  # bits 2-3 (0-3)
-rank = (info_byte >> 4) & 0x0F    # bits 4-7 (0-15, but only 0-7 used)
+rank = (info_byte >> 4) & 0x0F  # bits 4-7 (0-15, but only 0-7 used)
 ```
 
 **Note:** This provides a snapshot of all tank HP on map load, before any 0x2E updates are received.

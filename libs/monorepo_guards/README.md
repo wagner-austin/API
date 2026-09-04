@@ -131,6 +131,7 @@ from monorepo_guards import Rule, RuleReport, Violation
 from typing import Protocol
 from pathlib import Path
 
+
 class Rule(Protocol):
     @property
     def name(self) -> str: ...
@@ -142,6 +143,7 @@ class Rule(Protocol):
 
 ```python
 from typing import NamedTuple
+
 
 class Violation(NamedTuple):
     file: Path
@@ -183,6 +185,7 @@ Create custom rules by implementing the `Rule` protocol:
 ```python
 from pathlib import Path
 from monorepo_guards import Rule, Violation
+
 
 class MyCustomRule:
     @property

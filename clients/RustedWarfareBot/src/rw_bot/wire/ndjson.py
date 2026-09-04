@@ -322,7 +322,7 @@ def _render_string(value: str) -> str:
 def render_json(
     payload: Mapping[
         str,
-        str | int | bool | None | Sequence[str] | Sequence[Mapping[str, str | int | bool | None]],
+        str | int | bool | Sequence[str] | Sequence[Mapping[str, str | int | bool | None]] | None,
     ],
 ) -> str:
     """Render one response object as JSON.
@@ -349,9 +349,9 @@ def _render_value(
     value: str
     | int
     | bool
-    | None
     | Sequence[str]
-    | Sequence[Mapping[str, str | int | bool | None]],
+    | Sequence[Mapping[str, str | int | bool | None]]
+    | None,
 ) -> str:
     """Render one value of the shapes the fleet serves.
 

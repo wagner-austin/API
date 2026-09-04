@@ -25,7 +25,7 @@ class _FakeTranscriptionResult:
 
     def to_dict_recursive(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
         return {"text": "", "segments": []}
 
 

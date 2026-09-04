@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import sys
 import types
+import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from pathlib import Path
 from types import ModuleType
@@ -17,6 +18,7 @@ from platform_core.json_utils import JSONValue
 from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.core.corpus_download import (
+    _drain,
     _stream_for_source,
     ensure_corpus_file,
     stream_culturax,
@@ -316,3 +318,27 @@ def test_stream_for_source_culturax() -> None:
         assert list(gen) == ["a", "b"]
     finally:
         _test_hooks.stream_culturax_hook = orig
+
+
+def test_drain_skips_a_namespace_event() -> None:
+    """A "start-ns" payload is a prefix/uri tuple, not an element.
+
+    Production subscribes only to "end", where every payload really is an
+    Element -- so this is the one way to reach `_drain`'s type guard without
+    inventing a fake parser. The real class, fed real XML, simply yields a
+    different payload shape.
+    """
+    parser: ET.XMLPullParser[ET.Element[str] | tuple[str, str]] = ET.XMLPullParser(
+        events=("start-ns",)
+    )
+    parser.feed(b'<a xmlns:p="urn:example"><p:b>text</p:b></a>')
+
+    assert list(_drain(parser)) == []
+
+
+def test_drain_reads_the_text_of_an_end_event() -> None:
+    """The same drain yields sentences when the payload IS an element."""
+    parser: ET.XMLPullParser[ET.Element[str] | tuple[str, str]] = ET.XMLPullParser(events=("end",))
+    parser.feed(b"<page><text>One sentence. Another one!</text></page>")
+
+    assert list(_drain(parser)) == ["One sentence", "Another one"]

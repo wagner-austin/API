@@ -61,7 +61,7 @@ class ProbeDownloadClient(Protocol):
 
 
 def _as_float(val: int | float | str | None) -> float:
-    if isinstance(val, int | float):
+    if isinstance(val, (int, float)):
         return float(val)
     if isinstance(val, str):
         s = val.strip()
@@ -448,7 +448,7 @@ class STTTranscriptProvider:
             size_bytes_val = fmt.get("filesize") or fmt.get("filesize_approx")
             size_mb = (
                 float(size_bytes_val) / (1024 * 1024)
-                if isinstance(size_bytes_val, int | float)
+                if isinstance(size_bytes_val, (int, float))
                 else 0.0
             )
             if size_mb > approx_mb:

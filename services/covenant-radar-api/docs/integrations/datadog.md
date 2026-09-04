@@ -177,9 +177,11 @@ Tests override the metrics sink factory to capture metrics without sending UDP p
 ```python
 from covenant_radar_api.integrations.datadog import _test_hooks
 
+
 # In test setup
 def fake_factory(host: str, port: int, namespace: str) -> FakeMetricsSink:
     return FakeMetricsSink(host, port, namespace)
+
 
 _test_hooks.metrics_sink_factory = fake_factory
 ```
@@ -191,6 +193,7 @@ Tests override the tracing setup to skip ddtrace configuration:
 ```python
 def fake_tracing_setup(service: str, env: str, version: str) -> bool:
     return True  # Pretend tracing is configured
+
 
 _test_hooks.tracing_setup = fake_tracing_setup
 ```

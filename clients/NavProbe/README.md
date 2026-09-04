@@ -251,11 +251,15 @@ from navprobe.records import TrialSpec
 from navprobe.scenes import row_scene
 from navprobe.sweep import first_irreproducible, run_scene_sweep
 
+
 def build(model_xml: str, world_count: int):
     return MjWarpStateSimulatorFactory(
-        model_xml=model_xml, world_count=world_count,
-        perturbation=0.01, constraint_capacity=8192,
+        model_xml=model_xml,
+        world_count=world_count,
+        perturbation=0.01,
+        constraint_capacity=8192,
     )
+
 
 touching = tuple(row_scene(n, 0.055, 0.03, 0.005) for n in (2, 4, 5, 6, 8, 16, 32))
 entries = run_scene_sweep(build, touching, TrialSpec(seed=7, step_count=150, repetitions=12), 2)

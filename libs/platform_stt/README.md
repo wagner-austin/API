@@ -102,12 +102,14 @@ Use `ChunkerConfig` TypedDict for passing config as data:
 ```python
 from platform_stt import ChunkerConfig, decode_chunker_config
 
-config: ChunkerConfig = decode_chunker_config({
-    "target_chunk_mb": 20.0,
-    "max_chunk_duration_seconds": 600.0,
-    "silence_threshold_db": -40.0,
-    "silence_duration_seconds": 0.5,
-})
+config: ChunkerConfig = decode_chunker_config(
+    {
+        "target_chunk_mb": 20.0,
+        "max_chunk_duration_seconds": 600.0,
+        "silence_threshold_db": -40.0,
+        "silence_duration_seconds": 0.5,
+    }
+)
 ```
 
 ## Parallel Transcription
@@ -287,12 +289,10 @@ from platform_stt import (
     encode_transcript_segment,
     encode_audio_chunk,
     encode_verbose_response,
-
     # Decode from dict with validation
     decode_transcript_segment,
     decode_audio_chunk,
     decode_verbose_response,
-
     # Validate arbitrary JSONValue
     require_transcript_segment,
     require_audio_chunk,
@@ -350,9 +350,7 @@ fake_client = FakeSTTClient(
 fake_model = FakeLangIdModel(label="__label__vi", confidence=0.95)
 
 # Install fake subprocess runner
-fake_subprocess = make_fake_subprocess_run(
-    FakeSubprocessResult(returncode=0, stdout=b"output")
-)
+fake_subprocess = make_fake_subprocess_run(FakeSubprocessResult(returncode=0, stdout=b"output"))
 
 # Reset hooks after tests
 reset_hooks()
@@ -371,6 +369,7 @@ _test_hooks.openai_client_factory = lambda **kw: FakeSTTClient()
 
 # Reset to production after test
 from platform_stt.testing import reset_hooks
+
 reset_hooks()
 ```
 

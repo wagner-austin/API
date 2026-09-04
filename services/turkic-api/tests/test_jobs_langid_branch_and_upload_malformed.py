@@ -77,10 +77,8 @@ def _setup_hooks(tmp_path: Path) -> None:
 
     _test_hooks.ensure_corpus_file = _fake_ensure_corpus
     _test_hooks.load_langid_model = lambda _data_dir, prefer_218e=True: FakeLangIdModel()
-    _test_hooks.data_bank_client_factory = (
-        lambda api_url, api_key, timeout_seconds: FailingDataBankClient(
-            api_url, api_key, timeout_seconds=timeout_seconds
-        )
+    _test_hooks.data_bank_client_factory = lambda api_url, api_key, timeout_seconds: (
+        FailingDataBankClient(api_url, api_key, timeout_seconds=timeout_seconds)
     )
 
 

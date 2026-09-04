@@ -212,10 +212,22 @@ class TestFakeKafkaProducer:
 class TestFakeKafkaConsumer:
     """Tests for FakeKafkaConsumer."""
 
-    def test_subscribe(self) -> None:
+    def test_a_new_consumer_is_subscribed_to_nothing(self) -> None:
+        """The starting state, asserted on its own.
+
+        Split from the subscribe test because ``== ()`` NARROWS the attribute
+        to ``tuple[()]`` for the rest of the function, and mypy has no reason
+        to widen it again across a mutating call -- so the later assertion
+        read as a comparison that could never hold. Two tests, one state each,
+        and no narrowing to carry.
+        """
+        consumer = FakeKafkaConsumer()
+
+        assert consumer.subscribed_topics == ()
+
+    def test_subscribe_records_the_topics(self) -> None:
         """Subscribe records topics."""
         consumer = FakeKafkaConsumer()
-        assert consumer.subscribed_topics == ()
 
         consumer.subscribe(("topic1", "topic2"))
 

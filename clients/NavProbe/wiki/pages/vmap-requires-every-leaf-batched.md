@@ -43,6 +43,7 @@ Vectorise the **construction**, not the field assignment. `vmap` broadcasts valu
 def build_one(qpos: FlatArrayProtocol) -> MjxDataProtocol:
     return base_data.replace(qpos=qpos)
 
+
 build_batched_state = state_transforms.vmap(build_one)
 ```
 

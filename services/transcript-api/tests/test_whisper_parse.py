@@ -7,7 +7,7 @@ from transcript_api.whisper_parse import convert_verbose_to_segments, to_verbose
 
 
 def test_to_verbose_dict_accepts_dict_and_model_dump() -> None:
-    d: dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]] = {
+    d: dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None] = {
         "text": "hello",
         "segments": [],
     }
@@ -18,14 +18,14 @@ def test_to_verbose_dict_accepts_dict_and_model_dump() -> None:
         def __init__(
             self,
             payload: dict[
-                str, str | int | float | bool | None | list[dict[str, str | int | float]]
+                str, str | int | float | bool | list[dict[str, str | int | float]] | None
             ],
         ) -> None:
             self._payload = payload
 
         def model_dump(
             self,
-        ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+        ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
             return self._payload
 
     out2 = to_verbose_dict(_Dumpable(d))

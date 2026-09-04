@@ -36,9 +36,11 @@ from platform_discord.subscriber import RedisEventSubscriber, MessageSource
 # Define your event type
 from typing import TypedDict
 
+
 class MyEvent(TypedDict):
     type: str
     data: str
+
 
 # Implement MessageSource protocol (wraps Redis pubsub)
 class RedisSource(MessageSource):
@@ -46,12 +48,13 @@ class RedisSource(MessageSource):
     async def get(self) -> str | None: ...
     async def close(self) -> None: ...
 
+
 # Create subscriber
 subscriber = RedisEventSubscriber[MyEvent](
     channel="events:my-channel",
     source=redis_source,
     decode=lambda s: json.loads(s),  # str -> MyEvent | None
-    handle=my_async_handler,          # async (MyEvent) -> None
+    handle=my_async_handler,  # async (MyEvent) -> None
 )
 
 # Run event loop
@@ -92,7 +95,7 @@ from platform_discord.embed_helpers import (
 embed = create_embed(
     title="Status Update",
     description="Job completed",
-    color=0x57F287  # green
+    color=0x57F287,  # green
 )
 
 # Add fields
@@ -113,9 +116,9 @@ await interaction.followup.send(embed=unwrap_embed(embed))
 
 ```python
 from platform_discord.embed_helpers import (
-    EmbedProto,       # Protocol for embed operations
-    EmbedData,        # TypedDict for full embed
-    EmbedFieldData,   # TypedDict: name, value, inline
+    EmbedProto,  # Protocol for embed operations
+    EmbedData,  # TypedDict for full embed
+    EmbedFieldData,  # TypedDict: name, value, inline
     EmbedFooterData,  # TypedDict: text, icon_url
     EmbedAuthorData,  # TypedDict: name, icon_url, url
 )
@@ -167,7 +170,10 @@ if event is not None:
 
 # Or use runtime functions directly
 from platform_discord.handwriting.runtime import on_started, on_progress, on_completed
-act = on_started(rt, user_id=123, request_id="abc", model_id="mnist", total_epochs=10, queue="digits")
+
+act = on_started(
+    rt, user_id=123, request_id="abc", model_id="mnist", total_epochs=10, queue="digits"
+)
 ```
 
 **Handler Pattern:**
@@ -213,7 +219,13 @@ Turkic job progress embeds:
 
 ```python
 from platform_discord.turkic.embeds import build_job_started, build_job_completed
-from platform_discord.turkic.runtime import new_runtime, on_started, on_progress, on_completed, on_failed
+from platform_discord.turkic.runtime import (
+    new_runtime,
+    on_started,
+    on_progress,
+    on_completed,
+    on_failed,
+)
 
 rt = new_runtime()
 act = on_started(rt, user_id=123, job_id="abc", queue="default")
@@ -252,22 +264,49 @@ Full example with Redis pub/sub:
 from platform_core.job_events import JobEventV1, decode_job_event, default_events_channel
 from platform_discord.subscriber import RedisEventSubscriber
 from platform_discord.message_source import RedisPubSubSource
-from platform_discord.turkic.runtime import new_runtime, on_started, on_progress, on_completed, on_failed
+from platform_discord.turkic.runtime import (
+    new_runtime,
+    on_started,
+    on_progress,
+    on_completed,
+    on_failed,
+)
 
 source = RedisPubSubSource(redis_url)
 rt = new_runtime()
+
 
 async def handle(ev: JobEventV1) -> None:
     if ev["type"] == "turkic.job.started.v1":
         act = on_started(rt, user_id=None, job_id=ev["job_id"], queue=ev["queue"])
     elif ev["type"] == "turkic.job.progress.v1":
-        act = on_progress(rt, user_id=None, job_id=ev["job_id"], progress=ev["progress"], message=ev.get("message"))
+        act = on_progress(
+            rt,
+            user_id=None,
+            job_id=ev["job_id"],
+            progress=ev["progress"],
+            message=ev.get("message"),
+        )
     elif ev["type"] == "turkic.job.completed.v1":
-        act = on_completed(rt, user_id=None, job_id=ev["job_id"], result_id=ev["result_id"], result_bytes=ev["result_bytes"])
+        act = on_completed(
+            rt,
+            user_id=None,
+            job_id=ev["job_id"],
+            result_id=ev["result_id"],
+            result_bytes=ev["result_bytes"],
+        )
     else:
-        act = on_failed(rt, user_id=None, job_id=ev["job_id"], error_kind=ev.get("error_kind", "system"), message=ev.get("message", "unknown event"), status="failed")
+        act = on_failed(
+            rt,
+            user_id=None,
+            job_id=ev["job_id"],
+            error_kind=ev.get("error_kind", "system"),
+            message=ev.get("message", "unknown event"),
+            status="failed",
+        )
     if act["embed"]:
         await user.send(embed=unwrap_embed(act["embed"]))
+
 
 sub = RedisEventSubscriber[JobEventV1](
     channel=default_events_channel("turkic"),

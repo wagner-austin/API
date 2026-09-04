@@ -12,7 +12,8 @@
 
 ```python
 import sys
-sys.path.insert(0, 'src')
+
+sys.path.insert(0, "src")
 
 from transcript_api.adapters.openai_client import OpenAISttClient
 from transcript_api.adapters.yt_dlp_client import YtDlpAdapter

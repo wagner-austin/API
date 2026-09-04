@@ -282,8 +282,8 @@ def test_module_entrypoint_runs_main(_restore_script_hooks: None) -> None:
     core_hooks.get_argv = lambda: ["scripts.enemy_tracking_probe"]
     core_hooks.sync_playwright = _FakeSyncPlaywrightFactory()
     original_run = probe_module.run_enemy_tracking_probe
-    probe_module.run_enemy_tracking_probe = (
-        lambda target_url, output_path, **kwargs: _make_session()
+    probe_module.run_enemy_tracking_probe = lambda target_url, output_path, **kwargs: (
+        _make_session()
     )
 
     old_argv = sys.argv

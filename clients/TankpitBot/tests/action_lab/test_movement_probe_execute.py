@@ -230,8 +230,8 @@ def test_execute_probe_raises_when_target_builder_returns_empty_list() -> None:
 
 def test_run_movement_probe_writes_session_json(fake_fs: FakeFileSystem) -> None:
     original_factory = movement_probe_module._create_movement_probe
-    movement_probe_module._create_movement_probe = (
-        lambda target_url, *, headless, prefer_account: _FakeMovementProbe(
+    movement_probe_module._create_movement_probe = lambda target_url, *, headless, prefer_account: (
+        _FakeMovementProbe(
             target_url,
             headless=headless,
             prefer_account=prefer_account,

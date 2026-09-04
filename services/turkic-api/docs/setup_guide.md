@@ -500,10 +500,12 @@ poetry install --with dev
 ```python
 # WRONG
 import logging
+
 logger = logging.getLogger(__name__)
 
 # CORRECT
 from platform_core.logging import get_logger
+
 logger = get_logger(__name__)
 ```
 

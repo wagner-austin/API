@@ -80,13 +80,13 @@ class TestRunRegressionOptimization:
 
         regression_hooks.regression_registry_factory = _make_fake_regression_registry
         regression_hooks.regression_dataset_loader = _make_fake_regression_loader
-        regression_hooks.regressor_registry_factory = (
-            lambda b=self._fake_backend: _make_fake_regressor_registry(b)
+        regression_hooks.regressor_registry_factory = lambda b=self._fake_backend: (
+            _make_fake_regressor_registry(b)
         )
         regression_hooks.regressor_objective_factory = _make_fake_objective_factory
 
-        worker_hooks.optimizer_registry_factory = (
-            lambda o=self._fake_optimizer: _make_fake_optimizer_registry(o)
+        worker_hooks.optimizer_registry_factory = lambda o=self._fake_optimizer: (
+            _make_fake_optimizer_registry(o)
         )
         worker_hooks.dataset_registry_factory = _make_fake_standard_registry
         worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
@@ -312,8 +312,8 @@ class TestRunRegressionOptimization:
             total_duration_seconds=2.0,
         )
         fake_optimizer = _FakeOptimizer(summary)
-        worker_hooks.optimizer_registry_factory = (
-            lambda o=fake_optimizer: _make_fake_optimizer_registry(o)
+        worker_hooks.optimizer_registry_factory = lambda o=fake_optimizer: (
+            _make_fake_optimizer_registry(o)
         )
 
         output_dir = tmp_path / "output"

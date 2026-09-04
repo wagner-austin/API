@@ -17,7 +17,7 @@ from turkic_api.core.models import ProcessSpec
 
 def test_to_json_simple_supports_primitives_and_datetime() -> None:
     dt = datetime(2024, 1, 1, tzinfo=UTC)
-    payload: dict[str, str | int | float | bool | None | datetime] = {
+    payload: dict[str, str | int | float | bool | datetime | None] = {
         "a": 1,
         "b": True,
         "c": None,

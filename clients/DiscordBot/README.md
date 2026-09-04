@@ -377,6 +377,7 @@ from platform_discord.domain import (
 )
 from platform_discord.protocols import BotProto
 
+
 class DomainEventSubscriber(BotEventSubscriber[DomainEventV1]):
     __slots__ = ("_runtime",)
 

@@ -48,11 +48,11 @@ Only use this library directly when:
 
 ```python
 from platform_devpost import (
-    find_hackathons,      # Main entry point
-    get_codebase_profile, # Get detected capabilities
-    filter_hackathons,    # Apply interest filter
-    match_hackathon,      # Score single hackathon
-    match_hackathons,     # Score multiple hackathons
+    find_hackathons,  # Main entry point
+    get_codebase_profile,  # Get detected capabilities
+    filter_hackathons,  # Apply interest filter
+    match_hackathon,  # Score single hackathon
+    match_hackathons,  # Score multiple hackathons
 )
 ```
 

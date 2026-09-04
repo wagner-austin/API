@@ -17,7 +17,7 @@ class _Obj1:
 class _Obj2:
     def to_dict_recursive(
         self,
-    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+    ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
         return {"text": "all", "segments": [{"text": " a ", "start": "0.0", "end": "1.0"}]}
 
 
@@ -26,7 +26,7 @@ def test_to_verbose_dict_prefers_methods_and_raises_on_invalid() -> None:
     d = wmod.to_verbose_dict(_Obj2())
     assert isinstance(d, dict) and "segments" in d
     # Accept dict passed directly
-    test_dict: dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]] = {
+    test_dict: dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None] = {
         "text": "x",
         "segments": [],
     }
@@ -38,7 +38,7 @@ def test_to_verbose_dict_method_raises_and_bubbles() -> None:
     class _Bad:
         def to_dict_recursive(
             self,
-        ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+        ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
             raise TypeError("boom")
 
     import pytest
@@ -54,7 +54,7 @@ def test_to_verbose_dict_non_dict_then_next_method() -> None:
 
         def model_dump(
             self,
-        ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+        ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
             return {"text": "t", "segments": []}
 
     d = wmod.to_verbose_dict(_Obj())
@@ -80,7 +80,7 @@ def test_convert_verbose_to_segments_non_list_returns_empty() -> None:
 
 def test_to_verbose_dict_missing_fields_raise() -> None:
     # segment missing end field - runtime validation will catch this
-    bad4: dict[str, str | bool | int | float | None | list[dict[str, str | int | float]]] = {
+    bad4: dict[str, str | bool | int | float | list[dict[str, str | int | float]] | None] = {
         "text": "x",
         "segments": [{"text": "t", "start": 1.0}],
     }
@@ -99,7 +99,7 @@ def test_as_float_edges() -> None:
 
 
 def test_to_verbose_dict_strict_invalid_inputs() -> None:
-    bad_text: dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]] = {
+    bad_text: dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None] = {
         "text": 5,  # invalid type
         "segments": [],
     }
@@ -107,19 +107,19 @@ def test_to_verbose_dict_strict_invalid_inputs() -> None:
         _ = wmod.to_verbose_dict(bad_text)
 
     missing_segments: dict[
-        str, str | int | float | bool | None | list[dict[str, str | int | float]]
+        str, str | int | float | bool | list[dict[str, str | int | float]] | None
     ] = {"text": "x"}
     with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(missing_segments)
 
     bad_segment_shape: dict[
-        str, str | int | float | bool | None | list[dict[str, str | int | float]]
+        str, str | int | float | bool | list[dict[str, str | int | float]] | None
     ] = {"text": "x", "segments": [{"text": "only"}]}
     with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(bad_segment_shape)
 
     seg_missing_numbers: dict[
-        str, str | int | float | bool | None | list[dict[str, str | int | float]]
+        str, str | int | float | bool | list[dict[str, str | int | float]] | None
     ] = {
         "text": "x",
         "segments": [{"text": "a"}],

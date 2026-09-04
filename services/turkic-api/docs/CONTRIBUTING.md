@@ -138,8 +138,10 @@ poetry run python scripts/guard.py
 ```python
 from typing_extensions import TypedDict
 
+
 class JobParams(TypedDict):
     """Parameters for job processing from queue."""
+
     source: str
     language: str
     script: str | None
@@ -171,6 +173,7 @@ def parse_external(data: dict[str, JSONValue]) -> JobParams:
 ```python
 from typing import Protocol
 from turkic_api.api.types import LoggerProtocol
+
 
 def process_job(logger: LoggerProtocol) -> None:
     """Process job with injected logger dependency."""
@@ -237,13 +240,16 @@ This project uses **test hooks** for dependency injection instead of mocks or mo
 # In production code (e.g., api/jobs.py)
 from turkic_api import _test_hooks
 
+
 def process_job(job_id: str) -> None:
     client = _test_hooks.redis_factory(url)  # Uses hook
     # ...
 
+
 # In tests (e.g., tests/test_jobs.py)
 from turkic_api import _test_hooks
 from platform_workers.testing import FakeRedis
+
 
 def test_process_job() -> None:
     # Override hook with fake
@@ -298,10 +304,12 @@ def process(value: str | int) -> str:
         return value.upper()  # mypy knows value is str here
     return str(value)  # mypy knows value is int here
 
+
 # Literal types for constrained strings
 from typing import Literal
 
 Source = Literal["oscar", "wikipedia", "bible", "quran", "udhr", "cc100", "flores"]
+
 
 def validate_source(s: str) -> Source:
     if s not in ("oscar", "wikipedia", "bible", "quran", "udhr", "cc100", "flores"):
@@ -340,7 +348,9 @@ max_workers = get_env_int("MAX_WORKERS", default=4)
 ```python
 from platform_core.job_events import make_progress_event, encode_job_event
 
-event = make_progress_event(domain="turkic", job_id=job_id, user_id=user_id, progress=50, message="processing")
+event = make_progress_event(
+    domain="turkic", job_id=job_id, user_id=user_id, progress=50, message="processing"
+)
 redis.publish(channel, encode_job_event(event))
 ```
 
@@ -365,6 +375,7 @@ from turkic_api.api.types import QueueProtocol, JsonDict
 
 router = APIRouter()
 
+
 @router.post("/jobs")
 def create_job(
     payload: JsonDict,
@@ -379,6 +390,7 @@ def create_job(
 
 ```python
 from turkic_api.api.models import parse_job_create
+
 
 def create_job_handler(raw_payload: JsonDict) -> JobCreateResponse:
     """Parse and validate job creation request."""
@@ -396,6 +408,7 @@ from turkic_api.api.jobs import process_corpus_impl, JobParams, JobResult
 from turkic_api.api.config import Settings
 from turkic_api.api.types import LoggerProtocol
 from platform_workers.redis import RedisStrProto
+
 
 def process_job(
     job_id: str,
@@ -486,13 +499,13 @@ Brief description of what changed and why.
 ```python
 from fastapi import HTTPException
 
+
 def validate_source(source: str) -> Literal["oscar", "wikipedia", ...]:
     """Validate source with typed error."""
     valid_sources = ("oscar", "wikipedia", "bible", "quran", "udhr", "cc100", "flores")
     if source not in valid_sources:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid source. Must be one of: {', '.join(valid_sources)}"
+            status_code=400, detail=f"Invalid source. Must be one of: {', '.join(valid_sources)}"
         )
     return source  # type: ignore[return-value]  # Runtime validation ensures correctness
 ```
@@ -501,6 +514,7 @@ def validate_source(source: str) -> Literal["oscar", "wikipedia", ...]:
 
 ```python
 from pathlib import Path
+
 
 def load_corpus(data_dir: str, source: str, language: str) -> Path:
     """Load corpus file with type-safe path handling."""
@@ -514,6 +528,7 @@ def load_corpus(data_dir: str, source: str, language: str) -> Path:
 
 ```python
 from platform_core.json_utils import JSONValue, load_json_str
+
 
 def parse_response(payload: str) -> dict[str, str]:
     """Parse JSON response with runtime validation."""

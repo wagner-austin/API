@@ -153,13 +153,13 @@ class YouTubeTranscriptProvider:
 
 
 def _as_float(
-    val: str | int | float | bool | None | dict[str, str | int | float] | list[str | int | float],
+    val: str | int | float | bool | dict[str, str | int | float] | list[str | int | float] | None,
 ) -> float:
     """Convert value to float with runtime validation.
 
     Accepts int, float, or str. Returns 0.0 for invalid types/values.
     """
-    if isinstance(val, int | float):
+    if isinstance(val, (int, float)):
         return float(val)
     if isinstance(val, str):
         s = val.strip()

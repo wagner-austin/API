@@ -250,6 +250,7 @@ client.add_calendar(calendar_id="primary", summary="Test Calendar")
 
 # Create events with the fake client
 from platform_calendar import EventDateTime
+
 start = EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC")
 end = EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC")
 
