@@ -149,6 +149,17 @@ tools/hpc3/runs/*
 # is not: forcing works for whoever runs it and silently drops the file for
 # the next person, which is exactly the failure the note above records.
 !tools/hpc3/runs/*-stage.json
+# A run document and the payload it names are configuration too, and by the
+# same argument: `modeltrainer-cluster-train --payload P` and
+# `modeltrainer-continuations --spec S` are unrunnable without them, so a
+# clone carrying the run document and not the payload carries a command that
+# cannot start. `mi-arm-a.json` and `mi-arm-b.json` survive as history, the
+# shape the note above warns about; these are a negation instead.
+#
+# Force-added first, in 5bea978c, and corrected here for the reason dead545b
+# gives one commit earlier: a force works for whoever runs it and silently
+# drops the file for the next person.
+!tools/hpc3/runs/code-style-*.json
 **/corpus/
 
 # But allow source code directories named "data"
