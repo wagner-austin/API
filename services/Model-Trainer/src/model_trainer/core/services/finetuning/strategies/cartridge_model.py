@@ -396,8 +396,151 @@ class CompanionedCartridgeModel(CartridgeModel):
         )
 
 
+class MultiCompanionedCartridgeModel(CartridgeModel):
+    """A cartridge trained beside a VARYING number of frozen strangers.
+
+    The single-companion recipe's retention decays with deployment count
+    (44.6% at four compartments, 26.5% at eight, both recorded), and this
+    model is the intervention over that decay: each training forward draws
+    how many of a fixed pool of frozen companions stand in front of the
+    trainee, so gradients see the prefix at several lengths instead of one.
+
+    TRAINING ONLY, and THE POOL IS FROZEN BY CONSTRUCTION, both exactly as
+    :class:`CompanionedCartridgeModel`: scoring builds plain models, every
+    companion block is detached at every forward, and ``parameters()``
+    reports the trainee's slots only.
+
+    THE RNG CONSUMPTION IS FIXED PER FORWARD. Three draws -- presence,
+    count, and a full permutation of the pool -- are taken from torch's
+    global generator on EVERY forward, whatever the outcome, extending the
+    uniformity rule the single-companion model set: two configurations of
+    this class share one RNG-consumption pattern, so a sweep over its knobs
+    varies exactly the knob.
+    """
+
+    _companions: tuple[CartridgeSlots, ...]
+    _companion_probability: float
+
+    def __init__(
+        self,
+        *,
+        base: CacheCapableLMProto,
+        slots: CartridgeSlots,
+        companions: tuple[CartridgeSlots, ...],
+        companion_probability: float,
+    ) -> None:
+        """Freeze a base, put trainee slots in front, and hold a pool.
+
+        Args:
+            base: The model to prepend to, frozen exactly as
+                :class:`CartridgeModel` freezes it.
+            slots: The trainable blocks.
+            companions: The frozen pool. At least two members: a pool of one
+                is :class:`CompanionedCartridgeModel` wearing dead count and
+                permutation draws, and that class is the honest spelling.
+                Each member must be cut for the same model as ``slots``.
+            companion_probability: Chance per forward that any companions
+                are present, in (0, 1]; zero would be a plain
+                :class:`CartridgeModel` wearing a dead knob. When present,
+                the count is drawn uniformly from one to the pool size.
+
+        Raises:
+            ValueError: If the probability is outside (0, 1], or the pool
+                holds fewer than two companions.
+            AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if any companion
+                was cut for a differently shaped model.
+        """
+        if not 0.0 < companion_probability <= 1.0:
+            raise ValueError(
+                f"a companion probability of {companion_probability} is outside (0, 1]; "
+                f"zero companionship is the plain CartridgeModel and should be "
+                f"constructed as one, so the record never carries a dead knob"
+            )
+        if len(companions) < 2:
+            raise ValueError(
+                f"a pool of {len(companions)} companion(s) cannot vary the count; "
+                f"one companion is CompanionedCartridgeModel and should be "
+                f"constructed as one, so the count and permutation draws are "
+                f"never dead knobs"
+            )
+        for companion in companions:
+            require_matching_geometry(companion.geometry, slots.geometry)
+        super().__init__(base=base, slots=slots)
+        self._companions = companions
+        self._companion_probability = companion_probability
+        # Same constructor-owned device invariant as the single-companion
+        # model: a CPU-drawn pool meeting a CUDA base would torch.cat across
+        # devices on the first present forward, and a CPU-only suite cannot
+        # reach that failure.
+        device = str(next(iter(base.named_parameters()))[1].detach().device)
+        for companion in self._companions:
+            companion.to(device)
+
+    def to(self, device: str) -> LMModelProto:
+        """Move the base, the trainee slots and the pool onto a device.
+
+        Args:
+            device: Torch device string.
+
+        Returns:
+            This model, so the call chains.
+        """
+        super().to(device)
+        for companion in self._companions:
+            companion.to(device)
+        return self
+
+    def forward(self, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
+        """Run the base with a drawn number of companions before the trainee.
+
+        Args:
+            input_ids: Token ids, shaped (batch, positions).
+            labels: Targets for those same positions.
+
+        Returns:
+            The base model's output. Gradients reach the trainee's slots
+            only; every companion block is detached.
+        """
+        present = float(torch.rand(())) < self._companion_probability
+        count = int(torch.randint(1, len(self._companions) + 1, ()))
+        order = torch.randperm(len(self._companions))
+        if not present:
+            return super().forward(input_ids=input_ids, labels=labels)
+        chosen = [self._companions[int(order[position].item())] for position in range(count)]
+        batch_size = int(input_ids.shape[0])
+        blocks: list[tuple[torch.Tensor, torch.Tensor]] = []
+        for layer in range(self.geometry["num_layers"]):
+            keys: list[torch.Tensor] = []
+            values: list[torch.Tensor] = []
+            for companion in chosen:
+                companion_key, companion_value = companion.layer_blocks(
+                    layer, batch_size=batch_size
+                )
+                keys.append(companion_key.detach())
+                values.append(companion_value.detach())
+            trainee_key, trainee_value = self.slots.layer_blocks(layer, batch_size=batch_size)
+            keys.append(trainee_key)
+            values.append(trainee_value)
+            blocks.append((torch.cat(keys, dim=SLOT_AXIS), torch.cat(values, dim=SLOT_AXIS)))
+        attended = (
+            int(input_ids.shape[1])
+            + sum(companion.geometry["num_slots"] for companion in chosen)
+            + self.geometry["num_slots"]
+        )
+        return self._base(
+            input_ids=input_ids,
+            labels=labels,
+            past_key_values=Hooks.build_prefix_cache(blocks),
+            attention_mask=torch.ones(
+                (batch_size, attended), dtype=torch.long, device=input_ids.device
+            ),
+            use_cache=False,
+        )
+
+
 __all__ = [
     "CartridgeLoadResult",
     "CartridgeModel",
     "CompanionedCartridgeModel",
+    "MultiCompanionedCartridgeModel",
 ]

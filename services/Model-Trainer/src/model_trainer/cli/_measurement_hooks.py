@@ -27,9 +27,11 @@ from model_trainer.core.services.model.cartridge_plans import (
     CARTRIDGE_PLANS,
     COMPANION_SWEEP_PLANS,
     COMPOSITION_SWEEP_PLANS,
+    VARIED_COMPANION_SWEEP_PLANS,
     CartridgePlan,
     CompanionSweepPlan,
     CompositionSweepPlan,
+    VariedCompanionSweepPlan,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
 from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
@@ -95,6 +97,20 @@ class CompanionSweepPlansProto(Protocol):
     """
 
     def __call__(self) -> Mapping[str, CompanionSweepPlan]:
+        """Return every declared plan, in table order."""
+        ...
+
+
+class VariedCompanionSweepPlansProto(Protocol):
+    """Protocol for the varied-count companion-sweep plan table.
+
+    Behind a hook for the reason :class:`CompanionSweepPlansProto` is: the
+    real table's one plan trains dozens of cartridges over a real GPT-2, so
+    a suite that could only reach it would either run it or leave the entry
+    uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, VariedCompanionSweepPlan]:
         """Return every declared plan, in table order."""
         ...
 
@@ -311,6 +327,18 @@ def _default_companion_sweep_plans() -> Mapping[str, CompanionSweepPlan]:
 
 companion_sweep_plans: CompanionSweepPlansProto = _default_companion_sweep_plans
 
+
+def _default_varied_companion_sweep_plans() -> Mapping[str, VariedCompanionSweepPlan]:
+    """Production varied-count plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return VARIED_COMPANION_SWEEP_PLANS
+
+
+varied_companion_sweep_plans: VariedCompanionSweepPlansProto = _default_varied_companion_sweep_plans
+
 qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -340,6 +368,7 @@ __all__ = [
     "QaPlansProto",
     "TraceRungsProto",
     "TrainShapesProto",
+    "VariedCompanionSweepPlansProto",
     "benchmark_shapes",
     "cartridge_plans",
     "companion_sweep_plans",
@@ -351,4 +380,5 @@ __all__ = [
     "qa_plans",
     "trace_rungs",
     "train_shapes",
+    "varied_companion_sweep_plans",
 ]
