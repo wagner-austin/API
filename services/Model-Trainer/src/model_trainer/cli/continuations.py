@@ -75,6 +75,15 @@ RECORD_FLAG = "--record"
 
 _FLAGS = (SPEC_FLAG, OUT_DIR_FLAG, RECORD_FLAG)
 
+VERBATIM = ""
+"""Newline translation off, for text whose line endings are the measurement.
+
+Python rewrites a newline to the host's convention on write, so the same
+completion written on a laptop and on the cluster would be two different
+files -- and ruff, mypy and the guards reading them are exactly the kind of
+tool that notices. What the model emitted is what gets scored.
+"""
+
 PARTIAL_SUFFIX = ".partial"
 """What a file being written is called until it is complete.
 
@@ -195,7 +204,7 @@ def write_completion(out_dir: pathlib.Path, completion: Completion) -> None:
     target = generated_path(out_dir, completion["item_id"])
     target.parent.mkdir(parents=True, exist_ok=True)
     staged = target.with_name(target.name + PARTIAL_SUFFIX)
-    staged.write_text(completion["text"], encoding="utf-8")
+    staged.write_text(completion["text"], encoding="utf-8", newline=VERBATIM)
     staged.replace(target)
 
 
@@ -220,7 +229,10 @@ def append_manifest(out_dir: pathlib.Path, completions: Sequence[Completion]) ->
         + "\n"
         for c in completions
     )
-    with path.open("a", encoding="utf-8") as handle:
+    # Written verbatim too, for the same reason: a manifest whose rows end
+    # differently on two machines is one whose digest differs for a reason
+    # having nothing to do with the models.
+    with path.open("a", encoding="utf-8", newline=VERBATIM) as handle:
         _ = handle.write(body)
 
 
@@ -493,6 +505,7 @@ __all__ = [
     "PARTIAL_SUFFIX",
     "RECORD_FLAG",
     "SPEC_FLAG",
+    "VERBATIM",
     "SweepScope",
     "append_manifest",
     "batch_is_complete",
