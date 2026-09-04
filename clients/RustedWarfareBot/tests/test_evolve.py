@@ -118,16 +118,19 @@ def test_the_evolution_is_deterministic_end_to_end(tmp_path: Path) -> None:
     _, first = _run(tmp_path, "one")
     _, second = _run(tmp_path, "two")
     assert shape(first) == shape(second)
-    sample = "g2m7.doctrine"
+    sample = Path("probe") / "g2m7.doctrine"
     assert (tmp_path / "variants-one" / sample).read_text(encoding="utf-8") == (
         tmp_path / "variants-two" / sample
     ).read_text(encoding="utf-8")
 
 
 def test_compiled_candidates_are_valid_doctrines_on_disk(tmp_path: Path) -> None:
+    """The run's files live under its OWN subdirectory of the variant
+    dir -- evolve1 and evolve2 shared the bare directory on 2026-09-04
+    and overwrote each other's members all night."""
     _run(tmp_path, "files")
     variant_dir = tmp_path / "variants-files"
-    sample = variant_dir / "g0m0.doctrine"
+    sample = variant_dir / "probe" / "g0m0.doctrine"
     doctrine = parse_doctrine_lines(sample.read_text(encoding="utf-8").splitlines())
     assert doctrine["name"] == "g0m0"
     # The scaffold survives and the army tail fills the champion's slots.

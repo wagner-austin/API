@@ -283,6 +283,12 @@ def run_evolution(
         sweeps_root: Where batch scorecards land, injectable for tests.
         variant_dir: Where candidate doctrines land, injectable for tests.
 
+    The run's doctrine files land under ``variant_dir / name``: two runs
+    sharing the bare directory overwrote each other's ``g<i>m<j>``
+    files all night on 2026-09-04 -- survivable only because replays
+    rewrite deterministically before every submission, and each
+    graduate had to be banked inside that race window.
+
     Returns:
         Report lines, each also written the moment it happens.
 
@@ -290,6 +296,7 @@ def run_evolution(
         ClusterRoundError: Through the runner.
         GenomeError: Through the compiler.
     """
+    run_dir = variant_dir / name
     lines: list[str] = []
 
     def note(text: str) -> None:
@@ -311,10 +318,10 @@ def run_evolution(
     for generation in range(GENERATIONS):
         batch = f"{name}-g{generation}"
         genomes = sample_population(rng, mean, sigma)
-        write_generation(base_path, genomes, generation, variant_dir)
+        write_generation(base_path, genomes, generation, run_dir)
         seeds = generation_seeds(rng_seed, generation)
         note(f"# generation {generation}: {POPULATION} members, {PAIRS} pairs")
-        runner.run(batch, generation_job_lines(base_path, genomes, generation, seeds, variant_dir))
+        runner.run(batch, generation_job_lines(base_path, genomes, generation, seeds, run_dir))
         margins = batch_margins(sweeps_root / batch)
         scored: list[tuple[float, int]] = []
         for index in range(POPULATION):
@@ -345,7 +352,7 @@ def run_evolution(
         mean, sigma = refit(elite)
     note(
         f"# best member: {best_label} (margin delta {best_score:+.3f}); its doctrine "
-        f"file under {variant_dir.as_posix()} goes to the win-bar panel next -- "
+        f"file under {run_dir.as_posix()} goes to the win-bar panel next -- "
         "generation fitness is selection-biased and adopts nothing (laws six, nine)"
     )
     return tuple(lines)
