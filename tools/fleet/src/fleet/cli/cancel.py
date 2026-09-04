@@ -1,7 +1,7 @@
 """CLI: stop a dispatch, and give its project's environment back.
 
 Usage:
-    fleet-cancel --config runs/fleet.json --run services-Model-Trainer-1757000000
+    fleet-cancel --config fleet.json --run services-Model-Trainer-1757000000
 
 WHAT IT ACTUALLY DOES, in the order that matters. It stops the scheduled task
 on the node, closes the ledger row as ``cancelled``, emits that on the feed,
@@ -87,13 +87,18 @@ def stop_script(run_id: str) -> str:
     unanswered prompt would hang this command until its ssh timeout rather
     than stopping anything.
 
+    The task's name comes from :func:`fleet.core.dispatch.task_name`, the
+    same function the dispatch registered it with. Spelling it here a second
+    time is one rename away from a cancel that reports success having stopped
+    nothing.
+
     Args:
         run_id: The dispatch, which names its own task.
 
     Returns:
         The script's text.
     """
-    task = f"fleet-{run_id}"
+    task = dispatch.task_name(run_id)
     return (
         f"Stop-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue\n"
         f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false "
@@ -142,7 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     _emit_cancelled(loaded, row=row, ended_unix=ended_unix)
-    released = _release(loaded, run_id=run_id, now_unix=ended_unix)
+    released = leases.release_if_held(loaded.leases, run_id=run_id, now_unix=ended_unix)
 
     _log.info("cancelled %s on %s (%s)", run_id, row["node"], released)
     return 0
@@ -167,30 +172,6 @@ def _emit_cancelled(loaded: _config.LoadedWorkspace, *, row: LedgerEntry, ended_
             detail=f"cancelled by fleet-cancel; was dispatched by {row['agent']}",
         ),
     )
-
-
-def _release(loaded: _config.LoadedWorkspace, *, run_id: str, now_unix: int) -> str:
-    """Give the lease back, tolerating one that has already lapsed.
-
-    THE ONE PLACE A LAPSED LEASE IS NOT AN ERROR. A run whose lease expired
-    while it was still going is the wedge case, and it is exactly the run
-    somebody needs to cancel. Refusing here would leave the only tool that can
-    stop it unable to. The absence is reported rather than swallowed, so the
-    operator learns the run had already outlived its window.
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        run_id: The dispatch.
-        now_unix: Current time, whole seconds since the epoch.
-
-    Returns:
-        What happened to the lease, for the log line.
-    """
-    holder = leases.find_by_run(loaded.leases, run_id=run_id, now_unix=now_unix)
-    if holder is None:
-        return "its lease had already expired, so the run had outlived its declared window"
-    leases.release(loaded.leases, run_id=run_id, now_unix=now_unix)
-    return "lease released"
 
 
 def entrypoint() -> None:

@@ -60,8 +60,10 @@ ARCHIVE_NAME = "tree.tgz"
 ENCODED_NAME = "tree.b64"
 
 
-def archive(project_root: pathlib.Path, project: str, destination: pathlib.Path) -> bytes:
-    """Build a gzipped tar of one project's working tree.
+def archive(
+    project_root: pathlib.Path, members: tuple[str, ...], destination: pathlib.Path
+) -> bytes:
+    """Build a gzipped tar of everything a dispatch has to carry.
 
     Written to a file and read back rather than captured from tar's standard
     output, because the command runner decodes streams as UTF-8 with
@@ -69,28 +71,43 @@ def archive(project_root: pathlib.Path, project: str, destination: pathlib.Path)
 
     Args:
         project_root: Absolute path to the monorepo root.
-        project: Repo-relative project path.
+        members: Repo-relative directories to include, from
+            :func:`~fleet.core.manifest.build_tree`. A SET rather than one
+            project, because a project here is not self-contained: its
+            lockfile resolves against sibling path dependencies and its
+            Makefile calls a launcher at the repository root. Every member is
+            named relative to the root and extracted relative to the stage
+            directory, so ``../../libs/platform_core`` resolves on the node
+            exactly as it does here.
         destination: Local file to write the archive to.
 
     Returns:
         The archive bytes.
 
     Raises:
+        ValueError: If no members were given. An empty archive would stage
+            successfully, extract to nothing, and fail at ``make`` with a
+            missing-target error that says nothing about staging.
         AppError: With ``STAGE_ARCHIVE_UNREADABLE`` if tar exits non-zero,
-            carrying its own stderr. The usual cause is a project path that
-            does not exist locally, and tar reports that better than a
-            pre-check would.
+            carrying its own stderr. The usual cause is a member that does
+            not exist locally, and tar names it better than a pre-check
+            would.
     """
+    if not members:
+        raise ValueError(
+            "an archive needs at least one member; staging nothing extracts to nothing and "
+            "fails later at make, with a message about a missing target rather than staging"
+        )
     excludes: list[str] = []
     for name in EXCLUDED_DIRECTORIES:
         excludes.extend(("--exclude", name))
     result = _test_hooks.run(
-        ["tar", "-czf", str(destination), "-C", str(project_root), *excludes, project]
+        ["tar", "-czf", str(destination), "-C", str(project_root), *excludes, *members]
     )
     if result["returncode"] != 0:
         raise AppError(
             FleetErrorCode.STAGE_ARCHIVE_UNREADABLE,
-            f"could not archive {project!r} under {project_root}: "
+            f"could not archive {', '.join(members)} under {project_root}: "
             f"{result['stderr'].strip() or '<no stderr>'}",
         )
     return _test_hooks.read_bytes(destination)

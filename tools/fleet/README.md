@@ -31,12 +31,19 @@ structural — a shared mutable environment with no lock — not a rogue killer.
 ## The three files
 
 ```
+fleet.json        the workspace: where the nodes are, what each project costs
 runs/
-  fleet.json      the workspace: where the nodes are, what each project costs
   ledger.jsonl    append-only; every dispatch ever made from this machine
   feed.jsonl      append-only; the event stream subscribers tail
   leases.json     live state; who holds which project's environment
 ```
+
+**`fleet.json` is tracked and the three records are not**, because they are
+different kinds of thing. The workspace describes the fleet and belongs to
+everybody; the records are this machine's own history and live under `runs/`,
+which the monorepo gitignores. It sat under `runs/` at first and was therefore
+invisible to git — so the one file every command requires would not have
+survived a fresh clone, and the package would have arrived unrunnable.
 
 The ledger and feed are history and are never rewritten. Leases are live
 state and are: a release has to make a claim stop existing, and an
@@ -46,21 +53,41 @@ to answer one question.
 ## Commands
 
 ```bash
-fleet-nodes     --config runs/fleet.json                 # what is free right now
-fleet-preflight --config runs/fleet.json --project P     # would it run, and where
-fleet-preflight --config runs/fleet.json --project P --node lavender
-fleet-run       --config runs/fleet.json --project P \
+fleet-nodes     --config fleet.json                 # what is free right now
+fleet-preflight --config fleet.json --project P     # would it run, and where
+fleet-preflight --config fleet.json --project P --node lavender
+fleet-run       --config fleet.json --project P \
                 --agent <label> --session <uuid> --repo-root <path>
-fleet-watch     --config runs/fleet.json                 # the event stream
-fleet-watch     --config runs/fleet.json --run <run-id>
-fleet-cancel    --config runs/fleet.json --run <run-id>
+fleet-collect   --config fleet.json                 # close out what finished
+fleet-collect   --config fleet.json --run <run-id>
+fleet-watch     --config fleet.json                 # the event stream
+fleet-watch     --config fleet.json --run <run-id>
+fleet-cancel    --config fleet.json --run <run-id>
 ```
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
 it. The build outlives the command because it is launched through the node's
 task scheduler rather than as a child of the ssh call — Windows OpenSSH puts
-that child in a job object that dies with the connection. The result arrives
-on the feed, so follow it with `fleet-watch --run <the printed id>`.
+that child in a job object that dies with the connection.
+
+**Something therefore has to go back and ask, and that is `fleet-collect`.**
+For every dispatch the ledger still calls running it reads the node's recorded
+exit status, and for each that has one it appends the closing row, emits
+`passed` or `failed` on the feed, and releases the lease. It is safe to run as
+often as you like: an unfinished run is left exactly as it was and a finished
+one is closed once.
+
+It exits 0 for a failing suite. The status is whether *collection* worked, not
+whether the work passed — otherwise a shell loop stops on the first red build,
+which is the one moment somebody wants it still reporting.
+
+```bash
+while true; do
+  fleet-collect --config fleet.json
+  fleet-watch   --config fleet.json
+  sleep 30
+done
+```
 
 `--agent` and `--session` are required and are the board's own identity
 fields, so a ledger row and a board post can be matched by whoever reads both.
@@ -73,7 +100,7 @@ having none.
 integration:
 
 ```
-Monitor({command: "fleet-watch --config runs/fleet.json", description: "fleet events"})
+Monitor({command: "fleet-watch --config fleet.json", description: "fleet events"})
 ```
 
 There is deliberately no `--follow`. A polling loop belongs in the shell where
@@ -129,6 +156,22 @@ a way that reads as the code's fault.
 package exists to stop two dispatches sharing, and one machine's has absolute
 paths baked into it. The node builds its own from the lockfile that is sent.
 
+**A project is not the unit of staging, and the first real dispatch proved
+it.** `tools/fleet` went to sedona as one directory, which is what "dispatch a
+project" reads as and cannot build: its `pyproject.toml` resolves
+`platform-core` at `../../libs/platform_core`, its Makefile calls
+`..\..\scripts\run-tests.ps1`, its `scripts/guard.py` imports from
+`<root>/libs/monorepo_guards/src`, and those rules then read
+`monorepo-guards.toml` from the root. `fleet.core.manifest` computes the set:
+the project, its transitive **path dependencies read out of the manifests that
+declare them**, and the shared paths the monorepo asserts about its own layout.
+
+The path dependencies are read from `pyproject.toml` rather than declared
+beside each project in `fleet.json`, because poetry already reads the
+authoritative list every time anybody builds and a second copy drifts silently
+in the direction of staging too little — which surfaces as a lockfile error on
+a node and reads as the project's fault.
+
 ## Cancelling
 
 `fleet-cancel` is the only command that kills anything, and it kills exactly
@@ -159,6 +202,38 @@ and `cmd` into `powershell`, and the second attempt arrived as
 `@(python,poetry,git,...)` — unquoted bare words, a parser error on the far
 side. `fleet.core.remote` renders the script, sends it over stdin, and runs it
 by path, so the bytes that run are the bytes that were sent.
+
+**And the rule applies one layer further in.** The first version passed the
+whole build to `New-ScheduledTaskAction -Argument '-Command "cd ''{path}''…"'`.
+PowerShell ended that single-quoted argument at the first inner quote, so the
+registered task carried `-Command "cd` as its arguments and the remaining two
+hundred characters as its **working directory** — a path that does not exist,
+so the task could not be started at all. Nothing failed loudly:
+`Start-ScheduledTask` reports a refusal as a *non-terminating* error,
+PowerShell exited 0, and the ledger recorded a run that did not exist.
+
+So the build is its own script file, sent and named by path, and the
+registration interpolates one path and no code. It then waits for the task to
+leave `SCHED_S_TASK_HAS_NOT_RUN` before reporting a launch, because a
+registration that cannot start is not a dispatch.
+
+`-AllowStartIfOnBatteries` and `-DontStopIfGoingOnBatteries` are on the
+settings for the same reason: `New-ScheduledTaskSettingsSet` defaults both to
+refusing, and two of the three nodes are laptops.
+
+## What a lease can and cannot tell you
+
+Whether a run was **protected** is a question about whether its lease covered
+the run. Whether a lease is held **now** is a question about how promptly
+somebody came to collect. Conflating them refused a healthy run that had
+finished three minutes inside its window, twenty minutes after it ended.
+
+So the node reports *when* the build finished as well as what it exited with,
+and `fleet-collect` compares that against the deadline recomputed from the
+ledger row and the project's declared duration. A run that outlived its lease
+is refused — during that window a second dispatch could have entered the same
+environment, which is the corruption this package exists to prevent. A run
+collected late is closed normally.
 
 ## Development
 

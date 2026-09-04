@@ -1,8 +1,8 @@
 """CLI: would this project run right now, and on which node.
 
 Usage:
-    fleet-preflight --config runs/fleet.json --project services/Model-Trainer
-    fleet-preflight --config runs/fleet.json --project services/Model-Trainer \\
+    fleet-preflight --config fleet.json --project services/Model-Trainer
+    fleet-preflight --config fleet.json --project services/Model-Trainer \\
         --node lavender
 
 Two questions, one command. Without ``--node`` it asks the fleet and names the

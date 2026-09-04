@@ -1,7 +1,7 @@
 """CLI: what every node has free right now.
 
 Usage:
-    fleet-nodes --config runs/fleet.json
+    fleet-nodes --config fleet.json
 
 The ``sinfo`` of this package, and the command to run before wondering why a
 dispatch was refused. It probes every declared node and prints one line each,

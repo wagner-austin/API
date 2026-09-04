@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import os
-import tomllib
 from collections.abc import Callable
 
 from platform_core.json_utils import JSONValue
+from platform_core.toml_utils import loads_toml
 
 
 def _default_get_env(key: str) -> str | None:
@@ -31,12 +31,15 @@ def _default_get_environment() -> dict[str, str]:
 
 
 def _default_tomllib_loads(s: str) -> dict[str, JSONValue]:
-    """Production implementation - parses TOML string."""
-    # Use getattr to call tomllib.loads avoiding Any propagation
-    # tomllib.loads returns dict[str, Any], but valid TOML always produces
-    # values that are valid JSON types (str, int, float, bool, list, dict, None)
-    loads_func: Callable[[str], dict[str, JSONValue]] = tomllib.loads
-    return loads_func(s)
+    """Production implementation - parses TOML string.
+
+    Delegates to :func:`platform_core.toml_utils.loads_toml`, which is where
+    the ``dict[str, Any]`` that :mod:`tomllib` declares is narrowed. This
+    function used to do that narrowing itself, with a comment asserting that
+    valid TOML always produces JSON types -- which is untrue of TOML's date
+    types, and the shared helper checks rather than asserting.
+    """
+    return loads_toml(s)
 
 
 # Hook for environment variable access. Tests can override to provide fake values.

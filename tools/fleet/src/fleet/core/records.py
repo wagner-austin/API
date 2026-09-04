@@ -80,6 +80,34 @@ def read_ledger(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
     return tuple(rows)
 
 
+def latest_rows(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
+    """Read the CURRENT row for each dispatch the ledger knows about.
+
+    THE LEDGER IS APPEND-ONLY, SO A FINISHED RUN STILL HAS A RUNNING ROW IN
+    IT. Anything asking what is happening now must therefore reduce to the
+    last row per id, and the first version of :func:`live_runs` did not:
+    it counted every row whose outcome was ``running``, including the ones
+    already superseded. Measured 2026-09-04 on the second real dispatch --
+    sedona declares ``max_concurrent_runs: 1``, and having run and CANCELLED
+    exactly one dispatch it refused every future one as already full. A
+    node's live count could only ever go up.
+
+    Args:
+        path: The ledger file.
+
+    Returns:
+        One row per dispatch, each the most recently appended, in the order
+        the dispatches first appear.
+
+    Raises:
+        AppError: With ``LEDGER_ROW_UNPARSABLE`` if a line does not decode.
+    """
+    latest: dict[str, LedgerEntry] = {}
+    for row in read_ledger(path):
+        latest[row["run_id"]] = row
+    return tuple(latest.values())
+
+
 def live_runs(path: pathlib.Path, *, node: str) -> int:
     """Count the dispatches still holding resources on one node.
 
@@ -88,9 +116,10 @@ def live_runs(path: pathlib.Path, *, node: str) -> int:
         node: The node's workspace name.
 
     Returns:
-        How many rows for that node are still ``running``.
+        How many dispatches on that node are CURRENTLY running -- see
+        :func:`latest_rows` for why the distinction is load-bearing.
     """
-    return sum(1 for row in read_ledger(path) if row["node"] == node and is_live(row))
+    return sum(1 for row in latest_rows(path) if row["node"] == node and is_live(row))
 
 
 def append_ledger(path: pathlib.Path, entry: LedgerEntry) -> None:
@@ -140,6 +169,7 @@ def append_feed(path: pathlib.Path, event: FeedEvent) -> None:
 __all__ = [
     "append_feed",
     "append_ledger",
+    "latest_rows",
     "live_runs",
     "read_feed",
     "read_ledger",

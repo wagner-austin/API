@@ -1,0 +1,86 @@
+{
+  "nodes": {
+    "sedona": {
+      "host": "sedona",
+      "stage_root": "C:/fleet/stage",
+      "logical_cores": 20,
+      "ram_gb": 16.0,
+      "gpu": {
+        "model": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+        "vram_mib": 8192,
+        "compute_capability": "8.6",
+        "driver_version": "551.23"
+      },
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 4.0,
+        "worker_ram_gb": 1.1,
+        "max_concurrent_runs": 1,
+        "max_disk_gb": 40.0
+      }
+    },
+    "lavender": {
+      "host": "lavender",
+      "stage_root": "C:/fleet/stage",
+      "logical_cores": 16,
+      "ram_gb": 32.0,
+      "gpu": {
+        "model": "NVIDIA GeForce GTX 1630",
+        "vram_mib": 4096,
+        "compute_capability": "7.5",
+        "driver_version": "591.86"
+      },
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 6.0,
+        "worker_ram_gb": 1.1,
+        "max_concurrent_runs": 2,
+        "max_disk_gb": 40.0
+      }
+    },
+    "loki": {
+      "host": "loki",
+      "stage_root": "C:/fleet/stage",
+      "logical_cores": 16,
+      "ram_gb": 31.0,
+      "gpu": null,
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 6.0,
+        "worker_ram_gb": 1.1,
+        "max_concurrent_runs": 2,
+        "max_disk_gb": 40.0
+      }
+    }
+  },
+  "projects": {
+    "tools/fleet": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 5
+    },
+    "tools/hpc3": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 2
+    },
+    "libs/platform_core": {
+      "worker_ram_gb": 0.3,
+      "minimum_workers": 4,
+      "expected_minutes": 2
+    },
+    "libs/monorepo_guards": {
+      "worker_ram_gb": 0.25,
+      "minimum_workers": 4,
+      "expected_minutes": 2
+    },
+    "services/Model-Trainer": {
+      "worker_ram_gb": 1.1,
+      "minimum_workers": 6,
+      "expected_minutes": 4
+    }
+  },
+  "ledger": "runs/ledger.jsonl",
+  "feed": "runs/feed.jsonl",
+  "leases": "runs/leases.json"
+}

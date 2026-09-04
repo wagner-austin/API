@@ -189,4 +189,39 @@ def release(path: pathlib.Path, *, run_id: str, now_unix: int) -> None:
     _test_hooks.write_text(path, dump_json_str([encode_lease(entry) for entry in remaining]))
 
 
-__all__ = ["acquire", "find_by_run", "find_holder", "held_leases", "read_leases", "release"]
+def release_if_held(path: pathlib.Path, *, run_id: str, now_unix: int) -> str:
+    """Give a claim back, tolerating one that has already lapsed.
+
+    THE DIFFERENCE FROM :func:`release` IS WHO IS ASKING. ``release`` is for a
+    caller that believes it still holds the claim, and a lapsed lease there is
+    a fault worth raising. This is for the callers that close a run OUT --
+    ``fleet-cancel`` and ``fleet-collect`` -- and for them a lapsed lease is
+    ordinary: a run cancelled after its window, or a result collected an hour
+    after the build ended, has nothing to give back and refusing would leave
+    the only tools that can close it unable to.
+
+    The absence is reported rather than swallowed, so the caller can say so.
+
+    Args:
+        path: The lease file.
+        run_id: The dispatch.
+        now_unix: Current time, whole seconds since the epoch.
+
+    Returns:
+        What happened, as a sentence for a log line.
+    """
+    if find_by_run(path, run_id=run_id, now_unix=now_unix) is None:
+        return "its lease had already expired, so nothing was held to give back"
+    release(path, run_id=run_id, now_unix=now_unix)
+    return "lease released"
+
+
+__all__ = [
+    "acquire",
+    "find_by_run",
+    "find_holder",
+    "held_leases",
+    "read_leases",
+    "release",
+    "release_if_held",
+]

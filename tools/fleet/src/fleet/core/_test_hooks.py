@@ -155,6 +155,26 @@ class FileExistsProtocol(Protocol):
         """
 
 
+class DirectoryExistsProtocol(Protocol):
+    """Reports whether a path names an existing directory."""
+
+    def __call__(self, path: pathlib.Path) -> bool:
+        """Test a path.
+
+        Separate from :class:`FileExistsProtocol` rather than a flag on it,
+        because the two answer different questions and conflating them would
+        let a manifest satisfy a check for the directory beside it. The one
+        caller is checking that a shared directory a Makefile names is still
+        where the Makefile says.
+
+        Args:
+            path: Absolute path to test.
+
+        Returns:
+            True when the path exists and is a directory.
+        """
+
+
 class WriteTextProtocol(Protocol):
     """Replaces a file's whole contents, creating it if absent."""
 
@@ -257,6 +277,18 @@ def _default_file_exists(path: pathlib.Path) -> bool:
     return path.is_file()
 
 
+def _default_directory_exists(path: pathlib.Path) -> bool:
+    """Report whether a real path names an existing directory.
+
+    Args:
+        path: Absolute path to test.
+
+    Returns:
+        True when the path exists and is a directory.
+    """
+    return path.is_dir()
+
+
 def _default_write_text(path: pathlib.Path, text: str) -> None:
     """Replace a real file's contents.
 
@@ -273,6 +305,7 @@ now: NowProtocol = _default_now
 read_text: ReadTextProtocol = _default_read_text
 read_bytes: ReadBytesProtocol = _default_read_bytes
 file_exists: FileExistsProtocol = _default_file_exists
+directory_exists: DirectoryExistsProtocol = _default_directory_exists
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
 
@@ -280,6 +313,7 @@ write_text: WriteTextProtocol = _default_write_text
 __all__ = [
     "AppendTextProtocol",
     "CommandResult",
+    "DirectoryExistsProtocol",
     "FileExistsProtocol",
     "NowProtocol",
     "ReadBytesProtocol",
@@ -287,6 +321,7 @@ __all__ = [
     "RunProtocol",
     "WriteTextProtocol",
     "append_text",
+    "directory_exists",
     "file_exists",
     "now",
     "read_bytes",

@@ -1,9 +1,9 @@
 """CLI: is a node able to run a build, and make it so.
 
 Usage:
-    fleet-bootstrap --config runs/fleet.json
-    fleet-bootstrap --config runs/fleet.json --node lavender
-    fleet-bootstrap --config runs/fleet.json --node lavender --install
+    fleet-bootstrap --config fleet.json
+    fleet-bootstrap --config fleet.json --node lavender
+    fleet-bootstrap --config fleet.json --node lavender --install
 
 WHY THIS EXISTS. Measured 2026-09-04: of three reachable nodes, ONE could have
 run a ``make check``. ``make`` was on loki alone, poetry was absent from

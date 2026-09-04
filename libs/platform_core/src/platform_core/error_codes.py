@@ -423,8 +423,24 @@ class FleetErrorCode(ErrorCodeBase):
     STAGE_DIGEST_MISMATCH = "STAGE_DIGEST_MISMATCH"
     STAGE_ARCHIVE_UNREADABLE = "STAGE_ARCHIVE_UNREADABLE"
 
+    # The tree a dispatch has to carry. A project is not self-contained here:
+    # its pyproject names path dependencies, and its Makefile calls a launcher
+    # at the repository root. Measured 2026-09-04, the first dispatch that
+    # reached a node staged the project alone and could not have resolved its
+    # own lockfile.
+    PROJECT_MANIFEST_MISSING = "PROJECT_MANIFEST_MISSING"
+    PROJECT_MANIFEST_UNREADABLE = "PROJECT_MANIFEST_UNREADABLE"
+    PROJECT_DEPENDENCY_ESCAPES_ROOT = "PROJECT_DEPENDENCY_ESCAPES_ROOT"
+
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
+    # Distinct from DISPATCH_FAILED, which is work that ran and exited
+    # non-zero. This is work that never started: on 2026-09-04 a scheduled
+    # task registered cleanly, `Start-ScheduledTask` failed with a
+    # non-terminating error, PowerShell exited 0, and the ledger recorded a
+    # run that did not exist.
+    DISPATCH_NOT_LAUNCHED = "DISPATCH_NOT_LAUNCHED"
+    RUN_RESULT_UNREADABLE = "RUN_RESULT_UNREADABLE"
     RUN_UNKNOWN = "RUN_UNKNOWN"
     LEDGER_ROW_UNPARSABLE = "LEDGER_ROW_UNPARSABLE"
     FEED_EVENT_UNPARSABLE = "FEED_EVENT_UNPARSABLE"

@@ -1,9 +1,9 @@
 """CLI: dispatch a project's build to a node.
 
 Usage:
-    fleet-run --config runs/fleet.json --project services/Model-Trainer \\
+    fleet-run --config fleet.json --project services/Model-Trainer \\
         --agent opus-fleet-0904 --session <uuid>
-    fleet-run --config runs/fleet.json --project services/Model-Trainer \\
+    fleet-run --config fleet.json --project services/Model-Trainer \\
         --agent opus-fleet-0904 --session <uuid> --node lavender
 
 IT RETURNS AS SOON AS THE SUITE IS RUNNING, and does not wait for it. The
@@ -13,7 +13,7 @@ scheduler rather than as a child of the ssh call -- see
 
 So the result arrives on the feed, not on this command's standard output:
 
-    fleet-watch --config runs/fleet.json --run <the printed run id>
+    fleet-watch --config fleet.json --run <the printed run id>
 
 WHY ``--agent`` AND ``--session`` ARE REQUIRED. The incident this package
 exists for was two sessions colliding with no way for either to know the other

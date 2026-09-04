@@ -4,140 +4,27 @@ Only the ssh boundary is faked. The archive is a real tar built by the real
 tar binary over a real temporary tree and the digest is a real SHA-256, so
 what is exercised is the transport as it will actually behave -- including
 the exclusion that keeps one machine's ``.venv`` off another.
+
+THE SCRIPT TESTS BELOW ARE MOSTLY REGRESSIONS, and all of them come from one
+dispatch. On 2026-09-04 the first ``fleet-run`` that reached a node registered
+a scheduled task whose ``-Argument`` was the eleven characters ``-Command
+"cd`` and whose WORKING DIRECTORY was the remaining two hundred, because the
+build was interpolated into a single-quoted PowerShell string that contained
+single quotes. It could not be started. Nothing failed: PowerShell exited 0
+and the ledger recorded a run that did not exist.
 """
 
 from __future__ import annotations
 
+import base64
 import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import cancel
-from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dispatch, staging
-from tests.conftest import FakeClock, FakeRun, ok
-
-
-def _dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
-    """Every command a successful dispatch runs, in order.
-
-    Written out rather than indexed into, because the sequence is the thing
-    under test: the archive step runs `tar` through the SAME hook as ssh, so
-    a list built by patching one position silently misaligns the moment a
-    step is added. Naming each call makes that visible.
-
-    Args:
-        archive_digest: What the node should report having reassembled. The
-            real digest for a success; anything else exercises the refusal.
-
-    Returns:
-        One result per call.
-    """
-    return [
-        ok(""),  # probe: send script
-        ok(_PROBE_OK),  # probe: run it
-        ok(""),  # tar, locally
-        ok(""),  # stage: send mkdir script
-        ok(""),  # stage: run mkdir
-        ok(""),  # stage: send the base64 payload
-        ok(""),  # stage: send reassemble script
-        ok(archive_digest),  # stage: run reassemble
-        ok(""),  # stage: send extract script
-        ok(""),  # stage: run extract
-        ok(""),  # launch: send script
-        ok("launched"),  # launch: run it
-    ]
-
-
-_NOW = 1_757_000_000
-_PROJECT = "libs/demo"
-_RUN_ID = f"libs-demo-{_NOW}"
-
-_PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\n"
-
-
-def _workspace_document() -> JSONObject:
-    """Build a one-node, one-project workspace as JSON.
-
-    Returns:
-        The document, ready to serialise.
-    """
-    return {
-        "nodes": {
-            "lavender": {
-                "host": "lavender",
-                "stage_root": "C:/fleet/stage",
-                "logical_cores": 16,
-                "ram_gb": 32.0,
-                "gpu": None,
-                "budget": {
-                    "reserved_cores": 2,
-                    "reserved_ram_gb": 4.0,
-                    "worker_ram_gb": 1.1,
-                    "max_concurrent_runs": 2,
-                    "max_disk_gb": 20.0,
-                },
-            }
-        },
-        "projects": {
-            _PROJECT: {
-                "worker_ram_gb": 1.1,
-                "minimum_workers": 2,
-                "expected_minutes": 5,
-            }
-        },
-        "ledger": "ledger.jsonl",
-        "feed": "feed.jsonl",
-        "leases": "leases.json",
-    }
-
-
-@pytest.fixture(name="repo")
-def _repo(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Build a tiny monorepo with one project in it.
-
-    A real tree rather than a fixture archive, because the archive step runs
-    the real ``tar`` and a fabricated one would test nothing about it.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-
-    Returns:
-        The repo root.
-    """
-    root = tmp_path / "repo"
-    (root / _PROJECT).mkdir(parents=True)
-    (root / _PROJECT / "Makefile").write_text("check:\n\techo ok\n", encoding="utf-8")
-    (root / _PROJECT / ".venv").mkdir()
-    (root / _PROJECT / ".venv" / "huge.bin").write_text("x" * 4096, encoding="utf-8")
-    return root
-
-
-@pytest.fixture(name="config_path")
-def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Write a workspace document and pin the clock.
-
-    Args:
-        tmp_path: pytest's per-test temporary directory.
-
-    Returns:
-        Path to the written document.
-    """
-    _test_hooks.now = FakeClock(_NOW)
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(_workspace_document()), encoding="utf-8")
-    return path
-
-
-def _plan() -> ProjectConfig:
-    """The demo project's declaration.
-
-    Returns:
-        The project.
-    """
-    return ProjectConfig(worker_ram_gb=1.1, minimum_workers=2, expected_minutes=5)
+from fleet.core import _test_hooks, dispatch, manifest, staging
+from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
 
 
 class TestArchive:
@@ -151,7 +38,7 @@ class TestArchive:
         """
         destination = tmp_path / "tree.tgz"
 
-        payload = staging.archive(repo, _PROJECT, destination)
+        payload = staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
 
         assert destination.is_file()
         # A real gzip member, not merely some bytes: 1f 8b is the magic, and
@@ -163,21 +50,74 @@ class TestArchive:
         assert "Makefile" in listing
         assert ".venv" not in listing
 
+    def test_the_dependency_a_lockfile_resolves_against_is_inside(
+        self, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """The defect the first real dispatch found, as a regression.
+
+        ``tools/fleet`` was staged as one directory. Its pyproject declares
+        ``platform-core`` at ``../../libs/platform_core``, so poetry on the
+        node could not have resolved the lockfile at all -- and would have
+        reported that as the project's fault.
+        """
+        destination = tmp_path / "tree.tgz"
+
+        staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
+
+        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        assert f"{DEMO_DEPENDENCY}/pyproject.toml" in listing
+
+    def test_the_shared_launcher_directory_is_inside(
+        self, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """Every Makefile's test target calls ..\\..\\scripts\\run-tests.ps1."""
+        destination = tmp_path / "tree.tgz"
+
+        staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
+
+        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        for path in manifest.SHARED_PATHS:
+            assert path in listing
+
+    def test_the_extracted_layout_keeps_the_dependency_relative_to_the_project(
+        self, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """``../base`` has to resolve on the node exactly as it does here.
+
+        Unpacked into a stage directory, the members keep their repo-relative
+        names, so a manifest's relative path needs no rewriting.
+        """
+        destination = tmp_path / "tree.tgz"
+        staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
+        unpacked = tmp_path / "unpacked"
+        unpacked.mkdir()
+
+        _test_hooks.run(["tar", "-xzmf", str(destination), "-C", str(unpacked)])
+
+        declared = (unpacked / DEMO_PROJECT / "pyproject.toml").read_text(encoding="utf-8")
+        assert 'path = "../base"' in declared
+        assert (unpacked / DEMO_PROJECT / ".." / "base" / "pyproject.toml").resolve().is_file()
+
     def test_a_project_that_does_not_exist_is_refused(
         self, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         with pytest.raises(AppError) as excinfo:
-            staging.archive(repo, "libs/absent", tmp_path / "tree.tgz")
+            staging.archive(repo, ("libs/absent",), tmp_path / "tree.tgz")
 
         assert excinfo.value.code is FleetErrorCode.STAGE_ARCHIVE_UNREADABLE
+
+    def test_an_archive_with_no_members_is_refused(self, repo: pathlib.Path) -> None:
+        """It would stage, extract to nothing, and fail at make instead."""
+        with pytest.raises(ValueError) as excinfo:
+            staging.archive(repo, (), repo / "tree.tgz")
+
+        assert "at least one member" in str(excinfo.value)
 
     def test_the_digest_is_a_full_length_sha256(self) -> None:
         assert len(staging.digest(b"payload")) == 64
 
     def test_encoding_round_trips_through_base64(self) -> None:
         """Base64 because raw bytes do not survive ssh into PowerShell."""
-        import base64
-
         payload = bytes(range(256))
 
         assert base64.b64decode(staging.encode(payload)) == payload
@@ -200,13 +140,11 @@ class TestStage:
         _test_hooks.run = runner
 
         target = staging.stage(
-            "lavender", run_id=_RUN_ID, stage_root="C:/fleet/stage", payload=payload
+            "lavender", run_id=DEMO_RUN_ID, stage_root="C:/fleet/stage", payload=payload
         )
 
-        assert target == f"C:/fleet/stage/{_RUN_ID}"
-        assert any("tar -xzmf" in (call[-1] if call else "") for call in runner.calls) or any(
-            b"tar -xzmf" in (sent or b"") for sent in runner.stdin
-        )
+        assert target == f"C:/fleet/stage/{DEMO_RUN_ID}"
+        assert any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
@@ -214,39 +152,125 @@ class TestStage:
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as excinfo:
-            staging.stage("lavender", run_id=_RUN_ID, stage_root="C:/fleet/stage", payload=b"bytes")
+            staging.stage(
+                "lavender", run_id=DEMO_RUN_ID, stage_root="C:/fleet/stage", payload=b"bytes"
+            )
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
         assert "nothing has been unpacked" in excinfo.value.message
         assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
 
 
-class TestScripts:
-    def test_the_launch_script_registers_a_scheduled_task(self) -> None:
+class TestBuildScript:
+    def test_it_runs_the_recipe_in_the_project(self) -> None:
+        body = dispatch.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+
+        assert f"Set-Location -LiteralPath 'C:/s/run-1/{DEMO_PROJECT}'" in body
+        assert "make check" in body
+
+    def test_it_pins_the_worker_count(self) -> None:
+        body = dispatch.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+
+        assert "PYTEST_XDIST_AUTO_NUM_WORKERS = '6'" in body
+
+    def test_it_records_the_status_last(self) -> None:
+        """The result file's absence is how a run is known to be unfinished.
+
+        Written after the recipe, so it can never exist while make is still
+        going -- which is what lets `fleet-collect` treat absence as running.
+        """
+        body = dispatch.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+        lines = [line for line in body.splitlines() if line.strip()]
+
+        assert lines[-1].startswith("$LASTEXITCODE")
+        assert dispatch.RESULT_NAME in lines[-1]
+
+    def test_it_reads_the_exit_code_and_not_the_success_flag(self) -> None:
+        """`make` writes to stderr on a passing run; under redirection that
+        sets $? false in PS 5.1 while $LASTEXITCODE stays correct."""
+        body = dispatch.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+
+        assert "$LASTEXITCODE" in body
+        assert "$?" not in body
+
+
+class TestRegisterScript:
+    def test_it_registers_and_starts_a_scheduled_task(self) -> None:
         """Not an ssh child. Windows OpenSSH puts that in a job object that
         dies with the connection, and this command returns immediately."""
-        body = dispatch.launch_script(target="C:/s/run-1", project=_PROJECT, workers=6)
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
 
         assert "Register-ScheduledTask" in body
         assert "Start-ScheduledTask" in body
 
-    def test_the_launch_script_sets_priority_four(self) -> None:
+    def test_it_sets_priority_four(self) -> None:
         """Priority 7 is the Register-ScheduledTask default and sets LOW I/O.
 
         A run that inherits it crawls, and the symptom reads as a slow node
         rather than a misconfigured launch.
         """
-        body = dispatch.launch_script(target="C:/s/run-1", project=_PROJECT, workers=6)
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
 
         assert "-Priority 4" in body
         assert "[TimeSpan]::Zero" in body
         assert "-LogonType S4U" in body
 
-    def test_the_launch_script_pins_the_worker_count(self) -> None:
-        body = dispatch.launch_script(target="C:/s/run-1", project=_PROJECT, workers=6)
+    def test_it_runs_the_build_by_path_and_never_inlines_it(self) -> None:
+        """THE REGRESSION. Interpolating the build into -Argument split the
+        task in two: PowerShell ended the single-quoted string at the first
+        inner quote and bound the rest to -WorkingDirectory. Measured on
+        sedona 2026-09-04; the task could not be started at all.
+        """
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
 
-        assert "PYTEST_XDIST_AUTO_NUM_WORKERS = '6'" in body
+        assert f'-File "C:/s/run-1/{dispatch.BUILD_SCRIPT_NAME}"' in body
+        assert "-Command" not in body
+        assert "make check" not in body
 
+    def test_the_argument_string_contains_no_single_quotes(self) -> None:
+        """The mechanical form of the same defect, asserted directly.
+
+        -Argument is passed as a single-quoted PowerShell string, so ANY
+        single quote inside it terminates the argument early.
+        """
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+        argument = body.split("-Argument '", 1)[1].split("'\n", 1)[0]
+
+        assert "'" not in argument
+
+    def test_it_survives_the_lid_being_shut(self) -> None:
+        """Two of the three nodes are laptops and both battery settings
+        default to refusing: without these a dispatch to an unplugged sedona
+        registers a task that never runs, and reports nothing.
+        """
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+
+        assert "-AllowStartIfOnBatteries" in body
+        assert "-DontStopIfGoingOnBatteries" in body
+
+    def test_it_waits_for_the_task_to_actually_start(self) -> None:
+        """Start-ScheduledTask reports a refusal as a NON-terminating error.
+
+        On 2026-09-04 it failed with 'Element not found', PowerShell exited 0,
+        and the dispatch was recorded as running. The script now watches for
+        the task to leave SCHED_S_TASK_HAS_NOT_RUN and throws if it does not.
+        """
+        body = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+
+        assert "$ErrorActionPreference = 'Stop'" in body
+        assert str(dispatch.TASK_HAS_NOT_RUN) in body
+        assert "throw" in body
+
+    def test_the_task_name_is_the_one_cancel_stops(self) -> None:
+        """Both come from dispatch.task_name, so a rename cannot make
+        fleet-cancel report success having stopped nothing."""
+        registered = dispatch.register_script(target="C:/s/run-1", run_id=DEMO_RUN_ID)
+
+        assert dispatch.task_name(DEMO_RUN_ID) in registered
+        assert dispatch.task_name(DEMO_RUN_ID) in cancel.stop_script(DEMO_RUN_ID)
+
+
+class TestOtherScripts:
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.
 
@@ -263,4 +287,4 @@ class TestScripts:
 
     def test_the_stop_script_never_prompts(self) -> None:
         """There is nobody at the node to answer, and a prompt would hang."""
-        assert "-Confirm:$false" in cancel.stop_script(_RUN_ID)
+        assert "-Confirm:$false" in cancel.stop_script(DEMO_RUN_ID)

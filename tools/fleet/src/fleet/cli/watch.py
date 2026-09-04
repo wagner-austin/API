@@ -1,12 +1,12 @@
 """CLI: the event stream a session subscribes to.
 
 Usage:
-    fleet-watch --config runs/fleet.json
-    fleet-watch --config runs/fleet.json --run <run-id>
+    fleet-watch --config fleet.json
+    fleet-watch --config fleet.json --run <run-id>
 
 One line per event, oldest first, on standard output. That shape is the whole
 design: a Claude session subscribes with
-``Monitor({command: "fleet-watch --config runs/fleet.json"})`` and every line
+``Monitor({command: "fleet-watch --config fleet.json"})`` and every line
 becomes a notification, with no broker, no port, and no process that has to
 outlive the session.
 
@@ -53,6 +53,11 @@ def lost_runs(loaded: _config.LoadedWorkspace, *, now_unix: int) -> tuple[Ledger
     no lease behind it means the run stopped without saying so. That is the
     observable signature of a wedge, and it is observable only from outside.
 
+    It reads :func:`fleet.core.records.latest_rows` and not the raw ledger,
+    because the ledger is append-only: a cancelled dispatch still has its
+    ``running`` row in the file, and reading those would report every
+    completed run as wedged forever.
+
     Args:
         loaded: The workspace and its resolved record paths.
         now_unix: Current time, whole seconds since the epoch.
@@ -63,7 +68,7 @@ def lost_runs(loaded: _config.LoadedWorkspace, *, now_unix: int) -> tuple[Ledger
     held = {lease["run_id"] for lease in leases.held_leases(loaded.leases, now_unix=now_unix)}
     return tuple(
         row
-        for row in records.read_ledger(loaded.ledger)
+        for row in records.latest_rows(loaded.ledger)
         if is_live(row) and row["run_id"] not in held
     )
 

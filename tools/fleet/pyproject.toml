@@ -17,6 +17,11 @@ include = ["src/fleet/py.typed"]
 python = "^3.11"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
+# A RUNTIME dependency, not a dev one. `fleet.core.manifest` asks this package
+# which paths outside a project the guards read, so a dispatch stages them --
+# see its module docstring for the three declaration rules that failed on a
+# real node when it did not.
+monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"
@@ -30,6 +35,7 @@ pytest-xdist = "^3.8.0"
 fleet-nodes = "fleet.cli.nodes:entrypoint"
 fleet-preflight = "fleet.cli.preflight:entrypoint"
 fleet-run = "fleet.cli.run:entrypoint"
+fleet-collect = "fleet.cli.collect:entrypoint"
 fleet-watch = "fleet.cli.watch:entrypoint"
 fleet-cancel = "fleet.cli.cancel:entrypoint"
 fleet-bootstrap = "fleet.cli.bootstrap:entrypoint"

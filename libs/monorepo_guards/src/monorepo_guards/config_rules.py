@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from monorepo_guards import Violation
+from monorepo_guards.external_inputs import package_manifests
 from monorepo_guards.toml_reader import (
     check_banned_api,
     extract_mypy_bool,
@@ -273,19 +274,14 @@ class ConfigRule:
         return None
 
     def _scan_monorepo_pyprojects(self, monorepo_root: Path) -> set[Path]:
-        """Scan all subdirectories in monorepo for pyproject.toml files."""
-        found: set[Path] = set()
+        """Scan all subdirectories in monorepo for pyproject.toml files.
 
-        for category in ("services", "clients", "libs"):
-            category_path = monorepo_root / category
-            if category_path.is_dir():
-                for repo_dir in category_path.iterdir():
-                    if repo_dir.is_dir():
-                        pyproject = repo_dir / "pyproject.toml"
-                        if pyproject.exists():
-                            found.add(pyproject)
-
-        return found
+        Delegates to :func:`monorepo_guards.external_inputs.package_manifests`
+        so the category list has one home. A caller assembling a partial tree
+        has to carry these files or this rule silently checks fewer manifests
+        than a local run, and a second copy of the categories would drift.
+        """
+        return set(package_manifests(monorepo_root))
 
     def run(self, files: list[Path]) -> list[Violation]:
         """Find and validate all pyproject.toml files in the monorepo."""

@@ -13,10 +13,19 @@ class EnvRule:
 
     name = "env"
 
+    # The canonical readers, not exemptions from the rule. Each name here is a
+    # module whose PURPOSE is to be the one place a thing is read, and the list
+    # is how the rule knows which those are.
+    #
+    # `toml_utils.py` joined it on 2026-09-04 when the tomllib narrowing moved
+    # out of `config/_test_hooks.py` into a public module. The number of files
+    # importing tomllib did not change; only which one does.
     _ALLOW_SUFFIXES: ClassVar[set[str]] = {
+        "src/platform_core/toml_utils.py",
         "src/platform_core/config/_utils.py",
         "src/platform_core/config/_test_hooks.py",
         "tests/test_config.py",
+        "tests/test_toml_utils.py",
         "src/monorepo_guards/config_loader.py",
         "tests/test_config_loader.py",
         "tests/test_env_rules.py",
