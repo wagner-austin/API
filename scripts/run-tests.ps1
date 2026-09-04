@@ -187,6 +187,37 @@ if (-not (Test-Path 'runs')) { New-Item -ItemType Directory -Path 'runs' | Out-N
 $covToken = '.coverage-' + [System.Guid]::NewGuid().ToString('N').Substring(0, 8)
 $env:COVERAGE_FILE = (Resolve-Path -LiteralPath '.').Path + '\runs\' + $covToken
 
+# 5. ONE BLAS THREAD PER WORKER.
+#
+#    -n auto is 24 workers on this box and every one of them that imports torch
+#    gets a BLAS that sizes its own pool from the CPU count -- so 24 processes
+#    each open 24 threads and 576 of them contend for 24 cores. The tests that
+#    lose are the CPU-bound ones with a per-test timeout: covenant-radar-api's
+#    guard-shim test (~9s of work) and its Taiwan MLP training test both blew
+#    past 60s and pytest-timeout hard-exited their workers, which
+#    --max-worker-restart=0 then turned into a run failure. Measured on
+#    covenant-radar-api, 2637 tests:
+#
+#        -n auto, no cap    2 workers crashed        206s
+#        -n 6,    no cap    green                    116s
+#        -n auto, capped    green                     94s
+#
+#    So the cap is not a throughput trade for stability -- it is faster than
+#    both, because the contention was the cost.
+#
+#    SET HERE RATHER THAN IN A conftest, and that is the whole reason this is
+#    in the launcher: a BLAS reads these when it LOADS, so assigning them from
+#    inside a Python process that has already imported torch does nothing.
+#    model_trainer/worker/job_utils.py records the same finding from the other
+#    direction -- it had to switch to torch.set_num_threads for exactly this.
+#
+#    Code that wants more threads still gets them: torch.set_num_threads takes
+#    effect whenever it is called, which is how handwriting-ai's calibration
+#    explores thread counts. This sets the default, not a ceiling.
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
+$env:OPENBLAS_NUM_THREADS = '1'
+
 $code = 0
 try {
     poetry run pytest -n auto -v --max-worker-restart=0 @covArgs @PytestArgs

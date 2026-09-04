@@ -75,7 +75,11 @@ class TestDecodeErrors:
             "latency_ms": 25,
             "timestamp": "2024-01-15T10:00:00Z"
         }"""
-        with pytest.raises(JSONTypeError, match="Invalid risk tier"):
+        # The refusal now comes from the one shared narrowing in
+        # platform_core.risk_tiers, so it names the field and the accepted set
+        # rather than only the value -- the previous message, "Invalid risk
+        # tier 'INVALID'", left a reader to go and find what was valid.
+        with pytest.raises(JSONTypeError, match=r"Field 'risk_tier' must be one of"):
             decode_covenant_metrics_event(payload)
 
     def test_alert_invalid_alert_type_raises(self) -> None:

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from covenant_domain.features import RiskTier
 from platform_core.json_utils import (
     dump_json_str,
 )
@@ -41,7 +40,8 @@ AlertEventType = Literal["covenant.alert.v1"]
 # Shared Type Aliases
 # =============================================================================
 
-# RiskTier is imported from covenant_domain.features (single source of truth)
+# The tier names are declared once in platform_core.risk_tiers; annotations
+# spell the Literal inline and the risk-tier guard holds them to that tuple.
 
 EvaluationStatus = Literal["OK", "BREACH", "WARNING"]
 
@@ -118,7 +118,7 @@ class PredictionEventV1(TypedDict):
     covenants_evaluated: int
     breaches_count: int
     risk_probability: float
-    risk_tier: RiskTier
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     model_version: str
     evaluation_latency_ms: int
     prediction_latency_ms: int
@@ -309,7 +309,7 @@ def make_prediction_event(
     covenants_evaluated: int,
     breaches_count: int,
     risk_probability: float,
-    risk_tier: RiskTier,
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"],
     model_version: str,
     evaluation_latency_ms: int,
     prediction_latency_ms: int,

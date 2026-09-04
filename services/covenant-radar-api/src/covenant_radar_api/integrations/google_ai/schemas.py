@@ -16,40 +16,11 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.risk_tiers import require_risk_tier
 
-RiskTierValue = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 EvaluationStatusValue = Literal["OK", "BREACH", "WARNING"]
 
-VALID_RISK_TIERS: tuple[RiskTierValue, ...] = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 VALID_EVALUATION_STATUSES: tuple[EvaluationStatusValue, ...] = ("OK", "BREACH", "WARNING")
-
-
-def _require_risk_tier(obj: JSONObject, key: str) -> RiskTierValue:
-    """Require a risk tier field.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Key to look up.
-
-    Returns:
-        The validated risk tier value.
-
-    Raises:
-        KeyError: If key is missing.
-        TypeError: If value is not a string.
-        ValueError: If value is not a valid risk tier.
-    """
-    value = require_str(obj, key)
-    if value == "LOW":
-        return "LOW"
-    if value == "MEDIUM":
-        return "MEDIUM"
-    if value == "HIGH":
-        return "HIGH"
-    if value == "CRITICAL":
-        return "CRITICAL"
-    msg = f"{key} must be one of {VALID_RISK_TIERS}, got {value!r}"
-    raise ValueError(msg)
 
 
 def _require_evaluation_status(obj: JSONObject, key: str) -> EvaluationStatusValue:
@@ -206,7 +177,7 @@ def decode_alert_context(data: JSONObject) -> AlertContext:
         "borrower_name": require_str(data, "borrower_name"),
         "sector": require_str(data, "sector"),
         "risk_probability": require_float(data, "risk_probability"),
-        "risk_tier": _require_risk_tier(data, "risk_tier"),
+        "risk_tier": require_risk_tier(data, "risk_tier"),
         "evaluation_status": _require_evaluation_status(data, "evaluation_status"),
         "breaches_count": require_int(data, "breaches_count"),
         "covenants_evaluated": require_int(data, "covenants_evaluated"),

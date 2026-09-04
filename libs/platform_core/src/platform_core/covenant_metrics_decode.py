@@ -21,7 +21,6 @@ from platform_core.covenant_metrics_events import (
     PredictionCompletedV1,
     RetrainTriggeredV1,
     RetrainTriggerType,
-    RiskTier,
     StreamLagV1,
 )
 from platform_core.job_events import (
@@ -31,6 +30,7 @@ from platform_core.job_events import (
     JobStartedV1,
     default_events_channel,
 )
+from platform_core.risk_tiers import require_risk_tier
 
 from .json_utils import (
     JSONObject,
@@ -102,18 +102,6 @@ def _decode_evaluation_completed_event(
     }
 
 
-def _parse_risk_tier(raw: str) -> RiskTier:
-    if raw == "LOW":
-        return "LOW"
-    if raw == "MEDIUM":
-        return "MEDIUM"
-    if raw == "HIGH":
-        return "HIGH"
-    if raw == "CRITICAL":
-        return "CRITICAL"
-    raise JSONTypeError(f"Invalid risk tier '{raw}'")
-
-
 def _decode_prediction_completed_event(
     decoded: JSONObject,
     event_id: str,
@@ -122,8 +110,7 @@ def _decode_prediction_completed_event(
     period_start = require_str(decoded, "period_start")
     period_end = require_str(decoded, "period_end")
     risk_probability = require_float(decoded, "risk_probability")
-    risk_tier_raw = require_str(decoded, "risk_tier")
-    risk_tier = _parse_risk_tier(risk_tier_raw)
+    risk_tier = require_risk_tier(decoded, "risk_tier")
     model_version = require_str(decoded, "model_version")
     latency_ms = require_int(decoded, "latency_ms")
     timestamp = require_str(decoded, "timestamp")

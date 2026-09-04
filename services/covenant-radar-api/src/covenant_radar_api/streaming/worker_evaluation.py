@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from typing import Literal
 
 from covenant_domain import (
     Covenant,
@@ -15,7 +16,6 @@ from covenant_domain import (
 )
 from covenant_domain.features import (
     LoanFeatures,
-    RiskTier,
     classify_risk_tier,
     extract_features,
 )
@@ -202,7 +202,7 @@ class _StreamingWorkerEvaluation(_StreamingWorkerBuffers):
     def _run_prediction(
         self,
         features: LoanFeatures,
-    ) -> tuple[float, RiskTier, int]:
+    ) -> tuple[float, Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"], int]:
         """Run ML prediction and return results with timing.
 
         Args:

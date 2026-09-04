@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from covenant_domain import DealId
 from covenant_domain.features import (
     LoanFeatures,
-    RiskTier,
     classify_risk_tier,
     extract_features,
 )
@@ -150,7 +151,7 @@ def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> No
         probabilities = predict_probabilities(model, features_list)
         probability = probabilities[0]
 
-        risk_tier: RiskTier = classify_risk_tier(probability)
+        risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = classify_risk_tier(probability)
 
         response = PredictResponse(
             deal_id=req["deal_id"],

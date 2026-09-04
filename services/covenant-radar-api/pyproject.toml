@@ -134,7 +134,20 @@ testpaths = ["tests"]
 # ever regresses - capping workers only masks it. The Makefile deliberately
 # does not pass -n, so this is the single source of truth.
 addopts = "-v -n auto --dist loadscope"
-timeout = 60
+
+# 300, not 60, because 60 was below this package's slowest LEGITIMATE test and
+# so bounded nothing -- it was a coin flip on machine load rather than a hang
+# detector. Measured alone, with no contention: the guard-shim test runs the
+# whole lint pass over 370 files under coverage instrumentation and takes 43s,
+# and the Taiwan MLP training test exceeded 60s by itself. Under -n auto both
+# crossed the line, pytest-timeout hard-exited their workers, and
+# --max-worker-restart=0 turned that into a run failure -- so the suite failed
+# on load, not on code.
+#
+# 300 matches hpc3, a package of comparable size; Model-Trainer, which also
+# trains torch models, uses 900. 60 was the tightest in the monorepo by five
+# times, in the second-largest suite, in a package that trains models.
+timeout = 300
 timeout_method = "thread"
 filterwarnings = [
     "ignore::sklearn.exceptions.ConvergenceWarning",

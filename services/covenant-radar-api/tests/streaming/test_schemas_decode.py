@@ -161,7 +161,9 @@ class TestDecodePredictionEvent:
             }
         )
 
-        with pytest.raises(JSONTypeError, match="Invalid risk tier"):
+        # The refusal comes from the one shared narrowing now, so it names the
+        # field and the accepted set instead of only the value.
+        with pytest.raises(JSONTypeError, match="Field 'risk_tier' must be one of"):
             decode_prediction_event(payload)
 
     def test_decodes_warning_status(self) -> None:

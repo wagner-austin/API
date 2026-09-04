@@ -6,37 +6,17 @@ from typing import Literal, TypedDict
 from .models import CovenantResult, Deal
 
 # =============================================================================
-# Risk Tier Type and Classification
+# Risk Tier Classification
 # =============================================================================
-
-RiskTier = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-"""Risk tier classification for ML predictions.
-
-Thresholds:
-- LOW: probability < 0.25
-- MEDIUM: 0.25 <= probability < 0.50
-- HIGH: 0.50 <= probability < 0.80
-- CRITICAL: probability >= 0.80
-"""
-
-RISK_TIERS: tuple[RiskTier, ...] = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
-"""The accepted tiers, declared so something can check the copies.
-
-This set was spelled SEVEN ways: ``RiskTier`` here and again in
-``platform_core.covenant_metrics_events``, ``RiskTierValue`` in
-covenant-radar-api, four inline ``Literal[...]`` on fields and parameters,
-and a ``VALID_RISK_TIERS`` tuple beside one of them. Widening any one of them
-type-checks, because they are independent annotations and mypy has no reason
-to relate them -- so a decoder would come to accept a tier the classifier
-never produces, and the failure would surface as a prediction filed under a
-tier nothing reads.
-
-``monorepo_guards.literal_set_rules.RISK_TIER_SET`` reads this tuple and
-requires every ``risk_tier`` annotation in the monorepo to name exactly it.
-"""
+#
+# The tier NAMES are declared once in ``platform_core.risk_tiers``, which is
+# also where a string is narrowed to one. This module owns the thresholds
+# that map a probability onto them, and nothing else about the set: it used
+# to carry a ``RiskTier`` alias of its own, which is how the same four
+# strings came to be written seven ways across three packages.
 
 
-def classify_risk_tier(probability: float) -> RiskTier:
+def classify_risk_tier(probability: float) -> Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]:
     """Classify probability into risk tier.
 
     Uses standard thresholds:
@@ -49,7 +29,7 @@ def classify_risk_tier(probability: float) -> RiskTier:
         probability: Risk probability between 0.0 and 1.0.
 
     Returns:
-        Categorized RiskTier.
+        The tier the probability falls in.
     """
     if probability < 0.25:
         return "LOW"
@@ -82,7 +62,7 @@ class RiskPrediction(TypedDict, total=True):
     """ML model prediction output."""
 
     probability: float
-    risk_tier: RiskTier
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 
 # Feature column order for numpy array conversion
@@ -191,7 +171,6 @@ __all__ = [
     "REQUIRED_CURRENT_METRICS",
     "LoanFeatures",
     "RiskPrediction",
-    "RiskTier",
     "classify_risk_tier",
     "extract_features",
 ]

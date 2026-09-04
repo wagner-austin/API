@@ -38,7 +38,7 @@ from typing import Final
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import parse_source, read_source
 
 
 class LiteralSet:
@@ -125,7 +125,7 @@ STRATEGY_NAME_SET: Final = LiteralSet(
 
 RISK_TIER_SET: Final = LiteralSet(
     subject="risk-tier",
-    defining_module="covenant_domain/features.py",
+    defining_module="platform_core/risk_tiers.py",
     tuple_name="RISK_TIERS",
     field_names=frozenset({"risk_tier"}),
     consequence=(
@@ -341,6 +341,16 @@ class LiteralSetRule:
         expected = ", ".join(sorted(declared))
         found: list[Violation] = []
         for path in files:
+            # Rule the file out from text already read rather than walking its
+            # AST. A watched name reaches this rule only by appearing in the
+            # source -- as a field, a parameter, or inside the name of a
+            # function that returns one -- so a file that does not contain the
+            # string cannot hold a site. Without this, three rules walked every
+            # AST in the package to find annotations on three names, which is
+            # most of what they cost.
+            source = read_source(path)
+            if not any(name in source for name in declared_set.field_names):
+                continue
             for line_no, annotation in _annotation_sites(
                 parse_source(path), declared_set.field_names
             ):

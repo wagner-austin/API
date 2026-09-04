@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeGuard
 
-from covenant_domain.features import RiskTier
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -15,6 +14,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.risk_tiers import as_risk_tier
 
 from covenant_radar_api.streaming.schemas import (
     AlertEventV1,
@@ -46,29 +46,6 @@ def _parse_evaluation_status(raw: str) -> EvaluationStatus:
     if raw == "WARNING":
         return "WARNING"
     raise JSONTypeError(f"Invalid evaluation status '{raw}'")
-
-
-def _parse_risk_tier(raw: str) -> RiskTier:
-    """Parse risk tier from string.
-
-    Args:
-        raw: Raw string value.
-
-    Returns:
-        Validated RiskTier literal.
-
-    Raises:
-        JSONTypeError: If value is not valid.
-    """
-    if raw == "LOW":
-        return "LOW"
-    if raw == "MEDIUM":
-        return "MEDIUM"
-    if raw == "HIGH":
-        return "HIGH"
-    if raw == "CRITICAL":
-        return "CRITICAL"
-    raise JSONTypeError(f"Invalid risk tier '{raw}'")
 
 
 def _parse_alert_type(raw: str) -> AlertType:
@@ -167,7 +144,7 @@ def _decode_prediction_event(decoded: JSONObject, event_id: str) -> PredictionEv
     breaches_count = require_int(decoded, "breaches_count")
     risk_probability = require_float(decoded, "risk_probability")
     risk_tier_raw = require_str(decoded, "risk_tier")
-    risk_tier = _parse_risk_tier(risk_tier_raw)
+    risk_tier = as_risk_tier(risk_tier_raw, "risk_tier")
     model_version = require_str(decoded, "model_version")
     evaluation_latency_ms = require_int(decoded, "evaluation_latency_ms")
     prediction_latency_ms = require_int(decoded, "prediction_latency_ms")

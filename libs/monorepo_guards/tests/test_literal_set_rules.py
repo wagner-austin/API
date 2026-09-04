@@ -418,3 +418,68 @@ class TestTheRuleKnowsWhenItIsInert:
         violations = LiteralSetRule(CORPUS_FORMAT_SET, config_for(tmp_path)).run([declaring])
 
         assert [v.kind for v in violations] == ["corpus-format-tuple-missing"]
+
+
+class TestTheFileFilter:
+    """Files are ruled out from their text before their AST is walked.
+
+    Three rules walking every AST in a package to find annotations on three
+    names was most of what they cost -- it took covenant-radar-api's whole
+    guard run from 9s to 25s, and its guard-shim test past a 60s timeout under
+    parallel load. A watched name can only reach a site by appearing in the
+    source, so a file not containing the string cannot hold one.
+
+    These pin that the shortcut cannot hide a site, which is the only way it
+    could be wrong.
+    """
+
+    def test_a_field_annotation_is_still_found(self, tmp_path: Path) -> None:
+        _declaring(tmp_path, '"lines", "documents"')
+        stale = write_source(
+            tmp_path / "q.py",
+            'from typing import Literal\n\n\nclass P:\n    corpus_format: Literal["x"]\n',
+        )
+
+        assert [
+            v.kind for v in LiteralSetRule(CORPUS_FORMAT_SET, config_for(tmp_path)).run([stale])
+        ] == ["corpus-format-literal-drift"]
+
+    def test_a_parameter_annotation_is_still_found(self, tmp_path: Path) -> None:
+        _declaring(tmp_path, '"lines", "documents"')
+        stale = write_source(
+            tmp_path / "q.py",
+            "from typing import Literal\n\n\n"
+            'def read(corpus_format: Literal["x"]) -> None:\n    return None\n',
+        )
+
+        assert [
+            v.kind for v in LiteralSetRule(CORPUS_FORMAT_SET, config_for(tmp_path)).run([stale])
+        ] == ["corpus-format-literal-drift"]
+
+    def test_a_return_on_a_function_named_for_the_field_is_still_found(
+        self, tmp_path: Path
+    ) -> None:
+        """The one shape where the field name is in the FUNCTION name rather
+        than on the annotation. It still puts the string in the source, which
+        is what the filter reads."""
+        _declaring(tmp_path, '"lines", "documents"')
+        stale = write_source(
+            tmp_path / "q.py",
+            "from typing import Literal\n\n\n"
+            'def as_corpus_format(raw: str) -> Literal["x"]:\n    return "x"\n',
+        )
+
+        assert [
+            v.kind for v in LiteralSetRule(CORPUS_FORMAT_SET, config_for(tmp_path)).run([stale])
+        ] == ["corpus-format-literal-drift"]
+
+    def test_a_file_that_never_mentions_the_field_is_skipped(self, tmp_path: Path) -> None:
+        """A Literal of the same shape on an unrelated field is not this
+        rule's business, filter or no filter."""
+        _declaring(tmp_path, '"lines", "documents"')
+        unrelated = write_source(
+            tmp_path / "q.py",
+            'from typing import Literal\n\n\nclass P:\n    mode: Literal["x"]\n',
+        )
+
+        assert LiteralSetRule(CORPUS_FORMAT_SET, config_for(tmp_path)).run([unrelated]) == []

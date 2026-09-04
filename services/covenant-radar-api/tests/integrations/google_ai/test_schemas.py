@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONTypeError
 
 from covenant_radar_api.integrations.google_ai.schemas import (
     AlertContext,
@@ -202,7 +202,6 @@ class TestDecodeAlertContext:
 
     def test_raises_on_missing_field(self) -> None:
         """Test that missing field raises JSONTypeError."""
-        from platform_core.json_utils import JSONTypeError
 
         data = make_valid_alert_context_dict()
         del data["deal_id"]
@@ -211,11 +210,18 @@ class TestDecodeAlertContext:
             decode_alert_context(data)
 
     def test_raises_on_invalid_risk_tier(self) -> None:
-        """Test that invalid risk tier raises ValueError."""
+        """An undeclared tier is refused.
+
+        JSONTypeError rather than the ValueError this package's own copy of
+        the narrowing used to raise. There is one narrowing now, in
+        platform_core.risk_tiers, and it reports the same way for the event
+        decoder, the streaming decoder and this reader -- three paths that
+        previously disagreed about the type of their own refusal.
+        """
         data = make_valid_alert_context_dict()
         data["risk_tier"] = "INVALID"
 
-        with pytest.raises(ValueError, match="risk_tier"):
+        with pytest.raises(JSONTypeError, match="Field 'risk_tier' must be one of"):
             decode_alert_context(data)
 
     def test_raises_on_invalid_evaluation_status(self) -> None:
@@ -449,7 +455,6 @@ class TestDecodeGenerateAlertResponse:
 
     def test_raises_on_missing_field(self) -> None:
         """Test that missing field raises JSONTypeError."""
-        from platform_core.json_utils import JSONTypeError
 
         data: JSONObject = {
             "summary": "Alert",

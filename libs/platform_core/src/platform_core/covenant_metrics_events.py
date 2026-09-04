@@ -61,9 +61,6 @@ class EvaluationCompletedV1(TypedDict):
     timestamp: str
 
 
-RiskTier = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-
-
 class PredictionCompletedV1(TypedDict):
     """Risk prediction event published after ML inference."""
 
@@ -73,7 +70,7 @@ class PredictionCompletedV1(TypedDict):
     period_start: str
     period_end: str
     risk_probability: float
-    risk_tier: RiskTier
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     model_version: str
     latency_ms: int
     timestamp: str
@@ -200,7 +197,7 @@ def make_prediction_completed_event(
     period_start: str,
     period_end: str,
     risk_probability: float,
-    risk_tier: RiskTier,
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"],
     model_version: str,
     latency_ms: int,
     timestamp: str,
@@ -301,7 +298,6 @@ __all__ = [
     "PredictionCompletedV1",
     "RetrainTriggerType",
     "RetrainTriggeredV1",
-    "RiskTier",
     "StreamLagV1",
     "encode_covenant_metrics_event",
     "make_alert_triggered_event",
