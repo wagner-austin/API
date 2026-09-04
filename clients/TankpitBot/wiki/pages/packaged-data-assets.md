@@ -147,10 +147,10 @@ Two sessions were committing in one working tree twelve minutes apart. A
 shared index staged the renames under the first session's pathspec, so the
 bytes left in their commit and the code left in ours — and `bccf5afa`'s
 subject overclaims on its own terms, since it names minimaps it does not
-contain.
+contain.[^14]
 
 Both commits carry a `git notes` annotation saying this, following the
-convention three earlier commits already use here. **The notes are the
+convention three earlier commits already use here.[^15] **The notes are the
 convenience, not the record.** `refs/notes/commits` has never been pushed to
 `origin`, so every note in this repository — including the three from July —
 is visible only on the machine that wrote it. A reader who clones sees none of
@@ -181,3 +181,5 @@ layer.[^12]
 [^11]: `src/tankpit_bot/resources.py:89` (`field_gif_path`, returning `Path | None`) and `:111` (`require_asset`, raising `BundledAssetMissingError`). The split is pinned by `test_an_unknown_field_resolves_to_none_rather_than_raising` and `test_a_named_asset_that_does_not_ship_is_refused`.
 [^12]: Verified 2026-09-03 by building the wheel and reading it: `tankpit_bot-0.1.0-py3-none-any.whl` carries 44 files under `tankpit_bot/data/*.gif` plus `tankpit_bot/data/xor_static_key.txt`, with no hyphen spelling present. The hpc3 `ImageSpec` (`tools/hpc3/src/hpc3/contracts/image_spec.py:170-182`) declares no assets field.
 [^13]: `git log --follow` on `src/tankpit_bot/data/field01_r.gif` and on `xor_static_key.txt`, read 2026-09-03: both list `12717125` as their most recent commit. `git show --name-status 12717125` reports 46 `R100` entries under `clients/` alongside 12 additions and 62 modifications under `services/` and `libs/`. `git ls-remote origin 'refs/notes/*'` returns nothing.
+[^14]: Commit timestamps, read 2026-09-03: `12717125` at 01:41:28 -0700, `bccf5afa` at 01:53:39 -0700. `git show --stat bccf5afa` lists 37 files and no `.gif` among them, against a subject reading "TankpitBot ships its own data: the wheel carries the key and the minimaps".
+[^15]: `git notes list` returns five entries, read 2026-09-03: `12717125` and `bccf5afa` from this change, plus `52379073`, `63ed06e3` and `e0f5ff3a` from 2026-07-26, all three opening with the same line, "Also contains, from a concurrent session and unmentioned in the subject:".
