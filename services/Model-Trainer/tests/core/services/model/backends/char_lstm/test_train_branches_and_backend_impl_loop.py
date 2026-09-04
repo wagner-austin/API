@@ -156,6 +156,12 @@ def test_freeze_embeddings_when_enabled() -> None:
             self._requires_grad = value
 
         @property
+        def device(self: _EmbedParam) -> torch.device:
+            # Answered from the backing tensor rather than hardcoded, so the
+            # double cannot claim a device its own storage is not on.
+            return self._tensor.device
+
+        @property
         def grad(self: _EmbedParam) -> torch.Tensor | None:
             return None
 

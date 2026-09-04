@@ -125,13 +125,23 @@ class LogitsOutProto(ForwardOutProto, Protocol):
 
 
 class NamedParameter(Protocol):
-    """Protocol for named parameter tuples from named_parameters()."""
+    """Protocol for named parameter tuples from named_parameters().
+
+    ``device`` is declared for the same reason ``ParameterLike`` declares
+    ``grad``: a protocol that cannot say where a parameter lives cannot
+    express "this intervention did not move the model it was attached to",
+    and a companion module that silently lands on a different device than its
+    base is a real failure that reads as a mysterious slowdown.
+    """
 
     @property
     def requires_grad(self) -> bool: ...
 
     @requires_grad.setter
     def requires_grad(self, value: bool) -> None: ...
+
+    @property
+    def device(self) -> torch.device: ...
 
     @property
     def grad(self) -> torch.Tensor | None: ...
