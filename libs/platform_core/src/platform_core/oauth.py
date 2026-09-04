@@ -89,6 +89,33 @@ def generate_code_challenge(verifier: str) -> str:
 # =============================================================================
 
 
+def expires_at_is_past(
+    expires_at: int,
+    current_time: int,
+    *,
+    buffer_seconds: int = 60,
+) -> bool:
+    """Check whether an expiry timestamp has passed, or is about to.
+
+    Split out from :func:`is_token_expired` because the same arithmetic was
+    written three more times against a RAW timestamp rather than a token --
+    once in each of ``platform_calendar`` and ``platform_email``'s
+    ``cli_auth``, spelled ``current_time >= expires_at - buffer_seconds``.
+    That is the same inequality rearranged, which is exactly the kind of
+    agreement nothing checks and one edit ends.
+
+    Args:
+        expires_at: Expiry as a Unix timestamp in seconds.
+        current_time: Current Unix timestamp in seconds.
+        buffer_seconds: Treat as expired this many seconds early, so a token
+            cannot lapse between the check and the request it guards.
+
+    Returns:
+        Whether the timestamp is expired or within the buffer.
+    """
+    return expires_at <= current_time + buffer_seconds
+
+
 def is_token_expired(
     tokens: OAuthTokens,
     current_time: int,
@@ -105,7 +132,7 @@ def is_token_expired(
     Returns:
         True if token is expired or will expire within buffer.
     """
-    return tokens["expires_at"] <= current_time + buffer_seconds
+    return expires_at_is_past(tokens["expires_at"], current_time, buffer_seconds=buffer_seconds)
 
 
 # =============================================================================
@@ -377,6 +404,7 @@ __all__ = [
     "HttpPostHook",
     "build_authorization_url",
     "exchange_authorization_code",
+    "expires_at_is_past",
     "generate_code_challenge",
     "generate_code_verifier",
     "generate_state",

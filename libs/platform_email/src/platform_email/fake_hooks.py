@@ -296,8 +296,14 @@ def make_fake_console(inputs: list[str]) -> tuple[ConsoleOutputHook, ConsoleInpu
         outputs.append(message)
 
     def _input(prompt: str) -> str:
+        # Running past the script used to return "", so a test that consumed
+        # more prompts than it scripted passed while the code under test read
+        # an empty answer it never would have got from a person.
         if input_index[0] >= len(inputs):
-            return ""
+            raise AssertionError(
+                f"console_input asked for {prompt!r} but the fake was scripted "
+                f"with only {len(inputs)} answer(s)"
+            )
         result = inputs[input_index[0]]
         input_index[0] += 1
         return result

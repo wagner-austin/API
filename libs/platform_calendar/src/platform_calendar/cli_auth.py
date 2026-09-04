@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TypedDict
 
 from platform_core.json_utils import JSONObject, narrow_json_to_dict
+from platform_core.oauth import expires_at_is_past
 
 from platform_calendar.testing import hooks
 
@@ -179,10 +180,7 @@ def _is_token_expired(expires_at_str: str) -> bool:
     Returns:
         True if token is expired or expiring soon.
     """
-    expires_at = int(expires_at_str)
-    current_time = int(_get_now().timestamp())
-    buffer_seconds = 60
-    return current_time >= (expires_at - buffer_seconds)
+    return expires_at_is_past(int(expires_at_str), int(_get_now().timestamp()))
 
 
 def _refresh_token(

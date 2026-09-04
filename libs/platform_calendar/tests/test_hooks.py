@@ -231,8 +231,12 @@ class TestMakeFakeConsole:
         assert input_hook("prompt2: ") == "second"
         assert input_hook("prompt3: ") == "third"
 
-    def test_returns_empty_when_exhausted(self) -> None:
+    def test_reading_past_the_script_is_refused(self) -> None:
+        """This asserted the fake returned "" forever once exhausted, so a
+        test that consumed more prompts than it scripted passed while the code
+        under test read an empty answer no person would have given it."""
         _output_hook, input_hook = make_fake_console(["only one"])
         assert input_hook("prompt: ") == "only one"
-        assert input_hook("prompt: ") == ""
-        assert input_hook("prompt: ") == ""
+
+        with pytest.raises(AssertionError, match="scripted with only 1 answer"):
+            input_hook("prompt: ")

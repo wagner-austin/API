@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from platform_core.errors import AppError, CalendarErrorCode
+from platform_core.http_utils import http_delete
 from platform_core.json_utils import JSONObject
 from platform_core.oauth_types import (
     OAuthCredentials,
@@ -81,16 +82,13 @@ def _prod_http_patch(url: str, headers: dict[str, str], body: str) -> str:
 
 
 def _prod_http_delete(url: str, headers: dict[str, str]) -> None:
-    """Production HTTP DELETE using urllib."""
-    import urllib.request
-    from http.client import HTTPResponse
+    """Production HTTP DELETE.
 
-    req = urllib.request.Request(url, method="DELETE")
-    for key, value in headers.items():
-        req.add_header(key, value)
-    response = urllib.request.urlopen(req, timeout=30)
-    assert isinstance(response, HTTPResponse)
-    response.close()
+    Args:
+        url: The resource to delete.
+        headers: Headers to send.
+    """
+    http_delete(url, headers)
 
 
 def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
