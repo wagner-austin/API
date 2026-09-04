@@ -16,6 +16,26 @@ name: navprobe
 # stated to hold on the CPU device, so no GPU is required here -- what a GPU
 # adds is the measurements, which are taken by hand and recorded in the wiki,
 # not by CI.
+#
+# IT RUNS ON WINDOWS, and that is not a preference. This job failed on every
+# push from 2026-08-31 to 2026-09-03 -- `ubuntu-latest` was chosen for the
+# device question above and nobody asked the OS question. `scripts/
+# _test_hooks.py` calls `ctypes.WinDLL` and `ctypes.get_last_error` to opt the
+# process out of Win32 power throttling, and typeshed marks both
+# `sys.platform == "win32"` only, so the Types step reported six errors that
+# cannot occur on the machine this project measures on. Reproduce it anywhere
+# with `mypy --platform linux src tests scripts`.
+#
+# Guarding the call sites instead would move the failure rather than fix it.
+# The tests exercise the REAL Win32 boundary rather than a fake -- deliberately,
+# so the struct layout and the refusal code are checked against Windows itself
+# -- so on Linux they would have to be skipped, leaving those lines uncovered
+# under a 100%-coverage gate that this repository does not permit exemptions
+# from. A Windows runner is the only option that keeps the gate, the coverage
+# and the real-boundary tests all intact.
+#
+# Nothing here is Linux-specific: no fork, no /proc, no fcntl, no posix-only
+# imports anywhere in src/, scripts/ or tests/.
 
 on:
   push:
@@ -37,15 +57,23 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: clients/NavProbe
+        # bash, not the Windows default of pwsh. GitHub runs pwsh steps with a
+        # trailing `exit $LASTEXITCODE`, which propagates only the LAST
+        # command's status -- so in the two-command Lint step below, a failing
+        # `ruff check` followed by a passing `ruff format --check` would report
+        # success. Its bash wrapper is `bash --noprofile --norc -eo pipefail`,
+        # which stops at the first failure, so this keeps exactly the semantics
+        # the job had while it ran on Linux.
+        shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -53,7 +81,7 @@ jobs:
         run: pipx install poetry==2.3.4
 
       - name: Cache the virtualenv
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: clients/NavProbe/.venv
           key: navprobe-venv-${{ hashFiles('clients/NavProbe/poetry.lock') }}
