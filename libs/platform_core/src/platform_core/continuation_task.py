@@ -379,7 +379,10 @@ def batches(
         size: Maximum prompts per batch.
 
     Returns:
-        The batches, in the order they will be run.
+        The batches, in COMPOSITION order -- ascending by prompt length.
+        Which batch an item lands in is what has to be reproducible; the
+        order they are then RUN in is a separate question, and
+        :func:`heaviest_first` answers it.
 
     Raises:
         ValueError: If ``size`` is not positive. A batch of zero prompts
@@ -395,6 +398,77 @@ def batches(
     return [ordered[start : start + size] for start in range(0, len(ordered), size)]
 
 
+def batch_weight(batch: Sequence[EvalPrompt], count_tokens: TokenCounter) -> int:
+    """Measure the padded input a batch will build.
+
+    Every row is padded to the longest prompt in the batch, so what the model
+    receives is that width times the row count -- not the sum of the prompts.
+    A short batch of long prompts and a full batch of shorter ones are not
+    ordered by either quantity alone.
+
+    Args:
+        batch: One composed batch.
+        count_tokens: Measures each prompt.
+
+    Returns:
+        Rows times padded width, in tokens.
+
+    Raises:
+        ValueError: If the batch is empty, which has no width to pad to.
+    """
+    if not batch:
+        raise ValueError("an empty batch has no width")
+    return len(batch) * max(count_tokens(prompt["prompt"]) for prompt in batch)
+
+
+def heaviest_first(
+    groups: Sequence[Sequence[EvalPrompt]], count_tokens: TokenCounter
+) -> list[list[EvalPrompt]]:
+    """Order composed batches so the largest allocation happens first.
+
+    COMPOSITION IS NOT EXECUTION ORDER, and separating them is free. Each
+    batch is decoded independently and seeded independently, so which one
+    runs first changes nothing about what any of them produces -- not the
+    completions, not the manifest, not the payload digest, which is taken in
+    sweep order rather than execution order.
+
+    What it changes is WHEN a sweep that does not fit says so.
+    :func:`batches` sorts ascending, so the peak allocation is the LAST
+    batch: a run that cannot fit its widest batch discovers that after
+    generating every other one, which on a real sweep is hours. Running the
+    heaviest first turns that into minutes, and the batches already finished
+    are still on disk for the resumed attempt.
+
+    Ties break on the first item's id, so the order is total and two arms of
+    one sweep walk their batches in the same sequence -- which matters not
+    for correctness but for reading two logs side by side.
+
+    Args:
+        groups: The composed batches.
+        count_tokens: Measures each prompt.
+
+    Returns:
+        The same batches, heaviest first.
+
+    Raises:
+        ValueError: If any batch is empty.
+    """
+
+    def descending(batch: Sequence[EvalPrompt]) -> tuple[int, str]:
+        """Order one batch by size, breaking ties on its first item.
+
+        Args:
+            batch: One composed batch.
+
+        Returns:
+            The sort key: negated weight, then the leading item id.
+        """
+        first: EvalPrompt = batch[0]
+        return (-batch_weight(batch, count_tokens), first["item_id"])
+
+    return [list(batch) for batch in sorted(groups, key=descending)]
+
+
 __all__ = [
     "GENERATED_SUBDIR",
     "ITEM_SEGMENT_SEPARATOR",
@@ -404,6 +478,7 @@ __all__ = [
     "GenerationEntry",
     "MalformedRecordError",
     "TokenCounter",
+    "batch_weight",
     "batches",
     "build_prompts",
     "decode_generation_entry",
@@ -411,6 +486,7 @@ __all__ = [
     "finishable",
     "flatten_item_id",
     "generated_path",
+    "heaviest_first",
     "item_root",
     "manifest_path",
     "split_document",

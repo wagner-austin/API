@@ -17,6 +17,7 @@ from platform_core.continuation_task import (
     EvalPrompt,
     GenerationEntry,
     MalformedRecordError,
+    batch_weight,
     batches,
     build_prompts,
     decode_generation_entry,
@@ -24,6 +25,7 @@ from platform_core.continuation_task import (
     finishable,
     flatten_item_id,
     generated_path,
+    heaviest_first,
     item_root,
     manifest_path,
     split_document,
@@ -76,6 +78,22 @@ def _prompt(item_id: str, prompt: str, reference: str) -> EvalPrompt:
         The prompt.
     """
     return EvalPrompt(item_id=item_id, prompt=prompt, reference=reference)
+
+
+def _leading_id(batch: list[EvalPrompt]) -> str:
+    """Order batches by their first item, for comparing two orderings.
+
+    A named function rather than a lambda so the indexing is typed: this
+    package's mypy settings refuse the ``Any`` a subscripted lambda produces.
+
+    Args:
+        batch: One composed batch.
+
+    Returns:
+        The first item's id.
+    """
+    first: EvalPrompt = batch[0]
+    return first["item_id"]
 
 
 def _characters(text: str) -> int:
@@ -358,3 +376,83 @@ class TestHowPromptsAreBatched:
     def test_a_negative_batch_size_is_refused(self) -> None:
         with pytest.raises(ValueError, match="size must be positive"):
             _ = batches([_prompt("a.py", "h", "x")], _characters, -1)
+
+
+class TestWhichBatchRunsFirst:
+    """Composition is not execution order, and separating them is free.
+
+    A sweep that cannot fit its widest batch should say so in minutes rather
+    than after generating every other one. Because each batch is decoded and
+    seeded independently, the order costs nothing to change.
+    """
+
+    def _groups(self) -> list[list[EvalPrompt]]:
+        """Build three batches whose weights are unambiguous.
+
+        Returns:
+            Batches of increasing padded width, in composition order.
+        """
+        return [
+            [_prompt("a.py", "h", "x"), _prompt("b.py", "h", "x")],
+            [_prompt("c.py", "hh", "x"), _prompt("d.py", "hh", "x")],
+            [_prompt("e.py", "hhhh", "x")],
+        ]
+
+    def test_weight_is_rows_times_padded_width(self) -> None:
+        """Every row is padded to the longest prompt, so the sum is not it."""
+        batch = [_prompt("a.py", "h", "x"), _prompt("b.py", "hhhh", "x")]
+
+        assert batch_weight(batch, _characters) == 8
+
+    def test_an_empty_batch_has_no_weight_to_measure(self) -> None:
+        with pytest.raises(ValueError, match="no width"):
+            _ = batch_weight([], _characters)
+
+    def test_the_heaviest_batch_runs_first(self) -> None:
+        ordered = heaviest_first(self._groups(), _characters)
+
+        assert [p["item_id"] for p in ordered[0]] == ["c.py", "d.py"]
+
+    def test_a_full_batch_can_outweigh_a_wider_partial_one(self) -> None:
+        """Two rows of width two is four; one row of width four is four --
+        and the tie is why the key carries a second component at all. The
+        real case is a full batch of slightly shorter prompts against the
+        partial batch of the longest, which ascending order puts last."""
+        ordered = heaviest_first(self._groups(), _characters)
+
+        assert [batch_weight(batch, _characters) for batch in ordered] == [4, 4, 2]
+
+    def test_no_prompt_is_lost_or_duplicated(self) -> None:
+        ordered = heaviest_first(self._groups(), _characters)
+
+        assert sorted(p["item_id"] for batch in ordered for p in batch) == [
+            "a.py",
+            "b.py",
+            "c.py",
+            "d.py",
+            "e.py",
+        ]
+
+    def test_composition_is_untouched(self) -> None:
+        """Reordering must not repack. An item that moved to another batch
+        would sit with different neighbours, and padding is what a neighbour
+        changes -- which is the whole basis of the pairing."""
+        groups = self._groups()
+
+        ordered = heaviest_first(groups, _characters)
+
+        assert sorted(ordered, key=_leading_id) == sorted(
+            [list(batch) for batch in groups], key=_leading_id
+        )
+
+    def test_the_order_is_total(self) -> None:
+        """Two arms of one sweep must walk their batches the same way, or two
+        logs cannot be read side by side."""
+        groups = self._groups()
+
+        assert heaviest_first(groups, _characters) == heaviest_first(
+            list(reversed(groups)), _characters
+        )
+
+    def test_no_batches_order_to_nothing(self) -> None:
+        assert heaviest_first([], _characters) == []

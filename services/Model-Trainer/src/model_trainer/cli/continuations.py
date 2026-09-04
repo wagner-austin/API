@@ -44,6 +44,7 @@ from platform_core.continuation_task import (
     encode_generation_entry,
     finishable,
     generated_path,
+    heaviest_first,
     manifest_path,
 )
 from platform_core.json_utils import (
@@ -391,7 +392,13 @@ def generate_arm(
             "nothing would be generated and the sweep would report success"
         )
 
-    grouped = batches(prompts, token_counter(model), spec["batch_size"])
+    # Composed ascending so an item sits with the same neighbours in both
+    # arms, then RUN heaviest first so a sweep that does not fit its widest
+    # batch says so in minutes rather than after generating every other one.
+    # Each batch is decoded and seeded independently, so the order changes
+    # nothing it produces.
+    counter = token_counter(model)
+    grouped = heaviest_first(batches(prompts, counter, spec["batch_size"]), counter)
     _log.info(
         "arm %s: %d of %d prompt(s) fit the %d-token budget, in %d batch(es) of up to %d",
         spec["arm"],

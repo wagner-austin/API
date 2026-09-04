@@ -19,7 +19,7 @@ import pathlib
 
 import pytest
 from platform_core.continuation_task import generated_path, manifest_path
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
 from model_trainer.cli import continuations
 from tests._continuations_support import (
@@ -232,3 +232,30 @@ def test_a_batch_killed_between_its_manifest_and_its_files_heals_itself(
     assert recorder.batches == [["src/a.py", "src/b.py"]]
     assert generated_path(out_dir, "src/a.py").is_file()
     assert continuations.read_manifest(out_dir) == {"src/a.py": False, "src/b.py": False}
+
+
+@pytest.mark.usefixtures("restore_hooks")
+def test_the_widest_batch_is_generated_first(tmp_path: pathlib.Path) -> None:
+    # Composition is ascending by length, so the peak allocation is the LAST
+    # batch -- a sweep that cannot fit its widest one would discover that
+    # after generating every other one, which on the real holdout is hours.
+    # Each batch is decoded and seeded independently, so running the heaviest
+    # first costs nothing and turns that into minutes.
+    recorder = Recorder()
+    install(recorder)
+    long_first = "".join(f"{'x' * 80} line{index}\n" for index in range(30))
+    holdout = tmp_path / "mixed.jsonl"
+    holdout.write_text(
+        dump_json_str({"repo": "api", "path": "src/short.py", "text": LONG_SOURCE})
+        + "\n"
+        + dump_json_str({"repo": "api", "path": "src/wide.py", "text": long_first})
+        + "\n",
+        encoding="utf-8",
+    )
+    spec = spec_file(tmp_path, paths=("src/a.py",), batch_size=1)
+    document = narrow_json_to_dict(load_json_str(spec.read_text(encoding="utf-8")))
+    document["holdout_path"] = str(holdout)
+    spec.write_text(dump_json_str(document), encoding="utf-8")
+
+    assert continuations.main(command_line(tmp_path, spec)) == 0
+    assert recorder.batches[0] == ["src/wide.py"]
