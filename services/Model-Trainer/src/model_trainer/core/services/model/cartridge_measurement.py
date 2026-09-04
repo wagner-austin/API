@@ -42,6 +42,7 @@ as findings, and 0.02 is what this measurement's own noise turned out to be.
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Sequence
 
 import torch
@@ -296,9 +297,133 @@ def measure_composition(
     return replicate(f"{arm}-alone", alone), replicate(f"{arm}-composed", composed)
 
 
+def measure_composition_scaling(
+    base: CacheCapableLMProto,
+    *,
+    first_train: Sequence[torch.Tensor],
+    other_trains: Sequence[Sequence[torch.Tensor]],
+    held_out: Sequence[torch.Tensor],
+    arm: str,
+    num_slots: int,
+    seeds: Sequence[int],
+    epochs: int,
+    learning_rate: float,
+) -> tuple[ReplicatedGain, ReplicatedGain, ReplicatedGain, tuple[ReplicatedGain, ...]]:
+    """Measure one cartridge alone, and with several others composed in front.
+
+    The N-compartment generalisation of :func:`measure_composition`, which it
+    does not replace: the two-cartridge arm inside ``gpt2-wiki`` is what every
+    recorded retention so far was measured under, and this function's N=2 case
+    trains its cartridges under different arm names, so their numbers register
+    separately rather than overwriting that history.
+
+    THE CROSS-GAIN ARMS ARE THE HONESTY CHECK, NOT DECORATION. The two-halves
+    artifact -- 94% retention from composing two cartridges trained on halves
+    of one corpus -- was caught by noticing that each cartridge scored well on
+    the OTHER half's held-out text. So every other-corpus cartridge here is
+    also scored ALONE on the primary held-out items. A cross gain near zero or
+    negative says the corpus really was unrelated; a positive one says the
+    composed retention is inflated by overlap, and the number that catches it
+    is in the record rather than in somebody's memory of the caveat.
+
+    Args:
+        base: The frozen base.
+        first_train: Training windows for the cartridge whose retention is
+            the finding.
+        other_trains: One training-window sequence per additional cartridge,
+            each drawn from a corpus unrelated to the first and to each
+            other. Composing N compartments takes ``N - 1`` entries.
+        held_out: Items to score every arm on, drawn from the first corpus.
+        arm: Name for this configuration, e.g. ``"fixed-n4"``.
+        num_slots: Prefix positions for EACH cartridge; the composed prefix
+            is ``(1 + len(other_trains))`` times this.
+        seeds: Seeds to draw, one replicate each.
+        epochs: Passes over each corpus.
+        learning_rate: Step size for AdamW.
+
+    THE UNTRAINED-COMPOSED ARM ATTRIBUTES THE LOSS. Composing with trained
+    strangers and composing with freshly drawn noise cost different things:
+    if the untrained composition already loses most of the gain, the cost is
+    STRUCTURAL -- a long foreign prefix dilutes or damages regardless of
+    content -- and if the trained composition loses much more than the
+    untrained one, the loss is INTERFERENCE from what the strangers learned.
+    The two-cartridge work ran this control by hand and its verdict flipped
+    between model scales, so here it is an arm of the measurement rather
+    than a follow-up somebody must remember to run.
+
+    Returns:
+        ``(alone, composed, untrained_composed, cross)`` -- the first
+        cartridge by itself, the full trained composition, the same first
+        cartridge composed with untrained draws of identical shape, and one
+        cross-gain arm per other corpus, in the order given.
+
+    Raises:
+        AppError: With ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` if fewer than
+            the minimum seeds are given.
+    """
+    alone: list[tuple[int, float]] = []
+    composed: list[tuple[int, float]] = []
+    untrained_composed: list[tuple[int, float]] = []
+    cross: list[list[tuple[int, float]]] = [[] for _ in other_trains]
+    for seed in seeds:
+        first = train_cartridge(
+            base,
+            first_train,
+            num_slots=num_slots,
+            seed=seed,
+            epochs=epochs,
+            learning_rate=learning_rate,
+        )
+        # Seed offsets follow measure_composition's rule and extend it: the
+        # k-th other cartridge draws from seed + (k + 1) * len(seeds), so no
+        # two cartridges in one replicate share a draw, and no offset in one
+        # replicate collides with another replicate's base seed as long as
+        # the plan's seeds are consecutive or closer than len(seeds) apart --
+        # which the label records either way.
+        others = [
+            train_cartridge(
+                base,
+                other_train,
+                num_slots=num_slots,
+                seed=seed + (position + 1) * len(seeds),
+                epochs=epochs,
+                learning_rate=learning_rate,
+            )
+            for position, other_train in enumerate(other_trains)
+        ]
+        joined = functools.reduce(compose, others, first)
+        # The same seed offsets the trained strangers used, so the untrained
+        # draws differ from each other and from the first cartridge exactly
+        # the way the trained ones do. `fresh_cartridge` puts each draw on
+        # the base's device; only its slots are kept.
+        untrained_others = [
+            fresh_cartridge(
+                base, num_slots=num_slots, seed=seed + (position + 1) * len(seeds)
+            ).slots
+            for position in range(len(other_trains))
+        ]
+        untrained_joined = functools.reduce(compose, untrained_others, first)
+        alone.append((seed, _gain(CartridgeModel(base=base, slots=first), held_out)))
+        composed.append((seed, _gain(CartridgeModel(base=base, slots=joined), held_out)))
+        untrained_composed.append(
+            (seed, _gain(CartridgeModel(base=base, slots=untrained_joined), held_out))
+        )
+        for position, other in enumerate(others):
+            cross[position].append((seed, _gain(CartridgeModel(base=base, slots=other), held_out)))
+    return (
+        replicate(f"{arm}-alone", alone),
+        replicate(f"{arm}-composed", composed),
+        replicate(f"{arm}-untrained-composed", untrained_composed),
+        tuple(
+            replicate(f"{arm}-cross-{position}", results) for position, results in enumerate(cross)
+        ),
+    )
+
+
 __all__ = [
     "fresh_cartridge",
     "measure_composition",
+    "measure_composition_scaling",
     "measure_slot_count",
     "measure_untrained",
     "train_cartridge",

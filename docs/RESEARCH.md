@@ -110,6 +110,48 @@ goes from harmless to −0.7612 on held-out text.
   with a plausible story attached. Whether contention affects these numbers
   is still unmeasured.
 
+#### `cartridge_composition_sweep` — retention versus compartment count
+
+Added 2026-09-04 (board task `a67d6038`). Measures what a trained cartridge
+retains as more independently trained cartridges are composed in front of
+it, at N in {2, 4, 8} under two slot policies (fixed 64 per cartridge;
+fixed 512 total), with three built-in controls: an untrained-composed arm
+per configuration (structure-versus-content attribution), a cross-gain arm
+per other corpus (each foreign cartridge scored alone on the primary
+held-out text, the relatedness detector), and the fixed-policy alone arms
+being the same configuration at every N (exact agreement is a free
+replication check, and it held).
+
+- **Command:** `python -m model_trainer.cli.cartridge_composition_sweep
+  --plan gpt2-compartments --corpus <dir> --other-corpora <d1,d2,...>
+  --device cuda --out <file>`. Comma-joined Windows-form paths from Git
+  Bash — MSYS converts only the first `/c/...` in an argument, and the
+  mangled remainder reaches Python as a directory that globs empty.
+- **Result, measured 2026-09-04 on the 3090 Ti, driver 591.86, offline:**
+  the compartmental limit is TWO. Clean-roster retention (all cross-gains
+  negative): fixed-64 goes 62.8% at n2 to −45.4% at n4 to −7.0% at n8;
+  budget-512 goes 44.3% to +14.4% to −7.0%. Replicated across three roster
+  rotations: n2 sits at 59–73% whichever corpus partners (identity moves
+  it ±7pp), n4 is negative in every fixed-policy roster tested, n8 erases
+  the gain under both policies. The v2 record is bit-identical across two
+  processes (sha256 `aa61330b9692…`), and an earlier pair agreed on 90 of
+  90 shared observations across a record-shape change.
+- **Attribution:** at n2 the cost is structural — noise slots alone retain
+  41% and trained content adds about twenty points back; by n4 content
+  interference crosses over and trained strangers cost more than noise.
+- **Two artifacts this run caught in its own first roster:** tech-wiki and
+  hpc3-wiki cartridges predict me-wiki text sight-unseen (+0.18, +0.41
+  cross-gain) because the operator's narrative wiki shares their
+  vocabulary, which inflated the first n8 reading to +27% where the clean
+  number is negative. Relatedness between compartments is measured by the
+  cross-gain arm, never assumed. And a hostile cross-gain does not predict
+  composition damage: the most hostile-alone corpus (−0.42) composed as
+  benignly as the friendliest at n2.
+- **No run document is committed, deliberately,** for the reason
+  `cartridge_benchmark` states above: the registered `mi` image predates
+  both commands. The follow-on — composition-aware training, per the
+  ICAE multi-span finding — belongs to board task `292c3272`.
+
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
 - **Repo:** this one — `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,

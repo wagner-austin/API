@@ -23,7 +23,13 @@ from typing import Protocol
 # Safe at module scope for the same reason `probe_shapes` is: a table of
 # TypedDicts, a digest and a label formatter, importing no torch. The arms it
 # describes live in `cartridge_measurement`, which does.
-from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS, CartridgePlan
+from model_trainer.core.services.model.cartridge_plans import (
+    CARTRIDGE_PLANS,
+    COMPOSITION_SWEEP_PLANS,
+    CartridgePlan,
+    CompositionSweepPlan,
+)
+from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
 from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
 from model_trainer.core.services.model.gemm_shapes import (
     GemmShape,
@@ -45,6 +51,34 @@ class CartridgePlansProto(Protocol):
     """
 
     def __call__(self) -> Mapping[str, CartridgePlan]:
+        """Return every declared plan, in table order."""
+        ...
+
+
+class QaPlansProto(Protocol):
+    """Protocol for the question-set plan table.
+
+    Behind a hook for the reason :class:`CartridgePlansProto` is: the real
+    plan trains one cartridge per seed over a 124-million-parameter base and
+    scores three arms against it, so a suite that could only reach that table
+    would either run it or leave this entry uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, QaPlan]:
+        """Return every declared question-set plan, in table order."""
+        ...
+
+
+class CompositionSweepPlansProto(Protocol):
+    """Protocol for the composition-sweep plan table.
+
+    Behind a hook for the reason :class:`CartridgePlansProto` is: the real
+    table's one plan trains dozens of cartridges over a real GPT-2, so a
+    suite that could only reach it would either run it or leave the entry
+    uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, CompositionSweepPlan]:
         """Return every declared plan, in table order."""
         ...
 
@@ -218,6 +252,24 @@ def _default_cartridge_plans() -> Mapping[str, CartridgePlan]:
     return CARTRIDGE_PLANS
 
 
+def _default_qa_plans() -> Mapping[str, QaPlan]:
+    """Production question-set plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return QA_PLANS
+
+
+def _default_composition_sweep_plans() -> Mapping[str, CompositionSweepPlan]:
+    """Production composition-sweep plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return COMPOSITION_SWEEP_PLANS
+
+
 def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
     """Production probe ladder - used as default hook.
 
@@ -228,6 +280,10 @@ def _default_ladder_shapes() -> Mapping[str, ProbeShape]:
 
 
 cartridge_plans: CartridgePlansProto = _default_cartridge_plans
+
+composition_sweep_plans: CompositionSweepPlansProto = _default_composition_sweep_plans
+
+qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
 
@@ -247,18 +303,22 @@ probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
 __all__ = [
     "BenchmarkShapesProto",
     "CartridgePlansProto",
+    "CompositionSweepPlansProto",
     "CostShapesProto",
     "ForwardShapesProto",
     "LadderShapesProto",
     "ProbedShapesProto",
+    "QaPlansProto",
     "TraceRungsProto",
     "TrainShapesProto",
     "benchmark_shapes",
     "cartridge_plans",
+    "composition_sweep_plans",
     "cost_shapes_hook",
     "forward_shapes",
     "ladder_shapes",
     "probed_shapes_hook",
+    "qa_plans",
     "trace_rungs",
     "train_shapes",
 ]
