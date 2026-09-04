@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from tankpit_bot.bus.frame_bus import FrameStatsDict
 from tankpit_bot.bus.session_status import (
     WIRE_MODES,
     LiveStatsDict,
@@ -204,10 +205,54 @@ def decode_session_status(data: JSONObject) -> SessionStatusDict:
     )
 
 
+# =========================================================================
+# FrameStatsDict codecs
+# =========================================================================
+
+
+def encode_frame_stats(stats: FrameStatsDict) -> JSONObject:
+    """Encode :class:`FrameStatsDict` to a JSON-serializable dict.
+
+    Args:
+        stats: Counts read off the frame bus.
+
+    Returns:
+        JSON object carrying every field.
+    """
+    return {
+        "published": stats["published"],
+        "delivered": stats["delivered"],
+        "dropped": stats["dropped"],
+        "subscribers": stats["subscribers"],
+    }
+
+
+def decode_frame_stats(data: JSONObject) -> FrameStatsDict:
+    """Validate and decode a :class:`FrameStatsDict` from JSON.
+
+    Args:
+        data: JSON object to validate.
+
+    Returns:
+        Strictly-typed frame stats.
+
+    Raises:
+        JSONTypeError: If any field is missing or not an integer.
+    """
+    return FrameStatsDict(
+        published=require_int(data, "published"),
+        delivered=require_int(data, "delivered"),
+        dropped=require_int(data, "dropped"),
+        subscribers=require_int(data, "subscribers"),
+    )
+
+
 __all__ = [
+    "decode_frame_stats",
     "decode_live_stats",
     "decode_mode_command",
     "decode_session_status",
+    "encode_frame_stats",
     "encode_live_stats",
     "encode_mode_command",
     "encode_session_status",

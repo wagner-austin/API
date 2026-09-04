@@ -13,7 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot.bus.frame_bus import FrameSubscriber, FrameSubscriberProtocol
+from tankpit_bot.bus.frame_bus import (
+    FrameStatsDict,
+    FrameSubscriber,
+    FrameSubscriberProtocol,
+)
 from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
@@ -53,6 +57,14 @@ class _ExplodingFrameBus:
     def latest(self) -> bytes | None:
         """No cached frame."""
         return None
+
+    def stats(self) -> FrameStatsDict:
+        """Zeroed counts — this bus exists to explode, not to report.
+
+        Returns:
+            All-zero stats.
+        """
+        return FrameStatsDict(published=0, delivered=0, dropped=0, subscribers=0)
 
 
 class TestCrashedExitReason:

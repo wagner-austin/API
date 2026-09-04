@@ -170,19 +170,25 @@ asyncio_mode = "auto"
 # and no output -- and each was only diagnosed by going to the process table.
 # 60 seconds would have named the test in every case.
 #
-# 300, and the number is measured rather than picked. The bound has to clear
-# the slowest legitimate test, which is NOT one of the real-Chromium ones --
-# it is ``test_this_package_passes_its_own_guard``, which shells out and walks
-# all 1367 files. Solo on an idle box the three guard-shim tests take 39.5 s
-# together; under ``-n auto`` with 15 sibling workers hammering the same disk
-# (and another project's suite running beside it) that same test blew through
-# a 120 s bound and took its worker down with it. Contention is worth more
-# than 3x here, so the bound needs room for it.
+# 600, and the number was measured TWICE because the first two guesses were
+# both too tight. The bound has to clear the slowest legitimate test, which is
+# NOT one of the real-Chromium ones -- it is
+# ``test_this_package_passes_its_own_guard``, which shells out and walks all
+# 1367 files, so it is disk-bound and degrades badly when 15 sibling workers
+# are hammering the same disk.
 #
-# 300 still does the whole job: the full suite is 3-5.5 minutes of wall clock
-# across 16 workers, so ONE test reaching 300 s has taken as long as the entire
-# run and is wedged by definition. It turns a 36-minute silent stall into a
-# named failing test, which is the entire point.
+#   solo, idle box        39.5 s for all three guard-shim tests
+#   solo, later re-run    59.6 s for the same three
+#   under -n auto         blew a 120 s bound, then blew a 300 s bound
+#
+# Contention is worth at least 5x here, and the solo figure itself moves by
+# 50 per cent between runs, so a bound with only 3x headroom is a coin flip
+# dressed as a limit. 600 gives 10x.
+#
+# It still does the whole job. The full suite is 3-7 minutes of wall clock
+# across 16 workers, so ONE test reaching 600 s has taken longer than the
+# entire run and is wedged by definition. The point was never a tight bound --
+# it was turning a 36-minute silent stall into a named failing test.
 #
 # Not a per-test marker exemption on the guard shim. An exemption list is the
 # signal that the predicate is wrong, and the predicate here is "how long may a
@@ -195,5 +201,22 @@ asyncio_mode = "auto"
 # not a soft failure. See scripts/run-tests.ps1 for the 2026-08-19 incident and
 # --max-worker-restart=0, which turns that into a loud stop rather than a
 # 124-clone crash loop.
-timeout = 300
+timeout = 600
 timeout_method = "thread"
+# THE BOUND COVERS THE TEST, NOT ITS FIXTURES' TEARDOWN.
+#
+# Default is false, which charges setup and teardown to the test they happen
+# to bracket. Two modules here share a module-scoped headless Chromium because
+# ``launch()`` is the expensive call, so ``browser.close()`` lands on whichever
+# test ran LAST -- and on a host whose filesystem minifilter inspects browser
+# teardown that close has been measured at tens of seconds on its own. The
+# 2026-09-04 run that failed this way is the evidence: three real-browser tests
+# passed and the fourth, the last in its module, took the worker down.
+#
+# Bounding that would be bounding the fixture, and reporting it would name the
+# wrong test. What this loses is a hang INSIDE a fixture, and that is a real
+# gap, stated rather than hidden. It costs nothing against the failures this
+# setting exists for: both hangs on 2026-09-04 -- a tick loop with no exit and
+# a ``server_close`` that joined a thread parked forever on a silent socket --
+# were inside the test function, and both are still caught.
+timeout_func_only = true

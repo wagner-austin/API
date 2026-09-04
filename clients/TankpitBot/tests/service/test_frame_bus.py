@@ -207,3 +207,111 @@ def test_subscriber_indefinite_wait_loops_back_after_notify() -> None:
     consumer.join(timeout=1.0)
     assert not consumer.is_alive()
     assert received == [b"jpeg-11"]
+
+
+# =============================================================================
+# Drop accounting
+# =============================================================================
+
+
+def test_a_slow_consumer_is_counted_as_a_drop_not_as_silence() -> None:
+    """THE MEASUREMENT THAT WAS MISSING.
+
+    Latest-wins discards, and until 2026-09-04 nothing counted it. That
+    mattered because downstream a dropped frame and a frame that was
+    never produced are indistinguishable -- both are just a longer gap
+    between arrivals. Every rate taken from the ``/video`` end
+    therefore counts survivors, and a still game and a starved
+    connection read identically.
+
+    Three frames published, one consumer that takes nothing until the
+    end: two were overwritten and the bus must say so.
+    """
+    bus = FrameBus()
+    subscriber = bus.subscribe()
+
+    bus.publish(b"jpeg-1")
+    bus.publish(b"jpeg-2")
+    bus.publish(b"jpeg-3")
+
+    stats = bus.stats()
+    assert stats["published"] == 3
+    assert stats["dropped"] == 2
+    assert stats["delivered"] == 0
+    assert subscriber.next_frame(timeout=0.1) == b"jpeg-3"
+    assert bus.stats()["delivered"] == 1
+
+
+def test_a_consumer_that_keeps_up_drops_nothing() -> None:
+    """The control. Without it the counter above could just be a clock.
+
+    Same three frames, consumed between each publish: nothing is
+    overwritten, so the drop count must stay at zero. A counter that
+    rises no matter what measures nothing.
+    """
+    bus = FrameBus()
+    subscriber = bus.subscribe()
+
+    for marker in (b"jpeg-1", b"jpeg-2", b"jpeg-3"):
+        bus.publish(marker)
+        assert subscriber.next_frame(timeout=0.1) == marker
+
+    stats = bus.stats()
+    assert stats["published"] == 3
+    assert stats["dropped"] == 0
+    assert stats["delivered"] == 3
+
+
+def test_a_departed_viewers_losses_survive_its_unsubscribe() -> None:
+    """A tab closed because the picture was bad must not erase the why.
+
+    The losses are carried onto the bus as the subscriber is removed,
+    so the totals still describe the session after the viewer has gone.
+    """
+    bus = FrameBus()
+    subscriber = bus.subscribe()
+    bus.publish(b"jpeg-1")
+    bus.publish(b"jpeg-2")
+
+    bus.unsubscribe(subscriber)
+
+    stats = bus.stats()
+    assert stats["published"] == 2
+    assert stats["dropped"] == 1
+    assert stats["subscribers"] == 0
+
+
+def test_a_bus_nobody_watches_publishes_without_dropping() -> None:
+    """Zero subscribers is not a drop.
+
+    The caster runs only on viewer demand, but the cache-on-publish
+    path still records production. Counting an unwatched publish as a
+    loss would make an idle service look like a broken one.
+    """
+    bus = FrameBus()
+
+    bus.publish(b"jpeg-1")
+    bus.publish(b"jpeg-2")
+
+    stats = bus.stats()
+    assert stats["published"] == 2
+    assert stats["dropped"] == 0
+    assert stats["delivered"] == 0
+    assert stats["subscribers"] == 0
+
+
+def test_frames_pushed_after_close_are_not_counted_as_drops() -> None:
+    """A closed subscriber is a torn-down connection, not a loss.
+
+    ``push`` returns early once closed. Counting those as drops would
+    attribute every frame published after a viewer left to that
+    viewer, which would make a normal disconnect look like starvation.
+    """
+    subscriber = FrameSubscriber()
+    subscriber.push(b"jpeg-1")
+    subscriber.close()
+
+    subscriber.push(b"jpeg-2")
+    subscriber.push(b"jpeg-3")
+
+    assert subscriber.dropped == 0

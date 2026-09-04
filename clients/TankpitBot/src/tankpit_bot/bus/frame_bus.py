@@ -32,6 +32,26 @@ from __future__ import annotations
 import threading
 from typing import Protocol
 
+from typing_extensions import TypedDict
+
+
+class FrameStatsDict(TypedDict):
+    """What the bus produced against what viewers actually got.
+
+    Attributes:
+        published: Frames handed to :meth:`FrameBus.publish` since
+            boot — the caster's real production, before any loss.
+        delivered: Frames subscribers handed on to their consumers.
+        dropped: Frames discarded by latest-wins because a newer one
+            arrived before the consumer took the previous.
+        subscribers: Currently registered subscribers.
+    """
+
+    published: int
+    delivered: int
+    dropped: int
+    subscribers: int
+
 
 class FrameSubscriberProtocol(Protocol):
     """Surface one MJPEG consumer uses to await JPEG frames."""
@@ -63,6 +83,16 @@ class FrameSubscriberProtocol(Protocol):
     @property
     def closed(self) -> bool:
         """Return True when the subscriber has been closed."""
+        ...
+
+    @property
+    def dropped(self) -> int:
+        """Return how many frames were overwritten before consumption."""
+        ...
+
+    @property
+    def delivered(self) -> int:
+        """Return how many frames reached the consumer."""
         ...
 
 
@@ -113,6 +143,14 @@ class FrameBusProtocol(Protocol):
         """
         ...
 
+    def stats(self) -> FrameStatsDict:
+        """Return production versus delivery counts.
+
+        Returns:
+            The counts, as of this call.
+        """
+        ...
+
 
 class FrameSubscriber:
     """One MJPEG connection's slot in the fan-out.
@@ -127,6 +165,8 @@ class FrameSubscriber:
         self._cond = threading.Condition()
         self._latest: bytes | None = None
         self._closed = False
+        self._dropped = 0
+        self._delivered = 0
 
     def push(self, frame: bytes) -> None:
         """Store ``frame`` and wake any waiting :meth:`next_frame`.
@@ -134,12 +174,24 @@ class FrameSubscriber:
         Frames pushed after :meth:`close` are dropped silently — a
         closed subscriber is a torn-down ``/video`` connection.
 
+        LATEST-WINS MEANS THIS DISCARDS, AND THE DISCARD IS COUNTED
+        HERE because here is the only place that can see it. Arriving
+        on top of a frame the consumer has not taken yet means that
+        frame never reaches the viewer, and downstream the loss is
+        invisible: a dropped frame and a frame that was never produced
+        both show up as a gap between arrivals. Every rate measured at
+        the receiving end therefore counts survivors, not production,
+        and cannot tell a still game from a starved connection. The
+        counter is what separates them.
+
         Args:
             frame: Latest JPEG frame bytes.
         """
         with self._cond:
             if self._closed:
                 return
+            if self._latest is not None:
+                self._dropped += 1
             self._latest = frame
             self._cond.notify_all()
 
@@ -163,6 +215,8 @@ class FrameSubscriber:
                     return None
             frame = self._latest
             self._latest = None
+            if frame is not None:
+                self._delivered += 1
             return frame
 
     def close(self) -> None:
@@ -181,6 +235,27 @@ class FrameSubscriber:
         with self._cond:
             return self._closed
 
+    @property
+    def dropped(self) -> int:
+        """Frames this subscriber lost to a newer one.
+
+        Returns:
+            How many pushed frames overwrote a frame the consumer had
+            not taken yet.
+        """
+        with self._cond:
+            return self._dropped
+
+    @property
+    def delivered(self) -> int:
+        """Frames this subscriber actually handed to its consumer.
+
+        Returns:
+            How many frames :meth:`next_frame` returned.
+        """
+        with self._cond:
+            return self._delivered
+
 
 class FrameBus:
     """Fan-out of JPEG frames to N ``/video`` subscribers.
@@ -197,6 +272,9 @@ class FrameBus:
         self._lock = threading.Lock()
         self._subscribers: list[FrameSubscriberProtocol] = []
         self._latest: bytes | None = None
+        self._published = 0
+        self._retired_dropped = 0
+        self._retired_delivered = 0
 
     def publish(self, frame: bytes) -> None:
         """Push ``frame`` to every subscriber and cache it for late joiners.
@@ -206,6 +284,7 @@ class FrameBus:
         """
         with self._lock:
             self._latest = frame
+            self._published += 1
             recipients = list(self._subscribers)
         for subscriber in recipients:
             subscriber.push(frame)
@@ -240,6 +319,13 @@ class FrameBus:
         with self._lock:
             if subscriber in self._subscribers:
                 self._subscribers.remove(subscriber)
+                # Carried onto the bus BEFORE the subscriber is
+                # forgotten. A viewer's losses are most interesting
+                # exactly when that viewer has gone -- a tab closed
+                # because the picture was bad takes the evidence with
+                # it otherwise.
+                self._retired_dropped += subscriber.dropped
+                self._retired_delivered += subscriber.delivered
         subscriber.close()
 
     def subscriber_count(self) -> int:
@@ -262,10 +348,42 @@ class FrameBus:
         with self._lock:
             return self._latest
 
+    def stats(self) -> FrameStatsDict:
+        """Return what this bus made versus what viewers received.
+
+        THE MEASUREMENT NOTHING ELSE CAN TAKE. Every rate observed at
+        the far end of the stream counts frames that survived, so a
+        still game and a starved connection produce the same numbers
+        there. ``published`` is what the caster actually produced;
+        ``dropped`` is what latest-wins discarded on the way out. Only
+        the pair separates the two explanations.
+
+        Live and retired subscribers are summed together so a viewer
+        closing its tab does not erase its own losses.
+
+        Returns:
+            The counts, as of this call.
+        """
+        with self._lock:
+            live = list(self._subscribers)
+            published = self._published
+            dropped = self._retired_dropped
+            delivered = self._retired_delivered
+        for subscriber in live:
+            dropped += subscriber.dropped
+            delivered += subscriber.delivered
+        return FrameStatsDict(
+            published=published,
+            delivered=delivered,
+            dropped=dropped,
+            subscribers=len(live),
+        )
+
 
 __all__ = [
     "FrameBus",
     "FrameBusProtocol",
+    "FrameStatsDict",
     "FrameSubscriber",
     "FrameSubscriberProtocol",
 ]

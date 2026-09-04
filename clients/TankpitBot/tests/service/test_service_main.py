@@ -222,6 +222,11 @@ class TestAsyncMain:
             # executor thread is busy in a heavy tick.
             "/cast",
             "/frame",
+            # Production versus delivery. The one measurement that
+            # cannot be taken from the far end of the stream, where a
+            # dropped frame and a frame that was never produced are
+            # the same longer gap.
+            "/frames",
         }
         assert fake_site.start_calls == 1
         assert fake_site.cleanup_calls == 1

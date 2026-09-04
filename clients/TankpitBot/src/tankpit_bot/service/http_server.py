@@ -61,6 +61,7 @@ from tankpit_bot.bus.status_bus import StatusBusProtocol
 from tankpit_bot.service.session_runner import SessionAlreadyRunningError
 from tankpit_bot.service.types_codecs import (
     decode_mode_command,
+    encode_frame_stats,
     encode_session_status,
 )
 from tankpit_bot.service.watch_page import WATCH_PAGE_HTML
@@ -320,10 +321,33 @@ def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
 
+    async def frame_stats(request: web.Request) -> web.Response:
+        """``GET /frames`` — what the caster made vs what viewers got.
+
+        The one measurement that cannot be taken from outside. Every
+        rate observed on the ``/video`` stream counts frames that
+        SURVIVED, so a game that is genuinely still and a connection
+        that is being starved produce identical numbers there. This
+        reports the pair: ``published`` is the caster's real output,
+        ``dropped`` is what the latest-wins bus discarded on the way
+        out.
+
+        Diagnostic, and read from inside the container against a
+        child's own port. The manager does not relay it and the public
+        filter does not forward it.
+        """
+        _ = request
+        return web.Response(
+            text=dump_json_str(encode_frame_stats(frame_bus.stats()), indent=1),
+            content_type="application/json",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
+
     app.router.add_post("/cast", cast)
     app.router.add_get("/watch", watch)
     app.router.add_get("/video", video)
     app.router.add_get("/frame", frame)
+    app.router.add_get("/frames", frame_stats)
 
 
 def _parse_session_bounds(body: bytes) -> tuple[int, int]:

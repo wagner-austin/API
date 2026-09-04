@@ -16,9 +16,11 @@ from aiohttp.test_utils import (
     TestClient,
     TestServer,
 )
+from platform_core.json_utils import load_json_bytes, narrow_json_to_dict
 
 from tankpit_bot.bus.frame_bus import (
     FrameBus,
+    FrameStatsDict,
     FrameSubscriberProtocol,
 )
 from tankpit_bot.bus.mode_bridge import ModeBridge
@@ -26,6 +28,7 @@ from tankpit_bot.bus.status_bus import (
     StatusBus,
 )
 from tankpit_bot.service.http_server import make_app
+from tankpit_bot.service.types_codecs import decode_frame_stats
 from tests.service._http_fixtures import (
     _noop_shutdown,
     _RecordingRunner,
@@ -60,6 +63,14 @@ class _ImmediateCloseFrameSubscriber:
     def close(self) -> None:
         self._closed = True
 
+    @property
+    def dropped(self) -> int:
+        return 0
+
+    @property
+    def delivered(self) -> int:
+        return 0
+
 
 class _ImmediateCloseFrameBus:
     """FrameBus stand-in whose subscriber closes on the first poll."""
@@ -83,6 +94,9 @@ class _ImmediateCloseFrameBus:
     def latest(self) -> bytes | None:
         return None
 
+    def stats(self) -> FrameStatsDict:
+        return FrameStatsDict(published=0, delivered=0, dropped=0, subscribers=0)
+
 
 class _ImmediateTimeoutFrameSubscriber:
     """Frame subscriber whose waits time out instantly and never yield."""
@@ -103,6 +117,14 @@ class _ImmediateTimeoutFrameSubscriber:
 
     def close(self) -> None:
         self._closed = True
+
+    @property
+    def dropped(self) -> int:
+        return 0
+
+    @property
+    def delivered(self) -> int:
+        return 0
 
 
 class _ImmediateTimeoutFrameBus:
@@ -126,6 +148,9 @@ class _ImmediateTimeoutFrameBus:
 
     def latest(self) -> bytes | None:
         return None
+
+    def stats(self) -> FrameStatsDict:
+        return FrameStatsDict(published=0, delivered=0, dropped=0, subscribers=0)
 
 
 class _StubFrameSubscriber:
@@ -156,6 +181,14 @@ class _StubFrameSubscriber:
     def close(self) -> None:
         self._closed = True
 
+    @property
+    def dropped(self) -> int:
+        return 0
+
+    @property
+    def delivered(self) -> int:
+        return 0
+
 
 class _StubFrameBus:
     """Frame bus stand-in that hands back a preconfigured subscriber."""
@@ -179,6 +212,9 @@ class _StubFrameBus:
 
     def latest(self) -> bytes | None:
         return None
+
+    def stats(self) -> FrameStatsDict:
+        return FrameStatsDict(published=0, delivered=0, dropped=0, subscribers=0)
 
 
 class _CloseAfterFirstWaitFrameSubscriber:
@@ -206,6 +242,14 @@ class _CloseAfterFirstWaitFrameSubscriber:
 
     def close(self) -> None:
         self._closed = True
+
+    @property
+    def dropped(self) -> int:
+        return 0
+
+    @property
+    def delivered(self) -> int:
+        return 0
 
 
 class TestDrainFrameBusToResponseHelper:
@@ -435,3 +479,63 @@ class TestCastIntake:
 
         assert response.status == 400
         assert fbus.latest() is None
+
+
+class TestFrameStatsRoute:
+    """``GET /frames`` — the production-versus-delivery pair."""
+
+    @pytest.mark.asyncio
+    async def test_it_reports_what_was_published_and_what_was_lost(
+        self,
+        runner: _RecordingRunner,
+        bridge: ModeBridge,
+        bus: StatusBus,
+    ) -> None:
+        """The route reports the bus's real counts, not a placeholder.
+
+        Three frames published against a subscriber that consumed
+        none, so two were overwritten. A route that reported anything
+        else would be inventing numbers, which is worse than having
+        none -- the whole reason this exists is that every rate
+        measured at the receiving end counts survivors and cannot see
+        a loss at all.
+        """
+        frame_bus = FrameBus()
+        app = make_app(runner, bridge, bus, frame_bus, _noop_shutdown)
+        frame_bus.subscribe()
+        frame_bus.publish(b"\xff\xd8\xff-1")
+        frame_bus.publish(b"\xff\xd8\xff-2")
+        frame_bus.publish(b"\xff\xd8\xff-3")
+
+        async with TestClient(TestServer(app)) as client, client.get("/frames") as response:
+            assert response.status == 200
+            payload = decode_frame_stats(
+                narrow_json_to_dict(load_json_bytes(await response.read()))
+            )
+
+        assert payload["published"] == 3
+        assert payload["dropped"] == 2
+        assert payload["delivered"] == 0
+        assert payload["subscribers"] == 1
+
+    @pytest.mark.asyncio
+    async def test_a_fresh_service_reports_zeros_rather_than_nothing(
+        self,
+        runner: _RecordingRunner,
+        bridge: ModeBridge,
+        bus: StatusBus,
+    ) -> None:
+        """Before any frame exists the route still answers with a shape.
+
+        A 404 or an empty body here would make "no frames yet" and
+        "the route is broken" look identical to whoever is debugging.
+        """
+        app = make_app(runner, bridge, bus, FrameBus(), _noop_shutdown)
+
+        async with TestClient(TestServer(app)) as client, client.get("/frames") as response:
+            assert response.status == 200
+            payload = decode_frame_stats(
+                narrow_json_to_dict(load_json_bytes(await response.read()))
+            )
+
+        assert payload == {"published": 0, "delivered": 0, "dropped": 0, "subscribers": 0}
