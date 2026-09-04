@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "89aa2ecd10a8ec51c80012a6260e33ec63c9f15e",
+  "git_commit": "5bea978c018bb84727fe101cf6b2842435055835",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -269,7 +269,7 @@
       "attribute": "train_step_run_record"
     },
     {
-      "module": "model_trainer.cli._test_hooks",
+      "module": "model_trainer.cli._measurement_hooks",
       "attribute": "probed_shapes_hook"
     },
     {
@@ -287,15 +287,63 @@
     {
       "module": "ordered_kernels.cli.gemm_probe",
       "attribute": "ordered_run_record"
+    },
+    {
+      "module": "platform_core.continuation_task",
+      "attribute": "build_prompts"
+    },
+    {
+      "module": "platform_core.continuation_task",
+      "attribute": "generated_path"
+    },
+    {
+      "module": "platform_core.continuation_task",
+      "attribute": "batches"
+    },
+    {
+      "module": "platform_core.continuation_task",
+      "attribute": "finishable"
+    },
+    {
+      "module": "model_trainer.core.contracts.continuation_sweep",
+      "attribute": "decode_continuation_sweep_spec"
+    },
+    {
+      "module": "model_trainer.core.services.model.continuation_batch",
+      "attribute": "left_pad"
+    },
+    {
+      "module": "model_trainer.core.services.model.continuations",
+      "attribute": "generate_batch"
+    },
+    {
+      "module": "model_trainer.core.services.model.backends.hf_lm.io",
+      "attribute": "load_base_of_prepared_hf_lm"
+    },
+    {
+      "module": "model_trainer.cli.continuations",
+      "attribute": "generate_arm"
+    },
+    {
+      "module": "model_trainer.cli.continuations",
+      "attribute": "main"
+    },
+    {
+      "module": "model_trainer.cli._measurement_hooks",
+      "attribute": "ladder_shapes"
+    },
+    {
+      "module": "platform_workers.redis",
+      "attribute": "RedisStrProto"
     }
   ],
   "smoke_commands": [
     "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
     "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
-    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm.json', '--controls', 'none', '--kernel', 'cublas']))\"",
-    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-rank1.json', '--controls', 'both', '--kernel', 'rank1']))\"",
-    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-block1024.json', '--controls', 'both', '--kernel', 'block1024']))\"",
+    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _measurement_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm.json', '--controls', 'none', '--kernel', 'cublas']))\"",
+    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _measurement_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-rank1.json', '--controls', 'both', '--kernel', 'rank1']))\"",
+    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _measurement_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-block1024.json', '--controls', 'both', '--kernel', 'block1024']))\"",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.deterministic_gemm import BLOCK_ARMS, KERNEL_ARMS, require_block_size; assert BLOCK_ARMS == ('block256', 'block1024', 'block1280'), BLOCK_ARMS; assert [require_block_size(a) for a in BLOCK_ARMS] == [256, 1024, 1280]; assert len(KERNEL_ARMS) == 7, KERNEL_ARMS; from model_trainer.core.services.model.deterministic_gemm import OWNED_ARM, RANK1_ARM; assert KERNEL_ARMS.index(OWNED_ARM) == KERNEL_ARMS.index(RANK1_ARM) + 1, KERNEL_ARMS\"",
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.deterministic_gemm import blocked_matmul; torch.manual_seed(5); x = torch.randn(8, 4096); w = torch.randn(4096, 64); assert torch.equal(blocked_matmul(x, w, 4096), torch.addmm(torch.zeros(8, 64), x, w)), 'one chunk must be a single addmm onto a zero accumulator'; assert not torch.equal(blocked_matmul(x, w, 64), blocked_matmul(x, w, 4096)), 'chunk width must change the computation'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/gemm.json')); b = json.load(open('/tmp/gemm-rank1.json')); assert a['label'] == 'gemm-attribution-v2-none-cublas', a['label']; assert b['label'] == 'gemm-attribution-v2-both-rank1', b['label']; ka = {o['name'] for o in a['observations']}; assert ka == {o['name'] for o in b['observations']}, 'arms must probe the same shapes'; assert any('large-attn-qkv-M3840-K1280' in n for n in ka), 'the shape the v24 trace broke on is missing'\"",
@@ -315,10 +363,15 @@
     "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls none --kernel cublas --out /tmp/train-step.json",
     "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls both --kernel rank1 --out /tmp/train-step-rank1.json",
     "/opt/env/bin/python -m model_trainer.cli.train_step_probe --device cpu --rungs tiny --controls both --kernel owned --out /tmp/train-step-owned.json",
-    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _test_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-owned.json', '--controls', 'both', '--kernel', 'owned']))\"",
+    "/opt/env/bin/python -c \"import sys; from model_trainer.cli import _measurement_hooks as h; from model_trainer.core.services.model.gemm_shapes import GEMM_SHAPES; h.probed_shapes_hook = lambda: tuple(GEMM_SHAPES.items()); from model_trainer.cli.gemm_probe import main; sys.exit(main(['--device', 'cpu', '--out', '/tmp/gemm-owned.json', '--controls', 'both', '--kernel', 'owned']))\"",
     "/opt/env/bin/python -c \"import json; r = json.load(open('/tmp/gemm-rank1.json')); o = json.load(open('/tmp/gemm-owned.json')); ro = {x['name']: x['value'] for x in r['observations']}; oo = {x['name']: x['value'] for x in o['observations']}; assert set(ro) == set(oo), 'arms probed different shapes'; assert ro == oo, 'the owned FORWARD must be the rank-one forward bit for bit'; a = json.load(open('/tmp/train-step-rank1.json')); b = json.load(open('/tmp/train-step-owned.json')); assert b['label'].endswith('-both-owned'), b['label']; la = [x['value'] for x in a['observations'] if x['name'] == 'tiny|loss']; lb = [x['value'] for x in b['observations'] if x['name'] == 'tiny|loss']; assert la == lb, 'owned and rank1 share one forward, so one loss'; assert {x['name'] for x in a['observations']} == {x['name'] for x in b['observations']}, 'arms stepped different parameters'\"",
     "/opt/env/bin/python -c \"import json; a = json.load(open('/tmp/train-step.json')); b = json.load(open('/tmp/train-step-rank1.json')); assert a['experiment'] == 'train-step-attribution', a['experiment']; assert a['label'].endswith('-none-cublas'), a['label']; assert b['label'].endswith('-both-rank1'), b['label']; na = {o['name'] for o in a['observations']}; assert na == {o['name'] for o in b['observations']}, 'arms must step the same parameters'; assert 'tiny|grad|transformer.h.0.attn.c_attn.weight|digest48' in na, 'the first-divergence parameter has no gradient row'; assert 'tiny|updated|transformer.h.0.attn.c_attn.weight|sum' in na, 'the update was not digested'; assert 'tiny|loss' in na, sorted(na)[:5]\"",
-    "/opt/env/bin/python -c \"from ordered_kernels.kernels import CUDA_SOURCE, NVRTC_OPTIONS; assert '--fmad=false' in NVRTC_OPTIONS, NVRTC_OPTIONS; assert 'acc[i][j] + xr[i] * wc[j]' in CUDA_SOURCE, 'the separate multiply-add is the bit-compatibility linchpin'; import ordered_kernels.cli.gemm_probe; import ordered_kernels.cli.train_step; import ordered_kernels.cli.bench\""
+    "/opt/env/bin/python -c \"from ordered_kernels.kernels import CUDA_SOURCE, NVRTC_OPTIONS; assert '--fmad=false' in NVRTC_OPTIONS, NVRTC_OPTIONS; assert 'acc[i][j] + xr[i] * wc[j]' in CUDA_SOURCE, 'the separate multiply-add is the bit-compatibility linchpin'; import ordered_kernels.cli.gemm_probe; import ordered_kernels.cli.train_step; import ordered_kernels.cli.bench\"",
+    "/opt/env/bin/python -c \"from model_trainer.cli.continuations import entrypoint; import importlib.metadata as m; eps = {e.name for e in m.distribution('model_trainer_server').entry_points}; assert 'modeltrainer-continuations' in eps, sorted(eps)\"",
+    "/opt/env/bin/python -c \"from platform_core.continuation_task import EvalPrompt, batches, finishable; p = [EvalPrompt(item_id=f'{i}.py', prompt='h'*(i%3), reference='x') for i in range(6)]; assert batches(p, len, 2) == batches(list(reversed(p)), len, 2), 'batch composition must not depend on input order, or the arms are not paired'; assert [q['item_id'] for q in finishable(p, len, 1)] == [q['item_id'] for q in p], 'a one-token reference fits a one-token budget'\"",
+    "/opt/env/bin/python -c \"from platform_core.continuation_task import generated_path, item_root, manifest_path; import pathlib; d = pathlib.Path('out'); t = generated_path(d, 'src/pkg/mod.py'); assert t == d / 'src__pkg__mod.py' / 'src' / 'src__pkg__mod.py', t; assert item_root(d, 'src/pkg/mod.py') in t.parents, 'the guards would be pointed where the file is not'; assert manifest_path(d).parent == d.parent, 'the manifest must not sit among the files'\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.continuation_batch import left_pad, split_at_eos, truncate_to_tail; assert left_pad([[1,2,3],[9]], 0) == ([[1,2,3],[0,0,9]], [[1,1,1],[0,0,1]]), 'padding must be on the LEFT for decoder-only generation'; assert truncate_to_tail([1,2,3,4,5], 2) == [4,5], 'an over-long prompt keeps its TAIL'; assert split_at_eos([5,6,0,1], 0) == ([5,6], True)\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.contracts.continuation_sweep import decode_continuation_sweep_spec, encode_continuation_sweep_spec; d = {'run_id':'r','arm':'base','artifact_path':'/a','holdout_path':'/h','prompt_lines':20,'max_new_tokens':1536,'max_prompt_tokens':1024,'batch_size':32,'repetition_penalty':1.1,'seed':0,'device':'cuda','experiment':'e','label':'l'}; assert encode_continuation_sweep_spec(decode_continuation_sweep_spec(d)) == d, 'spec must round-trip'\""
   ],
   "labels": {
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"

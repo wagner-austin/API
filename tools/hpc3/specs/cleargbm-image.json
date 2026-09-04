@@ -214,6 +214,30 @@
     {
       "module": "platform_ml",
       "attribute": "ComputationalCost"
+    },
+    {
+      "module": "covenant_domain.features",
+      "attribute": "LoanFeatures"
+    },
+    {
+      "module": "covenant_nn.objectives.lstm_objective",
+      "attribute": "create_lstm_objective"
+    },
+    {
+      "module": "covenant_persistence.repositories",
+      "attribute": "CovenantRepository"
+    },
+    {
+      "module": "covenant_radar_api.worker_entry",
+      "attribute": "main"
+    },
+    {
+      "module": "platform_core.run_record",
+      "attribute": "run_record"
+    },
+    {
+      "module": "platform_workers.redis",
+      "attribute": "RedisStrProto"
     }
   ],
   "smoke_commands": [],

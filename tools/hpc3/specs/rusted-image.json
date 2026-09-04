@@ -61,6 +61,14 @@
     {
       "module": "rw_bot.harness.agent_build",
       "attribute": "JAVA_RELEASE"
+    },
+    {
+      "module": "platform_core.comparability",
+      "attribute": "RunFingerprint"
+    },
+    {
+      "module": "hpc3.contracts.stage",
+      "attribute": "StageManifest"
     }
   ],
   "smoke_commands": [

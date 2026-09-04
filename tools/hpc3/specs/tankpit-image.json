@@ -54,6 +54,14 @@
     {
       "module": "tankpit_bot.sim.run",
       "attribute": "run_sim_session"
+    },
+    {
+      "module": "monorepo_guards.config",
+      "attribute": "GuardConfig"
+    },
+    {
+      "module": "platform_core.run_record",
+      "attribute": "run_record"
     }
   ],
   "smoke_commands": [],
