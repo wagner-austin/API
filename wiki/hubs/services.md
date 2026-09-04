@@ -8,4 +8,6 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [Cartridge composition ceiling](../pages/model-trainer-composition-ceiling.md) -- Model-Trainer's composition-scaling sweep: two compartments is the measured limit (63% retention at n2, negative by n4, erased by n8, bit-identical record), the cost flips from structural to content interference with scale, and the cross-gain arm caught its own roster's leakage
 
+[Cartridge question set](../pages/model-trainer-cartridge-question-set.md) -- the arm that asks whether a cartridge's knowledge is USABLE rather than merely less surprising: it halves answer-token surprise (18.46 -> 10.68, p = 0.0066) while its accuracy gain sits inside its own seed spread, oracle retrieval answers every item, and the distractor policy alone flipped the base model between chance and 0.5417
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
