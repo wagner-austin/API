@@ -31,7 +31,9 @@ from platform_core.errors import (
 from model_trainer.core.contracts.cartridge import CartridgeGeometry
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
+    SLOT_AXIS,
     CartridgeSlots,
+    require_matching_geometry,
     slots_from_state,
 )
 from model_trainer.core.types import (
@@ -261,7 +263,134 @@ class CartridgeModel:
         return self._base.config
 
 
+class CompanionedCartridgeModel(CartridgeModel):
+    """A cartridge trained in the presence of a frozen stranger.
+
+    The composition-scaling measurement (board task ``a67d6038``) found that
+    independently trained cartridges collapse when composed, and its
+    untrained-composed control attributed the n2 cost to STRUCTURE: the base
+    was never asked to read a prefix with company in it. This model is the
+    intervention: during training, with a per-step probability, a frozen
+    companion's blocks are concatenated in front of the trainee's, so the
+    gradients teach the trainee to deliver its content beside a stranger.
+    The published precedent is ICAE's multi-span finding, where concatenation
+    of separately compressed spans failed until concatenation examples
+    entered training.
+
+    TRAINING ONLY. Scoring always builds a plain :class:`CartridgeModel`, so
+    a companion can never leak into a measurement arm: what is scored is the
+    trainee's slots, alone or explicitly composed.
+
+    THE COMPANION IS FROZEN BY CONSTRUCTION, not convention: its blocks are
+    ``detach()``-ed at every forward, so the optimizer built from
+    ``parameters()`` -- which reports the trainee's slots only, inherited
+    unchanged -- could not reach it even if a caller wired one that tried.
+
+    THE PROBABILITY DRAW IS UNIFORM ACROSS ARMS. One draw from torch's global
+    generator per forward, whatever the probability, including 1.0. Skipping
+    the draw at 1.0 would give the p-sweep's arms different RNG streams for
+    reasons that have nothing to do with the knob being swept, and the sweep
+    exists to vary exactly one thing.
+    """
+
+    _companion: CartridgeSlots
+    _companion_probability: float
+
+    def __init__(
+        self,
+        *,
+        base: CacheCapableLMProto,
+        slots: CartridgeSlots,
+        companion: CartridgeSlots,
+        companion_probability: float,
+    ) -> None:
+        """Freeze a base, put trainee slots in front, and hold a companion.
+
+        Args:
+            base: The model to prepend to, frozen exactly as
+                :class:`CartridgeModel` freezes it.
+            slots: The trainable blocks.
+            companion: The frozen stranger. Must be cut for the same model as
+                ``slots``; its slot count may differ.
+            companion_probability: Chance per forward that the companion is
+                present. Must lie in (0, 1]: zero would be a
+                :class:`CartridgeModel` wearing a knob that does nothing, and
+                the plain class is the honest spelling of that configuration.
+
+        Raises:
+            ValueError: If the probability is outside (0, 1].
+            AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if the companion
+                was cut for a differently shaped model.
+        """
+        if not 0.0 < companion_probability <= 1.0:
+            raise ValueError(
+                f"a companion probability of {companion_probability} is outside (0, 1]; "
+                f"zero companionship is the plain CartridgeModel and should be "
+                f"constructed as one, so the record never carries a dead knob"
+            )
+        require_matching_geometry(companion.geometry, slots.geometry)
+        super().__init__(base=base, slots=slots)
+        self._companion = companion
+        self._companion_probability = companion_probability
+
+    def to(self, device: str) -> LMModelProto:
+        """Move the base, the trainee slots and the companion onto a device.
+
+        Args:
+            device: Torch device string.
+
+        Returns:
+            This model, so the call chains.
+        """
+        super().to(device)
+        self._companion.to(device)
+        return self
+
+    def forward(self, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
+        """Run the base with the companion sometimes present before the trainee.
+
+        Args:
+            input_ids: Token ids, shaped (batch, positions).
+            labels: Targets for those same positions.
+
+        Returns:
+            The base model's output. Gradients reach the trainee's slots
+            only; the companion's blocks are detached.
+        """
+        present = float(torch.rand(())) < self._companion_probability
+        if not present:
+            return super().forward(input_ids=input_ids, labels=labels)
+        batch_size = int(input_ids.shape[0])
+        blocks: list[tuple[torch.Tensor, torch.Tensor]] = []
+        for layer in range(self.geometry["num_layers"]):
+            companion_key, companion_value = self._companion.layer_blocks(
+                layer, batch_size=batch_size
+            )
+            trainee_key, trainee_value = self.slots.layer_blocks(layer, batch_size=batch_size)
+            blocks.append(
+                (
+                    torch.cat([companion_key.detach(), trainee_key], dim=SLOT_AXIS),
+                    torch.cat([companion_value.detach(), trainee_value], dim=SLOT_AXIS),
+                )
+            )
+        attended = (
+            int(input_ids.shape[1])
+            + self._companion.geometry["num_slots"]
+            + self.geometry["num_slots"]
+        )
+        return self._base(
+            input_ids=input_ids,
+            labels=labels,
+            past_key_values=Hooks.build_prefix_cache(blocks),
+            attention_mask=torch.ones(
+                (batch_size, attended), dtype=torch.long, device=input_ids.device
+            ),
+            use_cache=False,
+        )
+
+
 __all__ = [
     "CartridgeLoadResult",
     "CartridgeModel",
+    "CompanionedCartridgeModel",
 ]

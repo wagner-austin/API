@@ -32,10 +32,13 @@ _INIT_STD = 0.02
 
 #: Axis the slots live on in a ``(batch, kv_heads, slots, head_dim)`` block.
 #:
-#: Named because two operations index it and a wrong axis is silent: joining on
-#: the head axis would produce a block of the right total size describing a
+#: Named because three operations index it and a wrong axis is silent: joining
+#: on the head axis would produce a block of the right total size describing a
 #: model with twice the heads, and attention would read it without complaint.
-_SLOT_AXIS = 2
+#: Public because the companioned training model concatenates a frozen
+#: companion's blocks onto a trainee's at forward time, and that concat must
+#: name the same axis this module's own :func:`compose` does.
+SLOT_AXIS = 2
 
 
 def discover_geometry(layers: Sequence[torch.Tensor], *, num_slots: int) -> CartridgeGeometry:
@@ -425,7 +428,7 @@ def _join_blocks(
     index = 2 * layer + (0 if is_key else 1)
     left = first.named_parameters()[index][1].detach()
     right = second.named_parameters()[index][1].detach()
-    return torch.cat([left, right], dim=_SLOT_AXIS).requires_grad_(True)
+    return torch.cat([left, right], dim=SLOT_AXIS).requires_grad_(True)
 
 
 def require_matching_geometry(
@@ -467,6 +470,7 @@ def require_matching_geometry(
 
 
 __all__ = [
+    "SLOT_AXIS",
     "CartridgeSlots",
     "compose",
     "discover_geometry",

@@ -52,7 +52,10 @@ from model_trainer.core.contracts.replicated_measurement import (
     replicate,
 )
 from model_trainer.core.services.finetuning.strategies.cartridge import measure_geometry
-from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
+from model_trainer.core.services.finetuning.strategies.cartridge_model import (
+    CartridgeModel,
+    CompanionedCartridgeModel,
+)
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     CartridgeSlots,
     compose,
@@ -141,6 +144,65 @@ def train_cartridge(
     # therefore hands training a state that depends on how many arms ran
     # earlier, which is the same defect one level down and harder to see.
     # Seeding here makes an arm a function of its seed and nothing else.
+    torch.manual_seed(seed)
+    _losses = train_on(model, corpus, epochs=epochs, learning_rate=learning_rate)
+    return model.slots
+
+
+def train_cartridge_with_companion(
+    base: CacheCapableLMProto,
+    corpus: Sequence[torch.Tensor],
+    *,
+    num_slots: int,
+    seed: int,
+    epochs: int,
+    learning_rate: float,
+    companion: CartridgeSlots,
+    companion_probability: float,
+) -> CartridgeSlots:
+    """Draw a cartridge and train it with a frozen stranger sometimes present.
+
+    The composition-aware variant of :func:`train_cartridge` (board task
+    ``bc29dc3e``): identical draw, identical seeding discipline, and the one
+    difference is that training forwards run through
+    :class:`CompanionedCartridgeModel`, which concatenates the companion's
+    detached blocks in front of the trainee's with the given per-step
+    probability. Whether this lifts composed retention is the measurement;
+    nothing here asserts that it does.
+
+    THE SEED COVERS THE PRESENCE DRAWS TOO. The companion-presence draw
+    consumes the same process-wide generator dropout does, and the seed is
+    set at the same point :func:`train_cartridge` sets it -- after the
+    geometry probe -- so a run remains a function of its seed with the
+    companion machinery included.
+
+    Args:
+        base: The frozen base to train in front of.
+        corpus: Training windows.
+        num_slots: Prefix positions for the trainee.
+        seed: Seed for the draw, the dropout stream, and the presence draws.
+        epochs: Passes over the corpus.
+        learning_rate: Step size for AdamW.
+        companion: The frozen stranger's slots. Not updated: gradients cannot
+            reach it by construction.
+        companion_probability: Chance per training forward that the companion
+            is present, in (0, 1].
+
+    Returns:
+        The trained slots, detached from any model.
+
+    Raises:
+        ValueError: If the probability is outside (0, 1].
+        AppError: With ``CARTRIDGE_GEOMETRY_MISMATCH`` if the companion was
+            cut for a differently shaped model.
+    """
+    drawn = fresh_cartridge(base, num_slots=num_slots, seed=seed)
+    model = CompanionedCartridgeModel(
+        base=base,
+        slots=drawn.slots,
+        companion=companion,
+        companion_probability=companion_probability,
+    )
     torch.manual_seed(seed)
     _losses = train_on(model, corpus, epochs=epochs, learning_rate=learning_rate)
     return model.slots
@@ -427,4 +489,5 @@ __all__ = [
     "measure_slot_count",
     "measure_untrained",
     "train_cartridge",
+    "train_cartridge_with_companion",
 ]
