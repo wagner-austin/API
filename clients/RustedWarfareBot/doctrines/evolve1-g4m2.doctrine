@@ -1,0 +1,45 @@
+# The first machine-LEARNED candidate: evolve1's best member (g4m2,
+# +4.197 at 8 pairs), from the CEM population search over the 4-unit
+# ground simplex (scripts/evolve.py, rng 1, 6 generations x 16 members
+# vs the close0-flame4 champion). The genome compiled into the
+# champion's own army slots: the c_artillery slot became heavyTank --
+# artillery-light heavy-armor, the mix the whole elite converged on and
+# no hand-built doctrine ever fielded. Every knob is the champion's.
+# Generation fitness is selection-biased at 8 pairs and adopts nothing;
+# this faces the 48-pair win bar on untouched seeds (laws six, nine).
+name evolve1-g4m2
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
