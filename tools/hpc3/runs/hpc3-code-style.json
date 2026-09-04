@@ -15,7 +15,7 @@
       "mem_gb": 32,
       "minutes": 240,
       "requeue": true,
-      "checkpoint_steps": 500,
+      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/images/v32/abl.sif",
         "sha256": "65762bbd4d30c27eab374d30785d2cffc32d159c5f91e57585bcbda2c6a915a7",

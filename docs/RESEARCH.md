@@ -39,7 +39,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | ckpt steps |
 |---|---|---|---|---|---|---|---|---|
 | `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | 0 |
-| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `65762bbd4d30` | yes | 500 |
+| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `65762bbd4d30` | yes | 0 |
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 500 |
 | `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
@@ -503,6 +503,21 @@ goes from harmless to −0.7612 on held-out text.
   number this project has produced so far was produced locally, before
   registration.** Registration makes the next run reproducible; it does not
   reach backwards.
+- **A preemption costs the whole run, and the workspace now says so.** This
+  project declared `checkpoint_steps: 500`, copied from `mi`. Nothing honours
+  it: `HPC3_CHECKPOINT_STEPS` is exported by the sbatch wrapper and read by no
+  payload in this monorepo, and Model-Trainer checkpoints at EPOCH boundaries
+  only — "every other completed epoch publishes the rolling checkpoint so an
+  interruption costs at most one epoch". This payload declares
+  `num_epochs: 1`, so one epoch is the whole run and the only checkpoint is
+  the one written after training finishes. The declaration is now `0`, which
+  the contract defines as "none".
+  What protects the run is the other half of the same rule: `deterministic`
+  replay, where "requeue alone IS protection … the whole run is a checkpoint
+  at step zero". On `free-gpu`, whose `PreemptMode` is `CANCEL`, `--requeue`
+  is inert, so in practice the protection is that a preempted run is
+  resubmitted by hand and replays. `mi` carries the same unhonoured `500`
+  against the same trainer.
 - **Results as of 2026-09-02, stated with their limits.** Perplexity moved
   2.8327 to 1.9631 with 392 of 392 held-out items improving, and train/holdout
   overlap was checked to be zero by path AND by content — the content check
