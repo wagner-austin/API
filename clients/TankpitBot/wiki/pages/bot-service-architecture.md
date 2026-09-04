@@ -10,8 +10,8 @@ source_paths:
   - "src/tankpit_bot/browser/live_view.py"
 source_git_blobs:
   "src/tankpit_bot/service": "1960dc175ef63744338161a8d30dc02ec128669f"
-  "src/tankpit_bot/bot/config.py": "73f00effaaba3a60107229f12ba7743ecd2f16cf"
-  "src/tankpit_bot/browser/live_view.py": "e7e18cb9ca4092ed4cbc2ab2762ef934ab909282"
+  "src/tankpit_bot/bot/config.py": "557c01140481f9d7930663253279f2b2907f1ef8"
+  "src/tankpit_bot/browser/live_view.py": "f879a88de41caa9d860f3da554a8cea54a3304e8"
 fact_checked: "2026-09-03"
 confidence: medium
 hubs: [architecture]
