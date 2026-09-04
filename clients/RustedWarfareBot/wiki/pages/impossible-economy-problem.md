@@ -114,3 +114,22 @@ the marginal loss. Class 1 as DESIGNED here is closed; a different gate
 (embargoing ALL expansion under fire, or escorting the builder) would be
 a new design, not a retuning. Class 3 (strike-window economics) is the
 remaining road.
+
+## The momentum signal's range at Impossible is MEASURED (imptr12)
+
+Every drop-gated knob reads `Momentum.drop()` -- the strongest
+survivor's army value below its 40-sample peak -- and until 2026-09-04
+no record of that signal's range at Impossible existed; thresholds were
+carried over from Very Hard intuition. The trace now records the signal
+itself (`rival_army`, the appendix column), and twelve traced control
+matches read: **per-match maximum drop 2,900-7,950, median 5,550.
+Fifteen thousand NEVER fires -- the whole distribution tops out at
+7,950** -- so strike 15000 and rebuild 15000 were behaviourally
+identical to control in every match that ever carried them. Five
+thousand opens in 9 of 12 matches but only for slivers (0-39 open
+samples of thousands; zero in a quarter of matches), which reframes
+strike5000's refutation as substantially "the window barely ever
+opened". The calibrated band no arm has ever tested is **2,000-3,000**:
+open in every match, with real dwell time. Rebuild stays closed -- its
+flat brackets (always-open 0 and mostly-shut 5000) pin the band between
+them -- but the strike release gets its first in-band arm.

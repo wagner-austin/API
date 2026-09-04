@@ -1,0 +1,43 @@
+# The upper-band strike arm ([[impossible-economy-problem]] class 3):
+# strike 4000 sits below imptr12's median per-match max drop (5,550), so
+# it opens in most matches but only on the deeper wave-breaks -- the
+# selectivity contrast with imp-strike2500's open-often window.
+# Everything else is flame-nocover.
+
+name imp-strike4000
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+navtilt 0
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 1
+forward 0
+scout 0
+raid 3
+rush 0
+creep 0
+hold 0
+riposte 0
+kite 0
+tech 1
+lurk 0
+allin 0
+strike 4000
+medics 0
+navy 0
+battery 0
+decoys 0
+hp_floor 0
+bunkers 0
+flame 2
+close 3
+income_ladder 0
+guns 0
+nukes 0
+rebuild 0
