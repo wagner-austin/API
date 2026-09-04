@@ -115,6 +115,38 @@ jobs:
       run:
         working-directory: ${{ matrix.package }}
         shell: bash
+    env:
+      # A PORTABLE CPU BASELINE, BECAUSE THE RUNNER THAT BUILDS A BINARY IS
+      # NOT ALWAYS THE RUNNER THAT LOADS IT.
+      #
+      # libs/cleargbm path-depends on libs/cleargbm_rs, so `poetry sync`
+      # compiles a Rust extension through maturin. That build reads
+      # libs/cleargbm_rs/.cargo/config.toml, which sets
+      # `-C target-cpu=native` and says in its own comment that the result
+      # "is not portable across CPU generations" -- acceptable for a
+      # locally-installed wheel, which is all it was ever used for.
+      #
+      # Then this workflow started caching `.venv`, and the two met.
+      # GitHub's hosted pool is heterogeneous (Xeon Platinum 8272CL / 8370C,
+      # EPYC 7763), so a `.so` built with one runner's feature set gets
+      # restored onto a runner that lacks those instructions. The result was
+      # `Fatal Python error: Illegal instruction` inside `create_module`
+      # while importing cleargbm_rs -- every xdist worker dying at import,
+      # `no tests ran`, and a coverage report of 18.15% that looked like a
+      # missing test suite rather than a binary the CPU could not execute.
+      #
+      # `RUSTFLAGS` REPLACES `[build] rustflags` from .cargo/config.toml
+      # rather than appending to it, so setting it here is what scopes the
+      # native flag to local builds. The package's config file is untouched
+      # on purpose: `docs/RESEARCH.md` registers `cleargbm`, and its
+      # benchmark numbers were measured against the native build. Changing
+      # what a developer's `make check` compiles would silently change the
+      # artifact those numbers describe.
+      #
+      # x86-64-v2 rather than v3: CI answers "does it work", not "how fast",
+      # and the widest floor is the one least likely to strand a future
+      # runner. Verified locally -- 1685 Rust tests pass under this flag.
+      RUSTFLAGS: -C target-cpu=x86-64-v2
     steps:
       - uses: actions/checkout@v7
 
@@ -125,11 +157,22 @@ jobs:
       - name: Install Poetry
         run: pipx install poetry==2.3.4
 
+      # The key covers the Rust sources as well as the lock file, and that is
+      # not belt-and-braces. A `.venv` holds COMPILED output from path
+      # dependencies -- cleargbm_rs's extension module -- and editing Rust
+      # changes none of the poetry.lock hashes. Keyed on the lock alone, a
+      # Rust change would restore the previously built `.so` and the suite
+      # would pass against code that is no longer in the tree, which is the
+      # stale-artifact failure rather than a red build.
+      #
+      # It costs one cache miss across the matrix whenever the Rust changes.
+      # Rust changes here are rare; a green run against the wrong binary is
+      # not a trade worth making.
       - name: Cache the virtualenv
         uses: actions/cache@v6
         with:
           path: ${{ matrix.package }}/.venv
-          key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package)) }}
+          key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package), 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}
 
       # `sync` rather than `install`, matching the other workflows: install
       # leaves behind anything the lock file no longer mentions, which is how
