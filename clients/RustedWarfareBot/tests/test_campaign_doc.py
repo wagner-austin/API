@@ -95,6 +95,11 @@ def _workspace(
                 "minutes": 45,
                 "requeue": False,
                 "checkpoint_steps": 0,
+                "image": {
+                    "path": f"{root}/images/v4/rusted.sif",
+                    "sha256": "b1eaaa2e5a43fd963ddeff20ba06f92c9128135cda918fed1bde458c5de93edb",
+                    "binds": [root],
+                },
                 "env_path": env_path,
                 "pinned_packages": {},
                 "deterministic": False,

@@ -288,6 +288,65 @@ def test_an_ssh_command_failing_on_its_own_terms_is_not_retried(tmp_path: Path) 
     assert len([argv for argv in cluster.argvs if argv[0] == "ssh"]) == 1
 
 
+def test_an_scp_copy_failure_is_ridden_out_like_a_drop(tmp_path: Path) -> None:
+    """The measured 2026-09-03 shape: a connection dropped MID-TRANSFER
+    makes scp exit 1 ("copy failed") rather than 255, and three drivers
+    crashed on mirror pulls that succeeded verbatim by hand minutes
+    later. The copy is an idempotent whole-file re-pull, so exit 1 rides
+    the same budget as a drop at connect time."""
+
+    class _MidTransfer(_Cluster):
+        def __init__(self) -> None:
+            super().__init__(filed=[2], queued=[])
+            self.scp_calls = 0
+
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "scp":
+                self.scp_calls += 1
+                if self.scp_calls == 1:
+                    self.argvs.append(tuple(argv))
+                    return 1, ("scp: Connection reset by peer",)
+            return super().run(argv)
+
+    reported: list[str] = []
+
+    def record_line(text: str) -> None:
+        reported.append(text)
+
+    mid_transfer = _MidTransfer()
+    saved = _test_hooks.write_line
+    _test_hooks.write_line = record_line
+    try:
+        _, slept = _drive(tmp_path, mid_transfer)
+    finally:
+        _test_hooks.write_line = saved
+    assert mid_transfer.scp_calls == 2
+    assert slept == [5.0]
+    drops = [line for line in reported if "transport dropped" in line]
+    assert len(drops) == 1
+    assert "scp" in drops[0]
+
+
+def test_an_ssh_command_exiting_1_is_never_retried(tmp_path: Path) -> None:
+    """The boundary of the per-program map: exit 1 from ssh is the REMOTE
+    command's own status passed through -- a defect surfacing, never a
+    transport verdict -- while the same status from scp is retryable."""
+
+    class _RemoteOne(_Cluster):
+        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "ssh":
+                self.argvs.append(tuple(argv))
+                return 1, ("mkdir: cannot create directory",)
+            return super().run(argv)
+
+    cluster = _RemoteOne(filed=[], queued=[])
+    with pytest.raises(ClusterRoundError) as caught:
+        _drive(tmp_path, cluster)
+    assert caught.value.code == "RW-CROUND-001"
+    assert "command failed (1)" in caught.value.message
+    assert len([argv for argv in cluster.argvs if argv[0] == "ssh"]) == 1
+
+
 def test_the_search_entry_point_routes_the_cluster_prefix(tmp_path: Path) -> None:
     """`hpc3:<workspace>` builds the cluster runner with the workspace it
     names; everything else stays a queue DSN. Routed by explicit prefix,

@@ -90,6 +90,9 @@ SIGMA_FLOOR = 0.15
 #: artifacts like the search's variants.
 VARIANT_DIR = Path("doctrines/evolve")
 
+#: Where generation job files land, committed alongside the search's.
+JOBS_DIR = Path("sweeps/evolve")
+
 #: Seed namespace: panels sit below 200k, search rounds at
 #: ``200k + rng*10k + round*1k``, and generations here at
 #: ``500k + rng*10k + generation*1k`` -- disjoint from both by
@@ -334,6 +337,7 @@ def main(
     argv: Sequence[str] | None = None,
     sweeps_root: Path = SWEEP_ROOT,
     variant_dir: Path = VARIANT_DIR,
+    jobs_dir: Path = JOBS_DIR,
 ) -> int:
     """Run one evolution from the command line.
 
@@ -342,6 +346,7 @@ def main(
             the process arguments.
         sweeps_root: Where batch scorecards land, injectable for tests.
         variant_dir: Where candidate doctrines land, injectable for tests.
+        jobs_dir: Where generation job files land, injectable for tests.
 
     Returns:
         ``EXIT_OK``, or ``EXIT_BAD_USAGE`` on a bad argument count or a
@@ -362,7 +367,7 @@ def main(
         fast_forward=FAST_FORWARD,
         scratch=CLUSTER_SCRATCH,
         sweeps_root=sweeps_root,
-        jobs_dir=Path("sweeps/evolve"),
+        jobs_dir=jobs_dir,
         poll_seconds=POLL_SECONDS,
     )
     run_evolution(runner, args[1], rng_seed, sweeps_root, variant_dir)

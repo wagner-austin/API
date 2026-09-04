@@ -54,6 +54,23 @@ CONVERGE_PASSES = 6
 #: 2026-09-02 websocket-leg drops surfaced as exactly this.
 TRANSPORT_EXIT = 255
 
+#: Which exit statuses mean the TRANSPORT failed, per program. ssh
+#: reserves 255 for a dead connection and otherwise passes the remote
+#: command's own status through, so anything else is the command's
+#: verdict and must fail fast. scp additionally exits 1 when the copy
+#: itself fails, which is exactly what a connection dropped MID-TRANSFER
+#: looks like (a drop at connect time is still 255) -- and every scp this
+#: runner issues is an idempotent whole-file re-copy, so a retry repeats
+#: no work, while a deterministic failure (a missing remote file) rides
+#: the budget out and raises carrying scp's own words. Measured
+#: 2026-09-03: three driver crashes on mirror scp exit 1 during a
+#: flapping tunnel, each command succeeding verbatim by hand minutes
+#: later.
+TRANSPORT_STATUSES: dict[str, tuple[int, ...]] = {
+    "ssh": (TRANSPORT_EXIT,),
+    "scp": (1, TRANSPORT_EXIT),
+}
+
 #: How many CONSECUTIVE transport losses one command may ride out before
 #: the route itself is the finding. Resets on any success; five drops in a
 #: row spaced a poll apart is an outage, not a blip, and pretending
@@ -135,13 +152,14 @@ class ClusterRound:
     def _capture(self, argv: Sequence[str]) -> tuple[str, ...]:
         """Run one child command, raising on failure.
 
-        ``ssh`` and ``scp`` commands whose CONNECTION died (exit
-        :data:`TRANSPORT_EXIT`) are re-run up to :data:`TRANSPORT_BUDGET`
-        consecutive times, a poll interval apart, each drop reported --
-        every cluster command this runner issues is idempotent by design,
-        so re-carrying one after a dropped connection repeats no work and
-        hides no defect. Any other non-zero status is the command itself
-        failing and raises immediately.
+        ``ssh`` and ``scp`` commands whose transport died (a status in
+        :data:`TRANSPORT_STATUSES` for that program) are re-run up to
+        :data:`TRANSPORT_BUDGET` consecutive times, a poll interval
+        apart, each drop reported -- every cluster command this runner
+        issues is idempotent by design, so re-carrying one after a
+        dropped connection repeats no work and hides no defect. Any
+        other non-zero status is the command itself failing and raises
+        immediately.
 
         Args:
             argv: Argument vector, program first.
@@ -157,14 +175,14 @@ class ClusterRound:
                 ``RW-CROUND-003`` when an ssh/scp route stays down through
                 the whole transport budget.
         """
-        transported = argv[0] in ("ssh", "scp")
+        retryable = TRANSPORT_STATUSES.get(argv[0], ())
         drops = 0
         while True:
             status, lines = _test_hooks.run_capture(argv)
             if status == 0:
                 return lines
             printed = "\n".join(lines)
-            if not (transported and status == TRANSPORT_EXIT):
+            if status not in retryable:
                 raise ClusterRoundError(
                     "RW-CROUND-001",
                     f"command failed ({status}): {' '.join(argv)}\n{printed}",
@@ -407,6 +425,7 @@ __all__ = [
     "CONVERGE_PASSES",
     "TRANSPORT_BUDGET",
     "TRANSPORT_EXIT",
+    "TRANSPORT_STATUSES",
     "ClusterRound",
     "ClusterRoundError",
 ]

@@ -17,6 +17,7 @@ import pytest
 from scripts.evolve import (
     ELITE,
     EXIT_BAD_USAGE,
+    EXIT_OK,
     GENERATIONS,
     PAIRS,
     POPULATION,
@@ -184,6 +185,99 @@ def test_main_builds_the_cluster_runner_for_the_cluster_route(tmp_path: Path) ->
     finally:
         host_hooks.run_capture = saved
     assert seen[0] == ("git", "rev-parse", "HEAD")
+
+
+class _ServedCluster:
+    """Scripts the whole subprocess conversation main's runner holds.
+
+    Every generation files instantly: the campaign reports complete, the
+    scorecard count matches the job file, and the pull manufactures the
+    scorecards the way :class:`_Cluster` scripts them -- member 0 wins
+    at half the longest match, the rest wipe.
+    """
+
+    def __init__(self, jobs_dir: Path) -> None:
+        self.jobs_dir = jobs_dir
+
+    def _batch_of(self, joined: str) -> str:
+        import re
+
+        matched = re.search(r"runs/sweeps/([\w-]+)", joined)
+        if matched is None:
+            raise AssertionError(f"no batch in {joined!r}")
+        return matched.group(1)
+
+    def _job_rows(self, batch: str) -> list[tuple[str, str]]:
+        text = (self.jobs_dir / f"{batch}.txt").read_text(encoding="utf-8")
+        rows: list[tuple[str, str]] = []
+        for line in text.splitlines():
+            if not line.startswith("#") and line.strip() != "":
+                label, seed_text = line.split("|")[:2]
+                rows.append((label, seed_text))
+        return rows
+
+    def _pull(self, batch: str, dest: Path) -> None:
+        dest.mkdir(parents=True, exist_ok=True)
+        for label, seed_text in self._job_rows(batch):
+            key = "m0" if label.endswith("m0") else label
+            verdict, samples = _SCRIPTED_ENDINGS.get(key, ("wiped", 1000))
+            (dest / f"{label}-s{seed_text}.txt").write_text(
+                f"### {label}-s{seed_text}\n"
+                f"verdict        {verdict} ({verdict})\n"
+                f"samples seen   {samples}\n",
+                encoding="utf-8",
+            )
+
+    def serve(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        joined = " ".join(argv)
+        if joined.endswith("rev-parse HEAD"):
+            return 0, ("abc123",)
+        if "hpc3.cli.campaign" in joined:
+            return 0, ("136 done, 0 in flight, 0 submitted, 0 remaining",)
+        if 'grep -c "\\.txt$"' in joined:
+            return 0, (str(len(self._job_rows(self._batch_of(joined)))),)
+        if argv[0] == "scp":
+            self._pull(self._batch_of(joined), Path(argv[-1]))
+        return 0, ()
+
+
+#: The scripted ending each label plays out, keyed by label with every
+#: non-winner falling to the wiped default.
+_SCRIPTED_ENDINGS = {
+    "control": ("survived", 1000),
+    "m0": ("won", 500),
+}
+
+
+def test_main_carries_a_whole_evolution_to_the_ok_exit(tmp_path: Path) -> None:
+    """The success path end to end: main builds the real cluster runner,
+    the scripted conversation files every generation instantly, and the
+    run ends at ``EXIT_OK`` having named a best member."""
+    jobs_dir = tmp_path / "jobs"
+    serve = _ServedCluster(jobs_dir).serve
+    written: list[str] = []
+
+    def record(text: str) -> None:
+        written.append(text)
+
+    saved = (host_hooks.run_capture, host_hooks.write_line)
+    host_hooks.run_capture = serve
+    host_hooks.write_line = record
+    try:
+        status = main(
+            ["hpc3:runs/hpc3-rusted.json", "probe6", "5"],
+            sweeps_root=tmp_path / "sweeps",
+            variant_dir=tmp_path / "variants",
+            jobs_dir=jobs_dir,
+        )
+    finally:
+        (host_hooks.run_capture, host_hooks.write_line) = saved
+    assert status == EXIT_OK
+    assert written[-1].startswith("# best member: g0m0 (margin delta +1.500)")
+    generations = [
+        line for line in written if line.startswith("# generation ") and "members" in line
+    ]
+    assert len(generations) == GENERATIONS
 
 
 def test_the_module_guard_runs_main() -> None:
