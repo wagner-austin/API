@@ -10,4 +10,6 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [Cartridge question set](../pages/model-trainer-cartridge-question-set.md) -- the arm that asks whether a cartridge's knowledge is USABLE rather than merely less surprising: it halves answer-token surprise (18.46 -> 10.68, p = 0.0066) while its accuracy gain sits inside its own seed spread, oracle retrieval answers every item, and the distractor policy alone flipped the base model between chance and 0.5417
 
+[A declared batch size trained at four times itself](../pages/model-trainer-declared-config-is-not-a-suggestion.md) -- the worker silently rewrote any declared batch of 4 or less on CUDA, and every record kept saying what the payload declared
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

@@ -1,12 +1,12 @@
 # API Platform Wiki
 
-**Read this first.** 4 topic hubs, 30 content pages (counted 2026-09-04). Follow the hub link for your topic; each hub lists its pages with one-line descriptions. This wiki documents the *api monorepo* — services, clients, shared libs, and the infrastructure that ties them together.
+**Read this first.** 4 topic hubs, 31 content pages (counted 2026-09-04). Follow the hub link for your topic; each hub lists its pages with one-line descriptions. This wiki documents the *api monorepo* — services, clients, shared libs, and the infrastructure that ties them together.
 
 **Known coverage shape, stated so nobody mistakes silence for absence:** 22 of these pages are ClearGBM. The services, clients and infrastructure hubs are thin relative to what the monorepo holds — 13 services and 4 clients against 4 service pages and 0 client pages. Client depth is deliberate (three clients keep their own full wikis). Infrastructure reads thinner than it is: cluster submission — the largest single body of it — lives in the `hpc3` sibling wiki below, registered 2026-09-02. **Service depth remains a real gap**: 13 services, 4 pages, and nothing else covers them.
 
 ## Hubs
 
-[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (4 pages)
+[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (5 pages)
 [Clients](hubs/clients.md) -- DiscordBot, TankpitBot and RustedWarfareBot, plus NavProbe, which is a simulator-determinism instrument rather than a user-facing client (1 page, cross-listed from infrastructure; TankpitBot, RustedWarfareBot and NavProbe each maintain their own dedicated wiki under `clients/<name>/wiki/`, which is why this hub stays thin by design)
 [Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, devpost, kaggle, stt, langid, translate) + domain libs (covenant_domain/ml/nn/persistence, cleargbm, cleargbm_rs, procart) + instrument_io + monorepo_guards (24 pages)
 [Infrastructure](hubs/infrastructure.md) -- docker-compose, Traefik, Redis/RQ, PostgreSQL, monorepo build + test + lint conventions, run-comparability env (3 pages; cluster submission is NOT here — `tools/hpc3` keeps its own wiki, see below)

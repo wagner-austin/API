@@ -106,8 +106,10 @@ def test_resolve_device_passthrough_cpu() -> None:
     assert resolve_device("cpu") == "cpu"
 
 
-def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
-    # CUDA available -> auto resolves to cuda and batch size increases to gpt2 default (32)
+def test_build_cfg_resolves_auto_and_keeps_the_declared_batch_size() -> None:
+    # CUDA available -> auto resolves to cuda, and the declared batch size is
+    # left alone. This comment said 'batch size increases to gpt2 default (32)'
+    # until the increase was removed on 2026-09-04.
     fake_torch = FakeTorchModule(cuda_available=True)
 
     def _fake_import() -> _TorchModuleProtocol:
