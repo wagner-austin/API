@@ -1,0 +1,18 @@
+# Momentum calibration at Impossible ([[impossible-economy-problem]]):
+# 12 champion-control matches whose traces carry the rival_army
+# column, so every drop-gated knob's threshold can finally be set
+# against the signal's measured range. Seeds 8691001-8695577.
+#
+# label | seed | doctrine | samples
+control|8691001|doctrines/flame-nocover.doctrine|10000
+control|8691417|doctrines/flame-nocover.doctrine|10000
+control|8691833|doctrines/flame-nocover.doctrine|10000
+control|8692249|doctrines/flame-nocover.doctrine|10000
+control|8692665|doctrines/flame-nocover.doctrine|10000
+control|8693081|doctrines/flame-nocover.doctrine|10000
+control|8693497|doctrines/flame-nocover.doctrine|10000
+control|8693913|doctrines/flame-nocover.doctrine|10000
+control|8694329|doctrines/flame-nocover.doctrine|10000
+control|8694745|doctrines/flame-nocover.doctrine|10000
+control|8695161|doctrines/flame-nocover.doctrine|10000
+control|8695577|doctrines/flame-nocover.doctrine|10000
