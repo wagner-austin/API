@@ -160,6 +160,19 @@ tools/hpc3/runs/*
 # gives one commit earlier: a force works for whoever runs it and silently
 # drops the file for the next person.
 !tools/hpc3/runs/code-style-*.json
+# Same shape again, for the cartridge measurement: the run document that pins
+# an image digest and the corpora it reads is configuration, and a clone
+# without it cannot reproduce the A100 record.
+#
+# A per-body-of-work prefix rather than a blanket `!*.json`, because 249 of the
+# 439 files in this directory are untracked run documents from past work. A
+# blanket negation would propose committing all of them, and the ignore is
+# doing real work by holding them back.
+#
+# That number is itself worth reading: run documents going missing is not a
+# hypothetical this rule prevents, it is the steady state everywhere a prefix
+# has not been negated.
+!tools/hpc3/runs/cartridge-*.json
 **/corpus/
 
 # But allow source code directories named "data"
