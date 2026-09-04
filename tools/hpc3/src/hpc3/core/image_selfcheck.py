@@ -18,6 +18,28 @@ Ordering is the whole value. An image that cannot import its own trainer is
 cheap to discover at build time and expensive to discover after a job has
 queued, waited for an A100, and died before its first step -- which is what
 the DeterminismReport rename actually did to the cluster's wheels.
+
+THE OUTPUT IS SOURCE IN THIS TREE, SO THIS PROJECT'S OWN RULES APPLY TO IT,
+and until 2026-09-04 they were broken by construction. Each assertion was
+emitted as three inline statements: the ``_fail`` line carried a module name,
+an attribute name and a sentence, so a long name pushed it past the column
+limit (E501), and ``main`` grew a branch per assertion until a large enough
+spec exceeded the complexity ceiling (C901). Across the artifacts on austinpc
+that was 871 and 31 of them.
+
+NOBODY COULD SEE IT. Ruff honours ``.gitignore``, these land under an ignored
+``runs/``, and ruff applies ``.gitignore`` only inside a git repository -- so
+the breach was invisible everywhere except a tree with no ``.git``, which is
+exactly one staged onto a build node. Dispatching hpc3 to lavender through
+the fleet failed lint with all 902, and ``ruff check . --no-respect-gitignore``
+run locally reports the same number, which is what identifies the mechanism
+rather than merely suggesting it.
+
+So the spec is rendered as DATA and walked by a loop. The assertions
+themselves are written once, in the header, where their length is fixed and
+known. ``main`` holds two loops whatever a spec declares, so its complexity is
+a constant; and every emitted data line carries one short literal, so no name
+a spec can hold puts a line over the limit.
 """
 
 from __future__ import annotations
@@ -66,6 +88,44 @@ _HEADER = (
     "    raise SystemExit(1)",
     "",
     "",
+    "def _require_version(package: str, expected: str) -> None:",
+    '    """Assert one distribution is installed at one version.',
+    "",
+    "    Args:",
+    "        package: Distribution name, as the spec spells it.",
+    "        expected: Exact version the built image must report.",
+    "",
+    "    Raises:",
+    "        SystemExit: Via ``_fail`` when the versions differ.",
+    '    """',
+    "    # Normalised on the way in, exactly as _INSTALLED's keys were:",
+    "    # packaging treats typing_extensions and typing-extensions as one",
+    "    # name, so a spec may spell either and mean the same distribution.",
+    '    found = _INSTALLED.get(package.lower().replace("_", "-"), "<not installed>")',
+    "    if found != expected:",
+    '        _fail(package + " is " + found + ", expected " + expected)',
+    "",
+    "",
+    "def _require_symbol(module: str, attribute: str) -> None:",
+    '    """Assert one module exports one attribute.',
+    "",
+    "    Args:",
+    "        module: Module to import inside the image.",
+    "        attribute: Attribute it must define.",
+    "",
+    "    Raises:",
+    "        SystemExit: Via ``_fail`` when the attribute is absent, which",
+    "            means a stale wheel was installed.",
+    '    """',
+    "    if not hasattr(importlib.import_module(module), attribute):",
+    '        _fail(module + " is missing " + attribute',
+    '              + " -- a stale wheel was baked into this image")',
+    "",
+    "",
+)
+
+_MAIN = (
+    "",
     "def main() -> int:",
     '    """Run every declared assertion.',
     "",
@@ -75,9 +135,10 @@ _HEADER = (
     "    Raises:",
     "        SystemExit: Via ``_fail`` on the first mismatch.",
     '    """',
-)
-
-_FOOTER = (
+    "    for _package, _expected in _VERSIONS:",
+    "        _require_version(_package, _expected)",
+    "    for _module, _attribute in _SYMBOLS:",
+    "        _require_symbol(_module, _attribute)",
     '    print("image self-check OK")',
     "    return 0",
     "",
@@ -87,66 +148,85 @@ _FOOTER = (
 )
 
 
-def canonical_distribution(name: str) -> str:
-    """Return the name a distribution is looked up by.
+def _render_pair(first: str, second: str) -> list[str]:
+    """Render one table entry with each string on a line of its own.
 
-    Python packaging treats ``typing_extensions`` and ``typing-extensions``
-    as one distribution and compares case-insensitively, so a spec may spell
-    a name either way and mean the same thing. Normalised here rather than in
-    the generated script, because the script runs in an image where nothing
-    but the standard library exists.
+    SPLIT UNCONDITIONALLY rather than only when it would be too long, which
+    would require this module to know the column limit its own project
+    configures -- a second copy of a number, and the drift it invites is
+    precisely the failure this shape exists to remove. One literal per line
+    means the only way to exceed the limit is a single name longer than the
+    limit, which is a property of the name and would be flagged wherever else
+    it was written down.
 
     Args:
-        name: The name as the spec spells it.
+        first: Left-hand value.
+        second: Right-hand value.
 
     Returns:
-        Lowercase, with underscores as hyphens.
+        The entry's lines, indented for a module-level tuple.
     """
-    return name.lower().replace("_", "-")
+    return [
+        "    (",
+        f"        {first!r},",
+        f"        {second!r},",
+        "    ),",
+    ]
 
 
-def _render_version_assertion(package: str, version: str) -> list[str]:
-    """Render one version assertion as indented Python statements.
+def _render_table(name: str, entries: list[list[str]]) -> list[str]:
+    """Render one module-level tuple of pairs.
+
+    NO EMPTY CASE, because there cannot be one:
+    :func:`~hpc3.contracts.image_spec.decode_image_spec` refuses both
+    ``expected_versions`` and ``required_symbols`` when empty -- "Field
+    'required_symbols' must not be empty" -- so an image always declares at
+    least one of each. A branch rendering ``()`` would be unreachable, and
+    unreachable code that looks defensive is worse than none: it invites a
+    reader to believe the contract is looser than it is.
+
+    Args:
+        name: The tuple's name in the generated script.
+        entries: Already-rendered entry lines, at least one.
+
+    Returns:
+        The assignment's lines.
+    """
+    lines = [f"{name} = ("]
+    for entry in entries:
+        lines.extend(entry)
+    lines.extend([")", ""])
+    return lines
+
+
+def _render_version_entry(package: str, version: str) -> list[str]:
+    """Render one version assertion as a table entry.
 
     Args:
         package: Distribution whose installed version is checked.
         version: Exact version the built image must report.
 
     Returns:
-        The statement lines, already indented for a function body. Read from
-        distribution metadata rather than from a module's ``__version__``: an
-        absent distribution reports itself as such instead of raising
-        ``PackageNotFoundError`` out of the check, and a package that defines
-        no ``__version__`` -- which ``typing_extensions`` does not -- can
-        still be asserted.
+        The entry's lines. The name is carried as the SPEC spells it and
+        canonicalised inside the generated helper, so the failure message
+        names the package the way a reader wrote it while the lookup still
+        matches what pip recorded.
     """
-    canonical = canonical_distribution(package)
-    return [
-        f'    _found = _INSTALLED.get({canonical!r}, "<not installed>")',
-        f"    if _found != {version!r}:",
-        f"        _fail({package!r} + ' is ' + str(_found) + ', expected ' + {version!r})",
-    ]
+    return _render_pair(package, version)
 
 
-def _render_symbol_assertion(check: SymbolCheck) -> list[str]:
-    """Render one symbol assertion as indented Python statements.
+def _render_symbol_entry(check: SymbolCheck) -> list[str]:
+    """Render one symbol assertion as a table entry.
 
     Args:
         check: The module and attribute that must exist in the built image.
 
     Returns:
-        The statement lines, already indented for a function body. A missing
-        attribute means a stale wheel was installed, so the message says that
-        rather than reporting a bare AttributeError.
+        The entry's lines. A missing attribute still reports a stale wheel
+        rather than a bare AttributeError -- that message lives in
+        ``_require_symbol``, written once.
     """
-    module = check["module"]
-    attribute = check["attribute"]
-    return [
-        f"    _mod = importlib.import_module({module!r})",
-        f"    if not hasattr(_mod, {attribute!r}):",
-        f"        _fail({module!r} + ' is missing ' + {attribute!r}"
-        " + ' -- a stale wheel was baked into this image')",
-    ]
+    return _render_pair(check["module"], check["attribute"])
 
 
 def render_selfcheck(spec: ImageSpec) -> str:
@@ -159,14 +239,29 @@ def render_selfcheck(spec: ImageSpec) -> str:
         Python source, LF-terminated, asserting every declared version and
         every declared symbol. It exits non-zero on the first failure, which
         fails the build rather than the first job that uses the image.
+
+        The assertions are emitted as DATA and walked by a loop rather than
+        unrolled into statements -- see the module docstring for the two lint
+        rules the unrolled form broke on its own output, and why nothing
+        noticed for as long as it did.
     """
     lines = list(_HEADER)
-    for package, version in spec["expected_versions"].items():
-        lines.extend(_render_version_assertion(package, version))
-    for check in spec["required_symbols"]:
-        lines.extend(_render_symbol_assertion(check))
-    lines.extend(_FOOTER)
+    lines.extend(
+        _render_table(
+            "_VERSIONS",
+            [
+                _render_version_entry(package, version)
+                for package, version in spec["expected_versions"].items()
+            ],
+        )
+    )
+    lines.extend(
+        _render_table(
+            "_SYMBOLS", [_render_symbol_entry(check) for check in spec["required_symbols"]]
+        )
+    )
+    lines.extend(_MAIN)
     return "\n".join(lines) + "\n"
 
 
-__all__ = ["canonical_distribution", "render_selfcheck"]
+__all__ = ["render_selfcheck"]

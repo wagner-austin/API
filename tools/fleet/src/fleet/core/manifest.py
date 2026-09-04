@@ -75,20 +75,15 @@ SHARED_DIRECTORIES: Final[tuple[str, ...]] = ("scripts", "libs/monorepo_guards")
 #: :func:`guard_inputs` would carry this file anyway, but only if it is there --
 #: it reports what exists. Requiring it here is what turns its absence into a
 #: refusal instead of a failure on somebody else's machine.
-#: ``.gitignore`` IS NOT HERE, AND IT WAS FOR TEN MINUTES. Ruff reads it, so
-#: it looked like an input to every ``make lint`` in the monorepo. Staging it
-#: changes nothing, measured on lavender 2026-09-04: the file arrived, ruff
-#: still reported 902 errors in ``tools/hpc3/runs``, because ruff applies
-#: ``.gitignore`` only inside a git repository and a staged tree has no
-#: ``.git``. Locally the same command passes and
-#: ``ruff check . --no-respect-gitignore`` reports exactly 902 -- the same
-#: number, which is what identifies the mechanism rather than merely
-#: suggesting it.
-#:
-#: That makes hpc3's lint result depend on ambient git state, which is a
-#: property of that project rather than of this one. It is fixed by an
-#: ``exclude`` in its own ruff config, not by carrying more files here.
-SHARED_FILES: Final[tuple[str, ...]] = (GUARD_CONFIG_NAME,)
+#: ``.gitignore`` IS HERE BECAUSE RUFF READS IT, and it is necessary without
+#: being sufficient. Ruff applies ``.gitignore`` only inside a git repository,
+#: so carrying the file alone changed nothing -- measured on lavender
+#: 2026-09-04, ``tools/hpc3`` still reported 902 errors in build artifacts the
+#: repository deliberately excludes. It is
+#: :func:`~fleet.core.staging.init_repository_script` that makes it apply, and
+#: that script has nothing to apply without this file. Neither is any use on
+#: its own, which is why the reason is written in both places.
+SHARED_FILES: Final[tuple[str, ...]] = (GUARD_CONFIG_NAME, ".gitignore")
 
 #: Everything a dispatch carries beyond the project and its dependencies.
 SHARED_PATHS: Final[tuple[str, ...]] = (*SHARED_DIRECTORIES, *SHARED_FILES)

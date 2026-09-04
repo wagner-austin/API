@@ -217,6 +217,8 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
         ok(archive_digest),  # stage: run reassemble
         ok(""),  # stage: send extract script
         ok(""),  # stage: run extract
+        ok(""),  # stage: send the git-init script
+        ok(""),  # stage: run git init
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script

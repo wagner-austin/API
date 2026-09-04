@@ -196,6 +196,40 @@ def reassemble_script(target: str) -> str:
     )
 
 
+def init_repository_script(target: str) -> str:
+    """Render the script that makes a staged tree a git repository.
+
+    WITHOUT THIS A STAGED BUILD LINTS DIFFERENT FILES FROM A LOCAL ONE, and
+    the difference is not cosmetic. Ruff honours ``.gitignore``, and applies
+    it ONLY inside a git repository -- so a tree that carries the file but no
+    ``.git`` silently widens what gets linted to include everything the
+    repository deliberately excludes.
+
+    Measured on lavender 2026-09-04, dispatching ``tools/hpc3``: 902 ruff
+    errors, all in ``tools/hpc3/runs``, which ``.gitignore`` line 170 excludes
+    as build artifacts while explicitly tracking the run documents beside
+    them. The same tree with ``git init`` run in it reports ``All checks
+    passed``. Locally ``ruff check .`` passes and
+    ``ruff check . --no-respect-gitignore`` reports exactly 902 -- the same
+    number, which identifies the mechanism rather than suggesting it.
+
+    THE ALTERNATIVE WAS TO ADD AN EXCLUDE TO THE PROJECT, AND IT WOULD HAVE
+    BEEN WRONG. The repository already states which paths are build output;
+    a ruff ``exclude`` restating it is a second copy of one policy, and the
+    copy that drifts is the one nobody looks at. Reproducing the environment
+    a build is defined against is this package's job, not the project's.
+
+    Args:
+        target: Absolute remote directory holding the staged tree.
+
+    Returns:
+        The script's text. It initialises an empty repository and commits
+        nothing: the ignore rules are read from the working tree, so the
+        marker is all ruff needs.
+    """
+    return f"git -C '{target}' init --quiet\n"
+
+
 def extract_script(target: str) -> str:
     """Render the script that unpacks a verified archive.
 
@@ -255,6 +289,7 @@ def stage(
         )
 
     remote.run_script(host, f"{target}/extract.ps1", extract_script(target))
+    remote.run_script(host, f"{target}/init-repo.ps1", init_repository_script(target))
     return target
 
 
@@ -266,6 +301,7 @@ __all__ = [
     "digest",
     "encode",
     "extract_script",
+    "init_repository_script",
     "make_directory_script",
     "reassemble_script",
     "stage",

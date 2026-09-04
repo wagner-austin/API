@@ -18,9 +18,10 @@ import subprocess
 import sys
 
 from platform_core.json_utils import JSONValue
+from platform_core.toml_utils import loads_toml
 
 from hpc3.contracts.image_spec import ImageSpec, decode_image_spec
-from hpc3.core.image_selfcheck import canonical_distribution, render_selfcheck
+from hpc3.core.image_selfcheck import render_selfcheck
 
 _PACKAGE = "fixturepkg"
 
@@ -187,8 +188,15 @@ class TestTheGeneratedScriptRuns:
         self, tmp_path: pathlib.Path
     ) -> None:
         """Packaging treats ``typing_extensions`` and ``typing-extensions``
-        as one name, so a spec may spell either."""
-        assert canonical_distribution("Typing_Extensions") == "typing-extensions"
+        as one name, so a spec may spell either.
+
+        Asserted by RUNNING the generated script against a distribution
+        recorded under one spelling and required under another. The
+        normalisation moved into the generated helper when the assertions
+        became data, so there is no longer a renderer-side function to unit
+        test -- and this was always the assertion that mattered, since it is
+        the image that has to agree with pip.
+        """
         _write_fixture_package(tmp_path, version="1.2.3", with_symbol=True)
         spec = _spec(expected_versions={_PACKAGE.upper(): "1.2.3"})
         assert _run_selfcheck(tmp_path, spec).returncode == 0
@@ -228,7 +236,10 @@ class TestTheGeneratedScriptRuns:
             ],
         )
         rendered = render_selfcheck(spec)
-        assert rendered.count("hasattr") == 2
+        # Quoted, because the assertions are emitted as table entries and
+        # `__name__` also appears unquoted in the script's entry-point guard.
+        assert rendered.count("'required_symbol'") == 1
+        assert rendered.count("'__name__'") == 1
         result = _run_selfcheck(tmp_path, spec)
         assert result.returncode == 0
 
@@ -246,3 +257,95 @@ class TestTheGeneratedScriptIsValidSource:
     def test_it_carries_no_carriage_returns(self) -> None:
         """A CRLF script makes the kernel report the interpreter as missing."""
         assert "\r" not in render_selfcheck(_spec())
+
+
+class TestTheGeneratedScriptPassesThisProjectsOwnLint:
+    """The output is source in this tree, so this project's rules apply to it.
+
+    THEY DID NOT, AND NOBODY COULD SEE IT. Until 2026-09-04 each assertion was
+    emitted as three inline statements: the ``_fail`` line carried a module
+    name, an attribute name and a sentence, so a long name pushed it past the
+    column limit, and ``main`` grew a branch per assertion until it exceeded
+    the complexity ceiling. Across the artifacts on austinpc that was 871
+    E501 and 31 C901 -- and ``ruff check .`` reported none of them, because
+    ruff honours ``.gitignore`` and these land under an ignored ``runs/``.
+    The breach was visible only where there is no git, which is precisely a
+    tree staged onto a build node: dispatching hpc3 to lavender through the
+    fleet failed lint with all 902.
+
+    So these assert the two properties directly, on a spec deliberately
+    larger and longer-named than any real one. A rule that only holds for
+    today's specs is not a property of the renderer.
+    """
+
+    def _long_spec(self) -> ImageSpec:
+        """Build a spec whose names and count would break the old renderer.
+
+        Returns:
+            A spec with forty symbol checks and names long enough that the
+            old three-statement form exceeded the column limit on every one.
+        """
+        module = "a_deliberately_long_package_name.and_a_long_submodule_name.plus_another"
+        return _spec(
+            expected_versions={f"{module}-dist-{index}": "1.2.3.post4" for index in range(40)},
+            required_symbols=[
+                {"module": module, "attribute": f"A_VERY_LONG_EXPORTED_SYMBOL_NAME_{index}"}
+                for index in range(40)
+            ],
+        )
+
+    def _line_limit(self) -> int:
+        """Read the column limit from this project's own ruff configuration.
+
+        Taken from ``pyproject.toml`` rather than written here, because a
+        second copy of the number is a second thing to keep in step -- and
+        the failure it would hide is exactly the one these tests exist for.
+
+        Returns:
+            The configured limit.
+        """
+        document = loads_toml(
+            (pathlib.Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+                encoding="utf-8"
+            )
+        )
+        tool = document["tool"]
+        assert isinstance(tool, dict)
+        ruff = tool["ruff"]
+        assert isinstance(ruff, dict)
+        limit = ruff["line-length"]
+        assert isinstance(limit, int)
+        return limit
+
+    def test_every_emitted_line_fits_the_column_limit(self) -> None:
+        limit = self._line_limit()
+        over = [
+            line for line in render_selfcheck(self._long_spec()).splitlines() if len(line) > limit
+        ]
+
+        assert over == []
+
+    def test_the_entry_points_complexity_does_not_grow_with_the_spec(self) -> None:
+        """C901 counts branches, and the old shape grew one per assertion.
+
+        Walking two tables means ``main`` holds exactly two branch points
+        whatever a spec declares -- eighty assertions here, the same two
+        loops -- which is what makes the rule unreachable rather than merely
+        unbroken for today's specs.
+        """
+        body = render_selfcheck(self._long_spec()).split("def main() -> int:", 1)[1]
+
+        assert body.count("    for ") == 2
+        assert "    if " not in body
+        assert body.count("_require_version(") == 1
+        assert body.count("_require_symbol(") == 1
+
+    def test_the_assertions_are_carried_as_data_rather_than_statements(self) -> None:
+        """The mechanism: the comparison and the message are written once in
+        the header, and a spec contributes table entries rather than code."""
+        rendered = render_selfcheck(self._long_spec())
+
+        assert rendered.count("def _require_version(") == 1
+        assert rendered.count("def _require_symbol(") == 1
+        assert rendered.count("hasattr(") == 1
+        assert rendered.count("A_VERY_LONG_EXPORTED_SYMBOL_NAME_") == 40

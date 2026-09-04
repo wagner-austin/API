@@ -228,6 +228,28 @@ It is checked **before any node is probed**, by both `fleet-run` and
 Probing three nodes to collect three identical refusals costs three round
 trips and produces a message shaped like a capacity problem.
 
+## The staged tree is made a git repository, and that is not decoration
+
+Ruff honours `.gitignore` and applies it **only inside a git repository**. A
+tree that carries the file but no `.git` therefore lints every path the
+repository deliberately excludes.
+
+Measured dispatching `tools/hpc3` to lavender: 902 ruff errors, all in
+`tools/hpc3/runs`, which `.gitignore` line 170 excludes as build artifacts
+while explicitly tracking the run documents beside them. The same tree with
+`git init` run in it reports `All checks passed`. Locally `ruff check .`
+passes and `ruff check . --no-respect-gitignore` reports exactly 902 — the
+same number, which identifies the mechanism rather than suggesting it.
+
+So `staging.stage` initialises an empty repository after extracting, and
+`.gitignore` travels with the tree. Neither is any use without the other.
+
+**The alternative was an `exclude` in the project's own ruff config, and it
+would have been wrong.** The repository already states which paths are build
+output; a ruff `exclude` restating it is a second copy of one policy, and the
+copy that drifts is the one nobody looks at. Reproducing the environment a
+build is defined against is this package's job, not the project's.
+
 ## A project's suite may read outside its own directory
 
 `tools/hpc3` was dispatched to lavender and four of its tests failed: its
