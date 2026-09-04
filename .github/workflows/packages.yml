@@ -172,6 +172,18 @@ jobs:
       # and the widest floor is the one least likely to strand a future
       # runner. Verified locally -- 1685 Rust tests pass under this flag.
       RUSTFLAGS: -C target-cpu=x86-64-v2
+      # PRESENT, NOT VALID. libs/platform_kaggle depends on the `kaggle`
+      # package, which authenticates AT IMPORT: it reads these two variables,
+      # checks both are set, stores them and returns -- no network call. With
+      # neither set it prints "Could not find kaggle.json" and calls
+      # `exit(1)`, so `import kaggle` took the whole suite down with
+      # `SystemExit: 1` and left two lines of _production.py unreachable.
+      #
+      # Dummy values are therefore enough to make the module importable, and
+      # no secret is needed for the gate. The one test that needs a REAL key
+      # queries the live API and is opt-in behind KAGGLE_LIVE=1.
+      KAGGLE_USERNAME: ci
+      KAGGLE_KEY: not-a-real-key
     steps:
       - uses: actions/checkout@v7
 

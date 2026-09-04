@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from platform_core.config import _test_hooks as config_env
+
 from platform_kaggle._production import (
     _get_kaggle_api,
     default_kaggle_api_factory,
@@ -18,10 +21,37 @@ from platform_kaggle.types import KaggleApiProtocol
 class TestGetKaggleApi:
     """Tests for _get_kaggle_api function."""
 
-    def test_get_kaggle_api_returns_real_kaggle_api(self) -> None:
-        """Test _get_kaggle_api returns the real kaggle.api singleton.
+    def test_returns_the_modules_authenticated_singleton(self) -> None:
+        """The function hands back ``kaggle.api``, and nothing else.
 
-        Requires KAGGLE_API_TOKEN to be set in environment.
+        This needs credentials to be PRESENT but not to be VALID. The kaggle
+        package authenticates at import: `_authenticate_with_legacy_apikey`
+        reads KAGGLE_USERNAME and KAGGLE_KEY from the environment, checks
+        both are there, stores them and returns -- no network call. Absent
+        them it prints "Could not find kaggle.json" and calls `exit(1)`,
+        which is why this module's two lines were unreachable in CI and the
+        whole suite died on `SystemExit: 1`.
+
+        So CI sets two dummy values and these lines run. The API call that
+        needs a REAL key lives in the live test below, which does not run by
+        default.
+        """
+        import kaggle
+
+        assert _get_kaggle_api() is kaggle.api
+
+    @pytest.mark.skipif(
+        config_env.get_env("KAGGLE_LIVE") != "1",
+        reason="live Kaggle API test; set KAGGLE_LIVE=1 with real credentials",
+    )
+    def test_get_kaggle_api_returns_real_kaggle_api(self) -> None:
+        """Query the real Kaggle API and check the shape that comes back.
+
+        OPT-IN, because it needs a valid key AND the network AND Kaggle to
+        have competitions today. It was previously part of the default gate,
+        so a run without credentials did not skip -- it exited the process.
+        A test that cannot pass in an environment should say so rather than
+        take the suite down with it.
         """
         api: KaggleApiProtocol = _get_kaggle_api()
 
