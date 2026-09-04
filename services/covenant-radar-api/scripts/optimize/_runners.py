@@ -36,6 +36,7 @@ from scripts.optimize.history import (
     result_to_entry,
 )
 from scripts.optimize.model_saver import SaveModelResult, save_best_model
+from scripts.optimize.run_records import append_optimization_record
 from scripts.optimize.runner import (
     RunResult,
     run_backend,
@@ -153,6 +154,19 @@ def _run_backend_with_progress(
         benchmark_fingerprint(determinism_record(UNPINNED_STACK, {}), config_env.get_env),
     )
     history.append(entry)
+    # The record goes out from the same place for the same reason: this is
+    # where a run is known to have finished and where its fingerprint was
+    # captured, so a record written here describes that moment and not a
+    # reconstruction of it. The history entry holds the search's shape; the
+    # record holds the claim, in the vocabulary
+    # `platform_core.run_record.compare_run_records` can read. Neither
+    # contains the other, which is why both are written.
+    #
+    # `result_to_entry` was handed a fingerprint unconditionally above, so
+    # this never hits the null-fingerprint refusal -- that arm exists for
+    # the 3,068 rows written before 2026-08-28, which are read back but
+    # never re-emitted.
+    append_optimization_record(history.path, entry)
     return result, elapsed, entry
 
 

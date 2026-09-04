@@ -254,6 +254,22 @@ class OptimizationHistory:
         self._entries: list[UnifiedHistoryEntry] = []
         self._loaded = False
 
+    @property
+    def path(self) -> Path:
+        """The JSONL this history reads and appends to.
+
+        Exposed because :mod:`scripts.optimize.run_records` writes the
+        workspace ``RunRecord`` for each run BESIDE this file, and under the
+        HPC3 farm the name carries a job-name suffix that only
+        :meth:`for_output_dir` knows how to build. A caller that guessed the
+        name would write records into one shared file while the history it
+        describes was correctly split per member.
+
+        Returns:
+            The history file path.
+        """
+        return self._path
+
     @classmethod
     def for_output_dir(cls, output_dir: Path) -> OptimizationHistory:
         """Create history manager for an output directory.
