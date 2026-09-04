@@ -15,7 +15,7 @@ source_git_blobs:
   "src/rw_bot/policy/situation.py": "4cf16f1d98b8bbe2e1f3611935f872b196533543"
 provenance:
   - "wiki/log.md 2026-08-07 'the arm ladder' — the wiki's own journal, kept as provenance rather than as a source_path: SCHEMA bans citing this wiki as evidence for a claim, and log.md is append-only so a pin on it would drift on every wiki operation"
-fact_checked: 2026-09-03
+fact_checked: 2026-09-04
 confidence: high
 hubs: [headless-harness]
 ---
@@ -96,15 +96,21 @@ construction, and only untouched-seed panels adopt.
 
 - Ratio rounding: the smallest integer ratio faithful to a weight vector
   (largest-remainder over a fixed total is the candidate).
-- Fitness at Impossible: ANSWERED NEGATIVELY (2026-09-03). impsearch1's
-  graduate read +0.27-0.32 across two search rounds and ZERO on 48
-  untouched seeds (imps5k48) -- round-to-round consistency inside one
-  selection process is not independent evidence, and margin fitness at
-  8-16 pairs per candidate selects noise there. A population at
-  Impossible needs far larger generations, a composite fitness
-  (survival depth, economy trajectory), or the corpus-trained heads
-  before it can climb. Very Hard's steeper landscape (deltas 1-2 at
-  similar sd) remains the right first target for v1.
+- Fitness at Impossible: ANSWERED NEGATIVELY (2026-09-03), and the
+  prescription SUPERSEDED (2026-09-04). impsearch1's graduate read
+  +0.27-0.32 across two search rounds and ZERO on 48 untouched seeds
+  (imps5k48) -- margin fitness at 8-16 pairs selects noise there. This
+  page then prescribed larger generations or a composite fitness; the
+  same-day composition washes close that route better than the
+  prescription knew: the VH champion's own byte-exact learned
+  composition read ZERO wins and +0.21 margin at Impossible
+  (g4m2imp48), the third composition wash at that rung -- so evolving
+  the army simplex there would spend larger generations measuring a
+  dimension already known flat. What remains for learning at
+  Impossible is the original plan's step three, the corpus-trained
+  heads: policy above the doctrine vocabulary, not better points
+  within it ([[impossible-economy-problem]] carries the closed-roads
+  map).
 - Generation seed budget: fresh blocks per generation burn ~2,500-seed
   panels fast; the seed namespace math holds to ~38 generations below
   the search floor and needs widening past that.

@@ -55,6 +55,7 @@ panel. Nothing on this list is a guess.
 ## Open questions (measurement running or queued)
 
 - The docket after the battery: the spatial layer (its first slice shipped 2026-08-15 -- coverage recorded as three trace columns, accumulating on every future match; next steps are the doom refit with spatial features once a corpus exists, and hold v2 designed against the field), a response worth driving with the banked doom model, and the exporter productionization. Composition tuning, the naval theater, the tilt, and the battery are all measured closed; the next gain must come from a capability class the bot does not yet have.
+- The Impossible frontier after 2026-09-04: every NAMED road is closed on mechanism-verified measurements in one span -- denial (impden48), rebuild-as-designed (imprb48), strike-window with the release provably firing (impstrike48), and composition three times over. Single-verb answers are exhausted; the standing next step is the original three-step plan's step three, the corpus-trained heads -- learned policy above the doctrine vocabulary -- with the spatial/doom corpus and the `rival_army` trace column as its instruments ([[impossible-economy-problem]], [[harness-population-search]]).
 
 ## Closed questions (measured, with the log entry that closed them)
 
