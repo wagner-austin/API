@@ -132,6 +132,31 @@ The other way a duplicate could return is the downloader, and it cannot:
 spelling in it.[^5] So the set has one producer and one shape, and the test
 holds the shape whether or not the producer is what filled the directory.
 
+## This change is split across two commits, and neither is comprehensible alone
+
+`git log` on any minimap, or on the static key, lands on a commit about a
+Model-Trainer cartridge strategy. That is not a mistake in the reader's
+search — it is where the files actually are.[^13]
+
+| commit | holds | subject says |
+|---|---|---|
+| `12717125` | the 46 file renames — 45 minimaps and the key | a Model-Trainer cartridge strategy |
+| `bccf5afa` | the code that addresses them — `resources.py`, the deleted override, the deleted CWD list, 23 repointed callers | "the wheel carries the key and the minimaps" |
+
+Two sessions were committing in one working tree twelve minutes apart. A
+shared index staged the renames under the first session's pathspec, so the
+bytes left in their commit and the code left in ours — and `bccf5afa`'s
+subject overclaims on its own terms, since it names minimaps it does not
+contain.
+
+Both commits carry a `git notes` annotation saying this, following the
+convention three earlier commits already use here. **The notes are the
+convenience, not the record.** `refs/notes/commits` has never been pushed to
+`origin`, so every note in this repository — including the three from July —
+is visible only on the machine that wrote it. A reader who clones sees none of
+them. That is why the table above is on this page rather than only in a note:
+the wiki is committed and shared, the notes are neither.
+
 ## What this buys
 
 A distribution that carries its own data works under pip, Docker, apptainer
@@ -155,3 +180,4 @@ layer.[^12]
 [^10]: Commit `bccf5afa` touches 37 files; the import repoint accounts for most of them, and `protocol/codec.py` retains no re-export of the moved function.
 [^11]: `src/tankpit_bot/resources.py:89` (`field_gif_path`, returning `Path | None`) and `:111` (`require_asset`, raising `BundledAssetMissingError`). The split is pinned by `test_an_unknown_field_resolves_to_none_rather_than_raising` and `test_a_named_asset_that_does_not_ship_is_refused`.
 [^12]: Verified 2026-09-03 by building the wheel and reading it: `tankpit_bot-0.1.0-py3-none-any.whl` carries 44 files under `tankpit_bot/data/*.gif` plus `tankpit_bot/data/xor_static_key.txt`, with no hyphen spelling present. The hpc3 `ImageSpec` (`tools/hpc3/src/hpc3/contracts/image_spec.py:170-182`) declares no assets field.
+[^13]: `git log --follow` on `src/tankpit_bot/data/field01_r.gif` and on `xor_static_key.txt`, read 2026-09-03: both list `12717125` as their most recent commit. `git show --name-status 12717125` reports 46 `R100` entries under `clients/` alongside 12 additions and 62 modifications under `services/` and `libs/`. `git ls-remote origin 'refs/notes/*'` returns nothing.
