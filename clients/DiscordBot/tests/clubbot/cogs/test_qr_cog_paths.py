@@ -131,7 +131,17 @@ def test_qr_extract_attr_and_setup() -> None:
     try:
         import clubbot.cogs.qr as qr_mod
 
-        asyncio.get_event_loop().run_until_complete(qr_mod.setup(_Bot()))
+        # `asyncio.run`, like every other coroutine-driving test in this
+        # suite. This line was the one holdout on
+        # `get_event_loop().run_until_complete(...)`, which reaches for an
+        # AMBIENT loop rather than making one. On Windows an ambient loop
+        # exists because `pytest_sessionstart` installs a policy; on Linux
+        # nothing has set one, so the call raises "There is no current event
+        # loop in thread 'MainThread'" and this was the only test in the
+        # package that failed on ubuntu. `get_event_loop()` outside a
+        # coroutine has been deprecated since 3.10 and raises from 3.12, so
+        # the platform split was a deadline as well as a portability gap.
+        asyncio.run(qr_mod.setup(_Bot()))
         assert added.get("ok") is True
     finally:
         _test_hooks.load_settings = original_load

@@ -85,7 +85,18 @@ _build_settings = build_settings
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    """Ensure get_event_loop() works reliably on Windows with strict asyncio mode."""
+    """Select the loop implementation Windows runs these tests under.
+
+    The selector policy, not the Proactor default: httpx and the trainer
+    notifier's polling both live on it, and Proactor's subprocess/socket
+    behaviour differs enough that a suite green under one is not evidence
+    for the other.
+
+    This used to say it was here so ``get_event_loop()`` would work. No test
+    calls ``get_event_loop()`` any more -- the last one drove a coroutine
+    through an ambient loop and failed on Linux for exactly that reason --
+    so the old sentence described a caller that no longer exists.
+    """
     if sys.platform.startswith("win"):
         if hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
