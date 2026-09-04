@@ -100,6 +100,29 @@ def find_holder(path: pathlib.Path, *, node: str, project: str, now_unix: int) -
     return None
 
 
+def find_by_run(path: pathlib.Path, *, run_id: str, now_unix: int) -> Lease | None:
+    """Find the live lease one dispatch holds, if it still holds one.
+
+    Distinct from :func:`find_holder`, which asks what stands in the way of a
+    NEW dispatch. This asks whether a KNOWN one still holds its claim, and the
+    answer None is meaningful rather than an error: a run whose lease lapsed
+    while it was still going is the wedge case, and the caller that needs to
+    know is the one trying to stop it.
+
+    Args:
+        path: The lease file.
+        run_id: The dispatch.
+        now_unix: Current time, whole seconds since the epoch.
+
+    Returns:
+        Its lease, or None when it holds none.
+    """
+    for lease in held_leases(path, now_unix=now_unix):
+        if lease["run_id"] == run_id:
+            return lease
+    return None
+
+
 def acquire(
     path: pathlib.Path,
     lease: Lease,
@@ -166,4 +189,4 @@ def release(path: pathlib.Path, *, run_id: str, now_unix: int) -> None:
     _test_hooks.write_text(path, dump_json_str([encode_lease(entry) for entry in remaining]))
 
 
-__all__ = ["acquire", "find_holder", "held_leases", "read_leases", "release"]
+__all__ = ["acquire", "find_by_run", "find_holder", "held_leases", "read_leases", "release"]

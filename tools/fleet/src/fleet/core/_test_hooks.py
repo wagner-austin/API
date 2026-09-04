@@ -116,6 +116,28 @@ class AppendTextProtocol(Protocol):
         """
 
 
+class ReadBytesProtocol(Protocol):
+    """Reads a file's whole contents as bytes."""
+
+    def __call__(self, path: pathlib.Path) -> bytes:
+        """Read a file without decoding it.
+
+        Distinct from :class:`ReadTextProtocol` rather than a mode on it,
+        because the one caller is reading a gzip archive and the text reader
+        decodes as UTF-8 with replacement -- which is right for a diagnostic
+        and silently destroys an archive.
+
+        Args:
+            path: Absolute path to read.
+
+        Returns:
+            The file's contents.
+
+        Raises:
+            OSError: If the file cannot be read.
+        """
+
+
 class FileExistsProtocol(Protocol):
     """Reports whether a path names an existing regular file."""
 
@@ -211,6 +233,18 @@ def _default_append_text(path: pathlib.Path, line: str) -> None:
         handle.write(line + "\n")
 
 
+def _default_read_bytes(path: pathlib.Path) -> bytes:
+    """Read a real file without decoding it.
+
+    Args:
+        path: Absolute path to read.
+
+    Returns:
+        The file's contents.
+    """
+    return path.read_bytes()
+
+
 def _default_file_exists(path: pathlib.Path) -> bool:
     """Report whether a real path names an existing file.
 
@@ -237,6 +271,7 @@ def _default_write_text(path: pathlib.Path, text: str) -> None:
 run: RunProtocol = _default_run
 now: NowProtocol = _default_now
 read_text: ReadTextProtocol = _default_read_text
+read_bytes: ReadBytesProtocol = _default_read_bytes
 file_exists: FileExistsProtocol = _default_file_exists
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
@@ -247,12 +282,14 @@ __all__ = [
     "CommandResult",
     "FileExistsProtocol",
     "NowProtocol",
+    "ReadBytesProtocol",
     "ReadTextProtocol",
     "RunProtocol",
     "WriteTextProtocol",
     "append_text",
     "file_exists",
     "now",
+    "read_bytes",
     "read_text",
     "run",
     "write_text",

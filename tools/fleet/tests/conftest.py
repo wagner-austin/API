@@ -143,6 +143,7 @@ def _restore() -> None:
     _test_hooks.run = _test_hooks._default_run
     _test_hooks.now = _test_hooks._default_now
     _test_hooks.read_text = _test_hooks._default_read_text
+    _test_hooks.read_bytes = _test_hooks._default_read_bytes
     _test_hooks.file_exists = _test_hooks._default_file_exists
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text

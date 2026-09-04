@@ -266,3 +266,37 @@ class TestRelease:
             leases.release(path, run_id="mine", now_unix=_NOW)
 
         assert excinfo.value.code is FleetErrorCode.LEASE_NOT_HELD
+
+
+class TestFindByRun:
+    def test_it_finds_the_lease_one_dispatch_holds(self, tmp_path: pathlib.Path) -> None:
+        path = tmp_path / "leases.json"
+        _write_leases(path, _lease(run_id="mine"))
+
+        found = leases.find_by_run(path, run_id="mine", now_unix=_NOW)
+
+        assert found == _lease(run_id="mine")
+
+    def test_it_scans_past_leases_other_runs_hold(self, tmp_path: pathlib.Path) -> None:
+        """The loop must keep going, not stop at the first non-match.
+
+        With one lease in the file both a working scan and a broken one
+        return the same answer, so the ordering here is the test.
+        """
+        path = tmp_path / "leases.json"
+        _write_leases(
+            path,
+            _lease(run_id="theirs", project="tools/hpc3"),
+            _lease(run_id="mine", project="services/Model-Trainer"),
+        )
+
+        found = leases.find_by_run(path, run_id="mine", now_unix=_NOW)
+
+        assert found == _lease(run_id="mine", project="services/Model-Trainer")
+
+    def test_a_dispatch_whose_lease_lapsed_holds_none(self, tmp_path: pathlib.Path) -> None:
+        """The wedge case, and the one `fleet-cancel` must still act on."""
+        path = tmp_path / "leases.json"
+        _write_leases(path, _lease(run_id="wedged", acquired=_NOW - 600, expires=_NOW - 1))
+
+        assert leases.find_by_run(path, run_id="wedged", now_unix=_NOW) is None
