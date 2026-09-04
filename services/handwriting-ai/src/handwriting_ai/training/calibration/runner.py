@@ -22,22 +22,15 @@ from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import MultiprocessingProcessProtocol
 from handwriting_ai.training.calibration._types import (
-    BudgetConfig as BudgetConfig,
+    BudgetConfig,
+    CalibrationResult,
+    Candidate,
+    CandidateOutcome,
 )
-from handwriting_ai.training.calibration._types import (
-    CandidateError as CandidateError,
-)
-from handwriting_ai.training.calibration._types import (
-    CandidateOutcome as CandidateOutcome,
-)
-from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
     InlineSpec,
     PreprocessSpec,
-)
-from handwriting_ai.training.calibration.measure import (
-    CalibrationResult,
 )
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 from handwriting_ai.training.safety import set_memory_guard_config
@@ -45,13 +38,6 @@ from handwriting_ai.training.safety import set_memory_guard_config
 _QueueHandler = load_queue_handler_factory()
 _QueueListener = load_queue_listener_factory()
 _LOGGER = get_logger("handwriting_ai")
-
-
-# CandidateError and CandidateOutcome are imported from _types to avoid circular imports.
-# Re-export for backwards compatibility.
-
-# BudgetConfig is imported from _types to avoid circular imports.
-# Re-export for backwards compatibility.
 
 
 class CandidateRunner(Protocol):
@@ -388,9 +374,6 @@ class SubprocessRunner:
 
 
 __all__ = [
-    "BudgetConfig",
-    "CandidateError",
-    "CandidateOutcome",
     "CandidateRunner",
     "SubprocessRunner",
 ]

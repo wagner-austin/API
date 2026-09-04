@@ -8,11 +8,11 @@ from handwriting_ai._hook_protocols_training import EffectiveConfig
 from handwriting_ai.training.dataset import AugmentConfig, DataLoaderConfig
 from handwriting_ai.training.resources import ResourceLimits
 
+from ._types import BudgetConfig, CalibrationResult
 from .cache import _read_cache, _valid_cache, _write_cache
 from .candidates import _generate_candidates
 from .ds_spec import PreprocessSpec
-from .measure import CalibrationResult
-from .runner import BudgetConfig, SubprocessRunner
+from .runner import SubprocessRunner
 from .signature import make_signature as _make_signature
 
 

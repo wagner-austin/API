@@ -10,7 +10,7 @@ from typing import Protocol
 import pytest
 from PIL import Image
 
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
     InlineSpec,

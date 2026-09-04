@@ -5,7 +5,7 @@ from __future__ import annotations
 from github_stats_api.api.schemas.stats import (
     Capability,
 )
-from github_stats_api.svg_renderer import (
+from github_stats_api.renderers import (
     build_capabilities_response,
     build_language_stats,
     build_user_stats,

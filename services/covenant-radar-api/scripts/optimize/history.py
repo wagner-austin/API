@@ -49,9 +49,9 @@ HISTORY_FILENAME = "optimization_history.jsonl"
 class UnifiedHistoryEntry(TypedDict, total=True):
     """Unified optimization run history entry for any backend.
 
-    Stores common fields plus the best AUC and best trial number.
-    Hyperparameters are stored as flat best_* fields for backward
-    compatibility with the JSONL history format.
+    Stores common fields plus the best AUC and best trial number. It carries
+    no hyperparameters: the sentence claiming they were held as flat ``best_*``
+    fields described a shape this entry does not have, and outlived it.
     """
 
     timestamp: str

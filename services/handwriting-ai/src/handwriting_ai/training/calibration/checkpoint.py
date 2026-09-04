@@ -6,8 +6,8 @@ from typing import TypedDict
 
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
 
+from handwriting_ai.training.calibration._types import CalibrationResult
 from handwriting_ai.training.calibration.cache import _decode_float, _decode_int
-from handwriting_ai.training.calibration.measure import CalibrationResult
 
 
 class CalibrationStage(StrEnum):

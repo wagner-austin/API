@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from platform_core.config import config_test_hooks
 from platform_core.errors import AppError, CalendarErrorCode
+from platform_core.oauth_types import OAuthTokens
 
 from platform_calendar._prod_hooks import (
     _prod_console_output,
@@ -21,7 +22,6 @@ from platform_calendar._prod_hooks import (
     _prod_save_tokens,
     _prod_write_file,
 )
-from platform_calendar.types import OAuthTokens
 
 
 def _make_fake_env_get(env_vars: dict[str, str]) -> Callable[[str], str | None]:

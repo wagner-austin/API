@@ -48,6 +48,7 @@ from monorepo_guards.rust_rules import (
     RustTestRule,
 )
 from monorepo_guards.security_rules import SecurityRule
+from monorepo_guards.shim_rules import ShimRule
 from monorepo_guards.standardization_rules import StandardizationRule
 from monorepo_guards.suppress_rules import SuppressRule
 from monorepo_guards.test_quality_rules import WeakAssertionRule
@@ -96,6 +97,7 @@ def _run_with_config(config: GuardConfig) -> int:
         LiteralSetRule(STRATEGY_NAME_SET),
         FileSizeRule(),
         GuardShimRule(),
+        ShimRule(),
         MockBanRule(),
         MonkeyPatchBanRule(),
         RestrictedSymbolRule(),

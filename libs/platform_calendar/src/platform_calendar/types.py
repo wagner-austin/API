@@ -1,8 +1,4 @@
-"""TypedDict definitions for Google Calendar API and competition tracking.
-
-OAuth types (OAuthCredentials, OAuthTokens, OAuthTokenResponse) are re-exported
-from platform_core.oauth_types for backward compatibility.
-"""
+"""TypedDict definitions for Google Calendar API and competition tracking."""
 
 from __future__ import annotations
 
@@ -18,18 +14,6 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
-
-# Re-export OAuth types from platform_core
-from platform_core.oauth_types import OAuthCredentials as OAuthCredentials
-from platform_core.oauth_types import OAuthTokenResponse as OAuthTokenResponse
-from platform_core.oauth_types import OAuthTokens as OAuthTokens
-from platform_core.oauth_types import TokenType as TokenType
-from platform_core.oauth_types import decode_oauth_credentials as decode_oauth_credentials
-from platform_core.oauth_types import decode_oauth_token_response as decode_oauth_token_response
-from platform_core.oauth_types import decode_oauth_tokens as decode_oauth_tokens
-from platform_core.oauth_types import encode_oauth_credentials as encode_oauth_credentials
-from platform_core.oauth_types import encode_oauth_token_response as encode_oauth_token_response
-from platform_core.oauth_types import encode_oauth_tokens as encode_oauth_tokens
 
 # =============================================================================
 # Literal Types
@@ -484,12 +468,8 @@ __all__ = [
     "EventStatus",
     "GoogleCredentialsFile",
     "GoogleInstalledCredentials",
-    "OAuthCredentials",
-    "OAuthTokenResponse",
-    "OAuthTokens",
     "ReminderMethod",
     "ReminderOverride",
-    "TokenType",
     "TrackedCompetition",
     "decode_calendar_event",
     "decode_calendar_list_item",
@@ -497,9 +477,6 @@ __all__ = [
     "decode_event_datetime",
     "decode_event_reminders",
     "decode_google_credentials_file",
-    "decode_oauth_credentials",
-    "decode_oauth_token_response",
-    "decode_oauth_tokens",
     "decode_reminder_override",
     "decode_tracked_competition",
     "encode_calendar_event",
@@ -507,9 +484,6 @@ __all__ = [
     "encode_competitions_file",
     "encode_event_datetime",
     "encode_event_reminders",
-    "encode_oauth_credentials",
-    "encode_oauth_token_response",
-    "encode_oauth_tokens",
     "encode_reminder_override",
     "encode_tracked_competition",
 ]

@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONTypeError
 
+from handwriting_ai.training.calibration._types import CalibrationResult
 from handwriting_ai.training.calibration.checkpoint import (
     CalibrationCheckpoint,
     CalibrationStage,
     read_checkpoint,
     write_checkpoint,
 )
-from handwriting_ai.training.calibration.measure import CalibrationResult
 
 
 def test_checkpoint_decode_invalid_header(tmp_path: Path) -> None:

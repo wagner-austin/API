@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from platform_core.oauth_types import OAuthCredentials
+
 from platform_calendar.config import (
     CALENDAR_SCOPES,
     GOOGLE_AUTH_URL,
@@ -18,7 +20,6 @@ from platform_calendar.fakes import (
 from platform_calendar.testing import (
     hooks,
 )
-from platform_calendar.types import OAuthCredentials
 
 
 class TestConstants:

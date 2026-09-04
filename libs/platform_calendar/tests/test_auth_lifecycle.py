@@ -6,6 +6,7 @@ import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import dump_json_str
 from platform_core.oauth import generate_code_challenge, generate_code_verifier
+from platform_core.oauth_types import OAuthCredentials, OAuthTokens
 
 from platform_calendar.auth import (
     authorize,
@@ -27,7 +28,6 @@ from platform_calendar.fakes import (
 from platform_calendar.testing import (
     hooks,
 )
-from platform_calendar.types import OAuthCredentials, OAuthTokens
 
 
 class TestIsTokenExpired:

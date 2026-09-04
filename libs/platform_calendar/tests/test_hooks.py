@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokens,
+)
 
 from platform_calendar.fakes import (
     make_fake_calendar,
@@ -25,10 +29,6 @@ from platform_calendar.fakes import (
 from platform_calendar.testing import (
     hooks,
     reset_hooks,
-)
-from platform_calendar.types import (
-    OAuthCredentials,
-    OAuthTokens,
 )
 
 

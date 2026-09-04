@@ -28,6 +28,11 @@ from platform_core.oauth import (
 from platform_core.oauth import (
     is_token_expired as _core_is_token_expired,
 )
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokens,
+    decode_oauth_token_response,
+)
 
 from platform_calendar.config import (
     CALENDAR_SCOPES,
@@ -35,11 +40,6 @@ from platform_calendar.config import (
     GOOGLE_TOKEN_URL,
 )
 from platform_calendar.testing import hooks
-from platform_calendar.types import (
-    OAuthCredentials,
-    OAuthTokens,
-    decode_oauth_token_response,
-)
 
 # =============================================================================
 # Authorization URL

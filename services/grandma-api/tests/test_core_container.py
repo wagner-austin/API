@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from platform_langid._test_hooks import SpokenLanguageDetectorProtocol
 from platform_langid.types import DetectorConfig, SpokenLanguageResult
+from platform_stt import _test_hooks as stt_hooks
+from platform_stt._test_hooks import OpenAIClientProtocol
+from platform_stt.types import BinaryFileProtocol, RawVerboseDict
 from platform_translate.types import TranslatorConfig
 
 from grandma_api.config import GrandmaApiSettings
 from grandma_api.core.container import (
     ServiceContainer,
     _default_langid_detector_factory,
+    _default_stt_client_factory,
     _default_translator_factory,
 )
 
@@ -18,6 +22,77 @@ from .conftest import (
     make_fake_stt_client,
     make_fake_translator,
 )
+
+
+class _FakeOpenAIAudioTranscriptions:
+    """Fake transcriptions interface."""
+
+    def create(
+        self,
+        *,
+        model: str,
+        file: BinaryFileProtocol,
+        response_format: str,
+        language: str | None = None,
+        timeout: float | None = None,
+    ) -> RawVerboseDict:
+        return {"text": "test", "segments": [], "language": "en"}
+
+
+class _FakeOpenAIAudioTranslations:
+    """Fake translations interface."""
+
+    def create(
+        self,
+        *,
+        model: str,
+        file: BinaryFileProtocol,
+        response_format: str,
+        timeout: float | None = None,
+    ) -> RawVerboseDict:
+        return {"text": "test", "segments": [], "language": "en"}
+
+
+class _FakeOpenAIAudio:
+    """Fake audio namespace."""
+
+    @property
+    def transcriptions(self) -> _FakeOpenAIAudioTranscriptions:
+        return _FakeOpenAIAudioTranscriptions()
+
+    @property
+    def translations(self) -> _FakeOpenAIAudioTranslations:
+        return _FakeOpenAIAudioTranslations()
+
+
+class _FakeOpenAIClient:
+    """Fake OpenAI client."""
+
+    @property
+    def audio(self) -> _FakeOpenAIAudio:
+        return _FakeOpenAIAudio()
+
+
+def test_default_stt_client_factory_creates_client() -> None:
+    """Test _default_stt_client_factory creates an STT client.
+
+    Rebinds platform_stt's own seam so no real OpenAI client is constructed.
+    This factory is what ``ServiceContainer.from_settings`` wires in
+    production, so it is covered here beside the two factories it sits with
+    rather than through a hook module nothing reads.
+    """
+    original = stt_hooks.openai_client_factory
+
+    def _fake_factory(*, api_key: str, timeout: float, max_retries: int) -> OpenAIClientProtocol:
+        return _FakeOpenAIClient()
+
+    stt_hooks.openai_client_factory = _fake_factory
+    try:
+        client = _default_stt_client_factory("sk-test-key")
+        assert callable(client.transcribe)
+        assert callable(client.translate)
+    finally:
+        stt_hooks.openai_client_factory = original
 
 
 def test_default_langid_detector_factory_creates_detector() -> None:

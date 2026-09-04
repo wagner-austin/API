@@ -11,6 +11,10 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from platform_core.json_utils import JSONObject
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokens,
+)
 
 # Re-export OAuth testing utilities from platform_core for convenience.
 # Note: platform_calendar has its own make_fake_credentials/make_fake_tokens
@@ -47,8 +51,6 @@ from platform_calendar.types import (
     CalendarEvent,
     CalendarListItem,
     EventDateTime,
-    OAuthCredentials,
-    OAuthTokens,
 )
 
 # =============================================================================

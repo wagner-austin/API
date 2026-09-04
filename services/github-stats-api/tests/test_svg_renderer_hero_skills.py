@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from github_stats_api.svg_renderer import (
+from github_stats_api.renderers import (
     render_hero_card,
     render_skills_card,
 )

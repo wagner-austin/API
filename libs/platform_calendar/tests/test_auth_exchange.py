@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import dump_json_str
+from platform_core.oauth_types import OAuthCredentials
 
 from platform_calendar.auth import (
     build_auth_url,
@@ -19,7 +20,6 @@ from platform_calendar.fakes import (
 from platform_calendar.testing import (
     hooks,
 )
-from platform_calendar.types import OAuthCredentials
 
 
 class TestBuildAuthUrl:

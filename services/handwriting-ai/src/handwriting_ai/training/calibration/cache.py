@@ -12,7 +12,7 @@ from platform_core.json_utils import (
 
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols import LoggerInstanceProtocol
-from handwriting_ai.training.calibration.measure import CalibrationResult
+from handwriting_ai.training.calibration._types import CalibrationResult
 from handwriting_ai.training.calibration.signature import CalibrationSignature
 
 

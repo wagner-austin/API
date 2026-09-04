@@ -13,12 +13,11 @@ from pathlib import Path
 
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import JSONObject
-from rich.console import Console
-
-from platform_calendar.types import (
+from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
 )
+from rich.console import Console
 
 
 def _prod_http_get(url: str, headers: dict[str, str]) -> str:
@@ -124,8 +123,7 @@ def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
         load_json_str,
         narrow_json_to_dict,
     )
-
-    from platform_calendar.types import OAuthTokens, decode_oauth_tokens
+    from platform_core.oauth_types import OAuthTokens, decode_oauth_tokens
 
     # Check environment variables first using centralized hook
     env_access_token = config_test_hooks.get_env("GOOGLE_CALENDAR_ACCESS_TOKEN")
@@ -172,8 +170,7 @@ def _prod_save_tokens(tokens: OAuthTokens, path: str | None = None) -> None:
     """Production token saver - writes to ~/.google/calendar_tokens.json."""
 
     from platform_core.json_utils import dump_json_str
-
-    from platform_calendar.types import encode_oauth_tokens
+    from platform_core.oauth_types import encode_oauth_tokens
 
     tokens_path = Path(path) if path else Path.home() / ".google" / "calendar_tokens.json"
     tokens_path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,8 +208,9 @@ def _prod_load_credentials(path: str | None = None) -> OAuthCredentials:
         load_json_str,
         narrow_json_to_dict,
     )
+    from platform_core.oauth_types import OAuthCredentials
 
-    from platform_calendar.types import OAuthCredentials, decode_google_credentials_file
+    from platform_calendar.types import decode_google_credentials_file
 
     # Check environment variables first using centralized hook
     env_client_id = config_test_hooks.get_env("GOOGLE_CALENDAR_CLIENT_ID")

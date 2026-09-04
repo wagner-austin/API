@@ -8,7 +8,7 @@ from torch.optim.optimizer import Optimizer as TorchOptimizer
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import BatchIterableProtocol, DataLoaderConfigProtocol
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.measure import _measure_candidate
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 from handwriting_ai.training.safety import (

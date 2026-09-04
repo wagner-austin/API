@@ -9,8 +9,7 @@ from platform_kaggle import build_profile
 
 from ..._test_hooks import get_client_hook, get_github_client_hook
 from ...client import GitHubClient
-from ...settings import Settings
-from ...svg_renderer import (
+from ...renderers import (
     build_capabilities_response,
     build_language_stats,
     build_user_stats,
@@ -20,6 +19,7 @@ from ...svg_renderer import (
     render_skills_card,
     render_stats_card,
 )
+from ...settings import Settings
 from ..schemas.stats import Capability
 from ..validators.stats import (
     decode_capabilities_request,

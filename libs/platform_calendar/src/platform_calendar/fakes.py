@@ -7,6 +7,10 @@ The hooks container and protocols live in
 from __future__ import annotations
 
 from platform_core.errors import AppError, CalendarErrorCode
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokens,
+)
 
 from platform_calendar.testing import (
     CalendarClientProtocol,
@@ -28,8 +32,6 @@ from platform_calendar.types import (
     CalendarListItem,
     EventDateTime,
     EventReminders,
-    OAuthCredentials,
-    OAuthTokens,
     ReminderOverride,
 )
 

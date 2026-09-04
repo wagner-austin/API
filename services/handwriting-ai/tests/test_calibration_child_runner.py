@@ -10,14 +10,16 @@ from typing import Protocol
 from PIL import Image
 from platform_core.logging import get_logger
 
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import (
+    BudgetConfig,
+    Candidate,
+)
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
     InlineSpec,
     PreprocessSpec,
 )
 from handwriting_ai.training.calibration.runner import (
-    BudgetConfig,
     _child_entry,
 )
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset

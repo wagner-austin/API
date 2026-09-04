@@ -7,11 +7,15 @@ from PIL import Image
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
 from handwriting_ai._hook_protocols_training import MemorySnapshotDict
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import (
+    BudgetConfig,
+    CalibrationResult,
+    Candidate,
+    CandidateOutcome,
+    OrchestratorConfig,
+)
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
-from handwriting_ai.training.calibration.measure import CalibrationResult
-from handwriting_ai.training.calibration.orchestrator import Orchestrator, OrchestratorConfig
-from handwriting_ai.training.calibration.runner import BudgetConfig, CandidateOutcome
+from handwriting_ai.training.calibration.orchestrator import Orchestrator
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 
 _TEST_CFG: AugmentConfig = {
@@ -272,7 +276,7 @@ def test_orchestrator_candidate_failure_aborts(tmp_path: Path) -> None:
             samples: int,
             budget: BudgetConfig,
         ) -> CandidateOutcome:
-            from handwriting_ai.training.calibration.runner import CandidateError
+            from handwriting_ai.training.calibration._types import CandidateError
 
             err: CandidateError = {
                 "kind": "timeout",

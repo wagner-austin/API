@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from github_stats_api.svg_renderer import (
+from github_stats_api.renderers import (
     build_language_stats,
     build_user_stats,
 )

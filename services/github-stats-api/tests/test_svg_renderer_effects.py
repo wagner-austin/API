@@ -6,7 +6,7 @@ from github_stats_api.api.schemas.stats import (
     LanguageStats,
     UserStats,
 )
-from github_stats_api.svg_renderer import (
+from github_stats_api.renderers import (
     render_langs_card,
     render_stats_card,
 )

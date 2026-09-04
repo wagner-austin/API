@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_core.oauth_types import OAuthCredentials
+
 from platform_calendar.testing import hooks
-from platform_calendar.types import OAuthCredentials
 
 # =============================================================================
 # Default Paths

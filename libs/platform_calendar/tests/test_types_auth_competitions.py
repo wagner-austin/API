@@ -4,20 +4,22 @@ from __future__ import annotations
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokens,
+    decode_oauth_credentials,
+    decode_oauth_tokens,
+    encode_oauth_credentials,
+    encode_oauth_tokens,
+)
 
 from platform_calendar.types import (
     CompetitionsFile,
-    OAuthCredentials,
-    OAuthTokens,
     TrackedCompetition,
     decode_competitions_file,
     decode_google_credentials_file,
-    decode_oauth_credentials,
-    decode_oauth_tokens,
     decode_tracked_competition,
     encode_competitions_file,
-    encode_oauth_credentials,
-    encode_oauth_tokens,
     encode_tracked_competition,
 )
 

@@ -1,12 +1,12 @@
 """Guard rule banning a type bound to a second spelling of its own name.
 
-    # Kept for backward compatibility with existing code.
+    # Retained so the old spelling still resolves.
     GoogleTokenResponse = OAuthTokenResponse
 
 The workspace already bans ``X: TypeAlias = ...`` (``typing_rules``). This is
 the same defect written without the annotation, which is exactly why it
 survived: that rule reads the annotation, and here there is none. Three of the
-five back-compat shims deleted on 2026-08-26 were this shape, and each was
+five compatibility aliases deleted on 2026-08-26 were this shape, and each was
 found by reading the comment its author left on it -- not a search strategy
 that scales, which is why the rule exists.
 

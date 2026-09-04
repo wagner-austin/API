@@ -8,23 +8,22 @@ from platform_core.logging import get_logger
 
 from handwriting_ai import _test_hooks
 from handwriting_ai._hook_protocols_ml import PreprocessDatasetProtocol
-from handwriting_ai.training.calibration._types import OrchestratorConfig as OrchestratorConfig
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import (
+    BudgetConfig,
+    CalibrationResult,
+    Candidate,
+    CandidateOutcome,
+    OrchestratorConfig,
+)
 from handwriting_ai.training.calibration.checkpoint import (
     CalibrationStage,
     read_checkpoint,
     write_checkpoint,
 )
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
-from handwriting_ai.training.calibration.measure import CalibrationResult
 from handwriting_ai.training.calibration.runner import (
-    BudgetConfig,
-    CandidateOutcome,
     CandidateRunner,
 )
-
-# OrchestratorConfig is imported from _types to avoid circular imports.
-# Re-export for backwards compatibility.
 
 
 class Orchestrator:
@@ -251,5 +250,4 @@ class Orchestrator:
 
 __all__ = [
     "Orchestrator",
-    "OrchestratorConfig",
 ]

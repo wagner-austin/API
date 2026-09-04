@@ -2,11 +2,8 @@ from __future__ import annotations
 
 import torch
 
-from handwriting_ai.training.calibration._types import Candidate as Candidate
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.resources import ResourceLimits, compute_max_batch_size
-
-# Candidate is imported from _types to avoid circular imports.
-# Re-export for backwards compatibility.
 
 
 def _candidate_threads(limits: ResourceLimits) -> list[int]:

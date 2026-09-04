@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from handwriting_ai.training.calibration._types import (
+    CalibrationResult,
+    Candidate,
+)
 from handwriting_ai.training.calibration.cache import (
     _decode_float,
     _decode_int,
@@ -11,13 +15,11 @@ from handwriting_ai.training.calibration.cache import (
 )
 from handwriting_ai.training.calibration.calibrator import calibrate_input_pipeline
 from handwriting_ai.training.calibration.candidates import (
-    Candidate,
     _candidate_threads,
     _candidate_workers,
     _generate_candidates,
 )
 from handwriting_ai.training.calibration.measure import (
-    CalibrationResult,
     _measure_candidate,
     _measure_loader,
     _safe_loader,

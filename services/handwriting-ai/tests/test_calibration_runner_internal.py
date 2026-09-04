@@ -5,7 +5,7 @@ from multiprocessing.process import BaseProcess
 from pathlib import Path
 
 from handwriting_ai import _test_hooks
-from handwriting_ai.training.calibration.measure import CalibrationResult
+from handwriting_ai.training.calibration._types import CalibrationResult
 from handwriting_ai.training.calibration.runner import (
     SubprocessRunner,
     _emit_result_file,

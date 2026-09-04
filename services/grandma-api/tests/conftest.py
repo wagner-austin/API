@@ -15,7 +15,6 @@ from platform_translate.backends.protocol import TranslationBackendProtocol
 from platform_translate.types import TranslationResult, TranslatorConfig
 from scripts import _test_hooks as scripts_test_hooks
 
-from grandma_api.api import _test_hooks as api_hooks
 from grandma_api.config import GrandmaApiSettings
 from grandma_api.core.container import (
     LangIdDetectorFactoryProtocol,
@@ -285,14 +284,6 @@ def _restore_config_hooks() -> Generator[None, None, None]:
     original_get_env = config_test_hooks.get_env
     yield
     config_test_hooks.get_env = original_get_env
-
-
-@pytest.fixture(autouse=True)
-def _restore_api_hooks() -> Generator[None, None, None]:
-    """Restore API hooks after each test."""
-    original_stt_factory = api_hooks.stt_client_factory
-    yield
-    api_hooks.stt_client_factory = original_stt_factory
 
 
 @pytest.fixture(autouse=True)

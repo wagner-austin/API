@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from handwriting_ai.training.calibration.candidates import Candidate
-from handwriting_ai.training.calibration.runner import BudgetConfig, SubprocessRunner
+from handwriting_ai.training.calibration._types import BudgetConfig, Candidate
+from handwriting_ai.training.calibration.runner import SubprocessRunner
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.train_config import default_train_config
 

@@ -6,7 +6,7 @@ from github_stats_api.api.schemas.stats import (
     CapabilitiesResponse,
     Capability,
 )
-from github_stats_api.svg_renderer import (
+from github_stats_api.renderers import (
     render_capabilities_card,
 )
 

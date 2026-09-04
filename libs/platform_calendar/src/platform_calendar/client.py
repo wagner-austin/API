@@ -14,6 +14,9 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.oauth_types import (
+    OAuthTokens,
+)
 
 from platform_calendar.config import GOOGLE_CALENDAR_API_BASE
 from platform_calendar.testing import CalendarClientProtocol, HTTPErrorProtocol, hooks
@@ -21,7 +24,6 @@ from platform_calendar.types import (
     CalendarEvent,
     CalendarListItem,
     EventDateTime,
-    OAuthTokens,
     decode_calendar_event,
     decode_calendar_list_item,
 )

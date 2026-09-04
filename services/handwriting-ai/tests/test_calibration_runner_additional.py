@@ -5,7 +5,7 @@ from pathlib import Path
 
 from platform_core.logging import get_logger
 
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
 from handwriting_ai.training.calibration.runner import _build_dataset_from_spec, _child_entry
 

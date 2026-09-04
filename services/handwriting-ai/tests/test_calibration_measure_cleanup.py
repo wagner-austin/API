@@ -3,7 +3,7 @@ from __future__ import annotations
 from PIL import Image
 
 from handwriting_ai import _test_hooks
-from handwriting_ai.training.calibration.candidates import Candidate
+from handwriting_ai.training.calibration._types import Candidate
 from handwriting_ai.training.calibration.measure import _measure_candidate
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.train_config import default_train_config
