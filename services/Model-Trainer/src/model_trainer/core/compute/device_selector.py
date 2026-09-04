@@ -1,8 +1,14 @@
 """Device selection utilities for Model-Trainer.
 
-Re-exports types and functions from platform_ml for centralized device detection,
-precision resolution, and batch size recommendations. Adds model-family-specific
-batch size logic that is unique to Model-Trainer.
+Re-exports types and functions from platform_ml for centralized device
+detection and precision resolution.
+
+IT USED TO ADD ONE THING OF ITS OWN, and that thing was removed on
+2026-09-04. ``recommended_batch_size_for`` rewrote any declared batch size of
+4 or less on CUDA to a family default, so a payload declaring 4 trained at 16
+and reported 4. Batch size decides the optimization trajectory, so that made
+one document describe two different experiments depending on which entry
+point ran it. What a payload declares is not a suggestion.
 """
 
 from __future__ import annotations
@@ -21,27 +27,3 @@ ModelFamily = Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
 
 _CUDA: Final[ResolvedDevice] = "cuda"
 _CPU: Final[ResolvedDevice] = "cpu"
-
-
-def recommended_batch_size_for(
-    model_family: ModelFamily, current: int, device: ResolvedDevice
-) -> int:
-    """Recommend a batch size based on model family and device.
-
-    This is Model-Trainer-specific logic that extends platform_ml's generic
-    recommended_batch_size with model-family-aware defaults.
-
-    - On CUDA, increase conservative defaults to backend-appropriate values when
-      users provided very small batches (<=4).
-    - On CPU, leave the user-provided batch unchanged.
-    """
-    if device == _CPU:
-        return current
-    if current > 4:
-        return current
-    if model_family == "char_lstm":
-        return 64
-    if model_family == "gpt2":
-        return 32
-    # Other families default to a modest bump
-    return 16

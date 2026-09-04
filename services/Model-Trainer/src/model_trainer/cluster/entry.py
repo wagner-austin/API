@@ -172,27 +172,74 @@ def _payload_run_id(payload: JSONObject) -> str:
     return run_id
 
 
-def _payload_corpus_file_id(payload: JSONObject) -> str:
-    """Read the corpus digest a payload asks for.
+def _payload_request(payload: JSONObject) -> JSONObject:
+    """Read the training request a payload carries.
+
+    Extracted so the readers below do not each re-establish it. When
+    ``_payload_hub_model_id`` carried its own copy of this check the branch
+    was unreachable -- ``main`` always read the corpus id first, which had
+    already raised -- and an unreachable refusal is one nothing can be shown
+    to do.
 
     Args:
         payload: The decoded run payload.
 
     Returns:
-        The requested ``corpus_file_id``.
+        The request object.
 
     Raises:
-        ValueError: If ``request.corpus_file_id`` is absent or not a string.
-            Not defaulted: a run that cannot say which corpus it wants must
-            not be given one.
+        ValueError: If ``request`` is absent or is not an object. Not
+            defaulted: a run that cannot say what it wants must not be given
+            a guess.
     """
     request = payload.get("request")
     if not isinstance(request, dict):
         raise ValueError("payload must carry a 'request' object")
+    return request
+
+
+def _request_corpus_file_id(request: JSONObject) -> str:
+    """Read the corpus digest a request asks for.
+
+    Args:
+        request: The payload's training request.
+
+    Returns:
+        The requested ``corpus_file_id``.
+
+    Raises:
+        ValueError: If ``corpus_file_id`` is absent or not a string. Not
+            defaulted: a run that cannot say which corpus it wants must not
+            be given one.
+    """
     file_id = request.get("corpus_file_id")
     if not isinstance(file_id, str):
         raise ValueError("payload request must carry a string 'corpus_file_id'")
     return file_id
+
+
+def _request_hub_model_id(request: JSONObject) -> str | None:
+    """Read the base model a request trains from, when it names one.
+
+    Args:
+        request: The payload's training request.
+
+    Returns:
+        The ``hub_model_id``, or None when the request names none -- which a
+        char-LSTM run legitimately does, since it trains a model this
+        repository defines rather than one it fetches.
+
+    Raises:
+        ValueError: If ``hub_model_id`` is present and not a string. Null and
+            a number must not be read the same way: null says "this backend
+            fetches nothing", a number says the document is wrong.
+    """
+    hub_model_id = request.get("hub_model_id")
+    if hub_model_id is None:
+        return None
+    if not isinstance(hub_model_id, str):
+        raise ValueError("payload request 'hub_model_id' must be a string or null")
+    return hub_model_id
 
 
 def _parse(tokens: Sequence[str]) -> dict[str, str]:
@@ -291,7 +338,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # thing a training run cannot recover from getting wrong: everything else
     # fails loudly, while the wrong corpus trains to completion and reports
     # perplexities for text nobody meant to model.
-    preflight.check_corpus_certified(corpus_dir, _payload_corpus_file_id(payload))
+    request = _payload_request(payload)
+    preflight.check_corpus_certified(corpus_dir, _request_corpus_file_id(request))
+
+    # The other input a run cannot recover from. Checked here rather than
+    # left to the first `from_pretrained`, which happens after the scheduler
+    # has already handed over a card -- job 55744648 spent one learning that
+    # a staged cache with no `refs/main` is unreadable offline.
+    hub_model_id = _request_hub_model_id(request)
+    if hub_model_id is not None:
+        preflight.check_model_available(hub_model_id)
 
     _log.info(
         "cluster training start",

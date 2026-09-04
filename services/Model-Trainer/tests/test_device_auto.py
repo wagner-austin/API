@@ -11,7 +11,6 @@ from platform_ml.torch_types import _TorchModuleProtocol
 from model_trainer.api.validators.runs import _decode_train_request
 from model_trainer.core.compute.device_selector import (
     recommended_batch_size,
-    recommended_batch_size_for,
     resolve_device,
     resolve_precision,
 )
@@ -148,7 +147,12 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
     }
     cfg = build_cfg(req, corpus_path="/tmp/corpus")
     assert cfg["device"] == "cuda"
-    assert cfg["batch_size"] == 32
+    # THE DECLARED BATCH SIZE SURVIVES ONTO CUDA. This asserted 32 until
+    # 2026-09-04, because `recommended_batch_size_for` rewrote any value of 4
+    # or less to a family default. A payload declaring 4 then trained at 32
+    # and recorded 4, which makes one document two experiments. What a
+    # payload declares is not a suggestion.
+    assert cfg["batch_size"] == 4
     expected_workers = min(4, int(os.cpu_count() or 1))
     assert cfg["data_num_workers"] == expected_workers
     assert cfg["data_pin_memory"] is True
@@ -198,22 +202,6 @@ def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
     # CPU retains default of 0 workers by design (keep lightweight in simple setups)
     assert cfg["data_num_workers"] == 0
     assert cfg["data_pin_memory"] is False
-
-
-def test_recommended_batch_size_for_families() -> None:
-    # char_lstm on CUDA bumps to 64 from small inputs
-    assert recommended_batch_size_for("char_lstm", 4, "cuda") == 64
-    # gpt2 on CUDA bumps to 32
-    assert recommended_batch_size_for("gpt2", 4, "cuda") == 32
-    # qwen fallback on CUDA bumps to 16
-    assert recommended_batch_size_for("qwen", 4, "cuda") == 16
-    # CPU leaves batch unchanged
-    assert recommended_batch_size_for("gpt2", 4, "cpu") == 4
-    # Larger user-provided batch remains unchanged on CUDA
-    assert recommended_batch_size_for("gpt2", 8, "cuda") == 8
-
-
-# ===== Precision tests =====
 
 
 def test_resolve_precision_fp32_on_cuda() -> None:

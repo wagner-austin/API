@@ -17,6 +17,7 @@ import sys
 from collections.abc import Generator
 
 import pytest
+from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from model_trainer.cluster import _test_hooks as cluster_hooks
@@ -307,6 +308,65 @@ class TestMain:
     def test_a_request_with_no_corpus_file_id_is_refused(self, tmp_path: pathlib.Path) -> None:
         args = _args(tmp_path, {"run_id": "r", "user_id": 1, "request": {"seed": 42}})
         with pytest.raises(ValueError, match="string 'corpus_file_id'"):
+            cluster_entry.main(args)
+
+    def test_a_base_model_that_cannot_be_resolved_stops_the_run(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The check that job 55744648 did not have.
+
+        That run was handed an A30, passed every output-root and artifact
+        check, certified its corpus, and then died on the first
+        `from_pretrained`. A base model is the same class of input as a
+        corpus: the run cannot recover from getting it wrong, so it is
+        refused here rather than after the scheduler has spent a card.
+        """
+        args = _args(
+            tmp_path,
+            {
+                "run_id": "r",
+                "user_id": 1,
+                "request": {
+                    "corpus_file_id": _CORPUS_ID,
+                    "hub_model_id": str(tmp_path / "no-such-model"),
+                },
+            },
+        )
+        with pytest.raises(AppError) as excinfo:
+            cluster_entry.main(args)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.MODEL_NOT_FOUND
+
+    def test_a_request_naming_no_base_model_is_not_checked_for_one(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A char-LSTM run trains a model this repository defines rather than
+        one it fetches, so `hub_model_id` is legitimately null and demanding
+        one would refuse a whole backend."""
+        cluster_hooks.run_job = _Recorder()
+        args = _args(
+            tmp_path,
+            {
+                "run_id": "r",
+                "user_id": 1,
+                "request": {"corpus_file_id": _CORPUS_ID, "hub_model_id": None},
+            },
+        )
+
+        assert cluster_entry.main(args) == 0
+
+    def test_a_non_string_base_model_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """Null means "this backend fetches nothing"; 7 means the document is
+        wrong, and the two must not be read the same way."""
+        args = _args(
+            tmp_path,
+            {
+                "run_id": "r",
+                "user_id": 1,
+                "request": {"corpus_file_id": _CORPUS_ID, "hub_model_id": 7},
+            },
+        )
+        with pytest.raises(ValueError, match="'hub_model_id' must be a string or null"):
             cluster_entry.main(args)
 
 

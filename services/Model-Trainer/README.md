@@ -98,7 +98,11 @@ precision = resolve_precision("auto", device)  # "fp16" on CUDA, "fp32" on CPU
 batch = recommended_batch_size(4, device)  # 8 on CUDA, 4 on CPU
 ```
 
-Model-Trainer extends this with model-family-specific batch sizing via `recommended_batch_size_for(model_family, batch, device)`.
+Model-Trainer used to extend this with `recommended_batch_size_for`, which rewrote any
+declared batch size of 4 or less on CUDA to a family default. It was removed on
+2026-09-04: batch size decides the optimization trajectory, so a payload that
+declared 4 and trained at 16 while recording 4 made one document describe two
+different experiments. What a payload declares is what trains.
 
 ### Local Development
 

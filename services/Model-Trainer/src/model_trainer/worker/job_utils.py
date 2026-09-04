@@ -33,7 +33,6 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.compute.device_selector import (
     RequestedPrecision,
     ResolvedPrecision,
-    recommended_batch_size_for,
     resolve_device,
     resolve_precision,
 )
@@ -396,16 +395,30 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
     data_num_workers = default_workers if req_workers is None else int(req_workers)
     data_pin_memory = (resolved_device == "cuda") if req_pinmem is None else bool(req_pinmem)
 
-    # Adjust batch size conservatively for CUDA when client used typical default
-    bs_in = int(req["batch_size"])  # explicit int conversion for safety
-    bs_eff = recommended_batch_size_for(req["model_family"], bs_in, resolved_device)
+    # THE DECLARED BATCH SIZE IS THE BATCH SIZE. This used to be handed to
+    # `recommended_batch_size_for`, which rewrote any value of 4 or less on
+    # CUDA to a family default -- 16 for hf_lm, 32 for gpt2, 64 for char_lstm.
+    #
+    # A payload declaring 4 therefore trained at 16, and said 4 in every
+    # record it wrote. That is not a performance nicety: batch size decides
+    # the optimization trajectory, so the same document described two
+    # different experiments depending on which entry point ran it. A local
+    # script calling `train_prepared_hf_lm` directly got 4; the same payload
+    # through `modeltrainer-cluster-train` got 16, and the two runs were not
+    # comparable while claiming to be identical.
+    #
+    # It surfaced as a CUDA OOM on 2026-09-04 -- job 55744675, which asked for
+    # 4 and died allocating the 9.27 GiB logits tensor that batch 16 implies
+    # over a 151,936-token vocabulary. The OOM was luck. A card with the
+    # headroom would have trained happily at the wrong batch size and reported
+    # the right one.
 
     cfg: ModelTrainConfig = {
         "model_family": req["model_family"],
         "model_size": req["model_size"],
         "max_seq_len": req["max_seq_len"],
         "num_epochs": req["num_epochs"],
-        "batch_size": bs_eff,
+        "batch_size": int(req["batch_size"]),
         "learning_rate": req["learning_rate"],
         "tokenizer_id": req["tokenizer_id"],
         "corpus_path": corpus_path,

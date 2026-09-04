@@ -332,3 +332,62 @@ class TestCheckCorpusCertified:
         assert len(body) > 1 << 20
         digest = _stage(tmp_path / "corpora", body, certified=True)
         preflight.check_corpus_certified(tmp_path / "corpora", digest)
+
+
+class TestTheBaseModelIsResolvableBeforeAGpuIsSpent:
+    """The other input a run cannot recover from, checked the same way.
+
+    This half did not exist until 2026-09-04, and the asymmetry cost a real
+    job: 55744648 was handed an A30, checked every output root, round-tripped
+    the artifact store, certified the corpus -- and then died nine seconds in
+    because the base model could not be resolved from a staged cache.
+
+    The cause is worth carrying, because the mistake is the CAREFUL one.
+    The model had been fetched with a pinned commit hash, which is the right
+    instinct. But huggingface_hub writes its ``refs/<revision>`` pointer only
+    when the requested revision differs from the resolved commit hash, so
+    pinning by hash writes no ref at all -- and ``from_pretrained("<repo>")``
+    asks for ``main``, which offline resolves only through ``refs/main``.
+    Every byte was present and none of it was reachable.
+    """
+
+    def _resolvable_model(self, tmp_path: pathlib.Path) -> str:
+        """Write the smallest directory ``AutoConfig`` will resolve.
+
+        A local path rather than a repo id, so the check exercises its real
+        resolution call without reaching the network or depending on a cache
+        this test did not build.
+
+        Args:
+            tmp_path: The test's temporary directory.
+
+        Returns:
+            The directory, as a string.
+        """
+        directory = tmp_path / "tiny-model"
+        directory.mkdir()
+        (directory / "config.json").write_text('{"model_type": "gpt2"}', encoding="utf-8")
+        return str(directory)
+
+    def test_a_resolvable_model_passes(self, tmp_path: pathlib.Path) -> None:
+        preflight.check_model_available(self._resolvable_model(tmp_path))
+
+    def test_a_model_that_cannot_be_resolved_is_refused(self, tmp_path: pathlib.Path) -> None:
+        """The failure that cost job 55744648, as a test rather than a story."""
+        missing = str(tmp_path / "nothing-here")
+
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_model_available(missing)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.MODEL_NOT_FOUND
+
+    def test_the_refusal_explains_the_ref_that_pinning_omits(self, tmp_path: pathlib.Path) -> None:
+        """The message has to carry the fix, because the cause is not guessable.
+
+        An operator reading "cannot resolve" against a cache they can SEE the
+        model sitting in has no reason to suspect a missing pointer file.
+        """
+        with pytest.raises(AppError) as excinfo:
+            preflight.check_model_available(str(tmp_path / "nothing-here"))
+
+        assert "refs/" in excinfo.value.message

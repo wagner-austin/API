@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
+from typing import Protocol
 
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.logging import get_logger
@@ -270,11 +271,97 @@ def check_corpus_certified(corpus_dir: Path, file_id: str) -> None:
     )
 
 
+class _ModelConfigProto(Protocol):
+    """The one field this module reads off a resolved configuration.
+
+    Reading something rather than discarding the result is deliberate: a
+    config that resolves but carries no architecture is not a model this run
+    can train, and the name is what the log line needs to be worth writing.
+    """
+
+    model_type: str
+
+
+class _ConfigLoaderProto(Protocol):
+    """The one thing this module needs from ``transformers.AutoConfig``.
+
+    Declared rather than imported for its type, because ``transformers``
+    carries no ``py.typed`` marker and mypy's strict mode refuses the ``Any``
+    a direct import produces.
+    """
+
+    def from_pretrained(self, pretrained_model_name_or_path: str, /) -> _ModelConfigProto:
+        """Resolve a model id to its configuration, or raise ``OSError``."""
+        ...
+
+
+def check_model_available(hub_model_id: str) -> None:
+    """Prove the base model can be resolved before a GPU is spent on it.
+
+    THE CORPUS HALF OF THIS MODULE ALREADY EXISTED and this half did not,
+    which is an asymmetry with no justification: a run cannot recover from a
+    missing corpus and it cannot recover from a missing base model either.
+    Job 55744648 died nine seconds in with "couldn't connect to
+    'https://huggingface.co' ... couldn't find it in the cached files", after
+    the scheduler had allocated an A30 and the entry had checked every output
+    root, round-tripped the artifact store and certified the corpus.
+
+    WHAT MADE THAT CACHE UNREADABLE IS WORTH RECORDING, because the mistake
+    is one anybody staging a model for an offline run will make. The model was
+    fetched with ``snapshot_download(..., revision=<commit hash>)``, which is
+    the careful thing to do -- it pins the weights. But
+    ``_cache_commit_hash_for_specific_revision`` writes the ``refs/<revision>``
+    pointer only ``if revision != commit_hash``, so pinning by hash writes NO
+    ref at all. ``from_pretrained("<repo>")`` then asks for the default
+    revision ``main``, which offline can only be resolved through
+    ``refs/main``. Every byte of the model was present and none of it was
+    reachable.
+
+    Resolving the CONFIG rather than the weights is deliberate: it exercises
+    the same repo-id resolution path that fails, costs no GPU memory and no
+    meaningful time, and does not warm a cache the run is about to build
+    properly anyway.
+
+    Args:
+        hub_model_id: The model the payload asks to train from.
+
+    Raises:
+        AppError: With ``MODEL_NOT_FOUND`` when the id cannot be resolved,
+            carrying the underlying reason. Raised before any weights load,
+            which is the whole point -- the alternative is discovering it
+            after the queue has already handed over a card.
+    """
+    # Narrowed to a Protocol rather than imported directly, because
+    # `transformers` ships no py.typed marker and a bare import makes every
+    # expression touching it Any. This is the same shape
+    # `hf_lm/_hook_protocols` uses for the model and tokenizer classes.
+    transformers = __import__("transformers", fromlist=["AutoConfig"])
+    loader: _ConfigLoaderProto = transformers.AutoConfig
+
+    try:
+        config = loader.from_pretrained(hub_model_id)
+    except OSError as unreachable:
+        raise AppError(
+            ModelTrainerErrorCode.MODEL_NOT_FOUND,
+            f"Cannot resolve base model {hub_model_id!r}: {unreachable}. "
+            "A run offline against a staged cache needs the repository's "
+            "refs/<revision> pointer as well as its snapshot; a "
+            "snapshot_download pinned to a commit hash writes the snapshot "
+            "and no ref.",
+        ) from unreachable
+
+    _log.info(
+        "base model resolvable",
+        extra={"hub_model_id": hub_model_id, "model_type": config.model_type},
+    )
+
+
 __all__ = [
     "CERTIFICATION_SUFFIX",
     "PROBE_ARTIFACT",
     "PROBE_NAME",
     "check_artifact_round_trip",
     "check_corpus_certified",
+    "check_model_available",
     "check_writable",
 ]
