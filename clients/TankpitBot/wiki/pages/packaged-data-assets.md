@@ -159,11 +159,11 @@ that wrote it, and no clone ever saw one. That is not a record; it is a
 private annotation that looks like one. All five were migrated into the wikis
 and deleted on 2026-09-03, on the reasoning that two systems where one is
 undistributed is worse than one system that is. The July three moved to
-`clients/RustedWarfareBot/wiki/log.md`.
+`clients/RustedWarfareBot/wiki/log.md`.[^16]
 
 What is genuinely lost is the point-of-use prompt: `git log` on a minimap no
-longer explains itself, and a reader has to reach this page instead. That is
-the trade, made deliberately.
+longer explains itself, and a reader has to reach this page instead.[^13] That
+is the trade, made deliberately.
 
 ## What this buys
 
@@ -191,3 +191,4 @@ layer.[^12]
 [^13]: `git log --follow` on `src/tankpit_bot/data/field01_r.gif` and on `xor_static_key.txt`, read 2026-09-03: both list `12717125` as their most recent commit. `git show --name-status 12717125` reports 46 `R100` entries under `clients/` alongside 12 additions and 62 modifications under `services/` and `libs/`. `git ls-remote origin 'refs/notes/*'` returns nothing.
 [^14]: Commit timestamps, read 2026-09-03: `12717125` at 01:41:28 -0700, `bccf5afa` at 01:53:39 -0700. `git show --stat bccf5afa` lists 37 files and no `.gif` among them, against a subject reading "TankpitBot ships its own data: the wheel carries the key and the minimaps".
 [^15]: `git notes list` returned five entries when read on 2026-09-03 — `12717125` and `bccf5afa` from this change, plus `52379073`, `63ed06e3` and `e0f5ff3a` from 2026-07-26, all three opening with the same line, "Also contains, from a concurrent session and unmentioned in the subject:". All five were removed the same day after their contents were verified present in the wikis; `git notes list` now returns nothing.
+[^16]: `clients/RustedWarfareBot/wiki/log.md`, entry `## [2026-09-03] provenance | three commits carry work their subjects never mention, migrated here from git notes`, committed in `bac3d567`. Twenty-one substantive claims from the three notes were checked present in that entry before `git notes remove` was run, and a raw dump of all five notes was taken first.
