@@ -31,6 +31,30 @@ tick (idempotent in-page, and re-evaluating each tick self-heals the
 caster across page navigations, which wipe injected JS — the binding
 itself survives navigations); zero subscribers →
 :meth:`LiveViewService.stop`.
+
+UNCHANGED FRAMES ARE NOT SENT (2026-09-03). The interval samples on a
+wall clock, but the tankpit client paints on DIRTY FLAGS: its rAF loop
+runs at 60 Hz and draws nothing unless a layer, a tank or an action was
+marked dirty, and game state advances on its own ``setTimeout`` tick
+rather than per frame. Measured at 12 Hz sampling, roughly 71 per cent
+of captures were byte-identical to the one before — the page was
+base64-ing and shipping about 800 KB/s to re-send a picture the viewer
+already had. The caster now compares each data URL to the previous one
+and calls the binding only on a change.
+
+This is safe for a new viewer because
+:meth:`~tankpit_bot.bus.frame_bus.FrameBus.subscribe` hands a fresh
+subscriber the CACHED frame, so a tile drawn during a still moment gets
+a picture immediately rather than waiting for the next repaint. The
+MJPEG keepalive re-sends the last frame on its own timer for
+intermediaries that idle out an inactive connection.
+
+What this does NOT do is make the picture smoother. The paint rate is
+the game's: an independent CDP screencast measurement on 2026-07-29,
+which is damage-driven and therefore reports real paints, recorded 0.6
+fps idle and 2.8 fps in play, and a 2026-09-03 measurement of distinct
+frames over this caster found 3.0 to 3.2 per second. Those agree. What
+changes here is that every frame on the wire is now a real one.
 """
 
 from __future__ import annotations
@@ -57,6 +81,7 @@ _CASTER_TEMPLATE = """
   if (window.__botCast === undefined) {
     window.__botCast = {
       timer: null,
+      lastData: null,
       collect() {
         const found = [];
         for (const c of document.querySelectorAll("canvas")) {
@@ -123,7 +148,8 @@ _CASTER_TEMPLATE = """
             }
             return;
           }
-          if (data !== null) {
+          if (data !== null && data !== this.lastData) {
+            this.lastData = data;
             window.__BINDING__(data);
           }
         }, __INTERVAL_MS__);

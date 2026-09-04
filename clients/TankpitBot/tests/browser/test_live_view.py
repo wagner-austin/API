@@ -10,18 +10,49 @@ with its loud drift rejections.
 from __future__ import annotations
 
 import base64
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, narrow_json_to_int, narrow_json_to_str
 
 from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks import BrowserProtocol, PageProtocol
 from tankpit_bot.browser.live_view import (
     BINDING_NAME,
     LiveViewService,
     build_caster_expression,
 )
 from tests.conftest import FakeEnv
+
+
+@pytest.fixture(scope="module")
+def headless_browser() -> Generator[BrowserProtocol, None, None]:
+    """Launch one real headless Chromium shared by this module's caster tests.
+
+    Module-scoped for the reason ``test_lifecycle.py`` gives for its own
+    copy: ``launch()`` is the expensive call, and on hosts where a
+    filesystem minifilter inspects browser teardown it has been measured
+    at tens of seconds. ``--dist loadscope`` keeps a module on one xdist
+    worker, so a module-scoped browser is never shared across processes.
+
+    Duplicated rather than imported because a pytest fixture cannot
+    travel by import without becoming an unused-name violation at every
+    call site, and there is no ``tests/browser/conftest.py`` to hold it.
+
+    Yields:
+        A live headless Chromium browser.
+    """
+    factory = _test_hooks.sync_playwright
+    if factory is None:
+        factory = _test_hooks.get_sync_playwright()
+    if factory is None:
+        pytest.skip("Playwright not available")
+    with factory() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        try:
+            yield browser
+        finally:
+            browser.close()
 
 
 class _RecordingCDP:
@@ -219,3 +250,76 @@ class TestBindingFrameRelay:
         with pytest.raises(ValueError, match="invalid base64"):
             handler({"name": BINDING_NAME, "payload": "data:image/jpeg;base64,@@nope@@"})
         assert sink.frames == []
+
+
+class TestCasterSuppressesUnchangedFrames:
+    """The caster JS, executed in a real headless Chromium.
+
+    Everything else in this file asserts substrings of the expression or
+    drives the Python relay. Neither can see what the injected script
+    DOES, and what it does is the whole point of this behaviour: the
+    tankpit client paints on dirty flags, so at 12 Hz sampling roughly
+    71 per cent of captures were byte-identical to the one before and
+    the page shipped every one of them.
+    """
+
+    @staticmethod
+    def _page(browser: BrowserProtocol) -> PageProtocol:
+        """Open a page with one canvas and a call-counting binding stand-in.
+
+        The real binding is installed by CDP as a function on ``window``;
+        the caster only checks ``typeof window.<name> === "function"``,
+        so a plain function of the same name exercises the identical
+        path without a CDP round trip.
+
+        Args:
+            browser: The shared headless browser.
+
+        Returns:
+            The prepared page.
+        """
+        page = browser.new_context().new_page()
+        page.goto(
+            "data:text/html,<canvas id=c width=64 height=64></canvas>"
+            "<script>"
+            "window.__delivered=[];"
+            f"window.{BINDING_NAME}=function(d){{window.__delivered.push(d);}};"
+            "window.paint=function(v){"
+            "const g=document.getElementById('c').getContext('2d');"
+            "g.fillStyle='rgb('+v+',20,40)';g.fillRect(0,0,64,64);};"
+            "window.paint(10);"
+            "</script>"
+        )
+        return page
+
+    def test_a_still_canvas_delivers_one_frame_not_a_stream_of_copies(
+        self, headless_browser: BrowserProtocol
+    ) -> None:
+        """Nothing moving means nothing sent after the first frame."""
+        page = self._page(headless_browser)
+        page.evaluate(build_caster_expression(50.0, 0.8))
+        page.wait_for_timeout(600)
+
+        assert narrow_json_to_int(page.evaluate("window.__delivered.length")) == 1
+
+    def test_a_repaint_delivers_exactly_one_more_frame(
+        self, headless_browser: BrowserProtocol
+    ) -> None:
+        """A changed canvas resumes delivery, and then stops again.
+
+        The second half is what distinguishes suppression from a broken
+        caster: it must send on the change and then fall silent, rather
+        than sending once and never again.
+        """
+        page = self._page(headless_browser)
+        page.evaluate(build_caster_expression(50.0, 0.8))
+        page.wait_for_timeout(400)
+        page.evaluate("window.paint(200)")
+        page.wait_for_timeout(600)
+
+        assert narrow_json_to_int(page.evaluate("window.__delivered.length")) == 2
+        first = narrow_json_to_str(page.evaluate("window.__delivered[0]"))
+        second = narrow_json_to_str(page.evaluate("window.__delivered[1]"))
+        assert first != second
+        assert first.startswith("data:image/jpeg;base64,")
+        assert second.startswith("data:image/jpeg;base64,")
