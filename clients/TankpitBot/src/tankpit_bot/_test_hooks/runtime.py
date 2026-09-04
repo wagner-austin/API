@@ -8,6 +8,7 @@ fixed list) and ``get_current_time_ms`` (scenario clocks).
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -233,6 +234,63 @@ def _real_kill_browser_processes() -> list[int]:
 kill_browser_processes: Callable[[], list[int]] = _real_kill_browser_processes
 
 
+def _git_head_ref(cwd: str) -> str:
+    """Return the HEAD commit of the repository at ``cwd``, or ``""``.
+
+    Args:
+        cwd: Directory to ask git in — the process's own directory for
+            the build stamp, but a real parameter: where to ask IS the
+            question.
+
+    Returns:
+        The full HEAD sha, or ``""`` when ``cwd`` is not inside a git
+        repository — which is a fact about the environment (a release
+        tree is a ``git archive`` and HAS no repository), not an
+        error to soften.
+    """
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        return ""
+    return completed.stdout.strip()
+
+
+def _real_resolve_build_ref() -> str:
+    """Real implementation — name the build this process runs from.
+
+    Three environment CLASSES answer one question, each by the only
+    means it has ([[flag-triage-20260902]] board task 7e766d65; the
+    same philosophy as hpc3's image ``git_commit`` baking):
+
+    * A STAMPED environment — the fleet container, whose image bakes
+      ``TANKPIT_BUILD_REF`` (the release tag) at build time — answers
+      from that variable.
+    * A CHECKOUT answers from ``git rev-parse HEAD``.
+    * An unstamped, repository-less environment answers ``""`` — the
+      artifact records that nothing identified the build, rather than
+      inventing one.
+
+    Returns:
+        The build reference, or ``""`` in an unstamped environment.
+    """
+    from tankpit_bot._test_hooks import env as env_hooks
+
+    stamped = env_hooks.get_env("TANKPIT_BUILD_REF")
+    if stamped is not None and stamped != "":
+        return stamped
+    return _git_head_ref(".")
+
+
+#: Build-reference seam for the session_build stamp. Tests inject a
+#: fixed string so artifact assertions stay deterministic and no git
+#: subprocess runs per test.
+resolve_build_ref: Callable[[], str] = _real_resolve_build_ref
+
+
 def _real_get_host_probe() -> HostProbe:
     """Real implementation -- the stdlib probe over this machine.
 
@@ -267,10 +325,12 @@ __all__ = [
     "InstallSignalHandlersProtocol",
     "KillableProcessProtocol",
     "StartWatchdogProtocol",
+    "_git_head_ref",
     "_kill_browser_engines",
     "_real_get_current_time_ms",
     "_real_get_host_probe",
     "_real_kill_browser_processes",
+    "_real_resolve_build_ref",
     "force_exit",
     "get_argv",
     "get_current_time_ms",
@@ -278,5 +338,6 @@ __all__ = [
     "install_signal_handlers",
     "kill_browser_processes",
     "read_distribution_version",
+    "resolve_build_ref",
     "start_watchdog",
 ]

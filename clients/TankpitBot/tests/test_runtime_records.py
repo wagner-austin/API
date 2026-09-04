@@ -43,7 +43,10 @@ def test_event_handler_skips_record_with_malformed_runtime_fields_value(
     )
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    # Only the opening session_build stamp: the malformed record was dropped.
+    events = files[artifacts["latest_events_path"]].strip().splitlines()
+    assert len(events) == 1
+    assert '"session_build"' in events[0]
 
 
 def test_event_handler_skips_record_with_non_string_key_in_runtime_fields(
@@ -63,7 +66,10 @@ def test_event_handler_skips_record_with_non_string_key_in_runtime_fields(
     )
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    # Only the opening session_build stamp: the malformed record was dropped.
+    events = files[artifacts["latest_events_path"]].strip().splitlines()
+    assert len(events) == 1
+    assert '"session_build"' in events[0]
 
 
 class TestRequireFieldAccessors:
@@ -278,7 +284,9 @@ class TestRuntimeContext:
         )
         emit_ai("HUNT score=0.5")
 
-        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        event_line = (
+            fake_fs.get_written_files()[artifacts["latest_events_path"]].strip().splitlines()[-1]
+        )
         decoded = narrow_json_to_dict(load_json_str(event_line))
         assert decoded["channel"] == "AI"
         assert decoded["message"] == "HUNT score=0.5"
@@ -296,7 +304,9 @@ class TestRuntimeContext:
         set_runtime_context(tick_n=12)
         emit_diagnostic(diagnostic_kind="fake_override", tick_n=999)
 
-        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        event_line = (
+            fake_fs.get_written_files()[artifacts["latest_events_path"]].strip().splitlines()[-1]
+        )
         decoded = narrow_json_to_dict(load_json_str(event_line))
         assert decoded["tick_n"] == 999
 
@@ -308,7 +318,9 @@ class TestRuntimeContext:
         set_runtime_context(tick_n=3)  # bot_state / in_flight_action_kind not set
         emit_state("IDLE")
 
-        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        event_line = (
+            fake_fs.get_written_files()[artifacts["latest_events_path"]].strip().splitlines()[-1]
+        )
         decoded = narrow_json_to_dict(load_json_str(event_line))
         assert decoded["tick_n"] == 3
         assert "bot_state" not in decoded
@@ -333,7 +345,9 @@ class TestRuntimeContext:
         )
         emit_shoot_miss(ws.ledger, duration_ms=80, target_id=530, target_name="orange-3")
 
-        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        event_line = (
+            fake_fs.get_written_files()[artifacts["latest_events_path"]].strip().splitlines()[-1]
+        )
         decoded = narrow_json_to_dict(load_json_str(event_line))
         assert decoded["channel"] == "DIAGNOSTIC"
         assert decoded["diagnostic_kind"] == "action_outcome"

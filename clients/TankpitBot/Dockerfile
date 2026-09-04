@@ -143,6 +143,14 @@ USER app
 # is compose's decision.
 EXPOSE 27300
 
+# The build's identity, baked at image build so every events artifact
+# a container bot writes can say what produced it (session_build,
+# board task 7e766d65). `make up` passes the release tag; an image
+# built without the arg stamps nothing and the artifact honestly
+# records "" for its build ref.
+ARG BUILD_REF=""
+ENV TANKPIT_BUILD_REF=$BUILD_REF
+
 # A bounded session, not a daemon. The bot is driven by
 # TANKPIT_BOT_SESSION_SECONDS and exits; `docker run` inherits that
 # lifetime rather than needing a stop signal. (The fleet override runs

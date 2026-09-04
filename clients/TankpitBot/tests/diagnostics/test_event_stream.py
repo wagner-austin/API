@@ -57,6 +57,8 @@ def test_load_event_records_skips_blank_lines(fake_fs: FakeFileSystem) -> None:
 
     records = load_event_records(latest)
 
-    assert len(records) == 1
-    assert records[0]["channel"] == "DIAGNOSTIC"
-    assert records[0]["fields"]["diagnostic_kind"] == "session_room_joined"
+    # The stamp opens the artifact; the emitted record follows it.
+    assert len(records) == 2
+    assert records[0]["fields"]["diagnostic_kind"] == "session_build"
+    assert records[1]["channel"] == "DIAGNOSTIC"
+    assert records[1]["fields"]["diagnostic_kind"] == "session_room_joined"

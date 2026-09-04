@@ -15,11 +15,16 @@ THERE ARE TWO CONFIGURATIONS AND ONLY ONE OF THEM IS KNOWABLE. This is the
 whole design, so it is stated first:
 
 * What produced the EVENTS -- a live bot run against tankpit.com, with its
-  build, doctrine, account and rank. **It is not recorded anywhere.** An
-  events artifact's records carry ``timestamp``, ``level``, ``logger``,
-  ``mode``, ``channel`` and ``message``, and no build stamp, commit or
-  version. For the runs already in ``runs/bot/`` it cannot be recovered, and
-  no fingerprint written today can honestly claim it.
+  build, doctrine, account and rank. **For artifacts written before
+  2026-09-04 it is not recorded anywhere**: their records carry
+  ``timestamp``, ``level``, ``logger``, ``mode``, ``channel`` and
+  ``message``, and no build stamp, commit or version -- it cannot be
+  recovered, and no fingerprint written today can honestly claim it.
+  Artifacts written since open with a ``session_build`` diagnostic
+  (build ref, distribution version, instance, doctrine, room -- never
+  the account name), emitted by ``configure_bot_runtime_logging``
+  (board task 7e766d65), so a future derivation can join its source
+  axis to a real build instead of only a digest.
 * What produced the FEATURE ROWS -- this derivation, running now. Fully
   knowable.
 

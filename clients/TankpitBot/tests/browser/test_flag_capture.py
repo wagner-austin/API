@@ -123,7 +123,9 @@ class TestRecordTick:
         cdp.handlers["Runtime.bindingCalled"](_click_params(1, 1785388629830))
 
         files = fake_fs.get_written_files()
-        event = narrow_json_to_dict(load_json_str(files[artifacts["latest_events_path"]].strip()))
+        event = narrow_json_to_dict(
+            load_json_str(files[artifacts["latest_events_path"]].strip().splitlines()[-1])
+        )
         recent = narrow_json_to_list(load_json_str(narrow_json_to_str(event["recent_ticks"])))
         fuels = [narrow_json_to_dict(tick)["fuel"] for tick in recent]
 
@@ -146,7 +148,9 @@ class TestBindingCalled:
         cdp.handlers["Runtime.bindingCalled"](_click_params(2, 1785388629830))
 
         files = fake_fs.get_written_files()
-        event = narrow_json_to_dict(load_json_str(files[artifacts["latest_events_path"]].strip()))
+        event = narrow_json_to_dict(
+            load_json_str(files[artifacts["latest_events_path"]].strip().splitlines()[-1])
+        )
         assert event["channel"] == "DIAGNOSTIC"
         assert event["diagnostic_kind"] == "human_flag"
         assert event["flag_seq"] == 2

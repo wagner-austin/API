@@ -37,6 +37,16 @@ from tests._runtime_logging_support import run_child_logger
 from tests.conftest import FakeFileSystem
 
 
+def _kinds(events_content: str) -> list[str]:
+    """The diagnostic_kind sequence of an events artifact's lines."""
+    kinds: list[str] = []
+    for line in events_content.strip().splitlines():
+        decoded = narrow_json_to_dict(load_json_str(line))
+        kind = decoded.get("diagnostic_kind")
+        kinds.append(kind if isinstance(kind, str) else "")
+    return kinds
+
+
 def test_event_handler_skips_record_whose_channel_is_not_a_string(
     fake_fs: FakeFileSystem,
 ) -> None:
@@ -66,7 +76,7 @@ def test_event_handler_skips_record_whose_channel_is_not_a_string(
     )
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    assert _kinds(files[artifacts["latest_events_path"]]) == ["session_build"]
 
 
 def test_configure_bot_runtime_logging_writes_text_and_event_artifacts(
@@ -93,11 +103,14 @@ def test_configure_bot_runtime_logging_writes_text_and_event_artifacts(
     assert "SYNC: waiting for collection at (120,137)" in latest_log
     assert "WORLD: Fuel: 499 -> 355 (-144)" in latest_log
     assert archive_log == latest_log
-    assert len(latest_events) == 5
-    assert len(archive_events) == 5
+    # The artifact OPENS with the session_build stamp (board task
+    # 7e766d65), then carries the five emitted records.
+    assert len(latest_events) == 6
+    assert len(archive_events) == 6
+    assert _kinds(files[artifacts["latest_events_path"]])[0] == "session_build"
 
     decoded_first = decode_runtime_event_record(
-        narrow_json_to_dict(load_json_str(latest_events[0]))
+        narrow_json_to_dict(load_json_str(latest_events[1]))
     )
     decoded_last = decode_runtime_event_record(
         narrow_json_to_dict(load_json_str(latest_events[-1]))
@@ -130,7 +143,7 @@ def test_configure_sniff_runtime_logging_resets_latest_files(
     assert files[artifacts["latest_summary_path"]] == ""
     assert "WORLD: Captured 88 WebSocket messages in 37.3s" in files[artifacts["latest_log_path"]]
 
-    event_line = files[artifacts["latest_events_path"]].strip()
+    event_line = files[artifacts["latest_events_path"]].strip().splitlines()[-1]
     decoded = decode_runtime_event_record(narrow_json_to_dict(load_json_str(event_line)))
 
     assert decoded["mode"] == "sniff"
@@ -213,7 +226,7 @@ def test_emit_diagnostic_writes_structured_fields_to_jsonl(
     )
 
     files = fake_fs.get_written_files()
-    event_line = files[artifacts["latest_events_path"]].strip()
+    event_line = files[artifacts["latest_events_path"]].strip().splitlines()[-1]
     decoded_raw = narrow_json_to_dict(load_json_str(event_line))
 
     assert decoded_raw["channel"] == "DIAGNOSTIC"
@@ -240,7 +253,7 @@ def test_runtime_logging_ignores_non_string_runtime_extras(
     )
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    assert _kinds(files[artifacts["latest_events_path"]]) == ["session_build"]
 
 
 def test_runtime_logging_reconfigures_without_duplicate_artifact_handlers(
@@ -272,7 +285,7 @@ def test_action_outcome_emission_writes_structured_fields_to_jsonl(
     emit_map_open_data_processed(ws.ledger, duration_ms=850)
 
     files = fake_fs.get_written_files()
-    event_line = files[artifacts["latest_events_path"]].strip()
+    event_line = files[artifacts["latest_events_path"]].strip().splitlines()[-1]
 
     decoded_raw = narrow_json_to_dict(load_json_str(event_line))
     assert decoded_raw["channel"] == "DIAGNOSTIC"
@@ -369,7 +382,7 @@ def test_event_handler_skips_record_without_runtime_channel_or_message(
     logger.info("plain log line with no runtime extras")
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    assert _kinds(files[artifacts["latest_events_path"]]) == ["session_build"]
 
 
 def test_emit_without_a_configured_run_still_reaches_the_console(
@@ -436,7 +449,7 @@ def test_event_handler_skips_record_with_missing_runtime_fields_extra(
     )
 
     files = fake_fs.get_written_files()
-    assert files[artifacts["latest_events_path"]] == ""
+    assert _kinds(files[artifacts["latest_events_path"]]) == ["session_build"]
 
 
 def test_two_concurrent_runs_keep_their_own_event_streams(
@@ -522,8 +535,13 @@ def test_reconfiguring_the_same_run_does_not_double_its_events(
     emit_ai("emitted once")
 
     files = fake_fs.get_written_files()
-    lines = files[artifacts["latest_events_path"]].strip().splitlines()
-    assert len(lines) == 1
+    content = files[artifacts["latest_events_path"]]
+    lines = content.strip().splitlines()
+    # The second configure truncated and re-stamped, then the one AI
+    # emit landed ONCE -- a doubled handler would write it twice.
+    assert len(lines) == 2
+    assert _kinds(content) == ["session_build", ""]
+    assert content.count("emitted once") == 1
 
 
 def test_clearing_runtime_logging_state_forgets_a_probe_run(

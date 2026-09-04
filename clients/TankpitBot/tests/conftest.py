@@ -124,6 +124,17 @@ def _unexpected_kill_browser_processes() -> list[int]:
     raise AssertionError("kill_browser_processes called without a test-installed fake")
 
 
+def _fixed_resolve_build_ref() -> str:
+    """Deterministic build ref for tests.
+
+    The real implementation asks the environment and then git; a test
+    that spawned a git subprocess per ``configure_bot_runtime_logging``
+    call would pay ~30 ms hundreds of times per run for an answer no
+    artifact assertion wants to depend on.
+    """
+    return "test-build-ref"
+
+
 def _noop_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
     """Inert signal-handler installer for tests.
 
@@ -167,6 +178,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.kill_browser_processes = _unexpected_kill_browser_processes
+    _test_hooks.resolve_build_ref = _fixed_resolve_build_ref
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     # The analysis layer owns its own seams (filesystem reads and
     # archive enumeration). Restoring them here rather than in a
@@ -185,6 +197,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.kill_browser_processes = _unexpected_kill_browser_processes
+    _test_hooks.resolve_build_ref = _fixed_resolve_build_ref
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     _test_hooks.get_env = _test_hooks._default_get_env
     _test_hooks.get_current_time_ms = _test_hooks._real_get_current_time_ms

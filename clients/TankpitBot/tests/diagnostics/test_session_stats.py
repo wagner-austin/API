@@ -132,16 +132,23 @@ def test_render_lists_every_run_and_totals(fake_fs: FakeFileSystem) -> None:
 
 
 def test_run_with_no_events_yields_zero_row(fake_fs: FakeFileSystem) -> None:
-    """A configured run that never emitted an event reports all zeros."""
+    """A configured run that never emitted an event reports only its stamp.
+
+    Since 2026-09-04 every configure opens the artifact with the
+    ``session_build`` provenance record (board task 7e766d65), so the
+    quietest possible run carries exactly one event.
+    """
     configure_bot_runtime_logging("20260610-100000")
 
     report = build_session_stats(_RUNS_DIR)
 
     row = report["rows"][0]
-    assert row["events"] == 0
+    assert row["events"] == 1
     assert row["duration_s"] == 0
-    assert row["started"] == ""
-    assert report["totals"]["events"] == 0
+    # The stamp carries a real timestamp, so even the quietest run has
+    # a start instant and one counted event.
+    assert row["started"] != ""
+    assert report["totals"]["events"] == 1
 
 
 def test_directory_without_artifacts_raises(fake_fs: FakeFileSystem) -> None:

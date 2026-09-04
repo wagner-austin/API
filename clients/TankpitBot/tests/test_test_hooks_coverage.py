@@ -5,12 +5,15 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+from pathlib import Path
 
 import psutil
 
 from tankpit_bot._test_hooks.runtime import (
+    _git_head_ref,
     _kill_browser_engines,
     _real_kill_browser_processes,
+    _real_resolve_build_ref,
     _real_start_watchdog,
 )
 
@@ -87,6 +90,56 @@ class TestKillBrowserEngines:
 
         assert _kill_browser_engines([racing]) == []
         assert racing.kill_calls == 1
+
+
+def test_git_head_ref_answers_from_a_real_repository() -> None:
+    """Inside the checkout the ref IS the repository's HEAD."""
+    expected = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+
+    assert _git_head_ref(".") == expected
+    assert len(expected) == 40
+
+
+def test_git_head_ref_answers_empty_outside_any_repository(tmp_path: Path) -> None:
+    """A directory with no repository answers "" — a fact, not an error.
+
+    The release tree is a ``git archive`` and HAS no repository; the
+    stamp records that nothing identified the build rather than
+    inventing one.
+    """
+    assert _git_head_ref(str(tmp_path)) == ""
+
+
+def test_resolve_build_ref_prefers_the_stamped_environment() -> None:
+    """The container class: TANKPIT_BUILD_REF answers without asking git."""
+    from tankpit_bot._test_hooks import env as env_hooks
+    from tests.conftest import FakeEnv
+
+    original = env_hooks.get_env
+    fake = FakeEnv()
+    fake.set("TANKPIT_BUILD_REF", "v0.1.0-abc1234")
+    env_hooks.get_env = fake
+    try:
+        assert _real_resolve_build_ref() == "v0.1.0-abc1234"
+    finally:
+        env_hooks.get_env = original
+
+
+def test_resolve_build_ref_falls_to_git_in_a_checkout() -> None:
+    """The checkout class: no stamp in the environment, git answers."""
+    from tankpit_bot._test_hooks import env as env_hooks
+    from tests.conftest import FakeEnv
+
+    original = env_hooks.get_env
+    env_hooks.get_env = FakeEnv()
+    try:
+        ref = _real_resolve_build_ref()
+    finally:
+        env_hooks.get_env = original
+
+    assert len(ref) == 40
 
 
 def test_real_kill_browser_processes_spares_non_engine_children() -> None:

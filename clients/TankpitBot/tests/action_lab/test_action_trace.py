@@ -119,7 +119,11 @@ def test_action_cycle_tracker_reports_overlap_and_emits_diagnostic(
         decode_runtime_event_record(narrow_json_to_dict(load_json_str(line)))
         for line in event_lines
     ]
-    diagnostics = [d for d in decoded if d["channel"] == "DIAGNOSTIC"]
+    diagnostics = [
+        d
+        for d in decoded
+        if d["channel"] == "DIAGNOSTIC" and d["fields"]["diagnostic_kind"] == "action_phase_overlap"
+    ]
     assert len(diagnostics) == 1
     fields = diagnostics[0]["fields"]
     assert fields["diagnostic_kind"] == "action_phase_overlap"

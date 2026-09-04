@@ -105,8 +105,16 @@ def test_build_run_audit_reads_the_sibling_capture(fake_fs: FakeFileSystem) -> N
 
 
 def test_build_run_audit_empty_artifact(fake_fs: FakeFileSystem) -> None:
-    """A configured run that emitted nothing audits as an empty run."""
+    """A record-less artifact audits as an empty run.
+
+    A LIVE run can no longer produce this shape -- configure stamps
+    ``session_build`` as the first record (board task 7e766d65) -- so
+    the artifact is written empty by hand, standing in for the
+    pre-2026-09-04 archives and for a session killed between file
+    creation and its first write.
+    """
     configure_bot_runtime_logging("20260719-120000")
+    fake_fs.write_text(Path(_LATEST_EVENTS), "")
 
     report = build_run_audit(_LATEST_EVENTS)
 

@@ -24,6 +24,7 @@ from pathlib import Path
 from platform_core.logging import get_logger, stdlib_logging
 from platform_core.rich_logging import setup_rich_logging
 
+from tankpit_bot import _test_hooks
 from tankpit_bot.runtime_artifacts import (
     BotRunArtifactsDict,
     ProbeRunArtifactsDict,
@@ -104,7 +105,8 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
         Configured bot runtime artifacts.
     """
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
-    artifacts = build_bot_run_artifacts(resolved_stamp, resolve_bot_instance())
+    instance = resolve_bot_instance()
+    artifacts = build_bot_run_artifacts(resolved_stamp, instance)
     setup_rich_logging(level="INFO")
     reset_artifact_files(
         Path(artifacts["latest_log_path"]),
@@ -122,6 +124,23 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
         Path(artifacts["archive_events_path"]),
     )
     _set_active_run(run_id, bot=artifacts)
+    # The run's own provenance, stamped as the artifact's first record
+    # (board task 7e766d65): 539 archived runs cannot say what
+    # produced them, and every future one now does. Session-scoped
+    # like ``session_room_joined`` — no tick has happened yet. The
+    # account name is DELIBERATELY absent (the tank_registry username
+    # exposure decision is open; a stamp here would widen it into
+    # every artifact).
+    doctrine = _test_hooks.get_env("TANKPIT_DOCTRINE")
+    room = _test_hooks.get_env("TANKPIT_ROOM")
+    emit_diagnostic(
+        diagnostic_kind="session_build",
+        distribution_version=_test_hooks.read_distribution_version("tankpit-bot"),
+        build_ref=_test_hooks.resolve_build_ref(),
+        instance=instance,
+        doctrine=doctrine if doctrine is not None else "",
+        room=room if room is not None else "",
+    )
     return artifacts
 
 
