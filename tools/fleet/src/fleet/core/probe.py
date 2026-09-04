@@ -28,11 +28,14 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.core import remote
 
-#: Where the probe script is written on the node.
+#: What the capacity probe is called under a node's stage root.
 #:
-#: Under the node's own temp directory rather than the stage root, because the
-#: probe answers whether the stage root can be used and must not need it first.
-PROBE_REMOTE_PATH = "$env:TEMP\\fleet-probe.ps1"
+#: A NAME, not a path, and under the stage root rather than the node's TEMP.
+#: ``$env:TEMP`` cannot be used: :mod:`fleet.core.remote` writes through a
+#: single-quoted PowerShell literal, which does not expand it, so the node
+#: would grow a directory called ``$env:TEMP`` instead of resolving one. The
+#: writer creates the parent, so nothing has to exist first.
+PROBE_SCRIPT_NAME = "fleet-capacity.ps1"
 
 #: The probe, verbatim. No substitution, so nothing can be injected into it.
 #:
@@ -170,8 +173,10 @@ def probe_node(node: NodeConfig, *, live_runs: int) -> NodeState:
             answer cannot be read, or ``DISPATCH_FAILED`` if the probe script
             itself exits non-zero.
     """
-    output = remote.run_script(node["host"], PROBE_REMOTE_PATH, PROBE_SCRIPT)
+    output = remote.run_script(
+        node["host"], f"{node['stage_root']}/{PROBE_SCRIPT_NAME}", PROBE_SCRIPT
+    )
     return parse_probe(node["host"], output, live_runs=live_runs)
 
 
-__all__ = ["PROBE_REMOTE_PATH", "PROBE_SCRIPT", "parse_probe", "probe_node"]
+__all__ = ["PROBE_SCRIPT", "PROBE_SCRIPT_NAME", "parse_probe", "probe_node"]

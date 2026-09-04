@@ -24,20 +24,29 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.toolchain import (
+    PACKAGE_MANAGERS,
     REQUIRED_PYTHON,
     REQUIRED_TOOLS,
     ToolReport,
+    available_managers,
+    install_command,
     missing,
     python_is_right,
 )
 from fleet.core import remote
 
-#: Where the toolchain probe is written on the node.
+#: What the toolchain probe is called under a node's stage root.
 #:
-#: Under the node's temp directory rather than the stage root, because this
-#: runs BEFORE a node is known to be usable and must not depend on a directory
-#: the bootstrap has not created yet.
-PROBE_REMOTE_PATH = "$env:TEMP\\fleet-toolchain.ps1"
+#: A NAME rather than a path, resolved against the node's declared stage root
+#: by its caller. ``$env:TEMP`` was tried first and is wrong:
+#: :mod:`fleet.core.remote` writes through a single-quoted PowerShell literal,
+#: which does not expand it, so a node would grow a directory named
+#: ``$env:TEMP``. The writer creates the parent, so nothing needs to exist
+#: before the very first probe.
+PROBE_SCRIPT_NAME = "fleet-toolchain.ps1"
+
+#: What the install script is called under a node's stage root.
+INSTALL_SCRIPT_NAME = "fleet-install.ps1"
 
 #: The probe, verbatim. Nothing is substituted into it by this package.
 #:
@@ -46,7 +55,7 @@ PROBE_REMOTE_PATH = "$env:TEMP\\fleet-toolchain.ps1"
 #: yields an empty version rather than a failure: absence and silence are
 #: different states, and only the first stops a dispatch.
 PROBE_SCRIPT = """\
-foreach ($tool in @('python','poetry','git','make','tar')) {
+foreach ($tool in @('python','poetry','git','make','tar','winget','choco')) {
   $found = Get-Command $tool -ErrorAction SilentlyContinue
   if ($found) {
     $raw = (& $tool --version 2>&1 | Select-Object -First 1)
@@ -75,7 +84,7 @@ def parse_probe(output: str) -> tuple[ToolReport, ...]:
             send the reader to install five things that are already there.
     """
     reports: list[ToolReport] = []
-    wanted = {tool["name"] for tool in REQUIRED_TOOLS}
+    wanted = {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS)
     for line in output.splitlines():
         parts = line.strip().split("=", 2)
         if len(parts) != 3 or parts[0] not in wanted:
@@ -106,7 +115,9 @@ def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
             ``DISPATCH_FAILED`` if the probe exits non-zero, or
             ``NODE_TOOL_MISSING`` if its answer cannot be read.
     """
-    return parse_probe(remote.run_script(node["host"], PROBE_REMOTE_PATH, PROBE_SCRIPT))
+    return parse_probe(
+        remote.run_script(node["host"], f"{node['stage_root']}/{PROBE_SCRIPT_NAME}", PROBE_SCRIPT)
+    )
 
 
 def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]) -> None:
@@ -127,10 +138,11 @@ def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, .
     """
     absent = missing(reports)
     if absent:
+        managers = available_managers(reports)
         wanted = {tool["name"]: tool for tool in REQUIRED_TOOLS}
         detail = "; ".join(
             f"{name} -- {wanted[name]['reason']} -- "
-            f"{wanted[name]['install'] or 'no automatic install'}"
+            f"{install_command(name, managers) or 'no automatic install on this node'}"
             for name in absent
             if name in wanted
         )
@@ -163,39 +175,64 @@ def _python_version(reports: tuple[ToolReport, ...]) -> str:
     return "unknown"
 
 
-def install_script(names: tuple[str, ...]) -> str:
-    """Render the script that installs the named tools on a node.
+def install_script(names: tuple[str, ...], managers: tuple[str, ...]) -> str:
+    """Render the script that installs the named tools on one node.
 
     Args:
-        names: The tools to install, which must all carry an install command.
+        names: The tools to install, each of which must have a command for
+            one of ``managers`` -- :func:`installable` is what guarantees
+            that, and calling this with anything else is a caller error.
+        managers: That node's available package managers, in preference
+            order. Taken as an argument rather than looked up, because the
+            same missing ``make`` is a winget command on lavender and a choco
+            one on loki, and this function must not guess which node it is
+            rendering for.
 
     Returns:
-        The script's text, one command per tool, each echoing what it is
-        about to do so the transcript says which command produced which
-        failure.
+        The script's text, one command per tool, each preceded by an echo so
+        a transcript says which command produced which failure.
+
+    Raises:
+        ValueError: If a named tool has no command for any of these
+            managers. Refused rather than skipped: silently omitting it
+            would report an install that covered less than it claimed, and
+            the caller would then re-probe and see the tool still absent
+            with no explanation.
     """
-    wanted = {tool["name"]: tool for tool in REQUIRED_TOOLS}
-    lines = []
+    lines: list[str] = []
     for name in names:
+        command = install_command(name, managers)
+        if not command:
+            raise ValueError(
+                f"{name!r} has no install command for managers {managers}; "
+                "installable() is what filters these and it was not consulted"
+            )
         lines.append(f"Write-Output 'installing {name}'")
-        lines.append(wanted[name]["install"])
+        lines.append(command)
     return "\n".join(lines) + "\n"
 
 
 def installable(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
-    """Name the absent tools this package knows how to install.
+    """Name the absent tools this node can have installed automatically.
+
+    Node-specific in two ways at once: which tools are absent, and which
+    managers are present to install them. Measured 2026-09-04, lavender had
+    only winget and loki only choco, so a fleet-wide answer to this question
+    does not exist.
 
     Args:
-        reports: What a node answered.
+        reports: What a node answered, covering both the required tools and
+            the package managers.
 
     Returns:
-        The absent tools carrying an install command. A tool with no command
-        is left out rather than reported as a failure: Python and tar are
-        decisions about what a machine should carry, not packages to add
-        because a build wanted them.
+        The absent tools with a command for a manager this node has. A tool
+        is left out when the package knows no command for it -- python and
+        tar carry none, because which interpreter a machine should have is a
+        decision -- and also when the node lacks the manager that command
+        needs, which is a gap to report rather than a failure to raise.
     """
-    wanted = {tool["name"]: tool for tool in REQUIRED_TOOLS}
-    return tuple(name for name in missing(reports) if name in wanted and wanted[name]["install"])
+    managers = available_managers(reports)
+    return tuple(name for name in missing(reports) if install_command(name, managers))
 
 
 def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
@@ -219,13 +256,18 @@ def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[
     names = installable(reports)
     if not names:
         return ()
-    remote.run_script(node["host"], "$env:TEMP\\fleet-install.ps1", install_script(names))
+    remote.run_script(
+        node["host"],
+        f"{node['stage_root']}/{INSTALL_SCRIPT_NAME}",
+        install_script(names, available_managers(reports)),
+    )
     return names
 
 
 __all__ = [
-    "PROBE_REMOTE_PATH",
+    "INSTALL_SCRIPT_NAME",
     "PROBE_SCRIPT",
+    "PROBE_SCRIPT_NAME",
     "install_missing",
     "install_script",
     "installable",

@@ -51,8 +51,25 @@ SSH_FAILURE = 255
 #: Streamed from stdin rather than passed as an argument, so no shell between
 #: here and the disk can interpret it. ``-LiteralPath`` because a path is a
 #: path: without it PowerShell treats ``[`` and ``]`` as wildcards.
+#:
+#: THE OUTER QUOTES ARE LOad-BEARING AND THEIR ABSENCE WAS A REAL BUG. Windows
+#: OpenSSH hands a remote command to ``cmd.exe``, not to PowerShell. Unquoted,
+#: cmd sees the ``|`` as ITS OWN pipe, runs ``powershell -Command $input``, and
+#: pipes the result to ``Set-Content`` -- which cmd does not have. Measured
+#: 2026-09-04 on the first real dispatch: ``'Set-Content' is not recognized as
+#: an internal or external command``. Quoting makes the whole thing one
+#: argument to powershell.
+#:
+#: The directory is created in the same command because the alternative is a
+#: second round trip that would itself need a path to already exist. Paths
+#: given to this must be ABSOLUTE and literal: a ``$env:TEMP`` inside the
+#: single quotes below is not expanded by PowerShell, so it would create a
+#: directory named ``$env:TEMP`` rather than resolving one.
 _WRITE_COMMAND = (
-    "powershell -NoProfile -Command $input | Set-Content -LiteralPath '{path}' -Encoding utf8"
+    'powershell -NoProfile -Command "'
+    "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '{path}') | Out-Null; "
+    "$input | Set-Content -LiteralPath '{path}' -Encoding utf8"
+    '"'
 )
 
 

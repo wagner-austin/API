@@ -1,22 +1,35 @@
 """What a node must already have before work can be dispatched to it.
 
-MEASURED 2026-09-04, and the reason this file exists rather than an assumption
-that a machine on the tailnet is ready:
+THE STATE THIS FILE WAS WRITTEN AGAINST, measured 2026-09-04 before any of it
+was fixed:
 
-    node      python3.11  poetry  git   make   tar
-    sedona    3.11.9      2.2.1   2.43  NO     yes
-    lavender  3.11.9      NO      NO    NO     yes
-    loki      3.11.9      2.1.3   2.50  yes    yes
+    node      python3.11  poetry  git   make   winget  choco
+    sedona    Store       2.2.1   2.43  NO     yes     yes
+    lavender  3.11.9      NO      NO    NO     yes     NO
+    loki      3.11.9      2.1.3   2.50  yes    NO      yes
 
-One node of three could have run a ``make check`` at all. A dispatcher that
-assumed otherwise would stage a whole monorepo, launch, and fail on the first
-line of the recipe -- having spent the transfer to learn something one probe
-answers instantly.
+ONE NODE OF THREE could have run a ``make check``. A dispatcher that assumed
+otherwise would stage a whole monorepo, launch, and fail on the recipe's first
+line -- having spent the transfer to learn what one probe answers instantly.
+
+The fleet was standardised the same day and now reads 3.11.9 / 2.4.2 / 2.55.0
+/ 4.4.1 across all three. THAT IS EXACTLY WHY THIS FILE STAYS. A fleet drifts
+the moment somebody installs something, and the table above is what drift
+looked like the first time anyone checked. The probe is the thing that notices
+the second time.
 
 WHY THE PYTHON VERSION IS PART OF THE REQUIREMENT AND NOT JUST THE BINARY.
-``loki`` has poetry installed under Python 3.12 while every project here pins
-3.11. Poetry itself runs fine on 3.12 and manages a 3.11 environment, so the
-presence of a ``python`` says nothing useful on its own -- the version does.
+``loki`` had poetry installed under Python 3.12 while every project here pins
+``^3.11`` -- WHICH ACCEPTS 3.12. So poetry would have built a 3.12 venv and
+resolved every lockfile against the wrong minor version, silently, and the
+build would have failed resolving rather than testing. Presence says nothing;
+the version says everything.
+
+AND WHY THE INSTALL KIND MATTERS TOO. ``sedona``'s Python was the Microsoft
+Store build, which sandboxes ``%LOCALAPPDATA%`` writes and has broken poetry
+venv creation before. It was replaced with a python.org install at the same
+path the other nodes use. A probe that only asked "is there a python" would
+have called that node ready.
 
 WHY THIS REFUSES RATHER THAN INSTALLS BY DEFAULT. These are other people's
 machines. Installing software on one is not something a dispatcher should do
@@ -39,22 +52,31 @@ from typing_extensions import TypedDict
 
 
 class RequiredTool(TypedDict):
-    """One thing a node must have, and how to get it.
+    """One thing a node must have, and how to get it on each package manager.
 
     Attributes:
         name: The executable, as it is spelled on a PATH.
         reason: Why a dispatch needs it. Carried so a refusal explains
             itself rather than naming a binary and leaving the reader to
             infer what it was for.
-        install: The command that installs it on a Windows node, or an empty
-            string for something that cannot be installed by this package.
-            Empty is a real state: a node without a working Python 3.11 needs
-            a decision, not a package manager invocation.
+        install: The command per package manager, keyed by the manager's own
+            executable name. An EMPTY MAPPING means this package does not
+            install that tool at all, which is a real state rather than a
+            gap: a node without a working Python 3.11 needs a decision, not a
+            package manager invocation.
+
+            A MAPPING RATHER THAN ONE COMMAND, and this was a defect before
+            it was a design. The first version hardcoded ``choco install`` --
+            inferred from loki's ``make`` living under
+            ``C:\\ProgramData\\chocolatey``, one node generalised to three.
+            Measured 2026-09-04: sedona has both managers, lavender has ONLY
+            winget, loki has ONLY choco. No single command works fleet-wide,
+            so the manager is chosen per node from what that node reported.
     """
 
     name: str
     reason: str
-    install: str
+    install: dict[str, str]
 
 
 class ToolReport(TypedDict):
@@ -83,29 +105,50 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
         reason="every project pins Python 3.11; poetry builds its venv from it",
-        install="",
+        install={},
     ),
     RequiredTool(
         name="poetry",
         reason="every Makefile's lint and test targets run poetry lock and poetry sync",
-        install="python -m pip install --user poetry",
+        install={"python": "python -m pip install --user poetry"},
     ),
     RequiredTool(
         name="git",
         reason="some suites read the repository state they are testing",
-        install="choco install git -y",
+        install={
+            "winget": "winget install --id Git.Git -e --source winget --accept-source-agreements",
+            "choco": "choco install git -y",
+        },
     ),
     RequiredTool(
         name="make",
         reason="make check is the entry point for every project in this monorepo",
-        install="choco install make -y",
+        install={
+            "winget": (
+                "winget install --id GnuWin32.Make -e --source winget --accept-source-agreements"
+            ),
+            "choco": "choco install make -y",
+        },
     ),
     RequiredTool(
         name="tar",
         reason="staging sends a gzipped tar and the node unpacks it",
-        install="",
+        install={},
     ),
 )
+
+#: The package managers a node is asked about, in the order they are preferred.
+#:
+#: ``python`` first because poetry installs through its own pip and needs no
+#: system package manager at all -- and a node that has no Python cannot run a
+#: build regardless, so nothing is lost by preferring it.
+#:
+#: ``winget`` before ``choco`` because it ships with Windows and needs no
+#: elevation for a user-scope install, while choco is a deliberate
+#: installation somebody made. Measured 2026-09-04: sedona has both, lavender
+#: only winget, loki only choco -- so the order decides only sedona, and
+#: either would work there.
+PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("python", "winget", "choco")
 
 #: The Python a project's environment is built from.
 #:
@@ -116,15 +159,25 @@ REQUIRED_PYTHON = "3.11"
 
 
 def missing(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
-    """Name the tools a node does not have.
+    """Name the REQUIRED tools a node does not have.
+
+    Filtered to :data:`REQUIRED_TOOLS` rather than returning everything the
+    probe found absent, because the probe also asks about package managers
+    and a node is not required to have any particular one. Unfiltered, loki
+    -- which has choco and no winget -- would be reported as missing a tool
+    and refused, though it can build perfectly well.
 
     Args:
-        reports: What the node answered, one entry per required tool.
+        reports: What the node answered, which covers the required tools and
+            the package managers together.
 
     Returns:
-        The absent tools' names, in the order they were reported.
+        The absent required tools' names, in the order they were reported.
     """
-    return tuple(report["name"] for report in reports if not report["present"])
+    required = {tool["name"] for tool in REQUIRED_TOOLS}
+    return tuple(
+        report["name"] for report in reports if report["name"] in required and not report["present"]
+    )
 
 
 def version_number(reported: str) -> str:
@@ -174,6 +227,45 @@ def python_is_right(reports: tuple[ToolReport, ...]) -> bool:
     return False
 
 
+def available_managers(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
+    """Name the package managers this node actually has, in preference order.
+
+    Args:
+        reports: What the node answered, which includes the managers it was
+            asked about as well as the tools it must have.
+
+    Returns:
+        The present managers, ordered by :data:`PACKAGE_MANAGERS`. Empty when
+        the node has none, which is not an error -- it means nothing can be
+        installed there automatically and the gap has to be closed by hand.
+    """
+    present = {report["name"] for report in reports if report["present"]}
+    return tuple(manager for manager in PACKAGE_MANAGERS if manager in present)
+
+
+def install_command(tool: str, managers: tuple[str, ...]) -> str:
+    """Choose how to install one tool on a node with these managers.
+
+    Args:
+        tool: The tool's name.
+        managers: The node's available managers, in preference order.
+
+    Returns:
+        The first command whose manager the node has, or an empty string when
+        the tool has no command for any of them. Empty covers both cases a
+        caller must not conflate with failure: a tool this package never
+        installs, and a node whose managers do not cover it.
+    """
+    for required in REQUIRED_TOOLS:
+        if required["name"] != tool:
+            continue
+        for manager in managers:
+            command = required["install"].get(manager)
+            if command:
+                return command
+    return ""
+
+
 def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
     """Render what stands between a node and its first dispatch.
 
@@ -182,17 +274,18 @@ def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
         reports: What it answered.
 
     Returns:
-        One line naming what is absent and what would install it, or a line
-        saying the node is ready. The install commands are included because
-        the reader's next question is always how to fix it, and sending them
-        to a README for that is how a gap stays open.
+        One line naming what is absent and what would install it ON THIS
+        NODE, or a line saying the node is ready. Node-specific because the
+        fleet does not share a package manager: the same missing ``make`` is
+        a winget command on lavender and a choco one on loki.
     """
     absent = missing(reports)
     if not absent and python_is_right(reports):
         return f"{node}: ready"
-    wanted = {tool["name"]: tool for tool in REQUIRED_TOOLS}
+    managers = available_managers(reports)
+    wanted = {tool["name"] for tool in REQUIRED_TOOLS}
     parts = [
-        f"{name} ({wanted[name]['install'] or 'install by hand'})"
+        f"{name} ({install_command(name, managers) or 'install by hand'})"
         for name in absent
         if name in wanted
     ]
@@ -263,13 +356,16 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 
 
 __all__ = [
+    "PACKAGE_MANAGERS",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",
     "RequiredTool",
     "ToolReport",
+    "available_managers",
     "decode_tool_report",
     "describe_gap",
     "encode_tool_report",
+    "install_command",
     "missing",
     "python_is_right",
     "version_number",
