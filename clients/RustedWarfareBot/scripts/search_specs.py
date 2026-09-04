@@ -159,10 +159,12 @@ def decode_search_spec(payload: JSONObject) -> SearchSpec:
 
 
 #: The registered regimes, every entry validated at import. ``vh`` is the
-#: Very Hard composition search around the sitting champion (close0-flame4
-#: since 2026-09-02; the flame axis runs to 8 because its adoption
-#: measured a strong 2 -> 4 gradient with the old cap sitting on the
-#: champion). ``imp`` aims the same machinery at Impossible's untried
+#: Very Hard knob search around the sitting champion (evolve1-g4m2 since
+#: 2026-09-04 -- the machine-learned composition, every knob inherited
+#: from close0-flame4 whose neighborhood vhsearch4 already measured flat;
+#: the flame axis history: the 2 -> 4 adoption measured a strong gradient
+#: with the old cap sitting on the champion).
+#: ``imp`` aims the same machinery at Impossible's untried
 #: composed fortress vocabulary: every value has been fielded in a
 #: committed doctrine (guns 1-2 from the zone arms, nukes 1 from
 #: fortress-nuke, mass 40 from the fortress chassis, strike 5000/15000
@@ -175,7 +177,7 @@ def decode_search_spec(payload: JSONObject) -> SearchSpec:
 SPECS: Mapping[str, SearchSpec] = {
     "vh": decode_search_spec(
         {
-            "base": "doctrines/close0-flame4.doctrine",
+            "base": "doctrines/evolve1-g4m2.doctrine",
             "space": {
                 "flame": [0, 2, 4, 6, 8],
                 "close": [0, 6],
