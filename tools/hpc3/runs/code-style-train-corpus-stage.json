@@ -1,0 +1,20 @@
+{
+  "destination": "/pub/wagnera3/code-style/train-corpora",
+  "provenance": {
+    "corpus": "code-corpus-v1, this monorepo's own Python read as documents",
+    "emitter": "tools/code-corpus, code-corpus-v1.jsonl.manifest.json",
+    "source_repos": "api dad00e68 (DIRTY), mcp 8d0f08e9 (DIRTY)",
+    "not_citable": "Both source repositories were dirty at emission, which the emitter's manifest flags. No run built on this corpus is citable until it is re-emitted clean; see docs/RESEARCH.md, code-style entry.",
+    "split": "seed 0, holdout_fraction 0.1, 3993 train files and 443 holdout files",
+    "selection": "1 generated file, 68 duplicates and 38 empty files excluded; the duplicate check is by content, which is what matters here because scripts/guard.py is byte-identical across all 41 packages",
+    "tokens_approx": "7,750,363 train and 733,683 holdout",
+    "named_by_digest": "The train corpus is staged under its own sha256 because model_trainer.cluster.stores.StagedCorpus resolves corpus_dir/<file_id> and the file id IS the digest"
+  },
+  "files": [
+    {
+      "name": "fc9069f9e4aa5e5715aaea789b4acd35f6a8d53b05f4331d1dee4c13269da77b",
+      "sha256": "fc9069f9e4aa5e5715aaea789b4acd35f6a8d53b05f4331d1dee4c13269da77b",
+      "size_bytes": 33755085
+    }
+  ]
+}
