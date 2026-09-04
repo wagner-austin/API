@@ -19,7 +19,7 @@ from collections.abc import Callable, Sequence
 from typing import Protocol
 
 import torch
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.core.services.model.gemm_probe import gemm_operands
 from model_trainer.core.services.model.gemm_shapes import GemmShape, gemm_label
 from platform_core import cli_args
@@ -114,7 +114,7 @@ def bench_table(device: str) -> dict[str, dict[str, float]]:
         Per shape label: vendor ms, ordered ms, and their ratio.
     """
     results: dict[str, dict[str, float]] = {}
-    for name, shape in _test_hooks.benchmark_shapes():
+    for name, shape in _measurement_hooks.benchmark_shapes():
         vendor, ordered = bench_shape(shape, device)
         # A zero vendor median is a broken clock, and dividing by it raising
         # loudly is the right report.

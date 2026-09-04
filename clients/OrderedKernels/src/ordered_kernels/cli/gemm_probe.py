@@ -18,7 +18,7 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
-from model_trainer.cli import _test_hooks
+from model_trainer.cli import _measurement_hooks
 from model_trainer.cli.gemm_probe import gemm_label_for
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.run_fingerprint import (
@@ -103,7 +103,7 @@ def ordered_run_record(device: str) -> RunRecord:
         probe_determinism(device, remove_split_k=True, math_attention=True),
     )
     observations: list[Observation] = []
-    for name, shape in _test_hooks.probed_shapes_hook():
+    for name, shape in _measurement_hooks.probed_shapes_hook():
         digest, total = ordered_identity(shape, device)
         _log.info(
             "gemm %s M%d K%d N%d digest=%.0f sum=%.17g",
@@ -149,7 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
     _log.info(
         "%d GEMMs %s %s -> %s",
-        len(_test_hooks.probed_shapes_hook()),
+        len(_measurement_hooks.probed_shapes_hook()),
         record["label"],
         describe_run_fingerprint(record["fingerprint"]),
         out,

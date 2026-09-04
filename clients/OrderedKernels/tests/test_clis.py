@@ -8,6 +8,7 @@ import sys
 from collections.abc import Generator
 
 import pytest
+from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli.gemm_probe import gemm_label_for
 from model_trainer.core.services.model.gemm_probe import gemm_identity
@@ -34,13 +35,20 @@ def _cheap_probe() -> Generator[None, None, None]:
     Yields:
         Nothing; the table holds for the test body.
     """
-    cli_hooks.probed_shapes_hook = lambda: CHEAP
-    cli_hooks.benchmark_shapes = lambda: CHEAP
+    # Replacing an attribute that does not exist silently creates it, and the
+    # test then reads back its own fake while production reads nothing: that
+    # is exactly how the 2026-09-04 hook move (5bea978c) broke gemm_probe on
+    # the cluster while this suite stayed green. Prove the production default
+    # is where this fixture is about to point before pointing there.
+    assert measurement_hooks.probed_shapes_hook is measurement_hooks._default_probed_shapes
+    assert measurement_hooks.benchmark_shapes is measurement_hooks._default_benchmark_shapes
+    measurement_hooks.probed_shapes_hook = lambda: CHEAP
+    measurement_hooks.benchmark_shapes = lambda: CHEAP
     try:
         yield
     finally:
-        cli_hooks.probed_shapes_hook = cli_hooks._default_probed_shapes
-        cli_hooks.benchmark_shapes = cli_hooks._default_benchmark_shapes
+        measurement_hooks.probed_shapes_hook = measurement_hooks._default_probed_shapes
+        measurement_hooks.benchmark_shapes = measurement_hooks._default_benchmark_shapes
 
 
 cheap_probe = pytest.fixture(_cheap_probe)
