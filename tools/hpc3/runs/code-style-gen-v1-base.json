@@ -1,7 +1,7 @@
 {
   "run_id": "code-style-qlora-qwen-v1",
   "arm": "base",
-  "artifact_path": "/pub/wagnera3/code-style/data/artifacts/models/code-style-qlora-qwen-v1",
+  "artifact_path": "/pub/wagnera3/code-style/adapters/code-style-qlora-qwen-v1",
   "holdout_path": "/pub/wagnera3/code-style/corpora/code-corpus-v1.holdout.jsonl",
   "prompt_lines": 20,
   "max_new_tokens": 1536,
