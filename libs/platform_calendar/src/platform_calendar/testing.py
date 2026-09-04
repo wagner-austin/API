@@ -331,6 +331,7 @@ def reset_hooks() -> None:
     _prod_hooks._cli_env_loaded = False
     _prod_hooks._cli_env_cache = {}
     _prod_hooks._cli_default_console = None
+    _prod_hooks._cli_env_path = _prod_hooks._default_cli_env_path()
     _init_production_hooks()
 
 

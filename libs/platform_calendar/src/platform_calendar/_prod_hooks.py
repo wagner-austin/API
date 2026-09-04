@@ -324,6 +324,32 @@ _cli_env_loaded: bool = False
 _cli_env_cache: dict[str, str] = {}
 _cli_default_console: Console | None = None
 
+#: Where :func:`_prod_cli_get_env` looks for its ``.env``.
+#:
+#: A module global with the real location as its value, reset by
+#: ``testing.reset_hooks`` alongside the two cache globals beside it, because
+#: the path used to be computed inline from ``__file__``. That made the
+#: parse loop reachable ONLY on a machine that happened to have a ``.env``
+#: in the package root -- which is gitignored, so it exists on a developer's
+#: box and nowhere else. The five lines that read and split the file were
+#: covered locally and uncovered in CI, and the package's 100% gate was
+#: being met by an untracked file rather than by a test.
+_cli_env_path: str = ""
+
+
+def _default_cli_env_path() -> str:
+    """Name the real ``.env``, in the package root.
+
+    Returns:
+        The path, as a string. A function rather than an inline expression
+        so ``testing.reset_hooks`` can restore the real location after a
+        test has pointed :data:`_cli_env_path` somewhere else.
+    """
+    return str(Path(__file__).parent.parent.parent / ".env")
+
+
+_cli_env_path = _default_cli_env_path()
+
 
 def _prod_cli_api_get(access_token: str, url: str) -> JSONObject:
     """Production CLI API GET request.
@@ -410,19 +436,15 @@ def _prod_cli_get_env(key: str) -> str | None:
     Returns:
         Value if found, None otherwise.
     """
-    import os
-
     global _cli_env_loaded, _cli_env_cache
 
     if not _cli_env_loaded:
-        # Load from .env file relative to this module
-        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
-        if os.path.exists(env_path):
-            with open(env_path) as f:
-                for line in f:
-                    if "=" in line and not line.startswith("#"):
-                        k, v = line.strip().split("=", 1)
-                        _cli_env_cache[k] = v
+        env_path = Path(_cli_env_path)
+        if env_path.exists():
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    _cli_env_cache[k] = v
         _cli_env_loaded = True
 
     return _cli_env_cache.get(key)

@@ -165,39 +165,79 @@ class TestProdCliGetEnv:
         assert result2 is None
 
     def test_loads_env_file_when_exists(self, tmp_path: Path) -> None:
-        """Test _prod_cli_get_env loads from .env file."""
+        """The .env is read, parsed, and its values come back out.
 
+        This test previously did not test that. It wrote a ``.env`` into
+        ``tmp_path``, reassigned ``_prod_hooks.__file__`` hoping to redirect
+        the lookup, and then said so in its own comment -- "which won't find
+        our test file (wrong location), so just verify the function runs
+        without error" -- before asserting ``result is None``. A test named
+        ``test_loads_env_file_when_exists`` asserted that nothing was
+        loaded.
+
+        The five lines that read and split the file were therefore covered
+        only on a machine that happened to have a real ``.env`` in the
+        package root. That file is gitignored, so CI had none, and this
+        package's 100% coverage gate was being met by an untracked
+        developer artifact. ``_cli_env_path`` exists so the lookup can be
+        pointed at a real file this test controls.
+        """
         from platform_calendar import _prod_hooks
+        from platform_calendar.testing import reset_hooks
 
-        # Save original state
-        original_env_loaded = _prod_hooks._cli_env_loaded
-        original_env_cache = _prod_hooks._cli_env_cache
-
-        # Create a temporary .env file
         env_file = tmp_path / ".env"
-        env_file.write_text("TEST_KEY=test_value\n", encoding="utf-8")
+        env_file.write_text(
+            "# a comment line, skipped\n"
+            "TEST_KEY=test_value\n"
+            "WITH_EQUALS=a=b=c\n"
+            "no_equals_sign_so_skipped\n",
+            encoding="utf-8",
+        )
 
-        # Reset state
         _prod_hooks._cli_env_loaded = False
         _prod_hooks._cli_env_cache = {}
+        _prod_hooks._cli_env_path = str(env_file)
+        try:
+            assert _prod_cli_get_env("TEST_KEY") == "test_value"
+            # Split on the FIRST '=' only, so a value may contain more.
+            assert _prod_cli_get_env("WITH_EQUALS") == "a=b=c"
+            assert _prod_cli_get_env("# a comment line, skipped") is None
+            assert _prod_cli_get_env("no_equals_sign_so_skipped") is None
+        finally:
+            reset_hooks()
 
-        # Temporarily change the module directory
-        original_file = _prod_hooks.__file__
-        _prod_hooks.__file__ = str(tmp_path / "platform_calendar" / "_prod_hooks.py")
+    def test_loads_nothing_when_the_env_file_is_absent(self, tmp_path: Path) -> None:
+        """A missing .env leaves an empty cache rather than raising.
 
-        # Create the expected directory structure
-        (tmp_path / "platform_calendar").mkdir()
+        The deployed CLI ships no ``.env`` -- it reads real environment
+        variables -- so this is the arm that runs in production, and it was
+        the only one CI ever executed.
+        """
+        from platform_calendar import _prod_hooks
+        from platform_calendar.testing import reset_hooks
 
-        # Call the function - it will try to load from __file__/../../.env
-        # which won't find our test file (wrong location), so just verify
-        # the function runs without error
-        result = _prod_cli_get_env("SOME_KEY")
-        assert result is None  # Won't find our key since path is different
+        _prod_hooks._cli_env_loaded = False
+        _prod_hooks._cli_env_cache = {}
+        _prod_hooks._cli_env_path = str(tmp_path / "definitely-absent.env")
+        try:
+            assert _prod_cli_get_env("TEST_KEY") is None
+            assert _prod_hooks._cli_env_loaded is True
+        finally:
+            reset_hooks()
 
-        # Restore original state
-        _prod_hooks.__file__ = original_file
-        _prod_hooks._cli_env_loaded = original_env_loaded
-        _prod_hooks._cli_env_cache = original_env_cache
+    def test_reset_hooks_restores_the_real_env_path(self) -> None:
+        """Teardown must put the real location back.
+
+        Without this the first test to point ``_cli_env_path`` at a tmpdir
+        would leave every later test reading a path that no longer exists,
+        which is the failure mode module-global seams have and hooks do not.
+        """
+        from platform_calendar import _prod_hooks
+        from platform_calendar.testing import reset_hooks
+
+        _prod_hooks._cli_env_path = "somewhere-else"
+        reset_hooks()
+        assert _prod_hooks._cli_env_path == _prod_hooks._default_cli_env_path()
 
 
 class TestProdCliSetEnv:
