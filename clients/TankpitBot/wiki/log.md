@@ -6140,3 +6140,84 @@ script as the earlier validations:
 
 Artifact: `tankpit-releases/v0.1.0-76a0f62b/clients/TankpitBot/`
 `runs/bot/demo-1/bot-20260904-022739.events.jsonl`.
+
+---
+
+## [2026-09-03] crack | 0x44 is the fuel-deposit command, and the layout was already on the page
+
+Closed the last "observed but NOT modelled" client command. The wiki's
+own table said it could not be modelled; the wiki's own table, 55 lines
+higher, said exactly how.
+
+**What 0x44 is.** `CMD_DEPOSIT_FUEL`, client class `Wb`, code `'D'`.
+Long press over a tile moves fuel from the tank INTO that tile's cache.
+Payload `[6][0x44][amount_lo][amount_hi][x][y]` — the **amount leads
+the tile**, which is the opposite of every other coordinate command and
+the entire reason the byte looked unmodellable. Read as
+`[x][y][tail]`, because type 6 is the combat type and the shot is the
+only other type-6 command, `06446400aaae` parses as a click at (100, 0)
+with an arbitrary two-byte tail. Read correctly it says **deposit 100
+at (170, 174)** — and the tile the server then reported a new volume
+for was (170, 174).
+
+**The two things I got wrong on the way, both the same mistake.**
+
+1. The `Wb` row (`| Wb | D | 6 | Deposit fuel: x, y, amount(LE u16) |`)
+   has been in [[js-source-map]] since the 2026-06-19 JS walk, and a
+   fully-correct byte-layout row has been in [[client-commands]]'s own
+   Resources table for as long. The sim work searched `0x44`, hit the
+   **server** message table's `FuelGain`, and stopped. Client and server
+   tables share a byte space and share nothing else.
+2. I then wrote the narrator to emit a top-level `0x43 CacheUpdate`,
+   because the archive dump showed `43aaae6400` and 0x43 is a real
+   server message. It is not one here: `container_pickup` encodes as a
+   `0x43` **subtype inside a 0x2E envelope**, and
+   [[fuel-system]] had byte-mined this exact choreography a month
+   earlier, on 2026-08-03, down to "the record comes ONCE — deposits do
+   NOT double their record the way every pickup does". Caught by
+   reading the page I was about to append to.
+
+Same lesson twice in one session, and the same one logged on 2026-07-26:
+**grep the page you are about to contradict.**
+
+**What was genuinely new.** The command layout (the old bullet said
+"type 0x07 with an XOR-encoded payload, encoding not yet cracked" —
+wrong type, and sent commands are not ciphered at all), a sixth deposit
+window from sniff-20260620-143345, and the **Requested** column that
+turns row 2 from a coincidence into a measurement: the client clamps
+its request to its own fuel, so a request of 294 — not a multiple of
+the 100-unit hold granularity — pins fuel-before at exactly 294. 194
+landed, 100 stayed. `deposited = min(requested, fuel - DEPOSIT_FLOOR)`,
+a fifth independent reading of the floor measured at four ranks in July.
+
+**Sim.** `sim/fuel_deposit.py` resolves (owns the mutation, creates the
+container record on bare ground, undotted);
+`narrate_fuel_deposit` narrates, pure and depositor-only — the 120-day
+atlas found zero cross-tank 0x64s and zero cross-tank refill records
+against hundreds of inferred refills, so a third party's deposit is
+wire-invisible. Routed through the move family: it walks, it obeys the
+window check, and it draws no 0x3F where a plain move would.
+
+**The audit's third status is deleted.** `STATUS_DECLARED_UNMODELLED`
+existed for exactly this byte. With it modelled the class was empty,
+and an empty status is a place to park the next byte where it stops
+counting as a defect. `make analyze-command-coverage` is now binary:
+**343 sessions, 17 command bytes, 17 handled, 0 crashing, 0 parked.**
+
+Also retired as stale: my own status line calling `protocol/commands.py`
+a 598-line trap. It was split in `074d1892` earlier the same day and is
+175 lines.
+
+## [2026-09-04] update | Events artifacts now open by naming their own build
+
+Board task 7e766d65 closed (`3c631fa9`): every bot events artifact
+opens with a `session_build` stamp — build ref, distribution version,
+instance, doctrine, room, never the account name. The build ref
+answers by environment class: the container from `TANKPIT_BUILD_REF`
+(Dockerfile bakes it, `make up` passes the release tag), a checkout
+from `git rev-parse HEAD`, an unstamped tree as `""` recorded
+honestly. 539 archived runs stay unattributable — a retroactive stamp
+would be invented — and `feature_provenance` now dates that limit to
+the pre-stamp era. The running fleet stamps `""` until its next
+release/up cycle. Twelve consumer tests across six files re-derived
+for the new first line; gate 7,000 tests at 100.00%.
