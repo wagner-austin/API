@@ -14,7 +14,8 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from monorepo_guards.external_inputs import external_inputs
+from monorepo_guards.external_inputs import declaring_modules, external_inputs
+from monorepo_guards.literal_set_rules import REGISTERED_SETS
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import manifest
@@ -113,19 +114,32 @@ class TestGuardInputs:
         """
         return pathlib.Path(__file__).resolve().parents[3]
 
-    def test_the_three_declaring_modules_are_carried(self) -> None:
+    def test_every_declaring_module_the_rules_look_for_is_carried(self) -> None:
         """THE REGRESSION, measured on sedona 2026-09-04. A dispatch that
-        carried the project, its dependencies and both shared directories
-        got through poetry sync and then failed on
-        corpus-format-, risk-tier- and strategy-name-declaration-unresolved,
-        because these three files had not travelled with it."""
-        members = manifest.build_tree(self.repo_root(), "tools/fleet")
+        carried the project, its dependencies and both shared directories got
+        through poetry sync and then failed on corpus-format-, risk-tier- and
+        strategy-name-declaration-unresolved, because the modules declaring
+        those sets had not travelled with it.
 
-        assert "services/Model-Trainer/src/model_trainer/core/contracts/dataset.py" in members
-        assert (
-            "services/Model-Trainer/src/model_trainer/core/contracts/strategy_names.py" in members
-        )
-        assert "libs/covenant_domain/src/covenant_domain/features.py" in members
+        DERIVED FROM THE REGISTRY, NOT NAMED. The first version of this test
+        listed the three paths, and one of them moved within the hour --
+        RISK_TIERS went from covenant_domain/features.py to
+        platform_core/risk_tiers.py while this was being written. A test that
+        spells the paths is the same second copy the code exists to avoid,
+        and it drifts the same way.
+        """
+        root = self.repo_root()
+        members = manifest.build_tree(root, "tools/fleet")
+
+        wanted = [
+            module.resolve().relative_to(root.resolve()).as_posix()
+            for module in declaring_modules(root)
+        ]
+        assert len(wanted) == len(REGISTERED_SETS)
+        for path in wanted:
+            assert any(path == member or path.startswith(f"{member}/") for member in members), (
+                f"{path} is neither staged nor inside anything staged"
+            )
 
     def test_the_list_comes_from_the_rules_and_not_from_here(self) -> None:
         """Asked of monorepo_guards rather than restated. A second copy would

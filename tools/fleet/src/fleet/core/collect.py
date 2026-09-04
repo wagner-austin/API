@@ -2,7 +2,7 @@
 
 THIS FILE CLOSES A HOLE THE TESTS COULD NOT SEE. Before it existed,
 :func:`fleet.core.dispatch.finish` and
-:func:`fleet.core.dispatch.result_script` were written, covered and reachable
+:func:`fleet.core.launch.result_script` were written, covered and reachable
 only from the test suite: NO command ever called them. So a dispatch could be
 leased, staged, started and recorded, and then had no path at all from the
 node's exit status back to the ledger -- every run stayed ``running`` until
@@ -32,7 +32,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
-from fleet.core import dispatch, remote
+from fleet.core import dispatch, launch, remote
 
 #: The exit status a passing ``make check`` leaves.
 PASSING_EXIT_CODE = 0
@@ -85,7 +85,7 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
     answer = remote.run_script(
         node["host"],
         f"{target}/{POLL_SCRIPT_NAME}",
-        dispatch.result_script(target),
+        launch.result_script(target),
     ).strip()
     if not answer:
         return None
@@ -94,7 +94,7 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
         raise AppError(
             FleetErrorCode.RUN_RESULT_UNREADABLE,
             f"{run_id} on {node['host']} recorded {answer!r} where an exit status and a "
-            f"timestamp were expected; the build's last act writes {dispatch.RESULT_NAME} and "
+            f"timestamp were expected; the build's last act writes {launch.RESULT_NAME} and "
             "nothing else does, so this is a node that was written to by something other than "
             "the build",
         )
@@ -150,7 +150,7 @@ def describe(node: NodeConfig, *, run_id: str, exit_code: int) -> str:
     """
     return (
         f"make {MAKE_TARGET} exited {exit_code}; log at "
-        f"{node['host']}:{node['stage_root']}/{run_id}/{dispatch.RESULT_NAME}.log"
+        f"{node['host']}:{node['stage_root']}/{run_id}/{launch.RESULT_NAME}.log"
     )
 
 

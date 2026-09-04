@@ -84,6 +84,27 @@ class LoadedWorkspace:
         return self._resolve(self.workspace["feed"])
 
     @property
+    def archives(self) -> pathlib.Path:
+        """Directory the staging archives are built in.
+
+        THE LEDGER'S DIRECTORY, not the workspace document's, and the
+        difference is not cosmetic. An archive is run OUTPUT, the same kind of
+        thing as the ledger, and this monorepo gitignores ``**/runs/`` and the
+        stager excludes it -- so putting archives there makes them invisible
+        to both, which is what they should be.
+
+        Measured 2026-09-04, when they were built beside the document instead:
+        moving ``fleet.json`` to the package root moved the archives with it,
+        so a 20.7 MB archive landed in ``tools/fleet/``, showed up untracked in
+        everybody's ``git status``, and was then STAGED BY THE NEXT DISPATCH --
+        which arrived at 42.5 MB carrying its own predecessor.
+
+        Returns:
+            The resolved path.
+        """
+        return self.ledger.parent
+
+    @property
     def leases(self) -> pathlib.Path:
         """Absolute path to the live lease file.
 

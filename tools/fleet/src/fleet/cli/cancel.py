@@ -36,7 +36,7 @@ from fleet.cli import _config
 from fleet.contracts.feed import FeedEvent
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, is_live
 from fleet.contracts.workspace import require_node
-from fleet.core import _test_hooks, dispatch, leases, records, remote
+from fleet.core import _test_hooks, dispatch, launch, leases, records, remote
 
 _log = get_logger(__name__)
 
@@ -87,7 +87,7 @@ def stop_script(run_id: str) -> str:
     unanswered prompt would hang this command until its ssh timeout rather
     than stopping anything.
 
-    The task's name comes from :func:`fleet.core.dispatch.task_name`, the
+    The task's name comes from :func:`fleet.core.launch.task_name`, the
     same function the dispatch registered it with. Spelling it here a second
     time is one rename away from a cancel that reports success having stopped
     nothing.
@@ -98,7 +98,7 @@ def stop_script(run_id: str) -> str:
     Returns:
         The script's text.
     """
-    task = dispatch.task_name(run_id)
+    task = launch.task_name(run_id)
     return (
         f"Stop-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue\n"
         f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false "

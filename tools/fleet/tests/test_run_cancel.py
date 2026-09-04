@@ -22,7 +22,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.cli import _config, cancel, run
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dispatch, leases, manifest, records, staging
+from fleet.core import _test_hooks, dispatch, leases, records, staging
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -33,6 +33,7 @@ from tests.conftest import (
     dispatch_replies,
     failed,
     ok,
+    prebuilt_archive,
 )
 
 
@@ -64,15 +65,46 @@ class TestRunIdentity:
 
 
 class TestRun:
+    def test_the_archive_is_built_where_the_records_live(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        """Not beside the workspace document. An archive is run output, and
+        one left where a tree is staged FROM is carried by the next dispatch:
+        measured 2026-09-04, a 20.7 MB archive beside fleet.json made the
+        following dispatch 42.5 MB."""
+        # The archive is placed where the workspace says archives go. tar is
+        # faked, so if run.py used any OTHER directory the dispatch would fail
+        # reading its own archive back -- which is what makes exit 0 here an
+        # assertion about the path and not merely about the file existing.
+        payload = prebuilt_archive(config_path, repo)
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+
+        code = run.main(
+            [
+                _config.CONFIG_FLAG,
+                str(config_path),
+                run.PROJECT_FLAG,
+                DEMO_PROJECT,
+                run.AGENT_FLAG,
+                "opus-fleet-0904",
+                run.SESSION_FLAG,
+                "s",
+                run.ROOT_FLAG,
+                str(repo),
+            ]
+        )
+
+        assert code == 0
+        assert loaded.archives != loaded.directory
+        assert (loaded.archives / f"{DEMO_RUN_ID}.tgz").is_file()
+        assert not (loaded.directory / f"{DEMO_RUN_ID}.tgz").exists()
+
     def test_a_dispatch_leases_stages_launches_and_records(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
 
         code = run.main(
@@ -122,11 +154,7 @@ class TestRun:
         another run holds is the corruption, not a step towards it.
         """
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
         argv = [
             _config.CONFIG_FLAG,
@@ -179,11 +207,7 @@ class TestRun:
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
 
         assert (
@@ -232,11 +256,7 @@ class TestCancel:
             config_path: The workspace document.
             repo: The monorepo root.
         """
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
         run.main(
             [
@@ -377,11 +397,7 @@ class TestFinish:
 
 class TestInvocationForms:
     def test_run_entrypoint_exits_zero(self, config_path: pathlib.Path, repo: pathlib.Path) -> None:
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
         saved = sys.argv
         sys.argv = [
@@ -458,11 +474,7 @@ class TestInvocationForms:
         block imports, runs nothing and exits 0 -- which for this command
         reads as a successful dispatch that never happened.
         """
-        payload = staging.archive(
-            repo,
-            manifest.build_tree(repo, DEMO_PROJECT),
-            config_path.parent / f"{DEMO_RUN_ID}.tgz",
-        )
+        payload = prebuilt_archive(config_path, repo)
         _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.run", None)

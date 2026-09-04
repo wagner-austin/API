@@ -26,7 +26,8 @@ from collections.abc import Generator, Sequence
 import pytest
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from fleet.core import _test_hooks, manifest
+from fleet.cli import _config
+from fleet.core import _test_hooks, manifest, staging
 
 
 class FakeRun:
@@ -217,9 +218,15 @@ def workspace_document() -> JSONObject:
                 "expected_minutes": 5,
             }
         },
-        "ledger": "ledger.jsonl",
-        "feed": "feed.jsonl",
-        "leases": "leases.json",
+        # Records under a subdirectory, exactly as the real workspace has
+        # them. A fixture that put them beside the document would make the
+        # archive directory equal to the document's directory, and the test
+        # that the two are DIFFERENT would pass by construction -- which is
+        # the arrangement that let a 20.7 MB archive land beside fleet.json
+        # and be staged by the next dispatch.
+        "ledger": "runs/ledger.jsonl",
+        "feed": "runs/feed.jsonl",
+        "leases": "runs/leases.json",
     }
 
 
@@ -283,6 +290,31 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
     return path
 
 
+def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:
+    """Build the archive a faked dispatch will read back, where it will look.
+
+    A dispatch under :class:`FakeRun` never really runs ``tar``, but it DOES
+    really read the archive back and digest it, so the bytes have to be on
+    disk at the path the dispatch will use. That path is the workspace's
+    archive directory, and taking it from the loaded workspace rather than
+    spelling it here is what keeps this from silently going stale -- it did,
+    when archives moved out of the document's directory into the records'.
+
+    Args:
+        config_path: The workspace document.
+        repo: The synthetic monorepo root.
+
+    Returns:
+        The archive bytes, already written where the dispatch expects them.
+    """
+    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+    return staging.archive(
+        repo,
+        manifest.build_tree(repo, DEMO_PROJECT),
+        loaded.archives / f"{DEMO_RUN_ID}.tgz",
+    )
+
+
 @pytest.fixture(name="reset_hooks", autouse=True)
 def _reset_hooks() -> Generator[None, None, None]:
     """Put every hook back to its real implementation around each test."""
@@ -299,5 +331,6 @@ def _restore() -> None:
     _test_hooks.read_bytes = _test_hooks._default_read_bytes
     _test_hooks.file_exists = _test_hooks._default_file_exists
     _test_hooks.directory_exists = _test_hooks._default_directory_exists
+    _test_hooks.make_directory = _test_hooks._default_make_directory
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text

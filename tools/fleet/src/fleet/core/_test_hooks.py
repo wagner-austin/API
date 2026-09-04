@@ -175,6 +175,27 @@ class DirectoryExistsProtocol(Protocol):
         """
 
 
+class MakeDirectoryProtocol(Protocol):
+    """Creates a directory and every parent it needs."""
+
+    def __call__(self, path: pathlib.Path) -> None:
+        """Make a directory, tolerating one that is already there.
+
+        The text writers create their own parents, so this exists for the one
+        act that cannot: ``tar`` will not create the directory it is asked to
+        write an archive into. A workspace whose records directory does not
+        exist yet is the ordinary first-run case -- the archive is written
+        before any record is appended -- so its first dispatch would otherwise
+        fail at tar with a message about a path rather than about staging.
+
+        Args:
+            path: Absolute path to create.
+
+        Raises:
+            OSError: If it cannot be created.
+        """
+
+
 class WriteTextProtocol(Protocol):
     """Replaces a file's whole contents, creating it if absent."""
 
@@ -289,6 +310,15 @@ def _default_directory_exists(path: pathlib.Path) -> bool:
     return path.is_dir()
 
 
+def _default_make_directory(path: pathlib.Path) -> None:
+    """Create a real directory and its parents.
+
+    Args:
+        path: Absolute path to create.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+
+
 def _default_write_text(path: pathlib.Path, text: str) -> None:
     """Replace a real file's contents.
 
@@ -306,6 +336,7 @@ read_text: ReadTextProtocol = _default_read_text
 read_bytes: ReadBytesProtocol = _default_read_bytes
 file_exists: FileExistsProtocol = _default_file_exists
 directory_exists: DirectoryExistsProtocol = _default_directory_exists
+make_directory: MakeDirectoryProtocol = _default_make_directory
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
 
@@ -315,6 +346,7 @@ __all__ = [
     "CommandResult",
     "DirectoryExistsProtocol",
     "FileExistsProtocol",
+    "MakeDirectoryProtocol",
     "NowProtocol",
     "ReadBytesProtocol",
     "ReadTextProtocol",
@@ -323,6 +355,7 @@ __all__ = [
     "append_text",
     "directory_exists",
     "file_exists",
+    "make_directory",
     "now",
     "read_bytes",
     "read_text",

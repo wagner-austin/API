@@ -146,7 +146,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         agent=agent,
         session_id=session_id,
         project_root=project_root,
-        archive_dir=loaded.directory,
+        archive_dir=loaded.archives,
     )
 
     _log.info(

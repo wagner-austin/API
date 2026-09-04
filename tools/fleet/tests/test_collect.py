@@ -4,7 +4,7 @@ THE FIRST TEST HERE IS THE ONE THAT WOULD HAVE CAUGHT THE HOLE.
 :meth:`TestTheWiring.test_a_dispatched_run_can_reach_a_terminal_state` runs a
 dispatch and then collects it, and asserts the feed ends on ``passed``. Before
 ``fleet-collect`` existed that was unreachable: ``dispatch.finish`` and
-``dispatch.result_script`` were both fully covered by tests that called them
+``launch.result_script`` were both fully covered by tests that called them
 directly, and NO command called either, so every dispatch stayed ``running``
 until its lease lapsed. A hundred per cent of statements and branches, and the
 feature did not exist.
@@ -25,7 +25,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, collect, run, watch
 from fleet.contracts.node import NodeConfig
-from fleet.core import _test_hooks, leases, manifest, records, staging
+from fleet.core import _test_hooks, leases, records, staging
 from fleet.core import collect as core_collect
 from tests.conftest import (
     DEMO_NOW,
@@ -35,6 +35,7 @@ from tests.conftest import (
     FakeRun,
     dispatch_replies,
     ok,
+    prebuilt_archive,
 )
 
 #: When the node says a demo build finished: inside its lease, which the demo
@@ -72,11 +73,7 @@ def _dispatch(config_path: pathlib.Path, repo: pathlib.Path) -> None:
         config_path: The workspace document.
         repo: The synthetic monorepo root.
     """
-    payload = staging.archive(
-        repo,
-        manifest.build_tree(repo, DEMO_PROJECT),
-        config_path.parent / f"{DEMO_RUN_ID}.tgz",
-    )
+    payload = prebuilt_archive(config_path, repo)
     _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
     run.main(
         [

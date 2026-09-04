@@ -51,6 +51,13 @@ EXCLUDED_DIRECTORIES = (
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
+    # `runs` is a package's own OUTPUT -- coverage fragments, ledgers, and the
+    # archives this module writes. Excluding it stops a dispatch carrying the
+    # previous ones: measured 2026-09-04, five consecutive dispatches of
+    # tools/fleet grew 185 KB, 1.4 MB, 4.5 MB, 13.5 MB, 20.7 MB, each one
+    # staging its predecessors. Nothing on the node needs it -- the shared
+    # launcher creates `runs/` before writing coverage there.
+    "runs",
 )
 
 #: What the reassembled archive is called on the node.
@@ -98,6 +105,12 @@ def archive(
             "an archive needs at least one member; staging nothing extracts to nothing and "
             "fails later at make, with a message about a missing target rather than staging"
         )
+    # tar will not create the directory it is asked to write into, and a
+    # workspace whose records directory does not exist yet is the ordinary
+    # first-run case: the archive is built BEFORE any record is appended, so
+    # nothing has made it. Without this the first dispatch into a fresh
+    # workspace fails at tar with a message about a path.
+    _test_hooks.make_directory(destination.parent)
     excludes: list[str] = []
     for name in EXCLUDED_DIRECTORIES:
         excludes.extend(("--exclude", name))
