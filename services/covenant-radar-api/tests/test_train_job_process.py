@@ -58,7 +58,16 @@ class TestProcessTrainJob:
             {
                 "REDIS_URL": "redis://test:6379/0",
                 "DATABASE_URL": "postgresql://test@localhost/test",
-                "MODEL_OUTPUT_DIR": str(tmp_path),
+                # APP__MODELS_ROOT is the name the loader reads --
+                # `_parse_str("APP__MODELS_ROOT", "/data/models")`. This said
+                # MODEL_OUTPUT_DIR, which nothing reads, so the redirect
+                # never happened and `process_train_job` fell through to the
+                # "/data/models" default. On Windows that resolves under the
+                # current drive and is writable, so the test passed; on Linux
+                # it is a directory at the filesystem root and
+                # `mkdir(parents=True)` raised PermissionError.
+                "APP__MODELS_ROOT": str(tmp_path),
+                "APP__DATA_ROOT": str(tmp_path),
             }
         )
 
@@ -115,6 +124,10 @@ class TestProcessTrainJob:
             model_path = Path(str(result["model_path"]))
             assert model_path.exists()
             assert model_path.suffix == ".ubj"
+            # ...and that it is THIS test's temp directory. Without this the
+            # test passes wherever the default happens to be writable, which
+            # is how a redirect that never took effect went unnoticed.
+            assert tmp_path in model_path.parents
 
             # Verify FakeRedis was only called with expected methods
             # sadd was called during setup, close is called during container.close()
@@ -393,7 +406,16 @@ class TestProcessTrainJobWithDataBank:
             {
                 "REDIS_URL": "redis://test:6379/0",
                 "DATABASE_URL": "postgresql://test@localhost/test",
-                "MODEL_OUTPUT_DIR": str(tmp_path),
+                # APP__MODELS_ROOT is the name the loader reads --
+                # `_parse_str("APP__MODELS_ROOT", "/data/models")`. This said
+                # MODEL_OUTPUT_DIR, which nothing reads, so the redirect
+                # never happened and `process_train_job` fell through to the
+                # "/data/models" default. On Windows that resolves under the
+                # current drive and is writable, so the test passed; on Linux
+                # it is a directory at the filesystem root and
+                # `mkdir(parents=True)` raised PermissionError.
+                "APP__MODELS_ROOT": str(tmp_path),
+                "APP__DATA_ROOT": str(tmp_path),
                 "DATA_BANK_API_URL": "https://data-bank.example.com",
                 "DATA_BANK_API_KEY": "test-key",
             }
