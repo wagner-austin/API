@@ -2,18 +2,18 @@
 title: A capture source drifts from the image it produced, and re-capturing silently ships the drift
 tags: [identity, environments, images]
 hubs: [images-and-staging]
-related: ["[[environment-pins]]", "[[image-build-flow]]", "[[image-ledger-lessons]]"]
+related: ["[[environment-pins]]", "[[image-build-flow]]", "[[image-ledger-lessons]]", "[[spec-symbol-drift]]"]
 source_paths:
   - "src/hpc3/cli/image_capture.py"
   - "src/hpc3/core/image_capture.py"
   - "specs/abl-image.json"
 source_git_blobs:
-  "src/hpc3/cli/image_capture.py": "00ac8efad2d702a41d1e7a5bf3cc8d004de47991"
-  "src/hpc3/core/image_capture.py": "05e0a12d2c07600a9485563a52c0a78005e0f106"
-  "specs/abl-image.json": "923b4e8b0b9dba0e5f09f81976ec6549ced5489d"
+  "src/hpc3/cli/image_capture.py": "af0766bc1d4da403e2e566d6f0540bc3e1766f40"
+  "src/hpc3/core/image_capture.py": "dc635e24b966209acc57e44e0f130c55015a9417"
+  "specs/abl-image.json": "fa51c3bd9abe519a9ccc54fdc38e5e532b0f0cc5"
 provenance:
   - "cluster environment /pub/wagnera3/envs/abl-pinned (not in this repo)"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-03
 confidence: high
 ---
 
@@ -50,40 +50,53 @@ whatever job first needed it.
 ## The probe follows the image, not the host
 
 Once a project declares an image the capture stops reading the host
-environment at all. `probe_command(config["env_path"])` builds the probe, and
-when `config["image"]` is not None the probe is wrapped in
-`run_inside_image` (`cli/image_capture.py` L 155-158). `env_path` is
-`/opt/env` for an imaged project, which exists only inside the `.sif`.
+environment at all. `probe_command(source["env_path"])` builds the probe, and
+when `source["image"]` is not None it is wrapped in `run_inside_image`
+(`cli/image_capture.py`, section `capture_spec`). `env_path` is `/opt/env`
+for an imaged project, which exists only inside the `.sif`.
 
-That means the drift above is not reachable by re-running capture as-is. To
-capture an environment carrying a new dependency, the config handed to
-capture has to point at the host env with no image declared, which is the
-onboarding shape, not the steady-state one.
+**This paragraph used to end "that means the drift above is not reachable by
+re-running capture as-is", and it is no longer true.** `--env-path` was added
+on 2026-09-03 to unblock onboarding, and it does exactly the thing this page
+said was unreachable: it names a host directory to probe and skips the
+registry entirely (`cli/image_capture.py`, section `_environment_to_probe`,
+and its module docstring's "TWO ROUTES"). So the host env CAN be re-captured
+now.
+
+What has not changed is that the two routes answer different questions. The
+registered route probes what the IMAGE contains; `--env-path` probes what a
+host directory contains. A capture that switches routes to pick up one added
+dependency also picks up everything the host env has drifted away from, which
+is the failure this page opened with.
 
 ## Three fields capture cannot carry forward
 
-`system_packages` and `smoke_commands` are emitted empty unconditionally
-(`cli/image_capture.py` L 176, L 190), and `required_symbols` comes only from
-the `--symbols` flag (L 184). Both empties are deliberate and documented in
-the source: capture reads what an environment CONTAINS, while an OS package
-list and a smoke command state what the image must be able to DO, which
-cannot be probed off a package listing.
+`system_packages` and `smoke_commands` are emitted empty unconditionally, and
+`required_symbols` comes only from the `--symbols` flag
+(`cli/image_capture.py`, section `capture_spec`). Both empties are deliberate
+and documented at the assignment: capture reads what an environment CONTAINS,
+while an OS package list and a smoke command state what the image must be
+able to DO, which cannot be probed off a package listing.
 
-For the abl spec as committed that is 29 smoke commands and 46 required
+For the abl spec as committed that is 34 smoke commands and 58 required
 symbols. A re-capture that does not re-supply them produces a spec that
 builds an image asserting nothing about itself.
 
+The symbols are no longer only hand-maintained, though: they are re-checked
+against this monorepo's source by a test, so a rename cannot leave them
+naming something that has moved ([[spec-symbol-drift]]).
+
 ## What the source says the practice already is
 
-The comment above the probe records it plainly: the command "was written for
-the onboarding case and worked exactly once per project; every version bump
-since has hand-edited `git_commit` in the generated spec instead"
-(`cli/image_capture.py` L 150-154).
+The comment above the probe records it plainly. The steady-state path "is the
+version bump, which was always the recurring job and was being done by
+hand-editing `git_commit` in the generated spec"
+(`cli/image_capture.py`, section `capture_spec`).
 
 So the surgical edit is not a shortcut around the tool. It is what every
-version bump has actually done, and for a single added dependency it is also
-the only edit that preserves cupy, the smoke commands and the symbol
-assertions in one step.
+version bump has actually done -- including the v32 build on 2026-09-03 --
+and for a single added dependency it is also the only edit that preserves
+cupy, the smoke commands and the symbol assertions in one step.
 
 ## Application notes
 
