@@ -91,7 +91,7 @@ cost level the raid verb can express. Class 2 is dead at current
 mechanics; classes 1 (rebuild-under-fire) and 3 (strike-window
 economics) are the remaining roads.
 
-## Class 1 exists as code now (2026-09-04) -- unmeasured
+## Class 1 measured FLAT at both thresholds (imprb48, 2026-09-04)
 
 Rebuild-under-fire shipped as the `rebuild` doctrine knob
 (RW-DOCTRINE-029, default 0 = prior behaviour exactly): a pool we HELD
@@ -99,8 +99,18 @@ and lost is withheld from the pool survey until the rival's army value
 drops at least `rebuild` below its recent peak -- the same Momentum
 wave-break signal the strike release reads -- so the builder's walk back
 goes through the wave's gap instead of into its face. Virgin pools claim
-as always; the opening cannot slow. Mechanism: `policy/reclaim.py`
-(`Razed` tracker + embargo gate) -> `survey_pools`'s `embargoed` filter,
-threaded via the expander. NO measurement exists yet; the first arm
-waits on the learned composition's own Impossible transfer panel
-(`g4m2imp48`) to pick its base.
+as always. Mechanism: `policy/reclaim.py` (`Razed` tracker + embargo
+gate) -> `survey_pools`'s `embargoed` filter, threaded via the expander.
+
+The measurement (48 shared fresh seeds, rebuild 5000 and 15000 vs the
+champion's 0): **nothing moved.** Paired margins -0.106 / +0.017 (sd
+~0.7), survival medians 3,299 / 3,288 / 3,293, peak economies identical
+(~5.7 extractors), end-state extractors median zero in every arm (9/48
+vs 5/48 vs 6/48 matches ending with any alive -- noise). The wave-gap
+reclaim-timing hypothesis is refuted at both drop scales the strike
+search validated as real window-openers: by the time pools are being
+razed the match is in its death phase, and the reclaim walk was never
+the marginal loss. Class 1 as DESIGNED here is closed; a different gate
+(embargoing ALL expansion under fire, or escorting the builder) would be
+a new design, not a retuning. Class 3 (strike-window economics) is the
+remaining road.
