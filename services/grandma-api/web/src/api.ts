@@ -67,7 +67,11 @@ export async function translateAudio(
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       log.error("Translation request timed out after", TRANSLATE_TIMEOUT_MS, "ms");
-      throw new Error("Translation request timed out");
+      // `cause` carries the AbortError forward. Without it the DOMException
+      // that actually fired -- the only thing that distinguishes our own
+      // abort from a network stack that gave up -- is discarded at the one
+      // point a reader of the stack would want it.
+      throw new Error("Translation request timed out", { cause: err });
     }
     log.error("Fetch failed:", err);
     throw err;

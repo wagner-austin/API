@@ -15,6 +15,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+import trustme
 from scripts import _test_hooks
 from scripts.webserver import DEFAULT_PORT, create_https_server, main
 
@@ -38,11 +39,48 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.reset_hooks()
 
 
-def test_create_https_server_returns_configured_server() -> None:
+@pytest.fixture(scope="session")
+def served_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A directory holding TLS material and one static file to serve.
+
+    Six tests in this file used to point at ``web/`` for ``cert.pem`` and
+    ``key.pem``. Those two are gitignored -- ``web/*.pem``, and correctly
+    so, because a committed private key is a private key nobody can rotate
+    -- so the files exist only where somebody once ran the generator. On CI
+    the directory has no ``.pem`` in it at all and every one of the six died
+    on ``FileNotFoundError`` inside ``load_cert_chain``.
+
+    Minting the pair per session fixes that and says something truer
+    besides: what these tests exercise is ``create_https_server`` wrapping a
+    socket in a context built from A certificate, not from THE developer's
+    certificate.
+
+    ``index.html`` is here for the same reason. The subprocess test asked
+    the real ``web/`` tree for a page, which coupled a webserver test to the
+    frontend's build output.
+
+    Args:
+        tmp_path_factory: pytest's session-scoped temp directory factory.
+
+    Returns:
+        The directory, containing ``cert.pem``, ``key.pem`` and
+        ``index.html``.
+    """
+    directory = tmp_path_factory.mktemp("served")
+    authority = trustme.CA()
+    certificate = authority.issue_cert("127.0.0.1", "localhost")
+    certificate.private_key_pem.write_to_path(str(directory / "key.pem"))
+    certificate.cert_chain_pems[0].write_to_path(str(directory / "cert.pem"))
+    (directory / "index.html").write_text(
+        "<!DOCTYPE html>\n<html><body>served</body></html>\n", encoding="utf-8"
+    )
+    return directory
+
+
+def test_create_https_server_returns_configured_server(served_dir: Path) -> None:
     """Test that create_https_server returns a properly configured server."""
-    web_dir = Path(__file__).parent.parent / "web"
-    cert_path = str(web_dir / "cert.pem")
-    key_path = str(web_dir / "key.pem")
+    cert_path = str(served_dir / "cert.pem")
+    key_path = str(served_dir / "key.pem")
     port = _find_free_port()
 
     server = create_https_server(port, cert_path, key_path)
@@ -61,9 +99,8 @@ def test_default_port_constant() -> None:
     assert DEFAULT_PORT == 8091
 
 
-def test_main_creates_server_and_calls_serve_forever() -> None:
+def test_main_creates_server_and_calls_serve_forever(served_dir: Path) -> None:
     """Test that main() creates a server and calls the serve hook."""
-    web_dir = Path(__file__).parent.parent / "web"
     port = _find_free_port()
 
     # Track port from serve_forever hook
@@ -81,9 +118,10 @@ def test_main_creates_server_and_calls_serve_forever() -> None:
     original_argv = sys.argv
     sys.argv = ["webserver.py", str(port)]
 
-    # Change to web directory where certs are
+    # Serve from the fixture directory: main() defaults cert/key to
+    # <cwd>/cert.pem and <cwd>/key.pem, so the cwd IS how it finds them.
     original_cwd = os.getcwd()
-    os.chdir(str(web_dir))
+    os.chdir(str(served_dir))
 
     main()
 
@@ -95,14 +133,13 @@ def test_main_creates_server_and_calls_serve_forever() -> None:
     assert served_port == port
 
 
-def test_main_uses_default_port_without_args() -> None:
+def test_main_uses_default_port_without_args(served_dir: Path) -> None:
     """Test that main() uses DEFAULT_PORT when no args provided.
 
     The requested port is captured from the server factory rather than from a
     bound socket: binding DEFAULT_PORT for real makes this test fail on any
     host where that port is reserved, which says nothing about main().
     """
-    web_dir = Path(__file__).parent.parent / "web"
 
     requested_port: int | None = None
     served = False
@@ -129,9 +166,10 @@ def test_main_uses_default_port_without_args() -> None:
     original_argv = sys.argv
     sys.argv = ["webserver.py"]
 
-    # Change to web directory where certs are
+    # Serve from the fixture directory: main() defaults cert/key to
+    # <cwd>/cert.pem and <cwd>/key.pem, so the cwd IS how it finds them.
     original_cwd = os.getcwd()
-    os.chdir(str(web_dir))
+    os.chdir(str(served_dir))
 
     main()
 
@@ -144,9 +182,8 @@ def test_main_uses_default_port_without_args() -> None:
     assert served is True
 
 
-def test_webserver_entrypoint_runs_as_main() -> None:
+def test_webserver_entrypoint_runs_as_main(served_dir: Path) -> None:
     """Test the if __name__ == '__main__' guard executes main()."""
-    web_dir = Path(__file__).parent.parent / "web"
     port = _find_free_port()
 
     # Set up fake serve hook before running module
@@ -167,9 +204,10 @@ def test_webserver_entrypoint_runs_as_main() -> None:
     original_argv = sys.argv
     sys.argv = ["webserver.py", str(port)]
 
-    # Change to web directory where certs are
+    # Serve from the fixture directory: main() defaults cert/key to
+    # <cwd>/cert.pem and <cwd>/key.pem, so the cwd IS how it finds them.
     original_cwd = os.getcwd()
-    os.chdir(str(web_dir))
+    os.chdir(str(served_dir))
 
     # Re-import the hooks module (the old one was popped above) and set the
     # fake on it. Bound under a name ending in _test_hooks so this reads as
@@ -188,11 +226,10 @@ def test_webserver_entrypoint_runs_as_main() -> None:
     assert main_called
 
 
-def test_real_serve_forever_implementation() -> None:
+def test_real_serve_forever_implementation(served_dir: Path) -> None:
     """Test _real_serve_forever calls server.serve_forever."""
-    web_dir = Path(__file__).parent.parent / "web"
-    cert_path = str(web_dir / "cert.pem")
-    key_path = str(web_dir / "key.pem")
+    cert_path = str(served_dir / "cert.pem")
+    key_path = str(served_dir / "key.pem")
     port = _find_free_port()
 
     server = create_https_server(port, cert_path, key_path)
@@ -231,21 +268,20 @@ def test_reset_hooks_restores_defaults() -> None:
     assert _test_hooks.serve_forever is _test_hooks._real_serve_forever
 
 
-def test_webserver_subprocess_integration() -> None:
+def test_webserver_subprocess_integration(served_dir: Path) -> None:
     """Test that webserver starts and serves files over HTTPS via subprocess."""
     project_root = Path(__file__).parent.parent
-    web_dir = project_root / "web"
     port = _find_free_port()
 
     # Launched exactly as scripts/start.ps1 launches it: `-m` from the project
     # root, with the directory to serve passed as argv[2] (main() chdirs to it).
-    # Running the file BY PATH with cwd=web_dir instead put scripts/ on
+    # Running the file BY PATH with cwd=served_dir instead put scripts/ on
     # sys.path[0] rather than the project root, so `from scripts import
     # _test_hooks` at the top of webserver.py could only resolve against an
     # INSTALLED top-level `scripts` package -- one that every package here
     # shipped, so the copy found was whichever installed last.
     proc = subprocess.Popen(
-        [sys.executable, "-m", "scripts.webserver", str(port), str(web_dir)],
+        [sys.executable, "-m", "scripts.webserver", str(port), str(served_dir)],
         cwd=str(project_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

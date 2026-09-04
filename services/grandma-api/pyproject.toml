@@ -32,6 +32,13 @@ pytest-xdist = "^3.8.0"
 mypy = "^2.3.1"
 ruff = "^0.16.6"
 httpx = "^0.28.0"
+# Self-signed TLS material for the webserver tests. The six that need a
+# cert used to read `web/cert.pem`, which `.gitignore` excludes (line 29,
+# `web/*.pem`) precisely because a private key must not be committed -- so
+# the file exists only on a machine where someone generated one, and the
+# tests could pass nowhere else. trustme mints the pair into a tmpdir at
+# test time, which is both portable and honest about what is under test.
+trustme = "^1.2.1"
 
 [tool.mypy]
 python_version = "3.11"

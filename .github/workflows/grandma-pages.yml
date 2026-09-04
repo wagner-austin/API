@@ -25,10 +25,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Node 24 "Krypton", the Active LTS. This was 20 "Iron", whose
+      # upstream support ENDED 2026-04-30 -- the page was being built by a
+      # runtime that had stopped receiving security fixes four months
+      # earlier. 24 also ships npm 11, which is what this package's
+      # lockfile is now written by.
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies
         run: |
