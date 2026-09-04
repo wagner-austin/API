@@ -80,6 +80,10 @@ _SSE_HEARTBEAT_SECONDS = 15.0
 # nginx/cloudflared from idling the connection out.
 _MJPEG_KEEPALIVE_SECONDS = 15.0
 
+#: First bytes of every JPEG. The frame-intake route refuses anything
+#: else, so one bad POST cannot put a non-image on the bus.
+_JPEG_MAGIC = b"\xff\xd8\xff"
+
 # Multipart boundary token for the ``/video`` MJPEG stream.
 _MJPEG_BOUNDARY = "tankpitbotframe"
 
@@ -272,6 +276,34 @@ def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None
         await _drain_frame_bus_to_response(frame_bus, response)
         return response
 
+    async def cast(request: web.Request) -> web.Response:
+        """``POST /cast`` — one JPEG frame from the in-page caster.
+
+        THE POINT OF THIS ROUTE IS WHICH THREAD IT RUNS ON. The caster
+        used to hand frames back through a CDP binding, which is
+        delivered on the connection Playwright owns and therefore
+        dispatched by the thread running the tick loop. A heavy tick --
+        a map open, a teleport, a shot at an off-screen target -- queued
+        every frame produced during it and released them in a single
+        burst afterwards, which the latest-wins bus collapsed to one.
+        Seconds of play arrived as one picture, and it read as a
+        slideshow.
+
+        aiohttp serves this on the event loop, which lives on the MAIN
+        thread; the session runs on an executor thread. So a frame
+        posted here reaches the bus no matter what the bot is doing.
+
+        The body IS the frame: a bare JPEG, no envelope. Anything that
+        does not start with the JPEG magic is refused rather than
+        published, because a bus carrying one non-image would hand every
+        MJPEG viewer a broken part.
+        """
+        body = await request.read()
+        if not body.startswith(_JPEG_MAGIC):
+            return web.Response(status=400, text="body is not a JPEG frame")
+        frame_bus.publish(body)
+        return web.Response(status=204)
+
     async def frame(request: web.Request) -> web.Response:
         """``GET /frame`` — one-shot JPEG snapshot.
 
@@ -288,6 +320,7 @@ def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
 
+    app.router.add_post("/cast", cast)
     app.router.add_get("/watch", watch)
     app.router.add_get("/video", video)
     app.router.add_get("/frame", frame)

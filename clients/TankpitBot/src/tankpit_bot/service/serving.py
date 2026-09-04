@@ -61,6 +61,49 @@ async def run_until_stopped(
         await site.cleanup()
 
 
+async def cancel_and_await(*tasks: asyncio.Task[None]) -> None:
+    """Cancel background tasks and WAIT for each one to actually finish.
+
+    ``Task.cancel`` only schedules the cancellation: it raises
+    ``CancelledError`` inside the coroutine the next time the loop runs
+    it. A caller that cancels and returns is asking the loop to shut
+    down while those coroutines are still between their cancel and
+    their unwinding, so their ``finally`` blocks may never execute and
+    the loop closes with pending tasks -- which asyncio reports, after
+    the fact and out of context, as "Task was destroyed but it is
+    pending!".
+
+    That is not cosmetic here. Both surfaces that call this cancel a
+    task whose ``finally`` does real work:
+    :func:`~tankpit_bot.service.service_main._autostart_session` calls
+    ``on_finished`` from one, and it is the thing that stops the
+    service when a fleet child's session ends.
+
+    Cancellation is the expected outcome, so ``CancelledError`` is
+    swallowed -- and ONLY ``CancelledError``. Anything else a task
+    raised on its way out is re-raised, because a background task that
+    failed for its own reasons has something to say and this is the
+    last place anyone is listening.
+
+    Args:
+        tasks: The tasks to cancel and await. Already-finished tasks
+            are fine: cancelling one is a no-op and awaiting it returns
+            immediately.
+
+    Raises:
+        BaseException: Whatever a task raised, other than
+            ``CancelledError``.
+    """
+    for task in tasks:
+        task.cancel()
+    for task in tasks:
+        try:
+            await task
+        except asyncio.CancelledError:
+            log.debug("Background task %r cancelled during shutdown", task.get_name())
+
+
 __all__ = [
+    "cancel_and_await",
     "run_until_stopped",
 ]

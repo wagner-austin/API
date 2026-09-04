@@ -383,3 +383,55 @@ class TestVideoRoute:
             await response.read()
             assert response.status == 200
         assert closing_bus.unsubscribed >= 1
+
+
+class TestCastIntake:
+    """``POST /cast`` — the route the in-page caster posts frames to.
+
+    Its reason for existing is which THREAD it runs on. The caster used
+    to hand frames back over a CDP binding, delivered on the connection
+    Playwright owns and therefore dispatched by the thread running the
+    tick loop; a heavy tick queued every frame produced during it and
+    released them in one burst the latest-wins bus collapsed to one.
+    aiohttp serves this on the main-thread event loop, which the session
+    never occupies.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_posted_frame_reaches_the_bus(
+        self, client: TestClient[web.Request, web.Application], fbus: FrameBus
+    ) -> None:
+        """The body IS the frame, and it lands where viewers read it."""
+        subscriber = fbus.subscribe()
+        jpeg = b"\xff\xd8\xff" + b"payload" * 8
+
+        response = await client.post("/cast", data=jpeg)
+
+        assert response.status == 204
+        assert fbus.latest() == jpeg
+        fbus.unsubscribe(subscriber)
+
+    @pytest.mark.asyncio
+    async def test_a_body_that_is_not_a_jpeg_is_refused(
+        self, client: TestClient[web.Request, web.Application], fbus: FrameBus
+    ) -> None:
+        """One non-image on the bus breaks every MJPEG viewer at once.
+
+        The stream is a byte relay, so a text body would be written into
+        the multipart response under an ``image/jpeg`` part header and
+        every consumer would fail to decode it.
+        """
+        response = await client.post("/cast", data=b"<html>not a frame</html>")
+
+        assert response.status == 400
+        assert fbus.latest() is None
+
+    @pytest.mark.asyncio
+    async def test_an_empty_body_is_refused(
+        self, client: TestClient[web.Request, web.Application], fbus: FrameBus
+    ) -> None:
+        """A dropped connection mid-post must not publish nothing."""
+        response = await client.post("/cast", data=b"")
+
+        assert response.status == 400
+        assert fbus.latest() is None

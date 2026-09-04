@@ -174,12 +174,20 @@ class TestSummarize:
         assert report["at_sampling_floor"] == 11
         assert any("UNDERSAMPLED" in v for v in verdicts(report))
 
-    def test_a_bursty_source_is_distinguished_from_a_slow_one(self) -> None:
-        """Motion then silence: the transport cannot fix the silence.
+    def test_bursty_arrivals_are_distinguished_from_a_uniformly_slow_stream(self) -> None:
+        """Motion then silence is its own shape, and it is AMBIGUOUS.
 
         Ten frames 30 ms apart, then a two-second hole. Average rate
-        alone would call this slow; the burst share is what says the
-        source went idle.
+        alone would call this slow; the burst share is what separates
+        it from a stream that is evenly slow.
+
+        What the burst share does NOT do is name the cause, and the
+        verdict must not either. An idle source makes this shape, and
+        so does a transport that queues frames through a stall and
+        releases them at once -- which is exactly what the CDP binding
+        did on the tick thread. The verdict said "the source is idle;
+        a faster transport cannot fill that", and that sentence was
+        wrong about the live stream it was pointed at.
         """
         frames = [_jpeg(i) for i in range(12)]
         arrivals = [i * 0.03 for i in range(10)] + [2.3, 2.33]
@@ -188,7 +196,10 @@ class TestSummarize:
 
         assert report["stalls"] == 1
         assert report["burst_share"] > 0.5
-        assert any("BURSTY SOURCE" in v for v in verdicts(report))
+        line = next(v for v in verdicts(report) if v.startswith("BURSTY ARRIVALS"))
+        assert "TWO causes" in line
+        assert "queues during a stall" in line
+        assert "cannot tell them apart" in line
 
     def test_a_uniformly_slow_stream_points_at_the_delivery_path(self) -> None:
         """No bursts and repeated stalls is the opposite diagnosis."""

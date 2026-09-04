@@ -1,9 +1,20 @@
 """Threadsafe JPEG-frame fan-out for the watch-page video stream.
 
-The screencast handler (Playwright thread) publishes each JPEG frame
-Chrome pushes; each ``GET /video`` MJPEG connection owns its own
-:class:`FrameSubscriber` and waits on the next frame. Semantics match
-:mod:`tankpit_bot.bus.status_bus` deliberately:
+The ``POST /cast`` route publishes each JPEG the in-page caster sends;
+each ``GET /video`` MJPEG connection owns its own
+:class:`FrameSubscriber` and waits on the next frame.
+
+Threadsafe is not decoration here, and WHICH threads has changed. The
+publisher used to be the Playwright thread -- first a CDP screencast
+handler, then a CDP binding relay -- which is the thread the tick loop
+runs on, so a busy tick stopped frames reaching this bus at all and the
+latest-wins rule below collapsed the resulting burst into one picture
+(:mod:`tankpit_bot.browser.live_view` has the measurements). The
+publisher is now aiohttp's event loop on the MAIN thread, and the
+session runs on an executor thread, so publishing is independent of
+what the bot is doing. Subscribers still wait on executor threads.
+
+Semantics match :mod:`tankpit_bot.bus.status_bus` deliberately:
 
 * **Latest-wins per subscriber.** A slow phone connection sees the
   newest frame, never a growing backlog — stale video frames are
@@ -13,7 +24,7 @@ Chrome pushes; each ``GET /video`` MJPEG connection owns its own
 * **Explicit unsubscribe.** ``GET /video`` handlers must remove their
   subscriber when the connection closes; the tick loop reads
   :meth:`FrameBus.subscriber_count` as the DEMAND signal that decides
-  whether the Chrome screencast runs at all.
+  whether the in-page caster runs at all.
 """
 
 from __future__ import annotations
@@ -56,7 +67,7 @@ class FrameSubscriberProtocol(Protocol):
 
 
 class FrameBusProtocol(Protocol):
-    """Surface the screencast publisher and HTTP handlers share."""
+    """Surface the ``/cast`` publisher and the viewer handlers share."""
 
     def publish(self, frame: bytes) -> None:
         """Push ``frame`` to every subscriber and cache it.
@@ -88,7 +99,7 @@ class FrameBusProtocol(Protocol):
         """Return the number of currently-registered subscribers.
 
         Returns:
-            The current subscriber count — the tick loop's screencast
+            The current subscriber count — the tick loop's caster
             demand signal.
         """
         ...
@@ -106,8 +117,8 @@ class FrameBusProtocol(Protocol):
 class FrameSubscriber:
     """One MJPEG connection's slot in the fan-out.
 
-    Guarded by an internal :class:`threading.Condition`: the screencast
-    handler calls :meth:`push` on the Playwright thread; the ``/video``
+    Guarded by an internal :class:`threading.Condition`: the ``/cast``
+    route calls :meth:`push` on the aiohttp event loop; the ``/video``
     handler calls :meth:`next_frame` on an aiohttp executor thread.
     """
 
@@ -174,11 +185,11 @@ class FrameSubscriber:
 class FrameBus:
     """Fan-out of JPEG frames to N ``/video`` subscribers.
 
-    Owned by the service; the bot's screencast handler publishes here,
-    and the aiohttp handlers call :meth:`subscribe` / :meth:`unsubscribe`
-    around each connection's lifetime. :meth:`subscriber_count` doubles
-    as the screencast demand signal: zero subscribers → the tick loop
-    stops the Chrome screencast so unwatched sessions pay nothing.
+    Owned by the service; the ``/cast`` route publishes here, and the
+    aiohttp handlers call :meth:`subscribe` / :meth:`unsubscribe` around
+    each connection's lifetime. :meth:`subscriber_count` doubles as the
+    caster demand signal: zero subscribers → the tick loop stops the
+    in-page caster so unwatched sessions pay nothing.
     """
 
     def __init__(self) -> None:
@@ -236,7 +247,7 @@ class FrameBus:
 
         Returns:
             The subscriber count — read by the tick loop as the
-            screencast demand signal and by the idle-exit monitor.
+            caster demand signal and by the idle-exit monitor.
         """
         with self._lock:
             return len(self._subscribers)

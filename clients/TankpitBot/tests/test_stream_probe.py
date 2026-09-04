@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Generator
+from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -319,17 +320,35 @@ class TestRealHttpStream:
             The bound port and the server, for the caller to shut down.
         """
 
-        # No log_message override: the base class writes its access
-        # line to stderr, which pytest captures and shows only on a
-        # failure, and silencing it would need an `object`-typed
-        # signature the typing guard rejects.
         class _Handler(BaseHTTPRequestHandler):
+            # Bounded, so a peer that opens a socket and says nothing
+            # cannot park this handler forever. The stdlib default is
+            # no timeout at all.
+            timeout = 5.0
+
             def do_GET(self) -> None:
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+
+            def log_message(self, format: str, *args: str) -> None:
+                """Swallow the access log.
+
+                An earlier note here said silencing this would need an
+                ``object``-typed signature the typing guard rejects.
+                It does not: the base signature is ``*args: Any``, and
+                mypy accepts a narrower override against ``Any``. The
+                stderr line it writes comes back out of ``make check``
+                wrapped in a PS 5.1 NativeCommandError record, which
+                reads as a failure in a passing run.
+
+                Args:
+                    format: Printf-style template; ignored.
+                    args: Template arguments; ignored.
+                """
+                _ = (format, args)
 
         server = HTTPServer(("127.0.0.1", 0), _Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -342,9 +361,14 @@ class TestRealHttpStream:
         chunks: list[bytes] = []
         # The concrete class, not the protocol: the context-manager pair
         # is part of the implementation and the protocol deliberately
-        # does not require it, so `with` has to name the real type.
+        # does not require it, so `with` has to name the real type. It
+        # is handed an already-open connection because that is now its
+        # contract — dialling belongs to the opener, which owns the
+        # socket until this object takes it.
+        connection = HTTPConnection("127.0.0.1", port, timeout=30.0)
+        connection.request("GET", "/video?x=1")
         try:
-            with _HttpClientStream(f"http://127.0.0.1:{port}/video?x=1") as stream:
+            with _HttpClientStream(connection, connection.getresponse()) as stream:
                 assert stream.status == 200
                 assert stream.content_type == CONTENT_TYPE
                 while True:
@@ -354,6 +378,7 @@ class TestRealHttpStream:
                     chunks.append(chunk)
         finally:
             server.shutdown()
+            server.server_close()
 
         assert b"".join(chunks) == payload
 
@@ -370,6 +395,7 @@ class TestRealHttpStream:
             stream.close()
         finally:
             server.shutdown()
+            server.server_close()
 
         assert content_type == ""
 
@@ -406,6 +432,31 @@ class TestRealHttpStream:
         """A ws:// or file:// URL is a caller error, named here."""
         with pytest.raises(ValueError, match="scheme must be http or https"):
             _real_open_http_stream("ws://127.0.0.1:1/video")
+
+    def test_a_refused_connection_closes_the_socket_it_opened(self) -> None:
+        """The open owns the socket until the stream takes it.
+
+        ``_HttpClientStream`` used to dial inside ``__init__``, so a
+        refusal raised with the socket already created and the
+        half-built object discarded — nothing closed it but the garbage
+        collector, whenever it got round to it, with a
+        ``ResourceWarning``. The dial now lives in the opener, which
+        closes what it opened when the handover never happens.
+
+        Bound to a real refused port rather than a fabricated failure:
+        the branch under test is the one a warming child hits every
+        time it is polled before its service binds, which is the
+        ordinary case for this probe.
+        """
+        # A port this test held and then released: known, and provably
+        # empty, which a hardcoded number cannot promise on a machine
+        # running a fleet and several MCP services.
+        port, server = self._serve(b"", "text/plain")
+        server.shutdown()
+        server.server_close()
+
+        with pytest.raises(OSError):
+            _real_open_http_stream(f"http://127.0.0.1:{port}/video")
 
     def test_a_url_without_a_host_is_refused(self) -> None:
         """A caller bug, named where it happens.

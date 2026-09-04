@@ -328,45 +328,57 @@ class WebSocketSniffer(BrowserSession):
                 if _chrome_stream_no_viewport()
                 else browser.new_context()
             )
-            page = context.new_page()
-            cdp = context.new_cdp_session(page)
-            if _chrome_stream_no_viewport():
-                _maximize_via_cdp(cdp)
+            # EVERYTHING past the launch is inside the try that closes
+            # it. The close used to sit at the tail of one of the two
+            # waiting branches, which left two ways to skip it: the
+            # indefinite branch never reached it at all, and a raise
+            # from the login (the likeliest failure in this whole
+            # function) jumped over it. Exiting the ``sync_playwright``
+            # context does kill the driver and the browser with it, so
+            # nothing leaked at the OS level -- but that is the abrupt
+            # path, and ``cleanup_browser`` is the graceful ladder this
+            # package exists to run.
+            try:
+                page = context.new_page()
+                cdp = context.new_cdp_session(page)
+                if _chrome_stream_no_viewport():
+                    _maximize_via_cdp(cdp)
 
-            # Set up console listener and CDP handlers
-            self._setup_console_listener(cdp)
-            self._setup_cdp_handlers(cdp)
+                # Set up console listener and CDP handlers
+                self._setup_console_listener(cdp)
+                self._setup_cdp_handlers(cdp)
 
-            navigate_and_login(
-                page,
-                cdp,
-                self.world,
-                target_url=self._target_url,
-                prefer_account=self._prefer_account,
-                tank_name_prefix="B",
-                auto_join_room=True,
-            )
+                navigate_and_login(
+                    page,
+                    cdp,
+                    self.world,
+                    target_url=self._target_url,
+                    prefer_account=self._prefer_account,
+                    tank_name_prefix="B",
+                    auto_join_room=True,
+                )
 
-            self._cdp_service.log_websocket_urls()
-            self._static_key = gather_intel(page, cdp)
+                self._cdp_service.log_websocket_urls()
+                self._static_key = gather_intel(page, cdp)
 
-            # Initialize DOM scraper for game log and combat tracker
-            self._init_game_log_scraper(cdp)
-            self._init_combat_tracker()
+                # Initialize DOM scraper for game log and combat tracker
+                self._init_game_log_scraper(cdp)
+                self._init_combat_tracker()
 
-            # Probe for JS fuel variables
-            self._probe_js_fuel(cdp)
+                # Probe for JS fuel variables
+                self._probe_js_fuel(cdp)
 
-            # Wait for specified capture duration (0 = wait until browser closed)
-            if capture_duration_ms <= 0:
-                log.info("Waiting indefinitely for browser close...")
-                # We can't easily run capture_loop in background with sync playwright
-                # without blocking. But _capture_magic_key is called in _navigate_and_login.
-                # Let's just ensure it's captured once we are in game.
-                page.wait_for_event("close", timeout=86_400_000)
-            else:
-                log.info("Waiting for %d ms...", capture_duration_ms)
-                page.wait_for_timeout(float(capture_duration_ms))
+                # Wait for specified capture duration (0 = wait until browser closed)
+                if capture_duration_ms <= 0:
+                    log.info("Waiting indefinitely for browser close...")
+                    # We can't easily run capture_loop in background with sync playwright
+                    # without blocking. But _capture_magic_key is called in _navigate_and_login.
+                    # Let's just ensure it's captured once we are in game.
+                    page.wait_for_event("close", timeout=86_400_000)
+                else:
+                    log.info("Waiting for %d ms...", capture_duration_ms)
+                    page.wait_for_timeout(float(capture_duration_ms))
+            finally:
                 cleanup_browser(browser)
 
         return self._build_capture_session()

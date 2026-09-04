@@ -81,6 +81,7 @@ pytest-xdist = "^3.8.0"
 ruff = "^0.16.6"
 mypy = "^2.3.1"
 types-psutil = "^7.0"
+pytest-timeout = "^2.4.0"
 
 [tool.mypy]
 python_version = "3.11"
@@ -158,3 +159,41 @@ addopts = "-v -n auto --dist loadscope"
 # leaks ``Any`` through mypy's strict rules; with it we type-check
 # clean async tests without a decorator surface.
 asyncio_mode = "auto"
+# A HANG MUST PRESENT AS A FAILING TEST, NOT AS A SLOW RUN.
+#
+# This suite had no bound at all until 2026-09-04, and it cost three
+# consecutive `make check` runs that day: a live-view test deadlocked in
+# ``ThreadingMixIn.server_close`` (it joins handler threads, and one was parked
+# on a silent Chrome socket with no timeout), and two tick-loop tests span
+# forever because a change removed the exception that was their only exit. Each
+# read as "the suite is slow" -- 36 minutes with a green-looking progress bar
+# and no output -- and each was only diagnosed by going to the process table.
+# 60 seconds would have named the test in every case.
+#
+# 300, and the number is measured rather than picked. The bound has to clear
+# the slowest legitimate test, which is NOT one of the real-Chromium ones --
+# it is ``test_this_package_passes_its_own_guard``, which shells out and walks
+# all 1367 files. Solo on an idle box the three guard-shim tests take 39.5 s
+# together; under ``-n auto`` with 15 sibling workers hammering the same disk
+# (and another project's suite running beside it) that same test blew through
+# a 120 s bound and took its worker down with it. Contention is worth more
+# than 3x here, so the bound needs room for it.
+#
+# 300 still does the whole job: the full suite is 3-5.5 minutes of wall clock
+# across 16 workers, so ONE test reaching 300 s has taken as long as the entire
+# run and is wedged by definition. It turns a 36-minute silent stall into a
+# named failing test, which is the entire point.
+#
+# Not a per-test marker exemption on the guard shim. An exemption list is the
+# signal that the predicate is wrong, and the predicate here is "how long may a
+# single test legitimately take on a contended box" -- the honest answer is
+# just larger than 120.
+#
+# Windows has no SIGALRM, so timeout_method can only be "thread", whose expiry
+# calls os._exit(1): the worker dies with no cleanup and no protocol shutdown,
+# and the xdist controller is left waiting on a dead channel. A timeout here is
+# not a soft failure. See scripts/run-tests.ps1 for the 2026-08-19 incident and
+# --max-worker-restart=0, which turns that into a loud stop rather than a
+# 124-clone crash loop.
+timeout = 300
+timeout_method = "thread"

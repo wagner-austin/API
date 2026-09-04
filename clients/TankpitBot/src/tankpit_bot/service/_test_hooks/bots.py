@@ -21,6 +21,7 @@ class BotFactoryBuilderProtocol(Protocol):
         *,
         headless: bool,
         prefer_account: bool,
+        cast_url: str,
     ) -> BotFactoryProtocol:
         """Return a bot factory bound to the requested session config.
 
@@ -29,6 +30,7 @@ class BotFactoryBuilderProtocol(Protocol):
             headless: Whether the launched Chromium runs headless.
             prefer_account: Whether the bot uses account credentials
                 instead of guest login.
+            cast_url: Where the in-page caster POSTs frames.
 
         Returns:
             A callable that :class:`SessionRunner` invokes once per
@@ -38,7 +40,7 @@ class BotFactoryBuilderProtocol(Protocol):
 
 
 def _real_build_bot_factory(
-    target_url: str, *, headless: bool, prefer_account: bool
+    target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
 ) -> BotFactoryProtocol:
     """Production bot factory — constructs a real :class:`Bot` per session.
 
@@ -47,6 +49,9 @@ def _real_build_bot_factory(
         headless: Whether the launched Chromium runs headless.
         prefer_account: Whether the bot uses account credentials
             instead of guest login.
+        cast_url: Where the in-page caster POSTs frames. The service
+            passes its own bound port, so the video path never has to
+            guess the address of the process it is already inside.
 
     Returns:
         A :class:`BotFactoryProtocol` callable that
@@ -71,6 +76,7 @@ def _real_build_bot_factory(
             mode_bridge=mode_bridge,
             status_bus=status_bus,
             frame_bus=frame_bus,
+            cast_url=cast_url,
         )
 
     return factory

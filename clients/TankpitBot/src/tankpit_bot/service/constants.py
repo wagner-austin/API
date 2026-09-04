@@ -95,6 +95,23 @@ def health_url(port: int) -> str:
     return f"http://127.0.0.1:{port}/health"
 
 
+def cast_url(port: int) -> str:
+    """Return the frame-intake URL the in-page caster POSTs to.
+
+    Loopback because the page and the service share a container. Built
+    here rather than in the browser package so exactly one module knows
+    the service's own address, and a bot with no service is handed an
+    empty string rather than a URL that answers nothing.
+
+    Args:
+        port: The service's resolved TCP port.
+
+    Returns:
+        The service's ``/cast`` URL.
+    """
+    return f"http://127.0.0.1:{port}/cast"
+
+
 def child_video_url(port: int) -> str:
     """Return the loopback MJPEG URL for one fleet child's service.
 
@@ -133,6 +150,7 @@ __all__ = [
     "SERVICE_IDLE_EXIT_SECONDS",
     "SERVICE_IDLE_POLL_SECONDS",
     "SERVICE_PORT",
+    "cast_url",
     "child_video_url",
     "health_url",
     "resolve_service_port",

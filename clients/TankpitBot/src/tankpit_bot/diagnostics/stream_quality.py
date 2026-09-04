@@ -196,9 +196,10 @@ def summarize_stream(
 def render_report(report: StreamReportDict) -> str:
     """Render a report as the operator-facing block.
 
-    The verdict lines are the point of the tool. Each names the ONE
-    reading that a number supports, so the report cannot be used to
-    argue for a fix it does not evidence.
+    The verdict lines are the point of the tool. Each names exactly the
+    reading its number supports — one where the number picks out one
+    cause, and both where it cannot — so the report can never be used
+    to argue for a fix it does not evidence, nor to rule one out.
 
     Args:
         report: The measured report.
@@ -250,9 +251,12 @@ def verdicts(report: StreamReportDict) -> list[str]:
         )
     if report["stalls"] > 0 and report["burst_share"] > 0.5:
         found.append(
-            f"BURSTY SOURCE: {report['burst_share'] * 100:.0f}% of gaps are motion but "
-            f"{report['stalls']} stalls cover {report['stalled_seconds']:.1f} s. The "
-            "source is idle between events; a faster transport cannot fill that."
+            f"BURSTY ARRIVALS: {report['burst_share'] * 100:.0f}% of gaps are motion but "
+            f"{report['stalls']} stalls cover {report['stalled_seconds']:.1f} s. TWO "
+            "causes make this exact shape and this measurement cannot tell them apart: "
+            "an idle source, or a transport that queues during a stall and releases the "
+            "queue in one burst. Discriminate by what the SENDER was doing across a "
+            "stall -- an idle source has an idle sender."
         )
     if report["stalls"] > 0 and report["burst_share"] <= 0.5:
         found.append(

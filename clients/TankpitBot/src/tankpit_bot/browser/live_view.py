@@ -1,66 +1,71 @@
-"""Page-push live view — steady-fps game video without the tick thread.
+"""Page-push live view — game video that never touches the tick thread.
+
+Capture happens INSIDE the game page: an injected interval composites
+the client's six stacked canvases ([[rendering-pipeline]] —
+Background/Tanks/Action/Map/Overlay at 384x256 plus the 384x48 Menu
+strip, DPI-scaled) into one JPEG per frame. The page then POSTs that
+JPEG to the service's own ``/cast`` route on loopback, where aiohttp
+receives it on the MAIN thread and publishes it to the frame bus.
+
+**Two earlier transports failed the same way, and the POST is what
+removes the shared cause.**
 
 The 2026-07-28 CDP screencast relay was rate-limited by the SAME
 Playwright thread the tick loop owns: Chrome only sends the next
 screencast frame after the previous one is ACKED, and the acks only
-flow while that thread pumps — so every heavy tick operation (map
-open, scan, teleport handling) stalled the whole stream for seconds
-(user report 2026-07-29: "the stream is a bit laggy... seems to
-freeze or drop frames"). This module replaces the relay with capture
-INSIDE the game page: an injected interval composites the client's
-six stacked canvases ([[rendering-pipeline]] — Background/Tanks/
-Action/Map/Overlay at 384x256 plus the 384x48 Menu strip, DPI-scaled)
-into one JPEG per frame and hands the data URL to the bot through a
-CDP BINDING (``Runtime.addBinding`` → ``window.__botCastDeliver``).
+flow while that thread pumps (user report 2026-07-29: "the stream is a
+bit laggy... seems to freeze or drop frames").
 
-Why a binding and not a loopback HTTP POST: Chrome's Local Network
-Access gate intercepts page fetches to 127.0.0.1 behind a permission
-no automated browser can grant THROUGH THE PERMISSIONS API — the
-fetch neither resolves nor rejects, it hangs forever (measured
-2026-07-29: caster ticks=36 in 3 s, posts=0, the one-shot probe
-fetch equally stuck; Playwright 1.57 exposes no
-``local-network-access`` permission to grant).
+Its replacement, a CDP BINDING (``Runtime.addBinding`` →
+``window.__botCastDeliver``), removed the ack handshake but not the
+thread. Binding events are dispatched by Playwright, on the connection
+Playwright owns, driven by the thread running the tick loop. Frames
+produced while that thread was busy queued and burst-delivered
+afterwards, and the latest-wins frame bus collapsed each burst to ONE
+frame. User report 2026-09-03: "it lags whenever the bot opens the map
+or shoots off screen or teleports. its like were showing a slideshow" —
+and the tick log agreed exactly: 7.84 s on a ``cmd=shoot`` at a distant
+target, 2.73 s on ``cmd=map_open``.
 
-CORRECTION (2026-09-03): this paragraph used to end there and was
-read as a law that the loopback POST is impossible. It is not. The
-gate is a Chromium FEATURE, and the bot owns its own launch args.
-Measured, five POSTs from a real https://tankpit.com page to a
-loopback listener in this workspace's own container:
+Two measurements bound where the binding did and did not survive. During
+``page.wait_for_timeout`` — how the tick loop waits (``bot/tick_loop.py``
+L 241, L 246) — binding frames arrived at 31.3/s, versus 29.3/s while
+the thread was otherwise inside Playwright: waiting does not starve the
+stream, because the dispatcher pumps throughout. But a pure-Python busy
+stretch blocked delivery completely: 0 frames for 3 s, then 94 in 7 ms.
+The heavy operations the user named are exactly that shape.
+
+Why a POST was believed impossible, and why it is not: Chrome's Local
+Network Access gate intercepts page fetches to 127.0.0.1 behind a
+permission no automated browser can grant THROUGH THE PERMISSIONS API —
+the fetch neither resolves nor rejects, it hangs forever (measured
+2026-07-29: caster ticks=36 in 3 s, posts=0; Playwright 1.57 exposes no
+``local-network-access`` permission to grant). That was recorded as a
+law and read as one, and it was cited as the reason this transport could
+not be reconsidered.
+
+CORRECTION (2026-09-03): the gate is a Chromium FEATURE, and this
+process owns its own launch args. Measured, five POSTs from a real
+https://tankpit.com page to a loopback listener in this workspace's own
+container:
 
     default flags                              server received 0/5
-    --disable-features=LocalNetworkAccessChecks,
-      BlockInsecurePrivateNetworkRequests,
-      PrivateNetworkAccessSendPreflights,
-      PrivateNetworkAccessRespectPreflightResults
+    with :data:`~tankpit_bot.sniffer.chrome_launch.LOOPBACK_POST_ARGS`
                                                server received 5/5
 
-So the constraint is "not grantable per-page at runtime", not "not
-possible". Nobody had tried turning the feature off. Recorded because
-a law stated without its escape hatch stops the next reader from
-looking, and this one did: it was cited as the reason a whole
-transport could not be reconsidered.
+So the constraint was "not grantable per-page at runtime", not "not
+possible". Nobody had tried turning the feature off. Recorded because a
+law stated without its escape hatch stops the next reader from looking.
 
-What the binding channel actually buys is no gate and NO
-BACKPRESSURE: the page keeps capturing at its configured fps
-regardless of what the bot thread is doing. Frames queued during a
-tick stall burst-deliver afterwards and collapse into the
-latest-wins frame bus.
+The POST inherits the binding's one real virtue — NO BACKPRESSURE, the
+page captures at its configured fps regardless of the bot — and drops
+its defect, because nothing on the delivery path is owned by the tick
+thread any more.
 
-That collapse is NOT the source of the stalls a viewer sees, which
-is the other thing this paragraph was used to explain. Measured
-2026-09-03: during ``page.wait_for_timeout`` — how the tick loop
-actually waits (``bot/tick_loop.py`` L 241, L 246) — binding frames
-arrive at 31.3/s, versus 29.3/s while the thread is otherwise inside
-Playwright. The dispatcher pumps events throughout, so a tick does
-not starve the stream. A pure-Python busy loop DOES block delivery
-(0/s, then 94 frames in 7 ms), but the bot never waits that way.
-
-The tick loop drives demand exactly like the screencast did:
-subscribers on the frame bus → :meth:`LiveViewService.ensure` every
-tick (idempotent in-page, and re-evaluating each tick self-heals the
-caster across page navigations, which wipe injected JS — the binding
-itself survives navigations); zero subscribers →
-:meth:`LiveViewService.stop`.
+The tick loop still drives demand: subscribers on the frame bus →
+:meth:`LiveViewService.ensure` every tick (idempotent in-page, and
+re-evaluating each tick self-heals the caster across page navigations,
+which wipe injected JS); zero subscribers → :meth:`LiveViewService.stop`.
 
 UNCHANGED FRAMES ARE NOT SENT (2026-09-03). The interval samples on a
 wall clock, but the tankpit client paints on DIRTY FLAGS: its rAF loop
@@ -70,7 +75,7 @@ rather than per frame. Measured at 12 Hz sampling, roughly 71 per cent
 of captures were byte-identical to the one before — the page was
 base64-ing and shipping about 800 KB/s to re-send a picture the viewer
 already had. The caster now compares each data URL to the previous one
-and calls the binding only on a change.
+and posts only on a change.
 
 This is safe for a new viewer because
 :meth:`~tankpit_bot.bus.frame_bus.FrameBus.subscribe` hands a fresh
@@ -79,21 +84,24 @@ a picture immediately rather than waiting for the next repaint. The
 MJPEG keepalive re-sends the last frame on its own timer for
 intermediaries that idle out an inactive connection.
 
-What this does NOT do is make the picture smoother. The paint rate is
-the game's: an independent CDP screencast measurement on 2026-07-29,
-which is damage-driven and therefore reports real paints, recorded 0.6
-fps idle and 2.8 fps in play, and a 2026-09-03 measurement of distinct
-frames over this caster found 3.0 to 3.2 per second. Those agree. What
-changes here is that every frame on the wire is now a real one.
+Dedup does not itself make the picture smoother — it makes every frame
+on the wire a real one. The ceiling is the game's own paint rate, and
+the two numbers taken for that ceiling both need an asterisk. A CDP
+screencast measurement on 2026-07-29 recorded 0.6 fps idle and 2.8 fps
+in play, but screencast delivery was ack-gated on the tick thread, so
+it reports what got THROUGH, not what was painted. A 2026-09-03 count
+of distinct frames over the binding caster found 3.0 to 3.2 per second,
+and that count was taken downstream of the latest-wins bus, which is
+precisely where a burst collapses to one. Neither is a clean
+measurement of the client, and they agree partly because they share the
+defect. What the paint ceiling actually is must be re-measured over the
+POST transport, with ``tankpit-stream-probe`` against the public
+stream.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
-from collections.abc import Callable
-
-from platform_core.json_utils import JSONObject, require_str
+from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
@@ -101,10 +109,6 @@ from tankpit_bot.bot.config import resolve_video_fps, resolve_video_quality
 
 log = get_logger(__name__)
 
-BINDING_NAME = "__botCastDeliver"
-"""Name of the CDP binding the caster calls with each frame's data URL."""
-
-_DATA_URL_PREFIX = "data:image/jpeg;base64,"
 
 _CASTER_TEMPLATE = """
 (() => {
@@ -165,9 +169,6 @@ _CASTER_TEMPLATE = """
           return;
         }
         this.timer = setInterval(() => {
-          if (typeof window.__BINDING__ !== "function") {
-            return;
-          }
           let data = null;
           try {
             data = this.frame();
@@ -178,10 +179,57 @@ _CASTER_TEMPLATE = """
             }
             return;
           }
-          if (data !== null && data !== this.lastData) {
-            this.lastData = data;
-            window.__BINDING__(data);
+          if (data === null || data === this.lastData) {
+            return;
           }
+          this.lastData = data;
+          // POST, not a CDP binding. The binding delivered frames on
+          // the connection Playwright owns, which is driven by the
+          // thread running the tick loop -- so a heavy tick (map open,
+          // teleport, a shot at a distant target) queued every frame
+          // produced during it and released them in one burst that the
+          // latest-wins bus collapsed to ONE. Seven seconds of play
+          // arrived as a single picture.
+          //
+          // fetch reaches the service's aiohttp loop on the MAIN
+          // thread, which the tick loop never occupies, so delivery no
+          // longer depends on what the bot is doing.
+          //
+          // Sent as BYTES, not as the base64 data URL the comparison
+          // above uses. `toDataURL` is what makes the cheap
+          // string-equality dedup possible, but base64 inflates every
+          // frame by a third and would have to be decoded again on the
+          // service side. `fetch` on a data: URL is a local decode, so
+          // the wire carries the JPEG itself.
+          //
+          // No `keepalive`: it caps the total inflight body at 64 KB
+          // across ALL keepalive requests, and one composited frame is
+          // already about 60 KB, so a second concurrent frame would be
+          // refused by the browser rather than sent.
+          //
+          // Re-typed text/plain so the POST stays a CORS SIMPLE
+          // request. The bytes are unchanged -- only the label moves.
+          // A Blob posted as image/jpeg is not simple, so the browser
+          // sends an OPTIONS preflight first, and a preflight the
+          // service does not answer means the frame is never sent at
+          // all. A simple request needs no preflight and no CORS
+          // response headers, because nothing here reads the reply.
+          // The route validates the JPEG magic bytes rather than
+          // trusting this header, so the label costs nothing.
+          fetch(data)
+            .then((r) => r.blob())
+            .then((blob) =>
+              fetch(__CAST_URL__, {
+                method: "POST",
+                body: new Blob([blob], { type: "text/plain" }),
+              }),
+            )
+            .catch((err) => {
+              if (!this.postErrorLogged) {
+                this.postErrorLogged = true;
+                console.error("BotCastHook post failed:", String(err));
+              }
+            });
         }, __INTERVAL_MS__);
       },
       stop() {
@@ -199,12 +247,15 @@ _CASTER_TEMPLATE = """
 _STOP_EXPRESSION = "(() => { if (window.__botCast !== undefined) { window.__botCast.stop(); } })()"
 
 
-def build_caster_expression(fps: float, quality: float) -> str:
+def build_caster_expression(fps: float, quality: float, cast_url: str) -> str:
     """Render the in-page caster snippet for the configured cadence.
 
     Args:
         fps: Frames per second the page interval targets.
         quality: JPEG quality (0..1) passed to ``toDataURL``.
+        cast_url: Absolute URL the page POSTs each frame to. Must be
+            non-empty: a caster with nowhere to send is a timer burning
+            JPEG encodes for nothing.
 
     Returns:
         A self-contained JS expression that defines ``window.__botCast``
@@ -212,60 +263,60 @@ def build_caster_expression(fps: float, quality: float) -> str:
 
     Raises:
         ValueError: When fps is not positive (the interval math would
-            divide by zero) or quality falls outside (0, 1].
+            divide by zero), quality falls outside (0, 1], or the cast
+            URL is empty.
     """
     if fps <= 0:
         raise ValueError(f"video fps must be positive, got {fps}")
     if not 0 < quality <= 1:
         raise ValueError(f"video quality must be in (0, 1], got {quality}")
+    if not cast_url:
+        raise ValueError("cast URL must not be empty")
     interval_ms = max(1, round(1000 / fps))
     return (
         _CASTER_TEMPLATE.replace("__QUALITY__", repr(quality))
         .replace("__INTERVAL_MS__", str(interval_ms))
-        .replace("__BINDING__", BINDING_NAME)
+        .replace("__CAST_URL__", dump_json_str(cast_url))
     )
 
 
 class LiveViewService:
-    """Owns the in-page caster + binding relay for one browser session.
+    """Installs and removes the in-page caster for one browser session.
 
-    Single-threaded by construction, like the screencast service it
-    replaced: :meth:`ensure` / :meth:`stop` and the binding events all
-    run on the Playwright thread, so ``active`` needs no lock. Only
-    the ``publish`` callback crosses threads, and the frame bus is
-    threadsafe.
+    It no longer RELAYS frames, which is the whole point: the caster
+    POSTs them straight to the service's aiohttp loop. This object only
+    turns casting on and off, so nothing about frame delivery depends on
+    the Playwright thread any more.
     """
 
-    def __init__(self, publish: Callable[[bytes], None]) -> None:
-        """Bind the relay to its frame sink.
+    def __init__(self, cast_url: str) -> None:
+        """Bind the caster to the endpoint it will post frames to.
 
         Args:
-            publish: Threadsafe sink each decoded JPEG frame is pushed
-                into — production wires
-                :meth:`~tankpit_bot.bus.frame_bus.FrameBus.publish`.
+            cast_url: Absolute URL of the service's frame-intake route.
+                The service knows its own port and passes it down; this
+                class does not read the environment, so a bot launched
+                without a service cannot be given a caster that posts
+                into nothing.
         """
-        self._publish = publish
-        self._expression = build_caster_expression(resolve_video_fps(), resolve_video_quality())
+        self._expression = build_caster_expression(
+            resolve_video_fps(), resolve_video_quality(), cast_url
+        )
         self._cdp: CDPSessionProtocol | None = None
         self.active = False
 
     def ensure(self, cdp: CDPSessionProtocol) -> None:
         """(Re)start the in-page caster. Called EVERY demanded tick.
 
-        The first call on a CDP session registers the frame binding
-        (CDP bindings survive page navigations). The caster snippet is
-        idempotent in-page (an existing interval is kept), and
-        re-evaluating each tick is the self-heal for page navigations —
-        quit-to-lobby or a re-login wipes injected JS, and the next
-        demanded tick simply reinstalls the caster.
+        The caster snippet is idempotent in-page (an existing interval
+        is kept), and re-evaluating each tick is the self-heal for page
+        navigations — quit-to-lobby or a re-login wipes injected JS, and
+        the next demanded tick simply reinstalls the caster.
 
         Args:
             cdp: Active CDP session attached to the live tankpit page.
         """
-        if self._cdp is not cdp:
-            cdp.on("Runtime.bindingCalled", self._on_binding_called)
-            cdp.send("Runtime.addBinding", {"name": BINDING_NAME})
-            self._cdp = cdp
+        self._cdp = cdp
         cdp.send("Runtime.evaluate", {"expression": self._expression})
         if not self.active:
             self.active = True
@@ -283,33 +334,8 @@ class LiveViewService:
         self.active = False
         log.info("Live view stopped (no viewers)")
 
-    def _on_binding_called(self, params: JSONObject) -> None:
-        """Decode one caster frame from a ``Runtime.bindingCalled`` event.
-
-        Args:
-            params: CDP event parameters carrying the binding ``name``
-                and the data-URL ``payload``.
-
-        Raises:
-            JSONTypeError: When the event omits ``name`` or
-                ``payload`` — CDP drift that must fail loudly.
-            ValueError: When the payload is not a JPEG data URL or its
-                base64 is corrupt — caster drift, equally loud.
-        """
-        if require_str(params, "name") != BINDING_NAME:
-            return
-        payload = require_str(params, "payload")
-        if not payload.startswith(_DATA_URL_PREFIX):
-            raise ValueError("caster payload is not a JPEG data URL")
-        try:
-            frame = base64.b64decode(payload[len(_DATA_URL_PREFIX) :], validate=True)
-        except binascii.Error as exc:
-            raise ValueError("caster payload carries invalid base64") from exc
-        self._publish(frame)
-
 
 __all__ = [
-    "BINDING_NAME",
     "LiveViewService",
     "build_caster_expression",
 ]

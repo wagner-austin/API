@@ -29,6 +29,32 @@ _PAGE_HTML = (
 )
 _TEST_PAGE_URL = "http://localhost:9999/test-page"
 
+_OPEN_INTEL_PAGES: list[PageProtocol] = []
+"""Pages :func:`_intel_page` opened for the test currently running.
+
+Module state rather than a return value the callers have to thread
+through a ``finally``: five tests open one of these, and a page closed
+only on the success path is not closed at all on the day one of them
+fails.
+"""
+
+
+@pytest.fixture(autouse=True)
+def _close_intel_pages() -> Generator[None, None, None]:
+    """Close every page :func:`_intel_page` opened, pass or fail.
+
+    The browser is module-scoped, so a page left open outlives its test
+    and holds a renderer process for the rest of the module. Registered
+    autouse so a new test cannot forget: the leak this replaces was
+    invisible precisely because nothing had to opt in to it.
+
+    Yields:
+        None, once, between the test and the teardown.
+    """
+    yield
+    while _OPEN_INTEL_PAGES:
+        _OPEN_INTEL_PAGES.pop().close()
+
 
 @pytest.fixture(scope="module")
 def headless_browser() -> Generator[BrowserProtocol, None, None]:
@@ -90,6 +116,7 @@ def _intel_page(
     context = browser.new_context()
     page = context.new_page()
     cdp = context.new_cdp_session(page)
+    _OPEN_INTEL_PAGES.append(page)
     page.route("**/test-page", _fulfill_page)
     page.route("**/tpclient.js", _fulfill_tpclient)
     page.goto(_TEST_PAGE_URL)

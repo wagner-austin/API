@@ -230,15 +230,20 @@ def execute_live_probe_bootstrap(
             playwright,
             headless=probe._headless,
         )
-        game_ready_timestamp_ms, intel_ready_timestamp_ms = prepare_live_probe_runtime(
-            probe,
-            page=page,
-            cdp=cdp,
-            tank_name_prefix="TP",
-            auto_join_room=True,
-        )
-
+        # The try opens IMMEDIATELY after the launch, so nothing between
+        # acquiring the browser and releasing it can skip the release.
+        # It used to start after ``prepare_live_probe_runtime``, which
+        # is the call that navigates and logs in -- the most
+        # failure-prone step in the function, and the one whose failure
+        # therefore skipped the teardown ladder entirely.
         try:
+            game_ready_timestamp_ms, intel_ready_timestamp_ms = prepare_live_probe_runtime(
+                probe,
+                page=page,
+                cdp=cdp,
+                tank_name_prefix="TP",
+                auto_join_room=True,
+            )
             (
                 initial_sync_started_ms,
                 initial_world_timestamp_ms,

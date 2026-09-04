@@ -57,6 +57,7 @@ from tankpit_bot.diagnostics.entity_alignment import EntityAlignmentEmitter
 from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.chrome_launch import (
+    LOOPBACK_POST_ARGS,
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
@@ -108,6 +109,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         status_bus: StatusBusProtocol | None = None,
         frame_bus: FrameBusProtocol | None = None,
         world: WorldService | None = None,
+        cast_url: str = "",
     ) -> None:
         """Initialize the bot.
 
@@ -126,6 +128,12 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 auto-arbitration runs unchanged. The service main
                 (Phase A8) injects the shared instance the aiohttp
                 thread owns.
+            cast_url: Absolute URL the in-page caster POSTs frames to.
+                Empty means NO live view at all, which is right for
+                ``make run`` / replay / scenarios: those have no service
+                listening, so a caster would burn a JPEG encode every
+                interval and throw the result at a closed port. The
+                service passes its own bound port down.
             status_bus: Fan-out the tick loop publishes
                 :class:`SessionStatusDict` frames into. When ``None``,
                 a fresh :class:`StatusBus` is created — a standalone
@@ -178,11 +186,13 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._frame_bus: FrameBusProtocol = (
             frame_bus if frame_bus is not None else default_frame_bus
         )
-        # The in-page caster captures at its own cadence and delivers
-        # frames over the CDP binding channel (Chrome's Local Network
-        # Access gate hangs page→loopback fetches forever, 2026-07-29);
-        # the binding handler publishes onto the shared frame bus.
-        self._live_view = LiveViewService(publish=self._frame_bus.publish)
+        # The in-page caster captures at its own cadence and POSTs each
+        # frame to the service's own /cast route, which publishes onto
+        # this frame bus from the aiohttp loop -- deliberately NOT from
+        # this thread, which is the one the tick loop occupies
+        # (tankpit_bot.browser.live_view explains what that cost).
+        # Empty URL means no caster: see the ``cast_url`` note above.
+        self._live_view = LiveViewService(cast_url) if cast_url else None
         # Human bug marker (2026-07-29): the HUD flag button delivers
         # clicks over its own CDP binding; the service turns each into
         # a human_flag diagnostic carrying the recent-tick ring.
@@ -269,7 +279,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._ai_state = make_initial_ai_state(env_ai_config())
         self._cdp_message_buffer = []
 
-        launch_args = _chrome_stream_display_args()
+        launch_args = _chrome_stream_display_args() + LOOPBACK_POST_ARGS
         # Keyed by login identity so a fleet child selecting a
         # different account can never resume another account's session
         # (the 2026-08-13 arterial-as-artax incident).
@@ -280,69 +290,85 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 headless=self._headless,
                 args=launch_args,
             )
-            context = (
-                browser.new_context(no_viewport=True, storage_state=storage_state_path)
-                if _chrome_stream_no_viewport()
-                else browser.new_context(storage_state=storage_state_path)
-            )
-            page = context.new_page()
-            cdp = context.new_cdp_session(page)
-            if _chrome_stream_no_viewport():
-                _maximize_via_cdp(cdp)
-
-            self._cdp = cdp
-            self._page = page
-
-            self._setup_console_listener(cdp)
-            self._setup_cdp_handlers(cdp)
-
-            navigate_and_login(
-                page,
-                cdp,
-                self.world,
-                target_url=self._target_url,
-                prefer_account=self._prefer_account,
-                tank_name_prefix="Bot",
-                auto_join_room=True,
-            )
-
-            wait_for_game_ready(page, self._messages)
-
-            # Persist the freshly-issued auth cookies + localStorage
-            # before the game loop can crash. Next launch of the bot
-            # skips the tankpit login flow entirely and rejoins in
-            # seconds instead of the ~5-10 s cold navigate + credential
-            # sequence.
-            save_storage_state(context, storage_cache)
-
-            self._cdp_service.log_websocket_urls()
-            self._static_key = gather_intel(page, cdp)
-
-            self._init_game_log_scraper(cdp)
-
-            log.info("Bot started, entering game loop")
-            emit_state("%s", self.get_state())
-
+            # ONE teardown path, and it starts the statement after the
+            # launch. The browser used to be closed at the tail of the
+            # game loop's own ``finally``, which meant a failure during
+            # bootstrap -- a login that never completes, a game that
+            # never becomes ready, the storage-state write -- never
+            # reached the teardown ladder. Exiting the
+            # ``sync_playwright`` context kills the driver and the
+            # browser with it, so no process outlived that path, but
+            # the graceful close and its watchdogs were skipped.
             try:
-                self._game_loop(
-                    page,
-                    session_seconds=session_seconds,
-                    session_kills=session_kills,
-                    stop_file_path=stop_file_path,
+                context = (
+                    browser.new_context(no_viewport=True, storage_state=storage_state_path)
+                    if _chrome_stream_no_viewport()
+                    else browser.new_context(storage_state=storage_state_path)
                 )
-            except KeyboardInterrupt:
-                log.info("Bot interrupted by user")
+                page = context.new_page()
+                cdp = context.new_cdp_session(page)
+                if _chrome_stream_no_viewport():
+                    _maximize_via_cdp(cdp)
+
+                self._cdp = cdp
+                self._page = page
+
+                self._setup_console_listener(cdp)
+                self._setup_cdp_handlers(cdp)
+
+                navigate_and_login(
+                    page,
+                    cdp,
+                    self.world,
+                    target_url=self._target_url,
+                    prefer_account=self._prefer_account,
+                    tank_name_prefix="Bot",
+                    auto_join_room=True,
+                )
+
+                wait_for_game_ready(page, self._messages)
+
+                # Persist the freshly-issued auth cookies + localStorage
+                # before the game loop can crash. Next launch of the bot
+                # skips the tankpit login flow entirely and rejoins in
+                # seconds instead of the ~5-10 s cold navigate + credential
+                # sequence.
+                save_storage_state(context, storage_cache)
+
+                self._cdp_service.log_websocket_urls()
+                self._static_key = gather_intel(page, cdp)
+
+                self._init_game_log_scraper(cdp)
+
+                log.info("Bot started, entering game loop")
+                emit_state("%s", self.get_state())
+
+                try:
+                    self._game_loop(
+                        page,
+                        session_seconds=session_seconds,
+                        session_kills=session_kills,
+                        stop_file_path=stop_file_path,
+                    )
+                except KeyboardInterrupt:
+                    log.info("Bot interrupted by user")
+                finally:
+                    # Bookkeeping before the socket drops. The panel sample
+                    # this files was taken at STARTUP -- it is a login-time
+                    # snapshot that does not move mid-session -- but the
+                    # tank's name and colour only arrive on the wire after
+                    # the first ticks, so the WRITE waits for identity even
+                    # though the READING did not. No keypress, no tick.
+                    #
+                    # Inside the browser's try, not beside it: these are
+                    # about a session that actually started, and a
+                    # bootstrap that failed has no tank to sample and no
+                    # capture worth saving.
+                    record_tank_sample(self.world, resolve_room_name())
+                    self._send_graceful_quit()
+                    self._save_capture_session()
+                    self._detach_cdp_session()
             finally:
-                # Bookkeeping before the socket drops. The panel sample
-                # this files was taken at STARTUP -- it is a login-time
-                # snapshot that does not move mid-session -- but the
-                # tank's name and colour only arrive on the wire after
-                # the first ticks, so the WRITE waits for identity even
-                # though the READING did not. No keypress, no tick.
-                record_tank_sample(self.world, resolve_room_name())
-                self._send_graceful_quit()
-                self._save_capture_session()
-                self._detach_cdp_session()
                 self._cdp = None
                 self._page = None
                 cleanup_browser(browser)

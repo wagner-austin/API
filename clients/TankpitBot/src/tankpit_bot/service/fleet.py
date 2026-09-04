@@ -41,7 +41,7 @@ from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_config import resolve_fleet_port
 from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_routes import make_fleet_app
-from tankpit_bot.service.serving import run_until_stopped
+from tankpit_bot.service.serving import cancel_and_await, run_until_stopped
 
 log = get_logger(__name__)
 
@@ -164,7 +164,7 @@ async def _async_main() -> None:
     try:
         await run_until_stopped(site, stop_event, name="Fleet manager")
     finally:
-        drain_monitor.cancel()
+        await cancel_and_await(drain_monitor)
 
 
 def main() -> None:

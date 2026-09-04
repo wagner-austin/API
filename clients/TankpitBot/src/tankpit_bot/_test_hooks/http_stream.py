@@ -123,26 +123,28 @@ def resolve_target(url: str) -> tuple[bool, str, int, str]:
 
 
 class _HttpClientStream:
-    """An :class:`HttpStreamProtocol` over a typed :mod:`http.client` response."""
+    """An :class:`HttpStreamProtocol` over a typed :mod:`http.client` response.
 
-    def __init__(self, url: str) -> None:
-        """Open the response.
+    Construction takes an ALREADY-OPEN connection and response rather
+    than a URL, so this object never exists half-built. It used to do
+    the dialling itself, which meant a refused connection or a broken
+    status line raised out of ``__init__`` with the socket already
+    created and nothing left holding a reference to close it — the only
+    thing that ever shut it was the garbage collector, on its own
+    schedule and with a ``ResourceWarning``. Opening is
+    :func:`_real_open_http_stream`'s job now, and it closes what it
+    opened when the open does not complete.
+    """
+
+    def __init__(self, connection: HTTPConnection, response: HTTPResponse) -> None:
+        """Bind to the connection this stream owns.
 
         Args:
-            url: Absolute URL to GET.
-
-        Raises:
-            ValueError: If :func:`resolve_target` refuses the URL.
-            OSError: If the host cannot be reached.
+            connection: The open connection; closed by :meth:`close`.
+            response: The response already read off it.
         """
-        secure, host, port, path = resolve_target(url)
-        self._connection: HTTPConnection = (
-            HTTPSConnection(host, port, timeout=30.0)
-            if secure
-            else HTTPConnection(host, port, timeout=30.0)
-        )
-        self._connection.request("GET", path)
-        self._response: HTTPResponse = self._connection.getresponse()
+        self._connection = connection
+        self._response = response
 
     @property
     def status(self) -> int:
@@ -207,7 +209,16 @@ class _HttpClientStream:
 
 
 def _real_open_http_stream(url: str) -> HttpStreamProtocol:
-    """Open a real HTTP stream.
+    """Open a real HTTP stream, owning the socket until the stream takes it.
+
+    The handover is the last thing that happens. Anything that fails
+    before it — a refused connection, a timeout, a peer that hangs up
+    mid-status-line — leaves this function still holding the socket, so
+    it closes it on the way out rather than leaving it to the
+    collector. Same ownership shape as
+    :func:`tankpit_bot.service._test_hooks.video._real_open_child_video`,
+    and for the same reason: nothing here HANDLES a failure, it just
+    declines to leak on one.
 
     Args:
         url: Absolute URL to GET.
@@ -216,10 +227,26 @@ def _real_open_http_stream(url: str) -> HttpStreamProtocol:
         The open stream.
 
     Raises:
-        ValueError: If the URL carries no host.
+        ValueError: If the URL carries no host or names a scheme other
+            than http/https.
         OSError: If the host cannot be reached.
     """
-    return _HttpClientStream(url)
+    secure, host, port, path = resolve_target(url)
+    connection: HTTPConnection = (
+        HTTPSConnection(host, port, timeout=30.0)
+        if secure
+        else HTTPConnection(host, port, timeout=30.0)
+    )
+    handed_over = False
+    try:
+        connection.request("GET", path)
+        response: HTTPResponse = connection.getresponse()
+        stream = _HttpClientStream(connection, response)
+        handed_over = True
+        return stream
+    finally:
+        if not handed_over:
+            connection.close()
 
 
 #: Hookable stream opener. The stream probe reads through this name so

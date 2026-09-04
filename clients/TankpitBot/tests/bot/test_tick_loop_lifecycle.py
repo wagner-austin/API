@@ -372,6 +372,10 @@ class TestBrowserClosedExit:
         subscribing in the same instant the operator closes the
         browser makes the caster's ``Runtime.evaluate`` the first
         call to observe the dead target.
+
+        The bot needs a cast URL for that to be true. Without one it
+        has no caster, nothing evaluates, the closed target is never
+        observed, and this loop runs forever rather than failing.
         """
         from collections.abc import Callable
 
@@ -399,7 +403,12 @@ class TestBrowserClosedExit:
 
         configure_bot_runtime_logging("20260728-120000")
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", headless=True, frame_bus=frames)
+        bot = Bot(
+            "https://test.tankpit.com/",
+            headless=True,
+            frame_bus=frames,
+            cast_url="http://127.0.0.1:27100/cast",
+        )
         bot._cdp = _ClosedTargetCDP()
         frames.subscribe()  # viewer demand → the sync attempts a start
 

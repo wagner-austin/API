@@ -93,8 +93,10 @@ def _make_recording_bot_factory(
         A :class:`BotFactoryBuilderProtocol`-compatible callable.
     """
 
-    def builder(target_url: str, *, headless: bool, prefer_account: bool) -> BotFactoryProtocol:
-        _ = (target_url, headless, prefer_account)
+    def builder(
+        target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
+    ) -> BotFactoryProtocol:
+        _ = (target_url, headless, prefer_account, cast_url)
 
         def factory(
             *,
@@ -130,7 +132,7 @@ class _CapturingBotFactoryBuilder:
         self.calls: list[tuple[str, bool, bool]] = []
 
     def __call__(
-        self, target_url: str, *, headless: bool, prefer_account: bool
+        self, target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
     ) -> BotFactoryProtocol:
         """Record one builder invocation and return a factory.
 

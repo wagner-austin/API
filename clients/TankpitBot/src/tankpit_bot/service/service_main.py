@@ -40,10 +40,11 @@ from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
     SERVICE_IDLE_POLL_SECONDS,
+    cast_url,
     resolve_service_port,
 )
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
-from tankpit_bot.service.serving import run_until_stopped
+from tankpit_bot.service.serving import cancel_and_await, run_until_stopped
 from tankpit_bot.service.session_runner import SessionRunner
 
 log = get_logger(__name__)
@@ -144,6 +145,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
             resolve_target_url(),
             headless=resolve_headless(),
             prefer_account=resolve_prefer_account(),
+            cast_url=cast_url(bound_port),
         ),
         mode_bridge=mode_bridge,
         status_bus=status_bus,
@@ -176,8 +178,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
     try:
         await run_until_stopped(site, stop_event, name="Bot service")
     finally:
-        idle_monitor.cancel()
-        autostart.cancel()
+        await cancel_and_await(idle_monitor, autostart)
 
 
 async def _autostart_session(

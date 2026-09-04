@@ -26,6 +26,12 @@ class _ExplodingFrameBus:
     (``_sync_live_view_demand``), so raising there models any
     unhandled mid-tick defect without reaching around the sanctioned
     constructor DI seam.
+
+    The bot that uses this bus MUST be built with a cast URL. A bot
+    without one has no caster, and ``_sync_live_view_demand`` returns
+    before it ever reads demand -- so the injected defect never fires,
+    the loop never ends, and the suite hangs instead of failing. That
+    is not hypothetical: it cost a 30-minute run on 2026-09-04.
     """
 
     def publish(self, frame: bytes) -> None:
@@ -66,6 +72,7 @@ class TestCrashedExitReason:
             "https://test.tankpit.com/",
             headless=True,
             frame_bus=_ExplodingFrameBus(),
+            cast_url="http://127.0.0.1:27100/cast",
         )
         bot._cdp = FakeCDPSession()
 

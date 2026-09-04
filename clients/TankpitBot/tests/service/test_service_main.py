@@ -59,6 +59,7 @@ class TestRealBuildBotFactory:
             "https://test.tankpit.com/",
             headless=True,
             prefer_account=False,
+            cast_url="http://127.0.0.1:27100/cast",
         )
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
@@ -71,6 +72,11 @@ class TestRealBuildBotFactory:
         assert raw._mode_bridge is bridge
         assert raw._status_bus is bus
         assert raw._frame_bus is frames
+        # The cast URL is what makes a caster exist at all; a bot built
+        # without one installs nothing (see Bot.__init__).
+        if raw._live_view is None:
+            raise AssertionError("a factory given a cast url must build a caster")
+        assert raw._live_view.active is False
 
     def test_factory_carries_headless_and_prefer_account(self) -> None:
         """Construction args flow through to the produced bot."""
@@ -78,6 +84,7 @@ class TestRealBuildBotFactory:
             "https://test.tankpit.com/",
             headless=True,
             prefer_account=True,
+            cast_url="http://127.0.0.1:27100/cast",
         )
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
@@ -209,6 +216,11 @@ class TestAsyncMain:
             "/shutdown",
             "/watch",
             "/video",
+            # The frame intake. Its whole purpose is the THREAD it runs
+            # on: aiohttp serves it on the main-thread event loop, so a
+            # frame posted here reaches the bus while the session's
+            # executor thread is busy in a heavy tick.
+            "/cast",
             "/frame",
         }
         assert fake_site.start_calls == 1

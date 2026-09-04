@@ -21,6 +21,7 @@ from tankpit_bot.bot.tick_loop import (
     _apply_pending_mode_override,
     _publish_session_status,
 )
+from tankpit_bot.browser.live_view import LiveViewService
 from tankpit_bot.bus.frame_bus import FrameBus
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.status_bus import StatusBus
@@ -234,64 +235,107 @@ class TestBotServiceDefaults:
     def test_supplied_frame_bus_is_used_directly(self) -> None:
         """The Bot uses the injected frame bus as its own reference."""
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
         assert bot._frame_bus is frames
+
+
+CAST_URL = "http://127.0.0.1:27100/cast"
+
+
+def _live_view(bot: Bot) -> LiveViewService:
+    """Return the bot's caster, failing loudly when it has none.
+
+    ``Bot._live_view`` is None for a session built without a cast URL
+    (``make run``, replay, scenarios). These tests all pass one, so a
+    None here is the test being wrong rather than a case to tolerate.
+
+    Args:
+        bot: The bot under test.
+
+    Returns:
+        The caster.
+
+    Raises:
+        AssertionError: If the bot was built without a cast URL.
+    """
+    if bot._live_view is None:
+        raise AssertionError("this test builds a bot WITH a cast url")
+    return bot._live_view
 
 
 class TestSyncLiveViewDemand:
     """Demand-driven in-page caster toggling at the tick boundary."""
 
-    def test_noop_before_cdp_attach(self) -> None:
-        """No CDP session yet → nothing happens even with demand."""
+    def test_a_bot_without_a_cast_url_has_no_caster_at_all(self) -> None:
+        """``make run`` has no service listening, so it installs nothing.
+
+        Previously every Bot built a caster whether or not anything
+        could receive its frames. With delivery over HTTP, a caster with
+        no endpoint would encode a JPEG every interval and throw it at a
+        closed port.
+        """
         frames = FrameBus()
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        cdp = _RecordingCDP()
+        bot._cdp = cdp
         frames.subscribe()
 
         _sync_live_view_demand(bot)
 
-        assert bot._live_view.active is False
+        assert bot._live_view is None
+        assert cdp.sent == []
+
+    def test_noop_before_cdp_attach(self) -> None:
+        """No CDP session yet → nothing happens even with demand."""
+        frames = FrameBus()
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
+        frames.subscribe()
+
+        _sync_live_view_demand(bot)
+
+        assert _live_view(bot).active is False
 
     def test_viewer_demand_installs_the_caster(self) -> None:
         """A frame-bus subscriber makes the next tick install the caster."""
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         frames.subscribe()
 
         _sync_live_view_demand(bot)
 
-        assert bot._live_view.active is True
+        assert _live_view(bot).active is True
         methods = [method for method, _ in cdp.sent]
-        assert methods == ["Runtime.addBinding", "Runtime.evaluate"]
+        assert methods == ["Runtime.evaluate"]
 
     def test_no_demand_with_inactive_caster_stays_inactive(self) -> None:
         """Zero subscribers and no caster → nothing is sent."""
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
         cdp = _RecordingCDP()
         bot._cdp = cdp
 
         _sync_live_view_demand(bot)
 
-        assert bot._live_view.active is False
+        assert _live_view(bot).active is False
         assert cdp.sent == []
 
     def test_last_viewer_leaving_stops_the_caster(self) -> None:
         """Demand dropping to zero stops the caster at the next tick."""
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         subscriber = frames.subscribe()
         _sync_live_view_demand(bot)
-        assert bot._live_view.active is True
+        assert _live_view(bot).active is True
 
         frames.unsubscribe(subscriber)
         _sync_live_view_demand(bot)
 
-        assert bot._live_view.active is False
-        assert len(cdp.sent) == 3  # addBinding + caster install + stop
+        assert _live_view(bot).active is False
+        assert len(cdp.sent) == 2  # caster install + stop; no binding any more
 
     def test_sustained_demand_reensures_every_tick(self) -> None:
         """Continuing demand re-evaluates the idempotent snippet per tick.
@@ -301,7 +345,7 @@ class TestSyncLiveViewDemand:
         reinstalls the caster without any navigation detection.
         """
         frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
+        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         frames.subscribe()
@@ -310,5 +354,5 @@ class TestSyncLiveViewDemand:
         _sync_live_view_demand(bot)
         _sync_live_view_demand(bot)
 
-        assert bot._live_view.active is True
-        assert len(cdp.sent) == 4  # one addBinding + three caster installs
+        assert _live_view(bot).active is True
+        assert len(cdp.sent) == 3  # three caster installs; no binding any more
