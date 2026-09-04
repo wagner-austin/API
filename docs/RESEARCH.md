@@ -619,11 +619,49 @@ of checked.
 
 ## Adding a research project
 
-1. Add an entry to `projects` in a workspace document under
-   `tools/hpc3/runs/` — resources, `budget`, and `repo`.
-2. Add a section here. `test_committed_runs.py` fails if a registered project
-   is missing from this file.
-3. Emit `RunRecord`s from whatever produces the numbers.
-4. Submit through the hpc3 CLI rather than a hand-written `sbatch` script, so
-   the run lands in the ledger and `hpc3-trace` can answer "which job produced
-   this artifact".
+**A project is registered once it is reproducible, not before.** Registration
+requires an image digest, and producing one is most of the work — so the first
+four steps happen before anything is written down here.
+
+```bash
+# 0. The first environment. NOT `module load python`: the cluster's python
+#    modules are 2.7/3.8/3.10/3.14 and everything here needs 3.11, which lives
+#    behind miniconda3. Bootstrap refuses to hand back an environment whose
+#    interpreter belongs to another project.
+hpc3-bootstrap --config runs/hpc3-<name>.json --project <name>     --env-path /pub/wagnera3/envs/<name> --python 3.11
+
+# 1-3. Turn that environment into a pinned image, and get its digest.
+hpc3-image-capture --config … --env-path /pub/wagnera3/envs/<name> --out specs/<name>-image.json
+hpc3-image --spec specs/<name>-image.json --out-dir … --image-name <name>
+#    scp the rendered files AND the first-party wheels into the image directory
+hpc3-image-build --config … --project <name> --name … --image-dir … --image-name <name>
+```
+
+Then, and only then:
+
+4. **Add the `projects` entry** to `tools/hpc3/runs/hpc3-<name>.json` —
+   resources, the built image's path and `sha256`, `env_path` (the in-image
+   prefix, normally `/opt/env`), `pinned_packages`, `budget` and `repo`. The
+   filename is not free: `test_committed_runs.py` requires
+   `hpc3-<name>.json` to declare exactly the project `<name>`, and requires
+   that no project is declared by two workspaces.
+5. **Add a section here.** `test_committed_runs.py` fails if a registered
+   project's name does not appear in this file. This is the one step nothing
+   can generate — it is where you say what the project measures and what its
+   provenance does not cover.
+6. **`hpc3-research-index --write`** to regenerate the table above. The
+   committed block is checked, so a stale one fails.
+7. **Emit `RunRecord`s** from whatever produces the numbers.
+8. **Submit through the hpc3 CLI** rather than a hand-written `sbatch` script,
+   so the run lands in the ledger and `hpc3-trace` can answer "which job
+   produced this artifact".
+
+**What this list used to omit, and what it cost.** Steps 0–3 were absent
+entirely, so the first environment was improvised each time — one of them
+(`envs/tankpit`) is a venv whose interpreter is a symlink into another
+project's environment, which nothing records and which breaks the day that
+project is cleaned up. Step 6 was absent, and until 2026-09-03 registration
+ALSO meant editing two hardcoded project lists inside
+`test_committed_runs.py`; both were met as surprise red tests rather than as
+steps. Those lists are now derived invariants, so a seventh project needs no
+test edit at all.

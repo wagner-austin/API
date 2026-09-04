@@ -152,29 +152,82 @@ def _sweep_member_artifacts() -> list[JSONValue]:
     return artifacts
 
 
+_ORIGINAL_WORKSPACE = "hpc3.json"
+"""The first workspace, which predates one-file-per-project.
+
+It declares ``cleargbm`` rather than a project named after itself. Every
+workspace added since is ``hpc3-<project>.json``.
+"""
+
+_WORKSPACE_PREFIX = "hpc3-"
+_WORKSPACE_SUFFIX = ".json"
+
+
+def _expected_projects_for(filename: str) -> list[str]:
+    """The projects a workspace filename commits it to declaring.
+
+    Args:
+        filename: A workspace document's filename, e.g. ``hpc3-rusted.json``.
+
+    Returns:
+        The single project the name implies, or ``cleargbm`` for the original
+        workspace. A one-element list rather than a bare name, so the caller
+        compares it against ``sorted(workspace["projects"])`` directly and a
+        document declaring TWO projects fails on the same comparison.
+    """
+    if filename == _ORIGINAL_WORKSPACE:
+        return ["cleargbm"]
+    return [filename[len(_WORKSPACE_PREFIX) : -len(_WORKSPACE_SUFFIX)]]
+
+
 class TestTheCommittedWorkspaces:
-    """One document per project, all sharing one ledger file."""
+    """One document per project, all sharing one ledger file.
 
-    def test_they_declare_every_project_exactly_once(self) -> None:
-        assert sorted(_by_project()) == [
-            "cleargbm",
-            "floor",
-            "mi",
-            "rusted",
-            "tankpit",
-            "turkic-lstm",
-        ]
+    These were two hardcoded inventories until 2026-09-03 -- a six-name list
+    and a six-entry filename map -- so REGISTERING A PROJECT MEANT EDITING
+    THIS FILE, and the edit was discovered by meeting a red test rather than
+    by following a step. That is the same defect
+    :mod:`hpc3.core.research_index` was built to remove from ``RESEARCH.md``:
+    a restatement of what the workspace documents already declare, kept in
+    sync by hand. What cannot drift is what nobody retypes.
 
-    def test_each_workspace_declares_the_project_its_filename_implies(self) -> None:
-        declared = {name: sorted(w["projects"]) for name, w in _workspaces().items()}
-        assert declared == {
-            "hpc3-floor.json": ["floor"],
-            "hpc3-mi.json": ["mi"],
-            "hpc3-rusted.json": ["rusted"],
-            "hpc3-tankpit.json": ["tankpit"],
-            "hpc3-turkic-lstm.json": ["turkic-lstm"],
-            "hpc3.json": ["cleargbm"],
+    They are now the PROPERTIES those lists were standing in for, so a
+    seventh project needs no edit here and still cannot violate either rule.
+    """
+
+    def test_no_project_is_declared_by_two_workspaces(self) -> None:
+        """ "Which document governs this run" must have exactly one answer.
+
+        The module docstring calls this the reading that must not be
+        permitted; it is the one thing pinnable without deciding whether the
+        budget split should be merged.
+        """
+        declaring: dict[str, list[str]] = {}
+        for filename, workspace in _workspaces().items():
+            for project in workspace["projects"]:
+                declaring.setdefault(project, []).append(filename)
+
+        assert {p: sorted(f) for p, f in declaring.items() if len(f) > 1} == {}
+
+    def test_each_workspace_declares_exactly_the_project_its_filename_names(self) -> None:
+        """``hpc3-<project>.json`` declares ``<project>``, and nothing else.
+
+        ``hpc3.json`` is the original workspace and predates the convention;
+        it declares ``cleargbm``. Naming that one exception is what lets the
+        rule be a rule instead of a list -- and it is checked here rather
+        than assumed, so the day it stops being true this fails.
+        """
+        wrong = {
+            filename: sorted(workspace["projects"])
+            for filename, workspace in _workspaces().items()
+            if sorted(workspace["projects"]) != _expected_projects_for(filename)
         }
+
+        assert wrong == {}
+
+    def test_the_registry_is_not_empty(self) -> None:
+        """A derived rule passes vacuously over nothing; this says it did not."""
+        assert len(_by_project()) >= 6
 
     def test_every_workspace_resolves_its_ledger_to_the_same_file(self) -> None:
         """The forks diverge on budget but converge on the ledger, which is
