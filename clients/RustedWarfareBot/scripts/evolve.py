@@ -99,6 +99,12 @@ JOBS_DIR = Path("sweeps/evolve")
 #: construction for every rng below 30.
 SEED_FLOOR = 500_000
 
+#: The largest rng seed an evolution may run under. Caps the namespace:
+#: ``500_000 + 49 * 10_000 + 5 * 1_000 + 15`` stays below the panel high
+#: region at 1_000_000 (``scripts.panel.PANEL_HIGH_FLOOR``), keeping the
+#: two namespaces disjoint by construction rather than by luck.
+RNG_CAP = 49
+
 #: Sample budget per match, the regime invariant.
 SAMPLES = 10000
 
@@ -107,12 +113,24 @@ def generation_seeds(rng_seed: int, generation: int) -> tuple[int, ...]:
     """Fresh, deterministic seeds for one generation.
 
     Args:
-        rng_seed: The run's reproducibility anchor.
+        rng_seed: The run's reproducibility anchor, at most
+            :data:`RNG_CAP`.
         generation: Which generation the seeds are for.
 
     Returns:
         Distinct odd seeds no other generation of this run uses.
+
+    Raises:
+        ValueError: When ``rng_seed`` exceeds :data:`RNG_CAP` or is
+            negative -- a seed past the cap would push this run's matches
+            into the panel high region, and a collision there would
+            silently pair a panel against replayed evolution matches.
     """
+    if not 0 <= rng_seed <= RNG_CAP:
+        raise ValueError(
+            f"rng seed {rng_seed} is outside [0, {RNG_CAP}]; past the cap the "
+            f"run's seeds would cross into the panel high region at 1,000,000"
+        )
     base = SEED_FLOOR + rng_seed * 10_000 + generation * 1_000
     return tuple(base + 2 * k + 1 for k in range(PAIRS))
 

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from scripts.panel import (
     EXIT_BAD_USAGE,
+    FIRST_HIGH_SEED,
     FIRST_SEED,
     SEARCH_SEED_FLOOR,
     SEED_BLOCK,
@@ -128,11 +129,22 @@ def test_the_seed_block_advances_past_panels_and_ignores_the_search_floor() -> N
     assert seed_block({12345, 214001}) == (13001, 18001)
 
 
-def test_an_exhausted_panel_namespace_is_refused() -> None:
-    with pytest.raises(PanelError) as caught:
-        seed_block({SEARCH_SEED_FLOOR - 500})
-    assert caught.value.code == "RW-PANEL-001"
-    assert str(SEARCH_SEED_FLOOR) in caught.value.message
+def test_a_full_low_region_continues_in_the_high_region() -> None:
+    """The measured 2026-09-04 shape: the block after impden48's would
+    have crossed the search floor and RW-PANEL-001 refused the layout.
+    Allocation now continues above PANEL_HIGH_FLOOR -- over every search
+    and evolution seed by construction -- instead of refusing."""
+    assert seed_block({SEARCH_SEED_FLOOR - 500}) == (
+        FIRST_HIGH_SEED,
+        FIRST_HIGH_SEED + SEED_BLOCK,
+    )
+    # Search and evolution seeds between the regions never drag the high
+    # block up; only prior HIGH-region panels advance it.
+    assert seed_block({SEARCH_SEED_FLOOR - 500, 214001, 500_011}) == (
+        FIRST_HIGH_SEED,
+        FIRST_HIGH_SEED + SEED_BLOCK,
+    )
+    assert seed_block({SEARCH_SEED_FLOOR - 500, 1_004_321}) == (1_005_001, 1_010_001)
 
 
 def test_a_panel_of_zero_pairs_is_refused(tmp_path: Path) -> None:

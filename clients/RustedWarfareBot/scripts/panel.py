@@ -69,16 +69,30 @@ FIRST_SEED = 10001
 #: strictly below it.
 SEARCH_SEED_FLOOR = 200_000
 
+#: The second panel region, opened 2026-09-04 when the sub-200k region
+#: filled (the block after impden48's would have crossed the floor).
+#: It sits strictly above every other namespace: searches top out below
+#: 500_000 and evolution constructs ``500_000 + rng * 10_000 +
+#: generation * 1_000`` with rng capped at :data:`scripts.evolve.RNG_CAP`
+#: (= 49), so no evolution seed reaches 996_000. Unbounded above --
+#: engine seeds are 31-bit safe and a panel consumes 5_000 per run.
+PANEL_HIGH_FLOOR = 1_000_000
+
+#: Where allocation starts inside the high region.
+FIRST_HIGH_SEED = 1_000_001
+
 
 class PanelError(RwBotError):
     """A panel could not be laid out.
 
     Args:
-        code: ``RW-PANEL-001`` when the next seed block would cross into
-            the search's namespace, ``RW-PANEL-002`` when fewer than one
-            pair is asked for, ``RW-PANEL-003`` when a relaunch's request
-            does not match the batch's existing job file, ``RW-PANEL-004``
-            when a sweep file's job line carries no readable seed.
+        code: ``RW-PANEL-002`` when fewer than one pair is asked for,
+            ``RW-PANEL-003`` when a relaunch's request does not match the
+            batch's existing job file, ``RW-PANEL-004`` when a sweep
+            file's job line carries no readable seed. ``RW-PANEL-001``
+            (namespace exhausted) fired once, 2026-09-04, and was retired
+            the same day by the high region -- allocation can no longer
+            exhaust.
         message: Human-readable description of the refusal.
     """
 
@@ -131,28 +145,26 @@ def used_seeds(jobs_dir: Path) -> set[int]:
 def seed_block(used: set[int]) -> tuple[int, int]:
     """The next thousand-aligned block above everything panels have used.
 
+    Allocates below :data:`SEARCH_SEED_FLOOR` while room remains -- the
+    original region -- and continues in the high region above
+    :data:`PANEL_HIGH_FLOOR` once a low block would cross the floor,
+    which the block after impden48's did on 2026-09-04. Colliding with a
+    search or evolution block was never an acceptable fallback; the high
+    region sits above both by construction.
+
     Args:
         used: Every consumed seed.
 
     Returns:
         ``(start, stop)`` for :func:`fresh_seeds`.
-
-    Raises:
-        PanelError: ``RW-PANEL-001`` when the block would reach
-            :data:`SEARCH_SEED_FLOOR` -- the panel namespace is exhausted
-            and colliding with a search block is not an acceptable
-            fallback.
     """
     below_floor = {seed for seed in used if seed < SEARCH_SEED_FLOOR}
     start = FIRST_SEED if below_floor == set() else (max(below_floor) // 1000 + 1) * 1000 + 1
-    stop = start + SEED_BLOCK
-    if stop > SEARCH_SEED_FLOOR:
-        raise PanelError(
-            "RW-PANEL-001",
-            f"the next panel block [{start}, {stop}) crosses the search seed "
-            f"floor {SEARCH_SEED_FLOOR}; the panel namespace is exhausted",
-        )
-    return start, stop
+    if start + SEED_BLOCK <= SEARCH_SEED_FLOOR:
+        return start, start + SEED_BLOCK
+    high = {seed for seed in used if seed >= PANEL_HIGH_FLOOR}
+    start = FIRST_HIGH_SEED if high == set() else (max(high) // 1000 + 1) * 1000 + 1
+    return start, start + SEED_BLOCK
 
 
 def panel_job_lines(

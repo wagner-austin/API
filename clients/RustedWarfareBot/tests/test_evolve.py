@@ -21,6 +21,7 @@ from scripts.evolve import (
     GENERATIONS,
     PAIRS,
     POPULATION,
+    RNG_CAP,
     SIGMA_FLOOR,
     generation_seeds,
     main,
@@ -140,6 +141,19 @@ def test_generation_seeds_live_in_their_own_namespace() -> None:
     assert all(seed % 2 == 1 for seed in seeds)
     assert min(seeds) >= 500_000
     assert set(generation_seeds(5, 0)) & set(generation_seeds(5, 1)) == set()
+    # The whole namespace stays below the panel high region: the largest
+    # seed any capped run can construct is the last pair of the last
+    # generation under RNG_CAP.
+    assert max(generation_seeds(RNG_CAP, GENERATIONS - 1)) < 1_000_000
+
+
+def test_an_rng_seed_past_the_cap_is_refused() -> None:
+    """Past RNG_CAP the run's matches would land inside the panel high
+    region and a later panel could silently pair against them."""
+    with pytest.raises(ValueError, match=r"outside \[0, 49\]"):
+        generation_seeds(RNG_CAP + 1, 0)
+    with pytest.raises(ValueError, match=r"outside \[0, 49\]"):
+        generation_seeds(-1, 0)
 
 
 def test_softmax_lands_on_the_simplex() -> None:
