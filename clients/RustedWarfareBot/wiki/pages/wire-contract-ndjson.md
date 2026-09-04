@@ -32,7 +32,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/StateStream.java": "206a05fdc2dc96ab22e61714fb6727b68a15930b"
   "agent/src/rwbot/agent/WireChecks.java": "65d943ad0858873fa084717938e217081210d000"
   "src/rw_bot/control/channel.py": "e5c4521155fea78be4e037ca2e9f631d3a8b8443"
-  "src/rw_bot/wire/ndjson.py": "188d5ecd49442155a37cc61e726f27cdffdd06bc"
+  "src/rw_bot/wire/ndjson.py": "25a0dba01f56dbe42e1bcbdedc8330b00b8d7765"
   "src/rw_bot/wire/state.py": "4cbdd31f7f3d23470ea1e009f8641bd07d10ae2e"
   "src/rw_bot/wire/codec.py": "7caa7903e5e14dc20bac2eafb718411f7295dba0"
 game_version: "1.15 (code 176, build #28)"

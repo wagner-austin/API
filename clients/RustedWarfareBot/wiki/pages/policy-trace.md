@@ -9,14 +9,16 @@ related:
 source_paths:
   - "src/rw_bot/policy/trace.py"
   - "src/rw_bot/policy/recorder.py"
-  - "src/rw_bot/harness/sweep.py"
+  - "src/rw_bot/harness/sweep.py:290"
+  - "src/rw_bot/harness/results_layout.py:106"
   - "runs/traces"
 source_git_blobs:
   "src/rw_bot/policy/trace.py": "18789b61934efeb623eb921215cba4e6f53c60fa"
   "src/rw_bot/policy/recorder.py": "274d44e2c5b1176069c6720defaee018ed6afb5b"
-  "src/rw_bot/harness/sweep.py": "2f4275d603abb31bbaf1411fe712984c5e2b34d7"
+  "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
+  "src/rw_bot/harness/results_layout.py": "bf31143781274b48e5f24bc1dffc6fcdfd372879"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -73,4 +75,4 @@ Sweeps used to pass `-` for the trace path and keep only the scorecard, on the r
 
 [^1]: `runs/trace-12345.ndjson` against `runs/sweeps/upgrade-fixed/long-s12345.txt`.
 [^2]: `runs/traces/r01..r12-s12345.ndjson`; `wiki/log.md:661`. Peak worth averages 67,650 and arrives 63% of the way through; final worth averages 7,237.
-[^3]: `src/rw_bot/harness/sweep.py`, `trace_path` and `play_args`.
+[^3]: `src/rw_bot/harness/sweep.py:290` for `play_args`, and `src/rw_bot/harness/results_layout.py:106` for `trace_path`. Both were attributed to `sweep.py` until 2026-09-03; `trace_path` now lives in the results-layout module alongside the rest of the on-disk path scheme.

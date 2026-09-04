@@ -14,9 +14,12 @@ source_paths:
   - "wiki/sources/m11-pools/type-flags.ndjson:85"
   - "wiki/sources/m11-pools/pool-build-run.log:401"
   - "wiki/sources/m11-pools/pool-build-run.log:403"
-  - "wiki/sources/m6-wire/world-sample.ndjson:20"
+  - "wiki/sources/m6-wire/world-sample.ndjson:22"
   - "wiki/sources/m11-pools/builder-travel-timing.txt:13"
   - "src/rw_bot/policy/build_order.py"
+  - "src/rw_bot/policy/siting.py:44"
+  - "src/rw_bot/policy/siting.py:355"
+  - "src/rw_bot/policy/siting.py:498"
   - "agent/src/rwbot/agent/MapTiles.java"
   - ".game/assets/units/extractor/extractor_common.ini:25"
   - ".game/assets/tilesets/misc.tsx:6"
@@ -24,12 +27,13 @@ source_paths:
 source_git_blobs:
   "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
   "wiki/sources/m11-pools/pool-build-run.log": "d661b6813fdcc17b1cdc08da7fc390fe22ce67b6"
-  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
+  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
   "wiki/sources/m11-pools/builder-travel-timing.txt": "c73ead926dfb2d281ba4ec591f56d6545ce2e948"
-  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
+  "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
+  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
   "agent/src/rwbot/agent/MapTiles.java": "cacf4bfc7ff02bb68ee5f843cd3436aade34dd81"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [game-mechanics, engine-internals]
 ---
@@ -72,6 +76,8 @@ A pool counts as taken when an *immobile* visible entity stands within one tile 
 
 A type the catalogue does not know is treated as not occupying. The two errors are not symmetric: guessing "free" wrongly costs one order the engine refuses, which the stall detector already catches, while guessing "taken" wrongly hides that pool for the rest of the run.
 
+Since 2026-08-31 the refusals themselves feed back. A site the engine refused silently is passed into the survey and excluded from the next choice, so the guessed-"free" error costs one order rather than repeating forever.[^16] The asymmetry that makes this necessary is that nothing in the world *un*-refuses a site: an occupied pool frees when the extractor on it dies, but a refused pool was empty when the engine said no, so waiting cannot help. Once refusals stand between the plan and every pool it can see, the plan is ruled `stalled` rather than left waiting — and this is strictly more patient than the behaviour it replaced, which stalled the whole plan on the *first* refusal with the other pools untried.[^16]
+
 ## What a live run does with it
 
 Five orders, five structures, nothing wasted.[^11] Three extractors landed on pool tile centres at (4070, 2610), (4470, 2610) and (3690, 2370) — tiles (203, 130), (223, 130) and (184, 118), all three confirmed `res_pool` in the map file — and two land factories took ring offsets from the Command Center ([[policy-loop]]).
@@ -98,7 +104,7 @@ And the fog filter over pools has never filtered anything, because fog is disabl
 [^2]: `com/corrodinggames/rts/game/b/g.java:215` in the decompiled tree — `if (properties.getProperty("res_pool") != null) { ((g)object).i = true; }`, one arm of the block that also sets the water, lava and cliff flags.
 [^3]: `com/corrodinggames/rts/game/units/y.java:4636` — `if (this.r().p()) { l2.bL.a(this.eo, this.ep); object = l2.bL.e(l2.bL.T, l2.bL.U); if (object == null || !((g)object).i) return "{2}"; }`. The `"{2}"` sentinel is mapped to the message field holding `gui.cannotPlace.needsResourcePool` at `com/corrodinggames/rts/gameFramework/f/g.java:1885`, set at `:356`.
 [^4]: `wiki/sources/m11-pools/pool-build-run.log:401` — `[rw-agent] map scan: 46 resource pool(s)`.
-[^5]: `wiki/sources/m6-wire/world-sample.ndjson:20` — `{"kind":"pool","frame":3569,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}`, the first pool record of the archived capture; the frame record at `:1` declares `"pools":46`.
+[^5]: `wiki/sources/m6-wire/world-sample.ndjson:22` — `{"kind":"pool","frame":1666,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":19}`, the first pool record of the archived capture; the frame record at `:1` declares `"pools":46`. The capture was regenerated on 2026-09-01, which moved every line offset and re-stamped the frame numbers (2703/2991/3289 became 1666/1951/2248); the pool geometry this footnote rests on — index 0 at tile (115, 6) — is identical across both, as is the count of 46. Frame numbers here are an artifact of when the sample was taken and carry no claim.
 [^6]: `.game/assets/maps/skirmish/[z;p10]Crossing Large (10p).tmx:1424` [synthesis] — the map's `Items` layer is base64 gzip; decompressed and scanned for gid 375 it yields 46 cells, the first at tile (115, 6), matching [^5]. Derived rather than archived because the map file is the primary source and ships with the game.
 [^7]: `.game/assets/units/extractor/extractor_common.ini:25` — `placeOnlyOnResPool: true`, with `radius: 18` at `:20` and `isBuilding: true` at `:23`. Every shipped extractor tier inherits this file via `copyFrom`. The loader reads the key at `com/corrodinggames/rts/game/units/custom/ag.java:1710` into the field the type predicate returns at `custom/l.java:723`.
 [^8]: `.game/assets/translations/Strings.properties:557` — `units.extractor.description=[[Generates credits.]]  [[Can only be built on resource pools.]] [[Upgradable to T3]]`. The same English sentence appears verbatim in the Japanese bundle, which is what shows it to be untranslated prose rather than generated text.
@@ -108,4 +114,5 @@ And the fog filter over pools has never filtered anything, because fog is disabl
 [^12]: `wiki/sources/m11-pools/builder-travel-timing.txt:13` — `RESULT travel_samples=52 total_samples=52`, with `construction_samples=0` at `:14`, `units_per_sample=11.72` at `:16` and `units_per_second=46.9` at `:17`, for the 609.3-unit order named in the header at `:5`. A one-off calibration rather than a regenerable target: it needs a live game and a builder free to walk.
 [^13]: `agent/src/rwbot/agent/StateStream.java:79` [synthesis] — the same measurement aimed at the farthest pool on the map first, 4,293 units out at tile (12, 52). The builder was still walking at sample 370, having reached (498, 1198) against opposing bases at roughly (370, 2430) and (590, 1690) in the archived capture, and had left the roster by sample 480. Recorded rather than archived because what the run establishes is a negative.
 [^14]: `com/corrodinggames/rts/game/units/ar$48.java` in the decompiled tree — `public String i() { return "marker"; }`, against the by-name lookup at `ar.java:291` which compares `ar2.name()`. Observed as a live failure first: the dump aborted with "the registry listed type marker but cannot resolve it by name".
-[^15]: `src/rw_bot/policy/build_order.py` — `survey_pools` and `_is_occupied`, with `POOL_OCCUPIED_RADIUS` and the reasoning for each of its three conditions. The threat filter it applies before ranking lives in `src/rw_bot/policy/threat.py` ([[policy-threat]]).
+[^15]: `src/rw_bot/policy/siting.py:355` (`survey_pools`) and `:498` (`_is_occupied`), with `POOL_OCCUPIED_RADIUS` at `:44` carrying the reasoning for each of the three conditions. The threat filter applied before ranking lives in `src/rw_bot/policy/threat.py` ([[policy-threat]]). This footnote named `build_order.py` until 2026-09-03, which had not held since 2026-07-28: commit 3e6765a7 moved all three symbols into `siting.py`, and `build_order.py` merely imports them. The attribution was already stale when this page was last fact-checked on 2026-08-17 — a bare path with no line anchor and no symbol check reads as verified whether or not anything it names is still there.
+[^16]: `src/rw_bot/policy/siting.py:141` — `refused_blocked` on the survey result, counted at `:212` by the chooser that takes `refused` at `:165`; `is_refused` at `:144`. The ruling is made in `src/rw_bot/policy/build_order.py:507`, `return _decision("stalled", no_pool_reason(target, survey))`, guarded on `survey["refused_blocked"] > 0`; the ring-position twin is at `:483`, and `:388` is what makes a `stalled` ruling non-deferrable where a `wait` still defers. Landed in commits afb8d9ad and 3db2f155 (2026-08-31).

@@ -15,13 +15,16 @@ source_paths:
   - "wiki/sources/m17-movement/reachability.txt"
   - "wiki/sources/m6-wire/world-sample.ndjson"
   - "src/rw_bot/policy/build_order.py"
+  - "src/rw_bot/policy/siting.py:355"
+  - "src/rw_bot/policy/siting.py:466"
 source_git_blobs:
   "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
   "wiki/sources/m17-movement/reachability.txt": "6e1637370797ebac09c7e3f6429318c57a99ed67"
-  "wiki/sources/m6-wire/world-sample.ndjson": "b07f259208d477629c7d45d438b1d304c36d76de"
-  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
+  "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
+  "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
+  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [game-mechanics, bot-architecture]
 ---
@@ -86,6 +89,6 @@ Nothing here uses the layers for anything but pools. The same comparison would a
 [^2]: `runs/decompiled/com/corrodinggames/rts/gameFramework/utility/y.java:204` — `b(float, float, ao)`, which resolves the layer's grid, converts the world point to a tile and indexes `g[x * width + y]`, returning `-3` when the grid is absent and `-2` when the tile is outside the map.
 [^3]: `runs/decompiled/com/corrodinggames/rts/gameFramework/utility/y.java:388` — the predicate quoted above, including the `l.g("pathPossible: no isolatedGroups found!")` line that names it.
 [^4]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:175` — the AI's zone-reachability check, which tries the zone centre and then four points at 0.4× its radius; the AI carries its own copy of the two-point predicate at `:188`.
-[^5]: `src/rw_bot/policy/build_order.py` — `_can_walk_to`, and the reasoning for rejecting negatives rather than mirroring the engine's comparison.
+[^5]: `src/rw_bot/policy/siting.py:466` — `_can_walk_to`, and the reasoning for rejecting negatives rather than mirroring the engine's comparison. Attributed to `build_order.py` until 2026-09-03; commit 3e6765a7 (2026-07-28) moved the siting logic into its own module.
 [^6]: `wiki/sources/m17-movement/reachability.txt` — the component census of the archived capture, derived from `wiki/sources/m6-wire/world-sample.ndjson` with no game running.
-[^7]: `src/rw_bot/policy/build_order.py` — `survey_pools` and the `unreachable` count it returns, rendered into the wait reason by `_no_pool_reason`.
+[^7]: `src/rw_bot/policy/siting.py:355` — `survey_pools` and the `unreachable` count it returns, declared on `PoolSurvey` at `:350`, incremented at `:447` and returned at `:460`; rendered into the wait reason by `no_pool_reason` at `:534`. Two corrections against the earlier version of this footnote: the module is `siting.py`, not `build_order.py`, and the renderer lost its leading underscore when it became part of that module's public surface — it is `no_pool_reason`, not `_no_pool_reason`.

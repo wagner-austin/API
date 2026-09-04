@@ -13,9 +13,9 @@ source_paths:
   - "scripts/search.py"
 source_git_blobs:
   "src/rw_bot/harness/margin.py": "11a9f454ce79405a6494e7d2dd72485cf89eef58"
-  "src/rw_bot/harness/search.py": "78e2145c0e7b619de81b36899c271fed6afdcf3c"
+  "src/rw_bot/harness/search.py": "01e1923a6b6e2f0f5f565dd38d5491960323db90"
   "scripts/margin.py": "1b40454709d859c785bded3e3337b0ed06438736"
-  "scripts/search.py": "961f2224bb191f22b78e325a9b0a18bf101541d3"
+  "scripts/search.py": "344576525bb482cbf8b8effd2cf755538665ea1b"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

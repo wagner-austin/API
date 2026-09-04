@@ -15,7 +15,8 @@ source_paths:
   - "wiki/sources/m15-production/before-after.txt"
   - ".game/assets/units/extractor/extractor.ini"
   - ".game/assets/units/fabricator/fabricatorT1.ini"
-  - "src/rw_bot/policy/economy.py"
+  - "src/rw_bot/policy/economy.py:221"
+  - "src/rw_bot/policy/siting.py:355"
   - "src/rw_bot/policy/ledger.py"
   - "wiki/sources/m28-holding/diag-post-worker-fix.ndjson"
   - "src/rw_bot/mechanics/income.py"
@@ -25,13 +26,14 @@ source_git_blobs:
   "wiki/sources/m19-income/income-windows.ndjson": "6ac6751249e68b8f8c162c80da456c1a9c8d656b"
   "wiki/sources/m19-income/economy-run.txt": "c97cf41d0a9cb028f2efd76a96d1de5178281271"
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
-  "src/rw_bot/policy/economy.py": "b6205482ac60aaf60685866bbdae89beaf268170"
+  "src/rw_bot/policy/economy.py": "90e570f62b5b7abc44386179d53d94ff70b4b1e8"
+  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
   "src/rw_bot/policy/ledger.py": "20d0641969fd6c7f69e9f469270f3294752ea7c3"
   "wiki/sources/m28-holding/diag-post-worker-fix.ndjson": "f294e4c69824a7661d702a2bc66aa33bd9d395f6"
   "src/rw_bot/mechanics/income.py": "a5cb0fdc641c0aa91be35b5a906f27f2335443e7"
   "scripts/income.py": "ab8278b76cf578a585a139f1815d74cb82200812"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [bot-architecture, engine-internals]
 ---
@@ -182,7 +184,7 @@ This is the shape [[policy-holding-ground]] recorded as *"275 expansion orders a
 [^2]: `wiki/sources/m19-income/measured-rates.txt`, with all 1,000 readings archived as `income-windows.ndjson`. Produced by `make income`, which builds one extractor per stage and idles 200 samples between them.
 [^3]: `.game/assets/units/extractor/extractor.ini`, `extractorT2.ini`, `extractorT3.ini`, `extractorT3_overclocked.ini`, `extractorT3_reinforced.ini`, `.game/assets/units/fabricator/fabricatorT1.ini`, and `extractor_common.ini` for the `[ai]` block. Shipped as plain text with the game.
 [^4]: `.decompiled/com/corrodinggames/rts/game/units/custom/ag.java:1500-1506` — `generation_delay` defaults to 40 and the rate is scaled by `40.0f / generation_delay`. The 60-tick simulation is inferred from the measured ×1.5 rather than read directly.
-[^5]: `src/rw_bot/policy/economy.py` — `expand_economy`, which calls `survey_pools` from `src/rw_bot/policy/build_order.py` rather than re-implementing pool selection.
+[^5]: `src/rw_bot/policy/economy.py:221` — `expand_economy`, which imports `survey_pools` from `src/rw_bot/policy/siting.py` at `:40` rather than re-implementing pool selection. The footnote named `build_order.py` as the source module until 2026-09-03; commit 3e6765a7 (2026-07-28) moved pool siting into `siting.py`, and `build_order.py` is now a peer consumer of it rather than its home. The point the footnote makes — that the expansion path reuses the planner's pool selection instead of forking it — is unchanged and is now true of a module both callers import.
 [^6]: `src/rw_bot/policy/campaign.py` — `fight` appends `BUILDER_TYPE` to the wanted list only when `find_builder` returns None.
 [^7]: `wiki/sources/m19-income/economy-run.txt`, from `runs/econ1.planner`.
 [^8]: Steam Community guide "A scientific approach to the economy system (kind of)" by Ionics, posted 2020-05-14, https://steamcommunity.com/sharedfiles/filedetails/?id=2095871975 — game version unstated, and its unit table does not match this build (see above). Carried only because its extractor conclusion agrees with the INI arithmetic, and explicitly NOT relied on for any number. Full notes in `wiki/sources/m19-income/community-research.txt`.

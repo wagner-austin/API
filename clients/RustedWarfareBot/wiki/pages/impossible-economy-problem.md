@@ -1,10 +1,27 @@
 ---
 title: The Impossible Economy Problem
 tags: [impossible, economy, design]
-related: [[campaign-ledger]], [[policy-budget]], [[harness-population-search]]
-sources: [runs/sweeps/imp48c0f4, src/rw_bot/policy/economy.py, src/rw_bot/policy/expander.py, wiki/log.md 2026-08-08/2026-09-02]
+related: ["[[campaign-ledger]]", "[[policy-budget]]", "[[harness-population-search]]", "[[policy-raid]]", "[[policy-economy]]"]
+source_paths:
+  - "src/rw_bot/policy/economy.py"
+  - "src/rw_bot/policy/expander.py:68"
+  - "src/rw_bot/policy/raid.py"
+  - "sweeps/impden48.txt"
+  - "runs/sweeps/imp48c6"
+  - "runs/sweeps/imp48c0f4"
+  - "runs/sweeps/impden48"
+source_git_blobs:
+  "src/rw_bot/policy/economy.py": "90e570f62b5b7abc44386179d53d94ff70b4b1e8"
+  "src/rw_bot/policy/expander.py": "e4123f9f747523e64cb4d69b78dfa984b86bb3cc"
+  "src/rw_bot/policy/raid.py": "4d6240b22965277824d1476c7dc8957b0310e74f"
+  "sweeps/impden48.txt": "4926d5899c862a22df7e2e91d53efe1b41f8405a"
+provenance:
+  - "runs/sweeps/imp48c6 + imp48c0f4 — 96 fresh scorecards, the control read"
+  - "runs/sweeps/impden48 — 144 scorecards, raid 3/6/8 on 48 shared seeds, 2026-09-03"
+  - "wiki/log.md entries 2026-08-08 (pre-cluster saving/withhold variants) through 2026-09-02"
 fact_checked: 2026-09-03
 confidence: high
+hubs: [bot-architecture]
 ---
 
 # The Impossible Economy Problem

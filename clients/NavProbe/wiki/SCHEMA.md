@@ -48,12 +48,32 @@ Every page opens with YAML frontmatter:
 ---
 title: Human-readable title, stated as the finding
 tags: [topic-tag, ...]              # cross-cutting, lowercase
-related: [[other-slug]], ...        # explicit cross-refs
-sources: [primary-source-1, ...]    # see Citations
+related: ["[[other-slug]]", ...]    # explicit cross-refs — MUST be quoted
+source_paths:                       # repo paths, relative to clients/NavProbe/
+  - "src/navprobe/determinism.py"
+source_git_blobs:                   # one pin per tracked source_paths entry
+  "src/navprobe/determinism.py": "<40-hex blob sha>"
+provenance:                         # evidence that is NOT a repo path
+  - "mujoco-warp 3.11.0"
 fact_checked: YYYY-MM-DD            # when claims were last confirmed current
 confidence: high | medium | low
 ---
 ```
+
+Two frontmatter traps, both of which this file documented wrongly until
+2026-09-03:
+
+1. **`related:` MUST be a quoted list.** The form shown here previously —
+   `related: [[a]], [[b]]` — is a YAML **syntax error**: a flow sequence
+   followed by a comma. A page carrying it does not parse, and an unparseable
+   page becomes a single `load-error` finding under which **no other rule
+   runs** — the pin checks, the line anchors, and the existence checks all go
+   silent. It reads as a clean page. Write `related: ["[[a]]", "[[b]]"]`.
+2. **`sources:` is not a field.** This wiki audits under the `code-paths`
+   source contract, which reads `source_paths:` + `source_git_blobs:`. A
+   freeform `sources:` list is ignored by every rule, so its contents are
+   never checked against anything. Evidence that is not a repo path goes in
+   `provenance:`.
 
 `fact_checked` = when someone last confirmed the claims are still true. Git tracks edit history; no `updated:` field. Pages without `fact_checked` have never been independently verified.
 

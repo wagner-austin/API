@@ -21,8 +21,10 @@ source_paths:
   - "wiki/sources/m12-produce/produce-run.log:411"
   - "wiki/sources/m12-produce/produce-run.log:437"
   - "src/rw_bot/policy/build_order.py"
-  - "src/rw_bot/policy/runner.py"
-  - "src/rw_bot/policy/campaign.py"
+  - "src/rw_bot/policy/progress.py:20"
+  - "src/rw_bot/policy/runner.py:91"
+  - "src/rw_bot/policy/runner.py:392"
+  - "src/rw_bot/policy/campaign.py:234"
   - "src/rw_bot/policy/budget.py"
   - "scripts/play.py"
 source_git_blobs:
@@ -34,13 +36,14 @@ source_git_blobs:
   "wiki/sources/m11-pools/builder-travel-timing.txt": "c73ead926dfb2d281ba4ec591f56d6545ce2e948"
   "wiki/sources/m12-produce/produce-timing.txt": "fe366f914e87811134a45ac1f7fe0ac041f3a711"
   "wiki/sources/m12-produce/produce-run.log": "9e6dbf9b8d9f7867ed36868664fdfd7210f46a79"
-  "src/rw_bot/policy/build_order.py": "e07a055e86b45ac976c4eab4cea48cfe0f860c3c"
-  "src/rw_bot/policy/runner.py": "749de3dbe47cc72f97571d57ee21677c4eb4fba6"
-  "src/rw_bot/policy/campaign.py": "ae3700f5a5c413b05f2909de398d1154d8262b2f"
+  "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
+  "src/rw_bot/policy/progress.py": "2586afbd25ffeb0216657b153e28dd9c7c19b4cd"
+  "src/rw_bot/policy/runner.py": "857d1e24c2cde142054e40c7bcb50b3a1d94b009"
+  "src/rw_bot/policy/campaign.py": "cb6a4ed7e6df2f29fba64b2b7da17c955e4f74ce"
   "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
   "scripts/play.py": "c95267440b13b56f48a32def2a00b99e2f9efe72"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [bot-architecture, game-mechanics]
 ---
@@ -167,8 +170,8 @@ What it does have is the shape a real policy needs: observe, decide, act, verify
 [^1]: `wiki/sources/m9-policy/visible-includes-opponents.ndjson:1` — a frame declaring `"visible":19` followed by entities on teams 5 and 1 with `"mine":false`; the full capture at `wiki/sources/m6-wire/world-sample.ndjson` carries teams 0, 1, 3, 5 and 7.
 [^2]: `wiki/sources/m9-policy/plan-stalled-on-laboratory.txt:5` — `outcome sample_limit (building laboratory (3 of 3))` with `completed 2/3` at `:6`, `orders sent 3` at `:7` and `credits left 11258` at `:10`.
 [^3]: `wiki/sources/m9-policy/engine-refused-the-laboratory.txt:4` — `Unit 'builder' can not queue build:laboratory`, followed at `:5` by `isValidNewWaypoint==false on: builder(pos:4247,2767 id:214 t:0)`; the order the planner sent is at `:3`.
-[^5]: `src/rw_bot/policy/runner.py` — `run` reads a sample, calls `decide`, and dispatches; `ordered_positions` bounds each plan position to one order, and `stall_samples` converts an unchanging position into a `stalled` outcome only once `_has_moved` reports the builder stationary.
-[^6]: `src/rw_bot/policy/build_order.py` — `completed_count` walks the roster, skipping entities whose `mine` is false, and matches each plan entry at most once.
+[^5]: `src/rw_bot/policy/runner.py:91` — the `OrderTracker` class, whose docstring states the bound directly: "An order is issued at most once per plan slot." `stall_samples` is its constructor parameter at `:117`, defaulting to `DEFAULT_STALL_SAMPLES = 45` at `:48` (`AFFORD_STALL_SAMPLES = 90` at `:72`), and movement enters through `_in_flight(sample, decision, builder_moved)` at `:392`. The tracker is constructed by the loop at `src/rw_bot/policy/campaign.py:234`. Four names in the earlier version of this footnote are withdrawn: there is no `run` or `decide` in `runner.py` — the loop is `campaign.py`'s `play` and `decide` belongs to `build_order.py` — and `ordered_positions` and `_has_moved` were both deleted, in commits 3e6765a7 and 64a6f9b8 respectively. The behaviour each described survives inside `OrderTracker`; only the names are gone.
+[^6]: `src/rw_bot/policy/progress.py:20` — `completed_count` walks the roster, skipping entities whose `mine` is false, and matches each plan entry at most once via a `remaining` list. It also skips entities whose `complete` is false, which the earlier version of this footnote did not mention and which is load-bearing: a building joins the roster the moment construction starts, so counting on presence once reported a plan done while a factory was still a shell. Attributed to `build_order.py` until 2026-09-03; that module imports the function at `:30` and calls it at `:252` but does not define it.
 [^7]: `wiki/sources/m11-pools/pool-build-run.log:403` — the five `channel: build` lines of the pool-aware run, three `extractorT1` and two `landFactory`, scoring `completed 5/5, orders sent 5` over 170 samples. It supersedes the earlier three-factory run at `wiki/sources/m9-policy/plan-completed.txt:5`, which is what the scorecard block showed before extractors were in the plan.
 [^9]: `src/rw_bot/policy/build_order.py` — `find_producer` reads the sample's own option list; `decide` blocks on no producer, waits on an unavailable action, and branches to `produce` when the option reports `placed` false.
 [^10]: `wiki/sources/m6-wire/world-sample.ndjson:1` — in the first sample of the archived capture the option records divide 2 / 13 / 108 across units 213 (`commandCenter`), 214 (`builder`) and 217 (`editorOrBuilder`); all 13 of the Builder's types also appear under 217, and `laboratory` appears only under 217.

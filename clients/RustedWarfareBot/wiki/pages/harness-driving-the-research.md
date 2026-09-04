@@ -1,10 +1,28 @@
 ---
 title: Driving the Research — The Operating Page
 tags: [harness, operations, hpc3]
-related: [[harness-doctrine-search]], [[harness-population-search]], [[campaign-ledger]]
-sources: [scripts/search.py, scripts/panel.py, scripts/evolve.py, scripts/search_specs.py, tools/hpc3/runs/hpc3-rusted.json]
+related: ["[[harness-doctrine-search]]", "[[harness-population-search]]", "[[campaign-ledger]]"]
+source_paths:
+  - "scripts/search.py"
+  - "scripts/search_specs.py:175"
+  - "scripts/panel.py:70"
+  - "scripts/evolve.py:97"
+  - "scripts/batch.py:71"
+  - "scripts/pairs.py"
+  - "scripts/margin.py"
+  - "../../tools/hpc3/runs/hpc3-rusted.json"
+source_git_blobs:
+  "scripts/search.py": "344576525bb482cbf8b8effd2cf755538665ea1b"
+  "scripts/search_specs.py": "81dc71a49259df7dc6761848c509cb4739c17b5c"
+  "scripts/panel.py": "fd7c3f0620f205bae6168a5136e6943e066e341d"
+  "scripts/evolve.py": "7fdc4885b2a87df729902739fb91867e18cb0fa4"
+  "scripts/batch.py": "e3183dff9f12edff09f374e7bf6bd2bb49e09dd9"
+  "scripts/pairs.py": "18311147e3897a81608c1d551c83a488000176ed"
+  "scripts/margin.py": "1b40454709d859c785bded3e3337b0ed06438736"
+  "../../tools/hpc3/runs/hpc3-rusted.json": "6f97e362db8befa63107a201d3f9d25a2014ca1a"
 fact_checked: 2026-09-03
 confidence: high
+hubs: [headless-harness]
 ---
 
 # Driving the Research — The Operating Page

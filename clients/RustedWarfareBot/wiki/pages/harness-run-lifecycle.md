@@ -10,8 +10,8 @@ source_paths:
   - "src/rw_bot/harness/runner.py"
   - "sweeps/run-xmap-1v1.sh"
 source_git_blobs:
-  "scripts/sweep.py": "8e99b999502b279e76b928e656f9e0261ad2680a"
-  "src/rw_bot/harness/runner.py": "ace02192fa040da0cadc67d3b486300ab03112c5"
+  "scripts/sweep.py": "97093577af50258d78e1609cb705fea02efc6738"
+  "src/rw_bot/harness/runner.py": "ae8a7506a87db5ffcb2fc53953a9756ab53ade38"
   "sweeps/run-xmap-1v1.sh": "4bf70377b380d60fae8fa09c1dd5509ddd483f5f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17

@@ -49,7 +49,7 @@ Every page opens with YAML frontmatter:
 ---
 title: Human-readable title
 tags: [topic-tag, ...]              # cross-cutting, lowercase
-related: [[other-slug]], ...        # explicit cross-refs
+related: ["[[other-slug]]", ...]    # explicit cross-refs — MUST be quoted
 source_paths:                       # see Citations — workspace-relative
   - "wiki/sources/m0-probe/x.log:42"#   <path>:<line> anchors are verified in-bounds
   - ".game/some-file.ini"           #   bare paths must resolve
@@ -61,6 +61,21 @@ confidence: high | medium | low     # how confident we are in this page's claims
 hubs: [hub-slug, ...]               # every hub linking this page
 ---
 ```
+
+Two frontmatter traps, both of which this file documented wrongly until
+2026-09-03:
+
+1. **`related:` MUST be a quoted list.** The form shown here previously —
+   `related: [[a]], [[b]]` — is a YAML **syntax error**: a flow sequence
+   followed by a comma. A page carrying it does not parse, and an unparseable
+   page becomes a single `load-error` finding under which **no other rule
+   runs** — pins, line anchors, and existence checks all go silent, so the
+   page reads as clean. Two pages written on 2026-09-03 hit exactly this,
+   copied from the example above. Write `related: ["[[a]]", "[[b]]"]`.
+2. **`sources:` is not a field.** The contract reads `source_paths:` +
+   `source_git_blobs:`. A freeform `sources:` list is ignored by every rule,
+   so nothing it names is ever checked. Evidence that is not a repo path —
+   a run label, a measurement, a log date range — goes in `provenance:`.
 
 `source_paths` follows the workspace's **`code-paths`** source contract, the same one the sibling TankpitBot wiki uses. Entries resolve relative to this client directory. Three shapes are recognised: a bare path (must exist), a `<path>:<line>` anchor (line must be within the file), and an external URL (skipped by the existence rules). Gitignored artifacts — everything under `runs/` and `.game/` — are unpinnable by nature and exempt from `source_git_blobs`, but their existence is still enforced, so a typo'd path fails loudly.
 

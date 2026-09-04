@@ -11,7 +11,7 @@ source_paths:
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
 source_git_blobs:
-  "wiki/log.md": "f81d58fbcc4fdb9e68062c7fdaad9889cb8ecccf"
+  "wiki/log.md": "33e387004d02e2d57810c7f97a6eb592219c2345"
   "doctrines/flame-nocover.doctrine": "f2fef915923ca031d05cda11f83029d0e89e195e"
 game_version: "1.15 (code 176, build #28)"
 confidence: high

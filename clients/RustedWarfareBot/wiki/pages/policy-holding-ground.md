@@ -25,8 +25,8 @@ source_git_blobs:
   "wiki/sources/m24-wave-mass/wave-mass-ab.txt": "843eea72af8a2e8029ac5a70fd341c8d30591ca1"
   "wiki/sources/m26-upgrades/structure-offers.txt": "9147f4d519e8ffb37ffbb6d06ab8536a1b53e07a"
   "wiki/sources/m27-aggression/attack-vs-turtle.txt": "e9fdde7396a6a99b6cc35b14b59e193b003b198a"
-  "src/rw_bot/policy/economy.py": "b6205482ac60aaf60685866bbdae89beaf268170"
-  "src/rw_bot/policy/spending.py": "73ed0d6ed7fc15b26af0403069e354b97cd10eed"
+  "src/rw_bot/policy/economy.py": "90e570f62b5b7abc44386179d53d94ff70b4b1e8"
+  "src/rw_bot/policy/spending.py": "cdef325f6e784124d362b1b910e3c716f4c8507c"
   "scripts/play.py": "c95267440b13b56f48a32def2a00b99e2f9efe72"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17

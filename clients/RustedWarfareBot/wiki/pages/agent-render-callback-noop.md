@@ -19,7 +19,7 @@ source_git_blobs:
   "wiki/sources/m2-agent/sandbox-agent-stdout.txt": "6a2df8f55bee277d774c8d1f05b5b6a4cf57e6c4"
   "wiki/sources/m2-agent/sandbox-agent-running.log": "48deb92be72da9d66203142f8bf684d548c008e3"
   "wiki/sources/m2-agent/sandbox-agent-jstack.txt": "34713821779b89529927b48e008407008dd25791"
-  "agent/src/rwbot/agent/Targets.java": "f14170d54937b35558465e96b7a1fdfab9bd6a3f"
+  "agent/src/rwbot/agent/Targets.java": "8152347e834a9d68515decc161d2cc8660b6bd0b"
   "agent/src/rwbot/agent/ClassFilePatcher.java": "5751ecd497ce67e54fbe42a35175e2c0aace03a4"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17

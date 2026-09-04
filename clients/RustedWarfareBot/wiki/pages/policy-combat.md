@@ -16,7 +16,9 @@ source_paths:
   - "agent/src/rwbot/agent/Orders.java"
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
-  - "src/rw_bot/policy/campaign.py"
+  - "src/rw_bot/policy/campaign.py:305"
+  - "src/rw_bot/policy/dispatching.py:304"
+  - "src/rw_bot/policy/match_report.py:68"
 source_git_blobs:
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
   "wiki/sources/m15-production/sustained-run.log": "259d966dc1a8164be5252977c78bda56dd0a38c5"
@@ -26,9 +28,11 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "8afff52d08a953cafe435d3543c337652cab3f47"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "ae3700f5a5c413b05f2909de398d1154d8262b2f"
+  "src/rw_bot/policy/campaign.py": "cb6a4ed7e6df2f29fba64b2b7da17c955e4f74ce"
+  "src/rw_bot/policy/dispatching.py": "c612a63cd632775bc0dd90ca7daed06a09327cb3"
+  "src/rw_bot/policy/match_report.py": "d5ece8f39080b2e4869eea62b40b8492b0f7fe96"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-03
 confidence: high
 hubs: [engine-internals, bot-architecture]
 ---
@@ -49,7 +53,7 @@ The weaker evidence is worth naming, because it was tempting. Ordering an attack
 
 ## Deciding is split from doing, again
 
-The build policy decides what to make; the combat policy decides what to do with it; and the two share nothing but the sample they read.[^4][^5] Neither opens a socket — the campaign module runs the phases and is the only place orders are sent.[^6]
+The build policy decides what to make; the combat policy decides what to do with it; and the two share nothing but the sample they read.[^4][^5] Neither opens a socket: `combat.py` and `build_order.py` contain no reference to the channel at all, which is what keeps them testable against a plain sample.[^6] Sending is a separate layer — `campaign.py` runs the phases and drives it, but it is no longer the only module that writes: `dispatching.py`, `convert.py`, `medic.py` and `navy.py` each take the channel and send their own orders.[^6]
 
 The army is the set of owned, finished, armed, mobile units that are not the editor placeholder. Each exclusion is load-bearing: an unfinished unit does not exist, an unarmed Builder sent at a tank is a Builder thrown away, a turret cannot travel to a fight, and the placeholder is not a unit ([[policy-loop]]). Armed and mobile are read from the catalogue rather than guessed from type names.
 
@@ -137,10 +141,10 @@ Negative ids mean "not on a movement grid", which is what every **structure** re
 
 [^1]: `agent/src/rwbot/agent/Orders.java` — `attack` adds the subject through the orderable setter and then calls the entity-taking setter, which is the `av.b` waypoint mode. The six candidate setters are listed in the decompiled command class; `av.c` is the build mode already pinned by [[issuing-orders]].
 [^2]: `wiki/sources/m15-production/before-after.txt` [synthesis] — the probe is described in the session log for 2026-07-26; the target's fall from 1200 to 1183 was observed live against a Scout whose catalogue `direct_damage` is 17.
-[^3]: `src/rw_bot/policy/campaign.py` — the `Battle` report names the field `killed` and documents it as targets engaged and no longer visible, explicitly not a kill count.
+[^3]: `src/rw_bot/policy/match_report.py:68` — the `MatchReport` field `killed`, documented as "Targets ordered against that are no longer visible. Not a kill count -- a target that retreated into fog reads the same way, which is why the field is named for what was observed", declared at `:193`. This footnote named a `Battle` report in `campaign.py` until 2026-09-03; no type called `Battle` exists anywhere in the repository, and the field's home is `match_report.py`. The semantics the footnote asserts are exactly right — only its address was wrong.
 [^4]: `src/rw_bot/policy/combat.py` — `find_army`, `find_targets`, `choose_target` and `engagements`, all pure.
 [^5]: `src/rw_bot/policy/production.py` — `sustain` and `idle_producers`, also pure.
-[^6]: `src/rw_bot/policy/campaign.py` — `fight` reads samples, orders reinforcements, and dispatches attacks; production runs before the army check so a wiped wave still queues its replacements.
+[^6]: `src/rw_bot/policy/combat.py` and `src/rw_bot/policy/build_order.py` — neither contains the string `channel`. The senders are `src/rw_bot/policy/dispatching.py:60` onward (`send_produce`, `send_build`, `send_move`, `send_attack`, `send_attack_move`, `send_posture`), plus `campaign.py`, `convert.py`, `medic.py` and `navy.py`. Two claims in the earlier version of this footnote were wrong and are withdrawn: `fight` is not in `campaign.py` — it is `src/rw_bot/policy/dispatching.py:304`, and it is combat dispatch only, explicitly touching no budget, so it orders no reinforcements. And production does not run "before the army check": `find_army` is called at `campaign.py:305`, well before the production channels at `:419`. The behaviour that observation was reaching for does survive, by a different mechanism — production is not gated on the army at all (no `if army` guard exists in the loop), so a wiped wave still queues its replacements.
 [^7]: `wiki/sources/m15-production/before-after.txt` — the two scorecards side by side, with the counts re-derived from the run log at the foot of the file.
 [^9]: `wiki/sources/m15-production/target-churn.txt` — the three runs side by side, with the counts derived from each run log and the variance caveat stated in the file itself.
 [^8]: `wiki/sources/m15-production/sustained-run.log` — 743 `channel: attack` lines and 49 `channel: produce` lines; the distinct target and attacker counts are the sorted-unique ids from those lines.
