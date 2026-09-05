@@ -138,6 +138,12 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         "-nostdin",
         "-f",
         "x11grab",
+        # The X cursor parks wherever it last was — the bot plays over
+        # the wire and never moves it — and drawing it into the public
+        # stream reads as a ghost hand on the game (operator report,
+        # 2026-09-05, first live viewing).
+        "-draw_mouse",
+        "0",
         "-framerate",
         str(config["fps"]),
         "-video_size",

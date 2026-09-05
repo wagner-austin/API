@@ -247,17 +247,34 @@ def _tick_once(bot: Bot) -> None:
         target_id=bot._ai_state["combat_target_id"],
         target_name=bot._ai_state["last_shot_target_name"],
     )
-    hud_cdp = bot._require_cdp()
-    bot._flag_capture.ensure(hud_cdp)
+    _publish_hud(bot, overlay)
+    _exchange_fleet_knowledge(bot)
+
+
+def _publish_hud(bot: Bot, overlay: OverlayStateDict) -> None:
+    """Deliver one tick's HUD payload to its consumers.
+
+    The DOM half — the rendered card and the flag-click binding it
+    carries — only exists for a human at the browser. A session with
+    the overlay off (the streamed demo fleet) skips BOTH: a card
+    would sit on top of the game in every captured frame, and a flag
+    binding without a human to click it is an armed control nobody
+    can reach. The ring record and the ``hud.json`` mirror stay
+    unconditional — the fleet page's card reads the mirror.
+
+    Args:
+        bot: Bot whose overlay switch and flag service drive delivery.
+        overlay: The tick's rendered HUD state.
+    """
+    if bot._hud_overlay:
+        hud_cdp = bot._require_cdp()
+        bot._flag_capture.ensure(hud_cdp)
+        update_bot_overlay(hud_cdp, overlay)
     bot._flag_capture.record_tick(overlay)
-    update_bot_overlay(hud_cdp, overlay)
-    # The same payload the in-page HUD renders, mirrored to disk each
-    # tick so the fleet page can show the identical card per instance.
     _test_hooks.write_text(
         bot_run_dir(resolve_bot_instance()) / "hud.json",
         dump_json_str(render_overlay_payload(overlay)),
     )
-    _exchange_fleet_knowledge(bot)
 
 
 def _exchange_fleet_knowledge(bot: Bot) -> None:

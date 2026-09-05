@@ -97,6 +97,31 @@ def _resolved(config: StreamConfigDict | None) -> StreamConfigDict:
     return config
 
 
+class TestResolveHudOverlay:
+    """The in-page diagnostic HUD switch — default ON, demo turns it off."""
+
+    def test_unset_means_the_hud_renders(self) -> None:
+        """The desktop operator watching the browser is the default case."""
+        from tankpit_bot.bot.config import resolve_hud_overlay
+
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_hud_overlay() is True
+
+    def test_false_turns_the_hud_off(self) -> None:
+        """The demo fleet's compose value disables the card."""
+        from tankpit_bot.bot.config import resolve_hud_overlay
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HUD_OVERLAY": "false"})
+        assert resolve_hud_overlay() is False
+
+    def test_truthy_spellings_keep_it_on(self) -> None:
+        """The shared yes-spellings work here like every other flag."""
+        from tankpit_bot.bot.config import resolve_hud_overlay
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_HUD_OVERLAY": "YES"})
+        assert resolve_hud_overlay() is True
+
+
 class TestResolveStreamConfig:
     """The display-capture configuration switch and its derivations."""
 

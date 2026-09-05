@@ -47,6 +47,11 @@ services:
       # the shared filesystem. The display number is the child's own
       # service port — already unique per live child.
       TANKPIT_STREAM_VIDEO: "true"
+      # No in-page diagnostic HUD: its card sits on top of the game in
+      # every captured frame, and the stream's viewers are strangers,
+      # not the operator it was built for. The fleet page still gets
+      # the same numbers through the per-tick hud.json mirror.
+      TANKPIT_HUD_OVERLAY: "false"
       # Bind wide INSIDE the container so the published port reaches
       # the process; the loopback-only security property moves to the
       # port mapping below, which is the container boundary's

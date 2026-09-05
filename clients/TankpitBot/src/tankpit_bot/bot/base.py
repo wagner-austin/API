@@ -26,7 +26,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.bot_dispatch import DispatchMixin
 from tankpit_bot.bot.command_service import CommandService
-from tankpit_bot.bot.config import env_ai_config
+from tankpit_bot.bot.config import env_ai_config, resolve_hud_overlay
 from tankpit_bot.bot.game_log_witness import GameLogWitnessMixin
 from tankpit_bot.bot.state_access import StateAccessMixin
 from tankpit_bot.bot.states import make_initial_state_data
@@ -38,6 +38,7 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.browser.flag_capture import FlagCaptureService
+from tankpit_bot.browser.fullscreen import enter_game_fullscreen
 from tankpit_bot.browser.lifecycle import (
     cleanup_browser,
     gather_intel,
@@ -192,6 +193,11 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         # pair live exactly as long as one browser does, so run() owns
         # their lifecycle and the constructor only keeps the wish.
         self._stream_config = stream_config
+        # Read once, like env_ai_config above: whether the in-page
+        # diagnostic HUD (and the flag-click binding that rides it)
+        # renders this session. The demo fleet turns it off — the card
+        # sat on top of the game in every captured frame.
+        self._hud_overlay = resolve_hud_overlay()
         # Human bug marker (2026-07-29): the HUD flag button delivers
         # clicks over its own CDP binding; the service turns each into
         # a human_flag diagnostic carrying the recent-tick ring.
@@ -364,8 +370,12 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 # The encoder starts only once there is a game on the
                 # screen: everything before this line is login flow,
                 # and recording it would spend the live window's first
-                # segments on a loading page.
+                # segments on a loading page. The game's own
+                # fullscreen goes first, so the first segment is
+                # already the game filling the frame rather than a
+                # centred box in dead margin.
                 if capture is not None:
+                    enter_game_fullscreen(cdp)
                     capture.start_encoder()
 
                 # Persist the freshly-issued auth cookies + localStorage

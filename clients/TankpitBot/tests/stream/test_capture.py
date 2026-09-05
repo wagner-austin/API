@@ -175,6 +175,8 @@ class TestCommandLines:
             "-nostdin",
             "-f",
             "x11grab",
+            "-draw_mouse",
+            "0",
             "-framerate",
             "30",
             "-video_size",

@@ -150,6 +150,11 @@ class FakeCDPSessionBot:
         Returns:
             The fake CDP response the sniffer / bot should observe.
         """
+        if "Toggle Fullscreen" in expression:
+            # The capture path's fullscreen-button locate
+            # (browser/fullscreen.py): answer with a stable rect
+            # centre so the trusted click can be dispatched.
+            return {"result": {"value": {"x": 320.0, "y": 431.0}}}
         if "window.__rawMsgs" in expression:
             return {
                 "result": {

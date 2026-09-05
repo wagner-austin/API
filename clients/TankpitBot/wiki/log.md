@@ -6253,6 +6253,21 @@ spent on the same picture. The latency floor moved from ~200 ms to a
 few seconds, which a passive demo does not feel — that trade is the
 design.
 
+Three polish fixes from the first hour of live viewing, same day: the
+X cursor no longer ships in the frame (``-draw_mouse 0`` — the bot
+plays over the wire and never moves it, so it was a parked ghost
+hand); the streamed session presses the CLIENT'S OWN fullscreen
+button after game-ready (``browser/fullscreen.py``, a trusted CDP
+click on ``#settings-bar``'s toggle — ``requestFullscreen`` demands a
+gesture and injected JS has none), so the game fills the frame
+instead of sitting centred in dead margin; and the demo fleet turns
+the in-page diagnostic HUD off (``TANKPIT_HUD_OVERLAY``, default on
+for the desktop operator it was built for) because its card sat on
+top of the game in every captured frame — the flag-click binding goes
+with it, since a binding without a human is an armed control nobody
+can reach, while the per-tick ``hud.json`` mirror the fleet page
+reads stays unconditional.
+
 `tankpit-stream-probe` was rewritten for the new observable: polling
 the playlist's `EXT-X-MEDIA-SEQUENCE` measures the ENCODER's cadence
 upstream of every viewer, which is exactly the fault line the old

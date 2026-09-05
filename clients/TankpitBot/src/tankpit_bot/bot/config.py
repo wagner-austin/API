@@ -152,6 +152,29 @@ and keeps request cadence at one playlist poll + one segment per two
 seconds per viewer."""
 
 
+def resolve_hud_overlay() -> bool:
+    """Return whether the in-page diagnostic HUD renders this session.
+
+    ``TANKPIT_HUD_OVERLAY`` defaults ON — the HUD exists for a human
+    watching the browser, and the desktop ``make run``/``make fleet``
+    operator is exactly that human. The demo fleet's compose sets it
+    off: its viewers are strangers watching the STREAM, the overlay
+    card sits on top of the game in every captured frame (operator
+    report, 2026-09-05), and the same numbers already reach the fleet
+    page through the per-tick ``hud.json`` mirror, which this switch
+    deliberately does not touch.
+
+    Returns:
+        False when the env var (case-insensitive) is set to anything
+        other than ``"true"``, ``"1"`` or ``"yes"``; True otherwise,
+        including when unset.
+    """
+    raw = _test_hooks.get_env("TANKPIT_HUD_OVERLAY")
+    if raw is None:
+        return True
+    return raw.lower() in _TRUTHY_VALUES
+
+
 def resolve_stream_config() -> StreamConfigDict | None:
     """Return the display-capture configuration, or ``None`` when off.
 
@@ -232,6 +255,7 @@ __all__ = [
     "env_ai_config",
     "resolve_env_flag",
     "resolve_headless",
+    "resolve_hud_overlay",
     "resolve_human_rank_window",
     "resolve_prefer_account",
     "resolve_priority_target",

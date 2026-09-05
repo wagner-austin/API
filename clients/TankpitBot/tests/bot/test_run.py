@@ -558,3 +558,43 @@ class TestBotGameLoopStates:
         assert runtime_calls == ["Runtime.evaluate"] * 4
         assert bot._ai_state["last_scan_ms"] > 0
         assert bot.get_state() == "SCANNING"
+
+    def test_hud_overlay_off_skips_the_card_and_the_flag_binding(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """``TANKPIT_HUD_OVERLAY=false`` removes exactly the DOM half.
+
+        Same scenario as the test above, one env var flipped: the
+        overlay-update evaluate disappears (4 -> 3) and the flag-click
+        binding is never armed — a card would sit on top of the game
+        in every captured frame, and a binding without a human is an
+        armed control nobody can reach. The hud.json mirror the fleet
+        page reads is written either way, which ``fake_fs`` proves.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+        from tests.fakes import FakeCDPSession, FakePageInterrupting
+
+        fake_env.set("TANKPIT_HUD_OVERLAY", "false")
+        ws = WorldService()
+        ws.update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(ws, 800)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._magic = "test_magic"
+
+        interrupting_page = FakePageInterrupting(interrupt_after=3)
+
+        with pytest.raises(KeyboardInterrupt):
+            bot._game_loop(interrupting_page, session_seconds=0, stop_file_path=_STOP)
+
+        runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
+        # snapshot read + structure survey + radar dispatch; NO overlay update.
+        assert runtime_calls == ["Runtime.evaluate"] * 3
+        assert "Runtime.addBinding" not in fake_cdp._sent_methods
+        written = fake_fs.get_written_files()
+        hud_payloads = [path for path in written if path.endswith("hud.json")]
+        assert len(hud_payloads) == 1

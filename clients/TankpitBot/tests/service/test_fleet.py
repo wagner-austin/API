@@ -8,6 +8,7 @@ crossed the 600-line ceiling.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import psutil
@@ -422,6 +423,36 @@ def test_resolve_fleet_port_contract() -> None:
         top_hooks.get_env = original_get_env
 
 
+def _unlink_accepting_handle_lag(path: Path) -> None:
+    """Delete a file a just-killed child held, accepting handle lag.
+
+    On Windows, ``TerminateProcess`` returning — and therefore the
+    parent's ``wait()`` — can precede the kernel's release of the
+    child's inherited handles by a beat under load. Observed
+    2026-09-05: this exact unlink raised ``WinError 32`` in an
+    otherwise green gate, and the file was freely deletable moments
+    later. The retry is bounded and typed to that ONE error; anything
+    else, and anything past the deadline, propagates — a file still
+    held after ten seconds is a leak, not lag.
+
+    Args:
+        path: The file the killed child's console was redirected to.
+
+    Raises:
+        PermissionError: Still locked at the deadline.
+        OSError: Any other deletion failure, immediately.
+    """
+    deadline = time.monotonic() + 10.0
+    while True:
+        try:
+            path.unlink()
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.1)
+
+
 def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
     """The production spawner starts a real child; killed before it acts.
 
@@ -447,7 +478,7 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
     finally:
         handle.kill()
         handle.wait(timeout=30)
-        console.unlink()
+        _unlink_accepting_handle_lag(console)
         console.parent.rmdir()
 
     assert process.is_running() is False
