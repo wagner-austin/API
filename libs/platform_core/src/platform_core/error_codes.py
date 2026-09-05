@@ -457,7 +457,50 @@ class FleetErrorCode(ErrorCodeBase):
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
 
 
+class BoardWatchErrorCode(ErrorCodeBase):
+    """Subscribing a shell to the corvis agent board's change feed.
+
+    A sibling of :class:`FleetErrorCode` rather than a section of it, because
+    the two fail at different layers. Fleet's codes are about a machine having
+    or not having a resource. These are about a RENDERED TEXT CONTRACT holding
+    or not holding: ``task_events`` answers in prose built for a model to
+    read, so every field this package needs is recovered by parsing rather
+    than by reading a JSON key. When that parse fails the useful question is
+    which part of the grammar moved, and a code per part is what answers it.
+
+    Same discipline as its siblings: no generic member. A code that covers
+    everything identifies nothing.
+    """
+
+    # Configuration -- what the shell must be given before it can call at all.
+    # Separate members rather than one CONFIG_ERROR because the operator fixes
+    # them in different places: one is a container's environment, the other is
+    # a row in the tenants table.
+    API_KEY_MISSING = "API_KEY_MISSING"
+    TENANT_ID_MISSING = "TENANT_ID_MISSING"
+
+    # Transport -- the board answered, but not with a result.
+    # HTTP_STATUS is the endpoint refusing (401 on a rotated key is the case
+    # that actually happens); RPC_ERROR is the endpoint accepting and the tool
+    # itself failing. Merging them would send a reader to the wrong layer.
+    HTTP_STATUS = "HTTP_STATUS"
+    RPC_ERROR = "RPC_ERROR"
+    RESPONSE_NOT_EVENT_STREAM = "RESPONSE_NOT_EVENT_STREAM"
+
+    # The rendered contract -- one code per element of the grammar, because
+    # each is produced by a different function on the server and so can move
+    # independently. Recorded 2026-09-05: a watcher scraping the cursor with a
+    # regex for ``nextCursor`` never matched the real footer, which spells it
+    # ``next cursor:``. It advanced no cursor and silently replayed the same
+    # events forever, and a single MALFORMED_RESPONSE code would not have said
+    # which half was wrong.
+    EVENT_LINE_MALFORMED = "EVENT_LINE_MALFORMED"
+    FOOTER_MISSING = "FOOTER_MISSING"
+    FOOTER_MALFORMED = "FOOTER_MALFORMED"
+
+
 __all__ = [
+    "BoardWatchErrorCode",
     "CalendarErrorCode",
     "EmailErrorCode",
     "ErrorCode",
