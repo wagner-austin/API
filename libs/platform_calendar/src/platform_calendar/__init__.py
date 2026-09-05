@@ -107,8 +107,6 @@ from platform_calendar.fakes import (
 )
 from platform_calendar.testing import (
     CalendarClientProtocol,
-    ConsoleInputHook,
-    ConsoleOutputHook,
     HooksContainer,
     HTTPErrorProtocol,
     hooks,
@@ -161,8 +159,6 @@ __all__ = [
     "CalendarListItem",
     "CompetitionSource",
     "CompetitionsFile",
-    "ConsoleInputHook",
-    "ConsoleOutputHook",
     "EventDateTime",
     "EventReminders",
     "EventStatus",

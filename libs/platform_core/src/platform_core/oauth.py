@@ -36,17 +36,6 @@ from platform_core.oauth_types import (
 )
 
 # =============================================================================
-# Hook Type Definitions
-# =============================================================================
-
-HttpPostHook = Callable[[str, dict[str, str], str], str]
-"""HTTP POST function: (url, headers, body) -> response_body."""
-
-CurrentTimeHook = Callable[[], int]
-"""Returns current Unix timestamp in seconds."""
-
-
-# =============================================================================
 # PKCE (Proof Key for Code Exchange)
 # =============================================================================
 
@@ -203,7 +192,7 @@ def exchange_authorization_code(
     code: str,
     code_verifier: str,
     *,
-    http_post: HttpPostHook,
+    http_post: Callable[[str, dict[str, str], str], str],
     current_time: int,
 ) -> OAuthTokens:
     """Exchange authorization code for access and refresh tokens.
@@ -269,7 +258,7 @@ def refresh_access_token(
     credentials: OAuthCredentials,
     refresh_token: str,
     *,
-    http_post: HttpPostHook,
+    http_post: Callable[[str, dict[str, str], str], str],
     current_time: int,
 ) -> OAuthTokens:
     """Refresh an expired access token.
@@ -333,7 +322,7 @@ def _post_to_token_endpoint(
     headers: dict[str, str],
     body: str,
     *,
-    http_post: HttpPostHook,
+    http_post: Callable[[str, dict[str, str], str], str],
     error_code: OAuthErrorCode,
     error_prefix: str,
 ) -> str:
@@ -400,8 +389,6 @@ def _decode_token_response(
 
 
 __all__ = [
-    "CurrentTimeHook",
-    "HttpPostHook",
     "build_authorization_url",
     "exchange_authorization_code",
     "expires_at_is_past",

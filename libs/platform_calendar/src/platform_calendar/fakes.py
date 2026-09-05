@@ -6,6 +6,8 @@ The hooks container and protocols live in
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.hook_fakes import (
     make_fake_console,
@@ -25,8 +27,6 @@ from platform_core.oauth_types import (
 
 from platform_calendar.testing import (
     CalendarClientProtocol,
-    LoadCredentialsHook,
-    LoadTokensHook,
 )
 from platform_calendar.types import (
     CalendarEvent,
@@ -319,7 +319,7 @@ class FakeCalendarClient(CalendarClientProtocol):
 # =============================================================================
 
 
-def make_fake_tokens(tokens: OAuthTokens) -> LoadTokensHook:
+def make_fake_tokens(tokens: OAuthTokens) -> Callable[[], OAuthTokens | None]:
     """Create a hook that returns fixed tokens."""
 
     def _hook() -> OAuthTokens | None:
@@ -328,7 +328,7 @@ def make_fake_tokens(tokens: OAuthTokens) -> LoadTokensHook:
     return _hook
 
 
-def make_fake_no_tokens() -> LoadTokensHook:
+def make_fake_no_tokens() -> Callable[[], OAuthTokens | None]:
     """Create a hook that returns None (no cached tokens)."""
 
     def _hook() -> OAuthTokens | None:
@@ -337,7 +337,7 @@ def make_fake_no_tokens() -> LoadTokensHook:
     return _hook
 
 
-def make_fake_credentials(creds: OAuthCredentials) -> LoadCredentialsHook:
+def make_fake_credentials(creds: OAuthCredentials) -> Callable[[], OAuthCredentials]:
     """Create a hook that returns fixed credentials."""
 
     def _hook() -> OAuthCredentials:

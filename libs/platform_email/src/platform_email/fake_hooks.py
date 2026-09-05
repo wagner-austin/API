@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal
 
 from platform_core.hook_fakes import (
@@ -16,12 +17,6 @@ from platform_core.hook_fakes import (
     make_raising_http_send,
 )
 
-from platform_email.testing import (
-    GetPathHook,
-    LoadGmailCredentialsHook,
-    LoadOutlookConfigHook,
-    LoadOutlookTokensHook,
-)
 from platform_email.types import (
     Attachment,
     BodyType,
@@ -36,14 +31,14 @@ from platform_email.types import (
 )
 
 
-def make_fake_tokens(tokens: OAuthTokens) -> LoadOutlookTokensHook:
+def make_fake_tokens(tokens: OAuthTokens) -> Callable[[], OAuthTokens | None]:
     """Create a hook that returns fixed tokens.
 
     Args:
         tokens: Tokens to return.
 
     Returns:
-        LoadTokensHook that returns the tokens.
+        A hook that answers with the tokens.
     """
 
     def _hook() -> OAuthTokens | None:
@@ -52,11 +47,11 @@ def make_fake_tokens(tokens: OAuthTokens) -> LoadOutlookTokensHook:
     return _hook
 
 
-def make_fake_no_tokens() -> LoadOutlookTokensHook:
+def make_fake_no_tokens() -> Callable[[], OAuthTokens | None]:
     """Create a hook that returns None (no cached tokens).
 
     Returns:
-        LoadTokensHook that returns None.
+        A hook that answers with no tokens.
     """
 
     def _hook() -> OAuthTokens | None:
@@ -65,14 +60,14 @@ def make_fake_no_tokens() -> LoadOutlookTokensHook:
     return _hook
 
 
-def make_fake_outlook_config(config: OutlookOAuthConfig) -> LoadOutlookConfigHook:
+def make_fake_outlook_config(config: OutlookOAuthConfig) -> Callable[[], OutlookOAuthConfig]:
     """Create a hook that returns fixed Outlook config.
 
     Args:
         config: Config to return.
 
     Returns:
-        LoadOutlookConfigHook that returns the config.
+        Callable[[], OutlookOAuthConfig] that returns the config.
     """
 
     def _hook() -> OutlookOAuthConfig:
@@ -81,14 +76,14 @@ def make_fake_outlook_config(config: OutlookOAuthConfig) -> LoadOutlookConfigHoo
     return _hook
 
 
-def make_fake_gmail_credentials(creds: OAuthCredentials) -> LoadGmailCredentialsHook:
+def make_fake_gmail_credentials(creds: OAuthCredentials) -> Callable[[], OAuthCredentials]:
     """Create a hook that returns fixed Gmail credentials.
 
     Args:
         creds: Credentials to return.
 
     Returns:
-        LoadGmailCredentialsHook that returns the credentials.
+        Callable[[], OAuthCredentials] that returns the credentials.
     """
 
     def _hook() -> OAuthCredentials:
@@ -97,14 +92,14 @@ def make_fake_gmail_credentials(creds: OAuthCredentials) -> LoadGmailCredentials
     return _hook
 
 
-def make_fake_path(path: str) -> GetPathHook:
+def make_fake_path(path: str) -> Callable[[], str]:
     """Create a hook that returns a fixed path.
 
     Args:
         path: Path string to return.
 
     Returns:
-        GetPathHook that returns the path.
+        Callable[[], str] that returns the path.
     """
 
     def _hook() -> str:

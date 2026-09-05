@@ -302,36 +302,6 @@ class FakeHTTPError(OSError):
 
 
 # =============================================================================
-# Hook Type Definitions
-# =============================================================================
-
-HttpGetHook = Callable[[str, dict[str, str]], str]
-HttpPostHook = Callable[[str, dict[str, str], str], str]
-HttpPatchHook = Callable[[str, dict[str, str], str], str]
-HttpDeleteHook = Callable[[str, dict[str, str]], None]
-LoadOutlookTokensHook = Callable[[], OAuthTokens | None]
-SaveOutlookTokensHook = Callable[[OAuthTokens], None]
-LoadOutlookConfigHook = Callable[[], OutlookOAuthConfig]
-LoadGmailTokensHook = Callable[[], OAuthTokens | None]
-SaveGmailTokensHook = Callable[[OAuthTokens], None]
-LoadGmailCredentialsHook = Callable[[], OAuthCredentials]
-OpenBrowserHook = Callable[[str], None]
-CurrentTimeHook = Callable[[], int]
-ReadFileHook = Callable[[str], str]
-ReadFileBytesHook = Callable[[str], bytes]
-WriteFileHook = Callable[[str, str], None]
-FileExistsHook = Callable[[str], bool]
-ConsoleOutputHook = Callable[[str], None]
-ConsoleInputHook = Callable[[str], str]
-GetPathHook = Callable[[], str]
-
-# CLI-specific hooks
-CliGetEnvHook = Callable[[str], str | None]
-CliSetEnvHook = Callable[[str, str], None]
-CliGetNowHook = Callable[[], datetime]
-
-
-# =============================================================================
 # Hooks Container
 # =============================================================================
 
@@ -339,33 +309,32 @@ CliGetNowHook = Callable[[], datetime]
 class HooksContainer:
     """Container for dependency injection hooks."""
 
-    http_get: HttpGetHook
-    http_post: HttpPostHook
-    http_patch: HttpPatchHook
-    http_delete: HttpDeleteHook
-    load_outlook_tokens: LoadOutlookTokensHook
-    save_outlook_tokens: SaveOutlookTokensHook
-    load_outlook_config: LoadOutlookConfigHook
-    load_gmail_tokens: LoadGmailTokensHook
-    save_gmail_tokens: SaveGmailTokensHook
-    load_gmail_credentials: LoadGmailCredentialsHook
-    open_browser: OpenBrowserHook
-    current_time: CurrentTimeHook
-    read_file: ReadFileHook
-    read_file_bytes: ReadFileBytesHook
-    write_file: WriteFileHook
-    file_exists: FileExistsHook
-    console_output: ConsoleOutputHook
-    console_input: ConsoleInputHook
-    outlook_tokens_path: GetPathHook
-    outlook_credentials_path: GetPathHook
-    gmail_tokens_path: GetPathHook
-    gmail_credentials_path: GetPathHook
+    http_get: Callable[[str, dict[str, str]], str]
+    http_post: Callable[[str, dict[str, str], str], str]
+    http_patch: Callable[[str, dict[str, str], str], str]
+    http_delete: Callable[[str, dict[str, str]], None]
+    load_outlook_tokens: Callable[[], OAuthTokens | None]
+    save_outlook_tokens: Callable[[OAuthTokens], None]
+    load_outlook_config: Callable[[], OutlookOAuthConfig]
+    load_gmail_tokens: Callable[[], OAuthTokens | None]
+    save_gmail_tokens: Callable[[OAuthTokens], None]
+    load_gmail_credentials: Callable[[], OAuthCredentials]
+    open_browser: Callable[[str], None]
+    current_time: Callable[[], int]
+    read_file: Callable[[str], str]
+    read_file_bytes: Callable[[str], bytes]
+    write_file: Callable[[str, str], None]
+    file_exists: Callable[[str], bool]
+    console_output: Callable[[str], None]
+    console_input: Callable[[str], str]
+    outlook_tokens_path: Callable[[], str]
+    outlook_credentials_path: Callable[[], str]
+    gmail_tokens_path: Callable[[], str]
+    gmail_credentials_path: Callable[[], str]
 
-    # CLI-specific hooks
-    cli_get_env: CliGetEnvHook
-    cli_set_env: CliSetEnvHook
-    cli_get_now: CliGetNowHook
+    cli_get_env: Callable[[str], str | None]
+    cli_set_env: Callable[[str, str], None]
+    cli_get_now: Callable[[], datetime]
 
     def reset(self) -> None:
         """Restore every hook to its production implementation.
@@ -435,32 +404,10 @@ def reset_hooks() -> None:
 
 
 __all__ = [
-    "CliGetEnvHook",
-    "CliGetNowHook",
-    "CliSetEnvHook",
-    "ConsoleInputHook",
-    "ConsoleOutputHook",
-    "CurrentTimeHook",
     "EmailClientProtocol",
     "FakeHTTPError",
-    "FileExistsHook",
-    "GetPathHook",
     "HTTPErrorProtocol",
     "HooksContainer",
-    "HttpDeleteHook",
-    "HttpGetHook",
-    "HttpPatchHook",
-    "HttpPostHook",
-    "LoadGmailCredentialsHook",
-    "LoadGmailTokensHook",
-    "LoadOutlookConfigHook",
-    "LoadOutlookTokensHook",
-    "OpenBrowserHook",
-    "ReadFileBytesHook",
-    "ReadFileHook",
-    "SaveGmailTokensHook",
-    "SaveOutlookTokensHook",
-    "WriteFileHook",
     "hooks",
     "reset_hooks",
 ]

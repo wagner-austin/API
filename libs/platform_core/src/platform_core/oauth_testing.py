@@ -9,8 +9,9 @@ Services use _test_hooks.py for internal dependency injection.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from platform_core.json_utils import dump_json_str
-from platform_core.oauth import CurrentTimeHook, HttpPostHook
 from platform_core.oauth_types import OAuthCredentials, OAuthTokenResponse, OAuthTokens
 
 # =============================================================================
@@ -18,14 +19,14 @@ from platform_core.oauth_types import OAuthCredentials, OAuthTokenResponse, OAut
 # =============================================================================
 
 
-def make_fake_http_post(response: str) -> HttpPostHook:
+def make_fake_http_post(response: str) -> Callable[[str, dict[str, str], str], str]:
     """Create an HTTP POST hook that returns a fixed response.
 
     Args:
         response: Response body to return for all requests.
 
     Returns:
-        HttpPostHook that returns the fixed response.
+        A hook answering with the fixed response.
     """
 
     def _hook(url: str, headers: dict[str, str], body: str) -> str:
@@ -35,14 +36,14 @@ def make_fake_http_post(response: str) -> HttpPostHook:
     return _hook
 
 
-def make_raising_http_post(exc: BaseException) -> HttpPostHook:
+def make_raising_http_post(exc: BaseException) -> Callable[[str, dict[str, str], str], str]:
     """Create an HTTP POST hook that raises an exception.
 
     Args:
         exc: Exception to raise on each request.
 
     Returns:
-        HttpPostHook that raises the exception.
+        A hook that raises the exception.
     """
 
     def _hook(url: str, headers: dict[str, str], body: str) -> str:
@@ -52,7 +53,9 @@ def make_raising_http_post(exc: BaseException) -> HttpPostHook:
     return _hook
 
 
-def make_sequenced_http_post(responses: list[str | BaseException]) -> HttpPostHook:
+def make_sequenced_http_post(
+    responses: list[str | BaseException],
+) -> Callable[[str, dict[str, str], str], str]:
     """Create an HTTP POST hook that returns different responses in sequence.
 
     Useful for testing retry logic or multi-step flows where different
@@ -62,7 +65,7 @@ def make_sequenced_http_post(responses: list[str | BaseException]) -> HttpPostHo
         responses: List of responses or exceptions to return/raise in order.
 
     Returns:
-        HttpPostHook that cycles through the responses.
+        A hook cycling through the responses.
     """
     call_count = [0]
 
@@ -88,14 +91,14 @@ def make_sequenced_http_post(responses: list[str | BaseException]) -> HttpPostHo
 # =============================================================================
 
 
-def make_fake_current_time(timestamp: int) -> CurrentTimeHook:
+def make_fake_current_time(timestamp: int) -> Callable[[], int]:
     """Create a current time hook that returns a fixed timestamp.
 
     Args:
         timestamp: Unix timestamp to return.
 
     Returns:
-        CurrentTimeHook that returns the fixed timestamp.
+        A hook answering with the fixed timestamp.
     """
 
     def _hook() -> int:
@@ -104,7 +107,7 @@ def make_fake_current_time(timestamp: int) -> CurrentTimeHook:
     return _hook
 
 
-def make_advancing_current_time(start: int, increment: int = 1) -> CurrentTimeHook:
+def make_advancing_current_time(start: int, increment: int = 1) -> Callable[[], int]:
     """Create a current time hook that advances on each call.
 
     Useful for testing token expiry with multiple time-sensitive operations.
@@ -114,7 +117,7 @@ def make_advancing_current_time(start: int, increment: int = 1) -> CurrentTimeHo
         increment: Amount to add on each subsequent call.
 
     Returns:
-        CurrentTimeHook that advances time on each call.
+        A hook advancing time on each call.
     """
     current = [start]
 

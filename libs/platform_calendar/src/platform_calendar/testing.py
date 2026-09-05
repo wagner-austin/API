@@ -213,37 +213,6 @@ class HTTPErrorProtocol(Protocol):
 
 
 # =============================================================================
-# Hook Type Definitions
-# =============================================================================
-
-HttpGetHook = Callable[[str, dict[str, str]], str]
-HttpPostHook = Callable[[str, dict[str, str], str], str]
-HttpPatchHook = Callable[[str, dict[str, str], str], str]
-HttpDeleteHook = Callable[[str, dict[str, str]], None]
-LoadTokensHook = Callable[[], OAuthTokens | None]
-SaveTokensHook = Callable[[OAuthTokens], None]
-LoadCredentialsHook = Callable[[], OAuthCredentials]
-OpenBrowserHook = Callable[[str], None]
-CurrentTimeHook = Callable[[], int]
-ReadFileHook = Callable[[str], str]
-WriteFileHook = Callable[[str, str], None]
-FileExistsHook = Callable[[str], bool]
-ConsoleOutputHook = Callable[[str], None]
-ConsoleInputHook = Callable[[str], str]
-
-# CLI-specific hooks
-CliApiGetHook = Callable[[str, str], JSONObject]
-CliApiPostHook = Callable[[str, str, JSONObject], JSONObject]
-CliApiDeleteHook = Callable[[str, str], None]
-CliGetEnvHook = Callable[[str], str | None]
-CliSetEnvHook = Callable[[str, str], None]
-CliGetNowHook = Callable[[], datetime]
-CliPromptAskHook = Callable[[str], str]
-CliConfirmAskHook = Callable[[str], bool]
-CliGetConsoleHook = Callable[[], Console]
-
-
-# =============================================================================
 # Hooks Container
 # =============================================================================
 
@@ -251,31 +220,30 @@ CliGetConsoleHook = Callable[[], Console]
 class HooksContainer:
     """Container for dependency injection hooks."""
 
-    http_get: HttpGetHook
-    http_post: HttpPostHook
-    http_patch: HttpPatchHook
-    http_delete: HttpDeleteHook
-    load_tokens: LoadTokensHook
-    save_tokens: SaveTokensHook
-    load_credentials: LoadCredentialsHook
-    open_browser: OpenBrowserHook
-    current_time: CurrentTimeHook
-    read_file: ReadFileHook
-    write_file: WriteFileHook
-    file_exists: FileExistsHook
-    console_output: ConsoleOutputHook
-    console_input: ConsoleInputHook
+    http_get: Callable[[str, dict[str, str]], str]
+    http_post: Callable[[str, dict[str, str], str], str]
+    http_patch: Callable[[str, dict[str, str], str], str]
+    http_delete: Callable[[str, dict[str, str]], None]
+    load_tokens: Callable[[], OAuthTokens | None]
+    save_tokens: Callable[[OAuthTokens], None]
+    load_credentials: Callable[[], OAuthCredentials]
+    open_browser: Callable[[str], None]
+    current_time: Callable[[], int]
+    read_file: Callable[[str], str]
+    write_file: Callable[[str, str], None]
+    file_exists: Callable[[str], bool]
+    console_output: Callable[[str], None]
+    console_input: Callable[[str], str]
 
-    # CLI-specific hooks
-    cli_api_get: CliApiGetHook
-    cli_api_post: CliApiPostHook
-    cli_api_delete: CliApiDeleteHook
-    cli_get_env: CliGetEnvHook
-    cli_set_env: CliSetEnvHook
-    cli_get_now: CliGetNowHook
-    cli_prompt_ask: CliPromptAskHook
-    cli_confirm_ask: CliConfirmAskHook
-    cli_get_console: CliGetConsoleHook
+    cli_api_get: Callable[[str, str], JSONObject]
+    cli_api_post: Callable[[str, str, JSONObject], JSONObject]
+    cli_api_delete: Callable[[str, str], None]
+    cli_get_env: Callable[[str], str | None]
+    cli_set_env: Callable[[str, str], None]
+    cli_get_now: Callable[[], datetime]
+    cli_prompt_ask: Callable[[str], str]
+    cli_confirm_ask: Callable[[str], bool]
+    cli_get_console: Callable[[], Console]
 
     def reset(self) -> None:
         """Restore every hook to its production implementation.
@@ -344,22 +312,8 @@ def reset_hooks() -> None:
 
 __all__ = [
     "CalendarClientProtocol",
-    "ConsoleInputHook",
-    "ConsoleOutputHook",
-    "CurrentTimeHook",
-    "FileExistsHook",
     "HTTPErrorProtocol",
     "HooksContainer",
-    "HttpDeleteHook",
-    "HttpGetHook",
-    "HttpPatchHook",
-    "HttpPostHook",
-    "LoadCredentialsHook",
-    "LoadTokensHook",
-    "OpenBrowserHook",
-    "ReadFileHook",
-    "SaveTokensHook",
-    "WriteFileHook",
     "hooks",
     "reset_hooks",
 ]
