@@ -10,7 +10,7 @@ related:
 source_paths:
   - "runs/bot"
   - "runs/sniff"
-fact_checked: "2026-08-01"
+fact_checked: "2026-09-05"
 confidence: high
 hubs: [protocol]
 ---
@@ -137,6 +137,28 @@ container 30 tiles out through two confirmed pans and refuels. This
 does NOT reopen the walking-as-travel question: the gait exists only
 on the marooned rung, under the 48-tile walk cap, where teleporting
 is arithmetically impossible.
+
+**Third doctrine consumer (2026-09-05): the forage frontier pan**
+(`bot/ai/forage.py::_frontier_pan`). The zero-extras frontier walk was
+built 2026-08-14 on the sliding-window model this page falsifies — it
+walked toward the window edge facing the richest uncovered band
+believing "the window slides with the tank". With autoscroll pinned
+OFF it never does, so once the tank stood ON the facing edge tile the
+walk target WAS its own tile, and the acceptance boundary answered
+every re-dispatch with `0x52 err=6` ("You are already there"): run
+demo-1 2026-09-05 17:48:25–19:00 replayed the identical
+`move -> (239,48)` from (239,48) — the NE corner of window (224,48) —
+395 times over 72 minutes, starving every rung below it. Two fixes,
+both in commit `74b4c42b` (API): the frontier now spends a free
+cardinal pan toward the band when its walk target is the tank's own
+tile (a cardinal pan from the facing edge always shifts under the
+anchor law, revealing 15 fresh tiles), and code 6 joined the `move`
+whitelist in `_COMMAND_ERROR_APPLICABILITY` — the bot holds during a
+move wait and never re-sends, so a 6 there can only mean the move is a
+no-op that will never resolve; it now rejects the action and
+tombstones the tile. A zero-length plain move is also refused at both
+planner emitters (`movement.py::_direct_move_command` and the
+terrain-less `walk_or_teleport` tail).
 
 **The scope-pending radar drop (2026-08-20, FIXED same day):** a `radar`
 dispatched while an `Rb` awaits its 0x5A is **silently dropped by the

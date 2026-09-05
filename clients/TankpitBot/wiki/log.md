@@ -6293,3 +6293,37 @@ image gains xvfb + ffmpeg; the display number is the child's own
 service port. `Bot` refuses `headless=True` with a stream config — a
 capture without a rendered window is a contradiction said at
 construction, not a black demo discovered in production.
+
+---
+
+## [2026-09-05] update | Frontier stuck-loop autopsy — the window never slides on a walk
+
+Operator flag: the demo bot "keeps saying you are already there — it's
+trying to go where it is, stuck in a loop, no loop break." Autopsy on
+run demo-1 (17:48:25–19:00): the zero-extras forage frontier walked to
+the window edge facing the richest uncovered band, arrived at
+(239,48) — the NE corner of window (224,48) — and then re-dispatched
+`move -> (239,48)` every ~2 s for 72 minutes, 395 times. Every
+dispatch drew `0x52 err=6` ("You are already there"), and every 6 was
+orphan-discarded because the move whitelist deliberately excluded it
+as "informational", so the tile was never marked failed and the
+identical plan re-derived forever.
+
+Root cause: the frontier walk (2026-08-14) was built on the
+sliding-window model that [[viewport-shift-protocol]] falsifies —
+with autoscroll pinned OFF the window only moves on a teleport or a
+free `Rb` pan, never on a walk. The identical failure shape was
+already cured once on the marooned rung (2026-08-25 pan-walk gait);
+the frontier never got the pan.
+
+Fix (API commit `74b4c42b`, deployed as `v0.1.0-74b4c42b`): the
+frontier spends a free cardinal pan toward the band when its walk
+target is the tank's own tile; `SUPERVISOR_ERROR_ALREADY_THERE` joined
+the move whitelist so a 6 on a move wait rejects the action and
+tombstones the tile (the loop break); zero-length plain moves are
+refused at both planner emitters. Pages updated:
+[[viewport-shift-protocol]] (third doctrine consumer + acceptance
+boundary consequences). The frontier tests' fixture blind spot — the
+default world centers the window on the tank, so no test could ever
+place the tank on an edge — is closed by `TestFrontierPan`, which
+rewrites the viewport placement directly.
