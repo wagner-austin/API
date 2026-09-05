@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TypedDict
 
 # =============================================================================
@@ -18,6 +19,7 @@ from platform_core.cli_args import (
     namespace_int,
     namespace_str,
     namespace_str_tuple,
+    run_subcommand_cli,
 )
 
 from platform_email.cli_auth import STYLE_ERROR, _print
@@ -211,10 +213,7 @@ def _dispatch_command(command_str: str, args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Main entry point."""
-    parser = _build_parser()
-    args = parser.parse_args()
-    command_str = namespace_str(args, "command", "")
-    _dispatch_command(command_str, args)
+    run_subcommand_cli(sys.argv[1:], build_parser=_build_parser, dispatch=_dispatch_command)
 
 
 if __name__ == "__main__":

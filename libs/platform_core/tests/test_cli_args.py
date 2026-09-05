@@ -16,6 +16,7 @@ from platform_core.cli_args import (
     namespace_str_tuple,
     parse_single_flags,
     require_flag,
+    run_subcommand_cli,
     take_value,
     usage_text,
 )
@@ -217,3 +218,86 @@ class TestNamespaceReaders:
         string, and iterating it would attach one file per character."""
         with pytest.raises(ValueError, match="expected list of str"):
             namespace_str_tuple(argparse.Namespace(attach="a.txt"), "attach")
+
+
+class TestRunSubcommandCli:
+    """The four lines two entry points each spelled for themselves."""
+
+    @staticmethod
+    def _build() -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(prog="demo")
+        subparsers = parser.add_subparsers(dest="command")
+        listing = subparsers.add_parser("list", aliases=["ls"])
+        listing.add_argument("-n", "--count", type=int, default=10)
+        return parser
+
+    def test_the_named_subcommand_reaches_the_dispatcher(self) -> None:
+        seen: list[str] = []
+
+        run_subcommand_cli(
+            ["list"],
+            build_parser=self._build,
+            dispatch=lambda command, _args: seen.append(command),
+        )
+
+        assert seen == ["list"]
+
+    def test_an_alias_arrives_as_itself_not_as_its_target(self) -> None:
+        """Both commands dispatch on membership in a tuple of aliases, so the
+        alias must not be resolved on the way in."""
+        seen: list[str] = []
+
+        run_subcommand_cli(
+            ["ls"],
+            build_parser=self._build,
+            dispatch=lambda command, _args: seen.append(command),
+        )
+
+        assert seen == ["ls"]
+
+    def test_no_subcommand_at_all_dispatches_the_empty_string(self) -> None:
+        """argparse leaves `command` None, and both commands rely on reaching
+        their default view rather than crashing on the attribute."""
+        seen: list[str] = []
+
+        run_subcommand_cli(
+            [],
+            build_parser=self._build,
+            dispatch=lambda command, _args: seen.append(command),
+        )
+
+        assert seen == [""]
+
+    def test_the_parsed_namespace_reaches_the_dispatcher_too(self) -> None:
+        """The dispatcher decodes the subcommand's own flags out of it."""
+        counts: list[int] = []
+
+        run_subcommand_cli(
+            ["list", "-n", "3"],
+            build_parser=self._build,
+            dispatch=lambda _command, args: counts.append(namespace_int(args, "count", 10)),
+        )
+
+        assert counts == [3]
+
+    def test_the_parser_is_built_once(self) -> None:
+        builds: list[argparse.ArgumentParser] = []
+
+        def _counting_build() -> argparse.ArgumentParser:
+            parser = self._build()
+            builds.append(parser)
+            return parser
+
+        run_subcommand_cli(["list"], build_parser=_counting_build, dispatch=lambda _c, _a: None)
+
+        assert len(builds) == 1
+
+    def test_an_unknown_subcommand_is_refused_by_argparse(self) -> None:
+        """The dispatcher never sees it: a mistyped subcommand exits rather
+        than falling through to whichever branch the dispatcher ends on."""
+        with pytest.raises(SystemExit):
+            run_subcommand_cli(
+                ["lst"],
+                build_parser=self._build,
+                dispatch=lambda _c, _a: None,
+            )

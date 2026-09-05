@@ -19,7 +19,7 @@ one is a different corpus; both would otherwise proceed and report success.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Final
 
 HELP_FLAGS: Final[tuple[str, ...]] = ("--help", "-h")
@@ -295,6 +295,37 @@ def namespace_str_tuple(ns: argparse.Namespace, key: str) -> tuple[str, ...]:
     return tuple(value)
 
 
+def run_subcommand_cli(
+    argv: Sequence[str],
+    *,
+    build_parser: Callable[[], argparse.ArgumentParser],
+    dispatch: Callable[[str, argparse.Namespace], None],
+) -> None:
+    """Run a CLI whose first positional argument names the subcommand.
+
+    Two entry points spelled this identically -- build the parser, parse,
+    read ``command``, dispatch -- and the piece worth holding in one place is
+    the last one: an invocation with NO subcommand leaves ``command`` set to
+    None, and it reaches the dispatcher as the empty string rather than
+    crashing on the attribute. Both commands rely on that to show a default
+    view, and neither said so.
+
+    ``argv`` is passed rather than read here so that a caller supplies
+    ``sys.argv[1:]`` at the boundary and a test supplies its own tokens. A
+    default reading the process's arguments would make the tokens invisible
+    at the one place they are chosen.
+
+    Args:
+        argv: The command-line tokens, WITHOUT the program name.
+        build_parser: Builds the parser, including its subparsers. Called once.
+        dispatch: Receives the subcommand name -- "" when none was given --
+            and the parsed namespace, and runs the command.
+    """
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    dispatch(namespace_str(args, "command", ""), args)
+
+
 __all__ = [
     "HELP_FLAGS",
     "HelpRequestedError",
@@ -305,6 +336,7 @@ __all__ = [
     "namespace_str_tuple",
     "parse_single_flags",
     "require_flag",
+    "run_subcommand_cli",
     "take_value",
     "usage_text",
 ]

@@ -76,12 +76,6 @@ branch = true
 precision = 2
 show_missing = true
 fail_under = 100
-exclude_lines = [
-    "if __name__ == .__main__.:",
-    "def main\\(\\) -> None:",
-    "\\.\\.\\.",
-    "@runtime_checkable",
-]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

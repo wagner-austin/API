@@ -4,10 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timedelta
 from typing import TypedDict
 
-from platform_core.cli_args import namespace_int, namespace_str, namespace_str_or_none
+from platform_core.cli_args import (
+    namespace_int,
+    namespace_str,
+    namespace_str_or_none,
+    run_subcommand_cli,
+)
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -447,7 +453,4 @@ def _dispatch_command(command_str: str, args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Main entry point."""
-    parser = _build_parser()
-    args = parser.parse_args()
-    command_str = namespace_str(args, "command", "")
-    _dispatch_command(command_str, args)
+    run_subcommand_cli(sys.argv[1:], build_parser=_build_parser, dispatch=_dispatch_command)

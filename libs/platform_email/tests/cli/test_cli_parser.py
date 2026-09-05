@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import runpy
+import sys
 from collections.abc import Generator
 from datetime import datetime
 
@@ -433,17 +435,70 @@ class TestDispatchCommand:
 
 
 class TestMain:
-    """Tests for main function."""
+    """The console-script entry point, called for real.
 
-    def test_main_dispatches_to_command(self) -> None:
-        """Test main parses args and dispatches to command.
+    What stood here reimplemented main's body in the test and asserted on the
+    reimplementation -- its own docstring said so -- while a coverage
+    exclusion for ``def main() -> None:`` kept the package at 100% without
+    the entry point ever running. Both are gone.
+    """
 
-        Since main() uses sys.argv directly, we test the components separately.
-        The _build_parser and _dispatch_command functions are tested above.
+    @staticmethod
+    def _run(*tokens: str) -> list[str]:
+        """Run main with the given command line, returning what it printed.
+
+        Args:
+            *tokens: Arguments as a shell would pass them, without the
+                program name.
+
+        Returns:
+            Every line the CLI wrote to the console.
         """
-        # Verify the main function exists and is callable
-        parser = cli._build_parser()
-        args = parser.parse_args(["folders"])
-        # Dispatch would be called with these args
-        command = namespace_str(args, "command", "")
-        assert command == "folders"
+        messages: list[str] = []
+        hooks.cli_get_env = lambda k: None
+        hooks.console_output = lambda m: messages.append(m)
+
+        original = sys.argv
+        sys.argv = ["email", *tokens]
+        try:
+            cli.main()
+        finally:
+            sys.argv = original
+        return messages
+
+    def test_a_named_subcommand_runs(self) -> None:
+        assert "Not authenticated" in " ".join(self._run("folders"))
+
+    def test_no_subcommand_runs_the_default_view(self) -> None:
+        """argparse leaves `command` None here, and the dispatcher's final
+        branch turns that into the inbox listing."""
+        assert "Not authenticated" in " ".join(self._run())
+
+    def test_a_subcommand_flag_reaches_the_command(self) -> None:
+        """`-n` is parsed by the subparser, so this proves main hands the
+        whole namespace on rather than only the command name."""
+        assert "Not authenticated" in " ".join(self._run("list", "-n", "3"))
+
+    def test_a_mistyped_subcommand_exits_rather_than_running_the_default(self) -> None:
+        """Falling through to the dispatcher's final branch would list the
+        inbox for someone who asked for something else entirely."""
+        with pytest.raises(SystemExit):
+            self._run("foldres")
+
+    def test_running_the_module_directly_reaches_main(self) -> None:
+        """`python -m platform_email.cli` is a supported invocation and the
+        guard requires the __main__ block, so the block itself is exercised
+        rather than excluded from coverage."""
+        messages: list[str] = []
+        hooks.cli_get_env = lambda k: None
+        hooks.console_output = lambda m: messages.append(m)
+
+        original = list(sys.argv)
+        sys.argv[:] = ["email", "folders"]
+        sys.modules.pop("platform_email.cli", None)
+        try:
+            runpy.run_module("platform_email.cli", run_name="__main__")
+        finally:
+            sys.argv[:] = original
+
+        assert "Not authenticated" in " ".join(messages)
