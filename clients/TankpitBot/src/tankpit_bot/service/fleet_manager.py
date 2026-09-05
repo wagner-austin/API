@@ -445,22 +445,18 @@ class FleetManager:
         if instance not in self._bots:
             raise FleetError(f"unknown instance {instance!r}")
 
-    def live_service_port(self, instance: str) -> int:
-        """Return the service port of a RUNNING instance.
+    def require_running(self, instance: str) -> None:
+        """Refuse unless ``instance`` is registered and still running.
 
-        Liveness is part of the answer, not a courtesy check. A dead
-        bot's port goes straight back into circulation
-        (:meth:`_allocate_service_port` reserves live children only), so
-        by the time anyone asks about a finished instance that number
-        may already belong to a different bot. Relaying to it would
-        serve one bot's video under another's name -- the exact
-        confusion the allocator exists to prevent.
+        The gate in front of serving an instance's video files. A dead
+        bot's HLS directory still holds its final segments, and its
+        name may soon belong to a fresh spawn writing new ones —
+        serving a picture under a name whose liveness nobody checked
+        is the exact confusion the old port allocator existed to
+        prevent, carried over to the on-disk world.
 
         Args:
             instance: Candidate instance name.
-
-        Returns:
-            The port this instance's own service is serving on.
 
         Raises:
             FleetError: If the instance is unregistered, or is
@@ -471,7 +467,6 @@ class FleetManager:
             raise FleetError(f"unknown instance {instance!r}")
         if not bot.process.is_running():
             raise FleetError(f"instance {instance!r} is not running")
-        return bot.service_port
 
     def stats(self, instance: str) -> JSONObject:
         """Summarize a registered instance's latest run from its events.

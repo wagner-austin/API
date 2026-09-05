@@ -17,6 +17,7 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.analysis import _test_hooks as analysis_test_hooks
 from tankpit_bot.replay import _test_hooks as replay_test_hooks
+from tankpit_bot.stream import _test_hooks as stream_test_hooks
 
 
 class FakeCDPSessionSimple:
@@ -152,13 +153,10 @@ def _noop_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
 def _restore_hooks() -> Generator[None, None, None]:
     """Reset all shared test hooks to canonical defaults for each test.
 
-    ``get_current_time_ms`` is in the list because a leaked frozen
-    clock is the nastiest cross-test poison: the scenarios harness
-    installs a scenario clock at construction, and any path that skips
-    ``close()`` used to freeze time for every later test on the same
-    xdist worker. Frozen dispatch stamps + capture-epoch decide clocks
-    made every replay enemy read as ``stale_map_data`` (the 4-test
-    replay flake diagnosed 2026-07-03).
+    ``get_current_time_ms`` is here because a leaked frozen clock is
+    the nastiest cross-test poison: a scenario clock surviving a
+    skipped ``close()`` froze time for every later test on the worker,
+    reading every replay enemy as stale (the 2026-07-03 replay flake).
     """
     _test_hooks.get_env = _test_hooks._default_get_env
     _test_hooks.get_current_time_ms = _test_hooks._real_get_current_time_ms
@@ -167,30 +165,31 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
     _test_hooks.remove_file = _test_hooks._real_remove_file
+    _test_hooks.read_bytes_from = _test_hooks._real_read_bytes_from
+    _test_hooks.child_environment = _test_hooks._real_child_environment
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
     _test_hooks.get_argv = _test_hooks._real_get_argv
-    # Watchdog hooks default to inert fakes in tests: a real daemon
-    # timer armed by one test would os._exit the xdist worker seconds
-    # later, killing unrelated tests. Tests that assert watchdog
-    # behavior install recording fakes explicitly.
+    # Watchdog hooks default to INERT fakes: a real daemon timer armed by
+    # one test would os._exit the xdist worker, killing unrelated tests.
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.kill_browser_processes = _unexpected_kill_browser_processes
     _test_hooks.resolve_build_ref = _fixed_resolve_build_ref
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
-    # The analysis layer owns its own seams (filesystem reads and
-    # archive enumeration). Restoring them here rather than in a
-    # per-file fixture keeps the single reset point this fixture's
-    # docstring describes.
+    # Package-local seams, reset here so this fixture stays the single
+    # reset point its docstring describes: the analysis layer's fs reads,
+    # the replay decode hook ([[session-state-deglobalisation]] step 8),
+    # and the capture pipeline's spawner + clocks (a leaked fake clock
+    # would hang the display-readiness wait, same poison class as above).
     analysis_test_hooks.reset_analysis_hooks()
-    # The replay decode hook lives in the replay package, not the
-    # process-wide one: it names WorldService, which _test_hooks cannot
-    # ([[session-state-deglobalisation]] step 8).
     replay_test_hooks.process_received_message_hook = (
         replay_test_hooks._real_process_received_message
     )
+    stream_test_hooks.spawn_capture_process = stream_test_hooks._real_spawn_capture_process
+    stream_test_hooks.monotonic_seconds = stream_test_hooks._real_monotonic_seconds
+    stream_test_hooks.sleep_seconds = stream_test_hooks._real_sleep_seconds
 
     yield
 
@@ -206,6 +205,8 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.append_text = _test_hooks._real_append_text
     _test_hooks.path_exists = _test_hooks._real_path_exists
     _test_hooks.remove_file = _test_hooks._real_remove_file
+    _test_hooks.read_bytes_from = _test_hooks._real_read_bytes_from
+    _test_hooks.child_environment = _test_hooks._real_child_environment
     _test_hooks.sync_playwright = None
     _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
@@ -213,6 +214,9 @@ def _restore_hooks() -> Generator[None, None, None]:
     replay_test_hooks.process_received_message_hook = (
         replay_test_hooks._real_process_received_message
     )
+    stream_test_hooks.spawn_capture_process = stream_test_hooks._real_spawn_capture_process
+    stream_test_hooks.monotonic_seconds = stream_test_hooks._real_monotonic_seconds
+    stream_test_hooks.sleep_seconds = stream_test_hooks._real_sleep_seconds
 
 
 @pytest.fixture(autouse=True)
@@ -253,15 +257,14 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     XOR table, the event counter, the outcome rings, the decision
     store, the mode-transition log, the outcome-pairing trackers, the
     teleport dispatch, the container blacklist, and the
-    client-structure survey. Every one of those is now an instance
-    attribute owned by the session that uses it, so constructing a
-    session IS the reset ([[session-state-deglobalisation]]).
+    client-structure survey. Each is now an instance attribute owned
+    by its session, so constructing one IS the reset
+    ([[session-state-deglobalisation]]).
 
-    What remains is ``reset_static_key_cache``: the XOR *static key* is
-    a process-wide constant read from disk, not per-session state, and
-    a test with a faked filesystem can poison it for later tests on the
-    same xdist worker. It stays because it is genuinely process-scoped
-    -- the exception that proves the rule rather than a leftover.
+    What remains is ``reset_static_key_cache``: the XOR *static key*
+    is a process-wide constant read from disk, not per-session state,
+    and a test with a faked filesystem can poison it for later tests
+    on the same xdist worker — genuinely process-scoped, not leftover.
     """
     from tankpit_bot.capture.xor import reset_static_key_cache
 

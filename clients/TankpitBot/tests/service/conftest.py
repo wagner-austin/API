@@ -16,7 +16,6 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.bus.frame_bus import FrameBus
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.status_bus import StatusBus
 from tankpit_bot.service import _test_hooks as service_hooks
@@ -39,12 +38,6 @@ async def bus() -> StatusBus:
 
 
 @pytest.fixture()
-async def fbus() -> FrameBus:
-    """Fresh :class:`FrameBus` per test."""
-    return FrameBus()
-
-
-@pytest.fixture()
 async def bridge() -> ModeBridge:
     """Fresh :class:`ModeBridge` per test."""
     return ModeBridge()
@@ -61,10 +54,9 @@ async def client(
     runner: _RecordingRunner,
     bridge: ModeBridge,
     bus: StatusBus,
-    fbus: FrameBus,
 ) -> AsyncIterator[TestClient[web.Request, web.Application]]:
-    """aiohttp TestClient bound to a real app."""
-    app = make_app(runner, bridge, bus, fbus, _noop_shutdown)
+    """aiohttp TestClient bound to a real app (no stream directory)."""
+    app = make_app(runner, bridge, bus, None, _noop_shutdown)
     server = TestServer(app)
     async with TestClient(server) as tc:
         yield tc

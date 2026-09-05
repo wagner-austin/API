@@ -15,6 +15,7 @@ include = [
   "src/tankpit_bot/py.typed",
   "src/tankpit_bot/data/*.gif",
   "src/tankpit_bot/data/xor_static_key.txt",
+  "src/tankpit_bot/data/hls.min.js",
 ]
 
 [tool.poetry.dependencies]

@@ -25,7 +25,6 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
-from tankpit_bot.bus.frame_bus import FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
 from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBusProtocol
@@ -50,16 +49,12 @@ class BotFactoryProtocol(Protocol):
         *,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
-        frame_bus: FrameBusProtocol,
     ) -> RunnableBotProtocol:
         """Construct a bot bound to the shared bridge + buses.
 
         Args:
             mode_bridge: Cross-thread mode override channel.
             status_bus: Fan-out for :class:`SessionStatusDict` frames.
-            frame_bus: Fan-out for screencast JPEG frames; its
-                subscriber count is the tick loop's screencast demand
-                signal.
 
         Returns:
             A bot whose :meth:`RunnableBotProtocol.run` will block the
@@ -124,7 +119,6 @@ class SessionRunner:
         bot_factory: BotFactoryProtocol,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
-        frame_bus: FrameBusProtocol,
         stop_file_path: Path,
     ) -> None:
         """Bind the runner to its cross-thread channels.
@@ -139,8 +133,6 @@ class SessionRunner:
                 with the HTTP handler.
             status_bus: Fan-out for :class:`SessionStatusDict` frames
                 shared with the SSE handler.
-            frame_bus: Fan-out for screencast JPEG frames shared with
-                the ``/video`` / ``/frame`` handlers.
             stop_file_path: Sentinel file the runner writes when the
                 SPA requests a stop; the tick loop polls its
                 existence.
@@ -148,7 +140,6 @@ class SessionRunner:
         self._bot_factory = bot_factory
         self._mode_bridge = mode_bridge
         self._status_bus = status_bus
-        self._frame_bus = frame_bus
         self._stop_file_path = stop_file_path
         self._state_lock = threading.Lock()
         self._state: SessionRunnerState = "idle"
@@ -242,7 +233,6 @@ class SessionRunner:
             bot = self._bot_factory(
                 mode_bridge=self._mode_bridge,
                 status_bus=self._status_bus,
-                frame_bus=self._frame_bus,
             )
             log.info("Session start: running bot")
             bot.run(

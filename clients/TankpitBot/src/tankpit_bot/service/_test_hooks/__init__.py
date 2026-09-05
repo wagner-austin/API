@@ -70,19 +70,10 @@ from tankpit_bot.service._test_hooks.serving import (
     serve,
     serve_fleet,
 )
-from tankpit_bot.service._test_hooks.video import (
-    ChildVideoStreamProtocol,
-    OpenChildVideoProtocol,
-    _AiohttpChildVideoStream,
-    _real_open_child_video,
-    open_child_video,
-)
 
 __all__ = [
     "BotFactoryBuilderProtocol",
-    "ChildVideoStreamProtocol",
     "OpenAdoptedProcessProtocol",
-    "OpenChildVideoProtocol",
     "ProbeExistingInstanceProtocol",
     "ProcessIdentityProtocol",
     "ServeProtocol",
@@ -92,12 +83,10 @@ __all__ = [
     "SpawnBotProcessProtocol",
     "SpawnedProcessProtocol",
     "_AdoptedProcess",
-    "_AiohttpChildVideoStream",
     "_AiohttpSite",
     "_real_build_bot_factory",
     "_real_build_site",
     "_real_open_adopted_process",
-    "_real_open_child_video",
     "_real_process_identity",
     "_real_serve",
     "_real_serve_fleet",
@@ -106,7 +95,6 @@ __all__ = [
     "build_bot_factory",
     "build_site",
     "open_adopted_process",
-    "open_child_video",
     "probe_existing_instance",
     "process_identity",
     "serve",

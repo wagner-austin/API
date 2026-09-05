@@ -208,7 +208,6 @@ def _tick_with_exit_boundary(bot: Bot, ticks_done: int) -> str | None:
     """
     try:
         tick_body._tick_once(bot)
-        tick_body._sync_live_view_demand(bot)
     except TargetClosedError:
         log.info("Browser closed during tick, ending run gracefully")
         return "browser_closed"

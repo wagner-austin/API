@@ -20,6 +20,7 @@ from tankpit_bot.bot.config import (
     resolve_weapon_resume_slack,
 )
 from tankpit_bot.service.config import resolve_idle_exit_seconds
+from tankpit_bot.stream.types import StreamConfigDict
 from tests.conftest import FakeEnv
 
 
@@ -77,59 +78,142 @@ class TestResolveIdleExitSeconds:
             resolve_idle_exit_seconds()
 
 
-class TestResolveVideoSettings:
-    """``resolve_video_fps`` / ``resolve_video_quality`` contracts (2026-07-29)."""
+def _resolved(config: StreamConfigDict | None) -> StreamConfigDict:
+    """Fail loudly when streaming was expected to resolve.
 
-    def test_fps_defaults_to_sixty(self) -> None:
-        """No env var yields the 60 fps capture default.
+    Args:
+        config: What ``resolve_stream_config`` returned.
 
-        12 -> 30 -> 60, each step taken because a measurement said the
-        previous one was still the floor. At 30 the public stream's
-        MEDIAN inter-frame gap was 28 ms, faster than the 33 ms
-        interval, with a third of gaps pinned at it -- the signature of
-        sampling slower than the source paints.
-        """
-        from tankpit_bot.bot.config import resolve_video_fps
+    Returns:
+        The configuration.
 
-        _test_hooks.get_env = FakeEnv({})
-        assert resolve_video_fps() == 60.0
+    Raises:
+        AssertionError: The resolver said streaming is off — these
+            tests all set ``TANKPIT_STREAM_VIDEO``, so ``None`` is the
+            test being wrong rather than a case to tolerate.
+    """
+    if config is None:
+        raise AssertionError("expected streaming to resolve a configuration")
+    return config
 
-    def test_fps_override_wins(self) -> None:
-        """A numeric override replaces the default."""
-        from tankpit_bot.bot.config import resolve_video_fps
 
-        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_FPS": "20"})
-        assert resolve_video_fps() == 20.0
+class TestResolveStreamConfig:
+    """The display-capture configuration switch and its derivations."""
 
-    def test_fps_non_numeric_raises(self) -> None:
-        """A malformed value fails loudly instead of picking a default."""
-        from tankpit_bot.bot.config import resolve_video_fps
-
-        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_FPS": "fast"})
-        with pytest.raises(ValueError):
-            resolve_video_fps()
-
-    def test_quality_defaults_to_point_eight(self) -> None:
-        """No env var yields the 0.8 JPEG-quality default."""
-        from tankpit_bot.bot.config import resolve_video_quality
+    def test_unset_means_no_capture(self) -> None:
+        """No ``TANKPIT_STREAM_VIDEO`` resolves to None, reading nothing else."""
+        from tankpit_bot.bot.config import resolve_stream_config
 
         _test_hooks.get_env = FakeEnv({})
-        assert resolve_video_quality() == 0.8
+        assert resolve_stream_config() is None
 
-    def test_quality_override_wins(self) -> None:
-        """A numeric override replaces the default."""
-        from tankpit_bot.bot.config import resolve_video_quality
+    def test_display_override_wins(self) -> None:
+        """``TANKPIT_STREAM_DISPLAY`` beats the service-port derivation."""
+        from tankpit_bot.bot.config import resolve_stream_config
 
-        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_QUALITY": "0.6"})
-        assert resolve_video_quality() == 0.6
+        _test_hooks.get_env = FakeEnv(
+            {
+                "TANKPIT_STREAM_VIDEO": "true",
+                "TANKPIT_STREAM_DISPLAY": "77",
+                "TANKPIT_BOT_SERVICE_PORT": "27301",
+            }
+        )
+        config = _resolved(resolve_stream_config())
+        assert config["display"] == 77
 
-    def test_quality_non_numeric_raises(self) -> None:
-        """A malformed value fails loudly instead of picking a default."""
-        from tankpit_bot.bot.config import resolve_video_quality
+    def test_display_derives_from_the_service_port(self) -> None:
+        """The fleet's unique per-child port doubles as the display number."""
+        from tankpit_bot.bot.config import resolve_stream_config
 
-        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_QUALITY": "crisp"})
+        _test_hooks.get_env = FakeEnv(
+            {"TANKPIT_STREAM_VIDEO": "true", "TANKPIT_BOT_SERVICE_PORT": "27301"}
+        )
+        config = _resolved(resolve_stream_config())
+        assert config["display"] == 27301
+
+    def test_no_display_source_refuses(self) -> None:
+        """Streaming on with no unique number to claim is refused loudly."""
+        from tankpit_bot.bot.config import resolve_stream_config
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_STREAM_VIDEO": "true"})
+        with pytest.raises(ValueError, match="no unique display number"):
+            resolve_stream_config()
+
+    def test_defaults_fill_the_rest(self) -> None:
+        """Geometry, rate, bitrate and segment length come from the constants."""
+        from tankpit_bot.bot.config import (
+            DEFAULT_STREAM_BITRATE_KBPS,
+            DEFAULT_STREAM_FPS,
+            DEFAULT_STREAM_HEIGHT,
+            DEFAULT_STREAM_SEGMENT_SECONDS,
+            DEFAULT_STREAM_WIDTH,
+            resolve_stream_config,
+        )
+
+        _test_hooks.get_env = FakeEnv(
+            {"TANKPIT_STREAM_VIDEO": "true", "TANKPIT_STREAM_DISPLAY": "9"}
+        )
+        config = _resolved(resolve_stream_config())
+        assert config["width"] == DEFAULT_STREAM_WIDTH
+        assert config["height"] == DEFAULT_STREAM_HEIGHT
+        assert config["fps"] == DEFAULT_STREAM_FPS
+        assert config["bitrate_kbps"] == DEFAULT_STREAM_BITRATE_KBPS
+        assert config["segment_seconds"] == DEFAULT_STREAM_SEGMENT_SECONDS
+
+    def test_fps_and_bitrate_overrides_win(self) -> None:
+        """Numeric overrides replace the defaults."""
+        from tankpit_bot.bot.config import resolve_stream_config
+
+        _test_hooks.get_env = FakeEnv(
+            {
+                "TANKPIT_STREAM_VIDEO": "true",
+                "TANKPIT_STREAM_DISPLAY": "9",
+                "TANKPIT_STREAM_FPS": "24",
+                "TANKPIT_STREAM_BITRATE_KBPS": "800",
+            }
+        )
+        config = _resolved(resolve_stream_config())
+        assert config["fps"] == 24
+        assert config["bitrate_kbps"] == 800
+
+    def test_non_numeric_display_raises(self) -> None:
+        """A malformed number fails loudly instead of picking a default."""
+        from tankpit_bot.bot.config import resolve_stream_config
+
+        _test_hooks.get_env = FakeEnv(
+            {"TANKPIT_STREAM_VIDEO": "true", "TANKPIT_STREAM_DISPLAY": "primary"}
+        )
         with pytest.raises(ValueError):
-            resolve_video_quality()
+            resolve_stream_config()
+
+    def test_domain_validation_is_the_codec_s(self) -> None:
+        """An out-of-domain value is refused by ``decode_stream_config``."""
+        from tankpit_bot.bot.config import resolve_stream_config
+
+        _test_hooks.get_env = FakeEnv(
+            {
+                "TANKPIT_STREAM_VIDEO": "true",
+                "TANKPIT_STREAM_DISPLAY": "9",
+                "TANKPIT_STREAM_FPS": "0",
+            }
+        )
+        with pytest.raises(ValueError, match="fps must be positive"):
+            resolve_stream_config()
+
+    def test_hls_dir_is_the_instance_run_dir(self) -> None:
+        """The segments land under the instance's own artifact namespace."""
+        from tankpit_bot.bot.config import resolve_stream_config
+        from tankpit_bot.runtime_artifacts import bot_run_dir
+
+        _test_hooks.get_env = FakeEnv(
+            {
+                "TANKPIT_STREAM_VIDEO": "true",
+                "TANKPIT_STREAM_DISPLAY": "9",
+                "TANKPIT_BOT_INSTANCE": "demo-1",
+            }
+        )
+        config = _resolved(resolve_stream_config())
+        assert config["hls_dir"] == str(bot_run_dir("demo-1") / "hls")
 
 
 class TestResolvePreferAccount:

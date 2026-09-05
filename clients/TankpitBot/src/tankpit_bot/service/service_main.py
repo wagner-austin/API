@@ -25,11 +25,11 @@ from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.config import (
     resolve_headless,
     resolve_prefer_account,
+    resolve_stream_config,
     resolve_target_url,
 )
 from tankpit_bot.bot.entry import resolve_session_kills, resolve_session_seconds
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
-from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.bus.session_status import idle_session_status
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
@@ -40,7 +40,6 @@ from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
     SERVICE_IDLE_POLL_SECONDS,
-    cast_url,
     resolve_service_port,
 )
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
@@ -68,7 +67,6 @@ def resolve_service_stop_file() -> Path:
 async def exit_when_idle(
     runner: SessionRunnerHTTPProtocol,
     status_bus: StatusBusProtocol,
-    frame_bus: FrameBusProtocol,
     stop_event: asyncio.Event,
     *,
     idle_exit_seconds: float = SERVICE_IDLE_EXIT_SECONDS,
@@ -76,20 +74,21 @@ async def exit_when_idle(
 ) -> None:
     """Set ``stop_event`` after a sustained stretch of total idleness.
 
-    "Idle" means no session running AND no SSE subscriber AND no video
-    viewer — nobody is using the service and nobody is even watching
-    it. The idle clock resets whenever any condition breaks, so an
-    operator staring at the stats strip (SSE open) or the live video
-    (``/video`` open) keeps the service alive indefinitely. Part of
-    the 2026-07-18 lifecycle pass: the phone's START SERVER button
-    relaunches in ~2 s, so an abandoned server has no reason to
-    outlive its last viewer by more than this window.
+    "Idle" means no session running AND no SSE subscriber — nobody is
+    using the service and nobody is even watching it. The idle clock
+    resets whenever either condition breaks, so an operator staring at
+    the stats strip (SSE open) keeps the service alive indefinitely.
+    Video viewers do NOT hold the service open any more: HLS viewers
+    are discrete file GETs with no connection to count, and a bot that
+    has ended has nothing more to stream — the segments a viewer is
+    still draining were already written. Part of the 2026-07-18
+    lifecycle pass: the phone's START SERVER button relaunches in
+    ~2 s, so an abandoned server has no reason to outlive its last
+    viewer by more than this window.
 
     Args:
         runner: Session runner whose ``is_running`` gates the clock.
         status_bus: Bus whose ``subscriber_count`` gates the clock.
-        frame_bus: Video-frame bus whose ``subscriber_count`` also
-            gates the clock (2026-07-28 watch page).
         stop_event: The service main's shutdown signal.
         idle_exit_seconds: Sustained idle seconds before exit. A
             non-positive value DISABLES the idle self-exit — the
@@ -108,11 +107,7 @@ async def exit_when_idle(
     idle_elapsed = 0.0
     while not stop_event.is_set():
         await asyncio.sleep(poll_seconds)
-        if (
-            runner.is_running()
-            or status_bus.subscriber_count() > 0
-            or frame_bus.subscriber_count() > 0
-        ):
+        if runner.is_running() or status_bus.subscriber_count() > 0:
             idle_elapsed = 0.0
             continue
         idle_elapsed += poll_seconds
@@ -139,25 +134,23 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
     bound_port = resolve_service_port() if port is None else port
     mode_bridge: ModeBridgeProtocol = ModeBridge()
     status_bus: StatusBusProtocol = StatusBus()
-    frame_bus: FrameBusProtocol = FrameBus()
+    stream_config = resolve_stream_config()
     runner = SessionRunner(
         bot_factory=service_hooks.build_bot_factory(
             resolve_target_url(),
             headless=resolve_headless(),
             prefer_account=resolve_prefer_account(),
-            cast_url=cast_url(bound_port),
+            stream_config=stream_config,
         ),
         mode_bridge=mode_bridge,
         status_bus=status_bus,
-        frame_bus=frame_bus,
         stop_file_path=resolve_service_stop_file(),
     )
     status_bus.publish(idle_session_status(get_current_time_ms()))
     stop_event = asyncio.Event()
-    app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
+    hls_dir = Path(stream_config["hls_dir"]) if stream_config is not None else None
+    app = make_app(runner, mode_bridge, status_bus, hls_dir, stop_event.set)
     site = await service_hooks.build_site(app, host, bound_port)
-    # Started AFTER the site is up so ``/video`` is already answering
-    # when the first frame lands on the bus.
     #
     # Unconditional: every process running this function is a fleet
     # child, and the manager already decided it should play by spawning
@@ -170,7 +163,6 @@ async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None
         exit_when_idle(
             runner,
             status_bus,
-            frame_bus,
             stop_event,
             idle_exit_seconds=resolve_idle_exit_seconds(),
         )

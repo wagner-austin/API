@@ -1,19 +1,27 @@
 """Self-contained phone watch page served by the bot service.
 
-One HTML string, zero external assets, served at ``GET /watch``. The
-page is the fiesta-free replacement for the vibeshine tankpit stream
-(2026-07-28): live game video via the ``/video`` MJPEG relay, session
-state via the ``/status`` SSE stream, and the same start/stop/mode
-controls the SPA bot panel offers — all against the service's own
-routes.
+One HTML string, no assets from outside the service, served at
+``GET /watch``. The page is the fiesta-free replacement for the
+vibeshine tankpit stream (2026-07-28): live game video from the
+session's HLS files under ``/video/``, session state via the
+``/status`` SSE stream, and the same start/stop/mode controls the SPA
+bot panel offers — all against the service's own routes. The one
+script it loads, ``watch/hls.js``, is the vendored hls.js build the
+wheel itself carries ([[packaged-data-assets]]).
+
+Playback takes BOTH standard HLS paths, and needs both to cover real
+devices rather than as a courtesy: iOS Safari plays HLS natively and
+(before 17.1) has no Media Source Extensions for hls.js to use, while
+Chrome — desktop and Android — has MSE and no native HLS at all.
+Feature detection picks the one path each device actually has.
 
 Every URL in the page is RELATIVE (no leading slash) so the page works
 identically on both of its origins:
 
-* direct: ``http://<host>:27100/watch`` → ``video`` resolves to
-  ``/video``
+* direct: ``http://<host>:27100/watch`` → ``video/index.m3u8``
+  resolves to ``/video/index.m3u8``
 * proxied: ``https://tankpit.austinwagner.org/api/tankbot/watch`` →
-  ``video`` resolves to ``/api/tankbot/video`` (nginx strips the
+  it resolves to ``/api/tankbot/video/index.m3u8`` (nginx strips the
   prefix back off)
 """
 
@@ -40,7 +48,8 @@ WATCH_PAGE_HTML = """<!DOCTYPE html>
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
   }
-  #video { width: 100%; height: 100%; object-fit: contain; display: none; }
+  #video { width: 100%; height: 100%; object-fit: contain; display: none;
+           background: #000; }
   #placeholder { color: #5a6a7a; font-size: 0.9rem; }
   #stats {
     display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
@@ -62,7 +71,7 @@ WATCH_PAGE_HTML = """<!DOCTYPE html>
 <body>
 <h1>TANKPITBOT</h1>
 <div id="view">
-  <img id="video" alt="live game view">
+  <video id="video" autoplay muted playsinline></video>
   <div id="placeholder">no session</div>
 </div>
 <div id="stats">
@@ -82,11 +91,13 @@ WATCH_PAGE_HTML = """<!DOCTYPE html>
   <button data-mode="UNSET">IDLE</button>
 </div>
 <div id="banner"></div>
+<script src="watch/hls.js"></script>
 <script>
 "use strict";
 const banner = document.getElementById("banner");
 const video = document.getElementById("video");
 const placeholder = document.getElementById("placeholder");
+const HLS_URL = "video/index.m3u8";
 
 function post(path, body) {
   const options = body === undefined
@@ -105,19 +116,57 @@ for (const b of document.querySelectorAll("[data-mode]")) {
 }
 
 let streaming = false;
+let hls = null;
 function setStreaming(on) {
   if (on === streaming) { return; }
   streaming = on;
   if (on) {
-    video.src = "video?t=" + Date.now();
+    // `autoplay muted playsinline` together are what let this start
+    // without a gesture: an unmuted autoplay is blocked outright, and
+    // on iOS a video without `playsinline` is hoisted into the
+    // fullscreen player.
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Native HLS (iOS/macOS Safari). The cache buster is not
+      // optional: a browser remembers a finished or failed media
+      // URL, so re-assigning the same src is a no-op and the
+      // element would sit black forever.
+      video.src = HLS_URL + "?t=" + Date.now();
+    } else {
+      // MSE path (Chrome desktop/Android) via the vendored hls.js.
+      // A fatal error (encoder still warming, service restarted)
+      // tears the instance down; the next status tick re-arms.
+      hls = new Hls();
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          banner.textContent = "video: " + data.type + " - retrying";
+          setStreaming(false);
+        }
+      });
+      hls.loadSource(HLS_URL);
+      hls.attachMedia(video);
+    }
     video.style.display = "block";
     placeholder.style.display = "none";
   } else {
+    if (hls !== null) { hls.destroy(); hls = null; }
+    // Pause before clearing. Removing src alone leaves the element in
+    // a playing state pointed at nothing, which keeps the decoder
+    // alive and, on some builds, the request open.
+    video.pause();
     video.removeAttribute("src");
+    video.load();
     video.style.display = "none";
     placeholder.style.display = "block";
   }
 }
+
+// A live stream has no end, so `ended` means the source dropped --
+// the service restarted, the encoder stopped, or the playlist went
+// away. Re-arming on the next status tick is what makes that
+// recoverable without a manual page reload, which is the failure the
+// old MJPEG viewer had.
+video.addEventListener("ended", () => { streaming = false; });
+video.addEventListener("error", () => { streaming = false; });
 
 function connectStatus() {
   const source = new EventSource("status");

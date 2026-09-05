@@ -180,6 +180,7 @@ class FakeBrowserType:
             magic: Magic key to embed in AUTH messages.
         """
         self._browsers: list[FakeBrowser] = []
+        self.launch_envs: list[dict[str, str] | None] = []
         self._emit_messages = emit_messages
         self._rate_limited = rate_limited
         self._login_fails = login_fails
@@ -193,9 +194,11 @@ class FakeBrowserType:
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
-        """Launch browser."""
+        """Launch browser, recording the environment it was handed."""
         _ = (headless, slow_mo, timeout, args)
+        self.launch_envs.append(env)
         browser = FakeBrowser(
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,

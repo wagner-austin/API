@@ -117,6 +117,7 @@ class BrowserTypeLaunchProtocol(Protocol):
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
         """Launch a browser instance.
 
@@ -127,6 +128,10 @@ class BrowserTypeLaunchProtocol(Protocol):
             args: Extra command-line flags forwarded to Chromium. The
                 sniffer + bot use this to pin the browser to the streamed
                 display (see ``_chrome_stream_display_args``).
+            env: Environment for the browser process. ``None`` inherits
+                this process's. Playwright REPLACES rather than merges,
+                so the display-capture path passes a full copy of the
+                parent environment with ``DISPLAY`` overlaid.
 
         Returns:
             Browser instance.
@@ -144,6 +149,7 @@ class BrowserTypeProtocol(Protocol):
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
         """Launch a browser instance.
 
@@ -154,6 +160,10 @@ class BrowserTypeProtocol(Protocol):
             args: Extra command-line flags forwarded to Chromium. The
                 sniffer + bot use this to pin the browser to the streamed
                 display (see ``_chrome_stream_display_args``).
+            env: Environment for the browser process. ``None`` inherits
+                this process's. Playwright REPLACES rather than merges,
+                so the display-capture path passes a full copy of the
+                parent environment with ``DISPLAY`` overlaid.
 
         Returns:
             Browser instance.

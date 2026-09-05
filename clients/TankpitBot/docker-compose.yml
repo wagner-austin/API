@@ -34,7 +34,19 @@ services:
     image: ${FLEET_IMAGE:-tankpit-fleet:local}
     command: tankpit-fleet
     environment:
-      TANKPIT_HEADLESS: "true"
+      # HEADED, because every fleet child is streamed: the capture
+      # records a rendered window, and each child brings its own Xvfb
+      # display to render onto (tankpit_bot.stream.capture), so "no X
+      # server in a container" stopped being true for this service.
+      # The Bot constructor REFUSES headless+stream, so flipping this
+      # back without also unsetting TANKPIT_STREAM_VIDEO is a loud
+      # boot failure, not a silent black demo.
+      TANKPIT_HEADLESS: "false"
+      # Every child records its display into runs/bot/<instance>/hls/,
+      # which the manager serves at /demo/video/{slot}/ straight off
+      # the shared filesystem. The display number is the child's own
+      # service port — already unique per live child.
+      TANKPIT_STREAM_VIDEO: "true"
       # Bind wide INSIDE the container so the published port reaches
       # the process; the loopback-only security property moves to the
       # port mapping below, which is the container boundary's

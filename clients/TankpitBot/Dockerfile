@@ -116,6 +116,14 @@ RUN playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* /root/.cache \
     && chmod -R a+rX /opt/playwright
 
+# The display-capture pair (tankpit_bot.stream.capture): each streamed
+# bot runs Chromium HEADED on its own Xvfb display and records it with
+# ffmpeg into HLS segments. Its own layer, after the browser install,
+# so a Playwright bump does not re-pull ffmpeg and vice versa.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends xvfb ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # The static XOR key and the field terrain GIFs are NOT copied here.

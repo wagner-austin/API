@@ -270,7 +270,7 @@ class TestAsyncMain:
             "/bots/{instance}/stats",
             "/bots/{instance}/hud",
             "/bots/{instance}/activity",
-            "/bots/{instance}/video",
+            "/bots/{instance}/video/{file}",
             "/bots/{instance}/stop",
             "/bots/{instance}/restart",
             "/bots/{instance}",
@@ -281,7 +281,7 @@ class TestAsyncMain:
             # rather than arriving as a side effect.
             "/demo/fleet",
             "/demo/spawn",
-            "/demo/video/{slot}",
+            "/demo/video/{slot}/{file}",
         }
 
     async def test_the_drain_monitor_is_cancelled_when_serving_ends(

@@ -27,7 +27,47 @@ def _default_get_env(key: str) -> str | None:
 get_env: Callable[[str], str | None] = _default_get_env
 
 
-__all__ = ["get_env"]
+class ChildEnvironmentProtocol(Protocol):
+    """Reads the whole environment a child process should inherit."""
+
+    def __call__(self) -> dict[str, str]:
+        """Copy the process environment.
+
+        Returns:
+            A copy, so a caller's overlay cannot reach back into this
+            process.
+        """
+        ...
+
+
+def _real_child_environment() -> dict[str, str]:
+    """Production implementation — platform_core's canonical reader.
+
+    Answers a process question rather than a configuration one: what
+    a CHILD should inherit. The display-capture launch path overlays
+    ``DISPLAY`` on this copy and hands it to Playwright, so the
+    Chromium child finds its X server without this process ever
+    mutating its own environment. ``platform_core.config._test_hooks``
+    is the one module permitted to read ``os.environ``, and the
+    import is function-level so its hook stays late-bound.
+
+    Returns:
+        A copy of the process environment.
+    """
+    from platform_core.config._test_hooks import get_environment
+
+    return get_environment()
+
+
+child_environment: ChildEnvironmentProtocol = _real_child_environment
+
+
+__all__ = [
+    "ChildEnvironmentProtocol",
+    "_real_child_environment",
+    "child_environment",
+    "get_env",
+]
 
 
 class LoadDotenvProtocol(Protocol):

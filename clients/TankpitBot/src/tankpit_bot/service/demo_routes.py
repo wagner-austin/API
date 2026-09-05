@@ -31,7 +31,7 @@ from tankpit_bot.service.demo import (
 )
 from tankpit_bot.service.fleet_error import FleetError
 from tankpit_bot.service.fleet_manager import FleetManager
-from tankpit_bot.service.video_relay import relay_child_video
+from tankpit_bot.service.video_files import instance_video_response
 
 log = get_logger(__name__)
 
@@ -81,23 +81,25 @@ def add_demo_routes(app: web.Application, manager: FleetManager) -> None:
             return web.Response(status=409, text=str(error))
         return _json_response(encode_demo_bot(row), status=201)
 
-    async def video(request: web.Request) -> web.StreamResponse:
-        """``GET /demo/video/{slot}`` — watch one demo bot play.
+    async def video(request: web.Request) -> web.Response:
+        """``GET /demo/video/{slot}/{file}`` — one HLS file of one demo bot.
 
         The slot is resolved through the demo grammar BEFORE the
         registry sees it, so an operator instance name reaches the
-        relay as a 404 rather than as a picture.
+        file serving as a 404 rather than as a picture. The viewer
+        asks for ``index.m3u8`` first and the playlist's own relative
+        segment names resolve back under this same prefix.
         """
         try:
             slot = demo_slot_or_refuse(request.match_info["slot"])
         except FleetError as error:
             log.info("Demo: refused video (404): %s", error)
             return web.Response(status=404, text=str(error))
-        return await relay_child_video(request, manager, slot)
+        return instance_video_response(manager, slot, request.match_info["file"])
 
     app.router.add_get("/demo/fleet", fleet_state)
     app.router.add_post("/demo/spawn", spawn)
-    app.router.add_get("/demo/video/{slot}", video)
+    app.router.add_get("/demo/video/{slot}/{file}", video)
 
 
 __all__ = [

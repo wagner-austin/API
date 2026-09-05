@@ -238,6 +238,32 @@ def _real_resolve_tree_hash(project_root: Path, repo_path: str) -> str | None:
 resolve_tree_hash: ResolveTreeHashProtocol = _real_resolve_tree_hash
 
 
+class SleepSecondsProtocol(Protocol):
+    """Blocks the calling thread for a while."""
+
+    def __call__(self, seconds: float) -> None:
+        """Sleep.
+
+        Args:
+            seconds: How long to block for.
+        """
+        ...
+
+
+def _real_sleep_seconds(seconds: float) -> None:
+    """Real implementation using :func:`time.sleep`.
+
+    Args:
+        seconds: How long to block for.
+    """
+    import time
+
+    time.sleep(seconds)
+
+
+sleep_seconds: SleepSecondsProtocol = _real_sleep_seconds
+
+
 __all__ = [
     "HttpGetProtocol",
     "HttpGetResponseProtocol",
@@ -248,10 +274,12 @@ __all__ = [
     "ResolveTreeHashProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
+    "SleepSecondsProtocol",
     "http_get",
     "load_and_decode_session",
     "path_exists",
     "read_text",
     "resolve_tree_hash",
     "setup_rich_logging",
+    "sleep_seconds",
 ]

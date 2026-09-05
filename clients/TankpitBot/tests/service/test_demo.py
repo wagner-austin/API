@@ -18,10 +18,10 @@ different ceiling on every machine.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Generator
+from pathlib import Path
 
 import pytest
 from aiohttp import web
-from aiohttp.client_exceptions import ClientConnectionError
 from aiohttp.test_utils import TestClient, TestServer
 from platform_core.json_utils import (
     JSONValue,
@@ -35,7 +35,6 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot import _test_hooks as top_hooks
-from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.demo import (
     DEMO_MAX_BOTS,
     DEMO_SESSION_SECONDS,
@@ -48,7 +47,7 @@ from tankpit_bot.service.demo import (
 from tankpit_bot.service.fleet_error import FleetError
 from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_routes import make_fleet_app
-from tankpit_bot.service.video_relay import CHILD_WARMUP_RETRY_SECONDS
+from tankpit_bot.stream.hls import WARMUP_RETRY_SECONDS
 from tests.service._fleet_fixtures import (
     _FakeSpawner,
     _restore_account_hooks,
@@ -288,60 +287,94 @@ async def test_the_demo_video_route_refuses_an_operator_instance(
     """
     assert (await demo_client.post("/bots", json=_OPERATOR_SPAWN)).status == 201
 
-    response = await demo_client.get("/demo/video/artax")
+    response = await demo_client.get("/demo/video/artax/index.m3u8")
 
     assert response.status == 404
     assert "is not a demo slot" in await response.text()
 
 
 @pytest.mark.asyncio
-async def test_the_demo_video_route_relays_a_demo_slot(
+async def test_the_demo_video_route_serves_a_demo_slot_playlist(
     demo_client: TestClient[web.Request, web.Application],
 ) -> None:
-    """A demo slot streams through the same relay the operator uses."""
+    """A demo slot's playlist is served straight off the shared disk."""
     assert (await demo_client.post("/demo/spawn")).status == 201
-    stream = _FakeChildVideoStream([b"one", b"two"])
-    original = service_hooks.open_child_video
-    service_hooks.open_child_video = _Opener(stream)
+    playlist = b"#EXTM3U\n#EXT-X-TARGETDURATION:2\n#EXTINF:2.0,\nseg00001.ts\n"
+    original = top_hooks.read_bytes_from
+    top_hooks.read_bytes_from = _FakeHlsFiles(
+        {str(Path("runs/bot/demo-1/hls/index.m3u8")): playlist}
+    )
     try:
-        response = await demo_client.get("/demo/video/demo-1")
+        response = await demo_client.get("/demo/video/demo-1/index.m3u8")
         body = await response.read()
     finally:
-        service_hooks.open_child_video = original
+        top_hooks.read_bytes_from = original
 
     assert response.status == 200
-    assert body == b"onetwo"
-    assert stream.closes == 1
+    assert body == playlist
+    assert response.headers["Content-Type"].startswith("application/vnd.apple.mpegurl")
+    assert response.headers["Cache-Control"] == "no-store"
 
 
 @pytest.mark.asyncio
-async def test_a_child_that_has_not_bound_its_port_yet_is_503_not_500(
+async def test_a_bot_whose_encoder_has_not_produced_yet_is_503_not_500(
     demo_client: TestClient[web.Request, web.Application],
 ) -> None:
     """Watching a bot the moment it starts says "not yet", not "broken".
 
-    A child is ``alive`` from the instant it is forked and its video
-    port opens seconds later, so the demo page — which draws a tile as
-    soon as a bot appears — asks early every single time. Uncaught, the
-    connection refusal reached the boundary as a 500 and reported the
-    server as broken while the bot was merely still booting.
+    A child is ``alive`` from the instant it is forked and its ffmpeg
+    writes the first playlist seconds later, so the demo page — which
+    draws a tile as soon as a bot appears — asks early every single
+    time. The absent playlist is the ordinary warming state and must
+    carry a retry hint, never a 500.
     """
     assert (await demo_client.post("/demo/spawn")).status == 201
-    original = service_hooks.open_child_video
-    service_hooks.open_child_video = _RefusingOpener()
+    original = top_hooks.read_bytes_from
+    top_hooks.read_bytes_from = _FakeHlsFiles({})
     try:
-        response = await demo_client.get("/demo/video/demo-1")
+        response = await demo_client.get("/demo/video/demo-1/index.m3u8")
         body = await response.text()
     finally:
-        service_hooks.open_child_video = original
+        top_hooks.read_bytes_from = original
 
     assert response.status == 503
-    assert response.headers["Retry-After"] == str(CHILD_WARMUP_RETRY_SECONDS)
-    # The cause travels: a refused connection that is NOT a warming
-    # child reads identically from outside, so the body has to say
-    # which one this was.
-    assert "is not serving video yet" in body
-    assert "connection refused by the child" in body
+    assert response.headers["Retry-After"] == str(WARMUP_RETRY_SECONDS)
+    assert "no playlist yet" in body
+
+
+@pytest.mark.asyncio
+async def test_a_rotated_out_segment_is_404(
+    demo_client: TestClient[web.Request, web.Application],
+) -> None:
+    """A segment past the live window answers 404, pointing back at the playlist."""
+    assert (await demo_client.post("/demo/spawn")).status == 201
+    original = top_hooks.read_bytes_from
+    top_hooks.read_bytes_from = _FakeHlsFiles({})
+    try:
+        response = await demo_client.get("/demo/video/demo-1/seg00001.ts")
+        body = await response.text()
+    finally:
+        top_hooks.read_bytes_from = original
+
+    assert response.status == 404
+    assert "no longer in the live window" in body
+
+
+@pytest.mark.asyncio
+async def test_a_filename_outside_the_grammar_never_touches_disk(
+    demo_client: TestClient[web.Request, web.Application],
+) -> None:
+    """Anything but the playlist or a segment name is refused before any read."""
+    assert (await demo_client.post("/demo/spawn")).status == 201
+    original = top_hooks.read_bytes_from
+    top_hooks.read_bytes_from = _ExplodingHlsFiles()
+    try:
+        response = await demo_client.get("/demo/video/demo-1/latest.log")
+    finally:
+        top_hooks.read_bytes_from = original
+
+    assert response.status == 404
+    assert "no such stream file" in await response.text()
 
 
 @pytest.mark.asyncio
@@ -349,7 +382,7 @@ async def test_the_demo_video_route_refuses_a_slot_nothing_is_playing_in(
     demo_client: TestClient[web.Request, web.Application],
 ) -> None:
     """A well-formed but empty slot is a 404, not an empty stream."""
-    response = await demo_client.get("/demo/video/demo-4")
+    response = await demo_client.get("/demo/video/demo-4/index.m3u8")
 
     assert response.status == 404
     assert "unknown instance" in await response.text()
@@ -463,78 +496,51 @@ class _SteppingClock:
         return self.now_ms
 
 
-class _FakeChildVideoStream:
-    """A child video stream over a fixed chunk list."""
+class _FakeHlsFiles:
+    """``read_bytes_from`` over an in-memory directory of HLS files."""
 
-    def __init__(self, chunks: list[bytes]) -> None:
-        """Bind the stream to the bytes it will yield.
+    def __init__(self, files: dict[str, bytes]) -> None:
+        """Bind the fake to its file contents.
 
         Args:
-            chunks: Body chunks to yield in order.
+            files: Path-string to bytes; anything else is absent.
         """
-        self._chunks = chunks
-        self.closes = 0
+        self._files = files
 
-    @property
-    def content_type(self) -> str:
-        """The upstream content type.
+    def __call__(self, path: Path, offset: int) -> bytes:
+        """Serve one read the way the real hook does.
+
+        Args:
+            path: File the caller asked for.
+            offset: Byte offset to start at.
 
         Returns:
-            A multipart type carrying the child's own boundary.
+            The bytes from ``offset`` on.
+
+        Raises:
+            FileNotFoundError: The path is not in the directory.
         """
-        return "multipart/x-mixed-replace; boundary=demoframe"
-
-    async def chunks(self) -> AsyncIterator[bytes]:
-        """Yield the bound chunks.
-
-        Yields:
-            Each chunk in order.
-        """
-        for chunk in self._chunks:
-            yield chunk
-
-    async def close(self) -> None:
-        """Record one release."""
-        self.closes += 1
+        key = str(path)
+        if key not in self._files:
+            raise FileNotFoundError(key)
+        return self._files[key][offset:]
 
 
-class _RefusingOpener:
-    """An opener that refuses, as a child mid-boot does."""
+class _ExplodingHlsFiles:
+    """``read_bytes_from`` that fails the test on ANY disk touch."""
 
-    async def __call__(self, url: str) -> _FakeChildVideoStream:
-        """Refuse the connection.
+    def __call__(self, path: Path, offset: int) -> bytes:
+        """Refuse — the caller was supposed to reject before reading.
 
         Args:
-            url: Upstream URL the route asked for.
+            path: File the caller asked for.
+            offset: Byte offset to start at.
 
         Returns:
             Never returns.
 
         Raises:
-            ClientConnectionError: Always.
+            AssertionError: Always.
         """
-        raise ClientConnectionError(f"connection refused by the child at {url}")
-
-
-class _Opener:
-    """An opener handing back one bound stream."""
-
-    def __init__(self, stream: _FakeChildVideoStream) -> None:
-        """Bind the opener to its stream.
-
-        Args:
-            stream: Stream returned for every call.
-        """
-        self._stream = stream
-
-    async def __call__(self, url: str) -> _FakeChildVideoStream:
-        """Return the bound stream.
-
-        Args:
-            url: Upstream URL the route asked for.
-
-        Returns:
-            The bound stream.
-        """
-        _ = url
-        return self._stream
+        _ = offset
+        raise AssertionError(f"disk was touched for {path!r} before the filename gate")

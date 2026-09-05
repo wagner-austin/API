@@ -20,9 +20,6 @@ from platform_core.json_utils import (
     dump_json_str,
 )
 
-from tankpit_bot.bus.frame_bus import (
-    FrameBus,
-)
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.status_bus import (
     StatusBus,
@@ -128,7 +125,7 @@ class TestStartRoute:
     ) -> None:
         """A start while already running returns 409 without touching runner.start."""
         runner = _RecordingRunner(already_running=True)
-        app = make_app(runner, bridge, bus, FrameBus(), _noop_shutdown)
+        app = make_app(runner, bridge, bus, None, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc:
             response = await tc.post("/start")
@@ -144,7 +141,7 @@ class TestStartRoute:
         """A ``SessionAlreadyRunningError`` from the executor is swallowed at WARN."""
         on_start = threading.Event()
         runner = _RecordingRunner(starts_reject=True, on_start=on_start)
-        app = make_app(runner, bridge, bus, FrameBus(), _noop_shutdown)
+        app = make_app(runner, bridge, bus, None, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc:
             response = await tc.post("/start")
@@ -212,7 +209,7 @@ class TestShutdownRoute:
         """The route requests session stop, fires ``on_shutdown``, returns 202."""
         runner = _RecordingRunner()
         fired: list[bool] = []
-        app = make_app(runner, bridge, bus, FrameBus(), lambda: fired.append(True))
+        app = make_app(runner, bridge, bus, None, lambda: fired.append(True))
         server = TestServer(app)
         async with TestClient(server) as tc:
             response = await tc.post("/shutdown")

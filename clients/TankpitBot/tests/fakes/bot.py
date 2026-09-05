@@ -388,6 +388,8 @@ class FakeBrowserTypeBot:
             interrupt_after: Number of wait_for_timeout calls before interrupt.
         """
         self._interrupt_after = interrupt_after
+        self.launch_args: list[list[str] | None] = []
+        self.launch_envs: list[dict[str, str] | None] = []
 
     def launch(
         self,
@@ -396,9 +398,12 @@ class FakeBrowserTypeBot:
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
-        """Launch browser."""
-        _ = (headless, slow_mo, timeout, args)
+        """Launch browser, recording args and env for assertions."""
+        _ = (headless, slow_mo, timeout)
+        self.launch_args.append(args)
+        self.launch_envs.append(env)
         return FakeBrowserBot(interrupt_after=self._interrupt_after)
 
 

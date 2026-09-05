@@ -5,9 +5,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from tankpit_bot.bus.frame_bus import (
-    FrameBusProtocol,
-)
 from tankpit_bot.bus.mode_bridge import (
     ModeBridgeProtocol,
 )
@@ -19,6 +16,7 @@ from tankpit_bot.service.session_runner import (
     BotFactoryProtocol,
     RunnableBotProtocol,
 )
+from tankpit_bot.stream.types import StreamConfigDict
 
 
 class _RecordingSite:
@@ -94,17 +92,20 @@ def _make_recording_bot_factory(
     """
 
     def builder(
-        target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+        stream_config: StreamConfigDict | None,
     ) -> BotFactoryProtocol:
-        _ = (target_url, headless, prefer_account, cast_url)
+        _ = (target_url, headless, prefer_account, stream_config)
 
         def factory(
             *,
             mode_bridge: ModeBridgeProtocol,
             status_bus: StatusBusProtocol,
-            frame_bus: FrameBusProtocol,
         ) -> RunnableBotProtocol:
-            _ = (mode_bridge, status_bus, frame_bus)
+            _ = (mode_bridge, status_bus)
             return recording_bot
 
         return factory
@@ -129,10 +130,15 @@ class _CapturingBotFactoryBuilder:
             recording_bot: Bot the produced factory hands back per call.
         """
         self._recording_bot = recording_bot
-        self.calls: list[tuple[str, bool, bool]] = []
+        self.calls: list[tuple[str, bool, bool, StreamConfigDict | None]] = []
 
     def __call__(
-        self, target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
+        self,
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+        stream_config: StreamConfigDict | None,
     ) -> BotFactoryProtocol:
         """Record one builder invocation and return a factory.
 
@@ -140,19 +146,20 @@ class _CapturingBotFactoryBuilder:
             target_url: URL the service resolved.
             headless: Whether the service asked for a windowless browser.
             prefer_account: Whether the service asked for account login.
+            stream_config: The capture configuration the service
+                resolved (``None`` when streaming is off).
 
         Returns:
             A factory yielding the bound recording bot.
         """
-        self.calls.append((target_url, headless, prefer_account))
+        self.calls.append((target_url, headless, prefer_account, stream_config))
 
         def factory(
             *,
             mode_bridge: ModeBridgeProtocol,
             status_bus: StatusBusProtocol,
-            frame_bus: FrameBusProtocol,
         ) -> RunnableBotProtocol:
-            _ = (mode_bridge, status_bus, frame_bus)
+            _ = (mode_bridge, status_bus)
             return self._recording_bot
 
         return factory

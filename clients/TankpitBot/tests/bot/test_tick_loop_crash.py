@@ -5,6 +5,12 @@ the 2026-06-20 write-up, but no writer existed until 2026-07-31 — a
 crashed session simply vanished from ``runs/bot/_index.tsv``. The
 boundary finalizes the scorecard, ``latest.summary.txt``, and the
 index row, then RE-RAISES so the process still fails loudly.
+
+The defect is injected by rebinding ``tick_body._tick_once`` — the
+same seam the lifecycle suite's browser-closed test uses — because
+that is where any real mid-tick defect surfaces. (The previous
+injection point, a chunk bus whose demand signal raised, left the
+codebase with the in-page caster on 2026-09-05.)
 """
 
 from __future__ import annotations
@@ -13,58 +19,24 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot.bus.frame_bus import (
-    FrameStatsDict,
-    FrameSubscriber,
-    FrameSubscriberProtocol,
-)
+from tankpit_bot.bot import tick_body as tick_body_module
+from tankpit_bot.bot.base import Bot
 from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
 
 
-class _ExplodingFrameBus:
-    """Protocol-complete frame bus whose demand signal raises.
+def _fail_tick_once_with_runtime_error(bot: Bot) -> None:
+    """Stand-in tick body modelling an unhandled mid-tick defect.
 
-    ``subscriber_count`` is read inside the tick's exception boundary
-    (``_sync_live_view_demand``), so raising there models any
-    unhandled mid-tick defect without reaching around the sanctioned
-    constructor DI seam.
+    Args:
+        bot: Ignored — the defect fires before any bot state is read.
 
-    The bot that uses this bus MUST be built with a cast URL. A bot
-    without one has no caster, and ``_sync_live_view_demand`` returns
-    before it ever reads demand -- so the injected defect never fires,
-    the loop never ends, and the suite hangs instead of failing. That
-    is not hypothetical: it cost a 30-minute run on 2026-09-04.
+    Raises:
+        RuntimeError: Always.
     """
-
-    def publish(self, frame: bytes) -> None:
-        """Drop the frame — no viewers in this scenario."""
-        del frame
-
-    def subscribe(self) -> FrameSubscriberProtocol:
-        """Return a real (inert) subscriber."""
-        return FrameSubscriber()
-
-    def unsubscribe(self, subscriber: FrameSubscriberProtocol) -> None:
-        """Close the handed-back subscriber."""
-        subscriber.close()
-
-    def subscriber_count(self) -> int:
-        """Explode — the injected mid-tick defect."""
-        raise RuntimeError("frame bus wiring broke mid-tick")
-
-    def latest(self) -> bytes | None:
-        """No cached frame."""
-        return None
-
-    def stats(self) -> FrameStatsDict:
-        """Zeroed counts — this bus exists to explode, not to report.
-
-        Returns:
-            All-zero stats.
-        """
-        return FrameStatsDict(published=0, delivered=0, dropped=0, subscribers=0)
+    del bot
+    raise RuntimeError("tick wiring broke mid-tick")
 
 
 class TestCrashedExitReason:
@@ -74,27 +46,27 @@ class TestCrashedExitReason:
         self, fake_fs: FakeFileSystem, fake_env: FakeEnv
     ) -> None:
         """The crash writes summary + index row, then propagates."""
-        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import run_tick_loop
         from tankpit_bot.diagnostics.runs_index import DEFAULT_INDEX_PATH, decode_row
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
+        _ = fake_env
         configure_bot_runtime_logging("20260731-000002")
-        bot = Bot(
-            "https://test.tankpit.com/",
-            headless=True,
-            frame_bus=_ExplodingFrameBus(),
-            cast_url="http://127.0.0.1:27100/cast",
-        )
+        bot = Bot("https://test.tankpit.com/", headless=True)
         bot._cdp = FakeCDPSession()
 
-        with pytest.raises(RuntimeError, match="frame bus wiring broke mid-tick"):
-            run_tick_loop(
-                bot,
-                _FakePage(),
-                session_seconds=0,
-                stop_file_path=Path("C:/tmp/never_exists.sentinel"),
-            )
+        saved_tick_once = tick_body_module._tick_once
+        tick_body_module._tick_once = _fail_tick_once_with_runtime_error
+        try:
+            with pytest.raises(RuntimeError, match="tick wiring broke mid-tick"):
+                run_tick_loop(
+                    bot,
+                    _FakePage(),
+                    session_seconds=0,
+                    stop_file_path=Path("C:/tmp/never_exists.sentinel"),
+                )
+        finally:
+            tick_body_module._tick_once = saved_tick_once
 
         text = fake_fs.get_written_files()[str(DEFAULT_INDEX_PATH)]
         data_lines = [line for line in text.splitlines() if line and not line.startswith("stamp\t")]

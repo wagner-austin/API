@@ -23,9 +23,6 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 
-from tankpit_bot.bus.frame_bus import (
-    FrameBus,
-)
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.session_status import (
     SessionStatusDict,
@@ -381,7 +378,7 @@ class TestStatusRoute:
         and skips it.
         """
         immediate_bus = _ImmediateCloseBus()
-        app = make_app(runner, bridge, immediate_bus, FrameBus(), _noop_shutdown)
+        app = make_app(runner, bridge, immediate_bus, None, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc, tc.get("/status") as response:
             # Read the entire response body — the server closes

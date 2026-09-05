@@ -194,9 +194,10 @@ class FakeBrowserTypeProbe:
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
         """Launch browser."""
-        _ = (headless, slow_mo, timeout, args)
+        _ = (headless, slow_mo, timeout, args, env)
         browser = FakeBrowserProbe(
             emit_messages=self._emit_messages,
             before_playing=self._before_playing,

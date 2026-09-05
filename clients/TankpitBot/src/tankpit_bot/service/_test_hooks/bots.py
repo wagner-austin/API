@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from tankpit_bot.service.session_runner import BotFactoryProtocol
+from tankpit_bot.stream.types import StreamConfigDict
 
 
 class BotFactoryBuilderProtocol(Protocol):
@@ -21,7 +22,7 @@ class BotFactoryBuilderProtocol(Protocol):
         *,
         headless: bool,
         prefer_account: bool,
-        cast_url: str,
+        stream_config: StreamConfigDict | None,
     ) -> BotFactoryProtocol:
         """Return a bot factory bound to the requested session config.
 
@@ -30,7 +31,8 @@ class BotFactoryBuilderProtocol(Protocol):
             headless: Whether the launched Chromium runs headless.
             prefer_account: Whether the bot uses account credentials
                 instead of guest login.
-            cast_url: Where the in-page caster POSTs frames.
+            stream_config: Display-capture parameters, or ``None``
+                when the session is not streamed.
 
         Returns:
             A callable that :class:`SessionRunner` invokes once per
@@ -40,7 +42,11 @@ class BotFactoryBuilderProtocol(Protocol):
 
 
 def _real_build_bot_factory(
-    target_url: str, *, headless: bool, prefer_account: bool, cast_url: str
+    target_url: str,
+    *,
+    headless: bool,
+    prefer_account: bool,
+    stream_config: StreamConfigDict | None,
 ) -> BotFactoryProtocol:
     """Production bot factory — constructs a real :class:`Bot` per session.
 
@@ -49,16 +55,15 @@ def _real_build_bot_factory(
         headless: Whether the launched Chromium runs headless.
         prefer_account: Whether the bot uses account credentials
             instead of guest login.
-        cast_url: Where the in-page caster POSTs frames. The service
-            passes its own bound port, so the video path never has to
-            guess the address of the process it is already inside.
+        stream_config: Display-capture parameters, or ``None`` when
+            the session is not streamed. The bot's run then owns the
+            Xvfb + ffmpeg pair for the session's lifetime.
 
     Returns:
         A :class:`BotFactoryProtocol` callable that
         :class:`SessionRunner` invokes once per session.
     """
     from tankpit_bot.bot.base import Bot
-    from tankpit_bot.bus.frame_bus import FrameBusProtocol
     from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
     from tankpit_bot.bus.status_bus import StatusBusProtocol
     from tankpit_bot.service.session_runner import RunnableBotProtocol
@@ -67,7 +72,6 @@ def _real_build_bot_factory(
         *,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
-        frame_bus: FrameBusProtocol,
     ) -> RunnableBotProtocol:
         return Bot(
             target_url,
@@ -75,8 +79,7 @@ def _real_build_bot_factory(
             prefer_account=prefer_account,
             mode_bridge=mode_bridge,
             status_bus=status_bus,
-            frame_bus=frame_bus,
-            cast_url=cast_url,
+            stream_config=stream_config,
         )
 
     return factory

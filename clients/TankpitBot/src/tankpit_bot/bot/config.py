@@ -18,6 +18,8 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.types import AIConfigDict, make_default_ai_config
 from tankpit_bot.fleetshare.role import resolve_engagement_doctrine, resolve_fleet_role
+from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
+from tankpit_bot.stream.types import StreamConfigDict, decode_stream_config
 
 DEFAULT_TARGET_URL = "https://tankpit.com/"
 """Canonical tankpit URL used when ``TANKPIT_URL`` is unset or empty."""
@@ -125,71 +127,85 @@ def resolve_human_rank_window() -> tuple[int, int]:
     )
 
 
-def resolve_video_fps() -> float:
-    """Return the live-view capture rate from ``TANKPIT_BOT_VIDEO_FPS``.
+DEFAULT_STREAM_WIDTH = 704
+"""Capture screen width. Sized just past the game's 672-wide composite
+so the client fills the frame; even, because yuv420p requires it."""
 
-    Default 60 fps as of 2026-09-04, raised from 30, which was itself
-    raised from 12 a day earlier because 12 was
-    UNDERSAMPLING THE GAME'S ANIMATIONS. Walking, a radar sweep and a
-    projectile's travel are each many frames, and a histogram of frame
-    arrivals from a live playing bot showed 71 of 148 inter-frame gaps
-    sitting in the 50-100 ms bucket — clustered on the 83 ms sampling
-    interval itself. That is the caster's own floor, not the game's
-    rate: nearly half the samples were taken as fast as the caster was
-    allowed to take them, so whatever happened in between was thrown
-    away and the motion arrived stepped.
+DEFAULT_STREAM_HEIGHT = 544
+"""Capture screen height, same sizing logic against the 532-tall
+composite."""
 
-    30 WAS STILL THE FLOOR, and ``tankpit-stream-probe`` is what said
-    so. Measuring the public stream at 30 Hz: median inter-frame gap
-    28 ms, and 35 of 107 gaps sitting within tolerance of the 33 ms
-    sampling interval. A median FASTER than the interval means the game
-    is painting at roughly 35 fps while motion is happening, so a third
-    of the frames were still being taken as fast as the caster was
-    allowed rather than as fast as the content changed.
+DEFAULT_STREAM_FPS = 30
+"""Display sampling rate. The game paints at ~60 Hz but its motion is
+readable at 30, and half the sampling is half the encode cost for a
+per-bot pipeline that runs N times per container."""
 
-    Affordable, measured in this workspace's own container against six
-    stacked 384x256 canvases all repainting every frame (the worst case
-    the real client can present): the caster achieved 59.0/s while the
-    page's own requestAnimationFrame stayed at 60.0/s, against a 60.0/s
-    baseline with no caster at all. It costs the page nothing at any of
-    the three rates.
+DEFAULT_STREAM_BITRATE_KBPS = 1000
+"""Encoder target. One megabit of H.264 at 704x544 is generous for
+2D game content — and ~5x less than the 678 KB/s the MJPEG pipeline
+this replaced was measured spending on the same picture."""
 
-    The bandwidth objection that kept this at 30 was answered by
-    measurement too. That worst case is 584 KB/s, but it assumes every
-    canvas changing every frame, which the game does not do: the public
-    stream at 30 Hz measured 216 KB/s with a 0 per cent duplicate share.
-    Doubling the sample rate cannot double a bill that only motion
-    pays.
-
-    The real cost is lower than either number because unchanged frames
-    are no longer sent at all (see
-    :mod:`tankpit_bot.browser.live_view`), so a still game bills
-    nothing for the higher rate and only motion spends it.
-
-    Returns:
-        Frames per second the in-page caster targets.
-
-    Raises:
-        ValueError: If the env value is set but not a number.
-    """
-    raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_FPS")
-    return float(raw) if raw is not None else 60.0
+DEFAULT_STREAM_SEGMENT_SECONDS = 2
+"""HLS segment length: the latency floor of the pipeline. Two seconds
+keeps a viewer 2-6 s behind live, which a passive demo does not feel,
+and keeps request cadence at one playlist poll + one segment per two
+seconds per viewer."""
 
 
-def resolve_video_quality() -> float:
-    """Return the live-view JPEG quality from ``TANKPIT_BOT_VIDEO_QUALITY``.
+def resolve_stream_config() -> StreamConfigDict | None:
+    """Return the display-capture configuration, or ``None`` when off.
 
-    Default 0.8 — visually clean on the composited game canvases
-    without ballooning per-frame size.
+    ``TANKPIT_STREAM_VIDEO`` is the switch, set by the fleet's compose
+    file and nothing else: a desktop ``make run`` has a real window to
+    watch and no Xvfb to start, so unset means no capture and no other
+    variable is read.
+
+    The display number comes from ``TANKPIT_STREAM_DISPLAY`` when set,
+    else from ``TANKPIT_BOT_SERVICE_PORT`` — the port the fleet
+    manager already allocates uniquely per live child, which makes it
+    a free unique X display number. No third source: a process with
+    neither has no collision-free number to claim, and guessing one
+    is how two bots end up recording each other's screens.
+
+    Args:
+        None.
 
     Returns:
-        JPEG quality in (0, 1] for the page's ``toDataURL``.
+        The validated configuration, or ``None`` when streaming is
+        off.
 
     Raises:
-        ValueError: If the env value is set but not a number.
+        ValueError: Streaming is on but no display number is
+            resolvable, or a numeric override is not an integer, or a
+            value is outside its domain (via
+            :func:`~tankpit_bot.stream.types.decode_stream_config`).
     """
-    raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_QUALITY")
-    return float(raw) if raw is not None else 0.8
+    if not resolve_env_flag("TANKPIT_STREAM_VIDEO"):
+        return None
+    raw_display = _test_hooks.get_env("TANKPIT_STREAM_DISPLAY")
+    if raw_display is None:
+        raw_display = _test_hooks.get_env("TANKPIT_BOT_SERVICE_PORT")
+    if raw_display is None:
+        raise ValueError(
+            "TANKPIT_STREAM_VIDEO is set but neither TANKPIT_STREAM_DISPLAY nor"
+            " TANKPIT_BOT_SERVICE_PORT is; there is no unique display number to use"
+        )
+    raw_fps = _test_hooks.get_env("TANKPIT_STREAM_FPS")
+    raw_bitrate = _test_hooks.get_env("TANKPIT_STREAM_BITRATE_KBPS")
+    hls_dir = bot_run_dir(resolve_bot_instance()) / "hls"
+    return decode_stream_config(
+        {
+            "display": int(raw_display),
+            "width": DEFAULT_STREAM_WIDTH,
+            "height": DEFAULT_STREAM_HEIGHT,
+            "fps": int(raw_fps) if raw_fps is not None else DEFAULT_STREAM_FPS,
+            "bitrate_kbps": (
+                int(raw_bitrate) if raw_bitrate is not None else DEFAULT_STREAM_BITRATE_KBPS
+            ),
+            "segment_seconds": DEFAULT_STREAM_SEGMENT_SECONDS,
+            "hls_dir": str(hls_dir),
+        }
+    )
 
 
 def resolve_priority_target() -> str:
@@ -207,6 +223,11 @@ def resolve_priority_target() -> str:
 
 
 __all__ = [
+    "DEFAULT_STREAM_BITRATE_KBPS",
+    "DEFAULT_STREAM_FPS",
+    "DEFAULT_STREAM_HEIGHT",
+    "DEFAULT_STREAM_SEGMENT_SECONDS",
+    "DEFAULT_STREAM_WIDTH",
     "DEFAULT_TARGET_URL",
     "env_ai_config",
     "resolve_env_flag",
@@ -214,9 +235,8 @@ __all__ = [
     "resolve_human_rank_window",
     "resolve_prefer_account",
     "resolve_priority_target",
+    "resolve_stream_config",
     "resolve_target_url",
-    "resolve_video_fps",
-    "resolve_video_quality",
 ]
 
 

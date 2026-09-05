@@ -46,8 +46,9 @@ orientation layer; when it and the wiki disagree, the wiki wins.
   simulated server on real terrain, with no browser and no live server
 - **Executable physics** (`physics/`) — one symbol per machine-checked wiki claim,
   re-derived from the runs archive on every `make check` and `make audit`
-- **Phone-driven service** — long-running aiohttp + SSE server with a live MJPEG
-  view, mode pinning, and a self-contained watch page
+- **Phone-driven service** — long-running aiohttp + SSE server with a live HLS
+  video view (each streamed bot records its own Xvfb display via ffmpeg),
+  mode pinning, and a self-contained watch page
 - **Live diagnostics** — in-page HUD, click-to-flag channel with lead-up snapshots,
   issue reports, ledger audits, and cross-session stats
 - **Type safety** — mypy strict, zero `Any`/`cast`/`type: ignore`, immutable TypedDicts
@@ -159,7 +160,7 @@ tick, emitting decision traces with no browser involved.
 | `GET /status` | SSE stream of `SessionStatusDict` frames, one per tick |
 | `POST /shutdown` | stop the session and the service |
 | `GET /watch` | self-contained phone watch page |
-| `GET /video` / `GET /frame` | MJPEG live view / one-shot JPEG snapshot |
+| `GET /video/{file}` | one HLS file (playlist or segment) of the session's display capture |
 
 Three threadsafe primitives cross the aiohttp-loop ↔ tick-loop boundary:
 `ModeBridge` (latest-wins mode slot), `StatusBus` (latest-wins fan-out), and

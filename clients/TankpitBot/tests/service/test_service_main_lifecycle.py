@@ -9,9 +9,6 @@ from aiohttp import web
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot._test_hooks import _real_load_dotenv
-from tankpit_bot.bus.frame_bus import (
-    FrameBus,
-)
 from tankpit_bot.bus.status_bus import (
     StatusBus,
 )
@@ -81,7 +78,6 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 StatusBus(),
-                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -101,7 +97,6 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 bus,
-                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -111,43 +106,12 @@ class TestExitWhenIdle:
         await asyncio.sleep(0.15)
         assert not stop_event.is_set()
 
-        # Viewer leaves → the clock finally runs out.
+        # Viewer leaves → the clock finally runs out. Awaiting the
+        # task is also what pins the shutdown exit: the monitor's
+        # ``return`` after ``stop_event.set()`` is unobservable from
+        # outside, so what matters is asserted here -- the task
+        # completes rather than polling forever.
         bus.unsubscribe(subscriber)
-        await asyncio.wait_for(task, timeout=2.0)
-        assert stop_event.is_set()
-
-    @pytest.mark.asyncio
-    async def test_a_video_viewer_keeps_the_service_alive(self) -> None:
-        """An open ``/video`` connection resets the idle clock every poll.
-
-        Awaiting the task is also what pins the shutdown exit. The
-        monitor's ``return`` after ``stop_event.set()`` is unobservable --
-        the loop it sits in is ``while not stop_event.is_set()`` and
-        there is no ``await`` between the set and the next check, so no
-        other coroutine can intervene and the loop ends either way. It is
-        structural rather than redundant: it terminates the body at a
-        control-flow boundary, and the equivalence holds only because
-        nothing follows the block. What matters is asserted here -- the
-        task completes rather than polling forever.
-        """
-        stop_event = asyncio.Event()
-        frames = FrameBus()
-        subscriber = frames.subscribe()
-        task = asyncio.create_task(
-            exit_when_idle(
-                _IdleProbeRunner(),
-                StatusBus(),
-                frames,
-                stop_event,
-                idle_exit_seconds=0.03,
-                poll_seconds=0.01,
-            )
-        )
-
-        await asyncio.sleep(0.15)
-        assert not stop_event.is_set()
-
-        frames.unsubscribe(subscriber)
         await asyncio.wait_for(task, timeout=2.0)
         assert stop_event.is_set()
 
@@ -160,7 +124,6 @@ class TestExitWhenIdle:
             exit_when_idle(
                 runner,
                 StatusBus(),
-                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -189,7 +152,6 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 StatusBus(),
-                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.0,
                 poll_seconds=0.01,
@@ -209,7 +171,6 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 StatusBus(),
-                FrameBus(),
                 stop_event,
                 idle_exit_seconds=10.0,
                 poll_seconds=0.01,

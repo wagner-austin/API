@@ -108,6 +108,9 @@ spot in the event stream:
     wiki's gate.
 [^3]: `src/tankpit_bot/browser/flag_capture.py:50` —
     `FlagCaptureService`, with `FLAG_RING_SIZE = 8` at `:46`;
-    binding-vs-fetch rationale measured 2026-07-29 in
-    `src/tankpit_bot/browser/live_view.py` module docs.
+    binding-vs-fetch rationale measured 2026-07-29 in the then-current
+    `src/tankpit_bot/browser/live_view.py` module docs (deleted
+    2026-09-05 with the canvas-scrape video pipeline —
+    [[bot-service-architecture]]; the flag button's own binding
+    channel is unaffected).
 [^4]: `src/tankpit_bot/runtime_context.py:26` — `RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})`, the context stamped onto every emitted diagnostic (field docs at `:57-67`). The flag's own fields come from `src/tankpit_bot/browser/flag_capture.py:100-105`: `emit_diagnostic(diagnostic_kind="human_flag", flag_seq=..., clicked_at_ms=..., recent_ticks=...)`.

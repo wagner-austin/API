@@ -223,6 +223,7 @@ class RecordedBrowserType:
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
         """Record the launch request and return the harness browser.
 
@@ -232,11 +233,13 @@ class RecordedBrowserType:
             timeout: Ignored (production uses defaults).
             args: Recorded but ignored — the harness never spawns a real
                 browser process.
+            env: Ignored — the harness never spawns a real browser
+                process.
 
         Returns:
             The harness browser.
         """
-        _ = (slow_mo, timeout, args)
+        _ = (slow_mo, timeout, args, env)
         self.launches.append(headless)
         return self._browser
 

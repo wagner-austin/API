@@ -14,10 +14,6 @@ from aiohttp import web
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bus.frame_bus import (
-    FrameBus,
-    FrameBusProtocol,
-)
 from tankpit_bot.bus.mode_bridge import (
     ModeBridge,
     ModeBridgeProtocol,
@@ -41,6 +37,7 @@ from tankpit_bot.service.service_main import (
     _autostart_session,
     main,
 )
+from tankpit_bot.stream.types import StreamConfigDict
 from tests.conftest import FakeEnv
 from tests.service._service_main_harness import (
     _CancellingSite,
@@ -55,28 +52,31 @@ class TestRealBuildBotFactory:
 
     def test_factory_produces_a_bot_bound_to_its_bridge_and_bus(self) -> None:
         """The bot returned by the factory has the injected channels."""
+        stream_config = StreamConfigDict(
+            display=9,
+            width=704,
+            height=544,
+            fps=30,
+            bitrate_kbps=1000,
+            segment_seconds=2,
+            hls_dir="runs/bot/demo-1/hls",
+        )
         factory = _real_build_bot_factory(
             "https://test.tankpit.com/",
-            headless=True,
+            headless=False,
             prefer_account=False,
-            cast_url="http://127.0.0.1:27100/cast",
+            stream_config=stream_config,
         )
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
-        frames: FrameBusProtocol = FrameBus()
 
-        raw = factory(mode_bridge=bridge, status_bus=bus, frame_bus=frames)
+        raw = factory(mode_bridge=bridge, status_bus=bus)
         if not isinstance(raw, Bot):
             raise AssertionError("real bot factory must return a Bot instance")
 
         assert raw._mode_bridge is bridge
         assert raw._status_bus is bus
-        assert raw._frame_bus is frames
-        # The cast URL is what makes a caster exist at all; a bot built
-        # without one installs nothing (see Bot.__init__).
-        if raw._live_view is None:
-            raise AssertionError("a factory given a cast url must build a caster")
-        assert raw._live_view.active is False
+        assert raw._stream_config is stream_config
 
     def test_factory_carries_headless_and_prefer_account(self) -> None:
         """Construction args flow through to the produced bot."""
@@ -84,17 +84,18 @@ class TestRealBuildBotFactory:
             "https://test.tankpit.com/",
             headless=True,
             prefer_account=True,
-            cast_url="http://127.0.0.1:27100/cast",
+            stream_config=None,
         )
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
 
-        raw = factory(mode_bridge=bridge, status_bus=bus, frame_bus=FrameBus())
+        raw = factory(mode_bridge=bridge, status_bus=bus)
         if not isinstance(raw, Bot):
             raise AssertionError("real bot factory must return a Bot instance")
 
         assert raw._headless is True
         assert raw._prefer_account is True
+        assert raw._stream_config is None
 
 
 class TestAiohttpSiteAdapter:
@@ -215,18 +216,12 @@ class TestAsyncMain:
             "/status",
             "/shutdown",
             "/watch",
-            "/video",
-            # The frame intake. Its whole purpose is the THREAD it runs
-            # on: aiohttp serves it on the main-thread event loop, so a
-            # frame posted here reaches the bus while the session's
-            # executor thread is busy in a heavy tick.
-            "/cast",
-            "/frame",
-            # Production versus delivery. The one measurement that
-            # cannot be taken from the far end of the stream, where a
-            # dropped frame and a frame that was never produced are
-            # the same longer gap.
-            "/frames",
+            # The vendored hls.js the watch page loads.
+            "/watch/hls.js",
+            # One HLS file per request — playlist or segment, read off
+            # the disk the session's own ffmpeg writes. Video serving
+            # no longer touches the tick loop or the page at all.
+            "/video/{file}",
         }
         assert fake_site.start_calls == 1
         assert fake_site.cleanup_calls == 1
@@ -377,7 +372,7 @@ class TestHeadlessWiring:
         with pytest.raises(asyncio.CancelledError):
             await _async_main()
 
-        assert [headless for _url, headless, _prefer in builder.calls] == [True]
+        assert [headless for _url, headless, _prefer, _stream in builder.calls] == [True]
 
     async def test_the_default_launch_keeps_the_window(
         self,
@@ -400,7 +395,39 @@ class TestHeadlessWiring:
         with pytest.raises(asyncio.CancelledError):
             await _async_main()
 
-        assert [headless for _url, headless, _prefer in builder.calls] == [False]
+        assert [headless for _url, headless, _prefer, _stream in builder.calls] == [False]
+
+    async def test_streaming_env_reaches_the_bot_factory(
+        self,
+        restore_service_hooks: None,
+    ) -> None:
+        """``TANKPIT_STREAM_VIDEO`` resolves a capture config at boot.
+
+        The service is where the resolver runs — a fleet child that
+        ignored the flag would silently stream nothing while the demo
+        page polled a warming 503 forever.
+        """
+        _ = restore_service_hooks
+        top_hooks.get_env = FakeEnv({"TANKPIT_STREAM_VIDEO": "true", "TANKPIT_STREAM_DISPLAY": "9"})
+        builder = _CapturingBotFactoryBuilder(_RecordingBot())
+        service_hooks.build_bot_factory = builder
+
+        async def cancelling_build_site(
+            app: web.Application, host: str, port: int
+        ) -> SiteRunnerProtocol:
+            _ = (app, host, port)
+            return _CancellingSite()
+
+        service_hooks.build_site = cancelling_build_site
+
+        with pytest.raises(asyncio.CancelledError):
+            await _async_main()
+
+        assert len(builder.calls) == 1
+        stream_config = builder.calls[0][3]
+        if stream_config is None:
+            raise AssertionError("the resolved capture config must reach the factory")
+        assert stream_config["display"] == 9
 
 
 class TestMain:

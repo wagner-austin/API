@@ -19,6 +19,25 @@ hubs: [architecture]
 
 # Bot Service Architecture
 
+> **STATUS 2026-09-05 — VIDEO CHANGED CLASS. The in-page canvas
+> caster, the frame/chunk bus, and the MJPEG relay described below
+> were all DELETED.** A streamed bot now runs Chromium HEADED on its
+> own Xvfb display inside the container and an ffmpeg owned by the
+> bot's run records that display into HLS segments
+> (`stream/capture.py`); the files land in
+> `runs/bot/<instance>/hls/` and are served as plain files — by the
+> child at `/video/{file}` and by the fleet manager at
+> `/demo/video/{slot}/{file}` straight off the shared filesystem
+> (`service/video_files.py`), no relay and no per-child port dial.
+> Capture rides the compositor: nothing about video touches the
+> page, the tick loop, or the CDP connection any more, which is the
+> failure class the whole 2026-09-04 slideshow session was spent
+> inside. Enabled per child by `TANKPIT_STREAM_VIDEO` (fleet compose
+> sets it, with `TANKPIT_HEADLESS: "false"`); the display number is
+> the child's own service port. Sections below describing the
+> caster, `frame_bus`/`chunk_bus`, `/cast`, or an endless `/video`
+> response are HISTORY of the replaced design.
+
 > **STATUS 2026-09-03 — READ THIS FIRST. The SPA that this page is
 > written around no longer exists, and neither does the console script
 > in the sentence below.** Tankpit was decoupled from fiesta in MCPs
@@ -78,13 +97,29 @@ Nine routes, all under nginx's `/api/tankbot/*` prefix in production:[^1]
 | `POST /mode`   | Decodes `ModeCommandDict`, calls `mode_bridge.submit(...)` | `204` on success |
 | `GET  /status` | Subscribes to `StatusBus`, streams `SessionStatusDict` frames as SSE `data: <json>` lines | `200 text/event-stream` |
 | `POST /shutdown` | Requests session stop, fires the service shutdown signal | `202 shutting down` |
-| `GET  /watch`  | Self-contained phone watch page (`service/watch_page.py`) | `200 text/html` |
-| `GET  /video`  | Subscribes to `FrameBus`, streams live-view JPEGs as MJPEG multipart parts | `200 multipart/x-mixed-replace` |
-| `GET  /frame`  | One-shot JPEG snapshot (fresh-frame wait, cached fallback) | `200 image/jpeg` / `404` before any frame |
+| `GET  /watch`  | Self-contained phone watch page (`service/watch_page.py`), playing HLS natively or via the vendored hls.js | `200 text/html` |
+| `GET  /watch/hls.js` | The wheel's own hls.js build (`tankpit_bot/data/hls.min.js`, pinned 1.5.20) | `200 application/javascript` |
+| `GET  /video/{file}` | One HLS file off this session's capture directory (`stream/hls.py::read_hls_file`) | `200`; `503` + `Retry-After` while the encoder warms; `404` for a rotated-out segment, a name outside the grammar, or a session with no stream |
 
-The SSE handler runs `subscriber.next_frame(timeout=15.0)` inside `loop.run_in_executor` so the event loop stays responsive; on timeout it writes a `: heartbeat` SSE comment to keep intermediaries (nginx, cloudflared) from idling the TCP connection out. The MJPEG drain mirrors that shape; its keepalive re-sends the last JPEG (MJPEG has no comment channel).[^1]
+(2026-09-05: `GET /video` as an endless MJPEG response, `GET /frame`,
+`POST /cast` and `GET /frames` all left with the canvas-scrape
+pipeline.)
+
+The SSE handler runs `subscriber.next_frame(timeout=15.0)` inside `loop.run_in_executor` so the event loop stays responsive; on timeout it writes a `: heartbeat` SSE comment to keep intermediaries (nginx, cloudflared) from idling the TCP connection out. (The MJPEG drain that once mirrored this shape is gone — HLS viewers are discrete file GETs with nothing to keep alive.)[^1]
 
 ## Watch surface — tankpit cut loose from fiesta (2026-07-28)
+
+> **HISTORY AS OF 2026-09-05.** Everything below in this section
+> describes the canvas-scrape era: the in-page caster
+> (`browser/live_view.py`, deleted), the frame bus
+> (`bus/frame_bus.py`, deleted), the per-tick demand sync
+> (`_sync_live_view_demand`, deleted) and the MJPEG `<img>` watch
+> page (rewritten for HLS). The measurements are kept because they
+> are the evidence for WHY the class change happened: even fixed and
+> tuned, capture that rides the page and delivery that rides one
+> endless HTTP response measured 9.65 fps with 12 stalls covering
+> 26.7 s of a 45.6 s public-stream window. The replacement records
+> the display itself — see the 2026-09-05 status block at the top.
 
 The phone no longer needs the Sunshine/Vibeshine stack to SEE the bot.
 The fiesta path streamed a virtual monitor (kernel IDD driver, patched

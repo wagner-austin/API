@@ -507,43 +507,6 @@ def _is_ready_for_decision(bot: Bot) -> bool:
     return True
 
 
-def _sync_live_view_demand(bot: Bot) -> None:
-    """Keep the in-page caster matched to viewer demand.
-
-    Runs once per tick, directly after ``_tick_once`` inside the same
-    ``TargetClosedError`` guard (a closed browser during the toggle
-    ends the run as ``browser_closed``). Demand is the frame bus's
-    subscriber count: a ``/video`` (or ``/frame``) connection on the
-    service creates it; the last disconnect removes it. While demand
-    holds, :meth:`LiveViewService.ensure` re-evaluates the idempotent
-    caster snippet EVERY tick — that repetition is the self-heal for
-    page navigations, which wipe injected JS. Sessions nobody watches
-    never run the caster, and ``make run`` / replay sessions (inert
-    default bus, zero subscribers) never start it at all.
-
-    Skipped entirely when the bot has no caster (``cast_url`` empty),
-    which is every ``make run`` / replay / scenario session: there is no
-    service listening for frames, so installing one would encode JPEGs
-    into a closed port.
-
-    Skipped silently before the CDP session is attached — the tick
-    loop's readiness gates run this only in ticks where the browser is
-    already up, but the very first iterations of a session can land
-    here pre-attach.
-
-    Args:
-        bot: Bot instance whose ``_live_view`` and ``_frame_bus``
-            drive the decision.
-    """
-    cdp = bot._cdp
-    if cdp is None or bot._live_view is None:
-        return
-    if bot._frame_bus.subscriber_count() > 0:
-        bot._live_view.ensure(cdp)
-    elif bot._live_view.active:
-        bot._live_view.stop(cdp)
-
-
 __all__ = [
     "log",
 ]

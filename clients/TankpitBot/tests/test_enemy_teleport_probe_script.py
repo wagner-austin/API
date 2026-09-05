@@ -79,8 +79,9 @@ class _FakeBrowserType:
         slow_mo: float | None = None,
         timeout: float | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> BrowserProtocol:
-        _ = (headless, slow_mo, timeout, args)
+        _ = (headless, slow_mo, timeout, args, env)
         raise AssertionError("playwright factory should not be invoked in this script test")
 
 

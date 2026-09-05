@@ -132,9 +132,12 @@ component, not a way to record that it has not.[^6]
 `bot/ai/modes.py` was a pure leaf (only `platform_core` and `typing`)
 living inside `bot/ai`, which forced `service/types.py` to import
 `bot`; it is now `types/modes.py`. The three cross-thread buses moved
-to a new `bus/` package -- `frame_bus.py` imports nothing from
-`tankpit_bot` at all, yet while it sat in `service/` the tick loop had
-to import the HTTP package to run. The last two edges were
+to a new `bus/` package -- the then-current `frame_bus.py` imported
+nothing from `tankpit_bot` at all, yet while it sat in `service/` the
+tick loop had to import the HTTP package to run. (The frame bus itself
+was deleted 2026-09-05 with the canvas-scrape video pipeline; the
+layering lesson and the `bus/` package both outlive it.) The last two
+edges were
 function-level imports, which is the tell: `bot/config.py` reached into
 `service.constants` because `resolve_idle_exit_seconds` is a service
 concern that was living in bot config, and `bot/entry.py` imported
@@ -188,4 +191,4 @@ a genuine module cycle, because the approach stages and the fire stage
 call each other and could not be separated while the wrappers existed.
 
 [^6]: `scripts/layer_rules.py:30` -- `BASE_LAYER: dict[str, frozenset[str]]`, the declaration this section's table renders, checked over `sorted(BASE_LAYER)` at `:93-94`. Its module docstring states the invariant at `:9-10`: "Each entry in :data:`BASE_LAYER` names a package and the complete set of ``tankpit_bot`` packages it is allowed to import. Anything else is a" violation. Verified 2026-08-07.
-[^7]: Post-move layout verified 2026-08-07: `src/tankpit_bot/types/modes.py` and `src/tankpit_bot/bus/frame_bus.py` both exist at their new homes, and the two CDP page readers are modules under `browser/` -- `src/tankpit_bot/browser/page_client_snapshot.py` and `src/tankpit_bot/browser/client_structure.py` -- not functions, which is why a symbol grep for them returns nothing.
+[^7]: Post-move layout verified 2026-08-07: `src/tankpit_bot/types/modes.py` and (then) `src/tankpit_bot/bus/frame_bus.py` both existed at their new homes, and the two CDP page readers are modules under `browser/` -- `src/tankpit_bot/browser/page_client_snapshot.py` and `src/tankpit_bot/browser/client_structure.py` -- not functions, which is why a symbol grep for them returns nothing. `frame_bus.py` was deleted 2026-09-05 with the canvas-scrape video pipeline ([[bot-service-architecture]]); `bus/` retains `mode_bridge.py`, `status_bus.py`, `session_status.py`.

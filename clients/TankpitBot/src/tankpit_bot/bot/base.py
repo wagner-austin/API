@@ -9,6 +9,7 @@ construction and the session run loop.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -43,26 +44,25 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
     wait_for_game_ready,
 )
-from tankpit_bot.browser.live_view import LiveViewService
 from tankpit_bot.browser.room_join import resolve_room_name
 from tankpit_bot.browser.session_storage import (
     load_storage_state,
     resolve_storage_state_path,
     save_storage_state,
 )
-from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.diagnostics.entity_alignment import EntityAlignmentEmitter
 from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.chrome_launch import (
-    LOOPBACK_POST_ARGS,
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
 )
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.stream.capture import DisplayCapture
+from tankpit_bot.stream.types import StreamConfigDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
 log = get_logger(__name__)
@@ -107,9 +107,8 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         command_service: CommandService | None = None,
         mode_bridge: ModeBridgeProtocol | None = None,
         status_bus: StatusBusProtocol | None = None,
-        frame_bus: FrameBusProtocol | None = None,
         world: WorldService | None = None,
-        cast_url: str = "",
+        stream_config: StreamConfigDict | None = None,
     ) -> None:
         """Initialize the bot.
 
@@ -128,23 +127,29 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 auto-arbitration runs unchanged. The service main
                 (Phase A8) injects the shared instance the aiohttp
                 thread owns.
-            cast_url: Absolute URL the in-page caster POSTs frames to.
-                Empty means NO live view at all, which is right for
-                ``make run`` / replay / scenarios: those have no service
-                listening, so a caster would burn a JPEG encode every
-                interval and throw the result at a closed port. The
-                service passes its own bound port down.
             status_bus: Fan-out the tick loop publishes
                 :class:`SessionStatusDict` frames into. When ``None``,
                 a fresh :class:`StatusBus` is created — a standalone
                 session gets a bus with zero subscribers, so publish
                 is a no-op.
-            frame_bus: Fan-out the screencast relay publishes JPEG
-                frames into (2026-07-28 watch page). When ``None``, a
-                fresh :class:`FrameBus` is created — a standalone
-                session has zero subscribers, so the tick loop's
-                demand check never starts the screencast.
+            stream_config: Display-capture parameters. ``None`` means
+                no capture — right for a desktop ``make run`` (the
+                operator watches the real window) and for replay /
+                scenario sessions, which have no viewers at all. The
+                fleet's containers pass the resolved configuration and
+                the run then owns an Xvfb + ffmpeg pair for its whole
+                lifetime.
+
+        Raises:
+            ValueError: ``stream_config`` with ``headless=True`` — a
+                capture records a rendered window, and a headless
+                launch has none to record.
         """
+        if headless and stream_config is not None:
+            raise ValueError(
+                "stream capture records a rendered window; run headed (TANKPIT_HEADLESS off)"
+                " when TANKPIT_STREAM_VIDEO is set"
+            )
         super().__init__(
             target_url,
             headless=headless,
@@ -182,17 +187,10 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._status_bus: StatusBusProtocol = (
             status_bus if status_bus is not None else default_status_bus
         )
-        default_frame_bus: FrameBusProtocol = FrameBus()
-        self._frame_bus: FrameBusProtocol = (
-            frame_bus if frame_bus is not None else default_frame_bus
-        )
-        # The in-page caster captures at its own cadence and POSTs each
-        # frame to the service's own /cast route, which publishes onto
-        # this frame bus from the aiohttp loop -- deliberately NOT from
-        # this thread, which is the one the tick loop occupies
-        # (tankpit_bot.browser.live_view explains what that cost).
-        # Empty URL means no caster: see the ``cast_url`` note above.
-        self._live_view = LiveViewService(cast_url) if cast_url else None
+        # Display capture is a RUN-scoped concern: the Xvfb + ffmpeg
+        # pair live exactly as long as one browser does, so run() owns
+        # their lifecycle and the constructor only keeps the wish.
+        self._stream_config = stream_config
         # Human bug marker (2026-07-29): the HUD flag button delivers
         # clicks over its own CDP binding; the service turns each into
         # a human_flag diagnostic carrying the recent-tick ring.
@@ -279,16 +277,43 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._ai_state = make_initial_ai_state(env_ai_config())
         self._cdp_message_buffer = []
 
-        launch_args = _chrome_stream_display_args() + LOOPBACK_POST_ARGS
+        # ``--kiosk`` when capturing: the Xvfb screen is sized exactly
+        # to the capture, so fullscreen-without-browser-UI is what puts
+        # pure game pixels in front of ffmpeg. (--start-maximized is
+        # NOT equivalent — see the Playwright #14314 note in
+        # chrome_launch — and a normal window would put a toolbar in
+        # every frame of the public stream.)
+        launch_args = _chrome_stream_display_args() + (
+            ["--kiosk"] if self._stream_config is not None else []
+        )
         # Keyed by login identity so a fleet child selecting a
         # different account can never resume another account's session
         # (the 2026-08-13 arterial-as-artax incident).
         storage_cache = resolve_storage_state_path(self._prefer_account)
         storage_state_path = load_storage_state(storage_cache)
-        with _test_hooks.sync_playwright() as playwright:
+        with ExitStack() as stack:
+            capture: DisplayCapture | None = None
+            launch_env: dict[str, str] | None = None
+            if self._stream_config is not None:
+                capture = DisplayCapture(self._stream_config)
+                # Registered BEFORE start_display: a display that
+                # timed out waiting still has a server process to
+                # stop. LIFO order means this runs after the
+                # playwright context below has closed the browser, so
+                # the display outlives its one client.
+                stack.callback(capture.stop)
+                capture.start_display()
+                # Chromium finds its display the way every X client
+                # does: DISPLAY in ITS environment. Playwright
+                # replaces the child environment rather than merging,
+                # so the overlay rides a full copy of the parent's.
+                launch_env = dict(_test_hooks.child_environment())
+                launch_env["DISPLAY"] = capture.display_env
+            playwright = stack.enter_context(_test_hooks.sync_playwright())
             browser = playwright.chromium.launch(
                 headless=self._headless,
                 args=launch_args,
+                env=launch_env,
             )
             # ONE teardown path, and it starts the statement after the
             # launch. The browser used to be closed at the tail of the
@@ -300,9 +325,14 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
             # browser with it, so no process outlived that path, but
             # the graceful close and its watchdogs were skipped.
             try:
+                # No fixed viewport whenever the window itself is the
+                # product: the Vibeshine streamed display, or a kiosk
+                # window filling the capture screen. Playwright's
+                # default 1280x720 viewport would clamp the content
+                # inside either.
                 context = (
                     browser.new_context(no_viewport=True, storage_state=storage_state_path)
-                    if _chrome_stream_no_viewport()
+                    if _chrome_stream_no_viewport() or self._stream_config is not None
                     else browser.new_context(storage_state=storage_state_path)
                 )
                 page = context.new_page()
@@ -327,6 +357,13 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 )
 
                 wait_for_game_ready(page, self._messages)
+
+                # The encoder starts only once there is a game on the
+                # screen: everything before this line is login flow,
+                # and recording it would spend the live window's first
+                # segments on a loading page.
+                if capture is not None:
+                    capture.start_encoder()
 
                 # Persist the freshly-issued auth cookies + localStorage
                 # before the game loop can crash. Next launch of the bot

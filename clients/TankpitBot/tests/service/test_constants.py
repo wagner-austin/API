@@ -11,7 +11,6 @@ from tankpit_bot.service.constants import (
     FLEET_CHILD_PORT_BASE,
     FLEET_CHILD_PORT_COUNT,
     SERVICE_PORT,
-    child_video_url,
     health_url,
     resolve_service_port,
 )
@@ -51,11 +50,6 @@ def test_bad_ports_are_loud_errors() -> None:
             resolve_service_port()
     finally:
         _test_hooks.get_env = original_get_env
-
-
-def test_child_video_url_carries_the_port() -> None:
-    """A child's video is addressed on loopback by its own port."""
-    assert child_video_url(27101) == "http://127.0.0.1:27101/video"
 
 
 def test_the_child_port_range_never_collides_with_the_service_port() -> None:

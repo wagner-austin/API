@@ -6221,3 +6221,47 @@ would be invented — and `feature_provenance` now dates that limit to
 the pre-stamp era. The running fleet stamps `""` until its next
 release/up cycle. Twelve consumer tests across six files re-derived
 for the new first line; gate 7,000 tests at 100.00%.
+
+## [2026-09-05] architecture | Video changed class: the canvas scraper is deleted, the bot records its own display
+
+The demo's video was rebuilt as the OTHER kind of system. Deleted
+whole: the in-page caster (`browser/live_view.py`), the frame/chunk
+bus, the `/cast` intake, the endless-`/video` relay
+(`service/video_relay.py`), the per-tick demand sync, and the
+`LOOPBACK_POST_ARGS` launch flags whose only purpose was the caster's
+loopback POST. In their place, `stream/`: a streamed bot runs Chromium
+HEADED in kiosk mode on its own Xvfb display inside the container, and
+an ffmpeg owned by `Bot.run` records that display into two-second HLS
+segments under `runs/bot/<instance>/hls/`. The manager serves the
+files straight off the shared filesystem (`service/video_files.py`,
+`GET /demo/video/{slot}/{file}`); the child serves its own at
+`/video/{file}`; the watch page and the public dashboard play them via
+native HLS or the vendored hls.js 1.5.20 (`data/hls.min.js`,
+[[packaged-data-assets]]).
+
+Why a class change and not another fix: the 2026-09-04 session
+measured the scraped MJPEG stream at 9.65 fps with 12 stalls covering
+26.7 s of a 45.6 s window, traced the floor to `toDataURL` riding the
+page's main thread, fixed a real CDP-thread defect that did not move
+the symptom, and concluded (board post 21:25Z, session 23fe4130) that
+capture riding the page and delivery riding one endless HTTP response
+cannot reach the quality bar the same machine's fiesta stack sets.
+Display capture removes video from the page, the tick loop and the CDP
+connection entirely; buffered HLS playback is what smooth looks like
+for an anonymous viewer, at ~1 Mbps against the 5.4 Mbps the MJPEG
+spent on the same picture. The latency floor moved from ~200 ms to a
+few seconds, which a passive demo does not feel — that trade is the
+design.
+
+`tankpit-stream-probe` was rewritten for the new observable: polling
+the playlist's `EXT-X-MEDIA-SEQUENCE` measures the ENCODER's cadence
+upstream of every viewer, which is exactly the fault line the old
+probe could not separate ("is it the stream or my phone").
+`exit_when_idle` no longer counts video viewers — HLS viewers are
+discrete GETs with no connection to count, and a finished bot's
+segments were already written. Fleet compose now runs children headed
+(`TANKPIT_HEADLESS: "false"`, `TANKPIT_STREAM_VIDEO: "true"`); the
+image gains xvfb + ffmpeg; the display number is the child's own
+service port. `Bot` refuses `headless=True` with a stream config — a
+capture without a rendered window is a contradiction said at
+construction, not a black demo discovered in production.

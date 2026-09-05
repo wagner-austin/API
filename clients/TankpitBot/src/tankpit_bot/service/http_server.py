@@ -1,6 +1,6 @@
 """aiohttp HTTP surface for the bot service.
 
-Exposes nine routes to the SPA and watch page (via the nginx
+Exposes eight routes to the SPA and watch page (via the nginx
 same-origin proxy):
 
 * ``GET  /health``  — cheap liveness probe. Returns immediately.
@@ -20,20 +20,16 @@ same-origin proxy):
   thread (if any) observes its stop-file at the next tick boundary.
 * ``GET  /watch``   — self-contained phone watch page (2026-07-28,
   the fiesta-free replacement for the vibeshine tankpit stream).
-* ``GET  /video``   — MJPEG relay of the Chrome screencast frames on
-  the frame bus. Subscribing here is the DEMAND signal that makes the
-  tick loop start the screencast.
-* ``GET  /frame``   — latest cached JPEG frame as a one-shot
-  snapshot; 404 until a first frame has ever been published.
+* ``GET  /video/{file}`` — one HLS file (playlist or segment) from
+  this session's capture directory, written by the ffmpeg the bot's
+  own run owns (:mod:`tankpit_bot.stream.capture`). 404 when this
+  session has no stream at all; 503 while the encoder is warming up.
 
-The three thread-crossings are deliberate:
+The two thread-crossings are deliberate:
 
 * ``POST /start`` offloads :meth:`SessionRunner.start` to a background
   thread via :meth:`AbstractEventLoop.run_in_executor` — the sync
   Playwright greenlet must run off the aiohttp event loop.
-* ``POST /stop`` calls :meth:`SessionRunner.request_stop` directly.
-  The method writes a file; the tick loop polls it. Zero coordination
-  needed.
 * ``GET /status`` waits on the sync ``StatusBus`` subscriber inside
   ``run_in_executor`` so the event loop stays responsive; each yielded
   frame writes back into aiohttp's SSE response.
@@ -43,6 +39,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol
 
 from aiohttp import web
@@ -55,16 +52,16 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
-from tankpit_bot.bus.frame_bus import FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridgeProtocol
 from tankpit_bot.bus.status_bus import StatusBusProtocol
+from tankpit_bot.resources import require_asset
 from tankpit_bot.service.session_runner import SessionAlreadyRunningError
 from tankpit_bot.service.types_codecs import (
     decode_mode_command,
-    encode_frame_stats,
     encode_session_status,
 )
 from tankpit_bot.service.watch_page import WATCH_PAGE_HTML
+from tankpit_bot.stream.hls import hls_web_response, read_hls_file
 
 log = get_logger(__name__)
 
@@ -74,25 +71,6 @@ log = get_logger(__name__)
 # service teardown) and so proxies (nginx, cloudflared) do not idle
 # the TCP connection out.
 _SSE_HEARTBEAT_SECONDS = 15.0
-
-# Same wake cadence for the MJPEG relay. MJPEG has no comment channel,
-# so on a quiet stretch (bot idle, page static) the relay re-sends the
-# last frame as the keepalive — visually idempotent, and it keeps
-# nginx/cloudflared from idling the connection out.
-_MJPEG_KEEPALIVE_SECONDS = 15.0
-
-#: First bytes of every JPEG. The frame-intake route refuses anything
-#: else, so one bad POST cannot put a non-image on the bus.
-_JPEG_MAGIC = b"\xff\xd8\xff"
-
-# Multipart boundary token for the ``/video`` MJPEG stream.
-_MJPEG_BOUNDARY = "tankpitbotframe"
-
-# How long ``GET /frame`` waits for a fresh frame before falling back
-# to the cached one. Slightly over one tick: subscribing creates
-# screencast demand, and the tick loop reacts at the next 2 s tick
-# boundary.
-_FRAME_SNAPSHOT_TIMEOUT_SECONDS = 3.0
 
 
 class SSEResponseProtocol(Protocol):
@@ -132,7 +110,7 @@ def make_app(
     runner: SessionRunnerHTTPProtocol,
     mode_bridge: ModeBridgeProtocol,
     status_bus: StatusBusProtocol,
-    frame_bus: FrameBusProtocol,
+    hls_dir: Path | None,
     on_shutdown: Callable[[], None],
 ) -> web.Application:
     """Build the aiohttp application backing the bot service.
@@ -141,8 +119,10 @@ def make_app(
         runner: The single-session runner shared with the service main.
         mode_bridge: Cross-thread mode override channel.
         status_bus: Cross-thread status fan-out.
-        frame_bus: Cross-thread JPEG-frame fan-out feeding ``/video``
-            and ``/frame``.
+        hls_dir: Directory this session's capture pipeline writes HLS
+            files into, or ``None`` when the session is not streamed —
+            ``/video/{file}`` then answers an honest 404 rather than a
+            warming 503 that would never resolve.
         on_shutdown: Fired by ``POST /shutdown`` after any running
             session has been asked to stop. Production wires the
             service main's ``stop_event.set``; tests pass a recorder.
@@ -238,21 +218,21 @@ def make_app(
     app.router.add_post("/mode", mode)
     app.router.add_get("/status", status)
     app.router.add_post("/shutdown", shutdown)
-    _add_watch_routes(app, frame_bus)
+    _add_watch_routes(app, hls_dir)
     return app
 
 
-def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None:
-    """Register the fiesta-free watch surface (2026-07-28).
+def _add_watch_routes(app: web.Application, hls_dir: Path | None) -> None:
+    """Register the viewer surface (2026-07-28, rebuilt 2026-09-05).
 
     Kept out of :func:`make_app` so the route builder stays under the
-    complexity budget: the three viewer routes share only the frame
-    bus and none of the session-control collaborators.
+    complexity budget: these routes share only the capture directory
+    and none of the session-control collaborators.
 
     Args:
         app: Application to register the routes on.
-        frame_bus: Cross-thread JPEG-frame fan-out feeding ``/video``
-            and ``/frame``.
+        hls_dir: This session's HLS directory, or ``None`` when the
+            session is not streamed.
     """
 
     async def watch(request: web.Request) -> web.Response:
@@ -264,90 +244,38 @@ def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
         )
 
-    async def video(request: web.Request) -> web.StreamResponse:
-        """``GET /video`` — MJPEG stream of screencast frames."""
-        response = web.StreamResponse(
-            headers={
-                "Content-Type": f"multipart/x-mixed-replace; boundary={_MJPEG_BOUNDARY}",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "X-Accel-Buffering": "no",
-            }
-        )
-        await response.prepare(request)
-        await _drain_frame_bus_to_response(frame_bus, response)
-        return response
+    async def video(request: web.Request) -> web.Response:
+        """``GET /video/{file}`` — one HLS file from this session's stream.
 
-    async def cast(request: web.Request) -> web.Response:
-        """``POST /cast`` — one JPEG frame from the in-page caster.
-
-        THE POINT OF THIS ROUTE IS WHICH THREAD IT RUNS ON. The caster
-        used to hand frames back through a CDP binding, which is
-        delivered on the connection Playwright owns and therefore
-        dispatched by the thread running the tick loop. A heavy tick --
-        a map open, a teleport, a shot at an off-screen target -- queued
-        every frame produced during it and released them in a single
-        burst afterwards, which the latest-wins bus collapsed to one.
-        Seconds of play arrived as one picture, and it read as a
-        slideshow.
-
-        aiohttp serves this on the event loop, which lives on the MAIN
-        thread; the session runs on an executor thread. So a frame
-        posted here reaches the bus no matter what the bot is doing.
-
-        The body IS the frame: a bare JPEG, no envelope. Anything that
-        does not start with the JPEG magic is refused rather than
-        published, because a bus carrying one non-image would hand every
-        MJPEG viewer a broken part.
+        The bytes come off disk, where the ffmpeg owned by the bot's
+        own run put them; this process never touches the page or the
+        tick loop to serve video, which is the entire architecture.
+        Status semantics live in :func:`read_hls_file`, shared with
+        the fleet manager's demo route so the two surfaces cannot
+        drift.
         """
-        body = await request.read()
-        if not body.startswith(_JPEG_MAGIC):
-            return web.Response(status=400, text="body is not a JPEG frame")
-        frame_bus.publish(body)
-        return web.Response(status=204)
+        if hls_dir is None:
+            return web.Response(status=404, text="this session has no stream")
+        return hls_web_response(read_hls_file(hls_dir, request.match_info["file"]))
 
-    async def frame(request: web.Request) -> web.Response:
-        """``GET /frame`` — one-shot JPEG snapshot.
+    async def hls_js(request: web.Request) -> web.Response:
+        """``GET /watch/hls.js`` — the vendored hls.js build.
 
-        404 only when no frame has EVER been published; see
-        :func:`_latest_frame_snapshot` for the demand-then-cache wait.
-        """
-        _ = request
-        data = await _latest_frame_snapshot(frame_bus)
-        if data is None:
-            return web.Response(status=404, text="no frame captured yet")
-        return web.Response(
-            body=data,
-            content_type="image/jpeg",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
-
-    async def frame_stats(request: web.Request) -> web.Response:
-        """``GET /frames`` — what the caster made vs what viewers got.
-
-        The one measurement that cannot be taken from outside. Every
-        rate observed on the ``/video`` stream counts frames that
-        SURVIVED, so a game that is genuinely still and a connection
-        that is being starved produce identical numbers there. This
-        reports the pair: ``published`` is the caster's real output,
-        ``dropped`` is what the latest-wins bus discarded on the way
-        out.
-
-        Diagnostic, and read from inside the container against a
-        child's own port. The manager does not relay it and the public
-        filter does not forward it.
+        Shipped inside the wheel ([[packaged-data-assets]]) so the
+        watch page stays servable with no reach outside the service —
+        a CDN tag would make the operator's phone page depend on a
+        third party to show a picture the service already has.
         """
         _ = request
         return web.Response(
-            text=dump_json_str(encode_frame_stats(frame_bus.stats()), indent=1),
-            content_type="application/json",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            body=require_asset("hls.min.js").read_bytes(),
+            content_type="application/javascript",
+            headers={"Cache-Control": "public, max-age=86400"},
         )
 
-    app.router.add_post("/cast", cast)
     app.router.add_get("/watch", watch)
-    app.router.add_get("/video", video)
-    app.router.add_get("/frame", frame)
-    app.router.add_get("/frames", frame_stats)
+    app.router.add_get("/watch/hls.js", hls_js)
+    app.router.add_get("/video/{file}", video)
 
 
 def _parse_session_bounds(body: bytes) -> tuple[int, int]:
@@ -432,85 +360,6 @@ async def _drain_status_bus_to_response(
                 continue
             payload = dump_json_str(encode_session_status(frame), compact=True)
             await response.write(f"data: {payload}\n\n".encode())
-    finally:
-        bus.unsubscribe(subscriber)
-
-
-async def _latest_frame_snapshot(bus: FrameBusProtocol) -> bytes | None:
-    """Wait briefly for a fresh frame, falling back to the cached one.
-
-    Subscribing is itself the demand signal: the tick loop sees a
-    non-zero subscriber count and starts the screencast at the next
-    2 s tick boundary, so the wait window
-    (:data:`_FRAME_SNAPSHOT_TIMEOUT_SECONDS`) usually ends with a live
-    frame. On timeout (no session running, or the first frame still in
-    flight) the bus's cached frame is served instead.
-
-    Args:
-        bus: Shared frame bus to snapshot from.
-
-    Returns:
-        JPEG bytes, or ``None`` when no frame has ever been published.
-    """
-    subscriber = bus.subscribe()
-    try:
-        loop = asyncio.get_running_loop()
-        data = await loop.run_in_executor(
-            None, subscriber.next_frame, _FRAME_SNAPSHOT_TIMEOUT_SECONDS
-        )
-    finally:
-        bus.unsubscribe(subscriber)
-    if data is None:
-        return bus.latest()
-    return data
-
-
-async def _drain_frame_bus_to_response(
-    bus: FrameBusProtocol,
-    response: SSEResponseProtocol,
-) -> None:
-    """Subscribe to ``bus`` and pump JPEG frames into an MJPEG response.
-
-    Mirrors :func:`_drain_status_bus_to_response`: owns the subscribe /
-    unsubscribe pair, waits on the sync subscriber inside
-    ``run_in_executor`` so the event loop stays responsive, and cleans
-    the subscriber off the bus on any exception (client disconnect,
-    teardown). The subscription itself is load-bearing beyond delivery:
-    the tick loop reads the bus's subscriber count as the screencast
-    demand signal.
-
-    Keepalive: on a wait timeout the LAST frame is re-sent (MJPEG has
-    no comment channel). Before any frame has arrived a timeout just
-    loops — an idle-service viewer holds a silent open connection until
-    a session starts publishing.
-
-    Args:
-        bus: Shared frame bus subscribed for the lifetime of the
-            connection.
-        response: aiohttp response whose write side receives multipart
-            JPEG parts.
-    """
-    subscriber = bus.subscribe()
-    try:
-        loop = asyncio.get_running_loop()
-        last: bytes | None = None
-        while not subscriber.closed:
-            frame = await loop.run_in_executor(
-                None, subscriber.next_frame, _MJPEG_KEEPALIVE_SECONDS
-            )
-            if subscriber.closed:
-                return
-            if frame is None:
-                if last is None:
-                    continue
-                frame = last
-            last = frame
-            header = (
-                f"--{_MJPEG_BOUNDARY}\r\n"
-                f"Content-Type: image/jpeg\r\n"
-                f"Content-Length: {len(frame)}\r\n\r\n"
-            ).encode()
-            await response.write(header + frame + b"\r\n")
     finally:
         bus.unsubscribe(subscriber)
 

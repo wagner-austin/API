@@ -20,7 +20,6 @@ from tankpit_bot._test_hooks.browser import (
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
 )
-from tankpit_bot.bus.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.bus.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.service.session_runner import (
@@ -111,16 +110,14 @@ def _make_runner(
         *,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
-        frame_bus: FrameBusProtocol,
     ) -> RunnableBotProtocol:
-        _ = (mode_bridge, status_bus, frame_bus)
+        _ = (mode_bridge, status_bus)
         return bot
 
     return SessionRunner(
         bot_factory=factory,
         mode_bridge=used_bridge,
         status_bus=used_bus,
-        frame_bus=FrameBus(),
         stop_file_path=_STOP_FILE,
     )
 
@@ -407,23 +404,20 @@ class TestBotFactoryReceivesSharedChannels:
         _ = fake_fs
         bridge = ModeBridge()
         bus = StatusBus()
-        frames = FrameBus()
-        received: list[tuple[ModeBridgeProtocol, StatusBusProtocol, FrameBusProtocol]] = []
+        received: list[tuple[ModeBridgeProtocol, StatusBusProtocol]] = []
 
         def factory(
             *,
             mode_bridge: ModeBridgeProtocol,
             status_bus: StatusBusProtocol,
-            frame_bus: FrameBusProtocol,
         ) -> RunnableBotProtocol:
-            received.append((mode_bridge, status_bus, frame_bus))
+            received.append((mode_bridge, status_bus))
             return _RecordingBot()
 
         runner = SessionRunner(
             bot_factory=factory,
             mode_bridge=bridge,
             status_bus=bus,
-            frame_bus=frames,
             stop_file_path=_STOP_FILE,
         )
 
@@ -432,4 +426,3 @@ class TestBotFactoryReceivesSharedChannels:
         assert len(received) == 1
         assert received[0][0] is bridge
         assert received[0][1] is bus
-        assert received[0][2] is frames

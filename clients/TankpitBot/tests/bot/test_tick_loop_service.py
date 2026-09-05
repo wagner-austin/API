@@ -1,48 +1,27 @@
 """Tests for the bot-service wiring inside the tick loop.
 
-Covers ``_apply_pending_mode_override``, ``_publish_session_status``,
-and ``_sync_live_view_demand`` against a real :class:`Bot` with a
-real :class:`ModeBridge` / :class:`StatusBus` / :class:`FrameBus` (no
-mocks — the primitives are the DUT). The wire is: SPA writes to the
-bridge → tick loop drains it → ai_state carries the override → tick
-loop publishes a status frame reflecting it; ``/video`` subscribers
-on the frame bus toggle the in-page live-view caster.
+Covers ``_apply_pending_mode_override`` and ``_publish_session_status``
+against a real :class:`Bot` with a real :class:`ModeBridge` /
+:class:`StatusBus` (no mocks — the primitives are the DUT). The wire
+is: SPA writes to the bridge → tick loop drains it → ai_state carries
+the override → tick loop publishes a status frame reflecting it.
+Video left the tick loop entirely (2026-09-05): the display-capture
+pipeline records the browser's own rendering and touches none of
+these primitives.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-from platform_core.json_utils import JSONObject
+import pytest
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.tick_body import _sync_live_view_demand
 from tankpit_bot.bot.tick_loop import (
     _apply_pending_mode_override,
     _publish_session_status,
 )
-from tankpit_bot.browser.live_view import LiveViewService
-from tankpit_bot.bus.frame_bus import FrameBus
 from tankpit_bot.bus.mode_bridge import ModeBridge
 from tankpit_bot.bus.status_bus import StatusBus
-
-
-class _RecordingCDP:
-    """CDP-session fake that records live-view evaluate sends."""
-
-    def __init__(self) -> None:
-        self.sent: list[tuple[str, JSONObject | None]] = []
-        self.handlers: dict[str, Callable[[JSONObject], None]] = {}
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        self.sent.append((method, params))
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        self.handlers[event] = handler
-
-    def detach(self) -> None:
-        raise AssertionError("the demand sync never detaches the session")
+from tankpit_bot.stream.types import StreamConfigDict
 
 
 class TestApplyPendingModeOverride:
@@ -227,132 +206,35 @@ class TestBotServiceDefaults:
         bot = Bot("https://test.tankpit.com/", status_bus=bus)
         assert bot._status_bus is bus
 
-    def test_bot_gets_a_default_frame_bus_when_none_supplied(self) -> None:
-        """A standalone ``make bot`` bot gets an empty frame bus."""
+    def test_bot_defaults_to_no_stream_config(self) -> None:
+        """A standalone ``make bot`` bot captures nothing."""
         bot = Bot("https://test.tankpit.com/")
-        assert bot._frame_bus.subscriber_count() == 0
+        assert bot._stream_config is None
 
-    def test_supplied_frame_bus_is_used_directly(self) -> None:
-        """The Bot uses the injected frame bus as its own reference."""
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        assert bot._frame_bus is frames
+    def test_supplied_stream_config_is_kept(self) -> None:
+        """The Bot holds the injected capture configuration verbatim."""
+        config = StreamConfigDict(
+            display=9,
+            width=704,
+            height=544,
+            fps=30,
+            bitrate_kbps=1000,
+            segment_seconds=2,
+            hls_dir="runs/bot/demo-1/hls",
+        )
+        bot = Bot("https://test.tankpit.com/", headless=False, stream_config=config)
+        assert bot._stream_config is config
 
-
-CAST_URL = "http://127.0.0.1:27100/cast"
-
-
-def _live_view(bot: Bot) -> LiveViewService:
-    """Return the bot's caster, failing loudly when it has none.
-
-    ``Bot._live_view`` is None for a session built without a cast URL
-    (``make run``, replay, scenarios). These tests all pass one, so a
-    None here is the test being wrong rather than a case to tolerate.
-
-    Args:
-        bot: The bot under test.
-
-    Returns:
-        The caster.
-
-    Raises:
-        AssertionError: If the bot was built without a cast URL.
-    """
-    if bot._live_view is None:
-        raise AssertionError("this test builds a bot WITH a cast url")
-    return bot._live_view
-
-
-class TestSyncLiveViewDemand:
-    """Demand-driven in-page caster toggling at the tick boundary."""
-
-    def test_a_bot_without_a_cast_url_has_no_caster_at_all(self) -> None:
-        """``make run`` has no service listening, so it installs nothing.
-
-        Previously every Bot built a caster whether or not anything
-        could receive its frames. With delivery over HTTP, a caster with
-        no endpoint would encode a JPEG every interval and throw it at a
-        closed port.
-        """
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
-        cdp = _RecordingCDP()
-        bot._cdp = cdp
-        frames.subscribe()
-
-        _sync_live_view_demand(bot)
-
-        assert bot._live_view is None
-        assert cdp.sent == []
-
-    def test_noop_before_cdp_attach(self) -> None:
-        """No CDP session yet → nothing happens even with demand."""
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        frames.subscribe()
-
-        _sync_live_view_demand(bot)
-
-        assert _live_view(bot).active is False
-
-    def test_viewer_demand_installs_the_caster(self) -> None:
-        """A frame-bus subscriber makes the next tick install the caster."""
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        cdp = _RecordingCDP()
-        bot._cdp = cdp
-        frames.subscribe()
-
-        _sync_live_view_demand(bot)
-
-        assert _live_view(bot).active is True
-        methods = [method for method, _ in cdp.sent]
-        assert methods == ["Runtime.evaluate"]
-
-    def test_no_demand_with_inactive_caster_stays_inactive(self) -> None:
-        """Zero subscribers and no caster → nothing is sent."""
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        cdp = _RecordingCDP()
-        bot._cdp = cdp
-
-        _sync_live_view_demand(bot)
-
-        assert _live_view(bot).active is False
-        assert cdp.sent == []
-
-    def test_last_viewer_leaving_stops_the_caster(self) -> None:
-        """Demand dropping to zero stops the caster at the next tick."""
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        cdp = _RecordingCDP()
-        bot._cdp = cdp
-        subscriber = frames.subscribe()
-        _sync_live_view_demand(bot)
-        assert _live_view(bot).active is True
-
-        frames.unsubscribe(subscriber)
-        _sync_live_view_demand(bot)
-
-        assert _live_view(bot).active is False
-        assert len(cdp.sent) == 2  # caster install + stop; no binding any more
-
-    def test_sustained_demand_reensures_every_tick(self) -> None:
-        """Continuing demand re-evaluates the idempotent snippet per tick.
-
-        The repetition is the navigation self-heal: quit-to-lobby or
-        a re-login wipes injected JS, and the next demanded tick
-        reinstalls the caster without any navigation detection.
-        """
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames, cast_url=CAST_URL)
-        cdp = _RecordingCDP()
-        bot._cdp = cdp
-        frames.subscribe()
-
-        _sync_live_view_demand(bot)
-        _sync_live_view_demand(bot)
-        _sync_live_view_demand(bot)
-
-        assert _live_view(bot).active is True
-        assert len(cdp.sent) == 3  # three caster installs; no binding any more
+    def test_headless_with_stream_config_is_refused(self) -> None:
+        """A capture without a rendered window is a contradiction, said loudly."""
+        config = StreamConfigDict(
+            display=9,
+            width=704,
+            height=544,
+            fps=30,
+            bitrate_kbps=1000,
+            segment_seconds=2,
+            hls_dir="runs/bot/demo-1/hls",
+        )
+        with pytest.raises(ValueError, match="rendered window"):
+            Bot("https://test.tankpit.com/", headless=True, stream_config=config)

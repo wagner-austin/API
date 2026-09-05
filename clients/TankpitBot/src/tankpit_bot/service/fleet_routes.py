@@ -39,7 +39,7 @@ from tankpit_bot.service.fleet_wire import (
     encode_fleet_bot,
     encode_fleet_snapshot,
 )
-from tankpit_bot.service.video_relay import relay_child_video
+from tankpit_bot.service.video_files import instance_video_response
 
 log = get_logger(__name__)
 
@@ -213,30 +213,31 @@ def _add_telemetry_routes(app: web.Application, manager: FleetManager) -> None:
 
 
 def _add_video_routes(app: web.Application, manager: FleetManager) -> None:
-    """Wire the per-instance video relay.
+    """Wire the per-instance video file serving.
 
-    Its own group rather than a fourth telemetry route: the others read
-    a value and answer, while this one holds a connection open against a
-    child for as long as somebody watches. Grouping by what a route DOES
-    is how the rest of this module is organised, and the split keeps
-    each wiring function inside the complexity budget.
+    Its own group so the split keeps each wiring function inside the
+    complexity budget, and because this is the one route family whose
+    payload comes off the shared ``runs/`` tree rather than out of the
+    registry.
 
     Args:
         app: Application under construction.
-        manager: The fleet registry the relay resolves ports through.
+        manager: The fleet registry liveness is resolved through.
     """
 
-    async def bot_video(request: web.Request) -> web.StreamResponse:
-        """``GET /bots/{instance}/video`` — relay one child's MJPEG stream.
+    async def bot_video(request: web.Request) -> web.Response:
+        """``GET /bots/{instance}/video/{file}`` — one HLS file of one child.
 
         Any REGISTERED instance: this is the operator surface, and an
-        operator who may stop a bot may watch it. The public demo route
-        narrows the same relay to demo slots
+        operator who may stop a bot may watch it. The public demo
+        route narrows the same serving to demo slots
         (:mod:`tankpit_bot.service.demo_routes`).
         """
-        return await relay_child_video(request, manager, request.match_info["instance"])
+        return instance_video_response(
+            manager, request.match_info["instance"], request.match_info["file"]
+        )
 
-    app.router.add_get("/bots/{instance}/video", bot_video)
+    app.router.add_get("/bots/{instance}/video/{file}", bot_video)
 
 
 def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:

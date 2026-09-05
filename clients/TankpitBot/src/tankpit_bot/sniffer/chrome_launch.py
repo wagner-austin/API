@@ -14,28 +14,6 @@ from tankpit_bot import _test_hooks
 log = get_logger(__name__)
 
 
-LOOPBACK_POST_ARGS = [
-    "--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests,"
-    "PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults",
-]
-"""Let the game page POST captured frames to the service on loopback.
-
-Chrome's Local Network Access gate parks a page -> 127.0.0.1 fetch
-behind a permission that cannot be granted at runtime, and the fetch
-hangs forever rather than failing. That was recorded as a law saying the
-loopback POST is impossible; it is not, because the gate is a Chromium
-FEATURE and this process owns its own launch args. Measured 2026-09-03,
-five POSTs from a real tankpit page to a loopback listener: 0 of 5
-arrived under default args, 5 of 5 with these.
-
-The trade is real and bounded: it lets THIS browser reach THIS
-container's local network. The browser exists to run one game in a
-container whose only neighbour is the service receiving the frames, and
-the alternative was routing video through the thread that runs the bot,
-which is what made the picture a slideshow.
-"""
-
-
 def _chrome_stream_display_args() -> list[str]:
     """Build Chromium args positioning the browser on the streamed virtual display.
 
@@ -149,5 +127,7 @@ def _chrome_stream_no_viewport() -> bool:
 
 
 __all__ = [
-    "LOOPBACK_POST_ARGS",
+    "_chrome_stream_display_args",
+    "_chrome_stream_no_viewport",
+    "_maximize_via_cdp",
 ]
