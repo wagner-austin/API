@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Protocol
 
 import numpy as np
-from covenant_ml.backends.protocol import ProgressCallback
 from covenant_ml.backends.registry import (
     ClassifierRegistry,
 )
@@ -26,7 +26,7 @@ from covenant_ml.optimizer.types import (
     SampledIntParams,
     SampledStringParams,
 )
-from covenant_ml.types import BackendName, PredictorProtocol
+from covenant_ml.types import BackendName, PredictorProtocol, TrainProgress
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker.optimize_types import UnifiedOptimizeParseResult
@@ -231,7 +231,7 @@ class _CreateMLPObjectiveProto(Protocol):
         n_epochs: int,
         early_stopping_patience: int,
         optimizer_name: Literal["adamw", "adam", "sgd"] = ...,
-        epoch_callback: ProgressCallback | None = ...,
+        epoch_callback: Callable[[TrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 
 
@@ -250,7 +250,7 @@ class _CreateLSTMObjectiveProto(Protocol):
         early_stopping_patience: int,
         sequence_length: int,
         bidirectional: bool = ...,
-        epoch_callback: ProgressCallback | None = ...,
+        epoch_callback: Callable[[TrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 
 

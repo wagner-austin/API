@@ -10,6 +10,7 @@ Implements ClassifierBackend protocol using sklearn LogisticRegression with:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
@@ -24,7 +25,6 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     LogRegConfig,
-    ProgressCallback,
     TrainOutcome,
     TrainProgress,
 )
@@ -332,7 +332,7 @@ class LogRegBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train Logistic Regression model on tabular data.

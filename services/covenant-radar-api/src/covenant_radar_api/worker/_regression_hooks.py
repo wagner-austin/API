@@ -12,11 +12,11 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Protocol
 
 import numpy as np
-from covenant_ml.backends.regressor_protocol import RegressorProgressCallback
 from covenant_ml.backends.regressor_registry import (
     RegressorBackendFactory,
     RegressorBackendRegistration,
@@ -36,7 +36,7 @@ from covenant_ml.explainers.regression_registry import (
     default_regression_explainer_registry,
 )
 from covenant_ml.features import FeaturePreset
-from covenant_ml.types_regression import RegressorBackendName
+from covenant_ml.types_regression import RegressionTrainProgress, RegressorBackendName
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._test_hooks import ObjectiveWithFeatureCount
@@ -307,7 +307,7 @@ class _CreateMLPRegressorObjectiveProto(Protocol):
         n_epochs: int,
         early_stopping_patience: int,
         optimizer_name: Literal["adamw", "adam", "sgd"] = ...,
-        epoch_callback: RegressorProgressCallback | None = ...,
+        epoch_callback: Callable[[RegressionTrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 
 
@@ -326,7 +326,7 @@ class _CreateLSTMRegressorObjectiveProto(Protocol):
         early_stopping_patience: int,
         sequence_length: int,
         bidirectional: bool = ...,
-        epoch_callback: RegressorProgressCallback | None = ...,
+        epoch_callback: Callable[[RegressionTrainProgress], None] | None = ...,
     ) -> ObjectiveWithFeatureCount: ...
 
 

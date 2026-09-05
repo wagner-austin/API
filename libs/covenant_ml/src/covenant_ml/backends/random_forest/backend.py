@@ -11,6 +11,7 @@ Implements ClassifierBackend protocol using sklearn RandomForestClassifier with:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Protocol, TypeGuard
 
@@ -24,7 +25,6 @@ from covenant_ml.types import (
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
-    ProgressCallback,
     RandomForestConfig,
     TrainOutcome,
     TrainProgress,
@@ -328,7 +328,7 @@ class RandomForestBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train Random Forest model on tabular data.

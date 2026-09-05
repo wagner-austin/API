@@ -5,7 +5,6 @@ Strict typing only. No Any, casts, or stubs.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Literal, NotRequired, Protocol, TypedDict
 
 import numpy as np
@@ -120,17 +119,6 @@ class TrainProgress(TypedDict, total=True):
     train_auc: float
     val_loss: float | None
     val_auc: float | None
-
-
-ProgressCallback = Callable[[TrainProgress], None]
-"""Called once per training round with that round's progress.
-
-Declared beside :class:`TrainProgress` rather than in a trainer or a backend
-because both declared it, identically, and neither could import the other's:
-``covenant_ml.backends`` pulls in backends that import
-:mod:`covenant_ml.trainer`, so a trainer reaching into a backend for the name
-closes a cycle. This module is the leaf they both already read.
-"""
 
 
 class Proba2DProtocol(Protocol):
@@ -570,7 +558,6 @@ __all__ = [
     "MLPPrecision",
     "PredictorProtocol",
     "Proba2DProtocol",
-    "ProgressCallback",
     "RandomForestConfig",
     "TrainConfig",
     "TrainConfigRequired",

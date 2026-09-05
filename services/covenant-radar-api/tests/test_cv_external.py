@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import runpy
 import sys
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import TypeGuard
 
@@ -20,7 +20,6 @@ from covenant_ml.backends.protocol import (
     BackendCapabilities,
     ClassifierBackend,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
@@ -43,6 +42,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from scripts.cv_external import (
@@ -139,7 +139,7 @@ class _FakeCVBackend:
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         self.inner_groups_seen.append(groups is not None)

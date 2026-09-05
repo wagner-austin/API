@@ -20,8 +20,6 @@ from covenant_radar_api.streaming._hook_protocols import (
 from .config import ConfluentConfig, ConsumerConfig, ProducerConfig
 
 KafkaConfigDict = dict[str, str | int | bool]
-RawProducerConstructor = Callable[[KafkaConfigDict], RawKafkaProducerProtocol]
-RawConsumerConstructor = Callable[[KafkaConfigDict], RawKafkaConsumerProtocol]
 
 
 def _get_confluent_kafka() -> ModuleType:
@@ -121,7 +119,9 @@ class RealKafkaProducer:
         config["compression.type"] = producer_config["compression_type"]
 
         confluent_kafka = _get_confluent_kafka()
-        producer_constructor: RawProducerConstructor = confluent_kafka.Producer
+        producer_constructor: Callable[[KafkaConfigDict], RawKafkaProducerProtocol] = (
+            confluent_kafka.Producer
+        )
         self._producer: RawKafkaProducerProtocol = producer_constructor(config)
 
     def produce(
@@ -188,7 +188,9 @@ class RealKafkaConsumer:
         config["heartbeat.interval.ms"] = consumer_config["heartbeat_interval_ms"]
 
         confluent_kafka = _get_confluent_kafka()
-        consumer_constructor: RawConsumerConstructor = confluent_kafka.Consumer
+        consumer_constructor: Callable[[KafkaConfigDict], RawKafkaConsumerProtocol] = (
+            confluent_kafka.Consumer
+        )
         self._consumer: RawKafkaConsumerProtocol = consumer_constructor(config)
 
     def subscribe(self, topics: tuple[str, ...]) -> None:

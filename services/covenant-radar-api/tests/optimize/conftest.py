@@ -5,7 +5,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Literal
 
@@ -15,7 +15,6 @@ import scripts._test_hooks as _hooks_module
 from covenant_ml.backends.protocol import (
     BackendCapabilities,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
 from covenant_ml.optimizer.types import (
@@ -33,6 +32,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from platform_core.rich_logging import setup_rich_logging
@@ -333,7 +333,7 @@ class FakeSaveModelBackend:
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Return fake train outcome."""

@@ -29,8 +29,6 @@ from ..optimizer.types import (
 )
 from .protocol import BackendCapabilities
 
-RegressorProgressCallback = Callable[[RegressionTrainProgress], None]
-
 
 class PreparedRegressor(Protocol):
     """A trained regressor ready for inference.
@@ -102,7 +100,7 @@ class RegressorBackend(Protocol):
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Train a regression model.
 
@@ -204,5 +202,4 @@ class RegressorBackend(Protocol):
 __all__ = [
     "PreparedRegressor",
     "RegressorBackend",
-    "RegressorProgressCallback",
 ]

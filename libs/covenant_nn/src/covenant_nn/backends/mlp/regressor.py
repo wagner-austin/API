@@ -11,6 +11,7 @@ Parallel to MLP classifier backend (backend.py). Key differences:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict, TypeGuard
 
@@ -18,7 +19,6 @@ import numpy as np
 from covenant_ml.backends.protocol import BackendCapabilities
 from covenant_ml.backends.regressor_protocol import (
     PreparedRegressor,
-    RegressorProgressCallback,
 )
 from covenant_ml.metrics_regression import compute_all_regression_metrics
 from covenant_ml.optimizer.search_spaces import (
@@ -35,6 +35,7 @@ from covenant_ml.types import FeatureImportance, MLPConfig
 from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
+    RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
 )
@@ -325,7 +326,7 @@ class MLPRegressorBackend:
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Train an MLP regressor with early stopping on val RMSE.
 

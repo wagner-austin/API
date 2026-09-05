@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -9,7 +10,6 @@ from covenant_ml.backends.protocol import BackendCapabilities
 from covenant_ml.backends.regressor_protocol import (
     PreparedRegressor,
     RegressorBackend,
-    RegressorProgressCallback,
 )
 from covenant_ml.backends.regressor_registry import (
     RegressorBackendRegistration,
@@ -50,6 +50,7 @@ from covenant_ml.types import FeatureImportance
 from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
+    RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
 )
@@ -285,7 +286,7 @@ class _FakeRegressorBackend:
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Not used in optimize tests."""
         raise NotImplementedError

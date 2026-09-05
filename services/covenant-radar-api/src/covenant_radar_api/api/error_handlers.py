@@ -25,8 +25,6 @@ from platform_core.errors import AppError, ErrorCode
 from platform_core.fastapi import register_json_error_handler
 from platform_core.json_utils import JSONTypeError
 
-_HandlerType = Callable[[Request, Exception], Response | Awaitable[Response]]
-
 
 def _json_type_error_handler(_: Request, exc: Exception) -> Response:
     """Translate a decode type error into a 400.
@@ -59,7 +57,9 @@ def install_covenant_error_handlers(app: FastAPI) -> None:
         app: Application to register handlers on.
     """
     register_json_error_handler(app)
-    json_type_handler: _HandlerType = _json_type_error_handler
+    json_type_handler: Callable[[Request, Exception], Response | Awaitable[Response]] = (
+        _json_type_error_handler
+    )
     app.add_exception_handler(JSONTypeError, json_type_handler)
 
 

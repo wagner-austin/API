@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 from covenant_ml.backends.protocol import (
     BackendCapabilities,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.backends.registry import (
     BackendRegistration,
@@ -47,6 +47,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -343,7 +344,7 @@ class _FakeBackend:
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Not used in optimize tests."""

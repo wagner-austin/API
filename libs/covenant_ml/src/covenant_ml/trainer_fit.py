@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -18,7 +19,6 @@ from covenant_ml.types import (
     DMatrixFactory,
     DMatrixProtocol,
     FeatureImportance,
-    ProgressCallback,
     RequestedDevice,
     ResolvedDevice,
     TrainConfig,
@@ -262,7 +262,7 @@ def train_model_with_validation(
     config: TrainConfig,
     output_dir: Path,
     feature_names: list[str],
-    progress_callback: ProgressCallback | None = None,
+    progress_callback: Callable[[TrainProgress], None] | None = None,
     groups: NDArray[np.int64] | None = None,
 ) -> TrainOutcome:
     """Train XGBoost classifier with validation and early stopping.

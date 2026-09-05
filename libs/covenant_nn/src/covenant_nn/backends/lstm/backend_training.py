@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Protocol, TypedDict
 
 import numpy as np
-from covenant_ml.backends.protocol import (
-    ProgressCallback,
-)
 from covenant_ml.metrics import compute_all_metrics
 from covenant_ml.types import (
     EvalMetrics,
@@ -406,7 +404,7 @@ def _run_training_loop(
     cfg: LSTMConfig,
     device: str,
     output_dir: Path,
-    progress: ProgressCallback | None,
+    progress: Callable[[TrainProgress], None] | None,
     sequence_length: int,
 ) -> _EarlyStopState:
     """Run the training loop with early stopping."""

@@ -13,6 +13,7 @@ Tests cover:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -21,7 +22,6 @@ from numpy.typing import NDArray
 from covenant_ml.ensemble import _hooks
 from covenant_ml.ensemble._hooks import (
     _ConstraintDict,
-    _ObjectiveFnType,
 )
 from covenant_ml.ensemble.regression_optimizer import (
     optimize_regression_ensemble_weights,
@@ -194,7 +194,7 @@ class TestOptimizeRegressionEnsembleWeights:
         from covenant_ml.ensemble.testing import FakeOptimizeResult
 
         def zero_minimize(
-            fun: _ObjectiveFnType,
+            fun: Callable[[NDArray[np.float64]], float],
             x0: NDArray[np.float64],
             method: str,
             bounds: tuple[tuple[float, float], ...],

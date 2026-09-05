@@ -12,12 +12,12 @@ Strict typing only: no Any, no casts, no stubs.
 from __future__ import annotations
 
 import gc
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
 import numpy as np
-from covenant_ml.backends.regressor_protocol import RegressorProgressCallback
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -28,6 +28,7 @@ from covenant_ml.types import (
     LSTMConfig,
     LSTMPrecision,
 )
+from covenant_ml.types_regression import RegressionTrainProgress
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
@@ -58,7 +59,7 @@ class LSTMRegressorObjective:
         early_stopping_patience: int,
         sequence_length: int,
         bidirectional: bool = False,
-        epoch_callback: RegressorProgressCallback | None = None,
+        epoch_callback: Callable[[RegressionTrainProgress], None] | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
 
@@ -209,7 +210,7 @@ def create_lstm_regressor_objective(
     early_stopping_patience: int,
     sequence_length: int,
     bidirectional: bool = False,
-    epoch_callback: RegressorProgressCallback | None = None,
+    epoch_callback: Callable[[RegressionTrainProgress], None] | None = None,
 ) -> LSTMRegressorObjective:
     """Create an objective function for LSTM regressor optimization.
 

@@ -9,12 +9,12 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
 import numpy as np
-from covenant_ml.backends.protocol import ProgressCallback
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -24,6 +24,7 @@ from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, Sa
 from covenant_ml.types import (
     LSTMConfig,
     LSTMPrecision,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
@@ -55,7 +56,7 @@ class LSTMObjective:
         early_stopping_patience: int,
         sequence_length: int,
         bidirectional: bool = False,
-        epoch_callback: ProgressCallback | None = None,
+        epoch_callback: Callable[[TrainProgress], None] | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
 
@@ -211,7 +212,7 @@ def create_lstm_objective(
     early_stopping_patience: int,
     sequence_length: int,
     bidirectional: bool = False,
-    epoch_callback: ProgressCallback | None = None,
+    epoch_callback: Callable[[TrainProgress], None] | None = None,
 ) -> LSTMObjective:
     """Create an objective function for LSTM optimization.
 

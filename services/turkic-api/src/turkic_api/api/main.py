@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Generator, Mapping
 from datetime import datetime
 
 from fastapi import FastAPI
@@ -8,19 +8,17 @@ from platform_core.errors import ErrorCode
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
+from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import QueueProtocol
 
+from turkic_api.api.config import Settings
 from turkic_api.api.logging_fields import LOG_EXTRA_FIELDS
-from turkic_api.api.provider_context import (
-    LoggerProvider,
-    RedisProviderType,
-    SettingsProvider,
-)
 from turkic_api.api.provider_context import (
     provider_context as _provider_context,
 )
 from turkic_api.api.routes import health as routes_health
 from turkic_api.api.routes import jobs as routes_jobs
+from turkic_api.api.types import LoggerProtocol
 
 _SimpleValue = str | int | float | bool | None | datetime
 
@@ -54,10 +52,12 @@ def _init_logging() -> None:
 
 def create_app(
     *,
-    redis_provider: RedisProviderType | None = None,
+    redis_provider: (
+        Callable[[Settings], RedisStrProto | Generator[RedisStrProto, None, None]] | None
+    ) = None,
     queue_provider: Callable[[], QueueProtocol] | None = None,
-    settings_provider: SettingsProvider | None = None,
-    logger_provider: LoggerProvider | None = None,
+    settings_provider: Callable[[], Settings] | None = None,
+    logger_provider: Callable[[], LoggerProtocol] | None = None,
 ) -> FastAPI:
     _init_logging()
     app = FastAPI(title="Turkic API", version="1.0.0")

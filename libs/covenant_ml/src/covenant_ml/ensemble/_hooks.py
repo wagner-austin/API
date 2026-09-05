@@ -15,8 +15,7 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
+_ConstraintDict = dict[str, str | Callable[[NDArray[np.float64]], float]]
 _OptionsDict = dict[str, int | float]
 
 
@@ -34,7 +33,7 @@ class _MinimizeFnProtocol(Protocol):
 
     def __call__(
         self,
-        fun: _ObjectiveFnType,
+        fun: Callable[[NDArray[np.float64]], float],
         x0: NDArray[np.float64],
         method: str,
         bounds: tuple[tuple[float, float], ...],
@@ -46,7 +45,7 @@ class _MinimizeFnProtocol(Protocol):
 
 
 def _real_minimize(
-    fun: _ObjectiveFnType,
+    fun: Callable[[NDArray[np.float64]], float],
     x0: NDArray[np.float64],
     method: str,
     bounds: tuple[tuple[float, float], ...],

@@ -6,7 +6,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 import shutil
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +15,6 @@ from covenant_ml.backends.protocol import (
     BackendCapabilities,
     ClassifierBackend,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.optimizer import SearchSpace
@@ -27,6 +26,7 @@ from covenant_ml.types import (
     FeatureImportance,
     LightGBMConfig,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from scripts.submit import _hooks as submit_hooks
@@ -188,7 +188,7 @@ class FakeBackend:
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train a classifier."""

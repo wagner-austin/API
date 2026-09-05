@@ -17,6 +17,7 @@ Strict typing only: no Any, no casts, no type: ignore.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -47,7 +48,6 @@ from ..protocol import BackendCapabilities
 from ..regressor_protocol import (
     PreparedRegressor,
     RegressorBackend,
-    RegressorProgressCallback,
 )
 from .backend import (
     _py_gbm_model_feature_importances,
@@ -167,7 +167,7 @@ class ClearGBMRegressorBackend:
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Train a ClearGBM regressor on tabular data.
 

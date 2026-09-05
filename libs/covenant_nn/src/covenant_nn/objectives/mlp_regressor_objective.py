@@ -12,12 +12,12 @@ Strict typing only: no Any, no casts, no stubs.
 from __future__ import annotations
 
 import gc
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Literal
 
 import numpy as np
-from covenant_ml.backends.regressor_protocol import RegressorProgressCallback
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -29,6 +29,7 @@ from covenant_ml.types import (
     MLPOptimizer,
     MLPPrecision,
 )
+from covenant_ml.types_regression import RegressionTrainProgress
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
@@ -55,7 +56,7 @@ class MLPRegressorObjective:
         n_epochs: int,
         early_stopping_patience: int,
         optimizer_name: MLPOptimizer = "adamw",
-        epoch_callback: RegressorProgressCallback | None = None,
+        epoch_callback: Callable[[RegressionTrainProgress], None] | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
 
@@ -204,7 +205,7 @@ def create_mlp_regressor_objective(
     n_epochs: int,
     early_stopping_patience: int,
     optimizer_name: MLPOptimizer = "adamw",
-    epoch_callback: RegressorProgressCallback | None = None,
+    epoch_callback: Callable[[RegressionTrainProgress], None] | None = None,
 ) -> MLPRegressorObjective:
     """Create an objective function for MLP regressor optimization.
 

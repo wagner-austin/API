@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import types
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -24,8 +25,6 @@ from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
-from covenant_ml.types import ProgressCallback
-
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_cleargbm_default_space, make_cleargbm_focused_space
 from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
@@ -36,6 +35,7 @@ from ...types import (
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
+    TrainProgress,
 )
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 from .config_resolution import (
@@ -253,7 +253,7 @@ class ClearGBMBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train ClearGBM model on tabular data.

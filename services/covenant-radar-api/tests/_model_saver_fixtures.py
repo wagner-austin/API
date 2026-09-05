@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 from covenant_ml.backends.protocol import (
     BackendCapabilities,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
 from covenant_ml.optimizer.types import (
@@ -26,6 +26,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from scripts.optimize.model_saver import (
@@ -127,7 +128,7 @@ class FakeClassifierBackend:
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Return a fake training outcome without actual training.

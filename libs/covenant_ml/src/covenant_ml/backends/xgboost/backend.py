@@ -6,6 +6,7 @@ train_model_with_validation and preserves existing behavior.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
@@ -13,7 +14,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.trainer_fit import train_model_with_validation
-from covenant_ml.types import ProgressCallback
 
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
@@ -25,6 +25,7 @@ from ...types import (
     FeatureImportance,
     TrainConfig,
     TrainOutcome,
+    TrainProgress,
 )
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 
@@ -87,7 +88,7 @@ class XGBoostBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         # Delegate to existing trainer (expects TrainConfig)

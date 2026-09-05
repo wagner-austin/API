@@ -17,6 +17,7 @@ utility from sequences.py before calling train().
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypeGuard
 
@@ -25,7 +26,6 @@ from covenant_ml.backends.protocol import (
     BackendCapabilities,
     ClassifierBackend,
     PreparedClassifier,
-    ProgressCallback,
 )
 from covenant_ml.metrics import compute_all_metrics
 from covenant_ml.optimizer.search_spaces import (
@@ -45,6 +45,7 @@ from covenant_ml.types import (
     FeatureImportance,
     LSTMConfig,
     TrainOutcome,
+    TrainProgress,
 )
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
@@ -295,7 +296,7 @@ class LSTMBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train LSTM model on tabular data."""

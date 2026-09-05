@@ -7,6 +7,7 @@ for classification.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypeGuard
 
@@ -22,6 +23,7 @@ from covenant_ml.types import (
 from covenant_ml.types_regression import (
     RegressionMetrics,
     RegressionTrainOutcome,
+    RegressionTrainProgress,
     RegressorBackendName,
     RegressorTrainConfig,
     XGBRegressorFactory,
@@ -34,7 +36,6 @@ from ..protocol import BackendCapabilities
 from ..regressor_protocol import (
     PreparedRegressor,
     RegressorBackend,
-    RegressorProgressCallback,
 )
 
 XGBOOST_REGRESSOR_CAPABILITIES: BackendCapabilities = {
@@ -133,7 +134,7 @@ class XGBoostRegressorBackend:
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Train an XGBoost regressor via the trainer module.
 

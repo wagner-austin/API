@@ -10,6 +10,7 @@ Implements RegressorBackend protocol using LightGBM with:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
@@ -37,7 +38,6 @@ from ..protocol import BackendCapabilities
 from ..regressor_protocol import (
     PreparedRegressor,
     RegressorBackend,
-    RegressorProgressCallback,
 )
 from .backend import _resolve_device
 
@@ -260,7 +260,7 @@ class LightGBMRegressorBackend:
         feature_names: list[str] | None,
         config: RegressorTrainConfig,
         output_dir: Path,
-        progress: RegressorProgressCallback | None,
+        progress: Callable[[RegressionTrainProgress], None] | None,
     ) -> RegressionTrainOutcome:
         """Train LightGBM regressor on tabular data.
 

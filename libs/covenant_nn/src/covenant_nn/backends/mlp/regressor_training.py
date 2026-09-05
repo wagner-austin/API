@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from pathlib import Path
 from typing import Final, TypedDict
 
 import numpy as np
-from covenant_ml.backends.regressor_protocol import (
-    RegressorProgressCallback,
-)
 from covenant_ml.metrics_regression import compute_all_regression_metrics
 from covenant_ml.preprocessing import AutoPreprocessor
 from covenant_ml.trainer import RegressionDataSplits
@@ -359,7 +357,7 @@ def _run_regression_training_loop(
     cfg: MLPConfig,
     device: str,
     output_dir: Path,
-    progress: RegressorProgressCallback | None,
+    progress: Callable[[RegressionTrainProgress], None] | None,
 ) -> _EarlyStopState:
     """Run the regression training loop with early stopping on val RMSE.
 

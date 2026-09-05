@@ -29,8 +29,6 @@ from .conftest import (
     make_fake_result,
 )
 
-ResultFactory = Callable[[], UnifiedOptimizationResult]
-
 
 class TestRealDatasetHooks:
     """Tests for real dataset hooks to ensure coverage."""
@@ -140,7 +138,7 @@ class TestRealTimeseriesHooks:
 
 
 def _make_unified_fake_runner(
-    result_factory: ResultFactory,
+    result_factory: Callable[[], UnifiedOptimizationResult],
     loading_info: LoadingProgressInfo | None = None,
 ) -> _hooks.OptimizationRunnerProtocol:
     """Create a fake runner that optionally invokes the loading progress callback.

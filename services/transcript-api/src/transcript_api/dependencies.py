@@ -17,17 +17,15 @@ from transcript_api.types import (
 from . import _test_hooks
 
 # Provider types for dependency injection
-RedisProviderType = Callable[[], RedisStrProto]
-LoggerProviderType = Callable[[], LoggerProtocol]
 
 
 class _ProviderContext:
     """Global context for injectable providers (used in testing)."""
 
     def __init__(self) -> None:
-        self.redis_provider: RedisProviderType | None = None
+        self.redis_provider: Callable[[], RedisStrProto] | None = None
         self.queue_provider: Callable[[], QueueProtocol] | None = None
-        self.logger_provider: LoggerProviderType | None = None
+        self.logger_provider: Callable[[], LoggerProtocol] | None = None
 
 
 provider_context = _ProviderContext()
@@ -77,10 +75,8 @@ QueueDep = Annotated[QueueProtocol, Depends(get_queue)]
 
 __all__ = [
     "LoggerDep",
-    "LoggerProviderType",
     "QueueDep",
     "RedisDep",
-    "RedisProviderType",
     "get_queue",
     "get_redis",
     "get_request_logger",

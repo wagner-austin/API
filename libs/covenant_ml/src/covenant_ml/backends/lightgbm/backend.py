@@ -10,14 +10,13 @@ Implements ClassifierBackend protocol using LightGBM with:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
 import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
-
-from covenant_ml.types import ProgressCallback
 
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
@@ -268,7 +267,7 @@ class LightGBMBackend(ClassifierBackend):
         feature_names: list[str] | None,
         config: ClassifierTrainConfig,
         output_dir: Path,
-        progress: ProgressCallback | None,
+        progress: Callable[[TrainProgress], None] | None,
         groups: NDArray[np.int64] | None = None,
     ) -> TrainOutcome:
         """Train LightGBM model on tabular data."""
