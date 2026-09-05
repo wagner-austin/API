@@ -39,6 +39,15 @@ ruff = "^0.16.6"
 typing-extensions = "^4.12.0"
 
 [tool.mypy]
+# Analyse as Windows regardless of the host. benchmarking/power.py opts the
+# measuring process out of EcoQoS throttling, which is a Windows behaviour with
+# no counterpart elsewhere, so it reaches ctypes.WinDLL and ctypes.get_last_error
+# -- attributes typeshed declares only under sys.platform == "win32". Without
+# this, the same source that type-checks here fails with 19 errors on a Linux CI
+# runner, which is what it did. Safe to assert globally because covenant_ml
+# branches on sys.platform nowhere: setting it changes the visibility of
+# platform-gated stdlib attributes and nothing else.
+platform = "win32"
 python_version = "3.11"
 strict = true
 warn_unused_ignores = true
