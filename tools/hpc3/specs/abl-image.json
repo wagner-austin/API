@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "d894c6b2bac1722cd319d93cec43bf59299cdee9",
+  "git_commit": "e5476201e30b622114cfe5ab477bb4a16f00cc00",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -381,7 +381,7 @@
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import COMPANION_SWEEP_PLANS, COMPOSITION_SWEEP_PLANS, companion_sweep_label; plan = COMPANION_SWEEP_PLANS['gpt2-companions']; label = companion_sweep_label('gpt2-companions', plan, digest='0' * 64); assert label.startswith('gpt2-companions-gpt2-w256-s4-e12-lr0.01-n2.4-c64-p0.25.0.5.1.0-seeds7.8.9-'), label; assert 'gpt2-compartments' in COMPOSITION_SWEEP_PLANS; n8 = COMPANION_SWEEP_PLANS['gpt2-companions-n8']; assert n8['compartment_counts'] == (8,) and n8['probabilities'] == (0.25, 0.5), n8\"",
     "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_companion_sweep import COMPANION_KINDS, COMPANION_SEED_STRIDE; assert COMPANION_KINDS == ('noise', 'trained'), COMPANION_KINDS; assert COMPANION_SEED_STRIDE == 11; from model_trainer.core.services.finetuning.strategies.cartridge_slots import SLOT_AXIS; assert SLOT_AXIS == 2, 'slot concat axis moved and every composed cartridge would be silently wrong'\"",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import VARIED_COMPANION_SWEEP_PLANS, varied_companion_sweep_label; plan = VARIED_COMPANION_SWEEP_PLANS['gpt2-companions-varied']; assert plan['compartment_counts'] == (4, 8) and plan['probability'] == 0.5 and plan['max_companions'] == 3, plan; label = varied_companion_sweep_label('gpt2-companions-varied', plan, digest='0' * 64); assert label.startswith('gpt2-companions-varied-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-'), label\"",
-    "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import DIVERSE_COMPANION_SWEEP_PLANS, VARIED_COMPANION_SWEEP_PLANS; assert DIVERSE_COMPANION_SWEEP_PLANS['gpt2-companions-diverse'] == VARIED_COMPANION_SWEEP_PLANS['gpt2-companions-varied'], 'the two pool grids must isolate exactly one difference'; from model_trainer.cli.cartridge_diverse_companion_sweep import measure_grid\"",
+    "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_plans import DIVERSE_COMPANION_SWEEP_PLANS, VARIED_COMPANION_SWEEP_PLANS; assert DIVERSE_COMPANION_SWEEP_PLANS['gpt2-companions-diverse'] == VARIED_COMPANION_SWEEP_PLANS['gpt2-companions-varied'], 'the two pool grids must isolate exactly one difference'; medium = DIVERSE_COMPANION_SWEEP_PLANS['gpt2-medium-companions-diverse']; recorded = DIVERSE_COMPANION_SWEEP_PLANS['gpt2-companions-diverse']; assert medium['model_id'] == 'gpt2-medium' and dict(medium, model_id=recorded['model_id']) == recorded, 'the scale rung must differ only in the base'; from model_trainer.cli.cartridge_diverse_companion_sweep import measure_grid\"",
     "/opt/env/bin/python -m model_trainer.cli.known_answer_probe --device cpu --out /tmp/probe.json",
     "/opt/env/bin/python -m model_trainer.cli.probe_ladder --device cpu --out /tmp/ladder.json",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.probe_shapes import PROBE_LABEL as L; assert L == 'gpt2-tiny-L2-d128-h2-v512-len64-seed42', L\"",
