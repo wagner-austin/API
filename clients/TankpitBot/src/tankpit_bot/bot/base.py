@@ -58,6 +58,7 @@ from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
+    _fullscreen_via_cdp,
     _maximize_via_cdp,
 )
 from tankpit_bot.sniffer.world_service import WorldService
@@ -277,15 +278,7 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._ai_state = make_initial_ai_state(env_ai_config())
         self._cdp_message_buffer = []
 
-        # ``--kiosk`` when capturing: the Xvfb screen is sized exactly
-        # to the capture, so fullscreen-without-browser-UI is what puts
-        # pure game pixels in front of ffmpeg. (--start-maximized is
-        # NOT equivalent — see the Playwright #14314 note in
-        # chrome_launch — and a normal window would put a toolbar in
-        # every frame of the public stream.)
-        launch_args = _chrome_stream_display_args() + (
-            ["--kiosk"] if self._stream_config is not None else []
-        )
+        launch_args = _chrome_stream_display_args()
         # Keyed by login identity so a fleet child selecting a
         # different account can never resume another account's session
         # (the 2026-08-13 arterial-as-artax incident).
@@ -339,6 +332,16 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 cdp = context.new_cdp_session(page)
                 if _chrome_stream_no_viewport():
                     _maximize_via_cdp(cdp)
+
+                # Fullscreen, not maximised, when the window IS the
+                # picture: ffmpeg records the whole Xvfb screen, and a
+                # maximised window would put the tab strip and address
+                # bar in every frame of the public stream. Post-launch
+                # CDP because ``--kiosk`` shapes Chromium's own startup
+                # window, which Playwright suppresses (observed live
+                # 2026-09-05: the flag applied to nothing).
+                if capture is not None:
+                    _fullscreen_via_cdp(cdp)
 
                 self._cdp = cdp
                 self._page = page

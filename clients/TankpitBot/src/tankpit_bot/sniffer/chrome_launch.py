@@ -109,6 +109,38 @@ def _maximize_via_cdp(cdp: _test_hooks.CDPSessionProtocol) -> None:
     )
 
 
+def _fullscreen_via_cdp(cdp: _test_hooks.CDPSessionProtocol) -> None:
+    """Flip the current window to OS-level FULLSCREEN via CDP.
+
+    The display-capture path needs pure page pixels: a maximised
+    window still wears the tab strip and address bar, and ffmpeg
+    records the whole screen, so browser chrome would sit in every
+    frame of the public stream (observed live 2026-09-05, first
+    capture off the new pipeline). ``--kiosk`` cannot do this under
+    Playwright — the flag shapes Chromium's own startup window, and
+    Playwright suppresses that window and opens pages
+    programmatically, so the flag applies to nothing.
+    ``Browser.setWindowBounds`` with ``windowState = "fullscreen"``
+    is the supported post-launch route, exactly parallel to
+    :func:`_maximize_via_cdp` above.
+
+    Args:
+        cdp: The active CDP session attached to the target Chromium
+            page.
+
+    Raises:
+        JSONTypeError: When the CDP surface returns a response missing
+            or with the wrong type for ``windowId`` — loud, for the
+            same drift-detection reason as the maximise call.
+    """
+    window = cdp.send("Browser.getWindowForTarget")
+    window_id = require_int(window, "windowId")
+    cdp.send(
+        "Browser.setWindowBounds",
+        {"windowId": window_id, "bounds": {"windowState": "fullscreen"}},
+    )
+
+
 def _chrome_stream_no_viewport() -> bool:
     """True when the launch is targeting the streamed virtual display.
 
@@ -129,5 +161,6 @@ def _chrome_stream_no_viewport() -> bool:
 __all__ = [
     "_chrome_stream_display_args",
     "_chrome_stream_no_viewport",
+    "_fullscreen_via_cdp",
     "_maximize_via_cdp",
 ]

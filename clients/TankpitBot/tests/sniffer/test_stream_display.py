@@ -17,6 +17,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
+    _fullscreen_via_cdp,
     _maximize_via_cdp,
 )
 from tests.conftest import FakeCDPSessionSimple, FakeEnv
@@ -137,3 +138,36 @@ class TestMaximizeViaCDP:
 
         with pytest.raises(JSONTypeError):
             _maximize_via_cdp(cdp)
+
+
+class TestFullscreenViaCDP:
+    """Cases for ``_fullscreen_via_cdp`` — the display-capture window state."""
+
+    def test_dispatches_both_setwindowbounds_commands(self) -> None:
+        """A well-formed CDP surface receives both commands in order.
+
+        Fullscreen rather than maximised: ffmpeg records the whole
+        screen, and a maximised window still wears the tab strip and
+        address bar (observed in the first live capture, 2026-09-05).
+        """
+        cdp = FakeCDPSessionSimple()
+        cdp.add_response({"windowId": 42})
+        cdp.add_response({})
+
+        _fullscreen_via_cdp(cdp)
+
+        calls = cdp.get_calls()
+        assert calls[0] == ("Browser.getWindowForTarget", None)
+        expected_params: JSONObject = {
+            "windowId": 42,
+            "bounds": {"windowState": "fullscreen"},
+        }
+        assert calls[1] == ("Browser.setWindowBounds", expected_params)
+
+    def test_raises_when_windowid_missing_from_response(self) -> None:
+        """A CDP surface that drops the ``windowId`` field surfaces loudly."""
+        cdp = FakeCDPSessionSimple()
+        cdp.add_response({})  # no windowId
+
+        with pytest.raises(JSONTypeError):
+            _fullscreen_via_cdp(cdp)

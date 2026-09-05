@@ -140,10 +140,6 @@ class TestBotRunWithCapture:
             raise AssertionError("the fake playwright was never started")
         browser_type = playwright._chromium
         assert browser_type.launch_envs == [{"KEEP": "1", "DISPLAY": ":7"}]
-        launch_args = browser_type.launch_args[0]
-        if launch_args is None:
-            raise AssertionError("the launch was handed no args at all")
-        assert "--kiosk" in launch_args
         # Ended by run()'s own teardown, not the reaper in the finally.
         for name, process in zip(("Xvfb", "ffmpeg"), processes, strict=True):
             if process.poll() is None:
