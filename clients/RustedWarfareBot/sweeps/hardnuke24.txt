@@ -1,0 +1,32 @@
+# The Hard finisher panel ([[campaign-ledger]]): champion vs
+# champion+nukes1 on 12 shared fresh seeds at difficulty 1. The
+# stalemate-seed probes read: close3 turned the held cap into a WIPE
+# (the all-in is the wrong verb from behind) and nukes1 turned it
+# into a WIN at sample 2,454. The panel asks whether the finisher
+# preserves the champion's wins. Seeds 8746001-8750577.
+#
+# label | seed | doctrine | samples
+champ|8746001|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8746001|doctrines/g4m2-nuke1.doctrine|10000
+champ|8746417|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8746417|doctrines/g4m2-nuke1.doctrine|10000
+champ|8746833|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8746833|doctrines/g4m2-nuke1.doctrine|10000
+champ|8747249|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8747249|doctrines/g4m2-nuke1.doctrine|10000
+champ|8747665|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8747665|doctrines/g4m2-nuke1.doctrine|10000
+champ|8748081|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8748081|doctrines/g4m2-nuke1.doctrine|10000
+champ|8748497|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8748497|doctrines/g4m2-nuke1.doctrine|10000
+champ|8748913|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8748913|doctrines/g4m2-nuke1.doctrine|10000
+champ|8749329|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8749329|doctrines/g4m2-nuke1.doctrine|10000
+champ|8749745|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8749745|doctrines/g4m2-nuke1.doctrine|10000
+champ|8750161|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8750161|doctrines/g4m2-nuke1.doctrine|10000
+champ|8750577|doctrines/evolve1-g4m2.doctrine|10000
+nuke1|8750577|doctrines/g4m2-nuke1.doctrine|10000
