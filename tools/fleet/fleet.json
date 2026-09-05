@@ -63,17 +63,19 @@
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
       "expected_minutes": 5,
-      "external_paths": ["docs"]
+      "external_paths": [
+        "docs"
+      ]
     },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
-      "expected_minutes": 2
+      "expected_minutes": 5
     },
     "libs/monorepo_guards": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
-      "expected_minutes": 2
+      "expected_minutes": 5
     },
     "services/Model-Trainer": {
       "worker_ram_gb": 1.1,
