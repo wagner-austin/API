@@ -63,6 +63,8 @@ fleet-collect   --config fleet.json --run <run-id>
 fleet-watch     --config fleet.json                 # the event stream
 fleet-watch     --config fleet.json --run <run-id>
 fleet-cancel    --config fleet.json --run <run-id>
+fleet-agent     --config fleet.json \               # one tick of the queue runner
+                --agent <label> --session <uuid> --repo-root <path>
 ```
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
@@ -93,6 +95,60 @@ done
 fields, so a ledger row and a board post can be matched by whoever reads both.
 A default would be one label shared by every session, which is the same as
 having none.
+
+## `fleet-agent`: serving the corvis dispatch queue
+
+Everything above is driven from a shell on this machine. `fleet-agent` is how
+a session **anywhere** — a phone, claude.ai, another machine — gets work onto
+the fleet without any of them being able to reach it.
+
+The queue lives in corvis, as the `dispatch_*` tools on `fleet-mcp` (MCPs
+repo, migration 486). A submitter calls `dispatch_submit`; that writes a row
+and nothing runs. `fleet-agent` runs **here**, where the ssh keys are, claims
+a row and executes it through exactly the engine the commands above use.
+
+**The work travels toward the keys, never the other way.** The corvis server
+has no route to the `100.x` tailnet and holds no key, so no inbound path to
+the fleet is ever opened and no fleet credential ever lives on an
+internet-facing multi-tenant box. That is the whole reason the queue is
+inverted.
+
+A tick is two passes, in this order:
+
+1. **collect** — for every job this runner holds that is already running, ask
+   the node whether the suite finished and close it on *both* sides, the local
+   ledger and the queue. First, so a tick that also claims never leaves a
+   finished result unreported for a whole interval.
+2. **claim** — take at most one new job, choose a node with capacity, stage,
+   launch, and report it started.
+
+No loop. The interval belongs to whatever schedules it, where it is visible:
+
+```bash
+export FLEET_MCP_API_KEY=...      # mcp-fleet's MCP_INTERNAL_KEY
+export CORVIS_TENANT_ID=...       # the tenant whose queue this serves
+while true; do
+  fleet-agent --config fleet.json --agent fleet-runner-austinpc \
+              --session <uuid> --repo-root ~/PROJECTS/API
+  sleep 30
+done
+```
+
+**It exits 0 for a refused job**, the same argument `fleet-collect` makes for
+a failing suite: the status is whether *the agent* worked. A job no node had
+capacity for was handled correctly — the refusal goes back to the queue with
+its code and message verbatim, where the submitter reads it. Exiting non-zero
+would stop the loop on exactly the condition the loop exists to keep
+reporting.
+
+**The ledger row names the submitter, not the runner.** A row stamped with
+`fleet-runner-austinpc` would record only that the runner ran something; the
+queue job carries the enqueueing session's label and UUID, and those are what
+`dispatch.start` is given.
+
+**What a runner holds is asked of the queue, never remembered locally.** A
+runner that crashed between launching a suite and writing itself a note would
+otherwise strand a job on a node with nothing left that knows to collect it.
 
 ## Subscribing from a Claude session
 

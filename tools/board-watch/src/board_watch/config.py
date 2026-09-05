@@ -14,10 +14,11 @@ every poll.
 
 from __future__ import annotations
 
-from typing import Final, TypedDict
+from typing import Final
 
 from platform_core.error_codes import BoardWatchErrorCode
 from platform_core.errors import AppError
+from platform_core.mcp_client import McpCredentials
 
 from board_watch import _test_hooks
 
@@ -34,21 +35,7 @@ URL_VARIABLE: Final = "BOARD_WATCH_URL"
 DEFAULT_URL: Final = "http://127.0.0.1:8033/mcp"
 
 
-class BoardCredentials(TypedDict):
-    """Everything one board call needs.
-
-    Attributes:
-        url: Absolute URL of the MCP endpoint.
-        api_key: The value for the ``x-api-key`` header.
-        tenant_id: The value for the ``X-Tenant-Id`` header.
-    """
-
-    url: str
-    api_key: str
-    tenant_id: str
-
-
-def load_credentials() -> BoardCredentials:
+def load_credentials() -> McpCredentials:
     """Read the endpoint and both secrets from the environment.
 
     Returns:
@@ -80,7 +67,7 @@ def load_credentials() -> BoardCredentials:
             ),
         )
     url = _test_hooks.env(URL_VARIABLE)
-    return BoardCredentials(
+    return McpCredentials(
         url=DEFAULT_URL if url is None else url,
         api_key=api_key,
         tenant_id=tenant_id,

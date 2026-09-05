@@ -17,9 +17,9 @@ from __future__ import annotations
 from typing import Final, TypedDict
 
 from platform_core.json_utils import JSONObject
+from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
-from board_watch.client import call_tool
-from board_watch.config import BoardCredentials
+from board_watch import _test_hooks
 from board_watch.contracts import BoardEvent, EventPage, decode_event_page
 
 #: The MCP tool this package reads.
@@ -113,7 +113,7 @@ def advance(held: str | None, page: EventPage) -> str | None:
     return page["next_cursor"]
 
 
-def prime(credentials: BoardCredentials) -> str | None:
+def prime(credentials: McpCredentials) -> str | None:
     """Walk the feed to its end and return the cursor for "from now on".
 
     THE LAST PARTIAL PAGE NEEDS A SECOND REQUEST, and getting that wrong is
@@ -142,20 +142,32 @@ def prime(credentials: BoardCredentials) -> str | None:
     """
     cursor: str | None = None
     while True:
-        page = decode_event_page(call_tool(credentials, EVENTS_TOOL, priming_arguments(cursor)))
+        page = decode_event_page(
+            call_mcp_tool(
+                _test_hooks.http_post,
+                credentials,
+                EVENTS_TOOL,
+                priming_arguments(cursor),
+            )
+        )
         if page["next_cursor"] is not None:
             cursor = page["next_cursor"]
             continue
         if page["count"] == 0:
             return cursor
         exact = decode_event_page(
-            call_tool(credentials, EVENTS_TOOL, priming_arguments(cursor, limit=page["count"]))
+            call_mcp_tool(
+                _test_hooks.http_post,
+                credentials,
+                EVENTS_TOOL,
+                priming_arguments(cursor, limit=page["count"]),
+            )
         )
         return advance(cursor, exact)
 
 
 def poll(
-    credentials: BoardCredentials, spec: SubscriptionSpec, cursor: str | None
+    credentials: McpCredentials, spec: SubscriptionSpec, cursor: str | None
 ) -> tuple[EventPage, str | None]:
     """Read one page of matching events and report the new position.
 
@@ -171,7 +183,12 @@ def poll(
         AppError: Any transport or contract failure from the underlying call.
     """
     page = decode_event_page(
-        call_tool(credentials, EVENTS_TOOL, subscription_arguments(spec, cursor))
+        call_mcp_tool(
+            _test_hooks.http_post,
+            credentials,
+            EVENTS_TOOL,
+            subscription_arguments(spec, cursor),
+        )
     )
     return page, advance(cursor, page)
 

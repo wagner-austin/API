@@ -24,7 +24,9 @@ import pathlib
 from collections.abc import Generator, Sequence
 
 import pytest
+from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.mcp_client import urllib_mcp_post
 
 from fleet.cli import _config
 from fleet.core import _test_hooks, manifest, staging
@@ -373,3 +375,11 @@ def _restore() -> None:
     _test_hooks.temp_root = _test_hooks._default_temp_root
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text
+    # The queue seams. The poster's default lives in platform_core: the SEAM
+    # is this package's, the transport behind it is shared with board-watch.
+    _test_hooks.http_post = urllib_mcp_post
+    _test_hooks.env = _test_hooks._default_env
+    # platform_core's own reader, which ``_default_env`` delegates to. A test
+    # that rebinds it would otherwise leak that binding into whichever test
+    # ``-n auto`` scheduled next.
+    config_test_hooks.get_env = config_test_hooks._default_get_env

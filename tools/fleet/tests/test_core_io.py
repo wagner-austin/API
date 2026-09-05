@@ -18,6 +18,7 @@ import pathlib
 import sys
 
 import pytest
+from platform_core.config import config_test_hooks
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
@@ -112,6 +113,26 @@ class TestDefaultHooks:
         assert seconds == int(seconds)
         assert seconds > 1_756_000_000
         assert _test_hooks._default_now() >= seconds
+
+    def test_the_real_environment_reader_normalises_blank_to_unset(self) -> None:
+        """It delegates to the monorepo's one permitted environment reader.
+
+        Rebinding THAT reader's own hook rather than setting a real variable
+        is what keeps this package from growing a second ``os.environ``
+        access -- the ``env`` guard rule names ``platform_core.config``
+        explicitly rather than exempting anyone -- and it exercises the
+        delegation rather than assuming it.
+
+        The blank case is the one that matters: an exported-but-empty
+        credential must read as unset, or a blank api key reaches the queue
+        and the failure arrives as a 401 from a server instead of a named
+        refusal here.
+        """
+        config_test_hooks.get_env = {"SET": "present", "BLANK": "   "}.get
+
+        assert _test_hooks._default_env("SET") == "present"
+        assert _test_hooks._default_env("BLANK") is None
+        assert _test_hooks._default_env("ABSENT") is None
 
     def test_append_creates_the_parent_directory(self, tmp_path: pathlib.Path) -> None:
         """A workspace pointing at a fresh directory is the first-run case."""

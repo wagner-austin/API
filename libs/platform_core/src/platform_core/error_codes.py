@@ -456,6 +456,38 @@ class FleetErrorCode(ErrorCodeBase):
     WORKSPACE_NODE_UNKNOWN = "WORKSPACE_NODE_UNKNOWN"
     WORKSPACE_PROJECT_UNKNOWN = "WORKSPACE_PROJECT_UNKNOWN"
 
+    # The corvis dispatch queue, which a runner on the hub claims work from.
+    # Two codes, split where a reader's next action splits: a malformed
+    # ANSWER means the tool's contract moved and the fix is in the MCP
+    # package, while a queue job naming something this workspace does not
+    # declare means the fleet.json here is behind and the fix is a config
+    # line. One code would send half its readers to the wrong repository.
+    QUEUE_ANSWER_MALFORMED = "QUEUE_ANSWER_MALFORMED"
+    QUEUE_CREDENTIALS_MISSING = "QUEUE_CREDENTIALS_MISSING"
+
+
+class McpClientErrorCode(ErrorCodeBase):
+    """Calling one MCP tool over HTTP -- the transport, and nothing above it.
+
+    Split out of :class:`BoardWatchErrorCode` on 2026-09-05, when a second
+    package started calling MCP tools and the transport half of that enum
+    turned out never to have been board-specific. These three describe the
+    EXCHANGE: the endpoint refusing, the endpoint accepting and the tool
+    failing, and the endpoint answering in a shape no MCP client can read.
+    What a particular tool's ANSWER should look like stays with whoever parses
+    it -- the board's rendered-prose grammar codes are still next door,
+    because a fleet-dispatch caller reading JSON cannot hit them.
+
+    Same discipline as its siblings: no generic member.
+    """
+
+    # HTTP_STATUS is the endpoint refusing (401 on a rotated key is the case
+    # that actually happens); RPC_ERROR is the endpoint accepting and the tool
+    # itself failing. Merging them would send a reader to the wrong layer.
+    HTTP_STATUS = "HTTP_STATUS"
+    RPC_ERROR = "RPC_ERROR"
+    RESPONSE_NOT_EVENT_STREAM = "RESPONSE_NOT_EVENT_STREAM"
+
 
 class BoardWatchErrorCode(ErrorCodeBase):
     """Subscribing a shell to the corvis agent board's change feed.
@@ -479,13 +511,10 @@ class BoardWatchErrorCode(ErrorCodeBase):
     API_KEY_MISSING = "API_KEY_MISSING"
     TENANT_ID_MISSING = "TENANT_ID_MISSING"
 
-    # Transport -- the board answered, but not with a result.
-    # HTTP_STATUS is the endpoint refusing (401 on a rotated key is the case
-    # that actually happens); RPC_ERROR is the endpoint accepting and the tool
-    # itself failing. Merging them would send a reader to the wrong layer.
-    HTTP_STATUS = "HTTP_STATUS"
-    RPC_ERROR = "RPC_ERROR"
-    RESPONSE_NOT_EVENT_STREAM = "RESPONSE_NOT_EVENT_STREAM"
+    # Transport codes used to live here. They moved to
+    # :class:`McpClientErrorCode` on 2026-09-05 with the client itself: an
+    # endpoint refusing and a tool erroring are properties of MCP-over-HTTP,
+    # not of this board, and a second caller needed the same three.
 
     # The rendered contract -- one code per element of the grammar, because
     # each is produced by a different function on the server and so can move
@@ -508,6 +537,7 @@ __all__ = [
     "FleetErrorCode",
     "HandwritingErrorCode",
     "Hpc3ErrorCode",
+    "McpClientErrorCode",
     "ModelTrainerErrorCode",
     "OAuthErrorCode",
     "TranscriptErrorCode",

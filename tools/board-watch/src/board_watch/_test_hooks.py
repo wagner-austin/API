@@ -9,6 +9,14 @@ Four kinds of seam, one per thing that reaches outside the process: the
 network, the environment, the filesystem holding the cursor, and standard
 output. Nothing else is hooked, because nothing else leaves.
 
+THE NETWORK SEAM IS DECLARED HERE AND IMPLEMENTED NEXT DOOR. ``http_post``
+binds :func:`platform_core.mcp_client.urllib_mcp_post`, lifted out of this
+module on 2026-09-05 when a second package needed the same POST. The SEAM
+stays here -- production binds the real thing, a test binds a fake, and no
+call site asks which -- while the implementation, down to the
+non-raising error processor, is shared. A second copy of that would be a
+second place for the SSE transport's quirks to be got wrong.
+
 There is deliberately no clock and no sleep. This command reads once and
 exits; the interval belongs to the shell loop that calls it, where it is
 visible at the call site. See :mod:`board_watch.cli.watch`.
@@ -16,53 +24,12 @@ visible at the call site. See :mod:`board_watch.cli.watch`.
 
 from __future__ import annotations
 
-import http.client
 import pathlib
 import sys
-import urllib.request
-from typing import Final, Protocol, TypedDict
+from typing import Protocol
 
 from platform_core.config import _optional_env_str
-
-
-class HttpResponse(TypedDict):
-    """What a POST to the board's HTTP surface answered.
-
-    Attributes:
-        status: The HTTP status line's code.
-        content_type: The ``Content-Type`` header, lowercased, or the empty
-            string when the response carried none.
-        body: The decoded response body.
-    """
-
-    status: int
-    content_type: str
-    body: str
-
-
-class HttpPostProtocol(Protocol):
-    """Post a JSON body and read the whole response."""
-
-    def __call__(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str],
-        body: bytes,
-        timeout_seconds: int,
-    ) -> HttpResponse:
-        """Perform the request.
-
-        Args:
-            url: Absolute URL to post to.
-            headers: Every request header, already complete.
-            body: The encoded request body.
-            timeout_seconds: How long to wait for the whole exchange.
-
-        Returns:
-            The response.
-        """
-        ...
+from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 
 class EnvProtocol(Protocol):
@@ -141,115 +108,6 @@ class EmitProtocol(Protocol):
         ...
 
 
-class _ResponseHeaders(Protocol):
-    """The one header lookup this package makes."""
-
-    def get(self, name: str, failobj: str) -> str:
-        """Read a header.
-
-        Args:
-            name: The header name.
-            failobj: What to answer when the header is absent.
-
-        Returns:
-            The header value, or ``failobj``.
-        """
-        ...
-
-
-class _UrlResponse(Protocol):
-    """The four members this package uses from an opened URL.
-
-    A Protocol rather than :class:`http.client.HTTPResponse` because
-    ``OpenerDirector.open`` is typed loosely enough that everything read off
-    its result would otherwise be ``Any``. Annotating the assignment with
-    this narrows it at the boundary, which is where parsing belongs.
-    """
-
-    status: int
-    headers: _ResponseHeaders
-
-    def read(self) -> bytes:
-        """Read the whole body.
-
-        Returns:
-            The body bytes.
-        """
-        ...
-
-    def close(self) -> None:
-        """Release the connection."""
-        ...
-
-
-class _PassThroughErrorProcessor(urllib.request.HTTPErrorProcessor):
-    """An error processor that hands back non-2xx responses instead of raising.
-
-    ``urllib``'s default turns a 401 into a raised
-    :class:`urllib.error.HTTPError`, which would force this module to catch an
-    exception in order to read a status code the caller needs. The status is
-    not an exceptional condition here -- a rotated API key is the ordinary way
-    this fails, and the caller's job is to attach
-    ``BoardWatchErrorCode.HTTP_STATUS`` to it.
-
-    Replacing the processor removes the exception at its source rather than
-    handling it downstream, so no ``except`` appears anywhere in this package.
-    """
-
-    def http_response(
-        self, request: urllib.request.Request, response: http.client.HTTPResponse
-    ) -> http.client.HTTPResponse:
-        """Return the response unchanged, whatever its status.
-
-        Args:
-            request: The request that produced it, unused.
-            response: The response as received.
-
-        Returns:
-            That same response.
-        """
-        return response
-
-    https_response = http_response
-
-
-def _default_http_post(
-    url: str,
-    *,
-    headers: dict[str, str],
-    body: bytes,
-    timeout_seconds: int,
-) -> HttpResponse:
-    """Post with the standard library.
-
-    ``urllib`` rather than ``httpx`` because this is a single loopback POST
-    from a short-lived CLI. ``platform_core.http_client`` exists for services
-    that hold a client across many requests and need transports injected;
-    borrowing it here would add a dependency to buy nothing.
-
-    Args:
-        url: Absolute URL to post to.
-        headers: Every request header, already complete.
-        body: The encoded request body.
-        timeout_seconds: How long to wait for the whole exchange.
-
-    Returns:
-        The response, whatever its status.
-    """
-    request = urllib.request.Request(url=url, data=body, headers=headers, method="POST")
-    opener = urllib.request.build_opener(_PassThroughErrorProcessor)
-    # Annotated at the assignment so the Protocol, not ``urlopen``'s loose
-    # return type, is what the rest of this function is checked against.
-    response: _UrlResponse = opener.open(request, timeout=timeout_seconds)
-    answer = HttpResponse(
-        status=response.status,
-        content_type=response.headers.get("Content-Type", "").lower(),
-        body=response.read().decode("utf-8"),
-    )
-    response.close()
-    return answer
-
-
 def _default_env(name: str) -> str | None:
     """Read a process environment variable.
 
@@ -318,10 +176,7 @@ def _default_emit(line: str) -> None:
     sys.stdout.flush()
 
 
-#: How long a single board call may take before it is abandoned.
-DEFAULT_TIMEOUT_SECONDS: Final = 20
-
-http_post: HttpPostProtocol = _default_http_post
+http_post: McpPostProtocol = urllib_mcp_post
 env: EnvProtocol = _default_env
 read_text: ReadTextProtocol = _default_read_text
 write_text: WriteTextProtocol = _default_write_text

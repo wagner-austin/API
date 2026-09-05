@@ -107,7 +107,7 @@ def collect_one(loaded: _config.LoadedWorkspace, row: LedgerEntry) -> str:
 
     plan = require_project(loaded.workspace, row["project"])
     if collect.outlived_its_lease(row, plan, finished_unix=result["finished_unix"]):
-        raise _lapsed(row, plan, finished_unix=result["finished_unix"])
+        raise lapsed_lease_refusal(row, plan, finished_unix=result["finished_unix"])
 
     exit_code = result["exit_code"]
     detail = collect.describe(node, run_id=row["run_id"], exit_code=exit_code)
@@ -123,7 +123,7 @@ def collect_one(loaded: _config.LoadedWorkspace, row: LedgerEntry) -> str:
     return f"{row['run_id']}: {collect.outcome_for(exit_code)} -- {detail}"
 
 
-def _lapsed(
+def lapsed_lease_refusal(
     row: LedgerEntry, plan: ProjectConfig, *, finished_unix: int
 ) -> AppError[FleetErrorCode]:
     """Build the refusal for a run that was still going without a lease.

@@ -28,7 +28,30 @@ import time
 from collections.abc import Sequence
 from typing import Protocol
 
+from platform_core.config import _optional_env_str
+from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 from typing_extensions import TypedDict
+
+
+class EnvProtocol(Protocol):
+    """Read one process environment variable.
+
+    Implementations MUST normalise a variable set to whitespace to None. An
+    exported-but-blank variable is the unset case as far as every caller here
+    is concerned, and a fake that returned ``""`` where the real reader
+    returns None would let a blank credential reach the queue.
+    """
+
+    def __call__(self, name: str) -> str | None:
+        """Read it.
+
+        Args:
+            name: The variable name.
+
+        Returns:
+            Its trimmed value, or None when unset or blank.
+        """
+        ...
 
 
 class CommandResult(TypedDict):
@@ -356,8 +379,35 @@ def _default_write_text(path: pathlib.Path, text: str) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
+def _default_env(name: str) -> str | None:
+    """Read a process environment variable.
+
+    Delegates to ``platform_core.config``, which is the monorepo's single
+    permitted reader of the process environment -- the ``env`` guard rule
+    names it explicitly rather than exempting it. A second reader here would
+    be the fork that rule exists to prevent.
+
+    Args:
+        name: The variable name.
+
+    Returns:
+        Its trimmed value, or None when unset OR set to whitespace. The
+        normalisation is the shared reader's, and it is why callers here test
+        only for None.
+    """
+    return _optional_env_str(name)
+
+
 run: RunProtocol = _default_run
 now: NowProtocol = _default_now
+# The dispatch queue's network seam. The implementation is
+# ``platform_core.mcp_client.urllib_mcp_post``, shared with tools/board-watch:
+# the SEAM belongs to this package (production binds the real thing, a test
+# binds a fake) while the JSON-RPC-over-SSE transport behind it is one
+# implementation everywhere, down to the error processor that hands back a
+# 401 instead of raising.
+http_post: McpPostProtocol = urllib_mcp_post
+env: EnvProtocol = _default_env
 read_text: ReadTextProtocol = _default_read_text
 read_bytes: ReadBytesProtocol = _default_read_bytes
 file_exists: FileExistsProtocol = _default_file_exists

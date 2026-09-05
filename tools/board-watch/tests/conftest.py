@@ -33,9 +33,10 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.mcp_client import McpCredentials, McpHttpResponse, urllib_mcp_post
 
 from board_watch import _test_hooks
-from board_watch.config import API_KEY_VARIABLE, TENANT_ID_VARIABLE, BoardCredentials
+from board_watch.config import API_KEY_VARIABLE, TENANT_ID_VARIABLE
 from board_watch.contracts import EMPTY_FEED_SENTINEL
 
 #: A real ``task_events`` row carrying mentions and a truncated body.
@@ -71,7 +72,7 @@ LIVE_MULTILINE_ROW: Final = (
 )
 
 #: The credentials every client test posts with.
-TEST_CREDENTIALS: Final = BoardCredentials(
+TEST_CREDENTIALS: Final = McpCredentials(
     url="http://127.0.0.1:8033/mcp",
     api_key="test-key",
     tenant_id="2e137b5f-0000-4000-8000-000000000000",
@@ -155,7 +156,7 @@ def page_text(lines: Sequence[str], next_cursor: str | None) -> str:
 class FakeHttpPost:
     """An HTTP poster that answers from a script and records the calls.
 
-    Satisfies :class:`~board_watch._test_hooks.HttpPostProtocol`.
+    Satisfies :class:`~platform_core.mcp_client.McpPostProtocol`.
 
     Attributes:
         urls: Every URL it was given, in order.
@@ -167,9 +168,9 @@ class FakeHttpPost:
     headers: list[dict[str, str]]
     bodies: list[bytes]
     timeouts: list[int]
-    _replies: list[_test_hooks.HttpResponse]
+    _replies: list[McpHttpResponse]
 
-    def __init__(self, replies: Sequence[_test_hooks.HttpResponse]) -> None:
+    def __init__(self, replies: Sequence[McpHttpResponse]) -> None:
         """Build a poster that will answer with these responses in order.
 
         Args:
@@ -190,7 +191,7 @@ class FakeHttpPost:
         headers: dict[str, str],
         body: bytes,
         timeout_seconds: int,
-    ) -> _test_hooks.HttpResponse:
+    ) -> McpHttpResponse:
         """Record a call and answer with the next scripted response.
 
         Args:
@@ -336,7 +337,7 @@ class FakeEmit:
         self.lines.append(line)
 
 
-def ok(body: str) -> _test_hooks.HttpResponse:
+def ok(body: str) -> McpHttpResponse:
     """Build a successful HTTP response.
 
     Args:
@@ -345,10 +346,10 @@ def ok(body: str) -> _test_hooks.HttpResponse:
     Returns:
         The response, status 200 and an event-stream content type.
     """
-    return _test_hooks.HttpResponse(status=200, content_type="text/event-stream", body=body)
+    return McpHttpResponse(status=200, content_type="text/event-stream", body=body)
 
 
-def refused(status: int, body: str) -> _test_hooks.HttpResponse:
+def refused(status: int, body: str) -> McpHttpResponse:
     """Build a refusing HTTP response.
 
     Args:
@@ -358,9 +359,7 @@ def refused(status: int, body: str) -> _test_hooks.HttpResponse:
     Returns:
         The response, with a JSON content type.
     """
-    return _test_hooks.HttpResponse(
-        status=status, content_type="application/json; charset=utf-8", body=body
-    )
+    return McpHttpResponse(status=status, content_type="application/json; charset=utf-8", body=body)
 
 
 def set_environment() -> FakeEnv:
@@ -421,7 +420,9 @@ def _restore() -> None:
     that rebinds it would otherwise leak that binding into whichever test
     ``-n auto`` happened to schedule next.
     """
-    _test_hooks.http_post = _test_hooks._default_http_post
+    # The network seam's default lives in platform_core now: the SEAM is
+    # this package's, the implementation behind it is shared.
+    _test_hooks.http_post = urllib_mcp_post
     _test_hooks.env = _test_hooks._default_env
     _test_hooks.read_text = _test_hooks._default_read_text
     _test_hooks.write_text = _test_hooks._default_write_text
