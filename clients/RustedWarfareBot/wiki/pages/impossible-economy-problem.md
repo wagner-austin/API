@@ -150,3 +150,21 @@ measurements where each mechanism verifiably engaged. What remains is
 not a knob: the subsidy's compounding outruns every single-verb answer
 the current vocabulary can express, and the next road must be a
 structurally different way to play the rung.
+
+## The braced pivot closes the same way (impbrace48b, 2026-09-05)
+
+Step three's first learned RESPONSE ran the same night it was built: the
+razing head (grouped-CV AUC 0.94-0.95; [[impossible-step-three-design]])
+armed in **48 of 48** braced matches at roughly sample 3,000 -- inside
+its 400-sample horizon before the median death at ~3,200, exactly as
+designed -- zeroing the reserve and standing expansion down. The
+outcome: **paired margin -0.029 (sd 0.607), survival medians 3,152 vs
+3,237, end-state economies identical** (mean 0.08 extractors, 4/48
+alive on each side). A near-perfect prediction of the razing, acted on
+with a match-reshaping pivot, moves nothing: by the time the razing is
+foreseeable even 400 samples out, no reallocation of the bot's own
+credits changes what the 5x subsidy does next. Four mechanism-verified
+closures now stand -- denial, rebuild, strike, brace -- and together
+they say the endgame is not where Impossible is lost. Whatever decides
+the rung is set earlier than any of these levers reach, or above the
+credit-allocation vocabulary entirely.
