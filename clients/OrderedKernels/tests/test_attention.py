@@ -228,3 +228,55 @@ class TestTheModuleSwap:
         wrapper.training = True
         with pytest.raises(ValueError, match="eval-only"):
             wrapper.forward(hidden)
+
+
+class TestTheGradientsFlowAtAnyLength:
+    """The training claim: autograd crosses the owned attention, every length.
+
+    The forward's bits are pinned by the longhand tests above -- these hold
+    the BACKWARD to the same standard: reproducible bit for bit, the same
+    derivative as the vendor's numerically, and never the vendor's bits,
+    because agreeing bitwise would mean passing through rather than
+    computing.
+    """
+
+    def _upstream(self, length: int) -> torch.Tensor:
+        # A fresh CONTIGUOUS tensor, never ``randn_like`` of either arm's
+        # output: the dispatcher returns a transposed layout, and
+        # ``randn_like`` preserves it, so one RNG stream would land in
+        # different logical positions per arm and the comparison would hold
+        # two different derivatives against each other. Measured before it
+        # was a comment: gaps of ~4.0 absolute, from the layout alone.
+        torch.manual_seed(41000 + length)
+        return torch.randn(1, 12, length, 64, device="cuda")
+
+    def _grads(self, length: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        q, k, v = _qkv(length)
+        q, k, v = q.requires_grad_(), k.requires_grad_(), v.requires_grad_()
+        out = ordered_causal_attention(q, k, v)
+        grad_q, grad_k, grad_v = torch.autograd.grad(out, (q, k, v), self._upstream(length))
+        return grad_q, grad_k, grad_v
+
+    def test_the_backward_reproduces_itself_bit_for_bit_on_every_length(self) -> None:
+        for length in LENGTHS:
+            first = self._grads(length)
+            second = self._grads(length)
+            for a, b in zip(first, second, strict=True):
+                assert torch.equal(a, b), f"backward did not reproduce at L={length}"
+
+    def test_the_gradients_agree_with_the_dispatcher_numerically(self) -> None:
+        # A different ORDER of the same sums, not a different derivative --
+        # and not the same bits, or the arm would be passing through.
+        for length in LENGTHS:
+            owned = self._grads(length)
+
+            q, k, v = _qkv(length)
+            q, k, v = q.requires_grad_(), k.requires_grad_(), v.requires_grad_()
+            theirs = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=True)
+            vendor = torch.autograd.grad(theirs, (q, k, v), self._upstream(length))
+
+            for ours, refs in zip(owned, vendor, strict=True):
+                assert torch.allclose(ours, refs, atol=1e-4)
+            assert any(
+                not torch.equal(ours, refs) for ours, refs in zip(owned, vendor, strict=True)
+            )

@@ -18,8 +18,14 @@ from model_trainer.core.services.model.kernel_arm_modules import (
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import require_probe_shape
 
-from ordered_kernels.api import ordered_addmm, ordered_matmul
+from ordered_kernels.api import (
+    ordered_addmm,
+    ordered_batched_matmul,
+    ordered_matmul,
+    ordered_row_softmax,
+)
 from ordered_kernels.autograd import SavedTensorsProto
+from ordered_kernels.kernels import gemm_batched
 from ordered_kernels.modules import use_ordered_kernels
 
 TINY = require_probe_shape("tiny")
@@ -219,3 +225,161 @@ def _empty_tree() -> SwapTargetProto:
     module = __import__("torch.nn", fromlist=["Sequential"])
     tree_ctor: _SequentialCtorProto = module.Sequential
     return tree_ctor()
+
+
+class _ForwardSoftmaxProto(Protocol):
+    def __call__(self, ctx: SavedTensorsProto, scores: torch.Tensor) -> torch.Tensor: ...
+
+
+class _BackwardSoftmaxProto(Protocol):
+    def __call__(self, ctx: SavedTensorsProto, grad_out: torch.Tensor) -> torch.Tensor: ...
+
+
+class _SoftmaxClassProto(Protocol):
+    forward: _ForwardSoftmaxProto
+    backward: _BackwardSoftmaxProto
+
+
+def _batched_class() -> _MatmulClassProto:
+    """Reach ``OrderedBatchedMatmul`` without naming it in an expression."""
+    module = __import__("ordered_kernels.autograd", fromlist=["OrderedBatchedMatmul"])
+    cls: _MatmulClassProto = module.OrderedBatchedMatmul
+    return cls
+
+
+def _softmax_class() -> _SoftmaxClassProto:
+    """Reach ``OrderedSoftmax`` without naming it in an expression."""
+    module = __import__("ordered_kernels.autograd", fromlist=["OrderedSoftmax"])
+    cls: _SoftmaxClassProto = module.OrderedSoftmax
+    return cls
+
+
+def _batched_operands() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    torch.manual_seed(23)
+    x = torch.randn(3, 7, 17, device="cuda", requires_grad=True)
+    w = torch.randn(3, 17, 5, device="cuda", requires_grad=True)
+    grad_out = torch.randn(3, 7, 5, device="cuda")
+    return x, w, grad_out
+
+
+def _slicewise_rank1(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """The batched longhand: the 2-D rank-one oracle applied per slice."""
+    return torch.stack([rank1_matmul(a[i], b[i]) for i in range(int(a.shape[0]))])
+
+
+def _ascending_row_sum(rows: torch.Tensor) -> torch.Tensor:
+    """Each row's columns summed left to right -- ``lastdim_sum``'s order."""
+    acc = rows[:, 0]
+    for j in range(1, int(rows.shape[1])):
+        acc = acc + rows[:, j]
+    return acc
+
+
+def _longhand_softmax(scores: torch.Tensor) -> torch.Tensor:
+    exps = torch.exp(scores - scores.amax(dim=-1, keepdim=True))
+    return exps / _ascending_row_sum(exps).unsqueeze(-1)
+
+
+def _softmax_operands() -> tuple[torch.Tensor, torch.Tensor]:
+    torch.manual_seed(29)
+    scores = torch.randn(9, 13, device="cuda", requires_grad=True)
+    grad_out = torch.randn(9, 13, device="cuda")
+    return scores, grad_out
+
+
+class TestTheBatchedGradients:
+    def test_the_forward_and_gradients_are_the_longhand_bit_for_bit(self) -> None:
+        x, w, grad_out = _batched_operands()
+
+        out = ordered_batched_matmul(x, w)
+        grad_x, grad_w = torch.autograd.grad(out, (x, w), grad_out)
+
+        assert torch.equal(out, _slicewise_rank1(x.detach(), w.detach()))
+        assert torch.equal(grad_x, _slicewise_rank1(grad_out, w.detach().transpose(-1, -2)))
+        assert torch.equal(grad_w, _slicewise_rank1(x.detach().transpose(-1, -2), grad_out))
+
+    def test_the_backward_called_directly_is_the_longhand(self) -> None:
+        x, w, grad_out = _batched_operands()
+        ctx = _Ctx()
+        cls = _batched_class()
+
+        out = cls.forward(ctx, x.detach(), w.detach())
+        grad_x, grad_w = cls.backward(ctx, grad_out)
+
+        assert torch.equal(out, _slicewise_rank1(x.detach(), w.detach()))
+        assert torch.equal(grad_x, _slicewise_rank1(grad_out, w.detach().transpose(-1, -2)))
+        assert torch.equal(grad_w, _slicewise_rank1(x.detach().transpose(-1, -2), grad_out))
+
+    def test_the_gradients_agree_with_the_vendor_backward_numerically(self) -> None:
+        # A different ORDER of the same sums, not a different derivative.
+        x, w, grad_out = _batched_operands()
+        out = ordered_batched_matmul(x, w)
+        owned = torch.autograd.grad(out, (x, w), grad_out)
+
+        x_v = x.detach().clone().requires_grad_()
+        w_v = w.detach().clone().requires_grad_()
+        vendor = torch.autograd.grad(torch.bmm(x_v, w_v), (x_v, w_v), grad_out)
+
+        gaps = [float((a - b).abs().max().item()) for a, b in zip(owned, vendor, strict=True)]
+        assert max(gaps) < 1e-4
+
+    def test_the_raw_kernel_detaches_and_the_function_does_not(self) -> None:
+        # The negative control, observed rather than assumed: the dlpack
+        # kernels drop autograd on the floor -- that is the very defect the
+        # Functions exist to close -- so a graph routed through them cannot
+        # train, and one routed through the Function can.
+        x, w, _ = _batched_operands()
+
+        assert not gemm_batched(x, w).requires_grad
+        assert ordered_batched_matmul(x, w).requires_grad
+
+
+class TestTheSoftmaxGradients:
+    def test_the_forward_and_gradient_are_the_longhand_bit_for_bit(self) -> None:
+        scores, grad_out = _softmax_operands()
+
+        probs = ordered_row_softmax(scores)
+        (grad_scores,) = torch.autograd.grad(probs, (scores,), grad_out)
+
+        longhand = _longhand_softmax(scores.detach())
+        assert torch.equal(probs, longhand)
+        projected = _ascending_row_sum(grad_out * longhand).unsqueeze(-1)
+        assert torch.equal(grad_scores, longhand * (grad_out - projected))
+
+    def test_the_backward_called_directly_is_the_longhand(self) -> None:
+        scores, grad_out = _softmax_operands()
+        ctx = _Ctx()
+        cls = _softmax_class()
+
+        probs = cls.forward(ctx, scores.detach())
+        grad_scores = cls.backward(ctx, grad_out)
+
+        longhand = _longhand_softmax(scores.detach())
+        assert torch.equal(probs, longhand)
+        projected = _ascending_row_sum(grad_out * longhand).unsqueeze(-1)
+        assert torch.equal(grad_scores, longhand * (grad_out - projected))
+
+    def test_the_gradient_agrees_with_the_vendor_backward_numerically(self) -> None:
+        scores, grad_out = _softmax_operands()
+        probs = ordered_row_softmax(scores)
+        (owned,) = torch.autograd.grad(probs, (scores,), grad_out)
+
+        scores_v = scores.detach().clone().requires_grad_()
+        (vendor,) = torch.autograd.grad(torch.softmax(scores_v, dim=-1), (scores_v,), grad_out)
+
+        assert float((owned - vendor).abs().max().item()) < 1e-5
+
+    def test_a_masked_row_keeps_its_zero_columns_out_of_the_gradient(self) -> None:
+        # The causal case: -inf columns hold probability exactly 0.0, so the
+        # backward's ``p * (...)`` zeroes their gradient exactly, whatever
+        # the incoming grad there claims.
+        scores, grad_out = _softmax_operands()
+        masked = scores.detach().clone()
+        masked[:, -2:] = float("-inf")
+        masked.requires_grad_()
+
+        probs = ordered_row_softmax(masked)
+        (grad_scores,) = torch.autograd.grad(probs, (masked,), grad_out)
+
+        assert torch.equal(probs[:, -2:], torch.zeros(9, 2, device="cuda"))
+        assert torch.equal(grad_scores[:, -2:], torch.zeros(9, 2, device="cuda"))

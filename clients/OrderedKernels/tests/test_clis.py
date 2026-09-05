@@ -119,7 +119,9 @@ class TestTheTrainCli:
         # whole tiny-rung record must match the owned arm's digests exactly.
         out = tmp_path / "train.json"
 
-        assert train_cli.main(["--device", "cuda", "--rungs", "tiny", "--out", str(out)]) == 0
+        args = ["--device", "cuda", "--rungs", "tiny", "--out", str(out), "--attention", "vendor"]
+
+        assert train_cli.main(args) == 0
 
         decoded = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
         assert decoded["label"] == train_step_label(("tiny",), "both", "ordered")
@@ -136,8 +138,50 @@ class TestTheTrainCli:
     ) -> None:
         out = tmp_path / "train.json"
 
+        args = ["--device", "cuda", "--rungs", "tiny,tiny", "--out", str(out)]
+
         with pytest.raises(ValueError, match="tiny"):
-            train_cli.main(["--device", "cuda", "--rungs", "tiny,tiny", "--out", str(out)])
+            train_cli.main([*args, "--attention", "vendor"])
+
+        assert not out.exists()
+
+    def test_the_ordered_full_arm_computes_rather_than_passes_through(
+        self, tmp_path: pathlib.Path, no_workspace: None
+    ) -> None:
+        # Same parameters, same observation names, a NEW label -- and the
+        # digests must differ from the vendor-attention arm's somewhere,
+        # because owned attention is different arithmetic for the same
+        # function. A full record that merely echoed the ordered arm would
+        # mean the attention walk swapped nothing that mattered.
+        vendor_out = tmp_path / "train-vendor.json"
+        full_out = tmp_path / "train-full.json"
+        base = ["--device", "cuda", "--rungs", "tiny", "--out"]
+
+        assert train_cli.main([*base, str(vendor_out), "--attention", "vendor"]) == 0
+        assert train_cli.main([*base, str(full_out), "--attention", "ordered"]) == 0
+
+        vendor = decode_run_record(load_json_str(vendor_out.read_text(encoding="utf-8")))
+        full = decode_run_record(load_json_str(full_out.read_text(encoding="utf-8")))
+        assert full["label"] == train_step_label(("tiny",), "both", "ordered-full")
+        vendor_by_name = {o["name"]: o["value"] for o in vendor["observations"]}
+        full_by_name = {o["name"]: o["value"] for o in full["observations"]}
+        assert set(vendor_by_name) == set(full_by_name)
+        differing = [n for n in vendor_by_name if vendor_by_name[n] != full_by_name[n]]
+        # The digests are the witness, deliberately not the loss: measured
+        # 2026-09-05, the tiny rung's loss is bit-EQUAL between the arms
+        # while 51 of 56 tensor digests differ -- the page-title phenomenon
+        # ("a loss agrees where the computation does not") repeating at the
+        # training step, and an assertion on the loss would have pinned a
+        # coincidence.
+        assert len(differing) > len(vendor_by_name) // 2
+
+    def test_an_undeclared_attention_arm_is_refused(self, tmp_path: pathlib.Path) -> None:
+        out = tmp_path / "train.json"
+
+        args = ["--device", "cuda", "--rungs", "tiny", "--out", str(out)]
+
+        with pytest.raises(ValueError, match="--attention"):
+            train_cli.main([*args, "--attention", "math"])
 
         assert not out.exists()
 
@@ -154,6 +198,7 @@ class TestTheTrainCli:
         out = tmp_path / "train-entry.json"
         saved = sys.argv
         sys.argv = ["ordered-train-step", "--device", "cuda", "--rungs", "tiny", "--out", str(out)]
+        sys.argv += ["--attention", "vendor"]
         try:
             with pytest.raises(SystemExit) as excinfo:
                 train_cli.entrypoint()
@@ -238,6 +283,7 @@ def test_running_train_step_as_main_actually_steps(tmp_path: pathlib.Path) -> No
     saved_argv = sys.argv
     saved_module = sys.modules.pop(module_name, None)
     sys.argv = ["ordered-train-step", "--device", "cuda", "--rungs", "tiny", "--out", str(out)]
+    sys.argv += ["--attention", "vendor"]
     try:
         with pytest.raises(SystemExit) as excinfo:
             runpy.run_module(module_name, run_name="__main__", alter_sys=False)

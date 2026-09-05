@@ -18,6 +18,14 @@ the mask add, the subtract, ``exp``, the divide -- is elementwise, computed
 by torch: an elementwise op has no reduction order, and the stage digests
 measure whether that trust holds rather than assume it.
 
+DIFFERENTIABLE, SAME BITS FORWARD. The reductions run inside the
+:mod:`autograd` Functions, so gradients flow at any length with the
+backward's reductions owned too: each matmul's two gradient products are
+batched fixed-order GEMMs, and softmax's backward projection is the owned
+row sum. The forward arithmetic inside those Functions is the kernel
+composition this module always ran -- the pinned inference records are the
+regression gate on that claim.
+
 WHAT THIS IS NOT. It is not a bit-reproduction of torch's math SDPA -- the
 whole point is DIFFERENT arithmetic for the same function. Correctness is
 asserted numerically against the math backend in the suite; cross-card
@@ -30,7 +38,7 @@ import math
 
 import torch
 
-from ordered_kernels.kernels import gemm_batched, lastdim_sum
+from ordered_kernels.api import ordered_batched_matmul, ordered_row_softmax
 
 #: The additive causal term: finite scores keep their value, future
 #: positions become -inf, whose exp is exactly 0.0 in every rounding mode.
@@ -58,6 +66,13 @@ def causal_bias(length: int, device: torch.device) -> torch.Tensor:
 def ordered_softmax(scores: torch.Tensor) -> torch.Tensor:
     """Last-dim softmax whose denominator is summed in ascending order.
 
+    Differentiable: the forward arithmetic is unchanged from the original
+    kernel composition -- the same amax, the same exp, the same owned sum,
+    the same divide -- but it now runs inside a ``Function`` whose backward
+    owns softmax's other row reduction too. The stage digests and the
+    pinned inference records are the proof the routing moved no forward
+    bit, not this sentence.
+
     Args:
         scores: ``[R, C]``, float32, CUDA. Rows holding ``-inf`` entries are
             fine -- ``exp`` maps them to exactly 0.0 -- but every row must
@@ -67,9 +82,7 @@ def ordered_softmax(scores: torch.Tensor) -> torch.Tensor:
     Returns:
         ``[R, C]``: each row's ``exp(x - max)`` divided by the owned sum.
     """
-    row_max = scores.amax(dim=-1, keepdim=True)
-    exps = torch.exp(scores - row_max)
-    return exps / lastdim_sum(exps).unsqueeze(-1)
+    return ordered_row_softmax(scores)
 
 
 def ordered_causal_attention(
@@ -99,7 +112,7 @@ def ordered_causal_attention(
         raise ValueError(f"expected [batch, heads, length, dim], got {query.dim()}-D")
     batch, heads, length, dim = (int(s) for s in query.shape)
     folded = batch * heads
-    scores = gemm_batched(
+    scores = ordered_batched_matmul(
         query.reshape(folded, length, dim), key.transpose(-1, -2).reshape(folded, dim, length)
     )
     # For GPT-2's head dim of 64 the scale is 0.125 -- a power of two, so
@@ -108,7 +121,9 @@ def ordered_causal_attention(
     scores = scores * (1.0 / math.sqrt(float(dim)))
     scores = scores + causal_bias(length, query.device)
     probs = ordered_softmax(scores.reshape(folded * length, length))
-    out = gemm_batched(probs.reshape(folded, length, length), value.reshape(folded, length, dim))
+    out = ordered_batched_matmul(
+        probs.reshape(folded, length, length), value.reshape(folded, length, dim)
+    )
     return out.reshape(batch, heads, length, dim)
 
 

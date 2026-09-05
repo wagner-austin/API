@@ -2,11 +2,27 @@
 
 Record-compatible with Model-Trainer's ``train_step_probe`` -- same
 experiment string, same observation names, same twice-run self-check -- with
-the model's projections swapped onto :mod:`ordered_kernels.modules` and the
-label arm ``ordered``. Controls hardwired to ``both``, as everywhere in this
-package. The load-bearing expectation: an ``ordered`` record equals an
-``owned`` record tensor for tensor, since the two arms are one arithmetic in
-different clothes; the cluster asserts it card by card.
+the model's projections swapped onto :mod:`ordered_kernels.modules`.
+Controls hardwired to ``both``, as everywhere in this package. Two arms,
+chosen by ``--attention``, stated explicitly on every invocation:
+
+* ``--attention vendor`` is the arm labelled ``ordered`` -- projections and
+  ``lm_head`` owned, attention on the vendor's math pin. The load-bearing
+  expectation: its record equals an ``owned`` record tensor for tensor,
+  since the two arms are one arithmetic in different clothes; the cluster
+  asserts it card by card. Its records are the pinned corpus, which is why
+  the arm's label and arithmetic never change.
+* ``--attention ordered`` is the arm labelled ``ordered-full`` -- the
+  attention walk runs first, so all three attention reductions AND their
+  backward reductions are program-ordered too. New label, new records: the
+  any-length training claim lives here without touching what the corpus
+  pins.
+
+THE MODEL STAYS IN EVAL MODE, in both arms, for ``train_step_probe``'s
+documented reason: train mode enables dropout, whose Philox masks are a
+question about the RNG rather than the arithmetic under study, and
+gradients flow identically in eval mode. ``OrderedSdpaAttention`` enforces
+the same discipline by refusing training mode outright.
 """
 
 from __future__ import annotations
@@ -50,14 +66,44 @@ from platform_core.run_record import (
 )
 
 from ordered_kernels.cli.gemm_probe import ORDERED_ARM
-from ordered_kernels.modules import use_ordered_kernels
+from ordered_kernels.modules import use_ordered_attention, use_ordered_kernels
 
 _log = get_logger(__name__)
 
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
+ATTENTION_FLAG = "--attention"
 
-_FLAGS = (DEVICE_FLAG, RUNGS_FLAG, OUT_FLAG)
+#: The fully-owned training arm's label. Distinct from ``ORDERED_ARM`` so
+#: the corpus's pinned ``ordered`` records keep meaning what they meant.
+ORDERED_FULL_ARM = "ordered-full"
+
+#: ``--attention`` value -> (run the attention walk, record label arm).
+_ATTENTION_ARMS: dict[str, tuple[bool, str]] = {
+    "vendor": (False, ORDERED_ARM),
+    "ordered": (True, ORDERED_FULL_ARM),
+}
+
+_FLAGS = (DEVICE_FLAG, RUNGS_FLAG, OUT_FLAG, ATTENTION_FLAG)
+
+
+def require_attention_arm(raw: str) -> tuple[bool, str]:
+    """Resolve the ``--attention`` value, refusing anything undeclared.
+
+    Args:
+        raw: The flag's value.
+
+    Returns:
+        ``(run the attention walk, the record's arm label)``.
+
+    Raises:
+        ValueError: For a value outside the two declared arms -- a record
+            whose attention posture was guessed names a condition it may not
+            have run under.
+    """
+    if raw not in _ATTENTION_ARMS:
+        raise ValueError(f"{ATTENTION_FLAG} must be one of {sorted(_ATTENTION_ARMS)}, got {raw!r}")
+    return _ATTENTION_ARMS[raw]
 
 
 def require_swapped(replaced: int) -> int:
@@ -83,22 +129,30 @@ def require_swapped(replaced: int) -> int:
     return replaced
 
 
-def ordered_step_once(device: str, shape: ProbeShape) -> tuple[tuple[TrainTensor, ...], float]:
+def ordered_step_once(
+    device: str, shape: ProbeShape, ordered_attention: bool
+) -> tuple[tuple[TrainTensor, ...], float]:
     """Build one rung's model fresh, swap it ordered, take one step.
 
     Args:
         device: Device to run on.
         shape: The rung to build.
+        ordered_attention: Whether to run the attention walk first, so the
+            step's attention reductions -- forward and backward -- are owned
+            too. The projections walk runs either way, and finds the
+            attention wrapper's held projections when it does.
 
     Returns:
         ``(digested tensors, the loss)``.
 
     Raises:
-        RuntimeError: When the swap matched nothing -- a record claiming an
+        RuntimeError: When a swap matched nothing -- a record claiming an
             arm that did not run is the defect every arm here refuses.
-        ValueError: Propagated from the builder, the swap, or the digests.
+        ValueError: Propagated from the builder, the swaps, or the digests.
     """
     model, ids = probe_model_and_input(device, shape)
+    if ordered_attention:
+        require_swapped(use_ordered_attention(model))
     require_swapped(use_ordered_kernels(model))
     outputs = model.forward(input_ids=ids, labels=ids)
     loss = outputs.loss
@@ -106,12 +160,15 @@ def ordered_step_once(device: str, shape: ProbeShape) -> tuple[tuple[TrainTensor
     return digest_step_tensors(model), float(loss.item())
 
 
-def ordered_step_identity(device: str, shape: ProbeShape) -> tuple[tuple[TrainTensor, ...], float]:
+def ordered_step_identity(
+    device: str, shape: ProbeShape, ordered_attention: bool
+) -> tuple[tuple[TrainTensor, ...], float]:
     """Take the same ordered step twice and refuse a card that cannot repeat.
 
     Args:
         device: Device to run on.
         shape: The rung to run.
+        ordered_attention: Passed through to :func:`ordered_step_once`.
 
     Returns:
         ``(digested tensors, the loss)``.
@@ -121,28 +178,33 @@ def ordered_step_identity(device: str, shape: ProbeShape) -> tuple[tuple[TrainTe
             :func:`ordered_step_once`.
         ValueError: Propagated from :func:`ordered_step_once`.
     """
-    first, first_loss = ordered_step_once(device, shape)
-    second, second_loss = ordered_step_once(device, shape)
+    first, first_loss = ordered_step_once(device, shape, ordered_attention)
+    second, second_loss = ordered_step_once(device, shape, ordered_attention)
     return require_step_reproduced(first, second, first_loss, second_loss, device)
 
 
-def ordered_train_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
+def ordered_train_record(device: str, rungs: tuple[str, ...], attention: str) -> RunRecord:
     """Pin the posture, step every rung twice, and record everything.
 
     Args:
         device: Device to step on.
         rungs: The rungs to walk, already known distinct.
+        attention: The ``--attention`` value, resolved by
+            :func:`require_attention_arm` before anything computes.
 
     Returns:
-        The record, labelled ``train-step-...-both-ordered``.
+        The record, labelled ``train-step-...-both-ordered`` or
+        ``...-both-ordered-full``.
 
     Raises:
         KeyError: Propagated from ``require_probe_shape`` for an undeclared
             rung, before anything computes.
         RuntimeError: Propagated from :func:`ordered_step_identity`.
-        ValueError: Propagated from :func:`ordered_step_once`.
+        ValueError: For an undeclared attention arm, or propagated from
+            :func:`ordered_step_once`.
     """
-    label = train_step_label(rungs, "both", ORDERED_ARM)
+    ordered_attention, arm = require_attention_arm(attention)
+    label = train_step_label(rungs, "both", arm)
     shapes = tuple((rung, require_probe_shape(rung)) for rung in rungs)
     workspace = workspace_observation()
     fingerprint: RunFingerprint = capture_run_fingerprint(
@@ -151,7 +213,7 @@ def ordered_train_record(device: str, rungs: tuple[str, ...]) -> RunRecord:
     )
     observations: list[Observation] = [workspace]
     for rung, shape in shapes:
-        tensors, loss = ordered_step_identity(device, shape)
+        tensors, loss = ordered_step_identity(device, shape, ordered_attention)
         _log.info("rung %s stepped, %d tensors digested, loss %.17g", rung, len(tensors), loss)
         observations.extend(step_observations(rung, tensors))
         observations.append(Observation(name=train_loss_name(rung), value=loss))
@@ -182,8 +244,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     device = cli_args.require_flag(parsed, DEVICE_FLAG)
     rungs = require_train_rungs(cli_args.require_flag(parsed, RUNGS_FLAG))
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+    attention = cli_args.require_flag(parsed, ATTENTION_FLAG)
 
-    record = ordered_train_record(device, rungs)
+    record = ordered_train_record(device, rungs, attention)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
@@ -214,11 +277,13 @@ def entrypoint() -> None:
 
 
 __all__ = [
+    "ORDERED_FULL_ARM",
     "entrypoint",
     "main",
     "ordered_step_identity",
     "ordered_step_once",
     "ordered_train_record",
+    "require_attention_arm",
     "require_swapped",
 ]
 
