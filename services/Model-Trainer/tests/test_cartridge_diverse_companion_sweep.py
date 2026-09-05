@@ -355,6 +355,15 @@ class TestProductionPlan:
             "gpt2-companions-diverse-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-"
         )
 
+    def test_the_scale_rung_differs_from_the_recorded_plan_only_in_the_base(self) -> None:
+        """The medium rung isolates parameter count: every other field --
+        the schedule deliberately included -- must equal the recorded diverse
+        plan, or scale is confounded with tuning."""
+        recorded = DIVERSE_COMPANION_SWEEP_PLANS["gpt2-companions-diverse"]
+        medium = DIVERSE_COMPANION_SWEEP_PLANS["gpt2-medium-companions-diverse"]
+        assert medium["model_id"] == "gpt2-medium"
+        assert {**medium, "model_id": recorded["model_id"]} == recorded
+
 
 def _argv(tmp_path: pathlib.Path, *, others: str, companions: str) -> list[str]:
     """Build a complete command line against staged corpora.

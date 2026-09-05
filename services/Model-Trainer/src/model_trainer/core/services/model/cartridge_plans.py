@@ -402,6 +402,25 @@ DIVERSE_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # The scale rung: the recorded recipe on a base three times the size.
+    # Every field except the base matches ``gpt2-companions-diverse``, so
+    # the two records isolate exactly the parameter count -- including the
+    # schedule, deliberately: a retuned schedule would confound scale with
+    # tuning. The question is whether the diverse-pool verdicts (n4 +55.5%,
+    # n8 +28.0%, content interference fully trained away) survive a base
+    # where 448 foreign slots are a smaller fraction of attention.
+    "gpt2-medium-companions-diverse": {
+        "model_id": "gpt2-medium",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 
