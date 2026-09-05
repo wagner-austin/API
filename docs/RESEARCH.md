@@ -257,7 +257,45 @@ records compare as supersets.
   companions cannot teach content diversity.
 - **The motivated follow-on is a content-DIVERSE pool** (companions drawn
   from several held-out corpora), deliberately excluded from this cell as
-  a second variable; this record is its baseline.
+  a second variable; this record is its baseline. It ran the same night —
+  next subsection.
+
+#### `cartridge_diverse_companion_sweep` — the best recipe, and the decay's cause settled
+
+Added 2026-09-05 (board task `d2c03dd4`), the named lever after the
+varied-count refutation: the pool's three members each train on a
+DIFFERENT held-out corpus (epi — the recorded companion, byte-identical
+by the shared seed formula — plus metabolomics and atmospheric-chemistry),
+and a NEW companion-cross instrument scores every pool member alone on
+the primary held-out, so companion leakage is measured in-record where
+every earlier grid assumed it.
+
+- **Command:** `python -m model_trainer.cli.cartridge_diverse_companion_sweep
+  --plan gpt2-companions-diverse --corpus <dir> --other-corpora <d1..d7>
+  --companion-corpora <c1,c2,c3> --device cuda --out <file>`
+- **Result, measured 2026-09-05 on HPC3** (job 55772675 + twin 55773234,
+  V100, image v36 `0401aa9b…` from `d894c6b2`, run documents
+  `tools/hpc3/runs/cartridge-companions-diverse-v100-v36{,-twin}.json`,
+  0 SU): **the program's best recipe at both counts.** n4 retention
+  **+55.5%** (composed +0.4608; vs single-companion 44.6% at ~1.4× floor)
+  and n8 retention **+28.0%** (composed +0.2323) — decisively above the
+  same-content pool's 18.3% (~1.4× floor) and a within-floor TIE with the
+  single companion's 26.5%, stated as a tie. Solo cost −0.060. All three
+  companion-cross arms NEGATIVE (epi −0.36, metabolomics −0.11,
+  atmospheric-chemistry −0.04): the pool is measured clean.
+- **The mechanism verdict that settles the arc:** with the diverse pool
+  the n8 composed arm EQUALS its untrained-composed control (+0.2323 vs
+  +0.2431, within a third of a spread) — content interference at n8 is
+  fully trained away, so the residual n4→n8 decay is STRUCTURAL slot
+  dilution (seven 64-slot strangers are 448 foreign positions against 64
+  own), which no companionship recipe can remove because the cost no
+  longer has a content component. Three arms (n8 extension, varied
+  refutation, diverse recovery) converge on this from three directions.
+- **Companionship is exhausted as an n8 lever; the follow-ons are
+  capacity-side:** the budget slot policy under diverse-companioned
+  training, base-side composition LoRA (teach the BASE to read crowded
+  prefixes, fixing every cartridge at once), and the scale rung — larger
+  bases where 448 foreign slots are a smaller fraction of attention.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
