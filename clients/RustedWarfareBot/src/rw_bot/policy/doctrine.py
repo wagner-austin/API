@@ -83,6 +83,7 @@ INT_FIELDS: Final = (
     "guns",
     "nukes",
     "rebuild",
+    "hunt",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -99,6 +100,7 @@ FLAG_FIELDS: Final = (
     "kite",
     "income_ladder",
     "brace",
+    "huntgate",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -324,6 +326,24 @@ class Doctrine(TypedDict):
             a learned trigger on an existing verb
             ([[impossible-step-three-design]]); every arm measured
             before 2026-09-04 played with this off.
+        hunt: The hunt party's size, zero for off. A standing party that
+            presses the nearest visible enemy MOVER -- and pushes at the
+            nearest remembered structure when nothing moves in sight --
+            so the enemy's groups are bled while they form: the shipped
+            AI commits a staging group early at whatever size it holds
+            when any member is damaged, a rule read from source and
+            watched live at Impossible ([[engine-ai-triggers]]). The
+            first verb aimed at the wave LADDER rather than the wave;
+            party discipline is the raid's, extracted shared
+            ([[policy-raid]]).
+        huntgate: Whether the razing head recalls the hunt. On, the loop
+            scores ``models/razebrace.ndjson`` every sample and the party
+            stands down -- fights its way home and rejoins the reserve --
+            while the razing is predicted, hunting again when the score
+            clears. The smallest real instance of a learned per-sample
+            decision driving a live tactical response
+            ([[impossible-step-three-design]]). Requires a hunt party;
+            a gate on nothing is refused at decode.
         income_ladder: Whether a refused extractor conversion saves toward
             itself. Off is the Impossible measurement: unconditional saving
             doubled income and lost, because the army pauses let the enemy's
@@ -395,6 +415,8 @@ class Doctrine(TypedDict):
     guns: int
     nukes: int
     rebuild: int
+    hunt: int
+    huntgate: bool
 
 
 #: The style everything so far was measured under, exactly.
@@ -451,6 +473,8 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     guns=0,
     nukes=0,
     rebuild=0,
+    hunt=0,
+    huntgate=False,
 )
 
 

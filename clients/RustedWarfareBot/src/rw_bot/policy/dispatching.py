@@ -27,6 +27,7 @@ from rw_bot.policy.budget import Budget
 from rw_bot.policy.creep import Creeper
 from rw_bot.policy.decoy import Decoys
 from rw_bot.policy.dispatch import WaveController
+from rw_bot.policy.hunt import Hunter
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.lurk import Lurker
 from rw_bot.policy.nuker import NukeOrders
@@ -154,6 +155,36 @@ def _draft_raid(
     for order in raiders.strike(sample, intel, army, catalogue, spare):
         channel.send_attack_move(order)
     drafted = raiders.party()
+    return tuple(u for u in army if u["unit_id"] not in drafted)
+
+
+def _draft_hunt(
+    channel: AgentChannel,
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    intel: Intel,
+    army: tuple[Entity, ...],
+    targets: tuple[Entity, ...],
+    waves: WaveController,
+    hunters: Hunter,
+    held_down: bool,
+) -> tuple[Entity, ...]:
+    """Advance the hunt and return the units the waves may still command.
+
+    The same arbitration as the raid's, for the same reason: whether the
+    army can SPARE a party is the wave gate's call, and a unit cannot
+    serve two commanders. What is the hunt's own here is the recall --
+    when the head holds the party down, it fights its way home and this
+    tick sends those orders instead ([[impossible-step-three-design]]).
+    """
+    if held_down:
+        for order in hunters.stand_down(army, catalogue, sample):
+            channel.send_attack_move(order)
+        return army
+    spare = len(army) >= waves.need() + hunters.size
+    for order in hunters.press(sample, intel, army, targets, catalogue, spare):
+        channel.send_attack_move(order)
+    drafted = hunters.party()
     return tuple(u for u in army if u["unit_id"] not in drafted)
 
 
@@ -311,14 +342,17 @@ def fight(
     targets: tuple[Entity, ...],
     waves: WaveController,
     raiders: Raider,
+    hunters: Hunter,
     rusher: Rusher,
     momentum: Momentum,
     *,
     raid: int,
+    hunt: int,
     rush: bool,
     allin: int,
     strike: int,
     committed_close: bool,
+    hunt_held: bool,
     pending_events: set[str],
 ) -> None:
     """Run one tick's combat dispatch, noting each decision as it happens.
@@ -339,13 +373,16 @@ def fight(
         targets: The hostile entities visible.
         waves: The wave controller, carrying its own commitments.
         raiders: The raid controller.
+        hunters: The hunt controller.
         rusher: The forced-march controller.
         momentum: The rival army-value window the strike release reads.
         raid: The raid party's size, zero for no raiding.
+        hunt: The hunt party's size, zero for no hunting.
         rush: Whether released waves march at the estimated enemy start.
         allin: The all-in release observation, zero for never.
         strike: The momentum release window's size, zero for off.
         committed_close: Whether the closer holds its latched commitment.
+        hunt_held: Whether the head holds the hunt party home this tick.
         pending_events: Decision codes accumulating toward the next row.
     """
     fighting = army
@@ -360,6 +397,13 @@ def fight(
         fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
         if raiders.raids > raids_before:
             pending_events.add("R")
+    if hunt:
+        hunts_before = hunters.hunts
+        fighting = _draft_hunt(
+            channel, sample, catalogue, intel, fighting, targets, waves, hunters, hunt_held
+        )
+        if hunters.hunts > hunts_before:
+            pending_events.add("H")
     window_open = strike_window(momentum, strike)
     if window_open:
         pending_events.add("S")

@@ -58,6 +58,7 @@ from rw_bot.policy.dispatching import (
 from rw_bot.policy.doctrine import NAVTILT_OFF, NAVTILT_PREDICTED
 from rw_bot.policy.expander import Expander
 from rw_bot.policy.head import HeadModel
+from rw_bot.policy.hunt import Hunter
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
 from rw_bot.policy.lurk import Lurker
@@ -100,6 +101,7 @@ def play(
     navtilt: int = NAVTILT_OFF,
     doom: HeadModel | None = None,
     brace_model: HeadModel | None = None,
+    gate_model: HeadModel | None = None,
     cover: bool = True,
     intercept: bool = False,
     guard_cap: int = 0,
@@ -127,6 +129,7 @@ def play(
     guns: int = 0,
     nukes: int = 0,
     rebuild: int = 0,
+    hunt: int = 0,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
@@ -188,20 +191,15 @@ def play(
         strike: Rival army-value drop that opens the release window. See Doctrine.
         medics: Combat engineers kept alive via saving hires. See Doctrine.
         navy: Attack submarines kept alive on the water. See Doctrine.
-        battery: Artillery batteries stood on the shore, at most one per
-            match. See Doctrine.
+        battery: Artillery batteries stood on the shore, at most one. See Doctrine.
         bunkers: Mobile turrets kept alive the same way. See Doctrine.
         flame: Flame turrets held by converting ground turrets. See Doctrine.
-        close: Dominance multiple that releases and marches everything. See
-            Doctrine.
-        guns: Top-tier gun turrets held by walking the turret chain. See
-            Doctrine.
-        nukes: Nuke launchers stood and kept firing at the priciest hostile
-            structure in sight. See Doctrine.
-        rebuild: Rival army-value drop required before a razed pool may be
-            re-claimed. See Doctrine.
-        income_ladder: Refused extractor conversions save toward themselves.
-            See Doctrine.
+        close: Dominance multiple that releases and marches everything. See Doctrine.
+        guns: Top-tier gun turrets held by walking the turret chain. See Doctrine.
+        nukes: Nuke launchers stood, firing at the priciest hostile seen. See Doctrine.
+        rebuild: Rival army-value drop before a razed pool re-claims. See Doctrine.
+        hunt: The hunt party's size, pressing visible enemy movers. See Doctrine.
+        income_ladder: Refused extractor conversions save toward themselves. See Doctrine.
 
         Each of these is one doctrine field; the reasoning and the
         measurements behind every flag live on
@@ -223,9 +221,10 @@ def play(
         ladder: How many units each successive wave waits for. Defaults to the
             shipped AI's ([[engine-ai-triggers]]).
         trace: Where to write the per-sample record, or None to keep none.
-        brace_model: The fitted razing head, or None to play unbraced.
-            Armed once, it zeroes the reserve and stands expansion down
-            for the rest of the match. See Doctrine (``brace``).
+        brace_model: The fitted razing head, or None. Armed once it zeroes the
+            reserve and stands expansion down for good. See Doctrine (``brace``).
+        gate_model: The same head scored continuously, or None: while it predicts
+            the razing the hunt party is held home. See Doctrine (``huntgate``).
 
     Returns:
         The match report.
@@ -242,13 +241,14 @@ def play(
     # Every WATER-moving type name seen this match, the bloodied gate's
     # accumulating half ([[policy-exact-timing]], the naval wall).
     fleet_seen: set[str] = set()
-    # Decision codes issued since the previous trace row was written --
-    # consumed by recorder.step, so each row carries what was decided in
-    # the window it closes (log 2026-08-09).
+    # Decision codes since the previous trace row -- consumed by
+    # recorder.step, so each row carries its window's decisions (log 2026-08-09).
     pending_events: set[str] = set()
     # Both prediction latches behind one feed; the navtilt gate on doom
     # stays here because which modes exist is the doctrine's business.
-    sentries = Sentries(doom if navtilt == NAVTILT_PREDICTED else None, brace_model, profiles)
+    sentries = Sentries(
+        doom if navtilt == NAVTILT_PREDICTED else None, brace_model, profiles, gate=gate_model
+    )
     waves = WaveController(
         ladder,
         intercept=intercept,
@@ -269,9 +269,10 @@ def play(
         medics=medics, navy=navy, bunkers=bunkers, flame=flame, guns=guns, battery=battery
     )
     closer = Closer(close)
-    # Sized by the doctrine; at zero the raid gate below never fires and the
-    # raider is never consulted, so the size is safe to construct with.
+    # Sized by the doctrine; at zero the raid gate never fires and the
+    # raider is never consulted.
     raiders = Raider(size=raid) if raid else Raider()
+    hunters = Hunter(size=hunt) if hunt else Hunter()
     rusher = Rusher()
     creeper = Creeper()
     nuker = Nuker()
@@ -280,11 +281,9 @@ def play(
     produced = 0
     refused = 0
     outlays = Outlays()
-    # Conversions already ordered, as (structure, tier). A conversion never
-    # fills the queue, so without this the same order is re-sent every
-    # observation -- and it is keyed by the pair rather than by the structure
-    # because a conversion keeps the engine identity, so remembering the unit
-    # alone would bar it from ever taking a second step up the chain.
+    # Conversions already ordered, as (structure, tier): a conversion never
+    # fills the queue so it would re-send every observation, and keying the
+    # PAIR -- identity survives conversion -- allows a second step up the chain.
     upgraded: set[tuple[int, str]] = set()
     teched: set[int] = set()
     completed = 0
@@ -314,27 +313,25 @@ def play(
                 # marched into the fight the moment enough of it gathers.
                 army = tuple(unit for unit in army if unit["type_name"] != SCOUT_TYPE)
             targets = find_targets(sample)
-            if scout or raid:
+            if scout or raid or hunt:
                 intel.observe(sample)
             momentum.observe(sample)
             razed_pools.observe(sample)
             airwatch.observe(sample)
-            # The closer: dominance decays, so a decided match is ended
-            # while it is decided -- eleven of nineteen dominant Very Hard
-            # positions lost when the game ran long. Latched by the Closer
-            # on SUSTAINED dominance only: the un-debounced latch turned
-            # early-game ratio noise into lifelong premature all-ins
-            # ([[policy-situation]]). Observed at the top of the tick since
-            # the finisher funds from it: the commitment IS the surplus
-            # signal at this rung (`runs/sweeps/vh-nuke`, log 2026-08-05).
+            # The closer: dominance decays -- eleven of nineteen dominant VH
+            # positions lost when the game ran long -- so a decided match is
+            # ended while decided. Latched on SUSTAINED dominance only
+            # (un-debounced, ratio noise became lifelong premature all-ins,
+            # [[policy-situation]]); observed at the top of the tick because
+            # the finisher funds from the commitment itself
+            # (`runs/sweeps/vh-nuke`, log 2026-08-05).
             committed_close = closer.observe(sample)
             scores.observe(sample, army, targets, workforce.size(sample))
             completed = tracker.completed(sample)
 
-            # Read unconditionally, on every sample. Movement is what tells
-            # both the plan and the economy that an order is still being carried
-            # out, so every worker has to be sampled even on observations that
-            # never reach a decision.
+            # Read unconditionally: movement is what tells the plan and the
+            # economy an order is still being carried out, so every worker is
+            # sampled even on observations that never reach a decision.
             free = workforce.free(sample)
 
             # Braced, the reserve floor is zero: the razing is predicted,
@@ -366,12 +363,11 @@ def play(
                 catalogue,
                 max_workers,
             )
-            # A wanted builder joins the composition rather than sitting in a
-            # channel of its own. The separate channel was reachable only by a
-            # producer that could make nothing in the army mix -- the Command
-            # Center and nothing else -- so a Land Factory, which can always
-            # make a tank, never fell through to it and the bot ran the whole
-            # match on one builder ([[policy-production]]).
+            # A wanted builder joins the composition rather than a channel of
+            # its own: the separate channel was reachable only by a producer
+            # that could make nothing in the army mix (the Command Center
+            # alone), so a Land Factory never fell through to it and the bot
+            # ran the whole match on one builder ([[policy-production]]).
             composition_now: tuple[str, ...] = (
                 *need,
                 # One shortfall for all three scout verbs together: each
@@ -560,13 +556,16 @@ def play(
                 targets,
                 waves,
                 raiders,
+                hunters,
                 rusher,
                 momentum,
                 raid=raid,
+                hunt=hunt,
                 rush=rush,
                 allin=allin,
                 strike=strike,
                 committed_close=committed_close,
+                hunt_held=sentries.hunted_down,
                 pending_events=pending_events,
             )
         finally:
@@ -588,7 +587,8 @@ def play(
         intercepts=waves.intercepts,
         sightings=intel.sightings_taken,
         raids=raiders.raids,
-        marches=raiders.marches + rusher.marches,
+        hunts=hunters.hunts,
+        marches=raiders.marches + rusher.marches + hunters.marches,
         killed=waves.killed(scores.visible_now),
         refused_claims=refused,
         outlays=outlays.rows(),

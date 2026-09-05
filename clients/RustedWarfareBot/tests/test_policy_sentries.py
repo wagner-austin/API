@@ -96,3 +96,41 @@ def test_a_high_threshold_brace_never_arms_on_a_calm_match() -> None:
     for _ in range(4):
         assert _observe(sentries, _world()) is False
     assert sentries.braced is False
+
+
+def test_the_hunt_gate_is_a_continuous_verdict_not_a_latch() -> None:
+    """The gate holds while the score clears the threshold and releases the
+    moment it does not -- the brace arms once, the gate reads every sample."""
+    swing = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": 0.0}',
+            '{"name": "rival_army_last", "mean": 8000.0, "std": 1000.0, "coef": 5.0}',
+        ]
+    )
+    sentries = Sentries(None, None, {}, gate=swing)
+    assert sentries.hunted_down is False  # window of 2 still open
+    _observe(sentries, _world(rival_army=9_000))
+    assert sentries.hunted_down is False  # still filling
+    _observe(sentries, _world(rival_army=9_000))
+    assert sentries.hunted_down is True  # rival army above the mean: doom
+    _observe(sentries, _world(rival_army=6_000))
+    assert sentries.hunted_down is False  # the score cleared: hunt again
+
+
+def test_the_gate_keeps_reading_after_the_brace_arms() -> None:
+    """One feed, two consumers: the armed brace stops being fed, the gate
+    does not -- a recalled party must be releasable when the score clears."""
+    swing = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": 0.0}',
+            '{"name": "rival_army_last", "mean": 8000.0, "std": 1000.0, "coef": 5.0}',
+        ]
+    )
+    sentries = Sentries(None, _brace_model(0.5), {}, gate=swing)
+    _observe(sentries, _world(rival_army=9_000))
+    assert _observe(sentries, _world(rival_army=9_000)) is True  # brace edge
+    assert sentries.braced is True
+    assert sentries.hunted_down is True
+    _observe(sentries, _world(rival_army=6_000))
+    assert sentries.braced is True  # the latch holds
+    assert sentries.hunted_down is False  # the gate released

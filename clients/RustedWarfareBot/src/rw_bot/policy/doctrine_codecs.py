@@ -50,6 +50,8 @@ _BAD_HOLD = "RW-DOCTRINE-026"
 _BAD_NAVY_COUNT = "RW-DOCTRINE-027"
 _BAD_BATTERY_COUNT = "RW-DOCTRINE-028"
 _BAD_REBUILD_DROP = "RW-DOCTRINE-029"
+_BAD_HUNT_SIZE = "RW-DOCTRINE-030"
+_GATE_ON_NOTHING = "RW-DOCTRINE-031"
 
 
 def _count(
@@ -134,6 +136,14 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     guns = _count(payload, "guns", _BAD_GUN_COUNT, "top-tier gun turrets to hold, 0 none")
     nukes = _count(payload, "nukes", _BAD_NUKE_COUNT, "nuke launchers to stand, 0 none")
     rebuild = _count(payload, "rebuild", _BAD_REBUILD_DROP, "a rival army-value drop, 0 for off")
+    hunt = _count(payload, "hunt", _BAD_HUNT_SIZE, "a party size with 0 meaning no hunting")
+    huntgate = require_bool(payload, "huntgate")
+    if huntgate and hunt == 0:
+        raise DoctrineError(
+            _GATE_ON_NOTHING,
+            "field 'huntgate' recalls the hunt party, and this doctrine fields none: "
+            "set hunt to a party size or turn the gate off",
+        )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -197,6 +207,8 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         guns=guns,
         nukes=nukes,
         rebuild=rebuild,
+        hunt=hunt,
+        huntgate=huntgate,
     )
 
 
@@ -250,6 +262,8 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "guns": doctrine["guns"],
         "nukes": doctrine["nukes"],
         "rebuild": doctrine["rebuild"],
+        "hunt": doctrine["hunt"],
+        "huntgate": doctrine["huntgate"],
     }
 
 

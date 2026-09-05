@@ -470,10 +470,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if doctrine["navtilt"] == NAVTILT_PREDICTED:
         doom = load_head_model("fleetdoom.ndjson")
     # The razing head rides the same convention: its own file, read only
-    # when the doctrine's brace flag asks for it.
+    # when the doctrine's brace flag asks for it. The hunt gate scores the
+    # SAME model continuously, so one read serves whichever knobs want it.
     brace_model: HeadModel | None = None
-    if doctrine["brace"]:
-        brace_model = load_head_model("razebrace.ndjson")
+    gate_model: HeadModel | None = None
+    if doctrine["brace"] or doctrine["huntgate"]:
+        razing = load_head_model("razebrace.ndjson")
+        brace_model = razing if doctrine["brace"] else None
+        gate_model = razing if doctrine["huntgate"] else None
     report = play(
         channel,
         plan,
@@ -489,6 +493,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         navtilt=doctrine["navtilt"],
         doom=doom,
         brace_model=brace_model,
+        gate_model=gate_model,
         cover=doctrine["cover"],
         intercept=doctrine["intercept"],
         guard_cap=doctrine["guard_cap"],
@@ -513,6 +518,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         guns=doctrine["guns"],
         nukes=doctrine["nukes"],
         rebuild=doctrine["rebuild"],
+        hunt=doctrine["hunt"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],
         kite=doctrine["kite"],

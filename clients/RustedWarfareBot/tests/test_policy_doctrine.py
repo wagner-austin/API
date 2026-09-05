@@ -63,6 +63,8 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         guns=0,
         nukes=0,
         rebuild=0,
+        hunt=0,
+        huntgate=False,
     )
 
 
@@ -297,6 +299,33 @@ def test_a_negative_rebuild_drop_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-029"
+
+
+def test_a_negative_hunt_size_is_refused() -> None:
+    """Zero already means no hunting; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["hunt"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-030"
+
+
+def test_a_gate_without_a_party_is_refused() -> None:
+    """huntgate recalls the hunt party; gating nothing is a silent no-op, refused."""
+    payload = encode_doctrine(_doctrine())
+    payload["huntgate"] = True
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-031"
+
+
+def test_a_gated_party_round_trips() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["hunt"] = 4
+    payload["huntgate"] = True
+    decoded = decode_doctrine(payload)
+    assert decoded["hunt"] == 4
+    assert decoded["huntgate"] is True
 
 
 def test_a_missing_field_is_an_error_not_a_default() -> None:

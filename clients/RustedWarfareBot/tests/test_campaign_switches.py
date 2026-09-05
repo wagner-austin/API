@@ -16,12 +16,14 @@ from pathlib import Path
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.policy.campaign import play
+from rw_bot.policy.head import decode_head_model
 from rw_bot.policy.situation import CLOSE_HOLD
 from rw_bot.wire.state import Sample
 from tests.campaign_fixtures import (
     BUILDER,
     CATALOGUE,
     CENTRE,
+    ENEMY,
     PLACEMENTS,
     PROFILES,
     WAVE,
@@ -242,6 +244,67 @@ def test_the_raid_sends_a_party_at_remembered_income() -> None:
     ]
     assert report["raids"] == 1
     assert report["marches"] == 3
+
+
+def test_the_hunt_presses_a_party_at_the_visible_mover() -> None:
+    """A hostile tank in sight: the hunt attack-moves a party at it, the
+    party is withheld from the waves, and the H event lands in the report's
+    figures -- with the knob off, the same world sends nobody anywhere
+    ([[engine-ai-triggers]]).
+
+    Five tanks: the wave gate's three plus the party's two, because the
+    draft is arbitrated exactly as the raid's is.
+    """
+    surplus = (*WAVE, entity(4, "c_tank"), entity(5, "c_tank"))
+    world = sample(CENTRE, *surplus, ENEMY)
+
+    idle = ScriptedPeer(lines(world))
+    play(AgentChannel(idle), (), CATALOGUE, PLACEMENTS, PROFILES, 1)
+    assert [line for line in idle.sent if "attack_move" in line] == []
+
+    hunting = ScriptedPeer(lines(world))
+    report = play(AgentChannel(hunting), (), CATALOGUE, PLACEMENTS, PROFILES, 1, hunt=2)
+    marched = [line for line in hunting.sent if "attack_move" in line]
+    assert marched == [
+        '{"kind":"attack_move","unit_id":1,"x":100.0,"y":0.0}',
+        '{"kind":"attack_move","unit_id":2,"x":100.0,"y":0.0}',
+    ]
+    assert report["hunts"] == 1
+    assert report["marches"] == 2
+
+
+def test_the_gate_recalls_the_hunt_when_the_head_predicts_doom() -> None:
+    """Sample one fills the gate's window while the party presses; sample
+    two reads doom and the same party fights its way home. The learned
+    per-sample decision driving a live tactical response, end to end in
+    miniature ([[impossible-step-three-design]])."""
+    always_doom = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": 6.0}',
+            '{"name": "credits_last", "mean": 4000.0, "std": 1000.0, "coef": 0.0}',
+        ]
+    )
+    surplus = (*WAVE, entity(4, "c_tank"), entity(5, "c_tank"))
+    world = sample(CENTRE, *surplus, ENEMY)
+    gated = ScriptedPeer(lines(world, world))
+    report = play(
+        AgentChannel(gated),
+        (),
+        CATALOGUE,
+        PLACEMENTS,
+        PROFILES,
+        2,
+        hunt=2,
+        gate_model=always_doom,
+    )
+    marched = [line for line in gated.sent if "attack_move" in line]
+    assert marched == [
+        '{"kind":"attack_move","unit_id":1,"x":100.0,"y":0.0}',
+        '{"kind":"attack_move","unit_id":2,"x":100.0,"y":0.0}',
+        '{"kind":"attack_move","unit_id":1,"x":0.0,"y":0.0}',
+        '{"kind":"attack_move","unit_id":2,"x":0.0,"y":0.0}',
+    ]
+    assert report["hunts"] == 1
 
 
 def test_a_save_that_never_progresses_frees_the_worker() -> None:

@@ -39,6 +39,7 @@ from collections.abc import Mapping, Sequence
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.policy.combat import FIRST_WAVE, RALLY_RADIUS
 from rw_bot.policy.intel import Intel, Sighting
+from rw_bot.policy.party import draft_gathered, homeward
 from rw_bot.policy.siting import find_anchor
 from rw_bot.wire.command import AttackMoveOrder, attack_move_order
 from rw_bot.wire.state import Entity, Sample
@@ -224,10 +225,9 @@ class Raider:
     def _disband(self, survivors: Sequence[int], anchor: Entity) -> tuple[AttackMoveOrder, ...]:
         """Send the under-strength party home fighting, and dissolve it.
 
-        Attack-move rather than move, because the road home crosses the same
-        ground the road out did. Once home the survivors are the wave
-        controller's again -- the campaign stops withholding whatever is no
-        longer in the party.
+        The discipline is the shared one ([[policy-raid]]): the orders come
+        from :func:`~rw_bot.policy.party.homeward`, and what is this raid's
+        own is only the bookkeeping it dissolves with them.
 
         Args:
             survivors: The remaining members, in id order.
@@ -239,9 +239,7 @@ class Raider:
         self._party = frozenset()
         self._objective = 0
         self._ordered = {}
-        return tuple(
-            attack_move_order(unit_id=member, x=anchor["x"], y=anchor["y"]) for member in survivors
-        )
+        return homeward(survivors, anchor)
 
     def _draft(self, army: Sequence[Entity], anchor: Entity) -> list[int]:
         """Pick a whole party from the units gathered at the anchor, or none.
@@ -254,15 +252,7 @@ class Raider:
             The new party in id order, empty when the gathering ground holds
             fewer than a party.
         """
-        limit = RALLY_RADIUS**2
-        gathered = sorted(
-            unit["unit_id"]
-            for unit in army
-            if (unit["x"] - anchor["x"]) ** 2 + (unit["y"] - anchor["y"]) ** 2 <= limit
-        )
-        if len(gathered) < self.size:
-            return []
-        return gathered[: self.size]
+        return draft_gathered(army, anchor, self.size)
 
 
 __all__ = ["INCOME_TYPES", "Raider", "income_objectives"]

@@ -123,7 +123,8 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             ``R`` a raid drafted, ``M`` a forced march moved, ``S`` the
             strike window stood open, ``C`` the closer held its commitment,
             ``B`` the brace armed -- razing predicted, reserve zeroed,
-            expansion stood down ([[impossible-step-three-design]]).
+            expansion stood down ([[impossible-step-three-design]]),
+            ``H`` the hunt took a new objective ([[engine-ai-triggers]]).
             Every tilt postmortem to date INFERRED firing from composition
             side-effects; a decision is now a column read, cut at recording
             boundaries so the loop's order never bends for the record

@@ -38,6 +38,8 @@ def _preset(
     counter: bool = False,
     navtilt: int = 0,
     brace: bool = False,
+    hunt: int = 0,
+    huntgate: bool = False,
 ) -> Path:
     """Write a doctrine file: the default style plus the head under test."""
     doctrine = Doctrine(
@@ -51,6 +53,8 @@ def _preset(
             "counter": counter,
             "navtilt": navtilt,
             "brace": brace,
+            "hunt": hunt,
+            "huntgate": huntgate,
         }
     )
     path = tmp_path / f"{name}.doctrine"
@@ -100,3 +104,15 @@ def test_the_brace_flag_loads_the_shipped_razing_head_and_plays(
     code = _run(_preset(tmp_path, "braced", brace=True))
     assert code in (EXIT_OK, EXIT_INCOMPLETE)
     assert capsys.readouterr().out.splitlines()[0] == "doctrine: braced"
+
+
+def test_the_hunt_gate_loads_the_shipped_razing_head_and_plays(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """huntgate 1 end to end WITHOUT the brace flag: main reads
+    models/razebrace.ndjson for the gate alone, and the loop runs with the
+    continuous score holding the party."""
+    code = _run(_preset(tmp_path, "gated", hunt=2, huntgate=True))
+    assert code in (EXIT_OK, EXIT_INCOMPLETE)
+    assert capsys.readouterr().out.splitlines()[0] == "doctrine: gated"

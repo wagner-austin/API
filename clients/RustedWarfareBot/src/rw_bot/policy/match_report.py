@@ -53,11 +53,14 @@ class MatchReport(TypedDict):
         raids: Income objectives assaulted by the raid party. The
             never-fired ambiguity again: a raid that found nothing remembered
             to hit and a raid switched off read identically without it.
+        hunts: Objective changes taken by the hunt party -- each new mover
+            pressed or structure pushed at counts one, for the same
+            never-fired reason ([[engine-ai-triggers]]).
         marches: Outbound orders sent to raid party members. The conveyor
             detector: v1's ``raids`` read 2-6 while dozens of lone
             replacements marched to the same objective and died, because
             re-drafts against a standing objective count nothing
-            (log: 2026-07-29).
+            (log: 2026-07-29). Hunt and rush member-orders count here too.
         army_start: Units available to fight at the first observation.
         army_end: Units still available at the last.
         targets_seen: Hostile entities visible at the first observation.
@@ -184,6 +187,7 @@ class MatchReport(TypedDict):
     intercepts: int
     sightings: int
     raids: int
+    hunts: int
     marches: int
     army_start: int
     army_end: int
@@ -262,6 +266,7 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"intercepted    {report['intercepts']}",
         f"sightings      {report['sightings']}",
         f"raids          {report['raids']}",
+        f"hunts          {report['hunts']}",
         f"marches        {report['marches']}",
         f"army           {report['army_start']} -> {report['army_end']}",
         f"army value     {report['army_value_start']} -> {report['army_value_end']}",
