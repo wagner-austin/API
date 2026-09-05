@@ -19,7 +19,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 64c2353ba4ef70c1f7e87d3c10c17b9965d9fc28
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "docs/RESEARCH.md": 501c5ffd30309634f82ca1c12a040ed91a75ff29
+  "docs/RESEARCH.md": 34510e8ff2fa12467f1a28058c91ffafe67fbf9f
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -30,6 +30,7 @@ provenance:
   - "varied-count cells measured 2026-09-04 on HPC3: jobs 55759514/55761217, both on hpc3-gpu-16-02 (V100), image v35 sha256 4e02f3b0 (truncated), plan gpt2-companions-varied, records bit-identical sha256 1fd6bb9d (truncated), board task 7815a0fd"
   - "diverse-pool cells measured 2026-09-05 on HPC3: job 55772675 on hpc3-gpu-17-03 (V100) + twin 55773234, image v36 sha256 0401aa9b (truncated), plan gpt2-companions-diverse, board task d2c03dd4; companion-cross instrument in-record"
   - "n2/n4 grid REPLICATED on a V100 2026-09-05 (job 55773639, v36): every verdict survives the card -- trained-p0.5 78.0%/41.4% vs the 3090 Ti's 78.3%/44.6%, orderings identical, overdose replicated in both kinds"
+  - "scale rung measured 2026-09-05 on HPC3: job 55776517 on hpc3-gpu-16-00 (V100) + twin 55786853, image v37 sha256 2adee62f (truncated), plan gpt2-medium-companions-diverse, plan commit e5476201"
 fact_checked: "2026-09-04"
 confidence: high
 hubs: [services]
@@ -145,6 +146,26 @@ trained away and the residual count-decay is STRUCTURAL slot dilution --
 seven 64-slot strangers are 448 foreign positions against 64 own, a cost
 with no content component left for any companionship recipe to remove.
 
+## The scale rung inverts the ceiling
+
+The recipe on a base three times the size (plan
+`gpt2-medium-companions-diverse`, identical in every field but the base,
+a contract pinned by test and by the image's own smoke) answers the
+scale question in both directions at once: **n4 transfers near-exactly
+(+54.1% retention against gpt2's +55.5%) and n8 COLLAPSES (-86.6%
+against +28.0%)**. The controls attribute the collapse: medium's n8
+untrained-composed arm is itself negative (-0.29 where gpt2's read
++0.24) -- the 24-layer base's structural tolerance for a 512-slot
+foreign prefix is far worse than the 12-layer base's before content
+enters -- and the composed arm sits another 0.42 below that, so the
+diverse recipe's content-erasure did not transfer either. The schedule
+is not the confound: it learns the solo cartridge (+0.81) and composes
+four compartments (+0.44) on medium, and only the crowded-prefix regime
+fails. Depth compounds prefix interference: scale alone COSTS
+many-compartment composition rather than buying it, and the larger-base
+path runs through base-side adaptation. Four-compartment deployment,
+by contrast, is scale-robust at ~55% on both bases.
+
 ## What this binds, and what is still open
 
 For the compartmental serving design the recipe changes the operating
@@ -154,10 +175,8 @@ quarter of the solo gain where naive training erased it -- with the
 diverse pool as the recipe of record. Companionship itself is EXHAUSTED
 as an n8 lever, by three convergent measurements. The n2/n4 grid has since been
 replicated on a V100 with every verdict surviving the card (provenance
-below). Still open, filed rather than implied and now capacity-side: the
-budget slot policy under diverse-companioned training; base-side
-composition LoRA (teach the BASE to read crowded prefixes, fixing every
-cartridge at once); and the scale rung -- whether any of this survives a
-larger base, which is cheap to ask because only slots carry optimizer
-state. The RESEARCH.md entry under
+below). Still open, filed rather than implied: the budget slot policy under
+diverse-companioned training, and base-side composition LoRA -- after
+the scale rung, not merely the next lever but the ONLY standing lever
+for many-compartment composition on larger bases. The RESEARCH.md entry under
 `mi` carries all four run summaries and the extension list.
