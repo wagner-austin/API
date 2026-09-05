@@ -219,12 +219,20 @@ and controls as the baseline sweep.
   non-gain has no reading; the raw arm means always carry the verdict.
   That rule exists because the p=1.0 collapse is a real cell every full
   grid hits, and the first version of the CLI died on it.
+- **The V100 replication ran 2026-09-05 and EVERY VERDICT SURVIVES THE
+  CARD** (job 55773639 on v36, run document
+  `tools/hpc3/runs/cartridge-companions-n2n4-v100-v36.json`, 0 SU): the
+  full grid — both kinds, all three probabilities including the p=1.0
+  collapse — reads trained-p0.5 at 78.0%/41.4% retention (vs the 3090 Ti's
+  78.3%/44.6%), with dose and kind orderings identical, the overdose
+  endpoint replicated in both kinds, and every p<1 alone arm agreeing
+  across cards to within a hundredth. Cross-card deltas are largest
+  exactly in the collapse cells, where the spreads are too.
 - **Open extensions, filed rather than implied:** the budget slot policy
-  under companioned training; the scale rung (`gpt2-medium` locally, a 7B
-  base on A100 — cheap for cartridges, since only slots carry optimizer
-  state); the V100 replication of the original n2/n4 grid, unblocked now
-  that v34 exists. Varied-count exposure was measured the same day and
-  REFUTED at its target — see the next subsection.
+  under companioned training; the scale rung (`gpt2-medium` on the
+  cluster, a 7B base on A100 — cheap for cartridges, since only slots
+  carry optimizer state). Varied-count exposure was measured the same day
+  and REFUTED at its target — see the next subsection.
 
 #### `cartridge_varied_companion_sweep` — varied-count exposure, refuted at its target
 
