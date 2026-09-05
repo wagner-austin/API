@@ -183,16 +183,18 @@ and the AI-trigger page says the early window is structured: the first
 attack commits only when a 3-unit group fills, and its build decisions
 ride a credit ladder ([[engine-ai-triggers]]). Whether 2 or 6 openers,
 a tank before the first extractor, or a forced second factory changes
-the early race has never been asked. ASKED 2026-09-05 (impopen96, 8 arms
-x 12 shared seeds): **no scaffold variant moves survival** -- medians
-2,472-3,245 around control's 2,894, zero wins anywhere -- so the stage-2
-gate is unmet on the screen. One arm earned the panel tier: **e1, one
-extractor then army, margin +0.327 with rival peak 161k vs control's
-205k at identical survival** -- the only lever yet measured that dents
-the rival's compounding at all (impden48's tripled raids could not).
-Sub-significance at n=12; `impe1v48` (48 pairs, laws six and nine) is
-the verdict. Greed (e4/e5/e6) reads flat-to-negative: more opening
-economy does not help, consistent with the four closures.
+the early race has never been asked. ASKED AND CLOSED 2026-09-05: the
+screen (impopen96, 8 arms x 12 shared seeds) read **no survival
+movement anywhere** (medians 2,472-3,245 around control's 2,894, zero
+wins), and its one panel-worthy signal -- e1, one extractor then army,
+margin +0.327 with a 22% rival-peak dent at identical survival -- was
+**REFUTED at verdict grade** (impe1v48, 48 pairs: margin +0.053 at sd
+0.799, flips 25:23, survival leaning worse, zero wins both sides). The
+screening signal was n=12 selection noise; law nine caught it. Greed
+(e4/e5/e6) read flat-to-negative on the screen: more opening economy
+does not help. **Stage 1 is closed flat -- the opening joins denial,
+rebuild, strike, and brace as the fifth closure**, and stage 2 stays
+blocked on funding no opening provides. Stage 3 is the road.
 
 **Stage 2 -- fortress, bank, finisher: blocked only on stage 1.** The
 community's stated Impossible path is turtle -> fortress -> nuke, and
