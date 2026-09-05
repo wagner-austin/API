@@ -96,11 +96,14 @@ def test_an_empty_horizon_pushes_at_the_nearest_memory() -> None:
     assert hunter.hunts == 1
 
 
-def test_nothing_seen_and_nothing_remembered_is_no_hunt() -> None:
+def test_nothing_seen_and_nothing_remembered_raises_no_party() -> None:
+    """No quarry, no draft: imphunt60's second defect was a party raised on
+    an empty horizon that idled at the anchor, withheld from the waves while
+    hunting nothing."""
     hunter = Hunter(size=2)
     army = (_tank(20), _tank(21))
     assert hunter.press(_world(*army), Intel(), army, (), _CATALOGUE, True) == ()
-    assert hunter.party() == frozenset({20, 21})
+    assert hunter.party() == frozenset()
     assert hunter.hunts == 0
 
 

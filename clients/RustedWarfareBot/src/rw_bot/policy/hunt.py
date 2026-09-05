@@ -218,17 +218,29 @@ class Hunter:
             self._objective = 0
             self._ordered = {}
             return homeward(survivors, anchor)
+        if not survivors:
+            # A party that died whole leaves ids behind; drop them so the
+            # campaign stops withholding ghosts from the waves.
+            self._party = frozenset()
+        # The quarry is chosen BEFORE any draft, measured from where the
+        # party would stand -- its own centre when one is out, the anchor
+        # when one would be raised. Drafting first was imphunt60's second
+        # defect: on an empty horizon the party was raised anyway and
+        # idled at the anchor, withheld from the waves while hunting
+        # nothing -- a diversion with hunts=0, invisible to every counter.
+        if survivors:
+            members = [unit for unit in army if unit["unit_id"] in self._party]
+            centre_x, centre_y = _centroid(members)
+        else:
+            centre_x, centre_y = anchor["x"], anchor["y"]
+        quarry = _quarry(targets, intel, catalogue, centre_x, centre_y)
+        if quarry is None:
+            return ()
         party = survivors
         if not party and may_draft:
             party = draft_gathered(army, anchor, self.size)
         self._party = frozenset(party)
         if not self._party:
-            return ()
-
-        members = [unit for unit in army if unit["unit_id"] in self._party]
-        centre_x, centre_y = _centroid(members)
-        quarry = _quarry(targets, intel, catalogue, centre_x, centre_y)
-        if quarry is None:
             return ()
         objective_id, x, y = quarry
 
