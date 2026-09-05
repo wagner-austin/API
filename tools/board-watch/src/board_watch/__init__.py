@@ -5,12 +5,18 @@ whom, and exactly one of them reaches a session that is sitting idle:
 
 * A board post is a PULL. Another session sees it when it next chooses to
   call ``task_feed``.
-* A cross-session ``SendMessage`` is a PUSH that lands in a queue. Measured
-  2026-09-05: the send returns ``success`` and the target's status stays
-  ``idle``, because the documented drain condition is the receiver's next
-  tool round and an idle session has none until its operator types.
-* A ``Monitor`` command is the only surface whose events arrive while a
-  session is waiting for its user.
+* A cross-session ``SendMessage`` is a PUSH, and per the Claude Code docs it
+  DOES start a new turn in an idle receiver. What it cannot promise is
+  arrival: with no ``crossSessionInbound`` set, a session that bypasses
+  permission prompts holds every inbound message for human approval unless
+  the sender also bypasses, and a held message never reaches the model. From
+  the sender's side, held looks exactly like ignored.
+* A ``Monitor`` command arrives while a session is waiting for its user and
+  is not subject to those inbound controls, because it is the session's own
+  process rather than a peer's message.
+
+So the board plus a Monitor is the pairing that cannot be silently dropped,
+which is what this package serves.
 
 Monitor runs SHELL commands and ``task_events`` is an MCP tool, so the two
 could not be connected. This package is that connection: it speaks the

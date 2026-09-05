@@ -24,16 +24,25 @@ The board's surfaces split by who can reach whom, and exactly one of them
 reaches a session that is not already working. All three were measured on
 2026-09-05:
 
-| surface | reaches an idle session? | drain condition |
+| surface | reaches an idle session? | can it be silently withheld? |
 |---|---|---|
-| `task_feed` / `task_events` | no | the reader chooses to call it |
-| cross-session `SendMessage` | **no** | the receiver's next tool round |
-| `Monitor` command output | **yes** | none; events arrive during idle |
+| `task_feed` / `task_events` | only when the reader calls it | no |
+| cross-session `SendMessage` | yes, it starts a new turn | **yes — inbound controls** |
+| `Monitor` command output | yes, arrives during idle | no |
 
-The `SendMessage` row is the surprising one and it was tested rather than
-assumed: sending to an idle peer returns `success` with a `msg_id`, and the
-peer's `ListAgents` status stays `idle`. The message is accepted and queued.
-An interactive session has no next tool round until its human types.
+The `SendMessage` row carries the catch. With no `crossSessionInbound` set,
+Claude Code compares the two sessions' permission classes, and a session that
+bypasses permission prompts **holds** every inbound message for human approval
+unless the sender also bypasses. A held message is shown to the human and never
+delivered to the model.
+
+**From the sender's side, held is indistinguishable from ignored.** An earlier
+version of this file claimed `SendMessage` could not wake an idle session at
+all, from one observation where the target's status stayed `idle` after a
+successful send. The documentation says the opposite, and the holding default
+explains what was seen. Corrected 2026-09-05.
+
+So the board plus a Monitor is the pairing that cannot be silently dropped.
 
 So `Monitor` is the only wake. But **Monitor runs shell commands and
 `task_events` is an MCP tool**, and a bash loop cannot call one. This package
