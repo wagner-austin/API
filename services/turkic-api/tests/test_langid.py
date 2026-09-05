@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import types
-from collections.abc import Generator
-from pathlib import Path
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -14,69 +10,7 @@ from turkic_api import _test_hooks
 from turkic_api.core import langid as lid
 
 
-def test_ensure_model_path_218e_downloads_when_missing(tmp_path: Path) -> None:
-    orig_download = _test_hooks.langid_download
-    calls: list[str] = []
-
-    def _fake_download(url: str, dest: Path) -> None:
-        calls.append(url)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(b"bin")
-
-    _test_hooks.langid_download = _fake_download
-    try:
-        out = lid.ensure_model_path(str(tmp_path), prefer_218e=True)
-        assert out.name == "lid218e.bin"
-        assert out.exists()
-        assert calls != []
-        assert "lid218e" in calls[0]
-    finally:
-        _test_hooks.langid_download = orig_download
-
-
-def test_ensure_model_path_218e_existing_no_download(tmp_path: Path) -> None:
-    orig_download = _test_hooks.langid_download
-    p = tmp_path / "models" / "lid218e.bin"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_bytes(b"bin")
-
-    def _boom(url: str, dest: Path) -> None:
-        raise AssertionError("download should not be called")
-
-    _test_hooks.langid_download = _boom
-    try:
-        out = lid.ensure_model_path(str(tmp_path), prefer_218e=True)
-        assert out == p
-    finally:
-        _test_hooks.langid_download = orig_download
-
-
-def test_ensure_model_path_176_branch(tmp_path: Path) -> None:
-    orig_download = _test_hooks.langid_download
-    calls: list[str] = []
-
-    def _fake_download(url: str, dest: Path) -> None:
-        calls.append(url)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(b"bin")
-
-    _test_hooks.langid_download = _fake_download
-    try:
-        out = lid.ensure_model_path(str(tmp_path), prefer_218e=False)
-        assert out.name == "lid.176.bin"
-        assert calls != []
-        assert "lid.176" in calls[0]
-
-        # Call again after file exists: should not download
-        calls.clear()
-        out2 = lid.ensure_model_path(str(tmp_path), prefer_218e=False)
-        assert out2 == out
-        assert calls == []
-    finally:
-        _test_hooks.langid_download = orig_download
-
-
-def test_build_lang_filter_with_threshold(tmp_path: Path) -> None:
+def test_build_lang_filter_with_threshold() -> None:
     class _Model:
         def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             # Return variants to hit mapping logic: __label__kk and kaz_Cyrl
@@ -90,7 +24,7 @@ def test_build_lang_filter_with_threshold(tmp_path: Path) -> None:
     assert keep("bar") is False  # prob below threshold
 
 
-def test_build_lang_script_filter_match_and_mismatch(tmp_path: Path) -> None:
+def test_build_lang_script_filter_match_and_mismatch() -> None:
     class _Model:
         def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             t = text.lower()
@@ -112,7 +46,7 @@ def test_build_lang_script_filter_match_and_mismatch(tmp_path: Path) -> None:
     assert keep2("text latn") is True
 
 
-def test_build_lang_script_filter_blank_script_treated_as_none(tmp_path: Path) -> None:
+def test_build_lang_script_filter_blank_script_treated_as_none() -> None:
     class _Model:
         def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             return (("__label__kaz_Latn",), make_probs(0.99))
@@ -161,46 +95,3 @@ def test_extract_prob_empty_array() -> None:
 def test_extract_prob_with_value() -> None:
     """Test _extract_prob returns the first value for non-empty arrays."""
     assert lid._extract_prob(make_probs(0.95, 0.05)) == 0.95
-
-
-def test_langid_download_writes_nonempty_chunks(tmp_path: Path) -> None:
-    """Test the default langid_download implementation writes only non-empty chunks."""
-    orig_download = _test_hooks.langid_download
-    dest = tmp_path / "models" / "x.bin"
-
-    # Create a fake requests response that yields mixed empty/non-empty chunks
-    class _FakeResponse:
-        def __init__(self) -> None:
-            self._chunks = [b"", b"abc", b"", b"def"]
-
-        def iter_content(self, chunk_size: int = 8192) -> Generator[bytes, None, None]:
-            yield from self._chunks
-
-        def raise_for_status(self) -> None:
-            return None
-
-        def __enter__(self) -> _FakeResponse:
-            return self
-
-        def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc_val: BaseException | None,
-            exc_tb: types.TracebackType | None,
-        ) -> None:
-            return None
-
-    def _fake_download(url: str, dest: Path) -> None:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        resp = _FakeResponse()
-        with dest.open("wb") as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-
-    _test_hooks.langid_download = _fake_download
-    try:
-        _test_hooks.langid_download("http://example/x", dest)
-        assert dest.read_bytes() == b"abcdef"
-    finally:
-        _test_hooks.langid_download = orig_download

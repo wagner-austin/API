@@ -1,34 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
-from typing import Final, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
 from turkic_api import _test_hooks
-
-_MODEL_DIRNAME: Final[str] = "models"
-_URL_218E: Final[str] = "https://dl.fbaipublicfiles.com/nllb/lid/lid218e.bin"
-_URL_176: Final[str] = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"
-
-
-def ensure_model_path(data_dir: str, prefer_218e: bool = True) -> Path:
-    """Ensure model file exists, downloading if necessary.
-
-    Uses _test_hooks.langid_download for the actual download operation.
-    """
-    base = Path(data_dir) / _MODEL_DIRNAME
-    path_218e = base / "lid218e.bin"
-    path_176 = base / "lid.176.bin"
-    if prefer_218e:
-        if not path_218e.exists():
-            _test_hooks.langid_download(_URL_218E, path_218e)
-        return path_218e
-    if not path_176.exists():
-        _test_hooks.langid_download(_URL_176, path_176)
-    return path_176
 
 
 def _parse_label(raw: str) -> tuple[str, str | None]:

@@ -20,6 +20,7 @@ import requests
 from platform_core.config import _optional_env_str
 from platform_core.data_bank_client import DataBankClient
 from platform_core.json_utils import JSONValue
+from platform_core.langid_models import langid_model_file
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
 from turkic_api._hook_protocols import (
@@ -115,22 +116,11 @@ def _default_langid_ensure_model_path(data_dir: str, prefer_218e: bool = True) -
         Path: Path to the model file, downloaded if it was absent.
     """
     from turkic_api import _test_hooks
-    from turkic_api.core.langid import (
-        _MODEL_DIRNAME,
-        _URL_176,
-        _URL_218E,
-    )
 
-    base = Path(data_dir) / _MODEL_DIRNAME
-    path_218e = base / "lid218e.bin"
-    path_176 = base / "lid.176.bin"
-    if prefer_218e:
-        if not path_218e.exists():
-            _test_hooks.langid_download(url=_URL_218E, dest=path_218e)
-        return path_218e
-    if not path_176.exists():
-        _test_hooks.langid_download(url=_URL_176, dest=path_176)
-    return path_176
+    wanted = langid_model_file(data_dir, prefer_218e=prefer_218e)
+    if not wanted["path"].exists():
+        _test_hooks.langid_download(url=wanted["url"], dest=wanted["path"])
+    return wanted["path"]
 
 
 def _default_langid_get_fasttext_factory() -> LangIdModelFactoryProtocol:

@@ -7,17 +7,13 @@ lid.176 models. Useful for auto-detecting source language before transcription.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Final
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_core.langid_models import langid_model_file
 
 from . import _test_hooks
 from .types import LanguageDetectionResult
-
-_MODEL_DIRNAME: Final[str] = "models"
-_URL_218E: Final[str] = "https://dl.fbaipublicfiles.com/nllb/lid/lid218e.bin"
-_URL_176: Final[str] = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"
 
 # ISO 639-3 to 639-1 mappings for common languages
 _LANG_MAPPING: dict[str, str] = {
@@ -84,16 +80,10 @@ def ensure_model_path(data_dir: str, prefer_218e: bool = True) -> Path:
     Returns:
         Path to the model file.
     """
-    base = Path(data_dir) / _MODEL_DIRNAME
-    path_218e = base / "lid218e.bin"
-    path_176 = base / "lid.176.bin"
-    if prefer_218e:
-        if not path_218e.exists():
-            _test_hooks.langid_download(_URL_218E, path_218e)
-        return path_218e
-    if not path_176.exists():
-        _test_hooks.langid_download(_URL_176, path_176)
-    return path_176
+    wanted = langid_model_file(data_dir, prefer_218e=prefer_218e)
+    if not wanted["path"].exists():
+        _test_hooks.langid_download(wanted["url"], wanted["path"])
+    return wanted["path"]
 
 
 def _parse_label(raw: str) -> tuple[str, str | None]:

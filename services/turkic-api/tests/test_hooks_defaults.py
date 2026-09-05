@@ -91,15 +91,6 @@ def test_default_ensure_corpus_file_calls_real_impl(tmp_path: Path) -> None:
         _test_hooks.stream_oscar_hook = orig
 
 
-def test_default_langid_download_with_fake_requests(tmp_path: Path) -> None:
-    """Test _default_langid_download writes downloaded content."""
-    # We need to override the requests.get call since we can't make real network calls
-    # The function imports requests locally, so we test it by mocking via hooks
-    # Actually, since we can't mock requests without monkeypatch, we skip the actual
-    # network call test and just verify the function signature exists
-    assert callable(_test_hooks._default_langid_download)
-
-
 def test_default_langid_ensure_model_path_prefer_218e(tmp_path: Path) -> None:
     """Test _default_langid_ensure_model_path prefer_218e path."""
     # Create fake model file to avoid download
