@@ -8,6 +8,7 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py
+  - services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py
   - services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py
   - docs/RESEARCH.md
@@ -15,9 +16,10 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 832de4e79068336b1cb8e6491d8b0553029f528a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
   "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": 0cc7a9f947c541be17d82fbe69c88be46c690ba0
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 64c2353ba4ef70c1f7e87d3c10c17b9965d9fc28
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "docs/RESEARCH.md": 534c0f8cd82cf73685c164f13f22c80df46411e1
+  "docs/RESEARCH.md": 572da96de4c1fc7fce922200d2f3780e9a58ac44
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -26,6 +28,7 @@ provenance:
   - "n8 cell measured 2026-09-04 on HPC3: job 55753007, Tesla V100-FHHL-16GB, driver 580.82.07, image v34 sha256 cdd1341b (truncated), plan gpt2-companions-n8, board task 684492dd"
   - "n8 record bit-identical across two DIFFERENT V100 nodes (jobs 55753007 on gpu-18-02 and 55753873 on gpu-16-04, both records sha256 6e63dad7 truncated) -- cross-node determinism"
   - "varied-count cells measured 2026-09-04 on HPC3: jobs 55759514/55761217, both on hpc3-gpu-16-02 (V100), image v35 sha256 4e02f3b0 (truncated), plan gpt2-companions-varied, records bit-identical sha256 1fd6bb9d (truncated), board task 7815a0fd"
+  - "diverse-pool cells measured 2026-09-05 on HPC3: job 55772675 on hpc3-gpu-17-03 (V100) + twin 55773234, image v36 sha256 0401aa9b (truncated), plan gpt2-companions-diverse, board task d2c03dd4; companion-cross instrument in-record"
 fact_checked: "2026-09-04"
 confidence: high
 hubs: [services]
@@ -122,16 +125,37 @@ baseline caught leaking) measured +0.05 cross-gain against a 0.048
 spread -- clean, verified in-run. Dose and kind orderings replicate from
 the n2/n4 grid.
 
+## The diverse pool: best recipe, and the decay's cause settled
+
+The content-diverse pool -- three companions each trained on a DIFFERENT
+held-out corpus (epi, the recorded companion by the shared seed formula,
+plus metabolomics and atmospheric-chemistry) -- was measured the same
+night (plan `gpt2-companions-diverse`, jobs 55772675/55773234 on a V100
+under image v36) and it is the program's best recipe at both counts: n4
+retention **+55.5%** (vs the single companion's 44.6%, ~1.4x floor) and
+n8 **+28.0%** -- decisively above the same-content pool's 18.3% and a
+within-floor tie with the single companion's 26.5%, stated as a tie. A
+new companion-cross instrument scores every pool member alone on the
+primary held-out, and all three read negative (-0.36/-0.11/-0.04): the
+pool is measured clean, not assumed. The mechanism verdict settles the
+arc: the n8 composed arm EQUALS its untrained-composed control (+0.2323
+vs +0.2431), so content interference at eight compartments is fully
+trained away and the residual count-decay is STRUCTURAL slot dilution --
+seven 64-slot strangers are 448 foreign positions against 64 own, a cost
+with no content component left for any companionship recipe to remove.
+
 ## What this binds, and what is still open
 
 For the compartmental serving design the recipe changes the operating
 point: four simultaneously wired compartments are viable at trained-p0.5
-where naive training made them destructive, and eight retain a quarter of
-the solo gain where naive training erased it. Still open, filed rather
-than implied: the content-DIVERSE companion pool (the varied-count
-refutation names it as the next lever); the budget slot policy under
-companioned training; the V100 replication of the original n2/n4 grid,
-unblocked by v34; and the scale rung -- whether any of this survives a 7B
-base, which is cheap to ask because only slots carry optimizer state. The
-RESEARCH.md entry under `mi` carries all three run summaries and the
-extension list.
+where naive training made them destructive, and eight retain over a
+quarter of the solo gain where naive training erased it -- with the
+diverse pool as the recipe of record. Companionship itself is EXHAUSTED
+as an n8 lever, by three convergent measurements. Still open, filed
+rather than implied and now capacity-side: the budget slot policy under
+diverse-companioned training; base-side composition LoRA (teach the BASE
+to read crowded prefixes, fixing every cartridge at once); the V100
+replication of the original n2/n4 grid, unblocked by v34; and the scale
+rung -- whether any of this survives a 7B base, which is cheap to ask
+because only slots carry optimizer state. The RESEARCH.md entry under
+`mi` carries all four run summaries and the extension list.
