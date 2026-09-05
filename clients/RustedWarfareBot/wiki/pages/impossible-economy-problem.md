@@ -168,3 +168,37 @@ closures now stand -- denial, rebuild, strike, brace -- and together
 they say the endgame is not where Impossible is lost. Whatever decides
 the rung is set earlier than any of these levers reach, or above the
 credit-allocation vocabulary entirely.
+
+## The road, staged by the evidence (2026-09-05)
+
+**Stage 1 -- the opening scaffold, the last unsearched decision layer.**
+Every arm in the entire Impossible record opens identically: three
+extractors, the inserted factory, then army -- the scaffold is fixed by
+construction in every doctrine and the genome compiler deliberately
+preserved it. The four closures point EARLIER than any measured lever,
+and the AI-trigger page says the early window is structured: the first
+attack commits only when a 3-unit group fills, and its build decisions
+ride a credit ladder ([[engine-ai-triggers]]). Whether 2 or 6 openers,
+a tank before the first extractor, or a forced second factory changes
+the early race has never been asked. Screening now (impopen96).
+
+**Stage 2 -- fortress, bank, finisher: blocked only on stage 1.** The
+community's stated Impossible path is turtle -> fortress -> nuke, and
+every mechanical link is PROVEN in this harness -- the launcher places,
+the warhead stockpiles, the strike erases what it is pointed at
+([[community-play-strategies]]). It is refuted solely on funding: no
+measured Impossible state carries the 45,000. The one non-loss ever
+recorded (tech-flame, full-cap survival) came from waves dying on a
+funded wall. If any opening moves survival materially, the 56k chain
+becomes fundable -- with law eight satisfied this time: the withhold
+gates on the proven head machinery rather than tick-one or a crude
+income floor, which is exactly how the earlier nuke arms starved.
+
+**Stage 3 -- above the vocabulary, if openings read flat.** Per-sample
+tactical policy ([[impossible-step-three-design]] option 1), and the
+scripted-AI plan surface itself: the AiZones instrument reads the AI's
+own group targets and timers ([[engine-ai-zones]]), and a posture
+designed against the wave-group ladder (keep their attack group from
+filling; bait a committed group) is a capability no credit knob
+expresses. Expensive, and the operator weighs it -- but it is a road,
+not a wall.

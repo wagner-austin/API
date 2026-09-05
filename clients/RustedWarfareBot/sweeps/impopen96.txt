@@ -1,0 +1,106 @@
+# The opening-scaffold screen ([[impossible-economy-problem]] stage
+# 1): the LAST unsearched decision layer. Every arm in the whole
+# Impossible record opened with three extractors; these vary only
+# the scaffold -- 1/2/4/5/6 openers, a tank before the first
+# extractor, a forced second factory -- everything else the
+# champion base exactly. 12 shared fresh seeds 8711001-8715577,
+# difficulty 3, judged on paired survival, rival dip, and the
+# extractor-retention shape.
+#
+# label | seed | doctrine | samples
+control|8711001|doctrines/flame-nocover.doctrine|10000
+e1|8711001|doctrines/open-e1.doctrine|10000
+e2|8711001|doctrines/open-e2.doctrine|10000
+e4|8711001|doctrines/open-e4.doctrine|10000
+e5|8711001|doctrines/open-e5.doctrine|10000
+e6|8711001|doctrines/open-e6.doctrine|10000
+tankfirst|8711001|doctrines/open-tankfirst.doctrine|10000
+fac2|8711001|doctrines/open-fac2.doctrine|10000
+control|8711417|doctrines/flame-nocover.doctrine|10000
+e1|8711417|doctrines/open-e1.doctrine|10000
+e2|8711417|doctrines/open-e2.doctrine|10000
+e4|8711417|doctrines/open-e4.doctrine|10000
+e5|8711417|doctrines/open-e5.doctrine|10000
+e6|8711417|doctrines/open-e6.doctrine|10000
+tankfirst|8711417|doctrines/open-tankfirst.doctrine|10000
+fac2|8711417|doctrines/open-fac2.doctrine|10000
+control|8711833|doctrines/flame-nocover.doctrine|10000
+e1|8711833|doctrines/open-e1.doctrine|10000
+e2|8711833|doctrines/open-e2.doctrine|10000
+e4|8711833|doctrines/open-e4.doctrine|10000
+e5|8711833|doctrines/open-e5.doctrine|10000
+e6|8711833|doctrines/open-e6.doctrine|10000
+tankfirst|8711833|doctrines/open-tankfirst.doctrine|10000
+fac2|8711833|doctrines/open-fac2.doctrine|10000
+control|8712249|doctrines/flame-nocover.doctrine|10000
+e1|8712249|doctrines/open-e1.doctrine|10000
+e2|8712249|doctrines/open-e2.doctrine|10000
+e4|8712249|doctrines/open-e4.doctrine|10000
+e5|8712249|doctrines/open-e5.doctrine|10000
+e6|8712249|doctrines/open-e6.doctrine|10000
+tankfirst|8712249|doctrines/open-tankfirst.doctrine|10000
+fac2|8712249|doctrines/open-fac2.doctrine|10000
+control|8712665|doctrines/flame-nocover.doctrine|10000
+e1|8712665|doctrines/open-e1.doctrine|10000
+e2|8712665|doctrines/open-e2.doctrine|10000
+e4|8712665|doctrines/open-e4.doctrine|10000
+e5|8712665|doctrines/open-e5.doctrine|10000
+e6|8712665|doctrines/open-e6.doctrine|10000
+tankfirst|8712665|doctrines/open-tankfirst.doctrine|10000
+fac2|8712665|doctrines/open-fac2.doctrine|10000
+control|8713081|doctrines/flame-nocover.doctrine|10000
+e1|8713081|doctrines/open-e1.doctrine|10000
+e2|8713081|doctrines/open-e2.doctrine|10000
+e4|8713081|doctrines/open-e4.doctrine|10000
+e5|8713081|doctrines/open-e5.doctrine|10000
+e6|8713081|doctrines/open-e6.doctrine|10000
+tankfirst|8713081|doctrines/open-tankfirst.doctrine|10000
+fac2|8713081|doctrines/open-fac2.doctrine|10000
+control|8713497|doctrines/flame-nocover.doctrine|10000
+e1|8713497|doctrines/open-e1.doctrine|10000
+e2|8713497|doctrines/open-e2.doctrine|10000
+e4|8713497|doctrines/open-e4.doctrine|10000
+e5|8713497|doctrines/open-e5.doctrine|10000
+e6|8713497|doctrines/open-e6.doctrine|10000
+tankfirst|8713497|doctrines/open-tankfirst.doctrine|10000
+fac2|8713497|doctrines/open-fac2.doctrine|10000
+control|8713913|doctrines/flame-nocover.doctrine|10000
+e1|8713913|doctrines/open-e1.doctrine|10000
+e2|8713913|doctrines/open-e2.doctrine|10000
+e4|8713913|doctrines/open-e4.doctrine|10000
+e5|8713913|doctrines/open-e5.doctrine|10000
+e6|8713913|doctrines/open-e6.doctrine|10000
+tankfirst|8713913|doctrines/open-tankfirst.doctrine|10000
+fac2|8713913|doctrines/open-fac2.doctrine|10000
+control|8714329|doctrines/flame-nocover.doctrine|10000
+e1|8714329|doctrines/open-e1.doctrine|10000
+e2|8714329|doctrines/open-e2.doctrine|10000
+e4|8714329|doctrines/open-e4.doctrine|10000
+e5|8714329|doctrines/open-e5.doctrine|10000
+e6|8714329|doctrines/open-e6.doctrine|10000
+tankfirst|8714329|doctrines/open-tankfirst.doctrine|10000
+fac2|8714329|doctrines/open-fac2.doctrine|10000
+control|8714745|doctrines/flame-nocover.doctrine|10000
+e1|8714745|doctrines/open-e1.doctrine|10000
+e2|8714745|doctrines/open-e2.doctrine|10000
+e4|8714745|doctrines/open-e4.doctrine|10000
+e5|8714745|doctrines/open-e5.doctrine|10000
+e6|8714745|doctrines/open-e6.doctrine|10000
+tankfirst|8714745|doctrines/open-tankfirst.doctrine|10000
+fac2|8714745|doctrines/open-fac2.doctrine|10000
+control|8715161|doctrines/flame-nocover.doctrine|10000
+e1|8715161|doctrines/open-e1.doctrine|10000
+e2|8715161|doctrines/open-e2.doctrine|10000
+e4|8715161|doctrines/open-e4.doctrine|10000
+e5|8715161|doctrines/open-e5.doctrine|10000
+e6|8715161|doctrines/open-e6.doctrine|10000
+tankfirst|8715161|doctrines/open-tankfirst.doctrine|10000
+fac2|8715161|doctrines/open-fac2.doctrine|10000
+control|8715577|doctrines/flame-nocover.doctrine|10000
+e1|8715577|doctrines/open-e1.doctrine|10000
+e2|8715577|doctrines/open-e2.doctrine|10000
+e4|8715577|doctrines/open-e4.doctrine|10000
+e5|8715577|doctrines/open-e5.doctrine|10000
+e6|8715577|doctrines/open-e6.doctrine|10000
+tankfirst|8715577|doctrines/open-tankfirst.doctrine|10000
+fac2|8715577|doctrines/open-fac2.doctrine|10000
