@@ -7,6 +7,7 @@ import pytest
 from monorepo_guards.toml_reader import (
     PackageInclude,
     check_banned_api,
+    coverage_carve_outs,
     extract_mypy_bool,
     extract_mypy_files,
     extract_package_includes,
@@ -208,10 +209,119 @@ version = "0.1.0"
     assert extract_package_includes(toml_content) == []
 
 
+def _manifest(*lines: str) -> str:
+    """Join manifest lines, so a test reads as the settings it is about.
+
+    Args:
+        *lines: Section headers and key assignments, in order.
+
+    Returns:
+        The manifest text.
+    """
+    return "\n".join(lines) + "\n"
+
+
+def test_coverage_carve_outs_reads_a_spread_array() -> None:
+    """The shape a formatter produces once the array outgrows one line, and
+    the one platform_email's exclusions were written in."""
+    content = _manifest(
+        "[tool.coverage.report]",
+        "fail_under = 100",
+        "exclude_lines = [",
+        '    "if __name__ == .__main__.:",',
+        '    "def main",',
+        "]",
+    )
+
+    found = coverage_carve_outs(content)
+
+    assert [(c.key, c.line_no) for c in found] == [("exclude_lines", 3)]
+    assert found[0].detail == "if __name__ == .__main__.:, def main"
+
+
+def test_coverage_carve_outs_reads_a_single_line_array() -> None:
+    content = _manifest(
+        "[tool.coverage.run]",
+        'omit = ["a/*", "b/*"]',
+    )
+
+    assert [(c.key, c.detail) for c in coverage_carve_outs(content)] == [("omit", "a/*, b/*")]
+
+
+def test_coverage_carve_outs_stops_at_the_end_of_an_unclosed_array() -> None:
+    """A manifest truncated mid-array must be reported, not read past the end
+    of the file -- the reader still has to be told what was excluded."""
+    content = _manifest(
+        "[tool.coverage.report]",
+        "exclude_lines = [",
+        '    "def main",',
+    )
+
+    assert [(c.key, c.detail) for c in coverage_carve_outs(content)] == [
+        ("exclude_lines", "def main")
+    ]
+
+
+def test_coverage_carve_outs_ignores_a_key_that_belongs_to_another_tool() -> None:
+    """`omit` is meaningful to coverage's run table and to nothing else here."""
+    content = _manifest(
+        "[tool.coverage.report]",
+        'omit = ["this is not where omit lives"]',
+        "fail_under = 100",
+    )
+
+    assert coverage_carve_outs(content) == []
+
+
+def test_coverage_carve_outs_accepts_a_fractional_hundred() -> None:
+    """`fail_under = 100.0` is the same bar written differently."""
+    content = _manifest("[tool.coverage.report]", "fail_under = 100.0")
+
+    assert coverage_carve_outs(content) == []
+
+
+def test_coverage_carve_outs_ignores_fail_under_outside_the_report_table() -> None:
+    content = _manifest("[tool.other]", "fail_under = 50")
+
+    assert coverage_carve_outs(content) == []
+
+
+def test_coverage_carve_outs_reports_them_in_file_order() -> None:
+    """The reader repairs the manifest top to bottom."""
+    content = _manifest(
+        "[tool.coverage.run]",
+        'omit = ["a/*"]',
+        "",
+        "[tool.coverage.report]",
+        "fail_under = 80",
+        'exclude_lines = ["def main"]',
+    )
+
+    assert [c.key for c in coverage_carve_outs(content)] == [
+        "omit",
+        "fail_under",
+        "exclude_lines",
+    ]
+
+
+def test_coverage_carve_outs_finds_nothing_in_a_manifest_without_coverage() -> None:
+    content = _manifest("[tool.poetry]", 'name = "thing"')
+
+    assert coverage_carve_outs(content) == []
+
+
 __all__ = [
     "test_check_banned_api_finds_typing_any",
     "test_check_banned_api_finds_typing_cast",
     "test_check_banned_api_returns_false_when_missing",
+    "test_coverage_carve_outs_accepts_a_fractional_hundred",
+    "test_coverage_carve_outs_finds_nothing_in_a_manifest_without_coverage",
+    "test_coverage_carve_outs_ignores_a_key_that_belongs_to_another_tool",
+    "test_coverage_carve_outs_ignores_fail_under_outside_the_report_table",
+    "test_coverage_carve_outs_reads_a_single_line_array",
+    "test_coverage_carve_outs_reads_a_spread_array",
+    "test_coverage_carve_outs_reports_them_in_file_order",
+    "test_coverage_carve_outs_stops_at_the_end_of_an_unclosed_array",
     "test_extract_mypy_bool_returns_false",
     "test_extract_mypy_bool_returns_none_when_missing",
     "test_extract_mypy_bool_returns_true",

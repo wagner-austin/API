@@ -1,17 +1,43 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Final
 
 from monorepo_guards import Violation
 from monorepo_guards.external_inputs import package_manifests
 from monorepo_guards.toml_reader import (
     check_banned_api,
+    coverage_carve_outs,
     extract_mypy_bool,
     extract_mypy_files,
     extract_package_includes,
     extract_ruff_src,
     read_pyproject,
 )
+
+#: The violation kind each coverage carve-out is reported under. Three kinds
+#: rather than one because the repairs differ: an omit is deleted, an
+#: exclusion is deleted AND its statements then have to be covered, and a
+#: lowered threshold is raised.
+CARVE_OUT_KINDS: Final[dict[str, str]] = {
+    "omit": "coverage-omit",
+    "exclude_lines": "coverage-exclude-lines",
+    "fail_under": "coverage-fail-under-below-100",
+}
+
+#: What each carve-out actually hides, said in the violation so the reader
+#: does not have to know coverage's semantics to act on it.
+CARVE_OUT_REASONS: Final[dict[str, str]] = {
+    "omit": (
+        "drops whole files from measurement, so the threshold is met over "
+        "less code than the package ships"
+    ),
+    "exclude_lines": (
+        "drops statements from the files that ARE measured, which is "
+        "invisible in the report: the package still prints 100%"
+    ),
+    "fail_under": "lowers the bar rather than covering the code",
+}
 
 
 class ConfigRule:
@@ -224,6 +250,39 @@ class ConfigRule:
             )
         return violations
 
+    def _check_coverage_carve_outs(self, repo_root: Path, toml_content: str) -> list[Violation]:
+        """Refuse settings that narrow what 100% coverage is measured against.
+
+        platform_email excluded ``def main() -> None:`` and three other
+        patterns and reported 100% for years with its console entry point
+        never once executed -- 305 statements were outside the measurement,
+        and the one test of ``main`` reimplemented the body in the test rather
+        than calling it. Nothing in a coverage report says that a report is
+        partial, which is why this is checked here instead.
+
+        Args:
+            repo_root: Directory holding the ``pyproject.toml``.
+            toml_content: Its full contents.
+
+        Returns:
+            One violation per carve-out, naming what it hides.
+        """
+        violations: list[Violation] = []
+        for carve_out in coverage_carve_outs(toml_content):
+            violations.append(
+                Violation(
+                    file=repo_root / "pyproject.toml",
+                    line_no=carve_out.line_no,
+                    kind=CARVE_OUT_KINDS[carve_out.key],
+                    line=(
+                        f"coverage {carve_out.key} = {carve_out.detail} -- this "
+                        f"{CARVE_OUT_REASONS[carve_out.key]}. Cover the code, or "
+                        f"delete it."
+                    ),
+                )
+            )
+        return violations
+
     def _check_pyproject(self, pyproject_path: Path) -> list[Violation]:
         """Check a single pyproject.toml file."""
         violations: list[Violation] = []
@@ -233,6 +292,7 @@ class ConfigRule:
         expected_dirs = self._get_expected_dirs(repo_root)
 
         violations.extend(self._check_package_includes(repo_root, toml_content))
+        violations.extend(self._check_coverage_carve_outs(repo_root, toml_content))
 
         if expected_dirs:
             violations.extend(self._check_mypy_files(repo_root, toml_content, expected_dirs))

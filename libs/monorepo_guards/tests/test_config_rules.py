@@ -4,6 +4,25 @@ from pathlib import Path
 
 from monorepo_guards.config_rules import ConfigRule
 
+COVERAGE_MANIFEST_TEMPLATE = """
+[tool.mypy]
+files = ["src"]
+strict = true
+disallow_any_expr = true
+disallow_any_explicit = true
+disallow_any_unimported = true
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any" = { msg = "no" }
+"typing.cast" = { msg = "no" }
+
+COVERAGE_BLOCK
+"""
+"""A manifest whose only variable part is its coverage configuration."""
+
 
 def test_config_rule_detects_missing_mypy_files(tmp_path: Path) -> None:
     """Test that missing directories in mypy files are detected."""
@@ -358,10 +377,199 @@ def test_config_rule_names_the_two_ways_a_rootless_include_hurts(tmp_path: Path)
     assert "wheel" in violations[0].line
 
 
+_RUN_SECTION = "[tool.coverage.run]"
+_REPORT_SECTION = "[tool.coverage.report]"
+
+
+def _coverage_config(*lines: str) -> str:
+    """Join coverage-configuration lines into a manifest fragment.
+
+    Written as lines rather than one triple-quoted block so a test reads as
+    the settings it is about.
+
+    Args:
+        *lines: Section headers and key assignments, in order.
+
+    Returns:
+        The fragment, newline-joined.
+    """
+    return "\n".join(lines)
+
+
+def _repo_with_coverage(tmp_path: Path, coverage_block: str) -> Path:
+    """Build a minimal package whose only interesting content is its coverage config.
+
+    Args:
+        tmp_path: Per-test temporary directory.
+        coverage_block: The coverage sections to write.
+
+    Returns:
+        Path to a source file inside it, for handing to ``rule.run``.
+    """
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    source = repo / "src" / "mod.py"
+    source.write_text("x = 1", encoding="utf-8")
+    (repo / "pyproject.toml").write_text(
+        COVERAGE_MANIFEST_TEMPLATE.replace("COVERAGE_BLOCK", coverage_block),
+        encoding="utf-8",
+    )
+    return source
+
+
+def _coverage_violations(source: Path) -> list[str]:
+    """Run the rule and return the kinds of its coverage violations.
+
+    Args:
+        source: A file inside the package to check.
+
+    Returns:
+        Every violation kind beginning with ``coverage-``, in report order.
+    """
+    return [v.kind for v in ConfigRule().run([source]) if v.kind.startswith("coverage-")]
+
+
+def test_config_rule_accepts_coverage_config_that_hides_nothing(tmp_path: Path) -> None:
+    """The shape every package here uses: source scoped, nothing carved out."""
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            "branch = true",
+            "",
+            _REPORT_SECTION,
+            "fail_under = 100",
+        ),
+    )
+
+    assert _coverage_violations(source) == []
+
+
+def test_config_rule_accepts_an_empty_carve_out(tmp_path: Path) -> None:
+    """An empty omit excludes nothing, and reporting it would train the reader
+    to ignore the rule."""
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            "omit = []",
+            "",
+            _REPORT_SECTION,
+            "fail_under = 100",
+        ),
+    )
+
+    assert _coverage_violations(source) == []
+
+
+def test_config_rule_detects_an_omit(tmp_path: Path) -> None:
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            'omit = ["src/generated/*"]',
+            "",
+            _REPORT_SECTION,
+            "fail_under = 100",
+        ),
+    )
+
+    assert _coverage_violations(source) == ["coverage-omit"]
+
+
+def test_config_rule_detects_excluded_lines(tmp_path: Path) -> None:
+    """The carve-out that hid platform_email's entry point. Invisible in the
+    report, because the package still printed 100%."""
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            "",
+            _REPORT_SECTION,
+            "fail_under = 100",
+            "exclude_lines = [",
+            '    "def main",',
+            "]",
+        ),
+    )
+
+    violations = [v for v in ConfigRule().run([source]) if v.kind == "coverage-exclude-lines"]
+
+    assert len(violations) == 1
+    assert "def main" in violations[0].line
+
+
+def test_config_rule_detects_a_lowered_threshold(tmp_path: Path) -> None:
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            "",
+            _REPORT_SECTION,
+            "fail_under = 95",
+        ),
+    )
+
+    assert _coverage_violations(source) == ["coverage-fail-under-below-100"]
+
+
+def test_config_rule_reports_every_carve_out_not_only_the_first(tmp_path: Path) -> None:
+    """A package that carved out three ways would otherwise be repaired one
+    lint run at a time."""
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            _RUN_SECTION,
+            'source = ["src"]',
+            'omit = ["a/*"]',
+            "",
+            _REPORT_SECTION,
+            "fail_under = 90",
+            'exclude_lines = ["def main"]',
+        ),
+    )
+
+    assert sorted(_coverage_violations(source)) == [
+        "coverage-exclude-lines",
+        "coverage-fail-under-below-100",
+        "coverage-omit",
+    ]
+
+
+def test_config_rule_ignores_an_omit_outside_the_coverage_section(tmp_path: Path) -> None:
+    """``omit`` is not a reserved word: another tool's table may hold one, and
+    that one hides nothing from coverage."""
+    source = _repo_with_coverage(
+        tmp_path,
+        _coverage_config(
+            "[tool.something_else]",
+            'omit = ["everything"]',
+            "",
+            _RUN_SECTION,
+            'source = ["src"]',
+            "",
+            _REPORT_SECTION,
+            "fail_under = 100",
+        ),
+    )
+
+    assert _coverage_violations(source) == []
+
+
 __all__ = [
     "test_config_rule_accepts_a_package_include_with_from",
+    "test_config_rule_accepts_an_empty_carve_out",
+    "test_config_rule_accepts_coverage_config_that_hides_nothing",
     "test_config_rule_accepts_valid_config",
+    "test_config_rule_detects_a_lowered_threshold",
     "test_config_rule_detects_a_package_include_without_from",
+    "test_config_rule_detects_an_omit",
+    "test_config_rule_detects_excluded_lines",
     "test_config_rule_detects_missing_banned_api",
     "test_config_rule_detects_missing_mypy_files",
     "test_config_rule_detects_missing_ruff_src",
@@ -370,6 +578,8 @@ __all__ = [
     "test_config_rule_handles_files_in_category_dirs",
     "test_config_rule_handles_no_files",
     "test_config_rule_handles_nonexistent_pyproject",
+    "test_config_rule_ignores_an_omit_outside_the_coverage_section",
     "test_config_rule_names_the_two_ways_a_rootless_include_hurts",
+    "test_config_rule_reports_every_carve_out_not_only_the_first",
     "test_config_rule_skips_repos_without_expected_dirs",
 ]

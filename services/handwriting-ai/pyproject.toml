@@ -95,7 +95,6 @@ explicit_package_bases = true
 
 [tool.coverage.run]
 source = ["src", "scripts"]
-omit = ["tests/*"]
 branch = true
 concurrency = ["multiprocessing", "thread"]
 
