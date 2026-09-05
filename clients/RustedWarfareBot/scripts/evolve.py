@@ -44,7 +44,7 @@ from pathlib import Path
 from rw_bot.harness import _test_hooks as host_hooks
 from rw_bot.harness.cluster_round import ClusterRound
 from rw_bot.harness.genome import ARMY_VOCABULARY, compile_genome
-from rw_bot.harness.margin import batch_margins
+from rw_bot.harness.margin import batch_margins, batch_survivals
 from rw_bot.harness.search import paired_delta
 from rw_bot.policy.doctrine_file import format_doctrine, parse_doctrine_lines
 from scripts.search import (
@@ -273,6 +273,7 @@ def run_evolution(
     rng_seed: int,
     sweeps_root: Path = SWEEP_ROOT,
     variant_dir: Path = VARIANT_DIR,
+    spec_name: str = "vh",
 ) -> tuple[str, ...]:
     """Run every generation and return the report.
 
@@ -282,6 +283,12 @@ def run_evolution(
         rng_seed: Reproducibility anchor for every draw and seed.
         sweeps_root: Where batch scorecards land, injectable for tests.
         variant_dir: Where candidate doctrines land, injectable for tests.
+        spec_name: The registered search regime -- its base is the
+            doctrine every member perturbs and its fitness is what the
+            elite is ranked by: ``margin`` for the paired margin delta
+            (every run before 2026-09-05), ``survival`` for the paired
+            samples-stood delta (the win path's Phase A objective,
+            [[impossible-economy-problem]]).
 
     The run's doctrine files land under ``variant_dir / name``: two runs
     sharing the bare directory overwrote each other's ``g<i>m<j>``
@@ -303,13 +310,15 @@ def run_evolution(
         host_hooks.write_line(text)
         lines.append(text)
 
-    spec = require_search_spec("vh")
+    spec = require_search_spec(spec_name)
     base_path = Path(spec["base"])
+    scorer = batch_survivals if spec["fitness"] == "survival" else batch_margins
     rng = random.Random(rng_seed)
     mean: tuple[float, ...] = (0.0,) * len(ARMY_VOCABULARY)
     sigma: tuple[float, ...] = (SIGMA_START,) * len(ARMY_VOCABULARY)
     note(
-        f"# evolve {name} (rng {rng_seed}): population {POPULATION}, elite {ELITE}, "
+        f"# evolve {name} (rng {rng_seed}, spec {spec_name}, fitness {spec['fitness']}): "
+        f"population {POPULATION}, elite {ELITE}, "
         f"{GENERATIONS} generations of {PAIRS} pairs vs {base_path.as_posix()}"
     )
 
@@ -322,14 +331,14 @@ def run_evolution(
         seeds = generation_seeds(rng_seed, generation)
         note(f"# generation {generation}: {POPULATION} members, {PAIRS} pairs")
         runner.run(batch, generation_job_lines(base_path, genomes, generation, seeds, run_dir))
-        margins = batch_margins(sweeps_root / batch)
+        figures = scorer(sweeps_root / batch)
         scored: list[tuple[float, int]] = []
         for index in range(POPULATION):
-            n, delta, sd = paired_delta(margins, member_label(generation, index), "control")
+            n, delta, sd = paired_delta(figures, member_label(generation, index), "control")
             scored.append((delta, index))
             note(
                 f"{batch} {member_label(generation, index):8} n={n:3}"
-                f"  margin delta {delta:+.3f} (sd {sd:.3f})"
+                f"  {spec['fitness']} delta {delta:+.3f} (sd {sd:.3f})"
             )
 
         def rank(pair: tuple[float, int]) -> tuple[float, int]:
@@ -351,8 +360,8 @@ def run_evolution(
         )
         mean, sigma = refit(elite)
     note(
-        f"# best member: {best_label} (margin delta {best_score:+.3f}); its doctrine "
-        f"file under {run_dir.as_posix()} goes to the win-bar panel next -- "
+        f"# best member: {best_label} ({spec['fitness']} delta {best_score:+.3f}); its "
+        f"doctrine file under {run_dir.as_posix()} goes to the win-bar panel next -- "
         "generation fitness is selection-biased and adopts nothing (laws six, nine)"
     )
     return tuple(lines)
@@ -367,8 +376,10 @@ def main(
     """Run one evolution from the command line.
 
     Args:
-        argv: ``<hpc3:workspace.json> <name> [rng-seed]``. ``None`` reads
-            the process arguments.
+        argv: ``<hpc3:workspace.json> <name> [rng-seed] [spec]``. ``None``
+            reads the process arguments. The spec defaults to ``vh``, the
+            regime every run before 2026-09-05 played; naming another aims
+            the same loop at that regime's base, difficulty and fitness.
         sweeps_root: Where batch scorecards land, injectable for tests.
         variant_dir: Where candidate doctrines land, injectable for tests.
         jobs_dir: Where generation job files land, injectable for tests.
@@ -379,23 +390,24 @@ def main(
         cluster, and the queue path never grew a population mode.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if len(args) not in (2, 3) or not args[0].startswith(CLUSTER_PREFIX):
-        sys.stdout.write("usage: evolve <hpc3:workspace.json> <name> [rng-seed]\n")
+    if len(args) not in (2, 3, 4) or not args[0].startswith(CLUSTER_PREFIX):
+        sys.stdout.write("usage: evolve <hpc3:workspace.json> <name> [rng-seed] [spec]\n")
         return EXIT_BAD_USAGE
-    rng_seed = int(args[2]) if len(args) == 3 else 0
+    rng_seed = int(args[2]) if len(args) >= 3 else 0
+    spec_name = args[3] if len(args) == 4 else "vh"
     runner = ClusterRound(
         config=args[0][len(CLUSTER_PREFIX) :],
         host=CLUSTER_HOST,
         cluster_root=CLUSTER_ROOT,
         map_path=MAP_PATH,
-        difficulty=require_search_spec("vh")["difficulty"],
+        difficulty=require_search_spec(spec_name)["difficulty"],
         fast_forward=FAST_FORWARD,
         scratch=CLUSTER_SCRATCH,
         sweeps_root=sweeps_root,
         jobs_dir=jobs_dir,
         poll_seconds=POLL_SECONDS,
     )
-    run_evolution(runner, args[1], rng_seed, sweeps_root, variant_dir)
+    run_evolution(runner, args[1], rng_seed, sweeps_root, variant_dir, spec_name=spec_name)
     return EXIT_OK
 
 

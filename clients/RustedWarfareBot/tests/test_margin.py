@@ -15,6 +15,7 @@ from scripts.margin import EXIT_BAD_USAGE, EXIT_OK, main
 
 from rw_bot.harness.margin import (
     batch_margins,
+    batch_survivals,
     margin_of,
     pressure_of,
     report,
@@ -93,6 +94,22 @@ def test_a_batch_is_scored_and_paired_from_its_cards(tmp_path: Path) -> None:
 def test_fields_are_read_by_the_sweeps_own_shape() -> None:
     fields = scorecard_fields("verdict        won (won)\nsamples seen   123\nBadLine\n")
     assert fields == {"verdict": "won (won)", "samples seen": "123"}
+
+
+def test_a_batch_reads_its_survivals_off_the_same_cards(tmp_path: Path) -> None:
+    """The survival fitness's figure: samples stood, per arm and seed --
+    losses included, because at Impossible losses are the whole field
+    and standing time is the gradient. A card with no readable samples
+    line is not a measurement."""
+    card = "### {name}\nverdict        wiped (wiped)\nsamples seen   {samples}\n"
+    (tmp_path / "control-s7.txt").write_text(
+        card.format(name="control-s7", samples=1000), encoding="utf-8"
+    )
+    (tmp_path / "arm-s7.txt").write_text(card.format(name="arm-s7", samples=9000), encoding="utf-8")
+    (tmp_path / "arm-s8.txt").write_text(
+        "### arm-s8\nverdict        wiped (wiped)\n", encoding="utf-8"
+    )
+    assert batch_survivals(tmp_path) == {"control": {7: 1000.0}, "arm": {7: 9000.0}}
 
 
 def test_stray_files_and_unfinished_cards_are_not_measurements(tmp_path: Path) -> None:

@@ -36,10 +36,17 @@ from rw_bot.policy.doctrine_file import parse_doctrine_lines
 
 
 class _Cluster:
-    """Files scripted scorecards: member 0 wins fast, the rest wipe."""
+    """Files scripted scorecards with one member scripted to dominate.
 
-    def __init__(self, sweeps_root: Path) -> None:
+    Margin flavor: member 0 wins fast, the rest wipe. Survival flavor:
+    everyone loses -- the Impossible shape -- and member 0 merely STANDS
+    nine times longer, which is exactly the gradient the survival fitness
+    exists to read and the margin cannot ([[impossible-economy-problem]]).
+    """
+
+    def __init__(self, sweeps_root: Path, fitness: str = "margin") -> None:
         self.sweeps_root = sweeps_root
+        self.fitness = fitness
         self.job_lines: list[str] = []
 
     def run(self, batch: str, job_lines: Sequence[str]) -> None:
@@ -50,7 +57,14 @@ class _Cluster:
             if line.startswith("#") or line.strip() == "":
                 continue
             label, seed_text, _doctrine, _samples = line.split("|")
-            if label == "control":
+            if self.fitness == "survival":
+                if label == "control":
+                    verdict, samples = "wiped", 1000
+                elif label.endswith("m0"):
+                    verdict, samples = "wiped", 9000
+                else:
+                    verdict, samples = "wiped", 500
+            elif label == "control":
                 verdict, samples = "survived", 1000
             elif label.endswith("m0"):
                 verdict, samples = "won", 500
@@ -86,11 +100,42 @@ def _run(tmp_path: Path, tag: str) -> tuple[tuple[str, ...], list[str]]:
     return lines, cluster.job_lines
 
 
+def test_the_survival_fitness_ranks_the_longest_stand_first(tmp_path: Path) -> None:
+    """Every member loses -- the Impossible shape -- and the loop still has
+    a gradient: member 0 stands nine times longer than control, ranks
+    first, and the report names the fitness it ranked by."""
+    cluster = _Cluster(tmp_path / "sweeps", fitness="survival")
+    written: list[str] = []
+
+    def record(text: str) -> None:
+        written.append(text)
+
+    saved = host_hooks.write_line
+    host_hooks.write_line = record
+    try:
+        lines = run_evolution(
+            cluster,
+            "stand",
+            rng_seed=5,
+            sweeps_root=tmp_path / "sweeps",
+            variant_dir=tmp_path / "variants",
+            spec_name="imp-survival",
+        )
+    finally:
+        host_hooks.write_line = saved
+    assert "fitness survival" in lines[0]
+    m0 = [line for line in lines if " g0m0 " in line]
+    assert m0 and "survival delta +8000.000" in m0[0]
+    assert lines[-1].startswith("# best member: ")
+    assert "survival delta +8000.000" in lines[-1]
+
+
 def test_the_evolution_runs_ranks_and_names_the_best(tmp_path: Path) -> None:
     lines, job_lines = _run(tmp_path, "a")
     header = lines[0]
     assert header.startswith(
-        f"# evolve probe (rng 5): population {POPULATION}, elite {ELITE}, {GENERATIONS} generations"
+        f"# evolve probe (rng 5, spec vh, fitness margin): "
+        f"population {POPULATION}, elite {ELITE}, {GENERATIONS} generations"
     )
     generations = [line for line in lines if line.startswith("# generation ") and "members" in line]
     assert len(generations) == GENERATIONS

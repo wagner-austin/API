@@ -42,6 +42,12 @@ class SearchSpec(TypedDict):
         pair_candidates: Two-knob candidates drawn per search -- law
             two's sample of the cross product the arm ladder could never
             afford.
+        fitness: What the regime optimizes -- ``"margin"`` (the paired
+            margin delta vs the base, every search before 2026-09-05) or
+            ``"survival"`` (samples stood, the win path's Phase A figure:
+            at a rung where every arm loses, the margin collapses all
+            losses toward one anchor and standing time is the gradient
+            [[impossible-economy-problem]]).
     """
 
     base: str
@@ -50,6 +56,7 @@ class SearchSpec(TypedDict):
     samples: int
     schedule: tuple[int, ...]
     pair_candidates: int
+    fitness: str
 
 
 def _int_values(items: Sequence[JSONValue], field: str) -> tuple[int, ...]:
@@ -148,6 +155,12 @@ def decode_search_spec(payload: JSONObject) -> SearchSpec:
             "RW-SEARCH-002",
             f"spec pair_candidates must be non-negative, got {pair_candidates}",
         )
+    fitness = require_str(payload, "fitness")
+    if fitness not in ("margin", "survival"):
+        raise SearchError(
+            "RW-SEARCH-002",
+            f"spec fitness must be 'margin' or 'survival', got {fitness!r}",
+        )
     return SearchSpec(
         base=base,
         space=space,
@@ -155,6 +168,7 @@ def decode_search_spec(payload: JSONObject) -> SearchSpec:
         samples=samples,
         schedule=schedule,
         pair_candidates=pair_candidates,
+        fitness=fitness,
     )
 
 
@@ -190,6 +204,7 @@ SPECS: Mapping[str, SearchSpec] = {
             "samples": 10000,
             "schedule": [8, 16],
             "pair_candidates": 6,
+            "fitness": "margin",
         }
     ),
     "imp": decode_search_spec(
@@ -207,6 +222,31 @@ SPECS: Mapping[str, SearchSpec] = {
             "samples": 10000,
             "schedule": [8, 16],
             "pair_candidates": 6,
+            "fitness": "margin",
+        }
+    ),
+    # The win path's Phase A regime ([[impossible-economy-problem]]):
+    # survival, not margin -- at a rung with zero wins the margin collapses
+    # every loss toward one anchor, and standing time is the gradient the
+    # turtle-bank-nuke chain needs first. The base is re-aimed at the
+    # turtle screen's winner when impturtle96 reads out; until then it is
+    # the champion base, the same doctrine the margin regime perturbs.
+    "imp-survival": decode_search_spec(
+        {
+            "base": "doctrines/flame-nocover.doctrine",
+            "space": {
+                "guns": [1, 2],
+                "nukes": [1],
+                "close": [6],
+                "mass": [40],
+                "strike": [5000, 15000],
+                "tech": [0, 2],
+            },
+            "difficulty": 3,
+            "samples": 10000,
+            "schedule": [8, 16],
+            "pair_candidates": 6,
+            "fitness": "survival",
         }
     ),
 }

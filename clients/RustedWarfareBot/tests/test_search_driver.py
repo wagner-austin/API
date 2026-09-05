@@ -131,6 +131,11 @@ def test_the_registry_resolves_by_name() -> None:
     assert imp["base"] == "doctrines/flame-nocover.doctrine"
     assert imp["space"]["guns"] == (1, 2)
     assert imp["space"]["nukes"] == (1,)
+    assert imp["fitness"] == "margin"
+    # The win path's Phase A regime: same rung, standing time as the
+    # objective ([[impossible-economy-problem]]).
+    assert require_search_spec("imp-survival")["fitness"] == "survival"
+    assert require_search_spec("imp-survival")["difficulty"] == 3
 
 
 def test_decode_refuses_each_malformed_field() -> None:
@@ -143,6 +148,7 @@ def test_decode_refuses_each_malformed_field() -> None:
         "samples": 10000,
         "schedule": [8, 16],
         "pair_candidates": 6,
+        "fitness": "margin",
     }
 
     def broken(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -163,6 +169,7 @@ def test_decode_refuses_each_malformed_field() -> None:
         (broken(schedule=[]), "at least one round"),
         (broken(schedule=[8, 0]), "positive"),
         (broken(pair_candidates=-1), "pair_candidates"),
+        (broken(fitness="wins"), "fitness"),
     ]
     for payload, fragment in cases:
         with pytest.raises(SearchError) as caught:

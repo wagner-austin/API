@@ -112,6 +112,59 @@ def margin_of(verdict: str, pressure: float, samples: int, longest: int) -> floa
     return anchor + pressure + tempo
 
 
+def _batch_cards(batch_dir: Path) -> list[tuple[str, int, dict[str, str]]]:
+    """Parse every completed card in one batch directory.
+
+    The one walk both scorers share: the margin and the survival fitness
+    read different figures off the same cards, and a second copy of the
+    stem parse is where an arm-name convention would drift.
+
+    Args:
+        batch_dir: The sweep directory holding ``<arm>-s<seed>.txt`` cards.
+
+    Returns:
+        ``(arm, seed, fields)`` per card, in path order.
+
+    Raises:
+        OSError: When a card cannot be read.
+    """
+    cards: list[tuple[str, int, dict[str, str]]] = []
+    for card_path in sorted(batch_dir.glob("*-s*.txt")):
+        arm, _, seed_text = card_path.stem.rpartition("-s")
+        if not arm or not seed_text.isdigit():
+            continue
+        fields = scorecard_fields(card_path.read_text(encoding="utf-8"))
+        cards.append((arm, int(seed_text), fields))
+    return cards
+
+
+def batch_survivals(batch_dir: Path) -> dict[str, dict[int, float]]:
+    """Read how long every match in one batch lived, in samples.
+
+    The survival fitness's figure: at a rung where every arm loses, how
+    LONG it stands is the gradient the margin cannot carry -- the margin
+    collapses all losses toward the same anchor, and the win path's
+    Phase A optimizes standing time first ([[impossible-economy-problem]]).
+
+    Args:
+        batch_dir: The sweep directory holding ``<arm>-s<seed>.txt`` cards.
+
+    Returns:
+        Samples seen by arm, then by seed. A card with no readable
+        ``samples seen`` line is skipped -- an unfinished card is not a
+        measurement.
+
+    Raises:
+        OSError: When a card cannot be read.
+    """
+    survivals: dict[str, dict[int, float]] = {}
+    for arm, seed, fields in _batch_cards(batch_dir):
+        samples_text = fields.get("samples seen", "")
+        if samples_text.isdigit():
+            survivals.setdefault(arm, {})[seed] = float(samples_text)
+    return survivals
+
+
 def batch_margins(batch_dir: Path) -> dict[str, dict[int, float]]:
     """Score every completed match in one batch directory.
 
@@ -124,17 +177,12 @@ def batch_margins(batch_dir: Path) -> dict[str, dict[int, float]]:
     Raises:
         OSError: When a card cannot be read.
     """
-    cards: list[tuple[str, int, dict[str, str]]] = []
+    cards = _batch_cards(batch_dir)
     longest = 0
-    for card_path in sorted(batch_dir.glob("*-s*.txt")):
-        arm, _, seed_text = card_path.stem.rpartition("-s")
-        if not arm or not seed_text.isdigit():
-            continue
-        fields = scorecard_fields(card_path.read_text(encoding="utf-8"))
+    for _, _, fields in cards:
         samples_text = fields.get("samples seen", "")
         samples = int(samples_text) if samples_text.isdigit() else 0
         longest = max(longest, samples)
-        cards.append((arm, int(seed_text), fields))
     margins: dict[str, dict[int, float]] = {}
     for arm, seed, fields in cards:
         verdict = fields.get("verdict", "").split(" ")[0]
@@ -193,6 +241,7 @@ def report(batch: str, margins: Mapping[str, Mapping[int, float]]) -> tuple[str,
 __all__ = [
     "VERDICT_SCORES",
     "batch_margins",
+    "batch_survivals",
     "margin_of",
     "pressure_of",
     "report",
