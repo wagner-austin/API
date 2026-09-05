@@ -12,11 +12,9 @@ from numpy.typing import NDArray
 from platform_ml.explainers.protocol import PredictorProtocol
 
 from covenant_ml.explainers.adapters import (
-    _get_importance_from_pair,
     _GradientAdapter,
     _GradientModelWrapper,
     _IntegratedGradientsAdapter,
-    _rank_features,
     _ShapTreeAdapter,
 )
 from covenant_ml.explainers.registry import (
@@ -63,70 +61,6 @@ class TestGradientModelWrapper:
 
         assert grads.shape == (5, 4)
         assert grads.dtype == np.float64
-
-
-class TestRankFeaturesHelper:
-    """Tests for _rank_features helper function."""
-
-    def test_rank_features_sorts_by_importance_descending(self) -> None:
-        """_rank_features sorts features by importance (highest first)."""
-        feature_names = ["a", "b", "c"]
-        importances: NDArray[np.float64] = np.zeros(3, dtype=np.float64)
-        importances[0] = 0.1
-        importances[1] = 0.5
-        importances[2] = 0.3
-
-        ranked = _rank_features(feature_names, importances)
-
-        assert len(ranked) == 3
-        assert ranked[0]["name"] == "b"
-        assert ranked[0]["importance"] == 0.5
-        assert ranked[0]["rank"] == 1
-        assert ranked[1]["name"] == "c"
-        assert ranked[1]["importance"] == 0.3
-        assert ranked[1]["rank"] == 2
-        assert ranked[2]["name"] == "a"
-        assert ranked[2]["importance"] == 0.1
-        assert ranked[2]["rank"] == 3
-
-    def test_rank_features_handles_equal_importances(self) -> None:
-        """_rank_features handles features with equal importance."""
-        feature_names = ["x", "y", "z"]
-        importances: NDArray[np.float64] = np.full(3, 0.5, dtype=np.float64)
-
-        ranked = _rank_features(feature_names, importances)
-
-        assert len(ranked) == 3
-        # All have same importance, order may vary but ranks should be 1, 2, 3
-        ranks = [r["rank"] for r in ranked]
-        assert sorted(ranks) == [1, 2, 3]
-
-    def test_rank_features_handles_single_feature(self) -> None:
-        """_rank_features handles single feature."""
-        feature_names = ["only"]
-        importances: NDArray[np.float64] = np.full(1, 1.0, dtype=np.float64)
-
-        ranked = _rank_features(feature_names, importances)
-
-        assert len(ranked) == 1
-        assert ranked[0]["name"] == "only"
-        assert ranked[0]["rank"] == 1
-
-
-class TestGetImportanceFromPairHelper:
-    """Tests for _get_importance_from_pair helper function."""
-
-    def test_extracts_importance_value(self) -> None:
-        """_get_importance_from_pair extracts second element of tuple."""
-        pair: tuple[int, float] = (3, 0.75)
-        importance = _get_importance_from_pair(pair)
-        assert importance == 0.75
-
-    def test_handles_negative_importance(self) -> None:
-        """_get_importance_from_pair handles negative values."""
-        pair: tuple[int, float] = (0, -0.5)
-        importance = _get_importance_from_pair(pair)
-        assert importance == -0.5
 
 
 class TestGradientAdapterConfigurations:

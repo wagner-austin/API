@@ -17,8 +17,6 @@ from platform_ml.explainers.protocol import (
 )
 
 from covenant_ml.explainers.regression_adapters import (
-    _get_importance_from_pair,
-    _rank_features,
     _RegressionGradientAdapter,
     _RegressionGradientModelWrapper,
     _RegressionIntegratedGradientsAdapter,
@@ -127,42 +125,6 @@ class _FakeRegressorNoGradients:
 
 # ---------------------------------------------------------------------------
 # Helper function tests
-# ---------------------------------------------------------------------------
-
-
-class TestGetImportanceFromPair:
-    """Tests for _get_importance_from_pair."""
-
-    def test_extracts_value(self) -> None:
-        """Extract importance from tuple."""
-        pair: tuple[int, float] = (0, 0.75)
-        assert _get_importance_from_pair(pair) == 0.75
-
-
-class TestRankFeatures:
-    """Tests for _rank_features."""
-
-    def test_ranks_descending(self) -> None:
-        """Features ranked from most to least important."""
-        names = ["a", "b", "c"]
-        aggregated: NDArray[np.float64] = np.zeros(3, dtype=np.float64)
-        aggregated[0] = 0.1
-        aggregated[1] = 0.5
-        aggregated[2] = 0.3
-
-        ranked = _rank_features(names, aggregated)
-
-        assert len(ranked) == 3
-        assert ranked[0]["name"] == "b"
-        assert ranked[0]["rank"] == 1
-        assert ranked[1]["name"] == "c"
-        assert ranked[1]["rank"] == 2
-        assert ranked[2]["name"] == "a"
-        assert ranked[2]["rank"] == 3
-
-
-# ---------------------------------------------------------------------------
-# Gradient model wrapper tests
 # ---------------------------------------------------------------------------
 
 

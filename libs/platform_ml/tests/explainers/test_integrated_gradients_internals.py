@@ -13,13 +13,11 @@ from platform_ml.explainers.integrated_gradients import (
     _compute_baseline,
     _compute_integrated_gradients_single,
     _compute_interpolated_inputs,
-    _get_importance_from_pair,
-    _rank_importances,
     _validate_inputs,
 )
 from platform_ml.explainers.protocol import GradientModelProtocol
 
-from .array_helpers import assert_close, get_float, make_float64_1d, make_float64_2d
+from .array_helpers import assert_close, get_float, make_float64_2d
 
 
 class ConstantGradientModel:
@@ -372,37 +370,3 @@ def test_aggregate_attributions_multiple_samples() -> None:
     # Mean of [0.2, 0.6] = 0.4, mean of [0.4, 0.8] = 0.6
     assert_close(get_float(result, 0), 0.4)
     assert_close(get_float(result, 1), 0.6)
-
-
-def test_get_importance_from_pair_extracts_value() -> None:
-    """Verify _get_importance_from_pair extracts second element."""
-    pair: tuple[int, float] = (3, 0.99)
-    result = _get_importance_from_pair(pair)
-    assert result == 0.99
-
-
-def test_rank_importances_correct_ordering() -> None:
-    """Verify _rank_importances sorts by importance descending."""
-    feature_names = ["low", "high", "medium"]
-    importances = make_float64_1d([0.1, 0.9, 0.5])
-
-    result = _rank_importances(feature_names, importances)
-
-    assert len(result) == 3
-    assert result[0]["name"] == "high"
-    assert result[0]["rank"] == 1
-    assert result[1]["name"] == "medium"
-    assert result[1]["rank"] == 2
-    assert result[2]["name"] == "low"
-    assert result[2]["rank"] == 3
-
-
-def test_rank_importances_preserves_exact_values() -> None:
-    """Verify _rank_importances preserves exact importance values."""
-    feature_names = ["a", "b"]
-    importances = make_float64_1d([0.123456, 0.789012])
-
-    result = _rank_importances(feature_names, importances)
-
-    assert result[0]["importance"] == 0.789012
-    assert result[1]["importance"] == 0.123456

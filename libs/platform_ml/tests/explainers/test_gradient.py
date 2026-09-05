@@ -16,15 +16,13 @@ from platform_ml.explainers.gradient import (
     GradientExplainer,
     _aggregate_attributions,
     _compute_attributions,
-    _get_importance_from_pair,
-    _rank_importances,
     _validate_inputs,
     create_gradient_explainer,
 )
 from platform_ml.explainers.protocol import GradientModelProtocol
 from platform_ml.explainers.types import GradientConfig
 
-from .array_helpers import assert_close, get_float, make_float64_1d, make_float64_2d
+from .array_helpers import assert_close, get_float, make_float64_2d
 
 
 class LinearGradientModel:
@@ -300,47 +298,6 @@ def test_aggregate_attributions_handles_negatives() -> None:
     # abs: [[0.2, 0.4], [0.2, 0.6]], mean: [0.2, 0.5]
     assert_close(get_float(result, 0), 0.2)
     assert_close(get_float(result, 1), 0.5)
-
-
-def test_get_importance_from_pair_int_index() -> None:
-    """Verify _get_importance_from_pair extracts importance from int-indexed pair."""
-    pair: tuple[int, float] = (5, 0.42)
-    result = _get_importance_from_pair(pair)
-    assert result == 0.42
-
-
-def test_get_importance_from_pair_zero() -> None:
-    """Verify _get_importance_from_pair works with zero importance."""
-    pair: tuple[int, float] = (0, 0.0)
-    result = _get_importance_from_pair(pair)
-    assert result == 0.0
-
-
-def test_rank_importances_correct_ordering() -> None:
-    """Verify _rank_importances sorts correctly."""
-    feature_names = ["low", "high", "medium"]
-    importances = make_float64_1d([0.1, 0.9, 0.5])
-
-    result = _rank_importances(feature_names, importances)
-
-    assert len(result) == 3
-    assert result[0]["name"] == "high"
-    assert result[0]["rank"] == 1
-    assert result[1]["name"] == "medium"
-    assert result[1]["rank"] == 2
-    assert result[2]["name"] == "low"
-    assert result[2]["rank"] == 3
-
-
-def test_rank_importances_uses_item_for_extraction() -> None:
-    """Verify _rank_importances correctly extracts values using .item()."""
-    feature_names = ["a", "b"]
-    importances = make_float64_1d([0.25, 0.75])
-
-    result = _rank_importances(feature_names, importances)
-
-    assert result[0]["importance"] == 0.75
-    assert result[1]["importance"] == 0.25
 
 
 def test_gradient_explainer_init() -> None:

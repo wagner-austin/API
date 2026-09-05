@@ -13,6 +13,7 @@ from platform_ml.explainers import (
     TreeModelProtocol,
 )
 from platform_ml.explainers.protocol import PredictorProtocol
+from platform_ml.explainers.ranking import rank_importances
 from platform_ml.explainers.types import (
     ExplainerCapabilities,
     ExplainerName,
@@ -98,59 +99,6 @@ class _GradientModelWrapper:
         return result
 
 
-def _get_importance_from_pair(pair: tuple[int, float]) -> float:
-    """Extract importance value from (index, importance) tuple.
-
-    Args:
-        pair: Tuple of (feature_index, importance_score).
-
-    Returns:
-        The importance score.
-    """
-    return pair[1]
-
-
-def _rank_features(
-    feature_names: list[str],
-    importances: NDArray[np.float64],
-) -> list[FeatureImportanceScore]:
-    """Rank features by importance and return sorted list.
-
-    Args:
-        feature_names: List of feature names.
-        importances: Array of importance scores with shape (n_features,).
-
-    Returns:
-        List of FeatureImportanceScore sorted by rank (most important first).
-    """
-    # Build list of (index, importance) using flat iterator with item()
-    index_importance_pairs: list[tuple[int, float]] = []
-    for i, imp in enumerate(importances.flat):
-        imp_float: float = float(imp.item())
-        index_importance_pairs.append((i, imp_float))
-
-    # Sort by importance descending using typed helper
-    sorted_pairs: list[tuple[int, float]] = sorted(
-        index_importance_pairs,
-        key=_get_importance_from_pair,
-        reverse=True,
-    )
-
-    # Build ranked results
-    results: list[FeatureImportanceScore] = []
-    for rank_idx, pair in enumerate(sorted_pairs):
-        feature_idx: int = pair[0]
-        imp_value: float = pair[1]
-        score: FeatureImportanceScore = {
-            "name": feature_names[feature_idx],
-            "importance": imp_value,
-            "rank": rank_idx + 1,
-        }
-        results.append(score)
-
-    return results
-
-
 class _LocalExplanation(TypedDict, total=True):
     """Local explanation for a single sample from ShapTreeWrapper.
 
@@ -229,7 +177,7 @@ class _GradientAdapter:
         if self._absolute_value:
             mean_grads = np.abs(mean_grads)
 
-        return _rank_features(feature_names, mean_grads)
+        return rank_importances(feature_names, mean_grads)
 
 
 class _IntegratedGradientsAdapter:
@@ -316,7 +264,7 @@ class _IntegratedGradientsAdapter:
         summed: NDArray[np.float64] = np.sum(abs_integrated, axis=0)
         mean_ig: NDArray[np.float64] = (summed / float(n_samples)).astype(np.float64)
 
-        return _rank_features(feature_names, mean_ig)
+        return rank_importances(feature_names, mean_ig)
 
 
 class _ShapTreeAdapter:
@@ -434,7 +382,7 @@ class _ShapTreeAdapter:
             current_agg: float = float(aggregated.flat[i].item())
             aggregated[i] = current_agg / float(sample_count)
 
-        return _rank_features(feature_names, aggregated)
+        return rank_importances(feature_names, aggregated)
 
 
 @runtime_checkable
@@ -477,6 +425,4 @@ __all__ = [
     "_GradientModelWrapper",
     "_IntegratedGradientsAdapter",
     "_ShapTreeAdapter",
-    "_get_importance_from_pair",
-    "_rank_features",
 ]
