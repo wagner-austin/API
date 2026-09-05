@@ -171,17 +171,19 @@ def _draft_hunt(
 ) -> tuple[Entity, ...]:
     """Advance the hunt and return the units the waves may still command.
 
-    The same arbitration as the raid's, for the same reason: whether the
-    army can SPARE a party is the wave gate's call, and a unit cannot
-    serve two commanders. What is the hunt's own here is the recall --
-    when the head holds the party down, it fights its way home and this
-    tick sends those orders instead ([[impossible-step-three-design]]).
+    The raid's arbitration shape -- the gate's figure plus the party, and
+    a unit cannot serve two commanders -- but against the OPENING rung,
+    not the current one: the escalating rung starved the hunt to zero
+    fires in its first screen (:meth:`WaveController.opening_need` carries
+    the measurement). What is the hunt's own here is the recall -- when
+    the head holds the party down, it fights its way home and this tick
+    sends those orders instead ([[impossible-step-three-design]]).
     """
     if held_down:
         for order in hunters.stand_down(army, catalogue, sample):
             channel.send_attack_move(order)
         return army
-    spare = len(army) >= waves.need() + hunters.size
+    spare = len(army) >= waves.opening_need() + hunters.size
     for order in hunters.press(sample, intel, army, targets, catalogue, spare):
         channel.send_attack_move(order)
     drafted = hunters.party()

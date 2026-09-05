@@ -327,6 +327,24 @@ class WaveController:
         """
         return wave_size(self._waves, self._ladder)
 
+    def opening_need(self) -> int:
+        """Return the ladder's FIRST rung, the opening's own gate.
+
+        The hunt arbitrates against this rather than :meth:`need`: the
+        current rung escalates to the doctrine's mass, and at Impossible
+        the army never clears mass-plus-a-party -- imphunt60's first cut
+        read hunts-median ZERO in every arm for exactly that reason. The
+        hunt is an opening-window verb (the enemy's first groups form at
+        target 3 by ~160 game-seconds, watched live in m32), and the
+        early rungs are the ladder's own statement of what the opening
+        may hold back ([[engine-ai-triggers]]). The party's cost to the
+        waves is the panel's question, not this gate's.
+
+        Returns:
+            The first rung of the ladder.
+        """
+        return self._ladder[0]
+
     def command(
         self,
         sample: Sample,

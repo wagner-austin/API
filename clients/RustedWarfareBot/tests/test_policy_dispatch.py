@@ -72,6 +72,18 @@ def test_the_gate_states_its_need_and_it_climbs_with_the_ladder() -> None:
     assert waves.need() == 5
 
 
+def test_the_opening_need_holds_at_the_first_rung_while_the_gate_climbs() -> None:
+    """The hunt's bar: the escalating rung starved its first screen to zero
+    fires, so the hunt arbitrates against the opening's own figure -- which
+    must stay put exactly when need() moves."""
+    waves = WaveController(ladder=(3, 5))
+    assert waves.opening_need() == 3
+    army = tuple(_tank(10 + n) for n in range(3))
+    waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    assert waves.need() == 5
+    assert waves.opening_need() == 3
+
+
 def test_below_the_first_wave_the_army_gathers_and_nobody_attacks() -> None:
     waves = WaveController()
     army = (_tank(10), _tank(11))
