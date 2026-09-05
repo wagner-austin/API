@@ -96,3 +96,8 @@ Written from a session that onboarded a new research project (`tankpit`) end to 
 **The general rule this leaves behind:** an invariant about what a project may DO belongs where doing happens; only an invariant about what a document IS belongs in decode. A rule of the first kind placed in the second location does not fail loudly — it passes for every project already finished and refuses only the ones still being built, so it looks correct right up until somebody tries to start something.
 
 **Also filed:** task e106aa83, on the general asymmetry this is the sharpest instance of — the system's refusals are mature and its on-ramps are not.
+
+## [2026-09-05] new page | command-length limits in the remote query layer
+Pages written: pages/command-length-limits.md
+Pages updated: hubs/operations.md (inclusion link), index.md (4→5 operations, 25→26 total)
+Notes: Records the two ceilings the package has now met -- cmd.exe's 8191 (vhsearch2-r0, 2026-09-02) and CreateProcess's 32767 (hpc3-triage at 6645 ledger rows, 2026-09-05) -- plus a third, remote-side, that both accept. The count-based EXISTENCE_CHUNK is replaced by remote.token_batches, measured by width. Fix in fa8f87f9 (repo ~/PROJECTS/API).

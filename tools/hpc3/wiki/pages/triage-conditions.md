@@ -2,16 +2,16 @@
 title: The five triage conditions that look like health
 tags: [operations, triage, ledger]
 hubs: [operations]
-related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]"]
+related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]", "[[command-length-limits]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/triage.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "69b8368f48a23345b08f55980cf0cec4e7dbcdb0"
+  "src/hpc3/cli/triage.py": "c891d961275455e106a3b12b41e336353ac9a8cf"
   "src/hpc3/core/triage.py": "fcff2038f7e816e0342f0c6fda663e0c2a55a129"
 provenance:
   - "261 of 621 pending GPU jobs on DependencyNeverSatisfied (squeue sample)"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-05
 confidence: high
 ---
 
@@ -33,7 +33,9 @@ and exits non-zero if anything is found.
   the check has to ask the account to enumerate itself (`squeue --me`).
 - **silent** — `RUNNING`, holding GPUs, and its log has stopped growing. Log
   age is measured against the cluster's own clock; a few minutes of skew
-  would either invent staleness or hide it.
+  would either invent staleness or hide it. Since 2026-09-05 the probe is
+  split into batches, and each batch carries its **own** clock reading for
+  this reason — see [[command-length-limits]].
 - **oversized** — the project asks Slurm for far more wall clock than its
   work has ever taken. Slurm backfills a job into a hole its own size, so an
   oversized request waits for a hole it never needed. Only `COMPLETED` runs

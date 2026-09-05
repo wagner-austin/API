@@ -2,16 +2,16 @@
 title: Closures, or why the unaccounted check does not rot
 tags: [operations, ledger, triage]
 hubs: [operations]
-related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]"]
+related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]", "[[command-length-limits]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/ledger.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "69b8368f48a23345b08f55980cf0cec4e7dbcdb0"
+  "src/hpc3/cli/triage.py": "c891d961275455e106a3b12b41e336353ac9a8cf"
   "src/hpc3/core/ledger.py": "94065680790919c0a68e097320d228400805b564"
 provenance:
   - "MinJobAge 300s, read from scontrol show config"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-05
 confidence: high
 ---
 
@@ -45,3 +45,12 @@ A job that vanished before triage ever saw it end has no closure and stays
 reportable forever, which is correct: that is the case the finding exists
 for. The corollary is that triage has to run at least once inside the
 retention window for a job to close cleanly.
+
+**And on 2026-09-05 that corollary met its sharpest case: triage could not
+run at all.** The query it builds is sized by the ledger, the ledger reached
+6645 rows, and the command outgrew the submitter's argument limit — so the
+closure record could not advance for as long as it had been long, and the
+backlog was invisible because nothing was failing loudly ([[command-length-limits]]).
+The first run after the fix wrote **6345 closures**; the next reported 72
+open entries and 0 new ones. Closures are cheap per job and unbounded in
+aggregate, and the thing that writes them has to stay buildable.

@@ -10,10 +10,10 @@ source_paths:
 source_git_blobs:
   "src/hpc3/contracts/job.py": "45f6be817460501c520ecca58b4f1dbc7341f4d0"
   "src/hpc3/core/inflight.py": "03cf4ad35a0e4c2987b9d5e8ed20e440b3891c55"
-  "src/hpc3/core/campaign.py": "661951977b36bde5c56488f996f826c3d23df76d"
+  "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
 provenance:
   - "scontrol show partition free-gpu (2026-08-28)"
-fact_checked: 2026-09-02
+fact_checked: 2026-09-05
 confidence: high
 ---
 
