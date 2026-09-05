@@ -18,7 +18,7 @@ generic dump against the decompilation ([[engine-ai-zones]],
 [[engine-ai-triggers]]): b = the engine's own behaviour label (quoted),
 A = target size, F = member list (members below is its size), h = attack
 flag, B = sea-group flag. Columns c and x are reported by letter only --
-their meaning is NOT pinned by this capture (c stayed false in all 313
+their meaning is NOT pinned by this capture (c stayed false in all 308
 rows; x grows monotonically per group and resets on new groups, consistent
 with an age/staging accumulator, unverified).
 
