@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble._hooks import (
-    _ConstraintDict,
     _OptionsDict,
 )
 from covenant_ml.ensemble.testing import FakeOptimizeResult, fake_minimize
@@ -65,8 +66,13 @@ class TestFakeMinimize:
 
         x0 = _float_array(0.5, 0.5)
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0))
-        constraint: _ConstraintDict = {"type": "eq", "fun": _sum_constraint}
-        constraints: tuple[_ConstraintDict, ...] = (constraint,)
+        constraint: dict[str, str | Callable[[NDArray[np.float64]], float]] = {
+            "type": "eq",
+            "fun": _sum_constraint,
+        }
+        constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = (
+            constraint,
+        )
         options: _OptionsDict = {"maxiter": 100, "ftol": 1e-6}
 
         result = fake_minimize(
@@ -101,8 +107,13 @@ class TestFakeMinimize:
 
         x0 = _float_array(0.5, 0.5)  # Initial is far from optimal
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0))
-        constraint: _ConstraintDict = {"type": "eq", "fun": _sum_constraint}
-        constraints: tuple[_ConstraintDict, ...] = (constraint,)
+        constraint: dict[str, str | Callable[[NDArray[np.float64]], float]] = {
+            "type": "eq",
+            "fun": _sum_constraint,
+        }
+        constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = (
+            constraint,
+        )
         options: _OptionsDict = {"maxiter": 100}
 
         # Initial objective value
@@ -133,7 +144,7 @@ class TestFakeMinimize:
 
         x0 = _float_array(0.5, 0.5)
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0))
-        constraints: tuple[_ConstraintDict, ...] = ()
+        constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = ()
         options: _OptionsDict = {"maxiter": 5}  # Low maxiter
 
         result = fake_minimize(
@@ -157,7 +168,7 @@ class TestFakeMinimize:
 
         x0 = _float_array(0.33, 0.33, 0.34)
         bounds: tuple[tuple[float, float], ...] = ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0))
-        constraints: tuple[_ConstraintDict, ...] = ()
+        constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = ()
         options: _OptionsDict = {"maxiter": 20}
 
         result = fake_minimize(

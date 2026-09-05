@@ -424,8 +424,7 @@ def assert_no_early_stall(records: list[SmokeRecord]) -> SmokeFailureDict | None
 
 # Tuple of every assertion in the order :func:`run` evaluates them.
 # Exposed at module scope so tests can iterate it.
-SmokeAssertion = Callable[[list[SmokeRecord]], SmokeFailureDict | None]
-SMOKE_ASSERTIONS: tuple[SmokeAssertion, ...] = (
+SMOKE_ASSERTIONS: tuple[Callable[[list[SmokeRecord]], SmokeFailureDict | None], ...] = (
     assert_login_completed,
     assert_map_open_cleared_via_map_data,
     assert_hunt_scored_target,

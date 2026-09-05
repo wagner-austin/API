@@ -15,7 +15,6 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-_ConstraintDict = dict[str, str | Callable[[NDArray[np.float64]], float]]
 _OptionsDict = dict[str, int | float]
 
 
@@ -37,7 +36,7 @@ class _MinimizeFnProtocol(Protocol):
         x0: NDArray[np.float64],
         method: str,
         bounds: tuple[tuple[float, float], ...],
-        constraints: tuple[_ConstraintDict, ...],
+        constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...],
         options: _OptionsDict,
     ) -> _OptimizeResultProtocol:
         """Minimize a function."""
@@ -49,7 +48,7 @@ def _real_minimize(
     x0: NDArray[np.float64],
     method: str,
     bounds: tuple[tuple[float, float], ...],
-    constraints: tuple[_ConstraintDict, ...],
+    constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...],
     options: _OptionsDict,
 ) -> _OptimizeResultProtocol:
     """Minimize via scipy, which is imported on the call rather than on import.

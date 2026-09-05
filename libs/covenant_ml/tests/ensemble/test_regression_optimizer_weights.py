@@ -20,9 +20,6 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble import _hooks
-from covenant_ml.ensemble._hooks import (
-    _ConstraintDict,
-)
 from covenant_ml.ensemble.regression_optimizer import (
     optimize_regression_ensemble_weights,
     validate_regression_oof_data,
@@ -198,7 +195,7 @@ class TestOptimizeRegressionEnsembleWeights:
             x0: NDArray[np.float64],
             method: str,
             bounds: tuple[tuple[float, float], ...],
-            constraints: tuple[_ConstraintDict, ...],
+            constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...],
             options: dict[str, int | float],
         ) -> FakeOptimizeResult:
             """Return all-zero weights to exercise normalization skip."""

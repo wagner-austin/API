@@ -6,13 +6,14 @@ using out-of-fold predictions.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.ensemble import _hooks
 from covenant_ml.ensemble._hooks import (
-    _ConstraintDict,
     _OptimizeResultProtocol,
     _OptionsDict,
 )
@@ -131,11 +132,13 @@ def optimize_ensemble_weights(
     bounds: tuple[tuple[float, float], ...] = tuple((0.0, 1.0) for _ in range(n_models))
 
     # Constraint: weights sum to 1
-    sum_constraint: _ConstraintDict = {
+    sum_constraint: dict[str, str | Callable[[NDArray[np.float64]], float]] = {
         "type": "eq",
         "fun": lambda w: float(np.sum(w)) - 1.0,
     }
-    constraints: tuple[_ConstraintDict, ...] = (sum_constraint,)
+    constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...] = (
+        sum_constraint,
+    )
 
     # Options
     options: _OptionsDict = {

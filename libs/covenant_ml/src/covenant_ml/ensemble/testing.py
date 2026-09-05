@@ -11,7 +11,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble._hooks import (
-    _ConstraintDict,
     _OptionsDict,
 )
 
@@ -45,7 +44,7 @@ def fake_minimize(
     x0: NDArray[np.float64],
     method: str,
     bounds: tuple[tuple[float, float], ...],
-    constraints: tuple[_ConstraintDict, ...],
+    constraints: tuple[dict[str, str | Callable[[NDArray[np.float64]], float]], ...],
     options: _OptionsDict,
 ) -> FakeOptimizeResult:
     """Fake minimize that does simple grid search.

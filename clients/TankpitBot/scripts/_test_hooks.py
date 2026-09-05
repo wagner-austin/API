@@ -98,7 +98,6 @@ class SessionDecoderProtocol(Protocol):
 
 
 # Type alias for load_and_decode_session hook
-LoadAndDecodeSessionFunc = Callable[[Path], SessionDecoderProtocol]
 
 
 def _real_load_and_decode_session(session_path: Path) -> SessionDecoderProtocol:
@@ -119,7 +118,7 @@ def _real_load_and_decode_session(session_path: Path) -> SessionDecoderProtocol:
     return real_load(session_path)
 
 
-load_and_decode_session: LoadAndDecodeSessionFunc = _real_load_and_decode_session
+load_and_decode_session: Callable[[Path], SessionDecoderProtocol] = _real_load_and_decode_session
 
 
 class SetupRichLoggingProtocol(Protocol):
@@ -267,7 +266,6 @@ sleep_seconds: SleepSecondsProtocol = _real_sleep_seconds
 __all__ = [
     "HttpGetProtocol",
     "HttpGetResponseProtocol",
-    "LoadAndDecodeSessionFunc",
     "LogLevel",
     "PathExistsProtocol",
     "ReadTextProtocol",
