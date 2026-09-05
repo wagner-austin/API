@@ -53,7 +53,6 @@ from clubbot._hook_defaults import (
     _default_trainer_api_client_factory,
     _default_trainer_event_subscriber_factory,
     _default_tree_sync,
-    _default_urlsplit,
     _default_validate_youtube_url,
     _default_validate_youtube_url_for_client,
     _default_wrap_interaction,
@@ -79,7 +78,6 @@ from clubbot._hook_protocols_platform import (
     SetupLoggingProtocol,
     TimeoutCtorProtocol,
     TranscriptResultLike,
-    UrlSplitProtocol,
 )
 from clubbot._hook_protocols_services import (
     AppCommandErrorHandlerProtocol,
@@ -172,8 +170,6 @@ create_service_container: CreateServiceContainerProtocol = _default_create_servi
 # Hook for creating BotOrchestrator. Tests override with fakes.
 create_bot_orchestrator: CreateBotOrchestratorProtocol = _default_create_bot_orchestrator
 
-# Hook for urlsplit. Tests override to simulate parse errors.
-urlsplit: UrlSplitProtocol = _default_urlsplit
 
 # Hook for TrainerEventSubscriber factory. Tests override with fakes.
 trainer_event_subscriber_factory: TrainerEventSubscriberFactoryProtocol = (
@@ -299,7 +295,6 @@ __all__ = [
     "TranscriptResultLike",
     "TreeSyncFactoryProtocol",
     "TreeSyncProtocol",
-    "UrlSplitProtocol",
     "ValidateYoutubeUrlForClientProtocol",
     "ValidateYoutubeUrlProtocol",
     "WrapInteractionProtocol",
@@ -332,7 +327,6 @@ __all__ = [
     "_default_trainer_api_client_factory",
     "_default_trainer_event_subscriber_factory",
     "_default_tree_sync",
-    "_default_urlsplit",
     "_default_validate_youtube_url",
     "_default_validate_youtube_url_for_client",
     "_default_wrap_interaction",
@@ -364,7 +358,6 @@ __all__ = [
     "trainer_api_client_factory",
     "trainer_event_subscriber_factory",
     "tree_sync",
-    "urlsplit",
     "validate_youtube_url",
     "validate_youtube_url_for_client",
     "wrap_interaction",

@@ -10,7 +10,6 @@ are in :mod:`clubbot._hook_defaults` and the bindings in
 
 from __future__ import annotations
 
-import urllib.parse as _url
 from typing import Protocol
 
 from platform_core.config.discordbot import Settings
@@ -219,14 +218,6 @@ class BuildBotProtocol(Protocol):
 
     def __call__(self) -> BotLikeProtocol:
         """Build and return a Bot instance."""
-        ...
-
-
-class UrlSplitProtocol(Protocol):
-    """Protocol for urllib.parse.urlsplit function."""
-
-    def __call__(self, url: str) -> _url.SplitResult:
-        """Split a URL into its components."""
         ...
 
 

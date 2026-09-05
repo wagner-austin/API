@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-import urllib.parse as _url
 
 import pytest
 from platform_core.errors import AppError
 
-from clubbot import _test_hooks
 from clubbot.utils.youtube import canonicalize_youtube_url, extract_video_id
 
 
@@ -20,13 +18,12 @@ def test_extract_video_id_watch_missing_v_param() -> None:
         extract_video_id("https://www.youtube.com/watch?x=y")
 
 
-def test_extract_video_id_urlsplit_failure() -> None:
-    def _boom(url: str) -> _url.SplitResult:
-        raise ValueError("bad parse")
-
-    _test_hooks.urlsplit = _boom
-    with pytest.raises(AppError):
-        extract_video_id("youtube.com/watch?v=dQw4w9WgXcQ")
+def test_extract_video_id_refuses_a_url_the_stdlib_cannot_parse() -> None:
+    """This used to bind a `urlsplit` hook that raised, to reach the branch
+    for an unparseable URL. An invalid IPv6 bracket produces the real
+    ValueError, so the hook -- and the only reason it existed -- is gone."""
+    with pytest.raises(AppError, match="Invalid YouTube URL format"):
+        extract_video_id("http://[")
 
 
 def test_canonicalize_produces_standard_watch_url() -> None:

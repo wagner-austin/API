@@ -56,14 +56,6 @@ def test_default_load_httpx_module() -> None:
     assert callable(result.Client)
 
 
-def test_default_urlsplit() -> None:
-    """Test _default_urlsplit uses stdlib urlsplit."""
-    result = _test_hooks._default_urlsplit("https://example.com/path?q=1")
-    assert result.scheme == "https"
-    assert result.netloc == "example.com"
-    assert result.path == "/path"
-
-
 @pytest.mark.asyncio
 async def test_default_tree_sync_calls_tree_method() -> None:
     """Test _default_tree_sync calls the tree's sync method."""

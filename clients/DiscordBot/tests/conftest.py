@@ -31,7 +31,6 @@ def reset_hooks() -> None:
     _test_hooks.setup_logging = _test_hooks._default_setup_logging
     _test_hooks.create_service_container = _test_hooks._default_create_service_container
     _test_hooks.create_bot_orchestrator = _test_hooks._default_create_bot_orchestrator
-    _test_hooks.urlsplit = _test_hooks._default_urlsplit
     _test_hooks.trainer_event_subscriber_factory = (
         _test_hooks._default_trainer_event_subscriber_factory
     )

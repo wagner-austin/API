@@ -8,8 +8,6 @@ module reads a hook, which is what keeps that rebinding effective.
 
 from __future__ import annotations
 
-import urllib.parse as _url
-
 from discord.abc import Snowflake as DiscordSnowflake
 from discord.app_commands import AppCommand
 from platform_core.config.discordbot import Settings
@@ -217,11 +215,6 @@ def _default_create_bot_orchestrator(
     if not isinstance(container, ServiceContainer):
         raise TypeError("Expected ServiceContainer instance")
     return BotOrchestrator(container)
-
-
-def _default_urlsplit(url: str) -> _url.SplitResult:
-    """Production implementation - uses stdlib urlsplit."""
-    return _url.urlsplit(url)
 
 
 def _default_trainer_event_subscriber_factory(
