@@ -19,7 +19,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 64c2353ba4ef70c1f7e87d3c10c17b9965d9fc28
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "docs/RESEARCH.md": 572da96de4c1fc7fce922200d2f3780e9a58ac44
+  "docs/RESEARCH.md": 501c5ffd30309634f82ca1c12a040ed91a75ff29
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -29,6 +29,7 @@ provenance:
   - "n8 record bit-identical across two DIFFERENT V100 nodes (jobs 55753007 on gpu-18-02 and 55753873 on gpu-16-04, both records sha256 6e63dad7 truncated) -- cross-node determinism"
   - "varied-count cells measured 2026-09-04 on HPC3: jobs 55759514/55761217, both on hpc3-gpu-16-02 (V100), image v35 sha256 4e02f3b0 (truncated), plan gpt2-companions-varied, records bit-identical sha256 1fd6bb9d (truncated), board task 7815a0fd"
   - "diverse-pool cells measured 2026-09-05 on HPC3: job 55772675 on hpc3-gpu-17-03 (V100) + twin 55773234, image v36 sha256 0401aa9b (truncated), plan gpt2-companions-diverse, board task d2c03dd4; companion-cross instrument in-record"
+  - "n2/n4 grid REPLICATED on a V100 2026-09-05 (job 55773639, v36): every verdict survives the card -- trained-p0.5 78.0%/41.4% vs the 3090 Ti's 78.3%/44.6%, orderings identical, overdose replicated in both kinds"
 fact_checked: "2026-09-04"
 confidence: high
 hubs: [services]
@@ -151,11 +152,12 @@ point: four simultaneously wired compartments are viable at trained-p0.5
 where naive training made them destructive, and eight retain over a
 quarter of the solo gain where naive training erased it -- with the
 diverse pool as the recipe of record. Companionship itself is EXHAUSTED
-as an n8 lever, by three convergent measurements. Still open, filed
-rather than implied and now capacity-side: the budget slot policy under
-diverse-companioned training; base-side composition LoRA (teach the BASE
-to read crowded prefixes, fixing every cartridge at once); the V100
-replication of the original n2/n4 grid, unblocked by v34; and the scale
-rung -- whether any of this survives a 7B base, which is cheap to ask
-because only slots carry optimizer state. The RESEARCH.md entry under
+as an n8 lever, by three convergent measurements. The n2/n4 grid has since been
+replicated on a V100 with every verdict surviving the card (provenance
+below). Still open, filed rather than implied and now capacity-side: the
+budget slot policy under diverse-companioned training; base-side
+composition LoRA (teach the BASE to read crowded prefixes, fixing every
+cartridge at once); and the scale rung -- whether any of this survives a
+larger base, which is cheap to ask because only slots carry optimizer
+state. The RESEARCH.md entry under
 `mi` carries all four run summaries and the extension list.
