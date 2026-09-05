@@ -71,10 +71,12 @@ from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_h
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
 from model_trainer.core.services.model.cartridge_measurement import train_cartridge
 from model_trainer.core.services.model.cartridge_plans import (
-    VARIED_COMPANION_SWEEP_EXPERIMENT,
-    VariedCompanionSweepPlan,
     corpus_digest,
     require_cartridge_plan,
+)
+from model_trainer.core.services.model.cartridge_pool_plans import (
+    VARIED_COMPANION_SWEEP_EXPERIMENT,
+    VariedCompanionSweepPlan,
     varied_companion_sweep_label,
 )
 from model_trainer.core.services.model.cartridge_varied import (

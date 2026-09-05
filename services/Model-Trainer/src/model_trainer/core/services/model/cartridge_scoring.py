@@ -18,6 +18,7 @@ reported as an effect of the cartridge.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Protocol
 
 import torch
 
@@ -28,6 +29,31 @@ from model_trainer.core.contracts.paired_comparison import (
 )
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.training.base_trainer_core import _get_optimizer_for_config
+from model_trainer.core.types import ForwardOutProto, ParameterLike
+
+
+class PrefixTrainableProto(Protocol):
+    """What :func:`train_on` actually consumes of the model it drives.
+
+    Named when the base-side composition LoRA arrived: the loop had been
+    annotated as taking a :class:`CartridgeModel`, but nothing in it reads a
+    slot -- it optimizes ``parameters()``, calls ``train()`` once and
+    ``forward`` per item. The base-LoRA trainer satisfies exactly that with
+    the gradient landing on the OTHER side of the prefix, so the honest type
+    is the surface the loop touches, not one caller's class.
+    """
+
+    def parameters(self) -> Sequence[ParameterLike]:
+        """Return the parameters the optimizer may update."""
+        ...
+
+    def train(self) -> None:
+        """Put the model in training mode."""
+        ...
+
+    def forward(self, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
+        """Run one training forward."""
+        ...
 
 
 def _loss_without_prefix(model: CartridgeModel, item: torch.Tensor) -> float:
@@ -96,25 +122,26 @@ def score_held_out(
 
 
 def train_on(
-    model: CartridgeModel,
+    model: PrefixTrainableProto,
     items: Sequence[torch.Tensor],
     *,
     epochs: int,
     learning_rate: float,
 ) -> list[float]:
-    """Train a cartridge over a corpus, one item at a time.
+    """Train a prefix-shaped model over a corpus, one item at a time.
 
     Deliberately the plainest loop that is still real: every item, every
     epoch, one optimizer step each. It exists so a measurement can state what
-    produced the cartridge it is about to score, without routing through the
+    produced the artifact it is about to score, without routing through the
     full trainer -- which brings checkpointing, validation splits and early
     stopping, none of which a controlled comparison wants varying underneath
     it.
 
     Args:
-        model: The cartridge-wrapped model. Only its prefix is updated; the
-            base is frozen and its parameters are not reachable from
-            ``parameters()``.
+        model: The model to drive. Whatever its ``parameters()`` chooses to
+            expose is what learns -- a cartridge model exposes its slots, the
+            base-LoRA model exposes the LoRA -- and everything else is frozen
+            by that model's own construction.
         items: Training sequences, each shaped (1, positions).
         epochs: Passes over the corpus.
         learning_rate: Step size for AdamW.
@@ -139,6 +166,7 @@ def train_on(
 
 
 __all__ = [
+    "PrefixTrainableProto",
     "score_held_out",
     "train_on",
 ]

@@ -308,154 +308,6 @@ def companion_sweep_label(name: str, plan: CompanionSweepPlan, *, digest: str) -
     )
 
 
-class VariedCompanionSweepPlan(TypedDict):
-    """One complete, reproducible varied-count companionship measurement.
-
-    The intervention over the intervention: single-companion training's
-    retention decays with deployment count (44.6% at four compartments,
-    26.5% at eight, both recorded), and the hypothesis this plan tests is
-    that a cartridge trained under a VARIED number of simultaneous
-    companions learns count-invariance a fixed single companion cannot
-    teach. One kind and one probability, because both knobs were already
-    swept: content-companionship dominated noise everywhere and p=0.5 was
-    the best dose, so this plan varies exactly the new thing.
-
-    Attributes:
-        model_id: HuggingFace id of the base to measure against.
-        window: Tokens per scored item.
-        held_out_stride: One window in this many is held out.
-        compartment_counts: How many cartridges to compose, in increasing
-            order.
-        slots: Prefix positions per cartridge, fixed across the grid.
-        probability: Chance per training forward that ANY companions are
-            present, in (0, 1]; when they are, the count is drawn uniformly
-            from one to ``max_companions``.
-        max_companions: Pool size, and the largest count a single forward
-            can draw. At least two: a pool of one is the recorded
-            single-companion recipe and must be spelled as that plan.
-        seeds: Initialisation seeds. Every arm runs once per seed.
-        epochs: Passes over each corpus.
-        learning_rate: Step size for AdamW.
-    """
-
-    model_id: str
-    window: int
-    held_out_stride: int
-    compartment_counts: tuple[int, ...]
-    slots: int
-    probability: float
-    max_companions: int
-    seeds: tuple[int, ...]
-    epochs: int
-    learning_rate: float
-
-
-#: Fixed for the reason the other experiment names are.
-VARIED_COMPANION_SWEEP_EXPERIMENT = "cartridge-varied-companioned-composition"
-
-
-#: The varied-count plans. ``gpt2-companions-varied`` matches the recorded
-#: companion grids on every shared field (window, stride, slots, seeds,
-#: schedule, and the trained-p0.5 recipe cell's probability), so its n4 and
-#: n8 cells subtract against the single-companion records directly: the n8
-#: baseline to beat is +26.5% retention, the n4 regression bar is +44.6%.
-VARIED_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
-    "gpt2-companions-varied": {
-        "model_id": "gpt2",
-        "window": 256,
-        "held_out_stride": 4,
-        "compartment_counts": (4, 8),
-        "slots": 64,
-        "probability": 0.5,
-        "max_companions": 3,
-        "seeds": (7, 8, 9),
-        "epochs": 12,
-        "learning_rate": 0.01,
-    },
-}
-
-
-#: Fixed for the reason the other experiment names are. The diverse sweep
-#: REUSES :class:`VariedCompanionSweepPlan` -- the knobs are identical and
-#: only the pool's construction differs (K corpora instead of K seeds of
-#: one corpus) -- but it is a different measurement answering a different
-#: question, so it records under its own experiment.
-DIVERSE_COMPANION_SWEEP_EXPERIMENT = "cartridge-diverse-companioned-composition"
-
-
-#: The diverse-pool plans. ``gpt2-companions-diverse`` matches
-#: ``gpt2-companions-varied`` on every field, so the two records isolate
-#: exactly one difference: whether the pool's members carry one voice or
-#: three. The varied record (n4 +51.0%, n8 +18.3%) and the single-companion
-#: record (n4 +44.6%, n8 +26.5%) are the baselines its cells subtract
-#: against.
-DIVERSE_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
-    "gpt2-companions-diverse": {
-        "model_id": "gpt2",
-        "window": 256,
-        "held_out_stride": 4,
-        "compartment_counts": (4, 8),
-        "slots": 64,
-        "probability": 0.5,
-        "max_companions": 3,
-        "seeds": (7, 8, 9),
-        "epochs": 12,
-        "learning_rate": 0.01,
-    },
-    # The scale rung: the recorded recipe on a base three times the size.
-    # Every field except the base matches ``gpt2-companions-diverse``, so
-    # the two records isolate exactly the parameter count -- including the
-    # schedule, deliberately: a retuned schedule would confound scale with
-    # tuning. The question is whether the diverse-pool verdicts (n4 +55.5%,
-    # n8 +28.0%, content interference fully trained away) survive a base
-    # where 448 foreign slots are a smaller fraction of attention.
-    "gpt2-medium-companions-diverse": {
-        "model_id": "gpt2-medium",
-        "window": 256,
-        "held_out_stride": 4,
-        "compartment_counts": (4, 8),
-        "slots": 64,
-        "probability": 0.5,
-        "max_companions": 3,
-        "seeds": (7, 8, 9),
-        "epochs": 12,
-        "learning_rate": 0.01,
-    },
-}
-
-
-def varied_companion_sweep_label(name: str, plan: VariedCompanionSweepPlan, *, digest: str) -> str:
-    """Build the label identifying one varied-count sweep on one primary corpus.
-
-    Args:
-        name: The plan's name.
-        plan: The plan.
-        digest: Digest of the PRIMARY corpus, from :func:`corpus_digest`.
-
-    Returns:
-        The label, e.g.
-        ``gpt2-companions-varied-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-1a2b3c4d5e6f``.
-        ``K`` carries the pool size; ``c`` and ``p`` keep the meanings the
-        companion-sweep label gave them.
-    """
-    counts = ".".join(str(count) for count in plan["compartment_counts"])
-    seeds = ".".join(str(seed) for seed in plan["seeds"])
-    return (
-        f"{name}"
-        f"-{plan['model_id']}"
-        f"-w{plan['window']}"
-        f"-s{plan['held_out_stride']}"
-        f"-e{plan['epochs']}"
-        f"-lr{plan['learning_rate']}"
-        f"-n{counts}"
-        f"-c{plan['slots']}"
-        f"-p{plan['probability']}"
-        f"-K{plan['max_companions']}"
-        f"-seeds{seeds}"
-        f"-{digest[:12]}"
-    )
-
-
 def require_cartridge_plan(plans: Mapping[str, _PlanT], name: str) -> _PlanT:
     """Look up a plan by name in a supplied table.
 
@@ -548,18 +400,12 @@ __all__ = [
     "COMPANION_SWEEP_PLANS",
     "COMPOSITION_SWEEP_EXPERIMENT",
     "COMPOSITION_SWEEP_PLANS",
-    "DIVERSE_COMPANION_SWEEP_EXPERIMENT",
-    "DIVERSE_COMPANION_SWEEP_PLANS",
-    "VARIED_COMPANION_SWEEP_EXPERIMENT",
-    "VARIED_COMPANION_SWEEP_PLANS",
     "CartridgePlan",
     "CompanionSweepPlan",
     "CompositionSweepPlan",
-    "VariedCompanionSweepPlan",
     "companion_sweep_label",
     "composition_sweep_label",
     "corpus_digest",
     "plan_label",
     "require_cartridge_plan",
-    "varied_companion_sweep_label",
 ]

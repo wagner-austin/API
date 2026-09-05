@@ -27,11 +27,15 @@ from model_trainer.core.services.model.cartridge_plans import (
     CARTRIDGE_PLANS,
     COMPANION_SWEEP_PLANS,
     COMPOSITION_SWEEP_PLANS,
-    DIVERSE_COMPANION_SWEEP_PLANS,
-    VARIED_COMPANION_SWEEP_PLANS,
     CartridgePlan,
     CompanionSweepPlan,
     CompositionSweepPlan,
+)
+from model_trainer.core.services.model.cartridge_pool_plans import (
+    BASE_LORA_SWEEP_PLANS,
+    DIVERSE_COMPANION_SWEEP_PLANS,
+    VARIED_COMPANION_SWEEP_PLANS,
+    BaseLoraSweepPlan,
     VariedCompanionSweepPlan,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
@@ -112,6 +116,19 @@ class VariedCompanionSweepPlansProto(Protocol):
     """
 
     def __call__(self) -> Mapping[str, VariedCompanionSweepPlan]:
+        """Return every declared plan, in table order."""
+        ...
+
+
+class BaseLoraSweepPlansProto(Protocol):
+    """Protocol for the base-LoRA sweep plan table.
+
+    Behind a hook for the reason :class:`CompanionSweepPlansProto` is, and
+    more so: the real table's one plan trains a pool, a LoRA and dozens of
+    cartridges over a real GPT-2.
+    """
+
+    def __call__(self) -> Mapping[str, BaseLoraSweepPlan]:
         """Return every declared plan, in table order."""
         ...
 
@@ -356,6 +373,18 @@ diverse_companion_sweep_plans: VariedCompanionSweepPlansProto = (
     _default_diverse_companion_sweep_plans
 )
 
+
+def _default_base_lora_sweep_plans() -> Mapping[str, BaseLoraSweepPlan]:
+    """Production base-LoRA plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return BASE_LORA_SWEEP_PLANS
+
+
+base_lora_sweep_plans: BaseLoraSweepPlansProto = _default_base_lora_sweep_plans
+
 qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -374,6 +403,7 @@ probed_shapes_hook: ProbedShapesProto = _default_probed_shapes
 
 
 __all__ = [
+    "BaseLoraSweepPlansProto",
     "BenchmarkShapesProto",
     "CartridgePlansProto",
     "CompanionSweepPlansProto",
@@ -386,6 +416,7 @@ __all__ = [
     "TraceRungsProto",
     "TrainShapesProto",
     "VariedCompanionSweepPlansProto",
+    "base_lora_sweep_plans",
     "benchmark_shapes",
     "cartridge_plans",
     "companion_sweep_plans",

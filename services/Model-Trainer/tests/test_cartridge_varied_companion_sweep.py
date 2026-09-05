@@ -30,9 +30,11 @@ from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_h
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_plans import (
     COMPANION_SWEEP_PLANS,
+    CompanionSweepPlan,
+)
+from model_trainer.core.services.model.cartridge_pool_plans import (
     VARIED_COMPANION_SWEEP_EXPERIMENT,
     VARIED_COMPANION_SWEEP_PLANS,
-    CompanionSweepPlan,
     VariedCompanionSweepPlan,
     varied_companion_sweep_label,
 )

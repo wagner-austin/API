@@ -41,6 +41,17 @@ class ParameterLike(Protocol):
         """Return the accumulated gradient, or None before any backward."""
         ...
 
+    @property
+    def requires_grad(self) -> bool:
+        """Return whether this parameter learns.
+
+        Declared for the reason :class:`NamedParameter` declares it: a
+        protocol that cannot say whether a parameter learns cannot express
+        "only the adapter's parameters are trainable", which is the whole
+        claim the base-side LoRA rests on.
+        """
+        ...
+
     def numel(self) -> int:
         """Return total number of elements in the parameter tensor."""
         ...
