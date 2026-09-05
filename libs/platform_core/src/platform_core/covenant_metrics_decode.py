@@ -23,6 +23,7 @@ from platform_core.covenant_metrics_events import (
     RetrainTriggerType,
     StreamLagV1,
 )
+from platform_core.evaluation_statuses import require_evaluation_status
 from platform_core.job_events import (
     JobCompletedV1,
     JobEventV1,
@@ -65,16 +66,6 @@ def _decode_measurement_received_event(
     }
 
 
-def _parse_evaluation_status(raw: str) -> Literal["OK", "BREACH", "WARNING"]:
-    if raw == "OK":
-        return "OK"
-    if raw == "BREACH":
-        return "BREACH"
-    if raw == "WARNING":
-        return "WARNING"
-    raise JSONTypeError(f"Invalid evaluation status '{raw}'")
-
-
 def _decode_evaluation_completed_event(
     decoded: JSONObject,
     event_id: str,
@@ -82,8 +73,7 @@ def _decode_evaluation_completed_event(
     deal_id = require_str(decoded, "deal_id")
     period_start = require_str(decoded, "period_start")
     period_end = require_str(decoded, "period_end")
-    status_raw = require_str(decoded, "status")
-    status = _parse_evaluation_status(status_raw)
+    status = require_evaluation_status(decoded, "status")
     covenants_evaluated = require_int(decoded, "covenants_evaluated")
     breaches_count = require_int(decoded, "breaches_count")
     latency_ms = require_int(decoded, "latency_ms")

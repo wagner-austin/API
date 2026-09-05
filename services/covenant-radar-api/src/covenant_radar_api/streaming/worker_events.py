@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from covenant_domain import (
     CovenantResult,
@@ -14,7 +14,6 @@ from .schemas import (
     AlertEventV1,
     AlertSeverity,
     AlertType,
-    EvaluationStatus,
     MeasurementEventV1,
     PredictionEventV1,
 )
@@ -145,14 +144,14 @@ def _current_iso_timestamp() -> str:
 
 def _determine_evaluation_status(
     results: tuple[CovenantResult, ...],
-) -> EvaluationStatus:
+) -> Literal["OK", "BREACH", "WARNING"]:
     """Determine overall evaluation status from covenant results.
 
     Args:
         results: Tuple of covenant evaluation results.
 
     Returns:
-        EvaluationStatus: OK, BREACH, or WARNING.
+        The period's status: OK, BREACH, or WARNING.
     """
     has_breach = False
     has_near_breach = False
@@ -191,7 +190,7 @@ def _determine_alert_severity(risk_probability: float) -> AlertSeverity:
 
 
 def _determine_alert_type(
-    evaluation_status: EvaluationStatus,
+    evaluation_status: Literal["OK", "BREACH", "WARNING"],
 ) -> AlertType:
     """Determine alert type based on evaluation status.
 
@@ -210,7 +209,7 @@ def _generate_alert_message(
     deal_id: str,
     deal_name: str,
     risk_probability: float,
-    evaluation_status: EvaluationStatus,
+    evaluation_status: Literal["OK", "BREACH", "WARNING"],
     breaches_count: int,
 ) -> str:
     """Generate alert message text.

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict, TypeGuard
 
+from platform_core.evaluation_statuses import require_evaluation_status
 from platform_core.json_utils import (
     JSONObject,
     require_float,
@@ -17,37 +18,6 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.risk_tiers import require_risk_tier
-
-EvaluationStatusValue = Literal["OK", "BREACH", "WARNING"]
-
-VALID_EVALUATION_STATUSES: tuple[EvaluationStatusValue, ...] = ("OK", "BREACH", "WARNING")
-
-
-def _require_evaluation_status(obj: JSONObject, key: str) -> EvaluationStatusValue:
-    """Require an evaluation status field.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Key to look up.
-
-    Returns:
-        The validated evaluation status value.
-
-    Raises:
-        KeyError: If key is missing.
-        TypeError: If value is not a string.
-        ValueError: If value is not a valid evaluation status.
-    """
-    value = require_str(obj, key)
-    if value == "OK":
-        return "OK"
-    if value == "BREACH":
-        return "BREACH"
-    if value == "WARNING":
-        return "WARNING"
-    msg = f"{key} must be one of {VALID_EVALUATION_STATUSES}, got {value!r}"
-    raise ValueError(msg)
-
 
 # =============================================================================
 # Alert Context Schema
@@ -178,7 +148,7 @@ def decode_alert_context(data: JSONObject) -> AlertContext:
         "sector": require_str(data, "sector"),
         "risk_probability": require_float(data, "risk_probability"),
         "risk_tier": require_risk_tier(data, "risk_tier"),
-        "evaluation_status": _require_evaluation_status(data, "evaluation_status"),
+        "evaluation_status": require_evaluation_status(data, "evaluation_status"),
         "breaches_count": require_int(data, "breaches_count"),
         "covenants_evaluated": require_int(data, "covenants_evaluated"),
         "period_start": require_str(data, "period_start"),

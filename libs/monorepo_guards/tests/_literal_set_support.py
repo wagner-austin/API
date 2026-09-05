@@ -103,6 +103,7 @@ def write_declared_sets(monorepo_root: Path) -> list[Path]:
 
 DECLARED_MEMBERS: dict[str, tuple[str, ...]] = {
     "corpus-format": ("lines", "documents"),
+    "evaluation-status": ("OK", "BREACH", "WARNING"),
     "risk-tier": ("LOW", "MEDIUM", "HIGH", "CRITICAL"),
     "strategy-name": ("full", "lora", "qlora"),
 }

@@ -225,11 +225,17 @@ class TestDecodeAlertContext:
             decode_alert_context(data)
 
     def test_raises_on_invalid_evaluation_status(self) -> None:
-        """Test that invalid evaluation status raises ValueError."""
+        """An undeclared status is refused.
+
+        JSONTypeError rather than the ValueError this package's own copy of
+        the narrowing raised. There is one narrowing now, in
+        platform_core.evaluation_statuses, and it reports the same way for all
+        three decoders that read this set.
+        """
         data = make_valid_alert_context_dict()
         data["evaluation_status"] = "INVALID"
 
-        with pytest.raises(ValueError, match="evaluation_status"):
+        with pytest.raises(JSONTypeError, match="Field 'evaluation_status' must be one of"):
             decode_alert_context(data)
 
     def test_decodes_all_risk_tier_values(self) -> None:

@@ -137,8 +137,32 @@ RISK_TIER_SET: Final = LiteralSet(
 )
 
 
+EVALUATION_STATUS_SET: Final = LiteralSet(
+    subject="evaluation-status",
+    defining_module="platform_core/evaluation_statuses.py",
+    tuple_name="EVALUATION_STATUSES",
+    field_names=frozenset({"evaluation_status"}),
+    consequence=(
+        "the streaming decoder, the Google AI schema and the covenant metrics event "
+        "would accept different sets, so a period's evaluation would be filed under a "
+        "status one of them cannot name"
+    ),
+)
+"""The evaluation-status set.
+
+NOT keyed on ``status``, which is what four of its nine sites are actually
+called. ``status`` names 28 DISTINCT Literal sets in this monorepo -- job
+states, probe outcomes, health, and a covenant-domain
+``OK/BREACH/NEAR_BREACH`` that is a different three-member set in the same
+domain -- so watching it would report every one of them as drift. Those four
+sites are held by ``platform_core.evaluation_statuses`` being the single
+narrowing they call, not by this rule. Adding ``status`` here would turn the
+guard into noise; the limit is recorded so nobody adds it helpfully.
+"""
+
 REGISTERED_SETS: Final[tuple[LiteralSet, ...]] = (
     CORPUS_FORMAT_SET,
+    EVALUATION_STATUS_SET,
     RISK_TIER_SET,
     STRATEGY_NAME_SET,
 )
@@ -374,6 +398,7 @@ class LiteralSetRule:
 
 __all__ = [
     "CORPUS_FORMAT_SET",
+    "EVALUATION_STATUS_SET",
     "PACKAGE_SOURCE_GLOB",
     "REGISTERED_SETS",
     "RISK_TIER_SET",

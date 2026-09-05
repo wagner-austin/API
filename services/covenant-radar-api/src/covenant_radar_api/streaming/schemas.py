@@ -43,7 +43,6 @@ AlertEventType = Literal["covenant.alert.v1"]
 # The tier names are declared once in platform_core.risk_tiers; annotations
 # spell the Literal inline and the risk-tier guard holds them to that tuple.
 
-EvaluationStatus = Literal["OK", "BREACH", "WARNING"]
 
 AlertType = Literal["breach", "high_risk"]
 
@@ -114,7 +113,7 @@ class PredictionEventV1(TypedDict):
     deal_id: str
     period_start: str
     period_end: str
-    evaluation_status: EvaluationStatus
+    evaluation_status: Literal["OK", "BREACH", "WARNING"]
     covenants_evaluated: int
     breaches_count: int
     risk_probability: float
@@ -305,7 +304,7 @@ def make_prediction_event(
     deal_id: str,
     period_start: str,
     period_end: str,
-    evaluation_status: EvaluationStatus,
+    evaluation_status: Literal["OK", "BREACH", "WARNING"],
     covenants_evaluated: int,
     breaches_count: int,
     risk_probability: float,
@@ -450,7 +449,6 @@ __all__ = [
     "DlqEventType",
     "DlqEventV1",
     "DlqReason",
-    "EvaluationStatus",
     "KafkaEventType",
     "KafkaEventV1",
     "MeasurementEventType",

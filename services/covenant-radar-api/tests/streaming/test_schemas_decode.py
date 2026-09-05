@@ -137,7 +137,9 @@ class TestDecodePredictionEvent:
             }
         )
 
-        with pytest.raises(JSONTypeError, match="Invalid evaluation status"):
+        # From the one shared narrowing now, so it names the field and the
+        # accepted set rather than only the value.
+        with pytest.raises(JSONTypeError, match="Field 'evaluation_status' must be one of"):
             decode_prediction_event(payload)
 
     def test_invalid_risk_tier_raises(self) -> None:

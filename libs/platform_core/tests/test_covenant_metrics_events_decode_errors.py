@@ -57,7 +57,9 @@ class TestDecodeErrors:
             "latency_ms": 15,
             "timestamp": "2024-01-15T10:00:00Z"
         }"""
-        with pytest.raises(JSONTypeError, match="Invalid evaluation status"):
+        # From the one shared narrowing in platform_core.evaluation_statuses,
+        # so it names the field and the accepted set rather than only the value.
+        with pytest.raises(JSONTypeError, match=r"Field 'status' must be one of"):
             decode_covenant_metrics_event(payload)
 
     def test_prediction_invalid_risk_tier_raises(self) -> None:

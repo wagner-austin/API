@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeGuard
 
+from platform_core.evaluation_statuses import as_evaluation_status
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -20,32 +21,10 @@ from covenant_radar_api.streaming.schemas import (
     AlertEventV1,
     AlertSeverity,
     AlertType,
-    EvaluationStatus,
     KafkaEventV1,
     MeasurementEventV1,
     PredictionEventV1,
 )
-
-
-def _parse_evaluation_status(raw: str) -> EvaluationStatus:
-    """Parse evaluation status from string.
-
-    Args:
-        raw: Raw string value.
-
-    Returns:
-        Validated EvaluationStatus literal.
-
-    Raises:
-        JSONTypeError: If value is not valid.
-    """
-    if raw == "OK":
-        return "OK"
-    if raw == "BREACH":
-        return "BREACH"
-    if raw == "WARNING":
-        return "WARNING"
-    raise JSONTypeError(f"Invalid evaluation status '{raw}'")
 
 
 def _parse_alert_type(raw: str) -> AlertType:
@@ -139,7 +118,7 @@ def _decode_prediction_event(decoded: JSONObject, event_id: str) -> PredictionEv
     period_start = require_str(decoded, "period_start")
     period_end = require_str(decoded, "period_end")
     evaluation_status_raw = require_str(decoded, "evaluation_status")
-    evaluation_status = _parse_evaluation_status(evaluation_status_raw)
+    evaluation_status = as_evaluation_status(evaluation_status_raw, "evaluation_status")
     covenants_evaluated = require_int(decoded, "covenants_evaluated")
     breaches_count = require_int(decoded, "breaches_count")
     risk_probability = require_float(decoded, "risk_probability")

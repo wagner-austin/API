@@ -27,10 +27,6 @@ from covenant_radar_api.streaming.worker_events import (
     _covenant_result_period_end_key,
 )
 
-from .schemas import (
-    EvaluationStatus,
-)
-
 _log = get_logger(__name__)
 
 
@@ -221,7 +217,7 @@ class _StreamingWorkerEvaluation(_StreamingWorkerBuffers):
 
     def _should_alert(
         self,
-        evaluation_status: EvaluationStatus,
+        evaluation_status: Literal["OK", "BREACH", "WARNING"],
         risk_probability: float,
     ) -> bool:
         """Determine if an alert should be generated.
