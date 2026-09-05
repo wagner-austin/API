@@ -25,6 +25,13 @@ class StreamConfigDict(TypedDict):
         width: Screen width in pixels. Even, because yuv420p encodes
             chroma at half resolution and ffmpeg refuses odd sizes.
         height: Screen height in pixels. Even, same law.
+        scale: Device scale factor Chromium renders at
+            (``--force-device-scale-factor``). The game client lays
+            out at a fixed 568x330 CSS pixels and its on-screen size
+            comes entirely from DPR — the operator's desktop runs at
+            ~1.75, an Xvfb defaults to 1, and 1 is why the first
+            captures were a small game floating in dead margin. The
+            screen geometry must be chosen for the scaled content.
         fps: Frames per second ffmpeg samples the display at.
         bitrate_kbps: Target video bitrate in kilobits per second.
         segment_seconds: Length of one HLS segment. Also the keyframe
@@ -36,6 +43,7 @@ class StreamConfigDict(TypedDict):
     display: int
     width: int
     height: int
+    scale: int
     fps: int
     bitrate_kbps: int
     segment_seconds: int
@@ -55,6 +63,7 @@ def encode_stream_config(config: StreamConfigDict) -> JSONObject:
         "display": config["display"],
         "width": config["width"],
         "height": config["height"],
+        "scale": config["scale"],
         "fps": config["fps"],
         "bitrate_kbps": config["bitrate_kbps"],
         "segment_seconds": config["segment_seconds"],
@@ -79,6 +88,7 @@ def decode_stream_config(data: JSONObject) -> StreamConfigDict:
         display=require_int(data, "display"),
         width=require_int(data, "width"),
         height=require_int(data, "height"),
+        scale=require_int(data, "scale"),
         fps=require_int(data, "fps"),
         bitrate_kbps=require_int(data, "bitrate_kbps"),
         segment_seconds=require_int(data, "segment_seconds"),
@@ -90,6 +100,8 @@ def decode_stream_config(data: JSONObject) -> StreamConfigDict:
         raise ValueError(f"width must be positive and even, got {config['width']}")
     if config["height"] <= 0 or config["height"] % 2:
         raise ValueError(f"height must be positive and even, got {config['height']}")
+    if config["scale"] <= 0:
+        raise ValueError(f"scale must be positive, got {config['scale']}")
     if config["fps"] <= 0:
         raise ValueError(f"fps must be positive, got {config['fps']}")
     if config["bitrate_kbps"] <= 0:

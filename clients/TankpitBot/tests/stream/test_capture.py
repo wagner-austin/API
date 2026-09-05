@@ -47,6 +47,7 @@ def _config(hls_dir: Path) -> StreamConfigDict:
         display=91,
         width=704,
         height=544,
+        scale=2,
         fps=30,
         bitrate_kbps=1000,
         segment_seconds=2,

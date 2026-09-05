@@ -6266,7 +6266,15 @@ for the desktop operator it was built for) because its card sat on
 top of the game in every captured frame — the flag-click binding goes
 with it, since a binding without a human is an armed control nobody
 can reach, while the per-tick ``hud.json`` mirror the fleet page
-reads stays unconditional.
+reads stays unconditional. A fourth followed from measuring the
+"dead space" complaint: the client lays out at a FIXED ~568x330 CSS
+pixels and its on-screen size is entirely devicePixelRatio (the
+operator's desktop runs ~1.75; an Xvfb defaults to 1), so the
+streamed launch now forces ``--force-device-scale-factor=2`` and the
+capture screen defaults to 1152x672 — the scaled content plus a
+margin the fullscreen centering absorbs. The factor is a typed field
+of ``StreamConfigDict`` because the geometry is only correct AT its
+scale; the two travel together or not at all.
 
 `tankpit-stream-probe` was rewritten for the new observable: polling
 the playlist's `EXT-X-MEDIA-SEQUENCE` measures the ENCODER's cadence

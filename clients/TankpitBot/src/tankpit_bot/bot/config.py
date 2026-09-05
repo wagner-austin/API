@@ -127,23 +127,36 @@ def resolve_human_rank_window() -> tuple[int, int]:
     )
 
 
-DEFAULT_STREAM_WIDTH = 704
-"""Capture screen width. Sized just past the game's 672-wide composite
-so the client fills the frame; even, because yuv420p requires it."""
+DEFAULT_STREAM_SCALE = 2
+"""Device scale factor for the streamed Chromium.
 
-DEFAULT_STREAM_HEIGHT = 544
-"""Capture screen height, same sizing logic against the 532-tall
-composite."""
+The game client lays out at a FIXED ~568x330 CSS pixels; its on-screen
+size comes entirely from devicePixelRatio. The operator's desktop runs
+~1.75 (which is where the caster era's 672x532 composite came from);
+an Xvfb defaults to 1, and 1 is why the first live captures were a
+small game floating in dead margin (measured 2026-09-05: content
+568x330 centred in 704x544). Forcing 2 renders the client at crisp
+double pixels, the same picture the desktop shows."""
+
+DEFAULT_STREAM_WIDTH = 1152
+"""Capture screen width: the client's 568-wide CSS layout at scale 2
+(1136 physical) plus a small even margin the fullscreen centering
+absorbs."""
+
+DEFAULT_STREAM_HEIGHT = 672
+"""Capture screen height: 330 CSS at scale 2 (660 physical) plus the
+same small margin."""
 
 DEFAULT_STREAM_FPS = 30
 """Display sampling rate. The game paints at ~60 Hz but its motion is
 readable at 30, and half the sampling is half the encode cost for a
 per-bot pipeline that runs N times per container."""
 
-DEFAULT_STREAM_BITRATE_KBPS = 1000
-"""Encoder target. One megabit of H.264 at 704x544 is generous for
-2D game content — and ~5x less than the 678 KB/s the MJPEG pipeline
-this replaced was measured spending on the same picture."""
+DEFAULT_STREAM_BITRATE_KBPS = 1500
+"""Encoder target. A megabit and a half of H.264 at 1152x672 is
+generous for scaled 2D game content — and still ~4x less than the
+678 KB/s the MJPEG pipeline this replaced was measured spending on a
+quarter of the pixels."""
 
 DEFAULT_STREAM_SEGMENT_SECONDS = 2
 """HLS segment length: the latency floor of the pipeline. Two seconds
@@ -215,12 +228,14 @@ def resolve_stream_config() -> StreamConfigDict | None:
         )
     raw_fps = _test_hooks.get_env("TANKPIT_STREAM_FPS")
     raw_bitrate = _test_hooks.get_env("TANKPIT_STREAM_BITRATE_KBPS")
+    raw_scale = _test_hooks.get_env("TANKPIT_STREAM_SCALE")
     hls_dir = bot_run_dir(resolve_bot_instance()) / "hls"
     return decode_stream_config(
         {
             "display": int(raw_display),
             "width": DEFAULT_STREAM_WIDTH,
             "height": DEFAULT_STREAM_HEIGHT,
+            "scale": int(raw_scale) if raw_scale is not None else DEFAULT_STREAM_SCALE,
             "fps": int(raw_fps) if raw_fps is not None else DEFAULT_STREAM_FPS,
             "bitrate_kbps": (
                 int(raw_bitrate) if raw_bitrate is not None else DEFAULT_STREAM_BITRATE_KBPS
@@ -249,6 +264,7 @@ __all__ = [
     "DEFAULT_STREAM_BITRATE_KBPS",
     "DEFAULT_STREAM_FPS",
     "DEFAULT_STREAM_HEIGHT",
+    "DEFAULT_STREAM_SCALE",
     "DEFAULT_STREAM_SEGMENT_SECONDS",
     "DEFAULT_STREAM_WIDTH",
     "DEFAULT_TARGET_URL",

@@ -87,6 +87,7 @@ class TestBotRunWithCapture:
             display=7,
             width=704,
             height=544,
+            scale=2,
             fps=30,
             bitrate_kbps=1000,
             segment_seconds=2,
@@ -140,6 +141,12 @@ class TestBotRunWithCapture:
             raise AssertionError("the fake playwright was never started")
         browser_type = playwright._chromium
         assert browser_type.launch_envs == [{"KEEP": "1", "DISPLAY": ":7"}]
+        launch_args = browser_type.launch_args[0]
+        if launch_args is None:
+            raise AssertionError("the launch was handed no args at all")
+        # The config's scale travels to Chromium: the client's picture
+        # size is entirely DPR, and geometry was chosen for factor 2.
+        assert launch_args == ["--force-device-scale-factor=2"]
         # Ended by run()'s own teardown, not the reaper in the finally.
         for name, process in zip(("Xvfb", "ffmpeg"), processes, strict=True):
             if process.poll() is None:

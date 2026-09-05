@@ -284,7 +284,17 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         self._ai_state = make_initial_ai_state(env_ai_config())
         self._cdp_message_buffer = []
 
-        launch_args = _chrome_stream_display_args()
+        # A streamed launch pins the device scale factor: the game
+        # client's on-screen size comes entirely from DPR (fixed CSS
+        # layout), and Xvfb's default of 1 shrank the picture into a
+        # corner of the capture. The screen geometry in the stream
+        # config was chosen for content AT this factor, so the two
+        # travel together.
+        launch_args = _chrome_stream_display_args() + (
+            [f"--force-device-scale-factor={self._stream_config['scale']}"]
+            if self._stream_config is not None
+            else []
+        )
         # Keyed by login identity so a fleet child selecting a
         # different account can never resume another account's session
         # (the 2026-08-13 arterial-as-artax incident).

@@ -22,6 +22,7 @@ def _valid_payload() -> JSONObject:
         "display": 9,
         "width": 704,
         "height": 544,
+        "scale": 2,
         "fps": 30,
         "bitrate_kbps": 1000,
         "segment_seconds": 2,
@@ -38,6 +39,7 @@ class TestRoundTrip:
             display=27301,
             width=704,
             height=544,
+            scale=2,
             fps=24,
             bitrate_kbps=800,
             segment_seconds=2,
@@ -83,6 +85,13 @@ class TestDomainRefusals:
         payload = _valid_payload()
         payload["height"] = height
         with pytest.raises(ValueError, match="height must be positive and even"):
+            decode_stream_config(payload)
+
+    def test_non_positive_scale_is_refused(self) -> None:
+        """A zero device scale factor is not a smaller picture, it is none."""
+        payload = _valid_payload()
+        payload["scale"] = 0
+        with pytest.raises(ValueError, match="scale must be positive"):
             decode_stream_config(payload)
 
     def test_non_positive_fps_is_refused(self) -> None:
