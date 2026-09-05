@@ -304,6 +304,26 @@ every earlier grid assumed it.
   training, base-side composition LoRA (teach the BASE to read crowded
   prefixes, fixing every cartridge at once), and the scale rung — larger
   bases where 448 foreign slots are a smaller fraction of attention.
+- **The scale rung ran 2026-09-05 and INVERTS the softer-ceiling
+  hypothesis** (plan `gpt2-medium-companions-diverse`, added `e5476201`
+  with the differs-only-in-the-base contract pinned by test and by the
+  v37 image's own smoke; job 55776517 + twin 55786853, V100, image v37
+  `2adee62f…`, run documents
+  `tools/hpc3/runs/cartridge-medium-diverse-v100-v37{,-twin}.json`,
+  0 SU): on a base three times the size under the identical recipe,
+  **n4 transfers near-exactly (+54.1% vs gpt2's +55.5%) and n8
+  COLLAPSES (−86.6% vs +28.0%)**. The controls attribute it: medium's
+  n8 untrained-composed arm is itself negative (−0.29 vs gpt2's +0.24) —
+  the 24-layer base's structural tolerance for a 512-slot foreign prefix
+  is far worse than the 12-layer base's before content enters — and
+  composed sits another 0.42 below that, so the recipe's content-erasure
+  did not transfer either. The schedule is not the confound: the same
+  schedule learns the solo cartridge (+0.81) and composes four
+  compartments (+0.44) on medium; only the crowded-prefix regime fails.
+  Depth compounds prefix interference; scale alone COSTS many-compartment
+  composition rather than buying it. **The 7B path runs through
+  base-side adaptation** (composition LoRA), now the only standing n8
+  lever at scale; n4 deployment is scale-robust at ~55% on both bases.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
