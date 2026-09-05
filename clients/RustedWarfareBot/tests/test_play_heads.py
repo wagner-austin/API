@@ -64,6 +64,19 @@ def _run(preset: Path) -> int:
         return main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1", str(preset)])
 
 
+def test_the_tree_root_is_derived_from_the_package_not_the_cwd() -> None:
+    """The impbrace48 lesson: a cwd-relative model path killed all 96
+    braced cluster members while their payload carried the file. The root
+    comes from where rw_bot itself was imported, so a frozen snapshot and
+    the working tree each answer for themselves."""
+    from scripts.play import tree_root
+
+    root = tree_root()
+    assert (root / "src" / "rw_bot" / "__init__.py").is_file()
+    assert (root / "models" / "fleetdoom.ndjson").is_file()
+    assert (root / "models" / "razebrace.ndjson").is_file()
+
+
 def test_the_predicted_mode_loads_the_shipped_doom_model_and_plays(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,

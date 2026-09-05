@@ -13,6 +13,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+import rw_bot
 from rw_bot.control.channel import open_channel
 from rw_bot.mechanics.build_tree import decode_build_tree
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
@@ -302,12 +303,30 @@ def load_doctrine(path: Path) -> Doctrine:
     return parse_doctrine_lines(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
-def load_head_model(path: Path) -> HeadModel:
-    """Read one fitted head model -- doom, razing, whichever file is named.
+def tree_root() -> Path:
+    """Return the root of the tree this planner is importing from.
+
+    Derived from the package's own location -- ``<root>/src/rw_bot`` --
+    so it is the FROZEN snapshot on a cluster member and the working
+    tree locally, with no second answer possible. A cwd-relative model
+    path was the defect: the harness tree-qualifies the doctrine path in
+    the play args, the model path was composed inside this script from
+    the working directory, and all 96 braced members of impbrace48's
+    first submission died on ``FileNotFoundError: models/razebrace.ndjson``
+    while their payload carried the file (log 2026-09-05).
+
+    Returns:
+        The absolute tree root.
+    """
+    return Path(rw_bot.__file__).resolve().parents[2]
+
+
+def load_head_model(name: str) -> HeadModel:
+    """Read one fitted head model out of the importing tree's ``models/``.
 
     Args:
-        path: The model file, e.g. ``models/fleetdoom.ndjson`` or
-            ``models/razebrace.ndjson``.
+        name: The model file's basename, e.g. ``fleetdoom.ndjson`` or
+            ``razebrace.ndjson``.
 
     Returns:
         The validated model.
@@ -316,6 +335,7 @@ def load_head_model(path: Path) -> HeadModel:
         HeadError: ``RW-HEAD-001`` when the file is malformed.
         OSError: When the file cannot be read.
     """
+    path = tree_root() / "models" / name
     return decode_head_model(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
@@ -448,12 +468,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     # even a read ([[policy-doctrine]]; log 2026-08-09).
     doom: HeadModel | None = None
     if doctrine["navtilt"] == NAVTILT_PREDICTED:
-        doom = load_head_model(Path("models/fleetdoom.ndjson"))
+        doom = load_head_model("fleetdoom.ndjson")
     # The razing head rides the same convention: its own file, read only
     # when the doctrine's brace flag asks for it.
     brace_model: HeadModel | None = None
     if doctrine["brace"]:
-        brace_model = load_head_model(Path("models/razebrace.ndjson"))
+        brace_model = load_head_model("razebrace.ndjson")
     report = play(
         channel,
         plan,
