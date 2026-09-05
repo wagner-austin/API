@@ -96,8 +96,19 @@ class TestFullFineTuneStrategyAdapt:
         assert adapted.is_peft_model is False
         assert adapted.lora_config is None
 
-    def test_adapt_calls_gradient_checkpointing_when_hook_set(self) -> None:
-        """Test that adapt() enables gradient checkpointing when hook is set."""
+    def test_adapt_does_not_enable_gradient_checkpointing(self) -> None:
+        """adapt() leaves checkpointing alone; the trainer owns that invariant.
+
+        This test asserts the ABSENCE of a call that used to be here, so it is
+        worth saying what it protects. ``adapt`` ran only on the fresh-run
+        path. A run continuing from ``pretrained_run_id`` is rebuilt by
+        ``load_adapted`` instead, so enabling checkpointing here meant
+        continuations trained without it -- measured at 22.84 GiB for a 124M
+        model on a 24 GB card. ``BaseTrainer.train`` now does it for both
+        paths. Restoring the call here would not break anything visibly; it
+        would just be a second place to keep in step, which is what this test
+        refuses.
+        """
         checkpointed: list[LMModelProto] = []
 
         def fake_enable_checkpointing(model: LMModelProto) -> None:
@@ -111,17 +122,14 @@ class TestFullFineTuneStrategyAdapt:
 
         strategy.adapt(model, "test/model", cfg)
 
-        assert len(checkpointed) == 1
-        assert checkpointed[0] is model
+        assert checkpointed == []
 
-    def test_adapt_skips_gradient_checkpointing_when_hook_not_set(self) -> None:
-        """Test that adapt() works when gradient checkpointing hook is None."""
-        # Hooks are reset by fixture, so enable_gradient_checkpointing is None
+    def test_adapt_returns_the_model_unchanged(self) -> None:
+        """Test that adapt() wraps the model without altering it."""
         strategy = FullFineTuneStrategy()
         model = FakeModel("base")
         cfg = make_test_config()
 
-        # Should not raise
         adapted = strategy.adapt(model, "test/model", cfg)
         assert adapted.model is model
 

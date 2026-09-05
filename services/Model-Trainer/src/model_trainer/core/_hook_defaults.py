@@ -45,6 +45,7 @@ from model_trainer.core._hook_protocols_ml import (
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.types import LMModelProto, TorchStateValue
 
@@ -245,6 +246,15 @@ def _default_freeze_embeddings(model: LMModelProto) -> None:
     )
 
     _freeze(model)
+
+
+def _default_enable_gradient_checkpointing(model: LMModelProto, strategy: StrategyName) -> bool:
+    """Production enable_gradient_checkpointing - used as default hook."""
+    from model_trainer.core.services.training.trainer_grad_utils import (
+        _enable_gradient_checkpointing_if_supported as _enable,
+    )
+
+    return _enable(model, strategy)
 
 
 def _default_shutil_which(cmd: str) -> str | None:

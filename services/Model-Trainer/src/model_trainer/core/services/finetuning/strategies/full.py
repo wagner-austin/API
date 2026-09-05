@@ -58,8 +58,17 @@ class FullFineTuneStrategy:
     ) -> AdaptedModel:
         """Adapt a model for full fine-tuning.
 
-        Enables gradient checkpointing if configured, but otherwise
-        leaves the model unchanged since all parameters will be trained.
+        Leaves the model unchanged, since all of its parameters will be
+        trained and there is no adapter to attach.
+
+        Gradient checkpointing is deliberately NOT enabled here. It used to
+        be, and that was the only place it happened for this strategy, so a
+        run rebuilt by :meth:`load_adapted` -- the ``pretrained_run_id``
+        continuation path -- trained without it. ``BaseTrainer.train`` now
+        owns that invariant for every arrival path. Unlike ``lora`` and
+        ``qlora``, which must checkpoint the base BEFORE wrapping it in a
+        PEFT model, this strategy wraps nothing, so a call here would be
+        pure duplication of the trainer's.
 
         Args:
             model: Base model to adapt.
@@ -69,9 +78,6 @@ class FullFineTuneStrategy:
         Returns:
             AdaptedModel wrapping the original model.
         """
-        # Enable gradient checkpointing for memory efficiency if hook is set
-        Hooks.enable_gradient_checkpointing(model)
-
         return AdaptedModel(
             model=model,
             base_model_id=model_id,

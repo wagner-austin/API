@@ -21,6 +21,7 @@ from model_trainer.api.schemas.tokenizers import (
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import CorpusSplit, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.types import LMModelProto
 
@@ -166,6 +167,14 @@ class FreezeEmbeddingsProto(Protocol):
 
     def __call__(self, model: LMModelProto) -> None:
         """Freeze embedding parameters in model."""
+        ...
+
+
+class EnableGradientCheckpointingProto(Protocol):
+    """Protocol for enable_gradient_checkpointing hook."""
+
+    def __call__(self, model: LMModelProto, strategy: StrategyName) -> bool:
+        """Enable activation checkpointing when the strategy supports it."""
         ...
 
 

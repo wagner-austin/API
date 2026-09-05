@@ -22,6 +22,7 @@ from model_trainer.core._hook_defaults import (
     _default_count_model_parameters,
     _default_datetime_utcnow_iso,
     _default_dump_json_str,
+    _default_enable_gradient_checkpointing,
     _default_env_git_commit,
     _default_env_image_digest,
     _default_freeze_embeddings,
@@ -118,6 +119,7 @@ from model_trainer.core._hook_protocols_ml import (
     CudaDeviceNameProto,
     CudaDriverVersionProto,
     CudaIsAvailableProto,
+    EnableGradientCheckpointingProto,
     FreezeEmbeddingsProto,
     LoadGpt2ModelProto,
     LoadPreparedGpt2FromHandleProto,
@@ -292,6 +294,10 @@ model_dir: ModelDirProto = _default_model_dir
 split_corpus: SplitCorpusProto = _default_split_corpus
 
 freeze_embeddings: FreezeEmbeddingsProto = _default_freeze_embeddings
+
+enable_gradient_checkpointing: EnableGradientCheckpointingProto = (
+    _default_enable_gradient_checkpointing
+)
 
 reload_shipped_weights: ReloadShippedWeightsProto = _default_reload_shipped_weights
 

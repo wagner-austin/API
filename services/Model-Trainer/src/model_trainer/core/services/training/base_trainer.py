@@ -72,6 +72,15 @@ class BaseTrainer(_TrainerLoop):
         model.train()
         model.to(str(self._device))
 
+        # Activation checkpointing, applied HERE because this is where both
+        # ways of arriving at training converge. A fresh run is built by a
+        # strategy's `apply`; a continuation -- `pretrained_run_id` set --
+        # is rebuilt by `load_adapted`, which cannot enable it because the
+        # same loader serves the scorer. Enabling it per-path left
+        # continuations training without it and OOMing a 124M model on a
+        # 24 GB card. See `_enable_gradient_checkpointing_if_supported`.
+        _test_hooks.enable_gradient_checkpointing(model, self._cfg["finetuning_strategy"])
+
         # Freeze embeddings if configured
         if self._cfg["freeze_embed"]:
             _test_hooks.freeze_embeddings(model)
