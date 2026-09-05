@@ -1,0 +1,36 @@
+{
+  "project": "mi",
+  "name": "cartridge-companions-diverse-v100-v36",
+  "image": {
+    "path": "/pub/wagnera3/images/v36/abl.sif",
+    "sha256": "0401aa9bfb61c6410a4dcb85cb10bcc567e980d3dcd7da631695c8ee96b14f28",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 120,
+  "mem_gb": 24,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_diverse_companion_sweep --plan gpt2-companions-diverse --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --companion-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-companions-diverse-v100-v36.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-companions-diverse-v100-v36.json",
+  "experiment": {
+    "measurement": "cartridge-diverse-companioned-composition",
+    "plan": "gpt2-companions-diverse",
+    "base_model": "gpt2",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "companion_pool": "epi.metabolomics.atmospheric-chemistry-member0-is-the-recorded-companion",
+    "seeds": "7.8.9",
+    "image_commit": "d894c6b2bac1722cd319d93cec43bf59299cdee9",
+    "single_companion_n4_retention": "0.446",
+    "single_companion_n8_retention": "0.265",
+    "varied_same_content_n4_retention": "0.510",
+    "varied_same_content_n8_retention": "0.183",
+    "naive_n8_fixed64_retention": "-0.070",
+    "why": "does-content-diversity-in-the-pool-close-the-content-interference-decay"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}
