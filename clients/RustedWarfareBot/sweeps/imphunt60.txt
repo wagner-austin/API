@@ -1,0 +1,71 @@
+# The hunt screen ([[impossible-economy-problem]] stage 3): both
+# arms on one lever. The party presses forming groups (damage
+# cancels staging and commits a group at whatever size it holds --
+# read from source, watched live in m32); hunt2/4/8 are the
+# hand-tuned arm, hunt4g stands the same party down while the
+# razing head predicts doom -- the smallest real learned-policy
+# instance. 12 shared fresh seeds 8726001-8730577,
+# difficulty 3, judged on paired margin, survival, and the wave
+# shape (units lost to, intercepts).
+#
+# label | seed | doctrine | samples
+control|8726001|doctrines/flame-nocover.doctrine|10000
+hunt2|8726001|doctrines/imp-hunt2.doctrine|10000
+hunt4|8726001|doctrines/imp-hunt4.doctrine|10000
+hunt8|8726001|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8726001|doctrines/imp-hunt4g.doctrine|10000
+control|8726417|doctrines/flame-nocover.doctrine|10000
+hunt2|8726417|doctrines/imp-hunt2.doctrine|10000
+hunt4|8726417|doctrines/imp-hunt4.doctrine|10000
+hunt8|8726417|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8726417|doctrines/imp-hunt4g.doctrine|10000
+control|8726833|doctrines/flame-nocover.doctrine|10000
+hunt2|8726833|doctrines/imp-hunt2.doctrine|10000
+hunt4|8726833|doctrines/imp-hunt4.doctrine|10000
+hunt8|8726833|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8726833|doctrines/imp-hunt4g.doctrine|10000
+control|8727249|doctrines/flame-nocover.doctrine|10000
+hunt2|8727249|doctrines/imp-hunt2.doctrine|10000
+hunt4|8727249|doctrines/imp-hunt4.doctrine|10000
+hunt8|8727249|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8727249|doctrines/imp-hunt4g.doctrine|10000
+control|8727665|doctrines/flame-nocover.doctrine|10000
+hunt2|8727665|doctrines/imp-hunt2.doctrine|10000
+hunt4|8727665|doctrines/imp-hunt4.doctrine|10000
+hunt8|8727665|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8727665|doctrines/imp-hunt4g.doctrine|10000
+control|8728081|doctrines/flame-nocover.doctrine|10000
+hunt2|8728081|doctrines/imp-hunt2.doctrine|10000
+hunt4|8728081|doctrines/imp-hunt4.doctrine|10000
+hunt8|8728081|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8728081|doctrines/imp-hunt4g.doctrine|10000
+control|8728497|doctrines/flame-nocover.doctrine|10000
+hunt2|8728497|doctrines/imp-hunt2.doctrine|10000
+hunt4|8728497|doctrines/imp-hunt4.doctrine|10000
+hunt8|8728497|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8728497|doctrines/imp-hunt4g.doctrine|10000
+control|8728913|doctrines/flame-nocover.doctrine|10000
+hunt2|8728913|doctrines/imp-hunt2.doctrine|10000
+hunt4|8728913|doctrines/imp-hunt4.doctrine|10000
+hunt8|8728913|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8728913|doctrines/imp-hunt4g.doctrine|10000
+control|8729329|doctrines/flame-nocover.doctrine|10000
+hunt2|8729329|doctrines/imp-hunt2.doctrine|10000
+hunt4|8729329|doctrines/imp-hunt4.doctrine|10000
+hunt8|8729329|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8729329|doctrines/imp-hunt4g.doctrine|10000
+control|8729745|doctrines/flame-nocover.doctrine|10000
+hunt2|8729745|doctrines/imp-hunt2.doctrine|10000
+hunt4|8729745|doctrines/imp-hunt4.doctrine|10000
+hunt8|8729745|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8729745|doctrines/imp-hunt4g.doctrine|10000
+control|8730161|doctrines/flame-nocover.doctrine|10000
+hunt2|8730161|doctrines/imp-hunt2.doctrine|10000
+hunt4|8730161|doctrines/imp-hunt4.doctrine|10000
+hunt8|8730161|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8730161|doctrines/imp-hunt4g.doctrine|10000
+control|8730577|doctrines/flame-nocover.doctrine|10000
+hunt2|8730577|doctrines/imp-hunt2.doctrine|10000
+hunt4|8730577|doctrines/imp-hunt4.doctrine|10000
+hunt8|8730577|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8730577|doctrines/imp-hunt4g.doctrine|10000
