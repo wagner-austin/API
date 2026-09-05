@@ -7,19 +7,13 @@ are normally replaced by fakes in other tests.
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
-
-import pytest
 
 from transcript_api._test_hooks import (
     _default_mkdtemp,
     _default_os_path_getsize,
     _default_os_remove,
     _default_os_stat,
-    _default_subprocess_run,
-    _run_subprocess_bytes,
-    _run_subprocess_text,
     _SubprocessRunResultImpl,
 )
 
@@ -80,155 +74,11 @@ def test_subprocess_run_result_impl_stores_values() -> None:
     assert result_none.stderr is None
 
 
-def test_run_subprocess_bytes_captures_output() -> None:
-    """Test _run_subprocess_bytes runs command and captures bytes output."""
-    result = _run_subprocess_bytes(
-        ["python", "-c", "print('hello')"],
-        capture_output=True,
-        check=False,
-        timeout=30.0,
-        input_data=None,
-        cwd=None,
-        env=None,
-    )
-    assert result.returncode == 0
-    # Type is bytes; comparison verifies both type and value
-    stdout = result.stdout
-    assert type(stdout) is bytes and stdout.strip() == b"hello"
-
-
-def test_run_subprocess_bytes_with_check_raises() -> None:
-    """Test _run_subprocess_bytes raises CalledProcessError when check=True."""
-    with pytest.raises(subprocess.CalledProcessError) as exc_info:
-        _run_subprocess_bytes(
-            ["python", "-c", "import sys; sys.exit(1)"],
-            capture_output=True,
-            check=True,
-            timeout=30.0,
-            input_data=None,
-            cwd=None,
-            env=None,
-        )
-    assert exc_info.value.returncode == 1
-
-
-def test_run_subprocess_bytes_with_input() -> None:
-    """Test _run_subprocess_bytes can pass input data."""
-    result = _run_subprocess_bytes(
-        ["python", "-c", "import sys; print(sys.stdin.read().strip())"],
-        capture_output=True,
-        check=False,
-        timeout=30.0,
-        input_data=b"test_input",
-        cwd=None,
-        env=None,
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is bytes and stdout.strip() == b"test_input"
-
-
-def test_run_subprocess_text_captures_output() -> None:
-    """Test _run_subprocess_text runs command and captures text output."""
-    result = _run_subprocess_text(
-        ["python", "-c", "print('hello_text')"],
-        capture_output=True,
-        check=False,
-        timeout=30.0,
-        input_data=None,
-        cwd=None,
-        env=None,
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is str and stdout.strip() == "hello_text"
-
-
-def test_run_subprocess_text_with_check_raises() -> None:
-    """Test _run_subprocess_text raises CalledProcessError when check=True."""
-    with pytest.raises(subprocess.CalledProcessError) as exc_info:
-        _run_subprocess_text(
-            ["python", "-c", "import sys; sys.exit(2)"],
-            capture_output=True,
-            check=True,
-            timeout=30.0,
-            input_data=None,
-            cwd=None,
-            env=None,
-        )
-    assert exc_info.value.returncode == 2
-
-
-def test_run_subprocess_text_with_input() -> None:
-    """Test _run_subprocess_text can pass input data."""
-    result = _run_subprocess_text(
-        ["python", "-c", "import sys; print(sys.stdin.read().strip())"],
-        capture_output=True,
-        check=False,
-        timeout=30.0,
-        input_data="text_input",
-        cwd=None,
-        env=None,
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is str and stdout.strip() == "text_input"
-
-
-def test_default_subprocess_run_bytes_mode() -> None:
-    """Test _default_subprocess_run in bytes mode (text=False)."""
-    result = _default_subprocess_run(
-        ["python", "-c", "print('bytes_mode')"],
-        capture_output=True,
-        text=False,
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is bytes and stdout.strip() == b"bytes_mode"
-
-
-def test_default_subprocess_run_text_mode() -> None:
-    """Test _default_subprocess_run in text mode (text=True)."""
-    result = _default_subprocess_run(
-        ["python", "-c", "print('text_mode')"],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is str and stdout.strip() == "text_mode"
-
-
-def test_default_subprocess_run_bytes_with_str_input() -> None:
-    """Test _default_subprocess_run encodes str input when text=False."""
-    result = _default_subprocess_run(
-        ["python", "-c", "import sys; print(sys.stdin.read().strip())"],
-        capture_output=True,
-        text=False,
-        input="str_as_bytes",
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is bytes and stdout.strip() == b"str_as_bytes"
-
-
-def test_default_subprocess_run_bytes_with_bytes_input() -> None:
-    """Test _default_subprocess_run passes bytes input directly when text=False."""
-    result = _default_subprocess_run(
-        ["python", "-c", "import sys; print(sys.stdin.read().strip())"],
-        capture_output=True,
-        text=False,
-        input=b"raw_bytes",
-    )
-    assert result.returncode == 0
-    stdout = result.stdout
-    assert type(stdout) is bytes and stdout.strip() == b"raw_bytes"
-
-
 def test_default_audio_chunker_factory_creates_chunker() -> None:
     """Test _default_audio_chunker_factory creates an AudioChunker instance."""
+    from platform_stt.chunker import AudioChunker
+
     from transcript_api._test_hooks import _default_audio_chunker_factory
-    from transcript_api.chunker import AudioChunker
 
     chunker = _default_audio_chunker_factory(
         target_chunk_mb=20.0,

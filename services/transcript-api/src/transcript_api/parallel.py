@@ -4,9 +4,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import BinaryIO, Literal, Protocol, runtime_checkable
 
 from platform_core.logging import get_logger
+from platform_stt import VerboseResponse
+from platform_stt.whisper_parse import convert_verbose_to_segments
 
-from .types import AudioChunk, TranscriptSegmentList, VerboseResponseTD
-from .whisper_parse import convert_verbose_to_segments
+from .types import AudioChunk, TranscriptSegmentList
 
 
 @runtime_checkable
@@ -18,7 +19,7 @@ class TranscribeFn(Protocol):
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         timeout: float | None = None,
-    ) -> VerboseResponseTD: ...
+    ) -> VerboseResponse: ...
 
 
 class ParallelTranscriber:

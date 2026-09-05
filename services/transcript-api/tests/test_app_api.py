@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, TranscriptErrorCode
 from platform_core.json_utils import load_json_str
+from platform_stt import VerboseResponse, VerboseSegment
 
 from transcript_api.api.main import (
     AppDeps,
@@ -31,8 +32,6 @@ from transcript_api.stt_provider import ProbeDownloadClient, STTClient
 from transcript_api.types import (
     RawTranscriptItem,
     SubtitleResultTD,
-    VerboseResponseTD,
-    VerboseSegmentTD,
     YtInfoTD,
 )
 
@@ -71,7 +70,7 @@ class _FakeYTClient(YouTubeTranscriptClient):
 
 
 class _FakeSTTClient(STTClient):
-    def __init__(self, segments: list[VerboseSegmentTD]) -> None:
+    def __init__(self, segments: list[VerboseSegment]) -> None:
         self._segments = segments
 
     def transcribe_verbose(
@@ -79,9 +78,9 @@ class _FakeSTTClient(STTClient):
         *,
         file: BinaryIO,
         timeout: float | None,
-    ) -> VerboseResponseTD:
+    ) -> VerboseResponse:
         # Return structure compatible with convert_verbose_to_segments
-        return {"text": "", "segments": self._segments}
+        return {"text": "", "language": None, "segments": self._segments}
 
 
 class _FakeProbeDownload(ProbeDownloadClient):

@@ -10,6 +10,7 @@ from typing import BinaryIO, Protocol
 
 import pytest
 from platform_core.errors import AppError
+from platform_stt import VerboseResponse, VerboseSegment
 
 from transcript_api import _test_hooks
 from transcript_api.stt_provider import (
@@ -18,8 +19,6 @@ from transcript_api.stt_provider import (
 from transcript_api.types import (
     AudioChunk,
     SubtitleResultTD,
-    VerboseResponseTD,
-    VerboseSegmentTD,
     YtInfoTD,
 )
 
@@ -33,11 +32,11 @@ class _StubSTTClient:
         self._responses = responses
         self.calls = 0
 
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
         data = file.read()
         self.calls += 1
         size = len(data)
-        segments: list[VerboseSegmentTD] = []
+        segments: list[VerboseSegment] = []
         for idx, base in enumerate(self._responses):
             text = f"{base.get('text', '')} {size}" if idx == 0 else str(base.get("text", ""))
             segments.append(
@@ -47,7 +46,7 @@ class _StubSTTClient:
                     "end": float(base.get("end", 1.0)),
                 }
             )
-        return {"text": "", "segments": segments}
+        return {"text": "", "language": None, "segments": segments}
 
 
 class _StubProbeDownloadClient:

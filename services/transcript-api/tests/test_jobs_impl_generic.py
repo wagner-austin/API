@@ -9,6 +9,7 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import stdlib_logging
 from platform_core.testing import make_fake_env
+from platform_stt import VerboseResponse
 from platform_workers.testing import FakeRedis
 
 from transcript_api import _test_hooks
@@ -28,7 +29,6 @@ from transcript_api.types import (
     SubtitleResultTD,
     TranscriptOptions,
     TranscriptSegment,
-    VerboseResponseTD,
     YtInfoTD,
 )
 
@@ -36,8 +36,8 @@ from transcript_api.types import (
 class _StubSTTClient:
     """Stub STT client implementing STTClientProto."""
 
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
-        return {"text": "hello world", "segments": []}
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
+        return {"text": "hello world", "language": None, "segments": []}
 
 
 class _StubProbeClient:
@@ -334,8 +334,8 @@ class _TestSTTClient:
     def __init__(self, api_key: str) -> None:
         _stt_api_key_captured.append(api_key)
 
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
-        return {"text": "", "segments": []}
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
+        return {"text": "", "language": None, "segments": []}
 
 
 def _make_test_stt_client_builder() -> Callable[[str], STTClientProto]:
@@ -443,8 +443,8 @@ class _DecodeTestSTTClient:
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
 
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
-        return {"text": "", "segments": []}
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
+        return {"text": "", "language": None, "segments": []}
 
 
 class _DecodeTestProbeClient:

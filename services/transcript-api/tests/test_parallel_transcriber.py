@@ -6,9 +6,10 @@ import tempfile
 from typing import BinaryIO, Literal
 
 import pytest
+from platform_stt import VerboseResponse
 
 from transcript_api.parallel import ParallelTranscriber
-from transcript_api.types import AudioChunk, VerboseResponseTD
+from transcript_api.types import AudioChunk
 
 
 def _make_chunk(contents: bytes, start: float, dur: float) -> AudioChunk:
@@ -45,9 +46,13 @@ def test_parallel_transcriber_returns_segments_per_chunk() -> None:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         timeout: float | None = None,
-    ) -> VerboseResponseTD:
+    ) -> VerboseResponse:
         data = file.read()
-        return {"text": "", "segments": [{"text": f"{len(data)} bytes", "start": 0.0, "end": 1.0}]}
+        return {
+            "text": "",
+            "language": None,
+            "segments": [{"text": f"{len(data)} bytes", "start": 0.0, "end": 1.0}],
+        }
 
     pt = ParallelTranscriber(transcribe=fake_transcribe, max_concurrent=2, max_retries=0)
     chunks = [
@@ -73,12 +78,16 @@ def test_parallel_transcriber_retries_then_succeeds() -> None:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         timeout: float | None = None,
-    ) -> VerboseResponseTD:
+    ) -> VerboseResponse:
         attempts.append(1)
         if len(attempts) == 1:
             raise TimeoutError("transient")
         data = file.read()
-        return {"text": "", "segments": [{"text": f"{len(data)} bytes", "start": 0.0, "end": 1.0}]}
+        return {
+            "text": "",
+            "language": None,
+            "segments": [{"text": f"{len(data)} bytes", "start": 0.0, "end": 1.0}],
+        }
 
     pt = ParallelTranscriber(
         transcribe=flaky_transcribe,
@@ -106,7 +115,7 @@ def test_parallel_transcriber_raises_after_retry_exhausted() -> None:
         file: BinaryIO,
         response_format: Literal["verbose_json"],
         timeout: float | None = None,
-    ) -> VerboseResponseTD:
+    ) -> VerboseResponse:
         calls.append(1)
         raise OSError("persistent failure")
 

@@ -6,6 +6,7 @@ from typing import BinaryIO
 
 from fastapi.testclient import TestClient
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_stt import VerboseResponse
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
@@ -13,7 +14,7 @@ from transcript_api.api.main import AppDeps, create_app
 from transcript_api.dependencies import provider_context
 from transcript_api.provider import TranscriptListing, TranscriptResource
 from transcript_api.service import Clients, Config
-from transcript_api.types import RawTranscriptItem, SubtitleResultTD, VerboseResponseTD, YtInfoTD
+from transcript_api.types import RawTranscriptItem, SubtitleResultTD, YtInfoTD
 
 
 class _StubResource:
@@ -38,8 +39,8 @@ class _StubYTClient:
 
 
 class _StubSTTClient:
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
-        return {"text": "", "segments": []}
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
+        return {"text": "", "language": None, "segments": []}
 
 
 class _StubProbeClient:

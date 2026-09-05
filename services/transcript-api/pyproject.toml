@@ -20,6 +20,7 @@ hypercorn = "^0.18"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
+platform-stt = { path = "../../libs/platform_stt", develop = true }
 redis = "^7.1"
 rq = "^2.3"
 openai = "^2.8.0"

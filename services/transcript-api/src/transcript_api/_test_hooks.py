@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import tempfile
 from collections.abc import Callable
 from typing import BinaryIO, Protocol
 
 from platform_core.json_utils import JSONValue
+from platform_stt import VerboseResponse
+from platform_stt import _test_hooks as stt_hooks
 from platform_workers.redis import RedisStrProto, redis_for_kv
 from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
@@ -18,7 +19,6 @@ from .types import (
     SubtitleResultTD,
     TranscriptOptions,
     TranscriptSegment,
-    VerboseResponseTD,
     YtDlpProto,
     YtInfoTD,
 )
@@ -142,7 +142,7 @@ class STTClientProto(Protocol):
         *,
         file: BinaryIO,
         timeout: float | None,
-    ) -> VerboseResponseTD: ...
+    ) -> VerboseResponse: ...
 
 
 class ProbeDownloadClientProto(Protocol):
@@ -244,92 +244,6 @@ class _SubprocessRunResultImpl:
         self.stderr = stderr
 
 
-def _run_subprocess_bytes(
-    args: list[str],
-    capture_output: bool,
-    check: bool,
-    timeout: float | None,
-    input_data: bytes | None,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> _SubprocessRunResultImpl:
-    """Run subprocess and return bytes output."""
-    stdout_pipe = subprocess.PIPE if capture_output else None
-    stderr_pipe = subprocess.PIPE if capture_output else None
-    stdin_pipe = subprocess.PIPE if input_data is not None else None
-
-    proc: subprocess.Popen[bytes] = subprocess.Popen(
-        args,
-        stdout=stdout_pipe,
-        stderr=stderr_pipe,
-        stdin=stdin_pipe,
-        cwd=cwd,
-        env=env,
-    )
-    stdout_bytes, stderr_bytes = proc.communicate(input=input_data, timeout=timeout)
-    returncode: int = proc.returncode
-
-    if check and returncode != 0:
-        raise subprocess.CalledProcessError(returncode, args, stdout_bytes, stderr_bytes)
-
-    return _SubprocessRunResultImpl(returncode, stdout_bytes, stderr_bytes)
-
-
-def _run_subprocess_text(
-    args: list[str],
-    capture_output: bool,
-    check: bool,
-    timeout: float | None,
-    input_data: str | None,
-    cwd: str | None,
-    env: dict[str, str] | None,
-) -> _SubprocessRunResultImpl:
-    """Run subprocess and return text output."""
-    stdout_pipe = subprocess.PIPE if capture_output else None
-    stderr_pipe = subprocess.PIPE if capture_output else None
-    stdin_pipe = subprocess.PIPE if input_data is not None else None
-
-    proc: subprocess.Popen[str] = subprocess.Popen(
-        args,
-        stdout=stdout_pipe,
-        stderr=stderr_pipe,
-        stdin=stdin_pipe,
-        text=True,
-        cwd=cwd,
-        env=env,
-    )
-    stdout_str, stderr_str = proc.communicate(input=input_data, timeout=timeout)
-    returncode: int = proc.returncode
-
-    if check and returncode != 0:
-        raise subprocess.CalledProcessError(returncode, args, stdout_str, stderr_str)
-
-    return _SubprocessRunResultImpl(returncode, stdout_str, stderr_str)
-
-
-def _default_subprocess_run(
-    args: list[str],
-    *,
-    capture_output: bool = False,
-    check: bool = False,
-    timeout: float | None = None,
-    text: bool = False,
-    input: bytes | str | None = None,
-    cwd: str | None = None,
-    env: dict[str, str] | None = None,
-) -> SubprocessRunResult:
-    """Production implementation - uses typed Popen to avoid Any types."""
-    if text:
-        input_str: str | None = input if isinstance(input, str) else None
-        return _run_subprocess_text(args, capture_output, check, timeout, input_str, cwd, env)
-    input_bytes: bytes | None = None
-    if isinstance(input, str):
-        input_bytes = input.encode()
-    elif isinstance(input, bytes):
-        input_bytes = input
-    return _run_subprocess_bytes(args, capture_output, check, timeout, input_bytes, cwd, env)
-
-
 def _default_openai_client_factory(
     *, api_key: str, timeout: float, max_retries: int
 ) -> OpenAIClientProto:
@@ -385,7 +299,7 @@ def _default_audio_chunker_factory(
     silence_duration_seconds: float,
 ) -> AudioChunkerProto:
     """Production implementation - creates real AudioChunker."""
-    from .chunker import AudioChunker
+    from platform_stt.chunker import AudioChunker
 
     chunker: AudioChunkerProto = AudioChunker(
         target_chunk_mb=target_chunk_mb,
@@ -476,7 +390,7 @@ mkdtemp: Callable[[str | None, str | None], str] = _default_mkdtemp
 os_remove: Callable[[str], None] = _default_os_remove
 
 # Hook for subprocess.run - typed loosely to allow various return types
-subprocess_run: SubprocessRunProtocol = _default_subprocess_run
+subprocess_run: SubprocessRunProtocol = stt_hooks._default_subprocess_run
 
 # Hook for OpenAI client factory
 openai_client_factory: OpenAIClientFactoryProto = _default_openai_client_factory
@@ -510,17 +424,8 @@ probe_client_builder: Callable[[], ProbeDownloadClientProto] = _default_probe_cl
 stt_provider_factory: STTProviderFactoryProto = _default_stt_provider_factory
 
 
-def _default_ffmpeg_available() -> bool:
-    """Production implementation - checks if ffmpeg/ffprobe are available."""
-    from shutil import which
-
-    ffmpeg = which("ffmpeg")
-    ffprobe = which("ffprobe")
-    return bool(ffmpeg and ffprobe)
-
-
 # Hook for ffmpeg availability check
-ffmpeg_available: Callable[[], bool] = _default_ffmpeg_available
+ffmpeg_available: Callable[[], bool] = stt_hooks._default_ffmpeg_available
 
 
 __all__ = [
@@ -541,7 +446,6 @@ __all__ = [
     "YTTranscriptResourceProto",
     "YtDlpFactoryProto",
     "_default_audio_chunker_factory",
-    "_default_ffmpeg_available",
     "_default_mkdtemp",
     "_default_openai_client_factory",
     "_default_os_path_getsize",
@@ -551,7 +455,6 @@ __all__ = [
     "_default_redis_for_kv",
     "_default_stt_client_builder",
     "_default_stt_provider_factory",
-    "_default_subprocess_run",
     "_default_yt_api_factory",
     "_default_yt_dlp_factory",
     "_default_yt_exceptions_factory",

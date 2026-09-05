@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import BinaryIO
 
+from platform_stt import VerboseResponse
+from platform_stt.whisper_parse import to_verbose_response
+
 from .. import _test_hooks
 from ..stt_provider import STTClient
-from ..types import OpenAIClientProto, VerboseResponseTD
-from ..whisper_parse import to_verbose_dict
+from ..types import OpenAIClientProto
 
 
 class OpenAISttClient(STTClient):
@@ -32,7 +34,7 @@ class OpenAISttClient(STTClient):
             max_retries=self.max_retries,
         )
 
-    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponse:
         client = self._client
         raw = client.audio.transcriptions.create(
             model="whisper-1",
@@ -40,7 +42,7 @@ class OpenAISttClient(STTClient):
             response_format="verbose_json",
             timeout=timeout,
         )
-        return to_verbose_dict(raw)
+        return to_verbose_response(raw)
 
 
 __all__ = ["OpenAISttClient"]

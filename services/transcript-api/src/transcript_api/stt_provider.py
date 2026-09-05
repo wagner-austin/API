@@ -8,6 +8,8 @@ from typing import BinaryIO, Literal, Protocol, runtime_checkable
 
 from platform_core.errors import AppError, TranscriptErrorCode
 from platform_core.logging import get_logger
+from platform_stt import VerboseResponse
+from platform_stt.whisper_parse import convert_verbose_to_segments
 from typing_extensions import TypedDict
 
 from . import _test_hooks
@@ -18,12 +20,10 @@ from .types import (
     SubtitleResultTD,
     TranscriptOptions,
     TranscriptSegment,
-    VerboseResponseTD,
     YtInfoTD,
 )
 from .url.direct import is_direct_url
 from .vtt_parser import parse_vtt_file
-from .whisper_parse import convert_verbose_to_segments
 
 
 @runtime_checkable
@@ -40,7 +40,7 @@ class STTClient(Protocol):
         *,
         file: BinaryIO,
         timeout: float | None,
-    ) -> VerboseResponseTD: ...
+    ) -> VerboseResponse: ...
 
 
 @runtime_checkable
@@ -405,7 +405,7 @@ class STTTranscriptProvider:
             file: BinaryIO,
             response_format: Literal["verbose_json"],
             timeout: float | None = None,
-        ) -> VerboseResponseTD:
+        ) -> VerboseResponse:
             return self.stt_client.transcribe_verbose(file=file, timeout=timeout)
 
         transcriber = ParallelTranscriber(

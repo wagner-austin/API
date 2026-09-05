@@ -19,7 +19,11 @@ class _FakeTranscriptionResult:
     def to_dict_recursive(
         self,
     ) -> dict[str, str | int | float | bool | list[dict[str, str | int | float]] | None]:
-        return {"text": "", "segments": [{"text": "ok", "start": 0.0, "end": 0.1}]}
+        return {
+            "text": "",
+            "language": None,
+            "segments": [{"text": "ok", "start": 0.0, "end": 0.1}],
+        }
 
 
 class _FakeTranscriptions:

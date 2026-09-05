@@ -140,15 +140,6 @@ class RawTranscriptItem(TypedDict):
 
 
 # OpenAI verbose response (canonical typed shape)
-class VerboseSegmentTD(TypedDict):
-    text: str
-    start: float
-    end: float
-
-
-class VerboseResponseTD(TypedDict):
-    text: str
-    segments: list[VerboseSegmentTD]
 
 
 # yt-dlp info structures (only the fields we consume)
