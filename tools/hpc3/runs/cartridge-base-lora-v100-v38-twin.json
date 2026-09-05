@@ -1,0 +1,36 @@
+{
+  "project": "mi",
+  "name": "cartridge-base-lora-v100-v38-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v38/abl.sif",
+    "sha256": "13bd47e9e68452cd8e1d558c1eae7c5712f03c628bb4370e8d1b2f7615e103f8",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 180,
+  "mem_gb": 24,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_base_lora_sweep --plan gpt2-base-lora --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --pool-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-base-lora-v100-v38-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-base-lora-v100-v38-twin.json",
+  "experiment": {
+    "measurement": "cartridge-base-lora-composition",
+    "plan": "gpt2-base-lora",
+    "base_model": "gpt2",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "pool_corpora": "epi.metabolomics.atmospheric-chemistry",
+    "seeds": "7.8.9",
+    "image_commit": "e1bc2009121249c73e2a9881c6c71d94f83d9539",
+    "naive_n4_retention": "-0.454",
+    "naive_n8_retention": "-0.070",
+    "diverse_n4_retention": "0.555",
+    "diverse_n8_retention": "0.280",
+    "why": "does-a-base-taught-to-read-crowds-rescue-plain-cartridges-and-compose-with-the-diverse-recipe"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1,
+    "gpu_pinned_because": "bit-identity twin: the certificate is byte-equality with job 55787810, which ran on a V100 -- a different card model produces honestly different bytes and certifies nothing"
+  }
+}

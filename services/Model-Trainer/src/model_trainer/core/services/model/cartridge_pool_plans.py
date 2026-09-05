@@ -218,6 +218,31 @@ BASE_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # The lever aimed at the base that needs it: gpt2-medium COLLAPSED at n8
+    # (-86.6%, cross-node bit-identical) because depth compounds crowded-
+    # prefix interference, and the gpt2 record proved the LoRA repairs
+    # exactly that structural component (-45.4% -> -6.9% at n4 with plain
+    # cartridges). Every field but the base matches ``gpt2-base-lora`` --
+    # the schedule and LoRA knobs deliberately included, so scale is not
+    # confounded with tuning.
+    "gpt2-medium-base-lora": {
+        "model_id": "gpt2-medium",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 

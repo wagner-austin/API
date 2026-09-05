@@ -279,6 +279,15 @@ class TestProductionPlan:
         assert lora["max_drawn"] == 8
         assert lora["pool_members_per_corpus"] == 3
 
+    def test_the_medium_rung_differs_from_the_recorded_plan_only_in_the_base(self) -> None:
+        """The medium row isolates parameter count: every other field --
+        schedule and LoRA knobs deliberately included -- must equal the
+        recorded plan, or scale is confounded with tuning."""
+        recorded = BASE_LORA_SWEEP_PLANS["gpt2-base-lora"]
+        medium = BASE_LORA_SWEEP_PLANS["gpt2-medium-base-lora"]
+        assert medium["model_id"] == "gpt2-medium"
+        assert {**medium, "model_id": recorded["model_id"]} == recorded
+
     def test_the_seed_geography_cannot_collide(self) -> None:
         """The LoRA and pool seeds sit past every measurement offset."""
         plan = BASE_LORA_SWEEP_PLANS["gpt2-base-lora"]
