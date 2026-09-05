@@ -31,9 +31,6 @@ from tankpit_bot.types import (
 
 log = get_logger(__name__)
 
-OnMessageCapturedFunc = Callable[[CapturedMessage], None]
-OnMagicCapturedFunc = Callable[[str], None]
-
 
 class CDPService:
     """Owns CDP event handling, WebSocket frame capture, and magic key extraction.
@@ -48,8 +45,8 @@ class CDPService:
         self.ws_urls: dict[str, str] = {}
         self.magic: str | None = None
         self.cdp: CDPSessionProtocol | None = None
-        self._on_message_captured: OnMessageCapturedFunc | None = None
-        self._on_magic_captured: OnMagicCapturedFunc | None = None
+        self._on_message_captured: Callable[[CapturedMessage], None] | None = None
+        self._on_magic_captured: Callable[[str], None] | None = None
         # The CDP clock's origin is this session's; anchoring it here
         # means a second session cannot read its frames through the
         # first session's offset ([[session-state-deglobalisation]]).
@@ -58,8 +55,8 @@ class CDPService:
     def set_callbacks(
         self,
         *,
-        on_message_captured: OnMessageCapturedFunc,
-        on_magic_captured: OnMagicCapturedFunc,
+        on_message_captured: Callable[[CapturedMessage], None],
+        on_magic_captured: Callable[[str], None],
     ) -> None:
         """Wire callbacks after construction.
 

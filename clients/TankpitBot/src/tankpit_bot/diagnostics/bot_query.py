@@ -156,10 +156,9 @@ def load_records(path: Path) -> list[BotQueryRecord]:
 
 # Stream signature used by each query helper. ``Callable[[str], int]``
 # matches both ``sys.stdout.write`` and the test recorder's write.
-StreamWrite = Callable[[str], int]
 
 
-def query_timeline(records: list[BotQueryRecord], write: StreamWrite) -> None:
+def query_timeline(records: list[BotQueryRecord], write: Callable[[str], int]) -> None:
     """Print one line per STATE / WIRE / DIAGNOSTIC event.
 
     Each line carries the timestamp, channel, the active ``tick_n`` (or
@@ -193,7 +192,7 @@ def _is_action_outcome(rec: BotQueryRecord) -> bool:
     )
 
 
-def query_stalls(records: list[BotQueryRecord], write: StreamWrite) -> None:
+def query_stalls(records: list[BotQueryRecord], write: Callable[[str], int]) -> None:
     """Print every ``action_outcome`` event with ``outcome=stall_timeout``.
 
     Each line carries the timestamp, the action_kind that stalled, its
@@ -221,7 +220,7 @@ def query_stalls(records: list[BotQueryRecord], write: StreamWrite) -> None:
         )
 
 
-def query_action_spans(records: list[BotQueryRecord], write: StreamWrite) -> None:
+def query_action_spans(records: list[BotQueryRecord], write: Callable[[str], int]) -> None:
     """Pair WIRE dispatch events with their ``action_outcome`` resolutions.
 
     Args:
@@ -269,7 +268,7 @@ def query_action_spans(records: list[BotQueryRecord], write: StreamWrite) -> Non
         )
 
 
-def query_target_decisions(records: list[BotQueryRecord], write: StreamWrite) -> None:
+def query_target_decisions(records: list[BotQueryRecord], write: Callable[[str], int]) -> None:
     """Print every HUNT score event with the target tile and score.
 
     Args:
@@ -311,7 +310,7 @@ _USAGE_BLOCK = (
 )
 
 
-_QUERIES: dict[str, Callable[[list[BotQueryRecord], StreamWrite], None]] = {
+_QUERIES: dict[str, Callable[[list[BotQueryRecord], Callable[[str], int]], None]] = {
     "timeline": query_timeline,
     "stalls": query_stalls,
     "action-spans": query_action_spans,
@@ -338,7 +337,7 @@ def run(argv: list[str]) -> int:
         return 1
     path = Path(argv[1]) if len(argv) == 2 else DEFAULT_EVENTS_PATH
     records = load_records(path)
-    writer: StreamWrite = sys.stdout.write
+    writer: Callable[[str], int] = sys.stdout.write
     _QUERIES[query_name](records, writer)
     return 0
 

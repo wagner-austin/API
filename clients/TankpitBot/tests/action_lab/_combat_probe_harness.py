@@ -117,22 +117,6 @@ class TeleportCommandFn(Protocol):
         """Dispatch the teleport and wait for its outcome."""
 
 
-LandingTileFn = Callable[
-    [
-        WorldStateDict,
-        SelfStateDict,
-        EnemyThreatDict,
-        TerrainMapProtocol | None,
-        int,
-        WorldService,
-    ],
-    tuple[int, int],
-]
-TerrainMapFn = Callable[[], TerrainMapProtocol | None]
-FindFreshEnemyFn = Callable[[ProbeBase, int, frozenset[int]], EnemyThreatDict | None]
-CurrentEnemyFn = Callable[[ProbeBase, int], EnemyThreatDict | None]
-
-
 def _make_world(
     timestamp_ms: int,
     x: int,
@@ -387,10 +371,20 @@ class _CombatModuleProtocol(Protocol):
     CombatProbe: type[CombatProbe]
     run_tracked_acquisition_phase: AcquisitionPhaseFn
     run_tracked_teleport_command: TeleportCommandFn
-    choose_combat_landing_tile: LandingTileFn
-    get_terrain_map: TerrainMapFn
-    _find_fresh_enemy: FindFreshEnemyFn
-    _current_enemy_by_id: CurrentEnemyFn
+    choose_combat_landing_tile: Callable[
+        [
+            WorldStateDict,
+            SelfStateDict,
+            EnemyThreatDict,
+            TerrainMapProtocol | None,
+            int,
+            WorldService,
+        ],
+        tuple[int, int],
+    ]
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
+    _find_fresh_enemy: Callable[[ProbeBase, int, frozenset[int]], EnemyThreatDict | None]
+    _current_enemy_by_id: Callable[[ProbeBase, int], EnemyThreatDict | None]
 
 
 _combat_module_import = __import__(

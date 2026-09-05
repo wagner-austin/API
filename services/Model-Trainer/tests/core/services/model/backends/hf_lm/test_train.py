@@ -14,7 +14,6 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel, TrainOutcome
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     Hooks,
-    ProgressCallback,
     TrainerProto,
     reset_hooks,
 )
@@ -44,7 +43,10 @@ class _FakeTrainer:
         run_id: str,
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
-        progress: ProgressCallback | None,
+        progress: (
+            Callable[[int, int, float, float, float, float, float | None, float | None], None]
+            | None
+        ),
         service_name: str,
         wandb_publisher: WandbPublisher | None,
     ) -> None:
@@ -93,7 +95,10 @@ class _CapturingTrainerFactory:
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
         resume: bool,
-        progress: ProgressCallback | None,
+        progress: (
+            Callable[[int, int, float, float, float, float, float | None, float | None], None]
+            | None
+        ),
         service_name: str,
         wandb_publisher: WandbPublisher | None,
         determinism: DeterminismRecord | None,

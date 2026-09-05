@@ -18,7 +18,6 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
-    ProgressCallback,
     QuantizationConfig,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
@@ -169,7 +168,9 @@ def _default_create_trainer(
     redis_hb: Callable[[float], None],
     cancelled: Callable[[], bool],
     resume: bool,
-    progress: ProgressCallback | None,
+    progress: (
+        Callable[[int, int, float, float, float, float, float | None, float | None], None] | None
+    ),
     service_name: str,
     wandb_publisher: WandbPublisher | None,
     determinism: DeterminismRecord,
@@ -414,7 +415,6 @@ __all__ = [
     "Hooks",
     "ModelDirFn",
     "PreparedModelLoader",
-    "ProgressCallback",
     "ReadTextFileFn",
     "TokenizerLoader",
     "TrainerProto",

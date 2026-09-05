@@ -26,7 +26,6 @@ from model_trainer.core.contracts.model import (
     ModelBackend,
     ModelTrainConfig,
     PreparedLMModel,
-    ProgressCallback,
     TrainOutcome,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
@@ -138,7 +137,9 @@ def _train(
     cancelled: Callable[[], bool],
     resume: bool,
     prepared: PreparedLMModel,
-    progress: ProgressCallback | None = None,
+    progress: (
+        Callable[[int, int, float, float, float, float, float | None, float | None], None] | None
+    ) = None,
 ) -> TrainOutcome:
     """Run one training execution through the backend under test."""
     return backend.train(

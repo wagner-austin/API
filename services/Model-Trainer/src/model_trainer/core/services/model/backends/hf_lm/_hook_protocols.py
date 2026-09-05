@@ -14,7 +14,6 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
-    ProgressCallback,
     QuantizationConfig,
     TrainOutcome,
 )
@@ -234,7 +233,10 @@ class CreateTrainerFn(Protocol):
         redis_hb: Callable[[float], None],
         cancelled: Callable[[], bool],
         resume: bool,
-        progress: ProgressCallback | None,
+        progress: (
+            Callable[[int, int, float, float, float, float, float | None, float | None], None]
+            | None
+        ),
         service_name: str,
         wandb_publisher: WandbPublisher | None,
         determinism: DeterminismRecord,

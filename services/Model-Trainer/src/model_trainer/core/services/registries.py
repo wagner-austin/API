@@ -8,18 +8,16 @@ from ..contracts.dataset import DatasetBuilder
 from ..contracts.model import BackendCapabilities, ModelBackend
 from ..contracts.tokenizer import TokenizerBackend
 
-BackendFactory = Callable[[DatasetBuilder], ModelBackend]
-
 
 class BackendRegistration:
     """Registration entry for a model backend with factory and capabilities."""
 
-    factory: BackendFactory
+    factory: Callable[[DatasetBuilder], ModelBackend]
     capabilities: BackendCapabilities
 
     def __init__(
         self: BackendRegistration,
-        factory: BackendFactory,
+        factory: Callable[[DatasetBuilder], ModelBackend],
         capabilities: BackendCapabilities,
     ) -> None:
         self.factory = factory

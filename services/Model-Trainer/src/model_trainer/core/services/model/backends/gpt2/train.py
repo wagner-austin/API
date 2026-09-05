@@ -11,7 +11,6 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
-    ProgressCallback,
     TrainOutcome,
 )
 from model_trainer.core.services.training.base_trainer import BaseTrainer
@@ -26,7 +25,9 @@ def train_prepared_gpt2(
     redis_hb: Callable[[float], None],
     cancelled: Callable[[], bool],
     resume: bool,
-    progress: ProgressCallback | None = None,
+    progress: (
+        Callable[[int, int, float, float, float, float, float | None, float | None], None] | None
+    ) = None,
     wandb_publisher: WandbPublisher | None = None,
     determinism: DeterminismRecord,
 ) -> TrainOutcome:

@@ -12,16 +12,14 @@ from typing import Literal, Protocol
 
 from tests.action_lab._combat_probe_harness import (
     AcquisitionPhaseFn,
-    LandingTileFn,
     TeleportCommandFn,
-    TerrainMapFn,
 )
 from tests.action_lab._replay_core import (
     StubbedBootstrapMixin,
     WorldStateOverrideMixin,
 )
 
-from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot._test_hooks import CDPSessionProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.enemy_tracking import EnemyTrackingProbe
 from tankpit_bot.action_lab.enemy_tracking_types import (
@@ -48,8 +46,6 @@ _SnapshotPhase = Literal[
     "landed",
     "timeout",
 ]
-
-CaptureSnapshotFn = Callable[[CDPSessionProtocol], PageClientSnapshotDict]
 
 
 class AnalyzeThreatsFn(Protocol):
@@ -222,10 +218,20 @@ class _TrackingModuleProtocol(Protocol):
     EnemyTrackingProbe: type[EnemyTrackingProbe]
     run_tracked_acquisition_phase: AcquisitionPhaseFn
     run_tracked_teleport_command: TeleportCommandFn
-    choose_combat_landing_tile: LandingTileFn
-    get_terrain_map: TerrainMapFn
+    choose_combat_landing_tile: Callable[
+        [
+            WorldStateDict,
+            SelfStateDict,
+            EnemyThreatDict,
+            TerrainMapProtocol | None,
+            int,
+            WorldService,
+        ],
+        tuple[int, int],
+    ]
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
     analyze_threats: AnalyzeThreatsFn
-    capture_page_client_snapshot: CaptureSnapshotFn
+    capture_page_client_snapshot: Callable[[CDPSessionProtocol], PageClientSnapshotDict]
     _wait_for_shot_feedback: ShotFeedbackFn
 
 
