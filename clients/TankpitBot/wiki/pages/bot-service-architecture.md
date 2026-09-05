@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/stream"
 source_git_blobs:
   "src/tankpit_bot/service": "8fb55988f5c6b233fd3b9ab76b05e3c25ad6872f"
-  "src/tankpit_bot/bot/config.py": "0748a03a52204e4b1ddf3aa95612e8a15e19c2e5"
+  "src/tankpit_bot/bot/config.py": "4d54f7e356112888c83a5788b923dfa1130b6ec8"
   "src/tankpit_bot/stream": "b24edbdd53f315d07737060e1b11fa8dfe003bbd"
 fact_checked: "2026-09-05"
 confidence: medium
