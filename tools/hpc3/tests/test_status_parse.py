@@ -10,12 +10,13 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 
+from hpc3.core.remote import MAX_COMMAND_CHARS
 from hpc3.core.status import (
     SACCT_FIELDS,
     parse_elapsed_seconds,
     parse_state,
     parse_tres_int,
-    sacct_command,
+    sacct_commands,
 )
 from tests.against_hpc3 import parse_sacct_output, parse_sacct_row
 
@@ -27,16 +28,16 @@ _REAL_ROW = (
 
 class TestSacctCommand:
     def test_it_requests_every_parsed_field(self) -> None:
-        command = sacct_command("55519937")
+        command = sacct_commands(["55519937"])[0]
         for field in SACCT_FIELDS:
             assert field in command
 
     def test_it_restricts_to_the_job_row(self) -> None:
         """Without -X, batch and extern steps triple every result."""
-        assert " -X" in sacct_command("55519937")
+        assert " -X" in sacct_commands(["55519937"])[0]
 
     def test_it_asks_for_parseable_output(self) -> None:
-        command = sacct_command("55519937")
+        command = sacct_commands(["55519937"])[0]
         assert " -n " in command
         assert " -P " in command
 
@@ -151,16 +152,44 @@ class TestParseSacctOutput:
 class TestMultiJobQuery:
     def test_several_ids_become_one_comma_separated_query(self) -> None:
         """Six separate calls would observe six different moments."""
-        command = sacct_command(["101", "102", "103"])
-        assert "sacct -j 101,102,103 " in command
+        commands = sacct_commands(["101", "102", "103"])
+        assert len(commands) == 1
+        assert "sacct -j 101,102,103 " in commands[0]
 
     def test_a_single_id_still_works(self) -> None:
-        assert "sacct -j 55519937 " in sacct_command(["55519937"])
+        assert "sacct -j 55519937 " in sacct_commands(["55519937"])[0]
 
     def test_no_ids_is_refused(self) -> None:
         """An id-less query would return every job the user ever ran."""
         with pytest.raises(ValueError, match="at least one job id"):
-            sacct_command([])
+            sacct_commands([])
+
+    def test_a_ledger_sized_query_splits_below_the_argument_limit(self) -> None:
+        """6645 open rows built a ~70 KB argv and died in CreateProcess with
+        `[WinError 206] The filename or extension is too long` -- locally,
+        before ssh, so hpc3-triage never reached the cluster (2026-09-05)."""
+        job_ids = [f"557{index:05d}_{index % 8}" for index in range(6645)]
+        commands = sacct_commands(job_ids)
+        assert len(commands) == 19
+        assert all(len(command) <= MAX_COMMAND_CHARS for command in commands)
+
+    def test_every_id_is_asked_about_exactly_once_across_the_split(self) -> None:
+        """A batch that drops or repeats an id reports a job as unaccounted,
+        which is precisely the finding triage exists to raise."""
+        job_ids = [f"557{index:05d}_{index % 8}" for index in range(6645)]
+        asked = [
+            job_id
+            for command in sacct_commands(job_ids)
+            for job_id in command.split(" -j ")[1].split(" ")[0].split(",")
+        ]
+        assert asked == job_ids
+
+    def test_each_batch_carries_the_whole_query_not_just_the_first(self) -> None:
+        """A suffix applied once would leave later batches unparseable."""
+        commands = sacct_commands([f"557{index:05d}" for index in range(1000)])
+        assert len(commands) > 1
+        assert all(command.endswith(" -X") for command in commands)
+        assert all(command.startswith("sacct -j 557") for command in commands)
 
 
 class TestGpuTresParsing:

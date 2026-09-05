@@ -65,6 +65,7 @@ from typing_extensions import TypedDict
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
+from hpc3.core.remote import token_batches
 
 FINISHED_STATE = "COMPLETED"
 """The only terminal state that means the artifact is the finished thing."""
@@ -121,25 +122,23 @@ def require_every_member_declares_an_artifact(specs: Sequence[JobSpec]) -> list[
     return artifacts
 
 
-#: Longest artifact list one existence command may carry. The probe used to
-#: pack every member into one shell line, and a 136-member search round
-#: built a ~10 KB command -- past cmd.exe's 8191-character argument limit on
-#: the Windows submitter, so the command reached bash TRUNCATED mid-loop and
-#: died on "unexpected end of file" (vhsearch2-r0, 2026-09-02). Sixty paths
-#: at this project's path lengths stay comfortably under half the limit; the
-#: round-trip count this was avoiding stays bounded at members/60 rather
-#: than members.
-EXISTENCE_CHUNK = 60
-
-
 def existence_commands(artifacts: Sequence[str]) -> tuple[str, ...]:
     """Build the commands that report which artifacts exist.
 
     Few commands rather than one per member: a campaign of thirty members
     over SSH is thirty round trips, each with its own chance to fail halfway
     and leave the plan built from a mixture of two moments. But not ONE
-    command either -- see :data:`EXISTENCE_CHUNK` for the truncation a
-    single 136-member line met.
+    command either -- a 136-member search round packed one ~10 KB line, past
+    cmd.exe's 8191-character argument limit on the Windows submitter, so the
+    command reached bash TRUNCATED mid-loop and died on "unexpected end of
+    file" (vhsearch2-r0, 2026-09-02).
+
+    The split is :func:`~hpc3.core.remote.token_batches`, the same one every
+    id-list query here uses. It used to be a private count of sixty paths,
+    which was a guess about path length rather than a measurement of the line
+    -- and the identical guess, made separately for job ids, is what let
+    ``hpc3-triage`` build a 70 KB argv three days later. The QUOTED paths are
+    batched, because the quoted path is what the command carries.
 
     Args:
         artifacts: Absolute cluster paths. Never empty -- an empty campaign
@@ -147,24 +146,23 @@ def existence_commands(artifacts: Sequence[str]) -> tuple[str, ...]:
 
     Returns:
         Shell commands, each printing one ``PRESENT|<path>`` or
-        ``ABSENT|<path>`` line per artifact, chunk by chunk in the order
+        ``ABSENT|<path>`` line per artifact, batch by batch in the order
         given. Each path is shell-quoted, so a filename holding a space or a
         quote is tested rather than interpreted.
 
     Raises:
-        ValueError: If no artifact is given.
+        ValueError: If no artifact is given, or one path is too long to probe
+            even alone.
     """
     if len(artifacts) == 0:
         raise ValueError("existence_commands requires at least one artifact")
-    commands: list[str] = []
-    for start in range(0, len(artifacts), EXISTENCE_CHUNK):
-        chunk = artifacts[start : start + EXISTENCE_CHUNK]
-        quoted = " ".join(shlex.quote(artifact) for artifact in chunk)
-        commands.append(
-            f"for p in {quoted}; do "
-            f'if [ -e "$p" ]; then echo "{_PRESENT}$p"; else echo "{_ABSENT}$p"; fi; done'
-        )
-    return tuple(commands)
+    prefix = "for p in "
+    suffix = f'; do if [ -e "$p" ]; then echo "{_PRESENT}$p"; else echo "{_ABSENT}$p"; fi; done'
+    quoted = [shlex.quote(artifact) for artifact in artifacts]
+    return tuple(
+        f"{prefix}{' '.join(batch)}{suffix}"
+        for batch in token_batches(quoted, overhead=len(prefix) + len(suffix), separator=" ")
+    )
 
 
 def parse_existence(output: str) -> set[str]:
@@ -274,7 +272,6 @@ def plan_campaign(
 
 
 __all__ = [
-    "EXISTENCE_CHUNK",
     "FINISHED_STATE",
     "CampaignPlan",
     "existence_commands",

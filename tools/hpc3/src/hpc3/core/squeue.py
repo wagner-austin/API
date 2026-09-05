@@ -26,6 +26,7 @@ from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.account import AccountJob, decode_account_job
 from hpc3.contracts.pending import PendingJob, decode_pending_job
+from hpc3.core.remote import token_batches
 
 SQUEUE_FORMAT = "%i|%j|%r"
 """Job id, name, reason -- the three fields, pipe-delimited, no header."""
@@ -51,8 +52,8 @@ _EXPECTED_COLUMNS = 3
 _BITSTR = "SLURM_BITSTR_LEN=4096 "
 
 
-def squeue_command(job_ids: Sequence[str]) -> str:
-    """Build the pending-reason query for one or more jobs.
+def squeue_commands(job_ids: Sequence[str]) -> list[str]:
+    """Build the pending-reason query for one or more jobs, split to fit.
 
     Args:
         job_ids: Slurm job ids. Never empty -- an id-less query would report
@@ -60,15 +61,21 @@ def squeue_command(job_ids: Sequence[str]) -> str:
             work.
 
     Returns:
-        A ``squeue`` command line restricted to pending jobs. Running jobs
-        have no meaningful reason and would only add rows to filter out.
+        One or more ``squeue`` command lines restricted to pending jobs,
+        together covering every id in the order given. Running jobs have no
+        meaningful reason and would only add rows to filter out.
 
     Raises:
         ValueError: If no job id is given.
     """
     if len(job_ids) == 0:
-        raise ValueError("squeue_command requires at least one job id")
-    return f"{_BITSTR}squeue -h -j {','.join(job_ids)} -t PD -o {SQUEUE_FORMAT!r}"
+        raise ValueError("squeue_commands requires at least one job id")
+    prefix = f"{_BITSTR}squeue -h -j "
+    suffix = f" -t PD -o {SQUEUE_FORMAT!r}"
+    return [
+        f"{prefix}{','.join(batch)}{suffix}"
+        for batch in token_batches(job_ids, overhead=len(prefix) + len(suffix), separator=",")
+    ]
 
 
 def account_command() -> str:
@@ -78,7 +85,7 @@ def account_command() -> str:
     return jobs already known, and the condition this exists to find is a job
     that is *not* known. ``--me`` scopes it to the authenticated account, so
     the 1,400 rows of other people's work that made an unrestricted
-    :func:`squeue_command` unacceptable are not in the result either.
+    :func:`squeue_commands` unacceptable are not in the result either.
 
     Returns:
         A ``squeue`` command line covering every state, header suppressed.
@@ -199,5 +206,5 @@ __all__ = [
     "parse_account_row",
     "parse_squeue_output",
     "parse_squeue_row",
-    "squeue_command",
+    "squeue_commands",
 ]

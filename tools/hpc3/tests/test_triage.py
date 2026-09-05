@@ -21,7 +21,8 @@ from hpc3.contracts.pending import (
     reason_code,
 )
 from hpc3.contracts.status import JobStatus
-from hpc3.core.squeue import parse_squeue_output, parse_squeue_row, squeue_command
+from hpc3.core.remote import MAX_COMMAND_CHARS
+from hpc3.core.squeue import parse_squeue_output, parse_squeue_row, squeue_commands
 from hpc3.core.triage import (
     blocked_jobs,
     live_entries,
@@ -326,14 +327,31 @@ class TestSqueueParsing:
             parse_squeue_row("|arm|Resources")
 
     def test_the_command_restricts_to_pending_and_to_our_ids(self) -> None:
-        command = squeue_command(["101", "102"])
-        assert "-j 101,102" in command
-        assert "-t PD" in command
+        commands = squeue_commands(["101", "102"])
+        assert len(commands) == 1
+        assert "-j 101,102" in commands[0]
+        assert "-t PD" in commands[0]
 
     def test_no_ids_is_refused(self) -> None:
         """An id-less query reports 1,400 rows of other people's work."""
         with pytest.raises(ValueError, match="at least one job id"):
-            squeue_command([])
+            squeue_commands([])
+
+    def test_a_wide_pending_wave_splits_and_every_batch_stays_restricted(self) -> None:
+        """The pending list is as long as the queue lets it be: 261 of 621
+        pending GPU jobs sat on DependencyNeverSatisfied once. A batch that
+        lost -t PD would report running jobs as blocked."""
+        job_ids = [f"557{index:05d}_{index % 8}" for index in range(2000)]
+        commands = squeue_commands(job_ids)
+        assert len(commands) > 1
+        assert all(len(command) <= MAX_COMMAND_CHARS for command in commands)
+        assert all("-t PD" in command for command in commands)
+        # The bitstr prefix has to survive the split too: without it Slurm
+        # truncates a sparse array's task expression mid-bracket and the row
+        # is refused as unparseable.
+        assert all(
+            command.startswith("SLURM_BITSTR_LEN=4096 squeue -h -j ") for command in commands
+        )
 
 
 class TestPendingContract:

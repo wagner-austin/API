@@ -31,13 +31,13 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from hpc3.cli import campaign as campaign_cli
 from hpc3.contracts.job import JobSpec
 from hpc3.core.campaign import (
-    EXISTENCE_CHUNK,
     existence_commands,
     finished_artifacts,
     parse_existence,
     plan_campaign,
     require_every_member_declares_an_artifact,
 )
+from hpc3.core.remote import MAX_COMMAND_CHARS
 from tests.against_hpc3 import decode_job_spec, decode_ledger_entry, read_ledger
 from tests.conftest import (
     FakeRun,
@@ -122,11 +122,18 @@ class TestAskingWhichArtifactsExist:
         Order is preserved across chunks, and every path appears once."""
         artifacts = [f"/pub/wagnera3/rusted/runs/sweeps/wide/arm-s{i}.txt" for i in range(136)]
         commands = existence_commands(artifacts)
-        assert len(commands) == 3
-        assert all(len(command) < 4500 for command in commands)
+        assert len(commands) == 2
+        assert all(len(command) <= MAX_COMMAND_CHARS for command in commands)
         joined = "\n".join(commands)
         assert all(artifact in joined for artifact in artifacts)
-        assert joined.index(artifacts[0]) < joined.index(artifacts[EXISTENCE_CHUNK])
+        assert joined.index(artifacts[0]) < joined.index(artifacts[-1])
+
+    def test_a_path_too_long_to_probe_alone_is_named_rather_than_truncated(self) -> None:
+        """The failure this splitting exists to prevent, at the one size
+        splitting cannot fix. Emitting it anyway rebuilds the over-long
+        command, and its error names neither the path nor the limit."""
+        with pytest.raises(ValueError, match="over the"):
+            existence_commands([f"/pub/{'d' * MAX_COMMAND_CHARS}/x.pt"])
 
     def test_a_path_carrying_a_space_is_quoted(self) -> None:
         assert "'/pub/a b.pt'" in existence_commands(["/pub/a b.pt"])[0]

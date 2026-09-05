@@ -62,9 +62,9 @@ from hpc3.core.campaign import (
     require_every_member_declares_an_artifact,
 )
 from hpc3.core.inflight import claimed_artifacts
-from hpc3.core.remote import run_remote
+from hpc3.core.remote import run_remote, run_remote_batched
 from hpc3.core.squeue import account_command, parse_account_output
-from hpc3.core.status import parse_sacct_output, sacct_command
+from hpc3.core.status import parse_sacct_output, sacct_commands
 
 _RUN_FLAG = "--run"
 _FLAGS = (_config.CONFIG_FLAG, _RUN_FLAG)
@@ -121,7 +121,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if candidates != []:
         states = {
             status["job_id"]: status["state"]
-            for status in parse_sacct_output(run_remote(host, sacct_command(candidates)), cluster)
+            for status in parse_sacct_output(
+                run_remote_batched(host, sacct_commands(candidates)), cluster
+            )
         }
     plan = plan_campaign(
         specs,

@@ -35,17 +35,31 @@ def log_path(entry: LedgerEntry) -> str:
     return f"{entry['log_dir']}/{entry['name']}-{entry['job_id']}.out"
 
 
-def age_command(entries: Sequence[LedgerEntry]) -> str:
-    """Build one command reading the cluster clock and every log's mtime.
+CLOCK_PROBE = r'echo "now $(date +%s)"'
+"""Reads the cluster's own clock. Every batch carries one -- see below."""
+
+_JOIN = "; "
+
+
+def age_commands(entries: Sequence[LedgerEntry]) -> list[str]:
+    """Build the commands reading the cluster clock and every log's mtime.
+
+    EVERY BATCH CARRIES ITS OWN CLOCK, and that is the reason this returns a
+    list rather than joining the outputs the way the accounting queries do.
+    An age is ``now - mtime``, and this module's whole premise is that both
+    come from the same instant; one clock shared across batches issued
+    seconds apart would silently be a different instant for every batch after
+    the first. Batches are therefore parsed separately and merged.
 
     Args:
         entries: Jobs whose logs to measure. Never empty.
 
     Returns:
-        A shell command emitting ``now <epoch>`` followed by one
-        ``<job_id> <mtime>`` line per log that exists. A log that does not
-        exist yet emits nothing, which is correct: a job whose output file
-        has not appeared has not been quiet, it has not started writing.
+        Shell commands, each emitting ``now <epoch>`` followed by one
+        ``<job_id> <mtime>`` line per log in that batch that exists. A log
+        that does not exist yet emits nothing, which is correct: a job whose
+        output file has not appeared has not been quiet, it has not started
+        writing.
 
         Each probe is an ``if`` block rather than ``test -f … && echo …``.
         The ``&&`` form emits the same output but leaves the FAILED test as
@@ -55,16 +69,22 @@ def age_command(entries: Sequence[LedgerEntry]) -> str:
         that is precisely the job this reconciliation exists to find.
 
     Raises:
-        ValueError: If no entries are given.
+        ValueError: If no entries are given, or one probe is too long to send
+            even alone.
     """
     if len(entries) == 0:
-        raise ValueError("age_command requires at least one entry")
-    parts = [r'echo "now $(date +%s)"']
-    for entry in entries:
-        path = log_path(entry)
-        emit = f"echo \"{entry['job_id']} $(stat -c %Y '{path}')\""
-        parts.append(f"if [ -f '{path}' ]; then {emit}; fi")
-    return "; ".join(parts)
+        raise ValueError("age_commands requires at least one entry")
+    probes = [
+        f"if [ -f '{log_path(entry)}' ]; then "
+        f"echo \"{entry['job_id']} $(stat -c %Y '{log_path(entry)}')\"; fi"
+        for entry in entries
+    ]
+    return [
+        _JOIN.join([CLOCK_PROBE, *batch])
+        for batch in remote.token_batches(
+            probes, overhead=len(CLOCK_PROBE) + len(_JOIN), separator=_JOIN
+        )
+    ]
 
 
 def parse_ages(output: str) -> dict[str, int]:
@@ -122,12 +142,19 @@ def log_ages(host: str, entries: Sequence[LedgerEntry]) -> dict[str, int]:
         no entries are given, which is the honest answer to a question about
         no jobs.
 
+        Each batch is parsed against the clock IT read, then merged, so an
+        age is never the difference between one batch's mtime and another
+        batch's clock.
+
     Raises:
-        AppError: If the remote command fails or its output cannot be read.
+        AppError: If a remote command fails or its output cannot be read.
     """
     if len(entries) == 0:
         return {}
-    return parse_ages(remote.run_remote(host, age_command(entries)))
+    ages: dict[str, int] = {}
+    for command in age_commands(entries):
+        ages.update(parse_ages(remote.run_remote(host, command)))
+    return ages
 
 
-__all__ = ["age_command", "log_ages", "log_path", "parse_ages"]
+__all__ = ["CLOCK_PROBE", "age_commands", "log_ages", "log_path", "parse_ages"]

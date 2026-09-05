@@ -11,7 +11,8 @@ import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 
 from hpc3.contracts.ledger import LedgerEntry
-from hpc3.core.logs import age_command, log_ages, log_path, parse_ages
+from hpc3.core.logs import CLOCK_PROBE, age_commands, log_ages, log_path, parse_ages
+from hpc3.core.remote import MAX_COMMAND_CHARS
 from tests.against_hpc3 import decode_ledger_entry
 from tests.conftest import FakeRun, ledger_row
 
@@ -43,16 +44,33 @@ class TestLogPath:
 class TestAgeCommand:
     def test_it_reads_the_cluster_clock(self) -> None:
         """Comparing against this machine's clock would invent staleness."""
-        assert "date +%s" in age_command([_entry("101")])
+        assert "date +%s" in age_commands([_entry("101")])[0]
 
     def test_it_stats_each_log(self) -> None:
-        command = age_command([_entry("101"), _entry("102")])
-        assert "/pub/logs/abl.arm-b-42-101.out" in command
-        assert "/pub/logs/abl.arm-b-42-102.out" in command
+        commands = age_commands([_entry("101"), _entry("102")])
+        assert len(commands) == 1
+        assert "/pub/logs/abl.arm-b-42-101.out" in commands[0]
+        assert "/pub/logs/abl.arm-b-42-102.out" in commands[0]
 
     def test_a_missing_log_emits_nothing_rather_than_a_zero(self) -> None:
         """A job whose output has not appeared has not been quiet."""
-        assert "if [ -f " in age_command([_entry("101")])
+        assert "if [ -f " in age_commands([_entry("101")])[0]
+
+    def test_a_wide_probe_splits_and_every_batch_reads_its_own_clock(self) -> None:
+        """Measured on the real cluster 2026-09-05, and it is NOT the local
+        argv limit: the ~29 KB single command was accepted by CreateProcess,
+        sent, and arrived at bash TRUNCATED mid-quote --
+        `bash: -c: line 1: unexpected EOF while looking for matching "'"`.
+
+        An age is `now - mtime`. A batch that inherited another batch's clock
+        would be subtracting across a different instant, so each carries its
+        own."""
+        entries = [_entry(str(index), name=f"abl.arm-{index}") for index in range(400)]
+        commands = age_commands(entries)
+        assert len(commands) > 1
+        assert all(len(command) <= MAX_COMMAND_CHARS for command in commands)
+        assert all(command.startswith(CLOCK_PROBE) for command in commands)
+        assert sum(command.count("if [ -f ") for command in commands) == 400
 
     def test_a_missing_log_does_not_fail_the_whole_query(self) -> None:
         """Measured on the real cluster, not deduced.
@@ -66,14 +84,14 @@ class TestAgeCommand:
 
         An ``if`` block exits zero whether or not the file is there.
         """
-        command = age_command([_entry("101"), _entry("102")])
+        command = age_commands([_entry("101"), _entry("102")])[0]
         assert "&&" not in command
         assert command.count("if [ -f ") == 2
         assert command.count("; fi") == 2
 
     def test_no_entries_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least one entry"):
-            age_command([])
+            age_commands([])
 
 
 class TestParseAges:
@@ -113,3 +131,16 @@ class TestLogAges:
     def test_no_entries_makes_no_remote_call(self, fake_run: FakeRun) -> None:
         assert log_ages("hpc3", []) == {}
         assert fake_run.calls == []
+
+    def test_every_batch_is_asked_and_a_late_batch_still_reports(self, fake_run: FakeRun) -> None:
+        """A split that asked only the first batch would report every job
+        after it as 'not writing yet' -- a wedged job read as health, which
+        is the exact condition this measurement exists to catch."""
+        entries = [_entry(str(index), name=f"abl.arm-{index}") for index in range(400)]
+        commands = age_commands(entries)
+        assert len(commands) > 1
+        late = [entry for entry in entries if log_path(entry) in commands[-1]][-1]
+        fake_run.add(log_path(late), stdout=f"now 1000\n{late['job_id']} 900\n", once=True)
+        fake_run.add("date +%s", stdout="now 1000\n0 400\n")
+        assert log_ages("hpc3", entries) == {"0": 600, late["job_id"]: 100}
+        assert len(fake_run.calls) == len(commands)

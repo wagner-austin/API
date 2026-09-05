@@ -34,8 +34,8 @@ from hpc3.contracts.layout import project_of
 from hpc3.contracts.status import JobState, JobStatus, gpu_hours, is_terminal, service_units
 from hpc3.contracts.workspace import Workspace, workspace_cluster
 from hpc3.core.budget import check_consumption
-from hpc3.core.remote import run_remote
-from hpc3.core.status import parse_sacct_output, sacct_command
+from hpc3.core.remote import run_remote_batched
+from hpc3.core.status import parse_sacct_output, sacct_commands
 
 _FLAGS = (_config.CONFIG_FLAG, "--job", "--until-done", "--poll-seconds")
 
@@ -130,7 +130,7 @@ def _read_rows(host: str, requested: Sequence[str], cluster: ClusterFacts) -> li
     Raises:
         AppError: If the remote command fails or the output is malformed.
     """
-    output = run_remote(host, sacct_command(requested))
+    output = run_remote_batched(host, sacct_commands(requested))
     return parse_sacct_output(output, cluster)
 
 

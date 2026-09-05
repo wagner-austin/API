@@ -22,6 +22,7 @@ from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobStatus, decode_job_status
+from hpc3.core.remote import token_batches
 
 SACCT_FIELDS = ("JobID", "JobName", "Partition", "State", "ElapsedRaw", "AllocTRES", "NodeList")
 """Columns requested from ``sacct``, in the order this module parses them."""
@@ -29,30 +30,36 @@ SACCT_FIELDS = ("JobID", "JobName", "Partition", "State", "ElapsedRaw", "AllocTR
 _EXPECTED_COLUMNS = len(SACCT_FIELDS)
 
 
-def sacct_command(job_ids: Sequence[str]) -> str:
-    """Build the accounting query for one or more jobs.
+def sacct_commands(job_ids: Sequence[str]) -> list[str]:
+    """Build the accounting query for one or more jobs, split to fit.
 
     ``sacct`` takes a comma-separated id list, so a sweep of six jobs is one
     round trip rather than six. That also makes the reported rows mutually
-    consistent: six separate calls observe six different moments.
+    consistent: six separate calls observe six different moments, and this
+    splits only when the command line leaves it no choice -- which is why the
+    split is by width and not by a job count.
 
     Args:
         job_ids: Slurm job ids. Never empty -- a query naming no job would
             return every job the user has ever run.
 
     Returns:
-        A ``sacct`` command line. ``-X`` restricts output to each job's own
-        row rather than also emitting its batch and extern steps, which
-        otherwise triple every result and report the step's resources rather
-        than the job's.
+        One or more ``sacct`` command lines, together covering every id in the
+        order given. ``-X`` restricts output to each job's own row rather than
+        also emitting its batch and extern steps, which otherwise triple every
+        result and report the step's resources rather than the job's.
 
     Raises:
         ValueError: If no job id is given.
     """
     if len(job_ids) == 0:
-        raise ValueError("sacct_command requires at least one job id")
-    fields = ",".join(SACCT_FIELDS)
-    return f"sacct -j {','.join(job_ids)} -n -P -o {fields} -X"
+        raise ValueError("sacct_commands requires at least one job id")
+    prefix = "sacct -j "
+    suffix = f" -n -P -o {','.join(SACCT_FIELDS)} -X"
+    return [
+        f"{prefix}{','.join(batch)}{suffix}"
+        for batch in token_batches(job_ids, overhead=len(prefix) + len(suffix), separator=",")
+    ]
 
 
 def parse_tres_int(alloc_tres: str, key: str) -> int:
@@ -206,5 +213,5 @@ __all__ = [
     "parse_sacct_row",
     "parse_state",
     "parse_tres_int",
-    "sacct_command",
+    "sacct_commands",
 ]

@@ -43,15 +43,15 @@ from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.pending import PendingJob
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
-from hpc3.core.remote import run_remote
+from hpc3.core.remote import run_remote, run_remote_batched
 from hpc3.core.rightsize import describe, oversized_projects
 from hpc3.core.squeue import (
     account_command,
     parse_account_output,
     parse_squeue_output,
-    squeue_command,
+    squeue_commands,
 )
-from hpc3.core.status import parse_sacct_output, sacct_command
+from hpc3.core.status import parse_sacct_output, sacct_commands
 from hpc3.core.triage import (
     Finding,
     blocked_jobs,
@@ -157,8 +157,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         _test_hooks.emit(f"{len(recorded)} recorded, all closed; nothing left to reconcile")
         return _report(findings)
 
+    # Batched, because this is the one query here whose size is the LEDGER's
+    # rather than a command line's. At 6645 recorded rows the single-command
+    # form built a ~70 KB argv and died in CreateProcess before ssh was
+    # spawned, so triage was unrunnable on this machine and said so in a
+    # FileNotFoundError that named no command (2026-09-05).
     job_ids = [entry["job_id"] for entry in entries]
-    statuses = parse_sacct_output(run_remote(host, sacct_command(job_ids)), cluster)
+    statuses = parse_sacct_output(run_remote_batched(host, sacct_commands(job_ids)), cluster)
 
     # squeue is asked ONLY about jobs accounting reports as queued. It holds a
     # job for minutes after it ends and then forgets it, and `squeue -j` on an
@@ -169,7 +174,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     pending_ids = [status["job_id"] for status in statuses if status["state"] == "PENDING"]
     pending: list[PendingJob] = []
     if pending_ids != []:
-        pending = parse_squeue_output(run_remote(host, squeue_command(pending_ids)))
+        pending = parse_squeue_output(run_remote_batched(host, squeue_commands(pending_ids)))
 
     still_live = live_entries(entries, statuses)
     ages = logs.log_ages(host, still_live)

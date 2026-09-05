@@ -11,7 +11,15 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 
-from hpc3.core.remote import make_directory, put_bytes, remote_digest, run_remote
+from hpc3.core.remote import (
+    MAX_COMMAND_CHARS,
+    make_directory,
+    put_bytes,
+    remote_digest,
+    run_remote,
+    run_remote_batched,
+    token_batches,
+)
 from tests.conftest import FakeRun
 
 
@@ -37,6 +45,92 @@ class TestRunRemote:
             run_remote("hpc3", "sbatch job.sbatch")
         assert "<no stderr>" in excinfo.value.message
         assert "exited 2" in excinfo.value.message
+
+
+class TestTokenBatches:
+    def test_a_list_that_fits_stays_one_batch(self) -> None:
+        """The ordinary case has to rebuild exactly the command this
+        replaced: splitting a small query would turn one consistent moment
+        into several."""
+        assert token_batches(["101", "102", "103"], overhead=80, separator=",") == [
+            ["101", "102", "103"]
+        ]
+
+    def test_no_tokens_produce_no_batches(self) -> None:
+        """Callers refuse an empty list by name first; this must not invent
+        a batch that would query everything."""
+        assert token_batches([], overhead=80, separator=",") == []
+
+    def test_it_splits_on_measured_width_not_on_a_token_count(self) -> None:
+        """A count is a guess about token length. These two lists hold the
+        same NUMBER of tokens and must split differently."""
+        narrow = token_batches(["1234567890"] * 800, overhead=80, separator=",")
+        wide = token_batches(["1234567890" * 4] * 800, overhead=80, separator=",")
+        assert len(narrow) < len(wide)
+
+    def test_every_batch_fits_the_limit_once_its_command_is_built(self) -> None:
+        overhead = 80
+        batches = token_batches(
+            [f"55{index:06d}" for index in range(5000)], overhead=overhead, separator=","
+        )
+        assert all(overhead + len(",".join(batch)) <= MAX_COMMAND_CHARS for batch in batches)
+
+    def test_the_separator_is_charged_between_tokens_and_not_before_them(self) -> None:
+        """Charging a separator the joined command will not carry loses a
+        token from a batch that had exactly enough room for it."""
+        token = "a" * 100
+        overhead = MAX_COMMAND_CHARS - 201
+        assert token_batches([token, token], overhead=overhead, separator=",") == [[token, token]]
+        assert token_batches([token, token], overhead=overhead + 1, separator=",") == [
+            [token],
+            [token],
+        ]
+
+    def test_order_survives_the_split(self) -> None:
+        tokens = [f"55{index:06d}" for index in range(5000)]
+        batches = token_batches(tokens, overhead=80, separator=",")
+        assert [token for batch in batches for token in batch] == tokens
+
+    def test_a_token_too_long_to_send_alone_names_itself_and_the_limit(self) -> None:
+        """Emitting it anyway would rebuild the over-long command this exists
+        to split, and fail again naming neither."""
+        with pytest.raises(ValueError) as excinfo:
+            token_batches(["z" * MAX_COMMAND_CHARS], overhead=80, separator=",")
+        assert f"over the {MAX_COMMAND_CHARS}-character limit" in str(excinfo.value)
+        assert "carrying 80 of overhead" in str(excinfo.value)
+
+
+class TestRunRemoteBatched:
+    def test_it_runs_every_batch(self, fake_run: FakeRun) -> None:
+        run_remote_batched("hpc3", ["sacct -j 1", "sacct -j 2"])
+        assert fake_run.commands() == ["sacct -j 1", "sacct -j 2"]
+
+    def test_the_batches_come_back_as_one_stream(self, fake_run: FakeRun) -> None:
+        fake_run.add("sacct -j 1", stdout="row-a\nrow-b\n", once=True)
+        fake_run.add("sacct -j 2", stdout="row-c\n", once=True)
+        assert run_remote_batched("hpc3", ["sacct -j 1", "sacct -j 2"]) == "row-a\nrow-b\nrow-c\n"
+
+    def test_a_batch_without_a_trailing_newline_does_not_fuse_two_rows(
+        self, fake_run: FakeRun
+    ) -> None:
+        """Concatenating raw stdout would make 'row-b' and 'row-c' one
+        malformed row, which reads as a parse defect and eats both."""
+        fake_run.add("sacct -j 1", stdout="row-a\nrow-b", once=True)
+        fake_run.add("sacct -j 2", stdout="row-c\n", once=True)
+        assert run_remote_batched("hpc3", ["sacct -j 1", "sacct -j 2"]) == "row-a\nrow-b\nrow-c\n"
+
+    def test_no_batches_report_nothing(self, fake_run: FakeRun) -> None:
+        assert run_remote_batched("hpc3", []) == ""
+        assert fake_run.calls == []
+
+    def test_one_failed_batch_fails_the_whole_query(self, fake_run: FakeRun) -> None:
+        """A partial answer reads as the complete one, and the rows it is
+        missing are the ones nobody goes looking for."""
+        fake_run.add("sacct -j 2", returncode=1, stderr="Invalid job id specified\n")
+        with pytest.raises(AppError) as excinfo:
+            run_remote_batched("hpc3", ["sacct -j 1", "sacct -j 2"])
+        assert excinfo.value.code is Hpc3ErrorCode.REMOTE_COMMAND_FAILED
+        assert "Invalid job id specified" in excinfo.value.message
 
 
 class TestPutBytes:

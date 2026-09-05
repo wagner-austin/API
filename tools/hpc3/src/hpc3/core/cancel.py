@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.status import JobState
 from hpc3.core import remote
-from hpc3.core.status import parse_sacct_output, sacct_command
+from hpc3.core.status import parse_sacct_output, sacct_commands
 
 
 class CancelOutcome:
@@ -55,6 +55,28 @@ _LIVE_BEFORE_CANCEL: frozenset[JobState] = frozenset(
 )
 
 
+def _scancel_commands(job_ids: Sequence[str]) -> list[str]:
+    """Build the cancel itself, split the same way the queries around it are.
+
+    ``scancel`` takes the ids on its command line like everything else here,
+    so a cancel wide enough to need splitting would otherwise be the one
+    command in this sequence that still died locally -- after the before-state
+    had already been read, and reporting nothing about which jobs it reached.
+
+    Args:
+        job_ids: Slurm job ids to cancel. Never empty; :func:`cancel` refuses
+            that by name, because a bare ``scancel`` takes everything.
+
+    Returns:
+        One or more ``scancel`` command lines covering every id in order.
+    """
+    prefix = "scancel "
+    return [
+        f"{prefix}{' '.join(batch)}"
+        for batch in remote.token_batches(job_ids, overhead=len(prefix), separator=" ")
+    ]
+
+
 def cancel(host: str, job_ids: Sequence[str], cluster: ClusterFacts) -> list[CancelOutcome]:
     """Cancel jobs and report what each one became.
 
@@ -83,10 +105,13 @@ def cancel(host: str, job_ids: Sequence[str], cluster: ClusterFacts) -> list[Can
 
     before = {
         status["job_id"]: status["state"]
-        for status in parse_sacct_output(remote.run_remote(host, sacct_command(job_ids)), cluster)
+        for status in parse_sacct_output(
+            remote.run_remote_batched(host, sacct_commands(job_ids)), cluster
+        )
     }
-    remote.run_remote(host, f"scancel {' '.join(job_ids)}")
-    after = parse_sacct_output(remote.run_remote(host, sacct_command(job_ids)), cluster)
+    for command in _scancel_commands(job_ids):
+        remote.run_remote(host, command)
+    after = parse_sacct_output(remote.run_remote_batched(host, sacct_commands(job_ids)), cluster)
 
     return [
         CancelOutcome(
