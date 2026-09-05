@@ -1,0 +1,32 @@
+# The Hard closer panel ([[campaign-ledger]]): champion vs
+# champion+close3 on 12 shared fresh seeds 8741001-8745577 at
+# difficulty 1. The rung's one non-win is a full-cap stalemate
+# and the champion carries close 0 -- it never all-ins. The
+# mandate does not accept stalemates; the closer is the knob
+# built for exactly this.
+#
+# label | seed | doctrine | samples
+champ|8741001|doctrines/evolve1-g4m2.doctrine|10000
+close3|8741001|doctrines/g4m2-close3.doctrine|10000
+champ|8741417|doctrines/evolve1-g4m2.doctrine|10000
+close3|8741417|doctrines/g4m2-close3.doctrine|10000
+champ|8741833|doctrines/evolve1-g4m2.doctrine|10000
+close3|8741833|doctrines/g4m2-close3.doctrine|10000
+champ|8742249|doctrines/evolve1-g4m2.doctrine|10000
+close3|8742249|doctrines/g4m2-close3.doctrine|10000
+champ|8742665|doctrines/evolve1-g4m2.doctrine|10000
+close3|8742665|doctrines/g4m2-close3.doctrine|10000
+champ|8743081|doctrines/evolve1-g4m2.doctrine|10000
+close3|8743081|doctrines/g4m2-close3.doctrine|10000
+champ|8743497|doctrines/evolve1-g4m2.doctrine|10000
+close3|8743497|doctrines/g4m2-close3.doctrine|10000
+champ|8743913|doctrines/evolve1-g4m2.doctrine|10000
+close3|8743913|doctrines/g4m2-close3.doctrine|10000
+champ|8744329|doctrines/evolve1-g4m2.doctrine|10000
+close3|8744329|doctrines/g4m2-close3.doctrine|10000
+champ|8744745|doctrines/evolve1-g4m2.doctrine|10000
+close3|8744745|doctrines/g4m2-close3.doctrine|10000
+champ|8745161|doctrines/evolve1-g4m2.doctrine|10000
+close3|8745161|doctrines/g4m2-close3.doctrine|10000
+champ|8745577|doctrines/evolve1-g4m2.doctrine|10000
+close3|8745577|doctrines/g4m2-close3.doctrine|10000
