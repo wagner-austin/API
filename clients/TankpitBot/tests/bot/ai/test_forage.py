@@ -9,9 +9,10 @@ from tankpit_bot.bot.ai.mode_gates import (
     should_enter_collect,
     should_exit_collect,
 )
+from tankpit_bot.protocol.commands import SCOPE_EAST
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state.scan_coverage import tile_key
-from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.state.types import TankStateDict, make_tank_state, make_viewport_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -408,6 +409,90 @@ class TestFrontierWalk:
         )
 
         assert decision is None
+
+
+class TestFrontierPan:
+    """An exhausted window spends a free pan instead of a zero-length move.
+
+    With autoscroll pinned OFF the window NEVER slides on a walk
+    ([[viewport-shift-protocol]] acceptance boundary), so a tank
+    standing on the facing edge tile has no walk that helps: the
+    pre-pan frontier re-dispatched ``move -> (own tile)`` forever and
+    the server rejected every one with 0x52 code 6. Live incident:
+    demo-1 2026-09-05 17:48-19:00, 395 identical ``move -> (239,48)``
+    dispatches from (239,48), the NE corner of window (224,48).
+    """
+
+    def _edge_window_ctx(self, *, left: int, top: int) -> DecideCtx:
+        """Zero-extras context with the window at (left, top), fully covered.
+
+        The default ``make_world`` centers the window on the tank
+        (the fixture blind spot that hid this bug); rewriting the
+        viewport puts the tank at (100,100) wherever the window
+        placement says, and covering exactly the window tiles drives
+        the cascade to the frontier branch.
+        """
+        coverage = {
+            tile_key(x, y): 100000 for x in range(left, left + 16) for y in range(top, top + 16)
+        }
+        ctx = _ctx(radars=0, scanned_tiles=coverage)
+        ctx.world["viewport"] = make_viewport_state(left=left, top=top, width=16, height=16)
+        return ctx
+
+    def test_tank_on_the_facing_edge_pans_instead_of_walking(self) -> None:
+        """East edge: the walk target IS the tank's tile, so the tick
+        is a scope pan toward the band, never a move."""
+        ctx = self._edge_window_ctx(left=85, top=92)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a frontier pan")
+        assert decision["behavior"]["reason_kind"] == "forage_frontier_pan"
+        assert decision["command"] == {"cmd_type": "scope_shift", "direction": SCOPE_EAST}
+        assert decision["behavior"]["target_x"] == 101
+        assert decision["behavior"]["target_y"] == 100
+
+    def test_corner_tank_pans_and_never_moves_to_itself(self) -> None:
+        """The demo-1 regression: tank at the window's NE corner. The
+        east and north bands both face uncovered ground and both edge
+        tiles ARE the tank's tile -- the tick must be a pan, and no
+        move command to (100,100) may ever be produced."""
+        ctx = self._edge_window_ctx(left=85, top=100)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a frontier pan")
+        assert decision["command"]["cmd_type"] == "scope_shift"
+        assert decision["behavior"]["reason_kind"] == "forage_frontier_pan"
+
+    def test_tank_inside_the_window_still_walks_to_the_edge(self) -> None:
+        """A pan from the facing edge reveals 15 fresh tiles against 8
+        from the centre (anchor law), so the walk-to-edge leg stays."""
+        ctx = self._edge_window_ctx(left=90, top=92)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a frontier walk")
+        assert decision["behavior"]["reason_kind"] == "forage_frontier_walk"
+        assert decision["command"] == {"cmd_type": "move", "target_x": 105, "target_y": 100}
 
 
 class TestForagePreservesHeldLocks:

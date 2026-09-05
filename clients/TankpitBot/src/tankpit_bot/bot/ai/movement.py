@@ -426,6 +426,11 @@ def _walk_or_teleport_without_terrain(
         if not is_pickup_target_actionable(ctx, tx, ty):
             return None
         return _make_pickup_command(pickup_kind, tx, ty)
+    if (tx, ty) == (ctx.self_state["x"], ctx.self_state["y"]):
+        # Same zero-length refusal as ``_direct_move_command`` -- this
+        # tail is the only plain-move emitter that bypasses it.
+        emit_ai("declining zero-length move to (%d,%d): tank is already there", tx, ty)
+        return None
     if not is_pickup_target_actionable(ctx, tx, ty):
         return _approach_command(ctx, tx, ty)
     if _is_occupied_by_enemy(ctx, tx, ty):
@@ -485,8 +490,16 @@ def _direct_move_command(
     """Return a direct move command when the straight path is clear.
 
     Pickup-kind targets dispatch their own ``pickup_*`` command
-    upstream; this helper only emits plain moves.
+    upstream; this helper only emits plain moves. A move to the
+    tank's own tile is refused outright: the server answers it with
+    0x52 code 6 ("You are already there") and no completing wire
+    signal ever comes, so a zero-length move is never a plan --
+    every terrain-aware plain move flows through here, making this
+    the chokepoint that keeps the invariant.
     """
+    if (tx, ty) == (ctx.self_state["x"], ctx.self_state["y"]):
+        emit_ai("declining zero-length move to (%d,%d): tank is already there", tx, ty)
+        return None
     if not is_pickup_target_actionable(ctx, tx, ty):
         emit_ai("direct target (%d,%d) is outside viewport", tx, ty)
         return None

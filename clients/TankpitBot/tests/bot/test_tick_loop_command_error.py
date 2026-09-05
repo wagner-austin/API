@@ -454,6 +454,35 @@ class TestClearCommandError:
         assert bot.get_state() == "TELEPORTING"
         assert ws.last_command_error == -1
 
+    def test_already_there_on_move_clears_and_marks_the_target(self, fake_env: FakeEnv) -> None:
+        """A 0x52 ``You are already there`` (code 6) aborts a move and tombstones its tile.
+
+        A move whose target IS the dispatch position draws a 6 and no
+        completing wire signal ever comes. Until 2026-09-05 the code
+        was orphan-discarded, so the tile was never marked failed and
+        the planner re-derived the identical zero-length move every
+        tick: demo-1 17:48-19:00 dispatched ``move -> (239,48)`` from
+        (239,48) 395 times over 72 minutes. The mark is the loop
+        break -- the next replan skips the tile and the cascade moves
+        on.
+        """
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+
+        ws = WorldService()
+        ws.update_world_state_from_position(239, 48)
+        bot = Bot("https://test.tankpit.com/", headless=True, world=ws)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("move", target_x=239, target_y=48)
+
+        ws.last_command_error = 6  # "You are already there"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert bot.get_state() == "IDLE"
+        assert ws.last_command_error == -1
+        assert ws.is_move_target_failed(239, 48, get_current_time_ms()) is True
+
     def test_move_wait_drops_orphan_tank_full(self, fake_env: FakeEnv) -> None:
         """A code=5 (tank full) during a move wait is orphaned.
 

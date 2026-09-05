@@ -364,6 +364,7 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
         "ferry_scope_scout",
         "gatherer_hold",
         "forage_frontier_walk",
+        "forage_frontier_pan",
     ):
         # The free viewport pan is a SEARCH beat: the tick looks at
         # water it cannot yet believe in, exactly like a local search

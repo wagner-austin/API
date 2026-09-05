@@ -396,6 +396,35 @@ class TestPlanViewportWalk:
 
         assert plan_viewport_walk(ctx, 104, 100) is None
 
+    def test_zero_length_move_declines(self) -> None:
+        """A walk to the tank's own tile is never a plan: the server
+        answers it with 0x52 code 6 and nothing ever completes it
+        (demo-1 2026-09-05, 395 rejected ``move -> (239,48)`` from
+        (239,48))."""
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx(InMemoryTerrainMap())
+
+        assert plan_viewport_walk(ctx, 100, 100) is None
+
+    def test_zero_length_move_declines_without_terrain(self) -> None:
+        """The terrain-less direct-move path refuses the same tile."""
+        from tankpit_bot.bot.ai.movement import plan_viewport_walk
+
+        ctx = self._ctx()
+
+        assert plan_viewport_walk(ctx, 100, 100) is None
+
+    def test_walk_or_teleport_refuses_zero_length_plain_move(self) -> None:
+        """The terrain-less ``walk_or_teleport`` tail holds the same
+        invariant -- it is the one plain-move emitter that bypasses
+        ``_direct_move_command``."""
+        from tankpit_bot.bot.ai.movement import walk_or_teleport
+
+        ctx = self._ctx()
+
+        assert walk_or_teleport(ctx, 100, 100, pickup_kind=None) is None
+
     def test_out_of_viewport_target_declines(self) -> None:
         """A coverage step never leaves the window (that is the search
         hop's job) -- and it certainly never teleports there."""

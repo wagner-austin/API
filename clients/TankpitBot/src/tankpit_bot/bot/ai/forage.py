@@ -41,8 +41,14 @@ from tankpit_bot.bot.ai.radar_economics import (
 from tankpit_bot.bot.ai.scoring_types import BehaviorMode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import make_radar_command
-from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.bot.types import make_radar_command, make_scope_shift_command
+from tankpit_bot.protocol.commands import (
+    SCOPE_EAST,
+    SCOPE_NORTH,
+    SCOPE_SOUTH,
+    SCOPE_WEST,
+)
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.scan_coverage import (
     free_radar_new_coverage,
     is_tile_covered,
@@ -54,9 +60,11 @@ from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 _FRONTIER_BAND_DEPTH = 8
 """How far past a viewport edge the frontier scorer looks.
 
-Half a window: walking to the chosen edge slides the anchored window
-about that far, so the band it scores is exactly the fresh ground the
-next scan-walk-scan cycle will work."""
+Half a window: a free ``Rb`` pan anchors the window to the tank
+([[viewport-shift-protocol]]), so a pan from the covered window's
+interior nets about this much fresh ground beyond the old edge --
+the band it scores is exactly what the next scan-walk-scan cycle
+will work."""
 
 
 def _frontier_walk_target(
@@ -65,14 +73,18 @@ def _frontier_walk_target(
     top: int,
     right: int,
     bottom: int,
-) -> tuple[int, int] | None:
-    """Pick the viewport-edge tile facing the most unscanned ground.
+) -> tuple[tuple[int, int], tuple[int, int], int] | None:
+    """Pick the frontier band facing the most unscanned ground.
 
     The zero-extras lawnmower's continuation (user doctrine
-    2026-08-14): score the four bands just beyond the window's edges
-    by uncovered-tile count and walk toward the richest one -- the
-    tank-anchored window slides along, and the in-viewport
-    scan-walk-scan loop resumes on the fresh ground.
+    2026-08-14: "move to the NEXT VIEWPORT OVER"): score the four
+    bands just beyond the window's edges by uncovered-tile count and
+    face the richest one. The window itself NEVER moves on a walk --
+    autoscroll is pinned OFF, so only a teleport or a free ``Rb``
+    pan shifts it ([[viewport-shift-protocol]] acceptance boundary).
+    The caller walks to the returned edge tile first (a pan from the
+    facing edge reveals a full 15 fresh tiles under the anchor law,
+    against 8 from the window's centre), then pans toward the band.
 
     Args:
         ctx: Decision context.
@@ -82,13 +94,17 @@ def _frontier_walk_target(
         bottom: Viewport bottom bound.
 
     Returns:
-        The edge tile to walk toward, or ``None`` when every adjacent
-        band is already covered (the search hop relocates instead).
+        ``(edge, beyond, direction)`` -- the in-window edge tile to
+        walk toward, the band's first tile past that edge, and the
+        compass byte a scope pan toward the band takes -- or ``None``
+        when every adjacent band is already covered (the search hop
+        relocates instead). A winning band is non-empty, so its
+        beyond tile is always on the map.
     """
     scanned = ctx.world["scanned_tiles"]
     floor_ms = ctx.forage_floor_ms
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    bands: list[tuple[int, tuple[int, int]]] = []
+    bands: list[tuple[int, tuple[int, int], tuple[int, int], int]] = []
     east = range(right + 1, min(right + _FRONTIER_BAND_DEPTH, 255) + 1)
     west = range(max(left - _FRONTIER_BAND_DEPTH, 0), left)
     south = range(bottom + 1, min(bottom + _FRONTIER_BAND_DEPTH, 255) + 1)
@@ -102,6 +118,8 @@ def _frontier_walk_target(
                 if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (right, sy),
+            (right + 1, sy),
+            SCOPE_EAST,
         )
     )
     bands.append(
@@ -113,6 +131,8 @@ def _frontier_walk_target(
                 if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (left, sy),
+            (left - 1, sy),
+            SCOPE_WEST,
         )
     )
     bands.append(
@@ -124,6 +144,8 @@ def _frontier_walk_target(
                 if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (sx, bottom),
+            (sx, bottom + 1),
+            SCOPE_SOUTH,
         )
     )
     bands.append(
@@ -135,17 +157,82 @@ def _frontier_walk_target(
                 if not is_tile_covered(scanned, x, y, floor_ms)
             ),
             (sx, top),
+            (sx, top - 1),
+            SCOPE_NORTH,
         )
     )
-    best_count, best_edge = max(bands, key=_band_score)
+    best_count, best_edge, best_beyond, best_direction = max(bands, key=_band_score)
     if best_count == 0:
         return None
-    return best_edge
+    return best_edge, best_beyond, best_direction
 
 
-def _band_score(band: tuple[int, tuple[int, int]]) -> int:
+def _band_score(band: tuple[int, tuple[int, int], tuple[int, int], int]) -> int:
     """Return the uncovered-tile count a frontier band carries."""
     return band[0]
+
+
+def _frontier_pan(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+    behavior_mode: BehaviorMode,
+    score: int,
+    beyond_x: int,
+    beyond_y: int,
+    direction: int,
+) -> TickDecisionDict:
+    """Pan the free viewport toward the richest uncovered band.
+
+    Reached when the frontier's walk target IS the tank's own tile:
+    the tank stands on the facing edge and the window has been walked
+    to exhaustion. With autoscroll pinned OFF the window never moves
+    on a walk, so re-dispatching the walk is a zero-length move the
+    server rejects with 0x52 code 6 ("You are already there") --
+    exactly the loop demo-1 span 2026-09-05 17:48-19:00, 395
+    identical ``move -> (239,48)`` dispatches from (239,48), the NE
+    corner of window (224,48). The ``Rb`` scope pan is the maroon
+    pan-walk gait's cure applied to coverage: it costs nothing,
+    anchors the window to the tank in the band's direction (the
+    measured anchor law, [[viewport-shift-protocol]]), and a cardinal
+    pan from the facing edge always shifts the window, revealing 15
+    fresh tiles for the scan-walk-scan loop to resume on.
+
+    Args:
+        ctx: Decision context.
+        ai_state: AI state to carry through the decision.
+        behavior_mode: Owning behavior mode label.
+        score: Priority score.
+        beyond_x: First band tile past the exhausted edge.
+        beyond_y: First band tile past the exhausted edge.
+        direction: Compass byte for the scope pan.
+
+    Returns:
+        The scope-shift decision.
+    """
+    emit_ai(
+        "forage frontier pan direction %d toward unscanned band at (%d,%d) mode=%s",
+        direction,
+        beyond_x,
+        beyond_y,
+        behavior_mode,
+    )
+    emit_diagnostic(
+        diagnostic_kind="forage_frontier_pan",
+        target_x=beyond_x,
+        target_y=beyond_y,
+        direction=direction,
+    )
+    return make_decision(
+        make_scope_shift_command(direction),
+        behavior_mode,
+        score,
+        beyond_x,
+        beyond_y,
+        "forage_frontier_pan",
+        ai_state,
+        ctx.equip,
+        reason_context={"direction": direction},
+    )
 
 
 def select_forage_target(ctx: DecideCtx) -> tuple[int, int] | None:
@@ -322,19 +409,34 @@ def plan_forage_search(
         # the spend floor counts the same uncovered tiles coverage
         # does.
         #
-        # Frontier walk (user free-radar doctrine 2026-08-14: "scan
-        # unique 5x5 areas until the viewport is fully scanned, then
-        # move to the NEXT VIEWPORT OVER"): the window is anchored to
-        # the tank, so a zero-extras scanner continues its lawnmower
-        # by WALKING toward the least-scanned adjacent band -- the
-        # window slides with it and the scan-walk-scan loop resumes
-        # on fresh ground. No teleport: relocation by hop is the
-        # search hop's job, and it only gets the tick when every
-        # adjacent band is already covered.
+        # Frontier continuation (user free-radar doctrine 2026-08-14:
+        # "scan unique 5x5 areas until the viewport is fully scanned,
+        # then move to the NEXT VIEWPORT OVER"): walk to the window
+        # edge facing the least-scanned adjacent band, then spend a
+        # free scope pan toward it. The window NEVER slides on a walk
+        # -- autoscroll is pinned OFF, so only a teleport or an
+        # ``Rb`` pan moves it ([[viewport-shift-protocol]]); the
+        # pre-pan version of this branch believed otherwise and, once
+        # the tank stood ON the facing edge tile, re-dispatched a
+        # zero-length move every tick forever (demo-1 2026-09-05,
+        # 395 rejected ``move -> (239,48)`` from (239,48)). No
+        # teleport: relocation by hop is the search hop's job, and it
+        # only gets the tick when every adjacent band is already
+        # covered.
         frontier = _frontier_walk_target(ctx, left, top, right, bottom)
         if frontier is None:
             return None
-        frontier_x, frontier_y = frontier
+        (frontier_x, frontier_y), (beyond_x, beyond_y), pan_direction = frontier
+        if (frontier_x, frontier_y) == (sx, sy):
+            return _frontier_pan(
+                ctx,
+                ai_state,
+                behavior_mode,
+                score,
+                beyond_x,
+                beyond_y,
+                pan_direction,
+            )
         command = plan_viewport_walk(ctx, frontier_x, frontier_y)
         if command is None:
             return None

@@ -32,6 +32,7 @@ from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_command_rejected,
 )
 from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_ALREADY_THERE,
     SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_EMPTY_CONTAINER,
@@ -75,11 +76,24 @@ from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full
 #
 # Sourced from ``tpclient.js`` server-side dispatch (see
 # ``wiki/pages/client-constants.md``) and the empirical set the bot has
-# observed across captures. Codes ``2/3/6/9/10`` are informational or
+# observed across captures. Codes ``2/3/9/10`` are informational or
 # universally non-blocking and appear in no whitelist.
+#
+# Code 6 ("You are already there") joined the ``move`` whitelist on
+# 2026-09-05: a move whose target IS the dispatch position draws a 6
+# and will never produce a completing wire signal, so discarding it as
+# an orphan removed the only loop break -- demo-1 17:48-19:00 replayed
+# the identical rejected ``move -> (239,48)`` from (239,48) 395 times
+# over 72 minutes, because the tile was never marked failed. The bot
+# holds during a move wait and never re-sends, so the acceptance
+# boundary's other 6 source ("re-sent while already walking",
+# [[viewport-shift-protocol]]) cannot arise from the bot's own
+# dispatch discipline. Teleport keeps 6 unlisted: no capture has ever
+# shown a teleport drawing it.
 _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
     "move": frozenset(
         {
+            SUPERVISOR_ERROR_ALREADY_THERE,
             SUPERVISOR_ERROR_CANT_DO,
             SUPERVISOR_ERROR_CANT_GO,
             SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
