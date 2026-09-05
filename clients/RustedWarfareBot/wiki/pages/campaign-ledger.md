@@ -10,12 +10,12 @@ source_paths:
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
 source_git_blobs:
-  "doctrines/flame-nocover.doctrine": "f2fef915923ca031d05cda11f83029d0e89e195e"
+  "doctrines/flame-nocover.doctrine": "aa9e6519a791ceb948a7578a0c24d4eb089b4c02"
 provenance:
   - "wiki/log.md — the chronological record this page summarises. Deliberately NOT a pinned source_path: it is append-only, so a pin on it goes stale every time any session logs anything, including edits to this page. That is drift with no information in it, and it was firing here. The page's own framing says the same thing — log.md is the journal, this page is the current position."
 game_version: "1.15 (code 176, build #28)"
 confidence: high
-fact_checked: 2026-09-04
+fact_checked: 2026-09-05
 hubs: [bot-architecture]
 ---
 
@@ -34,6 +34,10 @@ any AI, any human, any 1vX seating, any map.
 
 | Rung | Configuration | Record | Status |
 |---|---|---|---|
+| Very Easy (duel_lake) | `evolve1-g4m2` | 12/12 won, mean 1,736 samples (ladve12, fresh seeds, 2026-09-05) | First certification read at n=12 -- the rung had never been measured with the modern policy. Clean sweep. |
+| Easy (duel_lake) | `evolve1-g4m2` | 12/12 won, mean 2,076 samples (lade12, 2026-09-05) | First certification read at n=12. Clean sweep. |
+| Medium (duel_lake) | `evolve1-g4m2` | 12/12 won, mean 2,164 samples (ladm12, 2026-09-05) | First certification read at n=12. Clean sweep. |
+| Hard (duel_lake, modern policy) | `evolve1-g4m2` | 11/12 won + 1 survived-at-cap, 0 losses (ladh12, 2026-09-05) | First modern read of the rung. The non-win is a true stalemate (alive at 10,000 samples, 13,700 army vs a rival compounded to 134,550): the 1.4x subsidy already shows the shape that owns Impossible, one rung above where wins stop being automatic. |
 | Hard, Linux+pinned+ff10 (duel_lake) | `aa-counter-guard` | v8 detection, held to v7 across 120 paired seeds (ab24 + ab48 + ab48b, 2026-09-01): v7 102/120 won (85%) vs v8 90/120 (75%); 0 armyless, 0 losses, 0 stalls in all 240 matches | The pace question is CLOSED as noise: discordant pairs 25:13, two-sided p = 0.073, and the per-wave flips DILUTED (7:2, 9:4, 9:7) -- p rose with more data, which a real effect does not do. Trace-pinned mechanism of divergence: arms are bit-identical until the first refusal-recovery moment (the watch's ~2-sample report replacing the 45-sample clock), after which matches are different matches. Labeled hypothesis, untested: the early asymmetry tracked the contended-boot seam, which wave three (node-local clones, 96/96 zero failures) removed. v8 keeps the rung; detection is defect-critical. Windows-path figures do not compare. |
 | Very Hard (duel_lake) | `evolve1-g4m2` | 72/96 paired fresh seeds (75%) vs `close0-flame4`'s 45/96 on the same seeds | ADOPTED 2026-09-04 -- **the first machine-LEARNED champion**: the CEM population search's graduate (c_artillery slot -> heavyTank, every knob inherited), replicated to the byte by an independent rng (evolve2's g3m10). Laws six and nine vs close0-flame4: **+12 then +15** against the +4 bar (34-22 then 38-23), combined flips 40:13, **p=0.00027** -- the strongest adoption in the ladder's history (prior best p=0.005), at 71%/79% panel win rates where 50% was the record. Prior champion close0-flame4 (adopted 2026-09-02, +14/+5, p=0.005; confirmed a knob-space local optimum by vhsearch4 + flame2's rejection) stands as the knob-vocabulary ceiling the simplex broke through. |
 | Impossible (duel_lake) | `flame-nocover` | 0/~120 post-certification, survival floor ~3300; 0/48 vs `flame-close6` (imp48c6) AND 0/48 vs `close0-flame4` (imp48c0f4), both paired | No adoptable gain, and composition is now measured OFF the table: close6 washed (+0.051) and the full VH champion close0-flame4 washed too (-0.082, sd 0.784) -- one was a closing behavior that never acted, the other shapes the army from the first engagement, and neither moved. What wins at VH is orthogonal to what Impossible punishes -- confirmed a THIRD time by the machine-learned champion itself: g4m2imp48 read 0/48 both sides, paired margin +0.210 (sd 0.607), a small survival lean and no road to a win. The next gain requires a new capability class; rebuild-under-fire exists as code since 2026-09-04 and is the next measurement ([[impossible-economy-problem]]). Champion held by default of evidence. |

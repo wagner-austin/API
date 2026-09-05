@@ -4,22 +4,25 @@ tags: [impossible, economy, design]
 related: ["[[campaign-ledger]]", "[[policy-budget]]", "[[harness-population-search]]", "[[policy-raid]]", "[[policy-economy]]"]
 source_paths:
   - "src/rw_bot/policy/economy.py"
-  - "src/rw_bot/policy/expander.py:68"
+  - "src/rw_bot/policy/expander.py"
+  - "src/rw_bot/policy/floor.py"
   - "src/rw_bot/policy/raid.py"
   - "sweeps/impden48.txt"
   - "runs/sweeps/imp48c6"
   - "runs/sweeps/imp48c0f4"
   - "runs/sweeps/impden48"
 source_git_blobs:
-  "src/rw_bot/policy/economy.py": "90e570f62b5b7abc44386179d53d94ff70b4b1e8"
-  "src/rw_bot/policy/expander.py": "e4123f9f747523e64cb4d69b78dfa984b86bb3cc"
+  "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
+  "src/rw_bot/policy/expander.py": "eeb4f76c13011abaab836b71aec978d582e2e68c"
+  "src/rw_bot/policy/floor.py": "5471ec6039bbbe7a3256e8fdfcc68708d55732ee"
   "src/rw_bot/policy/raid.py": "4d6240b22965277824d1476c7dc8957b0310e74f"
   "sweeps/impden48.txt": "4926d5899c862a22df7e2e91d53efe1b41f8405a"
 provenance:
   - "runs/sweeps/imp48c6 + imp48c0f4 — 96 fresh scorecards, the control read"
   - "runs/sweeps/impden48 — 144 scorecards, raid 3/6/8 on 48 shared seeds, 2026-09-03"
   - "wiki/log.md entries 2026-08-08 (pre-cluster saving/withhold variants) through 2026-09-02"
-fact_checked: 2026-09-04
+  - "runs/sweeps/impopen96 — 96 scorecards, 8 opening arms on 12 shared seeds, 2026-09-05"
+fact_checked: 2026-09-05
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -180,7 +183,16 @@ and the AI-trigger page says the early window is structured: the first
 attack commits only when a 3-unit group fills, and its build decisions
 ride a credit ladder ([[engine-ai-triggers]]). Whether 2 or 6 openers,
 a tank before the first extractor, or a forced second factory changes
-the early race has never been asked. Screening now (impopen96).
+the early race has never been asked. ASKED 2026-09-05 (impopen96, 8 arms
+x 12 shared seeds): **no scaffold variant moves survival** -- medians
+2,472-3,245 around control's 2,894, zero wins anywhere -- so the stage-2
+gate is unmet on the screen. One arm earned the panel tier: **e1, one
+extractor then army, margin +0.327 with rival peak 161k vs control's
+205k at identical survival** -- the only lever yet measured that dents
+the rival's compounding at all (impden48's tripled raids could not).
+Sub-significance at n=12; `impe1v48` (48 pairs, laws six and nine) is
+the verdict. Greed (e4/e5/e6) reads flat-to-negative: more opening
+economy does not help, consistent with the four closures.
 
 **Stage 2 -- fortress, bank, finisher: blocked only on stage 1.** The
 community's stated Impossible path is turtle -> fortress -> nuke, and
