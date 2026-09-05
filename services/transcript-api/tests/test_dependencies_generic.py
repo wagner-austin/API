@@ -7,7 +7,7 @@ from platform_core.config import _test_hooks as platform_hooks
 from platform_core.json_utils import JSONValue
 from platform_core.testing import make_fake_env
 from platform_workers.redis import RedisStrProto
-from platform_workers.rq_harness import RQJobLike, RQRetryLike
+from platform_workers.rq_harness import EnqueueCallable, QueueProtocol, RQJobLike, RQRetryLike
 from platform_workers.testing import FakeRedis
 
 from transcript_api import _test_hooks
@@ -17,7 +17,6 @@ from transcript_api.dependencies import (
     get_request_logger,
     provider_context,
 )
-from transcript_api.types import QueueProtocol, _EnqCallable
 
 
 class _JobStub:
@@ -38,7 +37,7 @@ class _QueueStub:
 
     def enqueue(
         self,
-        func: str | _EnqCallable,
+        func: str | EnqueueCallable,
         *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,

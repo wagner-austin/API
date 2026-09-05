@@ -356,9 +356,114 @@ def rq_fetch_job(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto:
     return hooks.fetch_job(job_id, connection)
 
 
+class EnqueueCallable(Protocol):
+    """A job function referenced by value rather than by dotted path."""
+
+    def __call__(
+        self,
+        *args: _JsonValue,
+        job_timeout: int | None = None,
+        result_ttl: int | None = None,
+        failure_ttl: int | None = None,
+        retry: RQRetryLike | None = None,
+        description: str | None = None,
+    ) -> RQJobLike: ...
+
+
+class QueueProtocol(Protocol):
+    """Minimal interface for a background job queue."""
+
+    def enqueue(
+        self,
+        func: str | EnqueueCallable,
+        *args: _JsonValue,
+        job_timeout: int | None = None,
+        result_ttl: int | None = None,
+        failure_ttl: int | None = None,
+        retry: RQRetryLike | None = None,
+        description: str | None = None,
+    ) -> RQJobLike: ...
+
+
+class _ConnectingQueue:
+    """A queue that opens its Redis connection per enqueue.
+
+    Connecting on each call rather than holding one open is deliberate: a
+    FastAPI dependency is resolved per request and a long-lived binary
+    connection shared across them is what the services were avoiding.
+    """
+
+    def __init__(self, queue_name: str, redis_url: str) -> None:
+        """Bind a queue name to the URL its connection is made from.
+
+        Args:
+            queue_name: The RQ queue to enqueue onto.
+            redis_url: Where to connect for each enqueue.
+        """
+        self._queue_name = queue_name
+        self._redis_url = redis_url
+
+    def enqueue(
+        self,
+        func: str | EnqueueCallable,
+        *args: _JsonValue,
+        job_timeout: int | None = None,
+        result_ttl: int | None = None,
+        failure_ttl: int | None = None,
+        retry: RQRetryLike | None = None,
+        description: str | None = None,
+    ) -> RQJobLike:
+        """Enqueue a job, opening a connection for it.
+
+        Args:
+            func: Dotted path to the job function, or the function itself,
+                which is stringified to the same thing.
+            args: Positional arguments for the job.
+            job_timeout: Seconds the job may run before RQ abandons it.
+            result_ttl: Seconds to keep a successful result.
+            failure_ttl: Seconds to keep a failed job.
+            retry: RQ retry policy, or None for no retries.
+            description: Human-readable label shown in RQ's dashboards.
+
+        Returns:
+            The enqueued job.
+        """
+        reference = func if isinstance(func, str) else str(func)
+        connection = redis_raw_for_rq(self._redis_url)
+        queue: RQClientQueue = rq_queue(self._queue_name, connection=connection)
+        return queue.enqueue(
+            reference,
+            *args,
+            job_timeout=job_timeout,
+            result_ttl=result_ttl,
+            failure_ttl=failure_ttl,
+            retry=retry,
+            description=description,
+        )
+
+
+def connecting_queue(queue_name: str, redis_url: str) -> QueueProtocol:
+    """Build a queue that connects per enqueue.
+
+    transcript-api and turkic-api each defined this adapter inline in their
+    FastAPI dependency module, byte-identical but for the queue-name constant,
+    along with their own copies of the two protocols above.
+
+    Args:
+        queue_name: The RQ queue to enqueue onto.
+        redis_url: Where to connect for each enqueue.
+
+    Returns:
+        A queue satisfying :class:`QueueProtocol`.
+    """
+    return _ConnectingQueue(queue_name, redis_url)
+
+
 __all__ = [
     "CurrentJobProto",
+    "EnqueueCallable",
     "FetchedJobProto",
+    "QueueProtocol",
     "RQClientQueue",
     "RQJobLike",
     "RQRetryLike",
@@ -371,6 +476,7 @@ __all__ = [
     "_RQWorkerInternal",
     "_RedisBytesClient",
     "_WorkerCtorRaw",
+    "connecting_queue",
     "get_current_job",
     "load_no_such_job_error",
     "redis_raw_for_rq",

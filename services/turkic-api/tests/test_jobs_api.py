@@ -12,13 +12,13 @@ from platform_core.data_bank_client import DataBankClientError, HeadInfo, NotFou
 from platform_core.testing import make_fake_env
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import QueueProtocol
 from platform_workers.testing import FakeQueue, FakeRedis
 
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.main import create_app
 from turkic_api.api.models import parse_job_status_json
-from turkic_api.api.types import QueueProtocol
 
 
 def make_fake_head_info(

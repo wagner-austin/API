@@ -4,22 +4,23 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import EnqueueCallable, QueueProtocol
 from platform_workers.testing import FakeRedis, FakeRedisNoPong
 
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.main import create_app
 from turkic_api.api.models import parse_job_response_json
-from turkic_api.api.types import JSONValue, QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
+from turkic_api.api.types import JSONValue, RQJobLike, RQRetryLike
 
 
 class _QueueStub:
     def __init__(self) -> None:
-        self.calls: list[tuple[str | _EnqCallable, tuple[JSONValue, ...]]] = []
+        self.calls: list[tuple[str | EnqueueCallable, tuple[JSONValue, ...]]] = []
 
     def enqueue(
         self,
-        func: str | _EnqCallable,
+        func: str | EnqueueCallable,
         *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,

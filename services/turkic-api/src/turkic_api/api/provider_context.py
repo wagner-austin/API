@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import QueueProtocol
 
 from .config import Settings
 from .dependencies import (
@@ -19,7 +20,7 @@ from .dependencies import (
 from .dependencies import (
     get_settings as _get_settings_dep,
 )
-from .types import LoggerProtocol, QueueProtocol
+from .types import LoggerProtocol
 
 SettingsProvider = Callable[[], Settings]
 LoggerProvider = Callable[[], LoggerProtocol]

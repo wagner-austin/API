@@ -7,22 +7,10 @@ from typing import Protocol
 from platform_core.json_utils import JSONValue
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
 
-__all__ = ["JSONValue", "JsonDict", "LoggerProtocol", "QueueProtocol", "RQJobLike", "RQRetryLike"]
+__all__ = ["JSONValue", "JsonDict", "LoggerProtocol", "RQJobLike", "RQRetryLike"]
 
 # Public JSON type for API boundaries - non-recursive, one-level deep
 JsonDict = dict[str, str | int | float | bool | list[str | int | float | bool | None] | None]
-
-
-class _EnqCallable(Protocol):
-    def __call__(
-        self,
-        *args: JSONValue,
-        job_timeout: int | None = None,
-        result_ttl: int | None = None,
-        failure_ttl: int | None = None,
-        retry: RQRetryLike | None = None,
-        description: str | None = None,
-    ) -> RQJobLike: ...
 
 
 class LoggerProtocol(Protocol):
@@ -83,18 +71,3 @@ class LoggerProtocol(Protocol):
         stacklevel: int = 1,
         extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
-
-
-class QueueProtocol(Protocol):
-    """Minimal interface for a background job queue."""
-
-    def enqueue(
-        self,
-        func: str | _EnqCallable,
-        *args: JSONValue,
-        job_timeout: int | None = None,
-        result_ttl: int | None = None,
-        failure_ttl: int | None = None,
-        retry: RQRetryLike | None = None,
-        description: str | None = None,
-    ) -> RQJobLike: ...

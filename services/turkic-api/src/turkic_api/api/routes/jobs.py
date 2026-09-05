@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from platform_core.errors import AppError, ErrorCode
 from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import QueueProtocol
 
 from ..config import Settings
 from ..models import parse_job_create
@@ -17,7 +18,7 @@ from ..provider_context import (
 )
 from ..services import JobService
 from ..streaming import stream_data_bank_file
-from ..types import JsonDict, LoggerProtocol, QueueProtocol
+from ..types import JsonDict, LoggerProtocol
 
 
 def _to_hash_redis(r: RedisStrProto) -> RedisStrProto:

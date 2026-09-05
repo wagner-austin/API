@@ -4,16 +4,17 @@ import pytest
 from platform_core.json_utils import JSONTypeError
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.rq_harness import EnqueueCallable
 from platform_workers.testing import FakeRedis
 
 from turkic_api.api.services import JobService
-from turkic_api.api.types import JSONValue, RQJobLike, RQRetryLike, _EnqCallable
+from turkic_api.api.types import JSONValue, RQJobLike, RQRetryLike
 
 
 class _Queue:
     def enqueue(
         self,
-        func: str | _EnqCallable,
+        func: str | EnqueueCallable,
         *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,

@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from platform_workers.rq_harness import (
+    QueueProtocol,
+    RQJobLike,
+    RQRetryLike,
     WorkerConfig,
+    _JsonValue,
+    connecting_queue,
     get_current_job,
     rq_queue,
     rq_retry,
@@ -14,6 +19,7 @@ from platform_workers.rq_harness import (
 )
 from platform_workers.testing import (
     FakeRedisBytesClient,
+    FakeRedisBytesModule,
     FakeRQModule,
     _FakeCurrentJob,
     _FakeRQQueueInternal,
@@ -276,3 +282,94 @@ def test_rq_fetch_job_production_path_success() -> None:
     fetched = rq_fetch_job(job_id, conn)
     assert fetched.get_id() == job_id
     assert fetched.get_status() in ("queued", "started", "finished", "failed")
+
+
+class TestConnectingQueue:
+    """The queue adapter transcript-api and turkic-api each defined inline.
+
+    Both had it byte-identical but for the queue-name constant, alongside
+    their own copies of QueueProtocol and the enqueue-callable protocol. What
+    is worth pinning here is the behaviour those copies encoded: the queue
+    name reaches RQ, a callable reference is stringified, and a connection is
+    made PER enqueue rather than held.
+    """
+
+    def _fakes(self) -> FakeRQModule:
+        """Install the redis and rq module hooks.
+
+        Returns:
+            The fake rq module, so a test can read what reached it.
+        """
+        redis_hook, _redis_module = make_fake_load_redis_bytes_module()
+        hooks.load_redis_bytes_module = redis_hook
+        rq_hook, rq_module = make_fake_load_rq_module()
+        hooks.load_rq_module = rq_hook
+        return rq_module
+
+    def test_it_enqueues_onto_the_name_it_was_built_with(self) -> None:
+        self._fakes()
+
+        job = connecting_queue("transcripts", "redis://x").enqueue("my_func")
+
+        assert job.get_id() == "job-my_func"
+
+    def test_a_callable_reference_is_stringified(self) -> None:
+        """RQ takes a dotted path, so a caller passing the job function itself
+        relies on `str(func)`. Both copies did this and it is the only branch
+        in the adapter."""
+        self._fakes()
+
+        class _Job:
+            def __call__(
+                self,
+                *args: _JsonValue,
+                job_timeout: int | None = None,
+                result_ttl: int | None = None,
+                failure_ttl: int | None = None,
+                retry: RQRetryLike | None = None,
+                description: str | None = None,
+            ) -> RQJobLike:
+                raise NotImplementedError("never called; only its str() is used")
+
+            def __str__(self) -> str:
+                return "pkg.module.my_job"
+
+        job = connecting_queue("q", "redis://x").enqueue(_Job())
+
+        assert job.get_id() == "job-pkg.module.my_job"
+
+    def test_each_enqueue_opens_its_own_connection(self) -> None:
+        """Connecting per call rather than holding one open is why this is an
+        adapter at all -- a FastAPI dependency is resolved per request, and a
+        long-lived binary connection shared across them is what the services
+        were avoiding.
+
+        Counted at the module-loading seam rather than by extending the
+        shipped fake, since a connection is made by loading the module and
+        calling from_url, and the seam is where that begins.
+        """
+        _redis_hook, redis_module = make_fake_load_redis_bytes_module()
+        loads: list[int] = []
+
+        def _counting_hook() -> FakeRedisBytesModule:
+            loads.append(1)
+            return redis_module
+
+        hooks.load_redis_bytes_module = _counting_hook
+        rq_hook, _rq_module = make_fake_load_rq_module()
+        hooks.load_rq_module = rq_hook
+        queue = connecting_queue("q", "redis://x")
+
+        queue.enqueue("a")
+        queue.enqueue("b")
+
+        assert len(loads) == 2
+        assert redis_module.from_url_url == "redis://x"
+
+    def test_it_satisfies_the_queue_protocol(self) -> None:
+        """The services annotate their FastAPI dependency with QueueProtocol,
+        so the concrete adapter has to satisfy it structurally."""
+        self._fakes()
+        queue: QueueProtocol = connecting_queue("q", "redis://x")
+
+        assert queue.enqueue("f").get_id() == "job-f"
