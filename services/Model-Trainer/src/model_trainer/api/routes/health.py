@@ -8,8 +8,7 @@ from platform_core.health import (
     healthz,
 )
 from platform_core.logging import get_logger
-from platform_workers.health import readyz_redis_with_workers
-from platform_workers.redis import RedisStrProto
+from platform_workers.health import logged_readyz_with_workers
 
 from ...core.services.container import ServiceContainer
 
@@ -35,23 +34,6 @@ def build_router(container: ServiceContainer) -> APIRouter:
         return healthz()
 
     def readyz_route() -> ReadyResponse:
-        client: RedisStrProto = container.redis
-        result = readyz_redis_with_workers(client)
-        if result["status"] == "degraded":
-            _logger.info(
-                "readyz degraded",
-                extra={
-                    "category": "api",
-                    "service": "health",
-                    "event": "readyz",
-                    "reason": result["reason"],
-                },
-            )
-            return result
-        _logger.info(
-            "readyz",
-            extra={"category": "api", "service": "health", "event": "readyz", "status": "ready"},
-        )
-        return {"status": "ready", "reason": None}
+        return logged_readyz_with_workers(container.redis, _logger)
 
     return build_health_router(healthz_route=healthz_route, readyz_route=readyz_route)
