@@ -15,7 +15,7 @@ source_git_blobs:
   "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
   "src/rw_bot/policy/expander.py": "eeb4f76c13011abaab836b71aec978d582e2e68c"
   "src/rw_bot/policy/floor.py": "5471ec6039bbbe7a3256e8fdfcc68708d55732ee"
-  "src/rw_bot/policy/raid.py": "4d6240b22965277824d1476c7dc8957b0310e74f"
+  "src/rw_bot/policy/raid.py": "1b3d826a823ce7e5907dfab11976d5fc75420c4f"
   "sweeps/impden48.txt": "4926d5899c862a22df7e2e91d53efe1b41f8405a"
 provenance:
   - "runs/sweeps/imp48c6 + imp48c0f4 — 96 fresh scorecards, the control read"
@@ -216,3 +216,17 @@ designed against the wave-group ladder (keep their attack group from
 filling; bait a committed group) is a capability no credit knob
 expresses. Expensive, and the operator weighs it -- but it is a road,
 not a wall.
+
+**Stage 3's cheap end is measured closed (imphunt60b, 2026-09-05).**
+The anti-ladder posture ran as the hunt -- a standing party pressing
+visible enemy movers, built on the damage-cancels-staging rule the m32
+capture watched live -- hand-tuned at three sizes AND recalled by the
+razing head, both arms on one lever. With the mechanism verifiably
+firing (median 18-28 objectives pressed per match after two screen
+rebuilds fixed a starved draft bar and a silent idle-party defect),
+**nothing moved: margins -0.156 to +0.093, survival flat, zero wins.**
+The sixth closure. What remains of stage 3 is only the expensive end --
+the full per-sample policy or a build-sequencing head, the
+multi-session architecture lane whose cost
+[[impossible-step-three-design]] states honestly. That spend is the
+operator's call.

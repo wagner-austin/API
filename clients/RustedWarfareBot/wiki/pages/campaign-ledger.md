@@ -10,7 +10,7 @@ source_paths:
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
 source_git_blobs:
-  "doctrines/flame-nocover.doctrine": "aa9e6519a791ceb948a7578a0c24d4eb089b4c02"
+  "doctrines/flame-nocover.doctrine": "d38225dc9df027d8fa06c5b1bd73535d2cf56113"
 provenance:
   - "wiki/log.md — the chronological record this page summarises. Deliberately NOT a pinned source_path: it is append-only, so a pin on it goes stale every time any session logs anything, including edits to this page. That is drift with no information in it, and it was firing here. The page's own framing says the same thing — log.md is the journal, this page is the current position."
 game_version: "1.15 (code 176, build #28)"
@@ -61,6 +61,7 @@ panel. Nothing on this list is a guess.
 - The docket after the battery: the spatial layer (its first slice shipped 2026-08-15 -- coverage recorded as three trace columns, accumulating on every future match; next steps are the doom refit with spatial features once a corpus exists, and hold v2 designed against the field), a response worth driving with the banked doom model, and the exporter productionization. Composition tuning, the naval theater, the tilt, and the battery are all measured closed; the next gain must come from a capability class the bot does not yet have.
 - The Impossible frontier after 2026-09-04: every NAMED road is closed on mechanism-verified measurements in one span -- denial (impden48), rebuild-as-designed (imprb48), strike-window with the release provably firing (impstrike48), and composition three times over. Single-verb answers are exhausted; the standing next step is the original three-step plan's step three, the corpus-trained heads -- learned policy above the doctrine vocabulary -- with the spatial/doom corpus and the `rival_army` trace column as its instruments ([[impossible-economy-problem]], [[harness-population-search]]).
 - Updated 2026-09-05: TWO more closures land -- the brace (impbrace48b: the razing head armed 48/48 inside its horizon, margin -0.029, the fourth mechanism-proven endgame closure) and the opening scaffold (impopen96 screen flat everywhere; its one signal, e1's rival-compounding dent, REFUTED at verdict grade by impe1v48: margin +0.053 at sd 0.799, flips 25:23). The match is now closed from the first build order to the death phase; the credit-allocation vocabulary has no unmeasured layer left. Stage 3 of the staged road -- per-sample policy, or a posture built against the scripted AI's group ladder ([[engine-ai-zones]]) -- is the standing frontier ([[impossible-economy-problem]]).
+- Updated 2026-09-05 (later): the SIXTH closure -- stage 3's cheap end. The hunt (a standing party pressing forming groups, the first verb aimed at the wave LADDER, built same-day on the m32 live capture) measured flat at screen tier with the mechanism verifiably firing, in BOTH its arms at once: hand-tuned at three party sizes and recalled by the razing head (the first learned per-sample decision driving a live tactical response). imphunt60b: margins -0.156 to +0.093, survival flat, zero wins, hunts-median 18-28 where the first screen's starved-draft defect had read zero. Stage 3's remaining road is only the expensive architecture lane ([[impossible-step-three-design]]); that spend is the operator's call.
 
 ## Closed questions (measured, with the log entry that closed them)
 
