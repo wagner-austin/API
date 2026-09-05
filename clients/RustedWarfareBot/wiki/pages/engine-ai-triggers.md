@@ -19,10 +19,12 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1620"
   - "runs/decompiled/com/corrodinggames/rts/game/n.java:1088"
   - "wiki/sources/m15-ai-zones/zone-dump.txt"
+  - "wiki/sources/m32-imp-ladder/ladder-timeline.txt"
 source_git_blobs:
   "wiki/sources/m15-ai-zones/zone-dump.txt": "dbfff06d71e2e199976a8bd8727e163aa7d451f9"
+  "wiki/sources/m32-imp-ladder/ladder-timeline.txt": "2d5b68a6b1ff3f6e18554bb15ebc33e7870d4ee5"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-05
 confidence: medium
 hubs: [engine-internals, game-mechanics]
 ---
@@ -79,7 +81,7 @@ This is the mechanism our bot most obviously lacks. It produces when the plan's 
 A combat group is created **empty with a target size** and recruits until it is full — it only accepts members while the size exceeds the current count, and reports itself full on the same comparison.[^7] The sizes are fixed constants, and they escalate:[^8]
 
 - **Defensive groups: 8**, or 10 on hard. One to three of them, the cap rising with a counter at thresholds of 6 and 11.
-- **Attack groups: 3** for the first wave, **5** for the next few, **7** thereafter — and on hard, **14**, rising to **18** after 25 waves. Exactly one attack group exists at a time.
+- **Attack groups: 3** for the first wave, **5** for the next few, **7** thereafter — and on hard, **14**, rising to **18** after 25 waves. The source was read as allowing exactly one attack group at a time, and that reading **did not survive live observation**: at Impossible, single snapshots carry up to nine attack-flagged groups at once — land and sea, in every fill state, including two 14-target land groups both labelled `attacking main target` in one snapshot (7 members each, consistent with post-commit attrition).[^13] Whether the one-at-a-time reading was ever right for a narrower scope (one *forming* group per creation branch) is unresolved; as a statement about the live game it is wrong.
 - **Sea groups: 5**, or 10 on hard, one at a time, and only when the map's water area exceeds a threshold.
 - **Transport groups**: up to three, each wanting one unit.
 
@@ -114,7 +116,9 @@ The build side transfers less directly, because the capacity ratio driving the c
 
 The capacity ratio is read but not named — the overlay does not print it, so its definition is inferred from use rather than from the engine saying so. Everything that depends on it is therefore shape-correct and scale-uncertain.
 
-The group sizes and the budget range have now been watched ([[engine-ai-probe]]), and one of them contradicted the reading, which is recorded above rather than quietly fixed. The **timer constants still have not been**: they are in the engine's own tick accumulator rather than seconds, and converting them to wall-clock needs a measurement against the frame rate established for this build ([[engine-tick-and-clock]]). Nothing here has been observed firing — no group reached its target size within 150 seconds, so staging, the damage abort and the 17,000 timeout are all still source-only.
+The group sizes and the budget range have now been watched ([[engine-ai-probe]]), and one of them contradicted the reading, which is recorded above rather than quietly fixed. The **timer constants still have not been**: they are in the engine's own tick accumulator rather than seconds, and converting them to wall-clock needs a measurement against the frame rate established for this build ([[engine-tick-and-clock]]).
+
+**The lifecycle has now been observed firing, at Impossible, over whole matches** (2026-09-05, five instrumented champion matches on the impopen96 control seeds, 53 zone snapshots).[^13] What the sandbox runs never reached: full groups labelled `attacking main target`; the escalation ladder live at difficulty 3 — the first land group at target **3** (full by ~160 game-seconds), then **5**, then **14**, so Impossible uses the hard sizes; the source-predicted abort path live (`cannot reach main target` on a sea group whose label persisted across three snapshots); and behaviour labels the overlay never showed in sandbox — `fighting attacker`, `flight from attacker`, `random move: bad target`. The 18-after-25-waves rung was not reached in any match (the champion dies at ~10-14 waves). What is still unobserved: the staging flag transitioning (column `c` read false in all 308 extracted rows — either the flag is briefer than the 15-second sampling or the letter is misassigned), the damage abort's log line, and the 17,000 timeout.
 
 The capacity ratio is confirmed to be bounded in [0, 1] by the same dump, and the build-delay values are consistent with the two penalties, but the ladder thresholds themselves remain unobserved.
 
@@ -132,3 +136,4 @@ The target chooser itself is deliberately out of scope here — this page covers
 [^10]: `runs/decompiled/com/corrodinggames/rts/game/a/g.java:490`–`520` — the 800 re-issue interval, the reachability filter, the `"cannot reach main target"` abort, and `f.a(0, 100) < 80` selecting the position-targeted command over the unit-targeted one.
 [^11]: `wiki/sources/m15-ai-zones/zone-dump.txt` — the first run, four AI players at 40, 90 and 150 seconds, where every `A=5` group is also `B=true`. The sea-group branch is at `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1636`, gated on the map's water area.
 [^12]: `wiki/sources/m15-ai-zones/zone-dump-330s.txt` — a longer run at 60, 180 and 330 seconds. At 330s one player holds `Q=37 A=3 h=true B=false`, the first land attack group, and a defensive group at 8 of 8 with `l=0.0`.
+[^13]: `wiki/sources/m32-imp-ladder/ladder-timeline.txt` — 308 combat-group rows from five instrumented Impossible matches (header records the exact launch and extraction). Nine concurrent attack-flagged groups and the twin `attacking main target` 14-groups at 7 members each: seed 8711417 rows at t=170s. First land group full at target 3: seed 8711001, t=35s (`null target=3 members=3 attack=true sea=false`). The persistent `cannot reach main target` sea group: seed 8711417, t=140/155/170s, same accumulator column climbing 36210 -> 42451.
