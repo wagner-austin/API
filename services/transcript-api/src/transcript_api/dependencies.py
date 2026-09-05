@@ -18,7 +18,6 @@ from . import _test_hooks
 
 # Provider types for dependency injection
 RedisProviderType = Callable[[], RedisStrProto]
-QueueProviderType = Callable[[], QueueProtocol]
 LoggerProviderType = Callable[[], LoggerProtocol]
 
 
@@ -27,7 +26,7 @@ class _ProviderContext:
 
     def __init__(self) -> None:
         self.redis_provider: RedisProviderType | None = None
-        self.queue_provider: QueueProviderType | None = None
+        self.queue_provider: Callable[[], QueueProtocol] | None = None
         self.logger_provider: LoggerProviderType | None = None
 
 
@@ -80,7 +79,6 @@ __all__ = [
     "LoggerDep",
     "LoggerProviderType",
     "QueueDep",
-    "QueueProviderType",
     "RedisDep",
     "RedisProviderType",
     "get_queue",

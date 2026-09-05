@@ -12,13 +12,13 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.trainer import (
-    ProgressCallback,
     stratified_split,
 )
 from covenant_ml.types import (
     DMatrixFactory,
     DMatrixProtocol,
     FeatureImportance,
+    ProgressCallback,
     RequestedDevice,
     ResolvedDevice,
     TrainConfig,

@@ -5,7 +5,6 @@ Strict typing only: no Any, no dataclasses, no stubs.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypedDict
 
@@ -17,8 +16,8 @@ from covenant_ml.types import (
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
+    ProgressCallback,
     TrainOutcome,
-    TrainProgress,
 )
 
 from ..optimizer.types import (
@@ -36,9 +35,6 @@ class BackendCapabilities(TypedDict, total=True):
     supports_early_stopping: bool
     supports_feature_importance: bool
     model_format: str  # e.g., "ubj" for XGBoost booster, "pt" for torch
-
-
-ProgressCallback = Callable[[TrainProgress], None]
 
 
 class PreparedClassifier(Protocol):
@@ -123,5 +119,4 @@ __all__ = [
     "BackendCapabilities",
     "ClassifierBackend",
     "PreparedClassifier",
-    "ProgressCallback",
 ]

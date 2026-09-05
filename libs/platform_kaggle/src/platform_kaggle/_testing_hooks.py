@@ -18,15 +18,6 @@ _FAR_FUTURE_DEADLINE_DT = datetime(2999, 12, 31, 23, 59, 59)
 
 
 # -----------------------------------------------------------------------------
-# Hook Types
-# -----------------------------------------------------------------------------
-
-KaggleClientHook = Callable[[], KaggleClientProtocol]
-PageFetcherHook = Callable[[], KagglePageFetcherProtocol]
-ProfileScannerHook = Callable[[Path], CodebaseProfile]
-
-
-# -----------------------------------------------------------------------------
 # Hooks Container
 # -----------------------------------------------------------------------------
 
@@ -42,9 +33,9 @@ class HooksContainer:
     """
 
     kaggle_api_factory: KaggleApiFactoryProtocol
-    kaggle_client: KaggleClientHook
-    page_fetcher: PageFetcherHook
-    profile_scanner: ProfileScannerHook
+    kaggle_client: Callable[[], KaggleClientProtocol]
+    page_fetcher: Callable[[], KagglePageFetcherProtocol]
+    profile_scanner: Callable[[Path], CodebaseProfile]
 
 
 hooks = HooksContainer()

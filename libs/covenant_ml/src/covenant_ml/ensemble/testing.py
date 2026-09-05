@@ -5,15 +5,14 @@ Provides fake scipy minimize implementation for testing without real scipy.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import numpy as np
 from numpy.typing import NDArray
 
-# Type aliases matching optimizer.py
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
-_OptionsDict = dict[str, int | float]
+from covenant_ml.ensemble._hooks import (
+    _ConstraintDict,
+    _ObjectiveFnType,
+    _OptionsDict,
+)
 
 
 class FakeOptimizeResult:

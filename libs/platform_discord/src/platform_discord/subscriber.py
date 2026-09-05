@@ -14,17 +14,13 @@ class MessageSource(Protocol):
     async def close(self) -> None: ...
 
 
-Handler = Callable[[E], Awaitable[None]]
-Decoder = Callable[[str], E | None]
-
-
 class RedisEventSubscriber(Generic[E]):
     def __init__(
         self,
         channel: str,
         source: MessageSource,
-        decode: Decoder[E],
-        handle: Handler[E],
+        decode: Callable[[str], E | None],
+        handle: Callable[[E], Awaitable[None]],
     ) -> None:
         self.channel = channel
         self.source = source

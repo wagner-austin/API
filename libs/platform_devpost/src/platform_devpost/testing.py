@@ -25,13 +25,6 @@ from platform_devpost.types import (
     Theme,
 )
 
-# -----------------------------------------------------------------------------
-# Hook Types
-# -----------------------------------------------------------------------------
-
-DevpostClientHook = Callable[[], DevpostClientProtocol]
-ProfileScannerHook = Callable[[Path], CodebaseProfile]
-
 
 class DevpostApiFactoryProtocol(Protocol):
     """Protocol for Devpost API factory.
@@ -63,8 +56,8 @@ class HooksContainer:
     """
 
     devpost_api_factory: DevpostApiFactoryProtocol
-    devpost_client: DevpostClientHook
-    profile_scanner: ProfileScannerHook
+    devpost_client: Callable[[], DevpostClientProtocol]
+    profile_scanner: Callable[[Path], CodebaseProfile]
 
     def reset(self) -> None:
         """Restore every hook to its production implementation.
@@ -397,11 +390,9 @@ def make_interest_filter(
 
 __all__ = [
     "DevpostApiFactoryProtocol",
-    "DevpostClientHook",
     "FakeDevpostApi",
     "FakeDevpostClient",
     "HooksContainer",
-    "ProfileScannerHook",
     "hooks",
     "make_fake_capability",
     "make_fake_displayed_location",

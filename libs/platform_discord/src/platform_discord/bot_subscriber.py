@@ -10,7 +10,7 @@ Subclasses must implement _handle_event() to process decoded events.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Final, Generic, TypedDict, TypeVar
 
 from platform_core.logging import get_logger
@@ -22,9 +22,6 @@ from .subscriber import MessageSource, RedisEventSubscriber
 from .task_runner import Closable, Runnable, TaskRunner
 
 E = TypeVar("E")
-
-Decoder = Callable[[str], E | None]
-Handler = Callable[[E], Awaitable[None]]
 
 
 class _BuildResult(TypedDict):
@@ -70,7 +67,7 @@ class BotEventSubscriber(Generic[E]):
         redis_url: str,
         events_channel: str,
         task_name: str,
-        decode: Decoder[E],
+        decode: Callable[[str], E | None],
         source_factory: Callable[[str], MessageSource] | None = None,
     ) -> None:
         """Initialize the subscriber.
@@ -87,7 +84,7 @@ class BotEventSubscriber(Generic[E]):
         self._redis_url: Final[str] = redis_url
         self._events_channel: Final[str] = events_channel
         self._task_name: Final[str] = task_name
-        self._decode: Final[Decoder[E]] = decode
+        self._decode: Final[Callable[[str], E | None]] = decode
         self._source_factory: Final[Callable[[str], MessageSource]] = (
             source_factory if source_factory is not None else _default_source_factory
         )
@@ -216,4 +213,4 @@ def _default_source_factory(url: str) -> MessageSource:
     return RedisPubSubSource(url)
 
 
-__all__ = ["BotEventSubscriber", "Decoder"]
+__all__ = ["BotEventSubscriber"]

@@ -8,12 +8,13 @@ from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel, TrainOutcome
+from model_trainer.core.contracts.model import (
+    ModelTrainConfig,
+    PreparedLMModel,
+    ProgressCallback,
+    TrainOutcome,
+)
 from model_trainer.core.services.training.base_trainer import BaseTrainer
-
-ProgressCallback = Callable[
-    [int, int, float, float, float, float, float | None, float | None], None
-]
 
 
 def train_prepared_char_lstm(

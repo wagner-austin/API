@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Literal
 
 import numpy as np
@@ -14,10 +13,6 @@ from covenant_ml.ensemble.regression_types import (
 from covenant_ml.ensemble.types import ModelOOFPredictions
 
 _RegressionMetric = Literal["neg_rmse", "neg_mae", "r_squared"]
-
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
 
 
 def _float_array(values: tuple[float, ...]) -> NDArray[np.float64]:

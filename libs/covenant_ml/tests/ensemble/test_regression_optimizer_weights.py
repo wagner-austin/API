@@ -19,6 +19,10 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.ensemble import _hooks
+from covenant_ml.ensemble._hooks import (
+    _ConstraintDict,
+    _ObjectiveFnType,
+)
 from covenant_ml.ensemble.regression_optimizer import (
     optimize_regression_ensemble_weights,
     validate_regression_oof_data,
@@ -29,11 +33,9 @@ from covenant_ml.ensemble.regression_types import (
 )
 from covenant_ml.ensemble.testing import fake_minimize
 from tests.ensemble._regression_optimizer_fixtures import (
-    _ConstraintDict,
     _float_array,
     _make_model_predictions,
     _make_test_config,
-    _ObjectiveFnType,
 )
 
 

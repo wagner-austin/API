@@ -24,9 +24,6 @@ from platform_kaggle._testing_fakes import (
 )
 from platform_kaggle._testing_hooks import (
     HooksContainer,
-    KaggleClientHook,
-    PageFetcherHook,
-    ProfileScannerHook,
     hooks,
     reset_hooks,
 )
@@ -45,9 +42,6 @@ __all__ = [
     "HooksContainer",
     "KaggleApiFactoryProtocol",
     "KaggleApiProtocol",
-    "KaggleClientHook",
-    "PageFetcherHook",
-    "ProfileScannerHook",
     "hooks",
     "make_fake_capability",
     "make_fake_competition",

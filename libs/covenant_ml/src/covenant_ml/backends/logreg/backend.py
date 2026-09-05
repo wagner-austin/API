@@ -24,6 +24,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     LogRegConfig,
+    ProgressCallback,
     TrainOutcome,
     TrainProgress,
 )
@@ -37,7 +38,6 @@ from ..protocol import (
     BackendCapabilities,
     ClassifierBackend,
     PreparedClassifier,
-    ProgressCallback,
 )
 
 _log = get_logger(__name__)

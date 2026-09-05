@@ -16,8 +16,8 @@ from covenant_ml.types import (
     TrainOutcome,
 )
 
-from .backends.protocol import ProgressCallback
 from .backends.registry import ClassifierRegistry
+from .types import ProgressCallback
 
 
 class BaseTabularTrainer:

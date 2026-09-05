@@ -12,6 +12,18 @@ from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.types import LMModelProto
 
+ProgressCallback = Callable[
+    [int, int, float, float, float, float, float | None, float | None], None
+]
+"""Called each step with (step, total, loss, lr, tokens_per_s, elapsed, val_loss, val_ppl).
+
+Eight positionals is why this carries a name: spelled inline it is unreadable,
+and it WAS spelled inline once here in :class:`ModelBackend.train` while three
+backends and a test each declared their own copy of it. A backend whose
+progress signature drifts from the contract it implements is the failure this
+prevents, and four declarations could not have caught it.
+"""
+
 
 class ScoreConfig(TypedDict):
     """Configuration for scoring (computing loss/perplexity on text)."""
@@ -399,10 +411,7 @@ class ModelBackend(Protocol):
         cancelled: Callable[[], bool],
         prepared: PreparedLMModel,
         resume: bool,
-        progress: (
-            Callable[[int, int, float, float, float, float, float | None, float | None], None]
-            | None
-        ) = None,
+        progress: ProgressCallback | None = None,
         wandb_publisher: WandbPublisher | None = None,
         determinism: DeterminismRecord,
     ) -> TrainOutcome: ...

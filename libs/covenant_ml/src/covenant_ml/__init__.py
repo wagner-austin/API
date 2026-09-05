@@ -23,7 +23,6 @@ from covenant_ml.metrics_regression import (
 )
 from covenant_ml.trainer import (
     DataSplits,
-    ProgressCallback,
     RegressionDataSplits,
     regression_split,
     stratified_split,
@@ -38,6 +37,7 @@ from covenant_ml.types import (
     EvalMetrics,
     FeatureImportance,
     Proba2DProtocol,
+    ProgressCallback,
     TrainConfig,
     TrainOutcome,
     TrainProgress,

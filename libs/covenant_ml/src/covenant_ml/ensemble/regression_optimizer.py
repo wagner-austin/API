@@ -10,13 +10,15 @@ Reuses the scipy minimize hook from optimizer.py.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.ensemble import _hooks
+from covenant_ml.ensemble._hooks import (
+    _ConstraintDict,
+    _OptionsDict,
+)
 from covenant_ml.ensemble.regression_types import (
     RegressionEnsembleOOFData,
     RegressionOptimizationConfig,
@@ -32,9 +34,6 @@ from covenant_ml.metrics_regression import (
 _log = get_logger(__name__)
 
 # Type aliases for scipy minimize interface
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
-_OptionsDict = dict[str, int | float]
 
 
 # =============================================================================

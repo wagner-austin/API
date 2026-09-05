@@ -27,14 +27,13 @@ LoggerProvider = Callable[[], LoggerProtocol]
 
 # Provider types for dependency injection
 RedisProviderType = Callable[[Settings], RedisStrProto | Generator[RedisStrProto, None, None]]
-QueueProviderType = Callable[[], QueueProtocol]
 
 
 class _ProviderContext:
     def __init__(self) -> None:
         self.settings_provider: SettingsProvider | None = None
         self.redis_provider: RedisProviderType | None = None
-        self.queue_provider: QueueProviderType | None = None
+        self.queue_provider: Callable[[], QueueProtocol] | None = None
         self.logger_provider: LoggerProvider | None = None
 
 
@@ -76,7 +75,6 @@ def get_logger_from_context() -> LoggerProtocol:
 
 __all__ = [
     "LoggerProvider",
-    "QueueProviderType",
     "RedisProviderType",
     "SettingsProvider",
     "get_logger_from_context",

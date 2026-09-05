@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import numpy as np
 from numpy.typing import NDArray
 
+from covenant_ml.ensemble._hooks import (
+    _ConstraintDict,
+    _OptionsDict,
+)
 from covenant_ml.ensemble.testing import FakeOptimizeResult, fake_minimize
-
-# Type aliases matching testing.py
-_ObjectiveFnType = Callable[[NDArray[np.float64]], float]
-_ConstraintDict = dict[str, str | _ObjectiveFnType]
-_OptionsDict = dict[str, int | float]
 
 
 def _float_array(*values: float) -> NDArray[np.float64]:

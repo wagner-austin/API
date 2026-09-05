@@ -17,6 +17,8 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
+from covenant_ml.types import ProgressCallback
+
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
 from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
@@ -30,7 +32,7 @@ from ...types import (
     TrainOutcome,
     TrainProgress,
 )
-from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 
 _log = get_logger(__name__)
 

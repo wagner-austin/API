@@ -24,6 +24,8 @@ from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
+from covenant_ml.types import ProgressCallback
+
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_cleargbm_default_space, make_cleargbm_focused_space
 from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
@@ -35,7 +37,7 @@ from ...types import (
     FeatureImportance,
     TrainOutcome,
 )
-from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 from .config_resolution import (
     _compute_class_weight,
     _is_cleargbm_config,

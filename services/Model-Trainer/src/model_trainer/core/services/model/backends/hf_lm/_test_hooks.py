@@ -18,6 +18,7 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
+    ProgressCallback,
     QuantizationConfig,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
@@ -35,7 +36,6 @@ from model_trainer.core.services.model.backends.hf_lm._hook_protocols import (
     HFTokenizerProto,
     ModelDirFn,
     PreparedModelLoader,
-    ProgressCallback,
     ReadTextFileFn,
     TokenizerLoader,
     TrainerProto,

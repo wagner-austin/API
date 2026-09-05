@@ -5,12 +5,14 @@ Exports only registry/protocols; concrete backends live in submodules.
 
 from __future__ import annotations
 
+from covenant_ml.types import ProgressCallback
+
 from .lightgbm.regressor import (
     LIGHTGBM_REGRESSOR_CAPABILITIES,
     LightGBMRegressorBackend,
     create_lightgbm_regressor_backend,
 )
-from .protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from .protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 from .registry import BackendFactory, BackendRegistration, ClassifierRegistry, default_registry
 from .regressor_protocol import PreparedRegressor, RegressorBackend, RegressorProgressCallback
 from .regressor_registry import (

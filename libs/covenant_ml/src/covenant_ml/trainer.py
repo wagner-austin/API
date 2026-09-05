@@ -9,7 +9,6 @@ Enhanced trainer with:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Protocol
 
 import numpy as np
@@ -17,14 +16,8 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from .preprocessing import AutoPreprocessor, PreprocessingState
-from .types import (
-    TrainProgress,
-)
 
 _log = get_logger(__name__)
-
-# Type for progress callback
-ProgressCallback = Callable[[TrainProgress], None]
 
 
 class SplitData(Protocol):
@@ -567,7 +560,6 @@ __all__ = [
     "DataSplits",
     "FeatureScaler",
     "PreprocessedDataSplits",
-    "ProgressCallback",
     "RegressionDataSplits",
     "compute_feature_scaler",
     "preprocess_data_splits",

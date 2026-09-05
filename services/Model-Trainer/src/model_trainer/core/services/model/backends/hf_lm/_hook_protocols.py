@@ -14,16 +14,13 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
+    ProgressCallback,
     QuantizationConfig,
     TrainOutcome,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.types import LMModelProto
-
-ProgressCallback = Callable[
-    [int, int, float, float, float, float, float | None, float | None], None
-]
 
 
 class HFTokenizerProto(Protocol):

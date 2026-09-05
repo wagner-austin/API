@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.trainer_fit import train_model_with_validation
+from covenant_ml.types import ProgressCallback
 
 from ...metrics import compute_all_metrics
 from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
@@ -25,7 +26,7 @@ from ...types import (
     TrainConfig,
     TrainOutcome,
 )
-from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier
 
 
 class _XGBClassifierProtocol(Protocol):
