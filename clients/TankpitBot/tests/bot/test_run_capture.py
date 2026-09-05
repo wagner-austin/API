@@ -144,9 +144,11 @@ class TestBotRunWithCapture:
         launch_args = browser_type.launch_args[0]
         if launch_args is None:
             raise AssertionError("the launch was handed no args at all")
-        # The config's scale travels to Chromium: the client's picture
-        # size is entirely DPR, and geometry was chosen for factor 2.
-        assert launch_args == ["--force-device-scale-factor=2"]
+        # The config's scale travels to Chromium (the client's picture
+        # size is entirely DPR, and geometry was chosen for factor 2),
+        # and scrollbars are hidden so an overflowing layout can never
+        # draw them into a frame.
+        assert launch_args == ["--force-device-scale-factor=2", "--hide-scrollbars"]
         # Ended by run()'s own teardown, not the reaper in the finally.
         for name, process in zip(("Xvfb", "ffmpeg"), processes, strict=True):
             if process.poll() is None:

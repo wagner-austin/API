@@ -289,9 +289,14 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
         # layout), and Xvfb's default of 1 shrank the picture into a
         # corner of the capture. The screen geometry in the stream
         # config was chosen for content AT this factor, so the two
-        # travel together.
+        # travel together. Scrollbars are hidden because a layout that
+        # outgrows the screen by a pixel would otherwise draw them
+        # into every captured frame (observed live at 1152x672).
         launch_args = _chrome_stream_display_args() + (
-            [f"--force-device-scale-factor={self._stream_config['scale']}"]
+            [
+                f"--force-device-scale-factor={self._stream_config['scale']}",
+                "--hide-scrollbars",
+            ]
             if self._stream_config is not None
             else []
         )

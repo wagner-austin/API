@@ -187,7 +187,7 @@ class TestResolveStreamConfig:
         assert config["bitrate_kbps"] == DEFAULT_STREAM_BITRATE_KBPS
         assert config["segment_seconds"] == DEFAULT_STREAM_SEGMENT_SECONDS
 
-    def test_fps_bitrate_and_scale_overrides_win(self) -> None:
+    def test_fps_bitrate_scale_and_geometry_overrides_win(self) -> None:
         """Numeric overrides replace the defaults."""
         from tankpit_bot.bot.config import resolve_stream_config
 
@@ -198,12 +198,16 @@ class TestResolveStreamConfig:
                 "TANKPIT_STREAM_FPS": "24",
                 "TANKPIT_STREAM_BITRATE_KBPS": "800",
                 "TANKPIT_STREAM_SCALE": "1",
+                "TANKPIT_STREAM_WIDTH": "640",
+                "TANKPIT_STREAM_HEIGHT": "360",
             }
         )
         config = _resolved(resolve_stream_config())
         assert config["fps"] == 24
         assert config["bitrate_kbps"] == 800
         assert config["scale"] == 1
+        assert config["width"] == 640
+        assert config["height"] == 360
 
     def test_non_numeric_display_raises(self) -> None:
         """A malformed number fails loudly instead of picking a default."""

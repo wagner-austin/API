@@ -138,14 +138,16 @@ small game floating in dead margin (measured 2026-09-05: content
 568x330 centred in 704x544). Forcing 2 renders the client at crisp
 double pixels, the same picture the desktop shows."""
 
-DEFAULT_STREAM_WIDTH = 1152
-"""Capture screen width: the client's 568-wide CSS layout at scale 2
-(1136 physical) plus a small even margin the fullscreen centering
-absorbs."""
+DEFAULT_STREAM_WIDTH = 1280
+"""Capture screen width. The client's layout at scale 2 measured
+~1160 physical once live (a 1152 screen grew scrollbars — the
+first-frame content-box measurement ran a few percent under the real
+layout), so the default carries working margin rather than hugging a
+number that moves with the client's own chrome."""
 
-DEFAULT_STREAM_HEIGHT = 672
-"""Capture screen height: 330 CSS at scale 2 (660 physical) plus the
-same small margin."""
+DEFAULT_STREAM_HEIGHT = 768
+"""Capture screen height, same margin logic over the ~730 physical
+the layout measured at scale 2."""
 
 DEFAULT_STREAM_FPS = 30
 """Display sampling rate. The game paints at ~60 Hz but its motion is
@@ -229,12 +231,14 @@ def resolve_stream_config() -> StreamConfigDict | None:
     raw_fps = _test_hooks.get_env("TANKPIT_STREAM_FPS")
     raw_bitrate = _test_hooks.get_env("TANKPIT_STREAM_BITRATE_KBPS")
     raw_scale = _test_hooks.get_env("TANKPIT_STREAM_SCALE")
+    raw_width = _test_hooks.get_env("TANKPIT_STREAM_WIDTH")
+    raw_height = _test_hooks.get_env("TANKPIT_STREAM_HEIGHT")
     hls_dir = bot_run_dir(resolve_bot_instance()) / "hls"
     return decode_stream_config(
         {
             "display": int(raw_display),
-            "width": DEFAULT_STREAM_WIDTH,
-            "height": DEFAULT_STREAM_HEIGHT,
+            "width": int(raw_width) if raw_width is not None else DEFAULT_STREAM_WIDTH,
+            "height": int(raw_height) if raw_height is not None else DEFAULT_STREAM_HEIGHT,
             "scale": int(raw_scale) if raw_scale is not None else DEFAULT_STREAM_SCALE,
             "fps": int(raw_fps) if raw_fps is not None else DEFAULT_STREAM_FPS,
             "bitrate_kbps": (

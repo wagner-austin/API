@@ -6271,10 +6271,15 @@ reads stays unconditional. A fourth followed from measuring the
 pixels and its on-screen size is entirely devicePixelRatio (the
 operator's desktop runs ~1.75; an Xvfb defaults to 1), so the
 streamed launch now forces ``--force-device-scale-factor=2`` and the
-capture screen defaults to 1152x672 — the scaled content plus a
-margin the fullscreen centering absorbs. The factor is a typed field
-of ``StreamConfigDict`` because the geometry is only correct AT its
-scale; the two travel together or not at all.
+capture screen defaults to 1280x768 — the scaled content plus
+working margin, after a first cut at 1152x672 (sized from a
+content-box measurement) grew scrollbars live: the layout's own
+chrome runs a few percent past the measured box, so the default
+carries margin instead of hugging a number that moves, scrollbars are
+hidden at launch (``--hide-scrollbars``), and
+``TANKPIT_STREAM_WIDTH``/``HEIGHT`` override without a commit. The
+factor is a typed field of ``StreamConfigDict`` because the geometry
+is only correct AT its scale; the two travel together or not at all.
 
 `tankpit-stream-probe` was rewritten for the new observable: polling
 the playlist's `EXT-X-MEDIA-SEQUENCE` measures the ENCODER's cadence
