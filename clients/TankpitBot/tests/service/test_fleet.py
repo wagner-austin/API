@@ -250,6 +250,45 @@ def test_spawn_refuses_a_live_duplicate_but_replaces_a_dead_one(
     assert row["pid"] == 1002
 
 
+def test_spawn_clears_the_predecessors_stream_files(spawner: _FakeSpawner) -> None:
+    """A reused slot's ``hls/`` is emptied before the child starts.
+
+    A fresh spawn registers as running immediately, but its encoder
+    only writes after login and game-ready — for that window the
+    slot's directory still holds the DEAD session's playlist and
+    segments, and the liveness gate serves them as if live (operator
+    observation 2026-09-05: a respawned demo slot played the previous
+    session's footage, then visibly "restarted"). Spawn deletes them
+    so warmup reads 503 warming instead of a ghost.
+    """
+    original = _without_accounts()
+    hls = bot_run_dir("alpha") / "hls"
+    stale = [hls / "index.m3u8", hls / "seg00042.ts"]
+    removed: list[Path] = []
+
+    def fake_glob(directory: Path, pattern: str) -> list[Path]:
+        assert directory == hls
+        assert pattern == "*"
+        return list(stale)
+
+    def fake_remove(path: Path) -> None:
+        removed.append(path)
+
+    original_glob = top_hooks.glob_paths
+    original_remove = top_hooks.remove_file
+    top_hooks.glob_paths = fake_glob
+    top_hooks.remove_file = fake_remove
+    try:
+        manager = FleetManager()
+        manager.spawn(instance="alpha", account="", kills=0, seconds=0)
+    finally:
+        top_hooks.glob_paths = original_glob
+        top_hooks.remove_file = original_remove
+        top_hooks.path_exists = original
+
+    assert removed == stale
+
+
 def test_report_sorts_and_reflects_liveness(spawner: _FakeSpawner) -> None:
     """The report row set is sorted and tracks process exit."""
     original = _without_accounts()
