@@ -33,12 +33,6 @@ from collections.abc import Callable
 
 from platform_workers.redis import RedisStrProto
 
-PublishFn = Callable[[str, str], None]
-"""Takes a channel and a message, and puts them somewhere a human can read."""
-
-ClockFn = Callable[[], float]
-"""Returns a monotonically increasing seconds count, for expiry."""
-
 
 class LocalKV(RedisStrProto):
     """An in-process implementation of the Redis surface the trainer uses.
@@ -51,7 +45,7 @@ class LocalKV(RedisStrProto):
 
     __slots__ = ("_clock", "_deadlines", "_hashes", "_publish", "_sets", "_strings", "published")
 
-    def __init__(self, *, publish: PublishFn, clock: ClockFn) -> None:
+    def __init__(self, *, publish: Callable[[str, str], None], clock: Callable[[], float]) -> None:
         """Build a store bound to an output sink and a clock.
 
         Args:
@@ -282,4 +276,4 @@ class LocalKV(RedisStrProto):
         return
 
 
-__all__ = ["ClockFn", "LocalKV", "PublishFn"]
+__all__ = ["LocalKV"]

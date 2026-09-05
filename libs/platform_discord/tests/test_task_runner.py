@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import TypedDict
 
 import pytest
 
-from platform_discord.task_runner import BuildFunc, Closable, Runnable, TaskRunner
+from platform_discord.task_runner import Closable, Runnable, TaskRunner
 
 
 class _FakeClosable:
@@ -42,7 +43,7 @@ class _BR(TypedDict):
     closable: Closable
 
 
-def _build_pair(r: Runnable, c: Closable) -> BuildFunc:
+def _build_pair(r: Runnable, c: Closable) -> Callable[[], _BR]:
     def _builder() -> _BR:
         return {"runnable": r, "closable": c}
 

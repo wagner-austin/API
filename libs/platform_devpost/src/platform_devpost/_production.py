@@ -22,12 +22,11 @@ from platform_devpost.types import (
 # HTTP Client Builder Hook
 # -----------------------------------------------------------------------------
 
-HttpClientBuilder = Callable[[float, SyncTransport | None], HttpxClient]
 
-_http_client_builder: HttpClientBuilder = build_client
+_http_client_builder: Callable[[float, SyncTransport | None], HttpxClient] = build_client
 
 
-def _set_http_client_builder(builder: HttpClientBuilder) -> None:
+def _set_http_client_builder(builder: Callable[[float, SyncTransport | None], HttpxClient]) -> None:
     """Set HTTP client builder for testing.
 
     Args:

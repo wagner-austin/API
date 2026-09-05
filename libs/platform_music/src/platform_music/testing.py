@@ -5,10 +5,10 @@ from collections.abc import Callable
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
 from platform_music.models import PlayRecord, ServiceName, Track
-from platform_music.services.apple import AppleHttpGetHook, AppleMusicProto
+from platform_music.services.apple import AppleMusicProto
 from platform_music.services.lastfm import LastFmProto
-from platform_music.services.spotify import SpotifyHttpGetHook, SpotifyProto
-from platform_music.services.youtube import YouTubeHttpPostHook, YouTubeMusicProto
+from platform_music.services.spotify import SpotifyProto
+from platform_music.services.youtube import YouTubeMusicProto
 
 # =============================================================================
 # Fake Music Service Implementations
@@ -168,11 +168,6 @@ class FakeYouTubeMusic(YouTubeMusicProto):
 # =============================================================================
 
 # jobs.py hooks
-RedisClientHook = Callable[[str], RedisStrProto]
-LastFmClientHook = Callable[[str, str, str], LastFmProto]
-SpotifyClientHook = Callable[[str, str, int | str], SpotifyProto]
-AppleClientHook = Callable[[str, str], AppleMusicProto]
-YouTubeClientHook = Callable[[str, str], YouTubeMusicProto]
 
 # =============================================================================
 # Hooks Container
@@ -183,16 +178,16 @@ class HooksContainer:
     """Container for hooks. Production sets defaults, tests override with fakes."""
 
     # jobs.py dependencies - set to production implementations at module load
-    redis_client: RedisClientHook
-    lastfm_client: LastFmClientHook
-    spotify_client: SpotifyClientHook
-    apple_client: AppleClientHook
-    youtube_client: YouTubeClientHook
+    redis_client: Callable[[str], RedisStrProto]
+    lastfm_client: Callable[[str, str, str], LastFmProto]
+    spotify_client: Callable[[str, str, int | str], SpotifyProto]
+    apple_client: Callable[[str, str], AppleMusicProto]
+    youtube_client: Callable[[str, str], YouTubeMusicProto]
 
     # HTTP layer hooks for adapters (low-level) - set to production implementations
-    apple_http_get: AppleHttpGetHook
-    spotify_http_get: SpotifyHttpGetHook
-    youtube_http_post: YouTubeHttpPostHook
+    apple_http_get: Callable[[str, str, str, float], str]
+    spotify_http_get: Callable[[str, str, float], str]
+    youtube_http_post: Callable[[str, str, str, str, float, str], str]
 
     def reset(self) -> None:
         """Restore every hook to its production implementation.
@@ -323,7 +318,7 @@ def make_plays(service: ServiceName, count: int = 12) -> list[PlayRecord]:
 
 def make_fake_redis_client(
     fake_redis: RedisStrProto,
-) -> RedisClientHook:
+) -> Callable[[str], RedisStrProto]:
     """Create a redis client hook that returns the provided fake."""
 
     def _hook(url: str) -> RedisStrProto:
@@ -334,7 +329,7 @@ def make_fake_redis_client(
 
 def make_fake_lastfm_client(
     fake_lastfm: LastFmProto,
-) -> LastFmClientHook:
+) -> Callable[[str, str, str], LastFmProto]:
     """Create a lastfm client hook that returns the provided fake."""
 
     def _hook(api_key: str, api_secret: str, session_key: str) -> LastFmProto:
@@ -345,7 +340,7 @@ def make_fake_lastfm_client(
 
 def make_fake_spotify_client(
     fake_spotify: SpotifyProto,
-) -> SpotifyClientHook:
+) -> Callable[[str, str, int | str], SpotifyProto]:
     """Create a spotify client hook that returns the provided fake."""
 
     def _hook(access_token: str, refresh_token: str, expires_in: int | str) -> SpotifyProto:
@@ -356,7 +351,7 @@ def make_fake_spotify_client(
 
 def make_fake_apple_client(
     fake_apple: AppleMusicProto,
-) -> AppleClientHook:
+) -> Callable[[str, str], AppleMusicProto]:
     """Create an apple client hook that returns the provided fake."""
 
     def _hook(music_user_token: str, developer_token: str) -> AppleMusicProto:
@@ -367,7 +362,7 @@ def make_fake_apple_client(
 
 def make_fake_youtube_client(
     fake_youtube: YouTubeMusicProto,
-) -> YouTubeClientHook:
+) -> Callable[[str, str], YouTubeMusicProto]:
     """Create a youtube client hook that returns the provided fake."""
 
     def _hook(sapisid: str, cookies: str) -> YouTubeMusicProto:
@@ -376,7 +371,7 @@ def make_fake_youtube_client(
     return _hook
 
 
-def make_fake_apple_http_get(response_json: str) -> AppleHttpGetHook:
+def make_fake_apple_http_get(response_json: str) -> Callable[[str, str, str, float], str]:
     """Create an apple http_get hook that returns the provided JSON response."""
 
     def _hook(url: str, developer_token: str, user_token: str, timeout: float) -> str:
@@ -385,7 +380,7 @@ def make_fake_apple_http_get(response_json: str) -> AppleHttpGetHook:
     return _hook
 
 
-def make_fake_spotify_http_get(response_json: str) -> SpotifyHttpGetHook:
+def make_fake_spotify_http_get(response_json: str) -> Callable[[str, str, float], str]:
     """Create a spotify http_get hook that returns the provided JSON response."""
 
     def _hook(url: str, access_token: str, timeout: float) -> str:
@@ -394,7 +389,7 @@ def make_fake_spotify_http_get(response_json: str) -> SpotifyHttpGetHook:
     return _hook
 
 
-def make_fake_spotify_http_get_pages(pages: list[str]) -> SpotifyHttpGetHook:
+def make_fake_spotify_http_get_pages(pages: list[str]) -> Callable[[str, str, float], str]:
     """Create a spotify http_get hook that returns pages in sequence.
 
     After all pages are exhausted, returns the last page repeatedly.
@@ -411,7 +406,9 @@ def make_fake_spotify_http_get_pages(pages: list[str]) -> SpotifyHttpGetHook:
     return _hook
 
 
-def make_fake_youtube_http_post(response_json: str) -> YouTubeHttpPostHook:
+def make_fake_youtube_http_post(
+    response_json: str,
+) -> Callable[[str, str, str, str, float, str], str]:
     """Create a youtube http_post hook that returns the provided JSON response."""
 
     def _hook(url: str, sapisid: str, cookies: str, origin: str, timeout: float, body: str) -> str:
@@ -420,7 +417,7 @@ def make_fake_youtube_http_post(response_json: str) -> YouTubeHttpPostHook:
     return _hook
 
 
-def make_raising_apple_http_get(exc: BaseException) -> AppleHttpGetHook:
+def make_raising_apple_http_get(exc: BaseException) -> Callable[[str, str, str, float], str]:
     """Create an apple http_get hook that raises the provided exception."""
 
     def _hook(url: str, developer_token: str, user_token: str, timeout: float) -> str:
@@ -429,7 +426,7 @@ def make_raising_apple_http_get(exc: BaseException) -> AppleHttpGetHook:
     return _hook
 
 
-def make_raising_spotify_http_get(exc: BaseException) -> SpotifyHttpGetHook:
+def make_raising_spotify_http_get(exc: BaseException) -> Callable[[str, str, float], str]:
     """Create a spotify http_get hook that raises the provided exception."""
 
     def _hook(url: str, access_token: str, timeout: float) -> str:
@@ -438,7 +435,9 @@ def make_raising_spotify_http_get(exc: BaseException) -> SpotifyHttpGetHook:
     return _hook
 
 
-def make_raising_youtube_http_post(exc: BaseException) -> YouTubeHttpPostHook:
+def make_raising_youtube_http_post(
+    exc: BaseException,
+) -> Callable[[str, str, str, str, float, str], str]:
     """Create a youtube http_post hook that raises the provided exception."""
 
     def _hook(url: str, sapisid: str, cookies: str, origin: str, timeout: float, body: str) -> str:
@@ -452,16 +451,11 @@ def make_raising_youtube_http_post(exc: BaseException) -> YouTubeHttpPostHook:
 # =============================================================================
 
 __all__ = [
-    "AppleClientHook",
     "FakeAppleMusic",
     "FakeLastFm",
     "FakeSpotify",
     "FakeYouTubeMusic",
     "HooksContainer",
-    "LastFmClientHook",
-    "RedisClientHook",
-    "SpotifyClientHook",
-    "YouTubeClientHook",
     "hooks",
     "make_fake_apple_client",
     "make_fake_apple_http_get",

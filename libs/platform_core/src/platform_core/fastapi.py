@@ -10,7 +10,6 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from platform_core._asgi_protocols import (
-    _ExceptionHandlerProto,
     _FastAPIAppProto,
     _JSONResponseProto,
     _RequestProto,
@@ -109,7 +108,7 @@ class FastAPIAppAdapter:
     def add_exception_handler(
         self,
         exc_class_or_status_code: int | type[Exception],
-        handler: _ExceptionHandlerProto,
+        handler: Callable[[_RequestProto, Exception], Awaitable[_JSONResponseProto]],
     ) -> None:
         """Register exception handler, wrapping Protocol types to Starlette types."""
 

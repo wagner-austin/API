@@ -48,40 +48,6 @@ class MzMLReaderProtocol(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Type aliases for hooks
-# ---------------------------------------------------------------------------
-
-# Thermo hooks
-CreateTempDirFn = Callable[[], Path]
-CleanupTempDirFn = Callable[[Path], None]
-ConvertRawToMzmlFn = Callable[[Path, Path], Path]
-GetBundledExePathFn = Callable[[], Path]
-FindThermoRawFileParserFn = Callable[[], Path]
-ShutilWhichFn = Callable[[str], str | None]
-MzMLReaderFactory = Callable[[], MzMLReaderProtocol]
-
-# shutil.which hook
-ShutilWhichHookFn = Callable[[str], str | None]
-
-# Rainbow/Waters hooks
-LoadDataDirectoryFn = Callable[[Path], DataDirectoryProtocol]
-
-# ImzML hooks
-OpenImzmlFn = Callable[[Path], ImzMLParserProtocol]
-
-# PDF hooks
-OpenPdfFn = Callable[[Path], PDFProtocol]
-
-# SMPS hooks
-SMPSReadLinesFn = Callable[[Path], list[str]]
-
-# TXT hooks
-TXTDetectEncodingFn = Callable[[Path], str]
-TXTReadTextFn = Callable[[Path, str], str]
-TXTReadLinesFn = Callable[[Path, str], list[str]]
-
-
-# ---------------------------------------------------------------------------
 # Hooks container
 # ---------------------------------------------------------------------------
 
@@ -94,30 +60,30 @@ class _HooksContainer:
     """
 
     # Thermo hooks
-    create_temp_dir: CreateTempDirFn
-    cleanup_temp_dir: CleanupTempDirFn
-    convert_raw_to_mzml: ConvertRawToMzmlFn
-    get_bundled_exe_path: GetBundledExePathFn
-    find_thermorawfileparser: FindThermoRawFileParserFn
-    shutil_which: ShutilWhichHookFn
-    mzml_reader_factory: MzMLReaderFactory
+    create_temp_dir: Callable[[], Path]
+    cleanup_temp_dir: Callable[[Path], None]
+    convert_raw_to_mzml: Callable[[Path, Path], Path]
+    get_bundled_exe_path: Callable[[], Path]
+    find_thermorawfileparser: Callable[[], Path]
+    shutil_which: Callable[[str], str | None]
+    mzml_reader_factory: Callable[[], MzMLReaderProtocol]
 
     # Rainbow/Waters hooks
-    load_data_directory: LoadDataDirectoryFn
+    load_data_directory: Callable[[Path], DataDirectoryProtocol]
 
     # ImzML hooks
-    open_imzml: OpenImzmlFn
+    open_imzml: Callable[[Path], ImzMLParserProtocol]
 
     # PDF hooks
-    open_pdf: OpenPdfFn
+    open_pdf: Callable[[Path], PDFProtocol]
 
     # SMPS hooks
-    smps_read_lines: SMPSReadLinesFn
+    smps_read_lines: Callable[[Path], list[str]]
 
     # TXT hooks
-    txt_detect_encoding: TXTDetectEncodingFn
-    txt_read_text: TXTReadTextFn
-    txt_read_lines: TXTReadLinesFn
+    txt_detect_encoding: Callable[[Path], str]
+    txt_read_text: Callable[[Path, str], str]
+    txt_read_lines: Callable[[Path, str], list[str]]
 
     def reset(self) -> None:
         """Restore every hook to its production implementation.

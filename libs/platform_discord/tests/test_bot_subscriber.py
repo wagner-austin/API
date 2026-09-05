@@ -183,9 +183,6 @@ class _FakeEmbed:
         return result
 
 
-_SourceFactory = Callable[[str], MessageSource]
-
-
 class _ConcreteSubscriber(BotEventSubscriber[_TestEvent]):
     """Concrete implementation for testing."""
 
@@ -195,7 +192,7 @@ class _ConcreteSubscriber(BotEventSubscriber[_TestEvent]):
         *,
         redis_url: str,
         events_channel: str,
-        source_factory: _SourceFactory | None = None,
+        source_factory: Callable[[str], MessageSource] | None = None,
     ) -> None:
         super().__init__(
             bot,

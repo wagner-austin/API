@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import types
 import urllib.parse
-from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -36,7 +35,6 @@ class _RequestObj(Protocol):
 
 
 # Hook type for testing
-SpotifyHttpGetHook = Callable[[str, str, float], str]
 
 
 def http_get_impl(url: str, *, access_token: str, timeout: float) -> str:
@@ -128,4 +126,4 @@ def spotify_client(*, access_token: str, refresh_token: str, expires_in: int | s
     return _SpotifyClient(access_token=access_token)
 
 
-__all__ = ["SpotifyHttpGetHook", "SpotifyProto", "http_get_impl", "spotify_client"]
+__all__ = ["SpotifyProto", "http_get_impl", "spotify_client"]

@@ -48,9 +48,6 @@ class _JSONResponseProto(Protocol):
     def status_code(self) -> int: ...
 
 
-_ExceptionHandlerProto = Callable[[_RequestProto, Exception], Awaitable[_JSONResponseProto]]
-
-
 @runtime_checkable
 class _FastAPIAppProto(Protocol):
     """Minimal protocol for FastAPI application adapter.
@@ -62,12 +59,11 @@ class _FastAPIAppProto(Protocol):
     def add_exception_handler(
         self,
         exc_class_or_status_code: int | type[Exception],
-        handler: _ExceptionHandlerProto,
+        handler: Callable[[_RequestProto, Exception], Awaitable[_JSONResponseProto]],
     ) -> None: ...
 
 
 __all__ = [
-    "_ExceptionHandlerProto",
     "_FastAPIAppProto",
     "_JSONResponseProto",
     "_RequestProto",

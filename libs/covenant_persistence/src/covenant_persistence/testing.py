@@ -26,7 +26,6 @@ from .protocols import CursorProtocol
 
 _Params = tuple[str | int | bool | None, ...]
 _Row = tuple[str | int | bool | None, ...]
-_QueryHandler = Callable[[str, _Params], None]
 
 
 # =============================================================================
@@ -79,7 +78,7 @@ class InMemoryCursor:
         if handler is not None:
             handler(query_lower, params)
 
-    def _get_handler(self, query: str) -> _QueryHandler | None:
+    def _get_handler(self, query: str) -> Callable[[str, _Params], None] | None:
         """Get handler for query type."""
         handler = self._get_deal_handler(query)
         if handler is not None:
@@ -92,7 +91,7 @@ class InMemoryCursor:
             return handler
         return self._get_result_handler(query)
 
-    def _get_deal_handler(self, query: str) -> _QueryHandler | None:
+    def _get_deal_handler(self, query: str) -> Callable[[str, _Params], None] | None:
         """Get handler for deal operations."""
         if query.startswith("insert into deals"):
             return self._insert_deal
@@ -104,7 +103,7 @@ class InMemoryCursor:
             return self._delete_deal
         return None
 
-    def _get_covenant_handler(self, query: str) -> _QueryHandler | None:
+    def _get_covenant_handler(self, query: str) -> Callable[[str, _Params], None] | None:
         """Get handler for covenant operations."""
         if query.startswith("insert into covenants"):
             return self._insert_covenant
@@ -114,7 +113,7 @@ class InMemoryCursor:
             return self._delete_covenant
         return None
 
-    def _get_measurement_handler(self, query: str) -> _QueryHandler | None:
+    def _get_measurement_handler(self, query: str) -> Callable[[str, _Params], None] | None:
         """Get handler for measurement operations."""
         if query.startswith("insert into measurements"):
             return self._insert_measurement
@@ -122,7 +121,7 @@ class InMemoryCursor:
             return self._select_measurements
         return None
 
-    def _get_result_handler(self, query: str) -> _QueryHandler | None:
+    def _get_result_handler(self, query: str) -> Callable[[str, _Params], None] | None:
         """Get handler for covenant result operations."""
         if query.startswith("insert into covenant_results"):
             return self._insert_covenant_result

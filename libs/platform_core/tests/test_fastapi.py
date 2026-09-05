@@ -62,19 +62,20 @@ class _FakeJSONResponse:
 
 
 # Handler type that matches what Starlette/FastAPI expects
-_StarletteHandler = Callable[[Request, Exception], Awaitable[Response]]
 
 
 class _FakeFastAPIApp:
     """Fake FastAPI app that records registered handlers."""
 
     def __init__(self) -> None:
-        self.handlers: dict[int | type[Exception], _StarletteHandler] = {}
+        self.handlers: dict[
+            int | type[Exception], Callable[[Request, Exception], Awaitable[Response]]
+        ] = {}
 
     def add_exception_handler(
         self,
         exc_class_or_status_code: int | type[Exception],
-        handler: _StarletteHandler,
+        handler: Callable[[Request, Exception], Awaitable[Response]],
     ) -> None:
         self.handlers[exc_class_or_status_code] = handler
 

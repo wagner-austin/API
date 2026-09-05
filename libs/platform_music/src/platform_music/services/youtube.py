@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import time
 import types
-from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -36,7 +35,6 @@ class _RequestObj(Protocol):
 
 
 # Hook type for testing
-YouTubeHttpPostHook = Callable[[str, str, str, str, float, str], str]
 
 
 def sapisidhash(sapisid: str, origin: str, now: int) -> str:
@@ -175,7 +173,6 @@ def youtube_client(*, sapisid: str, cookies: str) -> YouTubeMusicProto:
 
 
 __all__ = [
-    "YouTubeHttpPostHook",
     "YouTubeMusicProto",
     "http_post_impl",
     "sapisidhash",

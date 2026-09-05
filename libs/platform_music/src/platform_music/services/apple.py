@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import types
-from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -34,7 +33,6 @@ class _RequestObj(Protocol):
 
 
 # Hook type for testing
-AppleHttpGetHook = Callable[[str, str, str, float], str]
 
 
 def http_get_impl(url: str, *, developer_token: str, user_token: str, timeout: float) -> str:
@@ -137,4 +135,4 @@ def apple_client(*, music_user_token: str, developer_token: str) -> AppleMusicPr
     return _AppleClient(developer_token=developer_token, user_token=music_user_token)
 
 
-__all__ = ["AppleHttpGetHook", "AppleMusicProto", "apple_client", "http_get_impl"]
+__all__ = ["AppleMusicProto", "apple_client", "http_get_impl"]

@@ -18,10 +18,6 @@ class _BuildResult(TypedDict):
     closable: Closable
 
 
-BuildFunc = Callable[[], _BuildResult]
-OnError = Callable[[BaseException], None]
-
-
 class TaskRunner:
     """Encapsulate start/stop/done-callback lifecycle for long-running tasks.
 
@@ -36,9 +32,9 @@ class TaskRunner:
     def __init__(
         self,
         *,
-        build: BuildFunc,
+        build: Callable[[], _BuildResult],
         name: str,
-        on_error: OnError | None = None,
+        on_error: Callable[[BaseException], None] | None = None,
     ) -> None:
         self._build = build
         self._name: Final[str] = name
@@ -141,4 +137,4 @@ class TaskRunner:
         self._task = task
 
 
-__all__ = ["BuildFunc", "Closable", "OnError", "Runnable", "TaskRunner"]
+__all__ = ["Closable", "Runnable", "TaskRunner"]
