@@ -19,11 +19,11 @@ from platform_email.auth.outlook import (
 from platform_email.fake_hooks import (
     make_fake_console,
     make_fake_current_time,
-    make_fake_http_post,
+    make_fake_http_send,
     make_fake_no_tokens,
     make_fake_outlook_config,
     make_fake_tokens,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.testing import (
     hooks,
@@ -93,7 +93,7 @@ class TestExchangeOutlookCodeForTokens:
                 "token_type": "Bearer",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         tokens = exchange_outlook_code_for_tokens(
@@ -109,7 +109,7 @@ class TestExchangeOutlookCodeForTokens:
     def test_raises_on_connection_error(self) -> None:
         """Test that ConnectionError is wrapped in AppError."""
         config = _make_config()
-        hooks.http_post = make_raising_http_post(ConnectionError("Network down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network down"))
 
         with pytest.raises(AppError) as exc_info:
             exchange_outlook_code_for_tokens(config, code="code", code_verifier="verifier")
@@ -119,7 +119,7 @@ class TestExchangeOutlookCodeForTokens:
     def test_raises_on_os_error(self) -> None:
         """Test that OSError is wrapped in AppError."""
         config = _make_config()
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         with pytest.raises(AppError) as exc_info:
             exchange_outlook_code_for_tokens(config, code="code", code_verifier="verifier")
@@ -129,7 +129,7 @@ class TestExchangeOutlookCodeForTokens:
     def test_raises_on_invalid_json(self) -> None:
         """Test that invalid JSON raises AppError."""
         config = _make_config()
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         with pytest.raises(AppError) as exc_info:
             exchange_outlook_code_for_tokens(config, code="code", code_verifier="verifier")
@@ -145,7 +145,7 @@ class TestExchangeOutlookCodeForTokens:
                 "error_description": "Code expired",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         with pytest.raises(AppError) as exc_info:
             exchange_outlook_code_for_tokens(config, code="code", code_verifier="verifier")
@@ -163,7 +163,7 @@ class TestExchangeOutlookCodeForTokens:
                 "token_type": "Bearer",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         with pytest.raises(AppError) as exc_info:
@@ -186,7 +186,7 @@ class TestRefreshOutlookAccessToken:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(2000)
 
         tokens = refresh_outlook_access_token(config, "old_refresh")
@@ -204,7 +204,7 @@ class TestRefreshOutlookAccessToken:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(2000)
 
         tokens = refresh_outlook_access_token(config, "old_refresh")
@@ -214,7 +214,7 @@ class TestRefreshOutlookAccessToken:
     def test_raises_on_connection_error(self) -> None:
         """Test that ConnectionError is wrapped in AppError."""
         config = _make_config()
-        hooks.http_post = make_raising_http_post(ConnectionError("Down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Down"))
 
         with pytest.raises(AppError) as exc_info:
             refresh_outlook_access_token(config, "refresh")
@@ -224,7 +224,7 @@ class TestRefreshOutlookAccessToken:
     def test_raises_on_os_error(self) -> None:
         """Test that OSError is wrapped in AppError."""
         config = _make_config()
-        hooks.http_post = make_raising_http_post(OSError("Socket"))
+        hooks.http_post = make_raising_http_send(OSError("Socket"))
 
         with pytest.raises(AppError) as exc_info:
             refresh_outlook_access_token(config, "refresh")
@@ -234,7 +234,7 @@ class TestRefreshOutlookAccessToken:
     def test_raises_on_invalid_json(self) -> None:
         """Test that invalid JSON raises AppError."""
         config = _make_config()
-        hooks.http_post = make_fake_http_post("{invalid")
+        hooks.http_post = make_fake_http_send("{invalid")
 
         with pytest.raises(AppError) as exc_info:
             refresh_outlook_access_token(config, "refresh")
@@ -245,7 +245,7 @@ class TestRefreshOutlookAccessToken:
         """Test that error in response raises AppError."""
         config = _make_config()
         response = dump_json_str({"error": "invalid_grant"})
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         with pytest.raises(AppError) as exc_info:
             refresh_outlook_access_token(config, "refresh")
@@ -277,7 +277,7 @@ class TestGetValidOutlookTokens:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         saved_tokens: list[OAuthTokens] = []
@@ -314,7 +314,7 @@ class TestAuthorizeOutlook:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
         hooks.open_browser = _open_browser
         hooks.console_output = output_hook
@@ -384,7 +384,7 @@ class TestOutlookLoadOrAuthorize:
 
         hooks.load_outlook_config = make_fake_outlook_config(config)
         hooks.load_outlook_tokens = make_fake_tokens(expired_tokens)
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         saved_tokens: list[OAuthTokens] = []
@@ -459,7 +459,7 @@ class TestOutlookLoadOrAuthorize:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         def _open_browser(_url: str) -> None:
             pass

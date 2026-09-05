@@ -10,8 +10,8 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from platform_email.fake_hooks import (
     make_fake_http_get,
-    make_fake_http_post,
-    make_raising_http_post,
+    make_fake_http_send,
+    make_raising_http_send,
 )
 from platform_email.providers.gmail import (
     _GmailEmailClient,
@@ -137,7 +137,7 @@ class TestGmailEmailClientMoveEmailErrors:
 
     def test_move_email_os_error(self) -> None:
         """Test OSError handling in move_email."""
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -147,7 +147,7 @@ class TestGmailEmailClientMoveEmailErrors:
 
     def test_move_email_invalid_json_response(self) -> None:
         """Test invalid JSON response in move_email."""
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:

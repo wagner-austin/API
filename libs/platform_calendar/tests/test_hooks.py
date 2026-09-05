@@ -17,14 +17,12 @@ from platform_calendar.fakes import (
     make_fake_file_system,
     make_fake_http_delete,
     make_fake_http_get,
-    make_fake_http_patch,
-    make_fake_http_post,
+    make_fake_http_send,
     make_fake_no_tokens,
     make_fake_tokens,
     make_raising_http_delete,
     make_raising_http_get,
-    make_raising_http_patch,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_calendar.testing import (
     hooks,
@@ -55,9 +53,9 @@ class TestMakeFakeHttpGet:
         assert result == '{"result": "ok"}'
 
 
-class TestMakeFakeHttpPost:
+class TestMakeFakeHttpSend:
     def test_returns_fixed_response(self) -> None:
-        hook = make_fake_http_post('{"id": "123"}')
+        hook = make_fake_http_send('{"id": "123"}')
         result = hook("https://example.com", {}, '{"data": "test"}')
         assert result == '{"id": "123"}'
 
@@ -69,9 +67,9 @@ class TestMakeRaisingHttpGet:
             hook("https://example.com", {})
 
 
-class TestMakeRaisingHttpPost:
+class TestMakeRaisingHttpSend:
     def test_raises_exception(self) -> None:
-        hook = make_raising_http_post(TimeoutError("Timeout"))
+        hook = make_raising_http_send(TimeoutError("Timeout"))
         with pytest.raises(TimeoutError, match="Timeout"):
             hook("https://example.com", {}, "")
 
@@ -89,20 +87,6 @@ class TestMakeRaisingHttpDelete:
         hook = make_raising_http_delete(ConnectionError("Delete failed"))
         with pytest.raises(ConnectionError, match="Delete failed"):
             hook("https://example.com/delete", {})
-
-
-class TestMakeFakeHttpPatch:
-    def test_returns_fixed_response(self) -> None:
-        hook = make_fake_http_patch('{"updated": true}')
-        result = hook("https://example.com/event", {}, '{"summary": "Updated"}')
-        assert result == '{"updated": true}'
-
-
-class TestMakeRaisingHttpPatch:
-    def test_raises_exception(self) -> None:
-        hook = make_raising_http_patch(ConnectionError("Patch failed"))
-        with pytest.raises(ConnectionError, match="Patch failed"):
-            hook("https://example.com/event", {}, '{"summary": "Test"}')
 
 
 class TestMakeFakeTokens:

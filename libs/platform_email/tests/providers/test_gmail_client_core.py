@@ -10,9 +10,9 @@ from platform_core.json_utils import dump_json_str
 
 from platform_email.fake_hooks import (
     make_fake_http_get,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_get,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.providers.gmail import (
     _GmailEmailClient,
@@ -132,7 +132,7 @@ class TestGmailEmailClientSendEmail:
                 },
             }
         )
-        hooks.http_post = make_fake_http_post(post_response)
+        hooks.http_post = make_fake_http_send(post_response)
         hooks.http_get = make_fake_http_get(get_response)
 
         client = _GmailEmailClient(access_token="token")
@@ -172,7 +172,7 @@ class TestGmailEmailClientSendEmail:
                 },
             }
         )
-        hooks.http_post = make_fake_http_post(post_response)
+        hooks.http_post = make_fake_http_send(post_response)
         hooks.http_get = make_fake_http_get(get_response)
 
         client = _GmailEmailClient(access_token="token")
@@ -213,7 +213,7 @@ class TestGmailEmailClientSendEmail:
                 },
             }
         )
-        hooks.http_post = make_fake_http_post(post_response)
+        hooks.http_post = make_fake_http_send(post_response)
         hooks.http_get = make_fake_http_get(get_response)
 
         client = _GmailEmailClient(access_token="token")
@@ -254,7 +254,7 @@ class TestGmailEmailClientSendEmail:
                 },
             }
         )
-        hooks.http_post = make_fake_http_post(post_response)
+        hooks.http_post = make_fake_http_send(post_response)
         hooks.http_get = make_fake_http_get(get_response)
 
         attachment = Attachment(
@@ -277,7 +277,7 @@ class TestGmailEmailClientSendEmail:
 
     def test_send_email_connection_error(self) -> None:
         """Test connection error handling."""
-        hooks.http_post = make_raising_http_post(ConnectionError("Network down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network down"))
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -410,7 +410,7 @@ class TestGmailEmailClientCreateDraft:
                 "message": {"id": "msg123", "threadId": "t1"},
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _GmailEmailClient(access_token="token")
         draft = client.create_draft(
@@ -430,7 +430,7 @@ class TestGmailEmailClientCreateDraft:
                 "message": {"id": "msg123", "threadId": "t1"},
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _GmailEmailClient(access_token="token")
         draft = client.create_draft(

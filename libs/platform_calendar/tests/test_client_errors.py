@@ -10,10 +10,10 @@ from platform_calendar.client import _GoogleCalendarClient, google_calendar_clie
 from platform_calendar.fakes import (
     make_fake_http_delete,
     make_fake_http_get,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_delete,
     make_raising_http_get,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_calendar.testing import (
     hooks,
@@ -101,7 +101,7 @@ class TestAPIErrors:
         assert "Invalid response" in error.message
 
     def test_post_invalid_json_response(self) -> None:
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -211,7 +211,7 @@ class TestHTTPErrorHandling:
             def read(self) -> bytes:
                 return b"Forbidden"
 
-        hooks.http_post = make_raising_http_post(FakeHTTPError("Forbidden"))
+        hooks.http_post = make_raising_http_send(FakeHTTPError("Forbidden"))
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)

@@ -20,10 +20,10 @@ from platform_email.fake_hooks import (
     make_fake_console,
     make_fake_current_time,
     make_fake_gmail_credentials,
-    make_fake_http_post,
+    make_fake_http_send,
     make_fake_no_tokens,
     make_fake_tokens,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.testing import (
     hooks,
@@ -92,7 +92,7 @@ class TestExchangeGmailCodeForTokens:
                 "token_type": "Bearer",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         tokens = exchange_gmail_code_for_tokens(
@@ -108,7 +108,7 @@ class TestExchangeGmailCodeForTokens:
     def test_raises_on_connection_error(self) -> None:
         """Test that ConnectionError is wrapped in AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_raising_http_post(ConnectionError("Network down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network down"))
 
         with pytest.raises(AppError) as exc_info:
             exchange_gmail_code_for_tokens(creds, code="code", code_verifier="verifier")
@@ -118,7 +118,7 @@ class TestExchangeGmailCodeForTokens:
     def test_raises_on_os_error(self) -> None:
         """Test that OSError is wrapped in AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         with pytest.raises(AppError) as exc_info:
             exchange_gmail_code_for_tokens(creds, code="code", code_verifier="verifier")
@@ -128,7 +128,7 @@ class TestExchangeGmailCodeForTokens:
     def test_raises_on_invalid_json(self) -> None:
         """Test that invalid JSON raises AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         with pytest.raises(AppError) as exc_info:
             exchange_gmail_code_for_tokens(creds, code="code", code_verifier="verifier")
@@ -144,7 +144,7 @@ class TestExchangeGmailCodeForTokens:
                 "error_description": "Code expired",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         with pytest.raises(AppError) as exc_info:
             exchange_gmail_code_for_tokens(creds, code="code", code_verifier="verifier")
@@ -161,7 +161,7 @@ class TestExchangeGmailCodeForTokens:
                 "token_type": "Bearer",
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         with pytest.raises(AppError) as exc_info:
@@ -183,7 +183,7 @@ class TestRefreshGmailAccessToken:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(2000)
 
         tokens = refresh_gmail_access_token(creds, "old_refresh")
@@ -202,7 +202,7 @@ class TestRefreshGmailAccessToken:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(2000)
 
         tokens = refresh_gmail_access_token(creds, "old_refresh")
@@ -213,7 +213,7 @@ class TestRefreshGmailAccessToken:
     def test_raises_on_connection_error(self) -> None:
         """Test that ConnectionError is wrapped in AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_raising_http_post(ConnectionError("Down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Down"))
 
         with pytest.raises(AppError) as exc_info:
             refresh_gmail_access_token(creds, "refresh")
@@ -223,7 +223,7 @@ class TestRefreshGmailAccessToken:
     def test_raises_on_os_error(self) -> None:
         """Test that OSError is wrapped in AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_raising_http_post(OSError("Socket"))
+        hooks.http_post = make_raising_http_send(OSError("Socket"))
 
         with pytest.raises(AppError) as exc_info:
             refresh_gmail_access_token(creds, "refresh")
@@ -233,7 +233,7 @@ class TestRefreshGmailAccessToken:
     def test_raises_on_invalid_json(self) -> None:
         """Test that invalid JSON raises AppError."""
         creds = _make_credentials()
-        hooks.http_post = make_fake_http_post("{invalid")
+        hooks.http_post = make_fake_http_send("{invalid")
 
         with pytest.raises(AppError) as exc_info:
             refresh_gmail_access_token(creds, "refresh")
@@ -244,7 +244,7 @@ class TestRefreshGmailAccessToken:
         """Test that error in response raises AppError."""
         creds = _make_credentials()
         response = dump_json_str({"error": "invalid_grant"})
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         with pytest.raises(AppError) as exc_info:
             refresh_gmail_access_token(creds, "refresh")
@@ -275,7 +275,7 @@ class TestGetValidGmailTokens:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         saved_tokens: list[OAuthTokens] = []
@@ -312,7 +312,7 @@ class TestAuthorizeGmail:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
         hooks.open_browser = _open_browser
         hooks.console_output = output_hook
@@ -381,7 +381,7 @@ class TestGmailLoadOrAuthorize:
 
         hooks.load_gmail_credentials = make_fake_gmail_credentials(creds)
         hooks.load_gmail_tokens = make_fake_tokens(expired_tokens)
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
         hooks.current_time = make_fake_current_time(1000)
 
         saved_tokens: list[OAuthTokens] = []
@@ -456,7 +456,7 @@ class TestGmailLoadOrAuthorize:
                 "expires_in": 3600,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         def _open_browser(_url: str) -> None:
             pass

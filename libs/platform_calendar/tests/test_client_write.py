@@ -9,9 +9,8 @@ from platform_core.oauth_types import OAuthTokens
 
 from platform_calendar.client import google_calendar_client
 from platform_calendar.fakes import (
-    make_fake_http_post,
-    make_raising_http_patch,
-    make_raising_http_post,
+    make_fake_http_send,
+    make_raising_http_send,
 )
 from platform_calendar.testing import (
     hooks,
@@ -42,7 +41,7 @@ class TestCreateEvent:
                 "reminders": {"useDefault": False, "overrides": []},
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -71,7 +70,7 @@ class TestCreateEvent:
                 "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -90,7 +89,7 @@ class TestCreateEvent:
         assert event["id"] == "new_event"
 
     def test_create_event_connection_error(self) -> None:
-        hooks.http_post = make_raising_http_post(ConnectionError("Network error"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network error"))
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -110,7 +109,7 @@ class TestCreateEvent:
         assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
 
     def test_create_event_os_error(self) -> None:
-        hooks.http_post = make_raising_http_post(OSError("OS error"))
+        hooks.http_post = make_raising_http_send(OSError("OS error"))
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -143,7 +142,7 @@ class TestCreateEvent:
                 "recurrence": [],
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -176,7 +175,7 @@ class TestCreateEvent:
                 "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -452,7 +451,7 @@ class TestUpdateEvent:
             def read(self) -> bytes:
                 return b'{"error": {"message": "Event not found"}}'
 
-        hooks.http_patch = make_raising_http_patch(FakeHTTPError("Not found"))
+        hooks.http_patch = make_raising_http_send(FakeHTTPError("Not found"))
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)

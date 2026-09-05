@@ -11,7 +11,7 @@ from platform_core.json_utils import dump_json_str
 from platform_email.fake_hooks import (
     make_fake_http_delete,
     make_fake_http_get,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_delete,
 )
 from platform_email.providers.outlook import (
@@ -192,7 +192,7 @@ class TestOutlookEmailClientCreateDraft:
     def test_create_draft_success(self) -> None:
         """Test creating a draft."""
         response = dump_json_str({"id": "draft123"})
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _OutlookEmailClient(access_token="token")
         draft = client.create_draft(
@@ -207,7 +207,7 @@ class TestOutlookEmailClientCreateDraft:
     def test_create_draft_with_cc_bcc(self) -> None:
         """Test creating draft with CC and BCC."""
         response = dump_json_str({"id": "draft123"})
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _OutlookEmailClient(access_token="token")
         draft = client.create_draft(
@@ -286,7 +286,7 @@ class TestOutlookEmailClientReplyToEmail:
             )
 
         hooks.http_get = fake_get
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         client = _OutlookEmailClient(access_token="token")
         reply = client.reply_to_email(email_id="original123", body="My reply")
@@ -335,7 +335,7 @@ class TestOutlookEmailClientDeleteEmail:
 
     def test_delete_email_to_trash(self) -> None:
         """Test moving email to trash."""
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         client = _OutlookEmailClient(access_token="token")
         client.delete_email(email_id="msg123")

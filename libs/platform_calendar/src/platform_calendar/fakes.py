@@ -7,6 +7,17 @@ The hooks container and protocols live in
 from __future__ import annotations
 
 from platform_core.errors import AppError, CalendarErrorCode
+from platform_core.hook_fakes import (
+    make_fake_console,
+    make_fake_current_time,
+    make_fake_file_system,
+    make_fake_http_delete,
+    make_fake_http_get,
+    make_fake_http_send,
+    make_raising_http_delete,
+    make_raising_http_get,
+    make_raising_http_send,
+)
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
@@ -14,18 +25,8 @@ from platform_core.oauth_types import (
 
 from platform_calendar.testing import (
     CalendarClientProtocol,
-    ConsoleInputHook,
-    ConsoleOutputHook,
-    CurrentTimeHook,
-    FileExistsHook,
-    HttpDeleteHook,
-    HttpGetHook,
-    HttpPatchHook,
-    HttpPostHook,
     LoadCredentialsHook,
     LoadTokensHook,
-    ReadFileHook,
-    WriteFileHook,
 )
 from platform_calendar.types import (
     CalendarEvent,
@@ -318,92 +319,6 @@ class FakeCalendarClient(CalendarClientProtocol):
 # =============================================================================
 
 
-def make_fake_http_get(response: str) -> HttpGetHook:
-    """Create a hook that returns a fixed response."""
-
-    def _hook(url: str, headers: dict[str, str]) -> str:
-        return response
-
-    return _hook
-
-
-def make_fake_http_post(response: str) -> HttpPostHook:
-    """Create a hook that returns a fixed response."""
-
-    def _hook(url: str, headers: dict[str, str], body: str) -> str:
-        return response
-
-    return _hook
-
-
-def make_raising_http_get(exc: BaseException) -> HttpGetHook:
-    """Create a hook that raises an exception."""
-
-    def _hook(url: str, headers: dict[str, str]) -> str:
-        raise exc
-
-    return _hook
-
-
-def make_raising_http_post(exc: BaseException) -> HttpPostHook:
-    """Create a hook that raises an exception."""
-
-    def _hook(url: str, headers: dict[str, str], body: str) -> str:
-        raise exc
-
-    return _hook
-
-
-def make_fake_http_delete() -> HttpDeleteHook:
-    """Create a hook that does nothing (successful delete)."""
-
-    def _hook(url: str, headers: dict[str, str]) -> None:
-        pass
-
-    return _hook
-
-
-def make_raising_http_delete(exc: BaseException) -> HttpDeleteHook:
-    """Create a hook that raises an exception."""
-
-    def _hook(url: str, headers: dict[str, str]) -> None:
-        raise exc
-
-    return _hook
-
-
-def make_fake_http_patch(response: str) -> HttpPatchHook:
-    """Create a hook that returns a fixed response.
-
-    Args:
-        response: Response body to return.
-
-    Returns:
-        HttpPatchHook that returns the fixed response.
-    """
-
-    def _hook(url: str, headers: dict[str, str], body: str) -> str:
-        return response
-
-    return _hook
-
-
-def make_raising_http_patch(exc: BaseException) -> HttpPatchHook:
-    """Create a hook that raises an exception.
-
-    Args:
-        exc: Exception to raise.
-
-    Returns:
-        HttpPatchHook that raises the exception.
-    """
-
-    def _hook(url: str, headers: dict[str, str], body: str) -> str:
-        raise exc
-
-    return _hook
-
-
 def make_fake_tokens(tokens: OAuthTokens) -> LoadTokensHook:
     """Create a hook that returns fixed tokens."""
 
@@ -429,67 +344,6 @@ def make_fake_credentials(creds: OAuthCredentials) -> LoadCredentialsHook:
         return creds
 
     return _hook
-
-
-def make_fake_current_time(timestamp: int) -> CurrentTimeHook:
-    """Create a hook that returns a fixed timestamp."""
-
-    def _hook() -> int:
-        return timestamp
-
-    return _hook
-
-
-def make_fake_file_system(
-    files: dict[str, str],
-) -> tuple[ReadFileHook, WriteFileHook, FileExistsHook]:
-    """Create hooks that use an in-memory file system."""
-    storage = dict(files)
-
-    def _read(path: str) -> str:
-        if path not in storage:
-            msg = f"File not found: {path}"
-            raise FileNotFoundError(msg)
-        return storage[path]
-
-    def _write(path: str, content: str) -> None:
-        storage[path] = content
-
-    def _exists(path: str) -> bool:
-        return path in storage
-
-    return _read, _write, _exists
-
-
-def make_fake_console(inputs: list[str]) -> tuple[ConsoleOutputHook, ConsoleInputHook]:
-    """Create hooks for fake console I/O.
-
-    Args:
-        inputs: List of strings to return from console_input in order.
-
-    Returns:
-        Tuple of (output_hook, input_hook).
-    """
-    outputs: list[str] = []
-    input_index = [0]  # Use list for closure mutation
-
-    def _output(message: str) -> None:
-        outputs.append(message)
-
-    def _input(prompt: str) -> str:
-        # Running past the script used to return "", so a test that consumed
-        # more prompts than it scripted passed while the code under test read
-        # an empty answer it never would have got from a person.
-        if input_index[0] >= len(inputs):
-            raise AssertionError(
-                f"console_input asked for {prompt!r} but the fake was scripted "
-                f"with only {len(inputs)} answer(s)"
-            )
-        result = inputs[input_index[0]]
-        input_index[0] += 1
-        return result
-
-    return _output, _input
 
 
 def make_fake_event(
@@ -567,12 +421,10 @@ __all__ = [
     "make_fake_file_system",
     "make_fake_http_delete",
     "make_fake_http_get",
-    "make_fake_http_patch",
-    "make_fake_http_post",
+    "make_fake_http_send",
     "make_fake_no_tokens",
     "make_fake_tokens",
     "make_raising_http_delete",
     "make_raising_http_get",
-    "make_raising_http_patch",
-    "make_raising_http_post",
+    "make_raising_http_send",
 ]

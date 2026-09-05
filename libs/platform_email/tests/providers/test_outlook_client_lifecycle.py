@@ -10,12 +10,10 @@ from platform_core.json_utils import dump_json_str
 
 from platform_email.fake_hooks import (
     make_fake_http_get,
-    make_fake_http_patch,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_delete,
     make_raising_http_get,
-    make_raising_http_patch,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.providers.outlook import (
     _OutlookEmailClient,
@@ -54,7 +52,7 @@ class TestOutlookEmailClientMoveEmail:
                 "hasAttachments": False,
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _OutlookEmailClient(access_token="token")
         email = client.move_email(email_id="msg123", destination_folder_id="archive")
@@ -163,7 +161,7 @@ class TestOutlookEmailClientPatch:
     def test_patch_success(self) -> None:
         """Test successful PATCH request."""
         response = dump_json_str({"id": "msg123", "isRead": True})
-        hooks.http_patch = make_fake_http_patch(response)
+        hooks.http_patch = make_fake_http_send(response)
 
         client = _OutlookEmailClient(access_token="token")
         result = client._patch("/me/messages/msg123", {"isRead": True})
@@ -172,7 +170,7 @@ class TestOutlookEmailClientPatch:
 
     def test_patch_connection_error(self) -> None:
         """Test connection error on PATCH."""
-        hooks.http_patch = make_raising_http_patch(ConnectionError("Failed"))
+        hooks.http_patch = make_raising_http_send(ConnectionError("Failed"))
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -183,7 +181,7 @@ class TestOutlookEmailClientPatch:
     def test_patch_http_error(self) -> None:
         """Test HTTP error on PATCH."""
         error = FakeHTTPError(404, "Not found")
-        hooks.http_patch = make_raising_http_patch(error)
+        hooks.http_patch = make_raising_http_send(error)
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -193,7 +191,7 @@ class TestOutlookEmailClientPatch:
 
     def test_patch_invalid_json(self) -> None:
         """Test invalid JSON response on PATCH."""
-        hooks.http_patch = make_fake_http_patch("not json")
+        hooks.http_patch = make_fake_http_send("not json")
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -260,7 +258,7 @@ class TestOutlookEmailClientErrorHandling:
 
     def test_post_invalid_json(self) -> None:
         """Test invalid JSON response on POST."""
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -271,7 +269,7 @@ class TestOutlookEmailClientErrorHandling:
     def test_post_http_error(self) -> None:
         """Test HTTP error on POST."""
         error = FakeHTTPError(400, "Bad request")
-        hooks.http_post = make_raising_http_post(error)
+        hooks.http_post = make_raising_http_send(error)
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -291,7 +289,7 @@ class TestOutlookEmailClientErrorHandling:
 
     def test_post_os_error_without_http_protocol(self) -> None:
         """Test OSError on POST that's not an HTTPErrorProtocol."""
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -301,7 +299,7 @@ class TestOutlookEmailClientErrorHandling:
 
     def test_patch_os_error_without_http_protocol(self) -> None:
         """Test OSError on PATCH that's not an HTTPErrorProtocol."""
-        hooks.http_patch = make_raising_http_patch(OSError("Socket error"))
+        hooks.http_patch = make_raising_http_send(OSError("Socket error"))
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:

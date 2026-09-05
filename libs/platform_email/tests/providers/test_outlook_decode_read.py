@@ -10,9 +10,9 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from platform_email.fake_hooks import (
     make_fake_http_get,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_get,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.providers.outlook import (
     _OutlookEmailClient,
@@ -272,7 +272,7 @@ class TestOutlookEmailClientSendEmail:
 
     def test_send_email_success(self) -> None:
         """Test successful email sending."""
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         client = _OutlookEmailClient(access_token="token")
         email = client.send_email(
@@ -287,7 +287,7 @@ class TestOutlookEmailClientSendEmail:
 
     def test_send_email_with_cc_bcc(self) -> None:
         """Test sending email with CC and BCC."""
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         client = _OutlookEmailClient(access_token="token")
         email = client.send_email(
@@ -304,7 +304,7 @@ class TestOutlookEmailClientSendEmail:
 
     def test_send_email_html_body(self) -> None:
         """Test sending email with HTML body."""
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         client = _OutlookEmailClient(access_token="token")
         email = client.send_email(
@@ -318,7 +318,7 @@ class TestOutlookEmailClientSendEmail:
 
     def test_send_email_with_attachments(self) -> None:
         """Test sending email with attachments."""
-        hooks.http_post = make_fake_http_post("{}")
+        hooks.http_post = make_fake_http_send("{}")
 
         attachment = Attachment(
             id="att1",
@@ -340,7 +340,7 @@ class TestOutlookEmailClientSendEmail:
 
     def test_send_email_connection_error(self) -> None:
         """Test connection error handling."""
-        hooks.http_post = make_raising_http_post(ConnectionError("Network down"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network down"))
 
         client = _OutlookEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:

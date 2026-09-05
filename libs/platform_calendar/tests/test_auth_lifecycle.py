@@ -20,10 +20,10 @@ from platform_calendar.fakes import (
     make_fake_console,
     make_fake_credentials,
     make_fake_current_time,
-    make_fake_http_post,
+    make_fake_http_send,
     make_fake_no_tokens,
     make_fake_tokens,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_calendar.testing import (
     hooks,
@@ -117,7 +117,7 @@ class TestGetValidTokens:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
 
         saved_tokens: list[OAuthTokens] = []
 
@@ -168,7 +168,7 @@ class TestPKCEFunctions:
 
 class TestExchangeCodeForTokensOSError:
     def test_exchange_os_error(self) -> None:
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -185,7 +185,7 @@ class TestExchangeCodeForTokensOSError:
 
 class TestRefreshAccessTokenOSError:
     def test_refresh_os_error(self) -> None:
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -210,7 +210,7 @@ class TestAuthorize:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
 
         # Fake browser opener (does nothing)
         opened_urls: list[str] = []
@@ -307,7 +307,7 @@ class TestLoadOrAuthorize:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
 
         saved_tokens: list[OAuthTokens] = []
 
@@ -338,7 +338,7 @@ class TestLoadOrAuthorize:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
         hooks.open_browser = lambda url: None
 
         console_output, console_input = make_fake_console(["auth_code"])

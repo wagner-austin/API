@@ -14,8 +14,8 @@ from platform_calendar.auth import (
 )
 from platform_calendar.fakes import (
     make_fake_current_time,
-    make_fake_http_post,
-    make_raising_http_post,
+    make_fake_http_send,
+    make_raising_http_send,
 )
 from platform_calendar.testing import (
     hooks,
@@ -48,7 +48,7 @@ class TestExchangeCodeForTokens:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
         hooks.current_time = make_fake_current_time(1735200000)
 
         creds = OAuthCredentials(
@@ -69,7 +69,7 @@ class TestExchangeCodeForTokens:
         assert tokens["token_type"] == "Bearer"
 
     def test_exchange_network_error(self) -> None:
-        hooks.http_post = make_raising_http_post(ConnectionError("Network error"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network error"))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -84,7 +84,7 @@ class TestExchangeCodeForTokens:
         assert "Failed to exchange" in error.message
 
     def test_exchange_invalid_json(self) -> None:
-        hooks.http_post = make_fake_http_post("not valid json")
+        hooks.http_post = make_fake_http_send("not valid json")
 
         creds = OAuthCredentials(
             client_id="id",
@@ -99,7 +99,7 @@ class TestExchangeCodeForTokens:
         assert "Invalid JSON" in error.message
 
     def test_exchange_not_object(self) -> None:
-        hooks.http_post = make_fake_http_post("[]")
+        hooks.http_post = make_fake_http_send("[]")
 
         creds = OAuthCredentials(
             client_id="id",
@@ -118,7 +118,7 @@ class TestExchangeCodeForTokens:
             "error": "invalid_grant",
             "error_description": "Code expired",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(error_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(error_response))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -134,7 +134,7 @@ class TestExchangeCodeForTokens:
 
     def test_exchange_error_without_description(self) -> None:
         error_response = {"error": "invalid_grant"}
-        hooks.http_post = make_fake_http_post(dump_json_str(error_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(error_response))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -154,7 +154,7 @@ class TestExchangeCodeForTokens:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
         hooks.current_time = make_fake_current_time(1735200000)
 
         creds = OAuthCredentials(
@@ -177,7 +177,7 @@ class TestRefreshAccessToken:
             "expires_in": 3600,
             "token_type": "Bearer",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(token_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(token_response))
         hooks.current_time = make_fake_current_time(1735200000)
 
         creds = OAuthCredentials(
@@ -193,7 +193,7 @@ class TestRefreshAccessToken:
         assert tokens["expires_at"] == 1735200000 + 3600
 
     def test_refresh_network_error(self) -> None:
-        hooks.http_post = make_raising_http_post(ConnectionError("Network error"))
+        hooks.http_post = make_raising_http_send(ConnectionError("Network error"))
 
         creds = OAuthCredentials(
             client_id="id",
@@ -208,7 +208,7 @@ class TestRefreshAccessToken:
         assert "Failed to refresh" in error.message
 
     def test_refresh_invalid_json(self) -> None:
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         creds = OAuthCredentials(
             client_id="id",
@@ -223,7 +223,7 @@ class TestRefreshAccessToken:
         assert "Invalid JSON" in error.message
 
     def test_refresh_not_object(self) -> None:
-        hooks.http_post = make_fake_http_post('"string"')
+        hooks.http_post = make_fake_http_send('"string"')
 
         creds = OAuthCredentials(
             client_id="id",
@@ -242,7 +242,7 @@ class TestRefreshAccessToken:
             "error": "invalid_grant",
             "error_description": "Token revoked",
         }
-        hooks.http_post = make_fake_http_post(dump_json_str(error_response))
+        hooks.http_post = make_fake_http_send(dump_json_str(error_response))
 
         creds = OAuthCredentials(
             client_id="id",

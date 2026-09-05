@@ -15,15 +15,13 @@ from platform_email.fake_hooks import (
     make_fake_gmail_credentials,
     make_fake_http_delete,
     make_fake_http_get,
-    make_fake_http_patch,
-    make_fake_http_post,
+    make_fake_http_send,
     make_fake_no_tokens,
     make_fake_outlook_config,
     make_fake_tokens,
     make_raising_http_delete,
     make_raising_http_get,
-    make_raising_http_patch,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.types import OAuthCredentials, OAuthTokens, OutlookOAuthConfig
 
@@ -42,32 +40,19 @@ class TestMakeFakeHttpGet:
         assert result == '{"result": "ok"}'
 
 
-class TestMakeFakeHttpPost:
-    """Tests for make_fake_http_post."""
+class TestMakeFakeHttpSend:
+    """The POST/PATCH shape. One class, because POST and PATCH take the
+    same (url, headers, body) signature and had two identical test classes."""
 
     def test_returns_fixed_response(self) -> None:
         """Test that the hook returns the fixed response."""
-        hook = make_fake_http_post('{"id": "123"}')
+        hook = make_fake_http_send('{"id": "123"}')
         result = hook(
             "https://api.example.com/create",
             {"Content-Type": "application/json"},
             '{"name": "test"}',
         )
         assert result == '{"id": "123"}'
-
-
-class TestMakeFakeHttpPatch:
-    """Tests for make_fake_http_patch."""
-
-    def test_returns_fixed_response(self) -> None:
-        """Test that the hook returns the fixed response."""
-        hook = make_fake_http_patch('{"updated": true}')
-        result = hook(
-            "https://api.example.com/update",
-            {"Content-Type": "application/json"},
-            '{"field": "value"}',
-        )
-        assert result == '{"updated": true}'
 
 
 class TestMakeFakeHttpDelete:
@@ -96,26 +81,15 @@ class TestMakeRaisingHttpGet:
         assert "Network error" in str(exc_info.value)
 
 
-class TestMakeRaisingHttpPost:
-    """Tests for make_raising_http_post."""
+class TestMakeRaisingHttpSend:
+    """The raising POST/PATCH shape, likewise one class rather than two."""
 
     def test_raises_exception(self) -> None:
         """Test that the hook raises the specified exception."""
-        hook = make_raising_http_post(OSError("Request failed"))
+        hook = make_raising_http_send(OSError("Request failed"))
         with pytest.raises(OSError) as exc_info:
             hook("https://api.example.com/data", {}, "{}")
         assert "Request failed" in str(exc_info.value)
-
-
-class TestMakeRaisingHttpPatch:
-    """Tests for make_raising_http_patch."""
-
-    def test_raises_exception(self) -> None:
-        """Test that the hook raises the specified exception."""
-        hook = make_raising_http_patch(TimeoutError("Timeout"))
-        with pytest.raises(TimeoutError) as exc_info:
-            hook("https://api.example.com/data", {}, "{}")
-        assert "Timeout" in str(exc_info.value)
 
 
 class TestMakeRaisingHttpDelete:

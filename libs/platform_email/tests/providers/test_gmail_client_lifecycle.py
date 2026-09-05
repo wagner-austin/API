@@ -11,10 +11,10 @@ from platform_core.json_utils import dump_json_str
 from platform_email.fake_hooks import (
     make_fake_http_delete,
     make_fake_http_get,
-    make_fake_http_post,
+    make_fake_http_send,
     make_raising_http_delete,
     make_raising_http_get,
-    make_raising_http_post,
+    make_raising_http_send,
 )
 from platform_email.providers.gmail import (
     _GmailEmailClient,
@@ -165,7 +165,7 @@ class TestGmailEmailClientDeleteEmail:
                 "labelIds": ["TRASH"],
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _GmailEmailClient(access_token="token")
         client.delete_email(email_id="msg123")
@@ -223,7 +223,7 @@ class TestGmailEmailClientMoveEmail:
                 },
             }
         )
-        hooks.http_post = make_fake_http_post(response)
+        hooks.http_post = make_fake_http_send(response)
 
         client = _GmailEmailClient(access_token="token")
         email = client.move_email(email_id="msg123", destination_folder_id="ARCHIVE")
@@ -374,7 +374,7 @@ class TestGmailEmailClientErrorHandling:
 
     def test_post_invalid_json(self) -> None:
         """Test invalid JSON response on POST."""
-        hooks.http_post = make_fake_http_post("not json")
+        hooks.http_post = make_fake_http_send("not json")
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -385,7 +385,7 @@ class TestGmailEmailClientErrorHandling:
     def test_post_http_error(self) -> None:
         """Test HTTP error on POST."""
         error = FakeHTTPError(400, "Bad request")
-        hooks.http_post = make_raising_http_post(error)
+        hooks.http_post = make_raising_http_send(error)
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
@@ -405,7 +405,7 @@ class TestGmailEmailClientErrorHandling:
 
     def test_post_os_error_without_http_protocol(self) -> None:
         """Test OSError on POST that's not an HTTPErrorProtocol."""
-        hooks.http_post = make_raising_http_post(OSError("Socket error"))
+        hooks.http_post = make_raising_http_send(OSError("Socket error"))
 
         client = _GmailEmailClient(access_token="token")
         with pytest.raises(AppError) as exc_info:
