@@ -1,0 +1,33 @@
+{
+  "project": "mi",
+  "name": "cartridge-medium-diverse-v100-v37-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v37/abl.sif",
+    "sha256": "2adee62f369addb7322d793c4ddc4d0c7f1b27d53df8178163d9c0032d43f60e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 220,
+  "mem_gb": 32,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_diverse_companion_sweep --plan gpt2-medium-companions-diverse --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --companion-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-medium-diverse-v100-v37-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-medium-diverse-v100-v37-twin.json",
+  "experiment": {
+    "measurement": "cartridge-diverse-companioned-composition",
+    "plan": "gpt2-medium-companions-diverse",
+    "base_model": "gpt2-medium",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "companion_pool": "epi.metabolomics.atmospheric-chemistry",
+    "seeds": "7.8.9",
+    "image_commit": "e5476201e30b622114cfe5ab477bb4a16f00cc00",
+    "gpt2_diverse_n4_retention": "0.555",
+    "gpt2_diverse_n8_retention": "0.280",
+    "why": "does-the-structural-dilution-ceiling-soften-on-a-base-three-times-the-size"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}
