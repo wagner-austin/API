@@ -18,6 +18,15 @@ What a compute node changes, and what it does not:
   bug.
 * **The corpus** must already be there. ``hpc3-stage`` places it and verifies
   its SHA-256 on both sides; a compute node has no service to fetch from.
+* **Resume is this node's decision, not the payload's.** In the service
+  deployment the orchestrator decides: it reads the run's status, confirms a
+  checkpoint exists, and enqueues a distinct execution with ``resume=True``.
+  There is no orchestrator here, and Slurm may execute one payload file many
+  times -- ``--requeue`` after a preemption runs the same file again -- so
+  whether an execution is a restart is not knowable when the file is written.
+  It is knowable here, from the same predicate the orchestrator uses, so the
+  payload's own ``resume`` is superseded by :func:`checkpoint_exists`. See
+  :func:`_resume_for_execution`.
 """
 
 from __future__ import annotations
@@ -37,6 +46,8 @@ from model_trainer.cluster import preflight
 from model_trainer.cluster.stores import LocalArtifacts, StagedCorpus
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
+from model_trainer.core.config.settings import Settings
+from model_trainer.core.services.training.checkpoint import checkpoint_exists
 from model_trainer.worker.job_utils import setup_job_logging
 
 _log = get_logger(__name__)
@@ -170,6 +181,51 @@ def _payload_run_id(payload: JSONObject) -> str:
     if not isinstance(run_id, str) or not run_id:
         raise ValueError("payload must carry a non-empty string 'run_id'")
     return run_id
+
+
+def _resume_for_execution(settings: Settings, run_id: str) -> JSONObject:
+    """Decide whether THIS execution continues a checkpoint, and say so.
+
+    A payload file is written once and may be executed many times: Slurm
+    requeues a preempted job onto the same file. So ``resume`` cannot be a
+    property of the file -- it is a property of the execution, and only the
+    execution can read it.
+
+    The rule is the orchestrator's rule, evaluated where the orchestrator
+    cannot reach: continue iff a checkpoint exists for this run. The trainer
+    then loads it strictly -- a checkpoint whose recorded config disagrees
+    with this run's raises rather than training something else under the same
+    id.
+
+    This deliberately does NOT soften the service path's meaning of
+    ``resume``. There, ``True`` is an instruction the orchestrator has already
+    verified, and if the checkpoint has since vanished the load must fail
+    loudly rather than quietly restart a twenty-hour run from zero. The
+    decision is made here, before dispatch, instead of being turned into a
+    best-effort inside the trainer.
+
+    Args:
+        settings: Settings whose ``artifacts_root`` locates the checkpoint
+            directory.
+        run_id: The run this execution belongs to; a requeued execution
+            carries the same id, which is what makes its checkpoint findable.
+
+    Returns:
+        The fields to overlay on the dispatched payload -- ``resume`` alone,
+        as a JSON object, so the caller composes a new payload rather than
+        mutating the one it read.
+    """
+    resume = checkpoint_exists(settings, run_id)
+    _log.info(
+        "resume decided from checkpoint state",
+        extra={
+            "category": "training",
+            "event": "cluster_resume_decided",
+            "run_id": run_id,
+            "resume": resume,
+        },
+    )
+    return {"resume": resume}
 
 
 def _payload_request(payload: JSONObject) -> JSONObject:
@@ -353,7 +409,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "cluster training start",
         extra={"payload": str(payload_path), "corpus_dir": str(corpus_dir)},
     )
-    cluster_hooks.run_job(payload)
+    cluster_hooks.run_job({**payload, **_resume_for_execution(settings, token)})
     return 0
 
 

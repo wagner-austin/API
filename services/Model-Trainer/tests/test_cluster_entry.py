@@ -3,8 +3,15 @@
 The claim this file has to defend is that a compute node runs the SAME
 training code the service does. So the tests are about wiring: that the three
 hooks come out pointing at local implementations, that the payload reaches
-``process_train_job`` unchanged, and that the arguments naming directories are
-required rather than guessed.
+``process_train_job`` unchanged except for the one field only this node can
+determine, and that the arguments naming directories are required rather than
+guessed.
+
+That one field is ``resume``. Slurm may execute a payload file more than once
+-- ``--requeue`` after a preemption runs the same file again -- so whether an
+execution continues a checkpoint is a property of the execution, not of the
+file, and the node reads it from the same predicate the service orchestrator
+uses.
 """
 
 from __future__ import annotations
@@ -260,11 +267,62 @@ class TestPublishingGoesThroughRealLogging:
 
 class TestMain:
     def test_it_hands_the_payload_to_the_training_entry_point(self, tmp_path: pathlib.Path) -> None:
-        """Unchanged, so a cluster run and a queued run are the same job."""
+        """Unchanged but for ``resume``, so a cluster run is the same job.
+
+        ``resume`` is the one field this node determines rather than carries:
+        a payload file may be executed many times because Slurm requeues a
+        preempted job onto it, so whether an execution continues a checkpoint
+        is not knowable when the file is written.
+        """
         recorder = _Recorder()
         cluster_hooks.run_job = recorder
         assert cluster_entry.main(_args(tmp_path)) == 0
-        assert recorder.payloads == [_PAYLOAD]
+        assert len(recorder.payloads) == 1
+        dispatched = recorder.payloads[0]
+        assert {k: v for k, v in dispatched.items() if k != "resume"} == _PAYLOAD
+
+    def test_no_checkpoint_means_this_execution_starts_fresh(self, tmp_path: pathlib.Path) -> None:
+        """A first attempt has nothing to continue from."""
+        recorder = _Recorder()
+        cluster_hooks.run_job = recorder
+        assert cluster_entry.main(_args(tmp_path)) == 0
+        assert recorder.payloads[0]["resume"] is False
+
+    def test_an_existing_checkpoint_makes_this_execution_a_resume(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The requeue case: the same run id, and a checkpoint on disk.
+
+        This is the whole point. Before it, a preempted arm resubmitted onto
+        the same payload restarted from epoch zero while its own rolling
+        checkpoint sat unread beside it -- measured 2026-09-04, four
+        preemptions across the 355M rung, every one discarding completed
+        epochs it had already paid for.
+        """
+        checkpoints = tmp_path / "artifacts" / "checkpoints"
+        checkpoints.mkdir(parents=True, exist_ok=True)
+        (checkpoints / f"{_PAYLOAD['run_id']}.pt").write_bytes(b"rolling state")
+
+        recorder = _Recorder()
+        cluster_hooks.run_job = recorder
+        assert cluster_entry.main(_args(tmp_path)) == 0
+        assert recorder.payloads[0]["resume"] is True
+
+    def test_the_payloads_own_resume_does_not_decide(self, tmp_path: pathlib.Path) -> None:
+        """A file declaring ``resume: true`` with no checkpoint still starts fresh.
+
+        The submitter cannot know, so the submitter does not get to say. Were
+        the declaration honoured, this execution would reach
+        ``load_training_checkpoint`` and die on a missing file -- which is the
+        correct behaviour for the service path, where ``resume`` is an
+        instruction the orchestrator has already verified, and the wrong one
+        for a payload Slurm may replay.
+        """
+        declared: JSONObject = {**_PAYLOAD, "resume": True}
+        recorder = _Recorder()
+        cluster_hooks.run_job = recorder
+        assert cluster_entry.main(_args(tmp_path, declared)) == 0
+        assert recorder.payloads[0]["resume"] is False
 
     def test_it_installs_the_hooks_before_running(self, tmp_path: pathlib.Path) -> None:
         """Wiring after the job started would have the trainer reach for
@@ -422,7 +480,9 @@ class TestTheModuleGuardActuallyRuns:
                 sys.modules[module_name] = saved
 
         assert excinfo.value.code == 0
-        assert recorder.payloads == [_PAYLOAD]
+        assert [{k: v for k, v in p.items() if k != "resume"} for p in recorder.payloads] == [
+            _PAYLOAD
+        ]
 
     def test_running_as_main_with_no_arguments_refuses(self, tmp_path: pathlib.Path) -> None:
         """The exact shape of the original failure: invoked with nothing, it
@@ -450,4 +510,6 @@ class TestEntrypoint:
         with pytest.raises(SystemExit) as excinfo:
             cluster_entry.entrypoint()
         assert excinfo.value.code == 0
-        assert recorder.payloads == [_PAYLOAD]
+        assert [{k: v for k, v in p.items() if k != "resume"} for p in recorder.payloads] == [
+            _PAYLOAD
+        ]
