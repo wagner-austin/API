@@ -1,0 +1,341 @@
+AI combat-group ladder at Impossible, watched live -- distilled extraction
+=========================================================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28). Five instrumented matches,
+the adopted champion (doctrines/evolve1-g4m2.doctrine) vs 1 AI at
+difficulty 3 (Impossible) on maps/skirmish/[p2]duel_lake.tmx, seeds
+8711001/8711105/8711209/8711313/8711417 (the impopen96 control seeds, so
+each match has a sibling scorecard in runs/sweeps/impopen96). Launcher:
+rw_bot.harness.play_match_cli, lockstep 75, pin-delta 3, fast-forward 10,
+agent option aiZones=true with discoverAtSeconds=20,35,...,200 (wall
+seconds; at ff10 one wall second here is ~4.6 game seconds, read from
+frame counters in the raw logs). Raw logs: runs/aizones/imp-zones-s*.log
+(local mirror, gitignored like all runs/ artifacts); this file is the
+distillation, produced by a parser over the raw logs.
+
+One row per combat group (`g` zone) per snapshot. Field mapping, from the
+generic dump against the decompilation ([[engine-ai-zones]],
+[[engine-ai-triggers]]): b = the engine's own behaviour label (quoted),
+A = target size, F = member list (members below is its size), h = attack
+flag, B = sea-group flag. Columns c and x are reported by letter only --
+their meaning is NOT pinned by this capture (c stayed false in all 313
+rows; x grows monotonically per group and resets on new groups, consistent
+with an age/staging accumulator, unverified).
+
+The 4,600-line-per-snapshot raw dumps carry every declared field of every
+zone; this extraction keeps only combat groups. Anything this file does
+not show, read the raw logs before claiming.
+
+== imp-zones-s8711001.log
+  t= 20s "random move"          target=10 members= 3 attack=false sea=false c=false x=4850.8267
+  t= 20s "random move: bad target" target=10 members= 0 attack=true  sea=true  c=false x=4850.8267
+  t= 35s "random move"          target=10 members=10 attack=false sea=false c=false x=9810.911
+  t= 35s "random move"          target=10 members= 3 attack=true  sea=true  c=false x=9810.911
+  t= 35s null                   target= 3 members= 3 attack=true  sea=false c=false x=3279.965
+  t= 35s null                   target= 3 members= 0 attack=true  sea=false c=false x=2160.0034
+  t= 50s "random move"          target=10 members= 9 attack=false sea=false c=false x=14051.003
+  t= 50s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=14051.003
+  t= 50s "flight from attacker" target= 3 members= 2 attack=true  sea=false c=false x=6400.087
+  t= 50s null                   target= 5 members= 2 attack=true  sea=false c=false x=3040.0247
+  t= 50s null                   target=10 members= 0 attack=true  sea=true  c=false x=400.14056
+  t= 65s "random move"          target=10 members= 8 attack=false sea=false c=false x=18130.885
+  t= 65s "attacking main target" target=10 members=10 attack=true  sea=true  c=false x=18130.885
+  t= 65s "fighting attacker"    target= 3 members= 2 attack=true  sea=false c=false x=10479.973
+  t= 65s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=7119.9067
+  t= 65s "random move"          target=10 members= 1 attack=true  sea=true  c=false x=4480.027
+  t= 65s null                   target= 5 members= 0 attack=true  sea=false c=false x=1119.9615
+  t= 80s "random move"          target=10 members=10 attack=false sea=false c=false x=22050.914
+  t= 80s "random move: bad target" target=10 members= 9 attack=true  sea=true  c=false x=8400.067
+  t= 80s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=5040.0063
+  t= 80s null                   target= 5 members= 1 attack=true  sea=false c=false x=320.04047
+  t= 95s "random move"          target=10 members=10 attack=false sea=false c=false x=26210.883
+  t= 95s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=12560.059
+  t= 95s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=4480.027
+  t= 95s null                   target=10 members= 7 attack=true  sea=true  c=false x=3760.0261
+  t= 95s "flight from attacker" target=14 members= 2 attack=true  sea=false c=false x=1519.9222
+  t=110s "random move"          target=10 members=10 attack=false sea=false c=false x=29810.873
+  t=110s "attacking main target" target= 5 members= 5 attack=true  sea=false c=false x=8080.027
+  t=110s "random move"          target=10 members=10 attack=true  sea=true  c=false x=7360.027
+  t=110s "random move"          target=14 members=12 attack=true  sea=false c=false x=5119.927
+  t=110s null                   target=10 members= 7 attack=true  sea=true  c=false x=2480.044
+  t=125s "defending base"       target=10 members= 9 attack=false sea=false c=false x=33410.88
+  t=125s "random move: bad target" target=14 members=14 attack=true  sea=false c=false x=8719.929
+  t=125s "random move: bad target" target=10 members= 8 attack=true  sea=true  c=false x=6080.047
+  t=125s null                   target=14 members= 8 attack=true  sea=false c=false x=2960.1045
+  t=125s null                   target=10 members= 1 attack=true  sea=true  c=false x=2719.9841
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=37010.957
+  t=140s "attacking main target" target=14 members=10 attack=true  sea=false c=false x=12319.938
+  t=140s "fighting attacker"    target=10 members= 7 attack=true  sea=true  c=false x=9680.051
+  t=140s "random move"          target=14 members=14 attack=true  sea=false c=false x=6560.1064
+  t=140s "random move: bad target" target=10 members= 9 attack=true  sea=true  c=false x=6319.987
+  t=140s null                   target=14 members=11 attack=true  sea=false c=false x=1920.0629
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=40451.01
+  t=155s "attacking main target" target=14 members= 6 attack=true  sea=false c=false x=15759.928
+  t=155s "fighting attacker"    target=10 members= 7 attack=true  sea=true  c=false x=13120.04
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=9759.971
+  t=155s null                   target=14 members=14 attack=true  sea=false c=false x=5360.047
+  t=155s null                   target=10 members=10 attack=true  sea=true  c=false x=3279.965
+  t=155s null                   target=14 members=11 attack=true  sea=false c=false x=2800.0842
+  t=155s null                   target=10 members= 1 attack=true  sea=true  c=false x=640.0809
+== imp-zones-s8711105.log
+  t= 20s "random move"          target=10 members= 1 attack=false sea=false c=false x=4770.9067
+  t= 20s "random move: bad target" target=10 members= 0 attack=true  sea=true  c=false x=4770.9067
+  t= 35s "random move"          target=10 members= 8 attack=false sea=false c=false x=9730.991
+  t= 35s "fighting attacker"    target=10 members= 5 attack=true  sea=true  c=false x=9730.991
+  t= 35s null                   target= 3 members= 3 attack=true  sea=false c=false x=2720.164
+  t= 35s null                   target= 3 members= 1 attack=true  sea=false c=false x=1280.1617
+  t= 50s "random move"          target=10 members=10 attack=false sea=false c=false x=13730.962
+  t= 50s "fighting attacker"    target=10 members=10 attack=true  sea=true  c=false x=13730.962
+  t= 50s null                   target= 3 members= 3 attack=true  sea=false c=false x=5280.1265
+  t= 50s null                   target= 5 members= 4 attack=true  sea=false c=false x=2400.1235
+  t= 50s null                   target=10 members= 0 attack=true  sea=true  c=false x=1200.0616
+  t= 50s null                   target= 5 members= 0 attack=true  sea=false c=false x=399.96057
+  t= 65s "random move: bad target" target=10 members=10 attack=false sea=false c=false x=17490.986
+  t= 65s "attacking main target" target=10 members=10 attack=true  sea=true  c=false x=17490.986
+  t= 65s "fighting attacker"    target= 5 members= 5 attack=true  sea=false c=false x=6160.1465
+  t= 65s "random move: bad target" target=10 members= 6 attack=true  sea=true  c=false x=4960.087
+  t= 65s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=4159.987
+  t= 65s null                   target= 5 members= 2 attack=true  sea=false c=false x=2320.0234
+  t= 80s "fighting attacker"    target=10 members=10 attack=false sea=false c=false x=21090.977
+  t= 80s "attacking main target" target=10 members= 4 attack=true  sea=true  c=false x=21090.977
+  t= 80s "random move"          target=10 members=10 attack=true  sea=true  c=false x=8560.088
+  t= 80s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=5920.027
+  t= 80s null                   target=14 members= 5 attack=true  sea=false c=false x=2320.0234
+  t= 80s null                   target=10 members= 0 attack=true  sea=true  c=false x=2080.0833
+  t= 95s "random move"          target=10 members=10 attack=false sea=false c=false x=24690.967
+  t= 95s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=24690.967
+  t= 95s "random move"          target=10 members=10 attack=true  sea=true  c=false x=12160.098
+  t= 95s "random move"          target=14 members=14 attack=true  sea=false c=false x=5920.027
+  t= 95s "random move"          target=10 members=10 attack=true  sea=true  c=false x=5680.087
+  t= 95s null                   target=14 members= 4 attack=true  sea=false c=false x=1200.0616
+  t= 95s null                   target=10 members= 1 attack=true  sea=true  c=false x=80.10011
+  t=110s "random move"          target=10 members=10 attack=false sea=false c=false x=28130.938
+  t=110s "random move"          target=10 members=10 attack=true  sea=true  c=false x=15600.087
+  t=110s "attacking main target" target=14 members= 4 attack=true  sea=false c=false x=9360.011
+  t=110s "random move"          target=10 members=10 attack=true  sea=true  c=false x=9120.069
+  t=110s null                   target=14 members=14 attack=true  sea=false c=false x=4640.0464
+  t=110s null                   target=10 members= 7 attack=true  sea=true  c=false x=3520.0857
+  t=110s null                   target=14 members= 8 attack=true  sea=false c=false x=2080.0833
+  t=125s "random move"          target=10 members=10 attack=false sea=false c=false x=31410.889
+  t=125s "random move"          target=10 members=10 attack=true  sea=true  c=false x=18880.043
+  t=125s "random move"          target=10 members=10 attack=true  sea=true  c=false x=12400.038
+  t=125s "attacking main target" target=14 members= 7 attack=true  sea=false c=false x=7920.0063
+  t=125s "random move"          target=10 members=10 attack=true  sea=true  c=false x=6800.047
+  t=125s "random move"          target=14 members=14 attack=true  sea=false c=false x=5360.047
+  t=125s null                   target=10 members=10 attack=false sea=false c=false x=3200.0452
+  t=125s null                   target=14 members= 2 attack=true  sea=false c=false x=240.12035
+  t=125s null                   target=10 members= 0 attack=true  sea=true  c=false x=240.12035
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=34610.965
+  t=140s "random move"          target=10 members=10 attack=true  sea=true  c=false x=22080.074
+  t=140s "random move"          target=10 members=10 attack=true  sea=true  c=false x=15600.087
+  t=140s "cannot reach main target" target=14 members= 4 attack=true  sea=false c=false x=11120.055
+  t=140s "random move"          target=10 members=10 attack=true  sea=true  c=false x=10000.092
+  t=140s "attacking main target" target=14 members= 9 attack=true  sea=false c=false x=8560.088
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=6400.087
+  t=140s null                   target=14 members=14 attack=true  sea=false c=false x=3440.1653
+  t=140s null                   target=10 members=10 attack=true  sea=true  c=false x=3440.1653
+  t=140s null                   target=14 members= 4 attack=true  sea=false c=false x=1520.1022
+  t=140s null                   target=10 members= 0 attack=true  sea=true  c=false x=240.12035
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=37570.95
+  t=155s "attacking target"     target=10 members=10 attack=true  sea=true  c=false x=25039.986
+  t=155s "random move"          target=10 members= 9 attack=true  sea=true  c=false x=18560.004
+  t=155s "cannot reach main target" target=14 members= 4 attack=true  sea=false c=false x=14079.982
+  t=155s "random move"          target=10 members=10 attack=true  sea=true  c=false x=12960.02
+  t=155s "attacking main target" target=14 members= 4 attack=true  sea=false c=false x=11520.016
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=9360.01
+  t=155s "attacking main target" target=14 members=12 attack=true  sea=false c=false x=6400.0864
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=6400.0864
+  t=155s null                   target=14 members=14 attack=true  sea=false c=false x=4480.027
+  t=155s null                   target=10 members= 1 attack=true  sea=true  c=false x=3200.0452
+  t=155s null                   target=14 members= 4 attack=true  sea=false c=false x=1679.9425
+== imp-zones-s8711209.log
+  t= 20s "random move"          target=10 members= 2 attack=false sea=false c=false x=4770.9067
+  t= 20s "random move: bad target" target=10 members= 0 attack=true  sea=true  c=false x=4770.9067
+  t= 35s "random move"          target=10 members= 9 attack=false sea=false c=false x=9730.991
+  t= 35s "random move"          target=10 members= 1 attack=true  sea=true  c=false x=9730.991
+  t= 35s null                   target= 3 members= 1 attack=true  sea=false c=false x=2560.144
+  t= 50s "random move"          target=10 members=10 attack=false sea=false c=false x=14130.923
+  t= 50s "random move"          target=10 members= 3 attack=true  sea=true  c=false x=14130.923
+  t= 50s "random move"          target= 3 members= 3 attack=true  sea=false c=false x=6960.067
+  t= 50s null                   target= 3 members= 2 attack=true  sea=false c=false x=2880.0046
+  t= 65s "random move"          target=10 members=10 attack=false sea=false c=false x=18450.924
+  t= 65s "random move"          target=10 members= 8 attack=true  sea=true  c=false x=18450.924
+  t= 65s "attacking main target" target= 3 members= 2 attack=true  sea=false c=false x=7200.007
+  t= 65s null                   target= 5 members= 5 attack=true  sea=false c=false x=4159.987
+  t= 65s null                   target= 5 members= 3 attack=true  sea=false c=false x=2160.0032
+  t= 80s "random move"          target=10 members=10 attack=false sea=false c=false x=22450.873
+  t= 80s "random move"          target=10 members=10 attack=true  sea=true  c=false x=22450.873
+  t= 80s "attacking main target" target= 5 members= 5 attack=true  sea=false c=false x=6159.9663
+  t= 80s "fighting attacker"    target= 5 members= 4 attack=true  sea=false c=false x=3679.9258
+  t= 80s null                   target=10 members= 2 attack=true  sea=true  c=false x=2399.9436
+  t= 80s null                   target=14 members= 1 attack=true  sea=false c=false x=1359.902
+  t= 95s "random move"          target=10 members=10 attack=false sea=false c=false x=26130.963
+  t= 95s "fighting attacker"    target= 5 members= 5 attack=true  sea=false c=false x=7360.027
+  t= 95s "random move: bad target" target=10 members= 7 attack=true  sea=true  c=false x=6080.047
+  t= 95s "random move"          target=14 members=11 attack=true  sea=false c=false x=5040.007
+  t=110s "random move"          target=10 members=10 attack=false sea=false c=false x=29970.893
+  t=110s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=9919.991
+  t=110s "Not staging due to damage" target=14 members=14 attack=true  sea=false c=false x=8879.949
+  t=110s null                   target=14 members= 4 attack=true  sea=false c=false x=3040.0247
+  t=110s null                   target=10 members= 2 attack=true  sea=true  c=false x=1760.0426
+  t=125s "random move"          target=10 members=10 attack=false sea=false c=false x=33490.8
+  t=125s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=13439.9
+  t=125s "attacking main target" target=14 members= 9 attack=true  sea=false c=false x=12399.858
+  t=125s "random move"          target=14 members=12 attack=true  sea=false c=false x=6559.9263
+  t=125s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=5279.947
+  t=125s null                   target=10 members= 0 attack=true  sea=true  c=false x=239.94034
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=37010.957
+  t=140s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=16959.986
+  t=140s "attacking main target" target=14 members= 5 attack=true  sea=false c=false x=15919.948
+  t=140s "random move"          target=14 members=14 attack=true  sea=false c=false x=10080.012
+  t=140s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=8800.028
+  t=140s null                   target=10 members= 2 attack=true  sea=true  c=false x=3760.0261
+  t=140s null                   target=14 members=14 attack=true  sea=false c=false x=3040.025
+  t=140s null                   target=14 members= 3 attack=true  sea=false c=false x=80.10011
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=40371.09
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=20320.037
+  t=155s "attacking main target" target=14 members= 4 attack=true  sea=false c=false x=19280.002
+  t=155s "attacking main target" target=14 members= 8 attack=true  sea=false c=false x=13440.081
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=12160.098
+  t=155s "random move"          target=10 members=10 attack=true  sea=true  c=false x=7120.087
+  t=155s null                   target=14 members=14 attack=true  sea=false c=false x=6400.087
+  t=155s null                   target=14 members=14 attack=true  sea=false c=false x=3440.1653
+  t=155s null                   target=14 members= 3 attack=true  sea=false c=false x=1360.0819
+  t=155s null                   target=10 members= 1 attack=true  sea=true  c=false x=880.0212
+  t=155s null                   target=10 members= 0 attack=false sea=false c=false x=560.16077
+== imp-zones-s8711313.log
+  t= 20s "random move"          target=10 members= 1 attack=false sea=false c=false x=4850.8267
+  t= 20s "random move"          target=10 members= 2 attack=true  sea=true  c=false x=4850.8267
+  t= 35s "random move"          target=10 members=10 attack=false sea=false c=false x=9810.911
+  t= 35s "random move"          target=10 members= 4 attack=true  sea=true  c=false x=9810.911
+  t= 35s null                   target= 3 members= 3 attack=true  sea=false c=false x=2559.9639
+  t= 35s null                   target= 3 members= 0 attack=true  sea=false c=false x=239.94034
+  t= 50s "random move"          target=10 members=10 attack=false sea=false c=false x=14210.843
+  t= 50s "random move"          target=10 members= 8 attack=true  sea=true  c=false x=14210.843
+  t= 50s null                   target= 3 members= 3 attack=true  sea=false c=false x=4639.8667
+  t= 50s null                   target= 5 members= 5 attack=true  sea=false c=false x=2239.9236
+  t= 50s null                   target= 5 members= 1 attack=true  sea=false c=false x=79.92011
+  t= 65s "fighting attacker"    target=10 members= 7 attack=false sea=false c=false x=18610.943
+  t= 65s "random move"          target=10 members=10 attack=true  sea=true  c=false x=18610.943
+  t= 65s null                   target= 5 members= 5 attack=true  sea=false c=false x=4480.0264
+  t= 65s null                   target=10 members= 1 attack=true  sea=true  c=false x=2400.1235
+  t= 65s "fighting attacker"    target= 5 members= 3 attack=true  sea=false c=false x=1999.983
+  t= 80s "random move"          target=10 members=10 attack=false sea=false c=false x=23010.852
+  t= 80s "random move"          target=10 members= 8 attack=true  sea=true  c=false x=6800.0464
+  t= 80s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=6399.9067
+  t= 80s "fighting attacker"    target=14 members= 4 attack=true  sea=false c=false x=3359.8853
+  t= 95s "random move"          target=10 members=10 attack=false sea=false c=false x=27090.9
+  t= 95s "random move"          target=10 members=10 attack=true  sea=true  c=false x=10880.114
+  t= 95s "fighting attacker"    target=14 members=10 attack=true  sea=false c=false x=7439.947
+  t= 95s null                   target=10 members= 1 attack=true  sea=true  c=false x=2399.9436
+  t=110s "random move"          target=10 members=10 attack=false sea=false c=false x=30930.83
+  t=110s "random move"          target=14 members=14 attack=true  sea=false c=false x=11279.8955
+  t=110s "random move"          target=10 members= 9 attack=true  sea=true  c=false x=6239.8867
+  t=110s null                   target=14 members= 6 attack=true  sea=false c=false x=1760.0426
+  t=125s "random move"          target=10 members=10 attack=false sea=false c=false x=34530.863
+  t=125s "flight from attacker" target=10 members= 3 attack=true  sea=true  c=false x=9839.892
+  t=125s "fighting attacker"    target=14 members=13 attack=true  sea=false c=false x=5360.047
+  t=125s "fighting attacker"    target=10 members= 5 attack=true  sea=true  c=false x=3119.9448
+  t=125s null                   target=14 members= 4 attack=true  sea=false c=false x=1200.0616
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=38370.887
+  t=140s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=13679.842
+  t=140s "attacking main target" target=14 members= 9 attack=true  sea=false c=false x=9199.989
+  t=140s "random move: bad target" target=10 members= 7 attack=true  sea=true  c=false x=6959.8867
+  t=140s "random move"          target=14 members=14 attack=true  sea=false c=false x=5040.0063
+  t=140s null                   target=10 members= 4 attack=false sea=false c=false x=1679.9425
+  t=140s null                   target=14 members= 3 attack=true  sea=false c=false x=1519.9222
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=41731.02
+  t=155s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=17039.908
+  t=155s "attacking main target" target=14 members= 3 attack=true  sea=false c=false x=12560.059
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=10319.952
+  t=155s "attacking main target" target=14 members= 5 attack=true  sea=false c=false x=8400.067
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=5040.007
+  t=155s "random move"          target=14 members=14 attack=true  sea=false c=false x=4879.987
+  t=155s null                   target=10 members= 2 attack=true  sea=true  c=false x=1839.9628
+  t=155s null                   target=14 members= 0 attack=true  sea=false c=false x=0.0
+  t=170s "random move"          target=10 members=10 attack=false sea=false c=false x=45171.074
+  t=170s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=13759.941
+  t=170s "random move"          target=10 members=10 attack=false sea=false c=false x=8479.987
+  t=170s "random move"          target=14 members=14 attack=true  sea=false c=false x=8319.967
+  t=170s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=5279.947
+  t=170s null                   target=14 members=14 attack=true  sea=false c=false x=3439.9856
+  t=170s null                   target=10 members= 2 attack=true  sea=true  c=false x=959.9413
+  t=170s null                   target=14 members= 3 attack=true  sea=false c=false x=399.96057
+  t=185s "random move"          target=10 members=10 attack=false sea=false c=false x=48371.184
+  t=185s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=16959.986
+  t=185s "random move"          target=10 members=10 attack=false sea=false c=false x=11680.036
+  t=185s "attacking main target" target=14 members= 3 attack=true  sea=false c=false x=11520.016
+  t=185s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=8479.987
+  t=185s "Not staging due to damage" target=14 members=14 attack=true  sea=false c=false x=6640.027
+  t=185s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=4159.987
+  t=185s null                   target=14 members=14 attack=true  sea=false c=false x=3600.0056
+  t=185s null                   target=10 members= 4 attack=true  sea=true  c=false x=1119.9615
+  t=185s null                   target=14 members= 0 attack=true  sea=false c=false x=720.001
+== imp-zones-s8711417.log
+  t= 20s "random move"          target=10 members= 1 attack=false sea=false c=false x=4850.8267
+  t= 20s "random move"          target=10 members= 1 attack=true  sea=true  c=false x=4850.8267
+  t= 35s "random move"          target=10 members= 7 attack=false sea=false c=false x=9890.831
+  t= 35s "random move"          target=10 members= 2 attack=true  sea=true  c=false x=9890.831
+  t= 35s null                   target= 3 members= 0 attack=true  sea=false c=false x=639.9009
+  t= 50s "fighting attacker"    target=10 members= 9 attack=false sea=false c=false x=14210.843
+  t= 50s "fighting attacker"    target=10 members= 2 attack=true  sea=true  c=false x=14210.843
+  t= 50s "random move"          target= 3 members= 0 attack=true  sea=false c=false x=4959.9062
+  t= 65s "random move"          target=10 members= 9 attack=false sea=false c=false x=18370.824
+  t= 65s "random move: bad target" target=10 members= 6 attack=true  sea=true  c=false x=18370.824
+  t= 65s "random move"          target= 3 members= 3 attack=true  sea=false c=false x=9119.889
+  t= 65s null                   target= 3 members= 1 attack=true  sea=false c=false x=1359.902
+  t= 80s "random move"          target=10 members=10 attack=false sea=false c=false x=22290.854
+  t= 80s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=22290.854
+  t= 80s "random move"          target= 3 members= 3 attack=true  sea=false c=false x=5279.9463
+  t= 80s null                   target= 5 members= 1 attack=true  sea=false c=false x=1760.0426
+  t= 80s null                   target=10 members= 0 attack=true  sea=true  c=false x=720.001
+  t= 95s "random move"          target=10 members=10 attack=false sea=false c=false x=26290.803
+  t= 95s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=26290.803
+  t= 95s "random move"          target= 5 members= 5 attack=true  sea=false c=false x=5760.0063
+  t= 95s "random move"          target=10 members=10 attack=true  sea=true  c=false x=4719.967
+  t= 95s null                   target= 5 members= 5 attack=true  sea=false c=false x=2799.9043
+  t= 95s null                   target= 5 members= 2 attack=true  sea=false c=false x=720.001
+  t= 95s null                   target=10 members= 1 attack=true  sea=true  c=false x=319.86044
+  t=110s "random move"          target=10 members=10 attack=false sea=false c=false x=29890.793
+  t=110s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=29890.793
+  t=110s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=8319.967
+  t=110s null                   target= 5 members= 5 attack=true  sea=false c=false x=6399.9062
+  t=110s null                   target= 5 members= 5 attack=true  sea=false c=false x=4320.0063
+  t=110s null                   target=10 members= 9 attack=true  sea=true  c=false x=3919.8662
+  t=110s null                   target=14 members= 9 attack=true  sea=false c=false x=1919.8829
+  t=125s "random move"          target=10 members=10 attack=false sea=false c=false x=33250.855
+  t=125s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=33250.855
+  t=125s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=11680.036
+  t=125s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=7279.927
+  t=125s "random move"          target=14 members=14 attack=true  sea=false c=false x=5279.947
+  t=125s null                   target=10 members= 8 attack=true  sea=true  c=false x=3200.0452
+  t=125s null                   target=14 members= 7 attack=true  sea=false c=false x=1760.0426
+  t=140s "random move"          target=10 members=10 attack=false sea=false c=false x=36210.84
+  t=140s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=36210.84
+  t=140s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=14639.964
+  t=140s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=10239.853
+  t=140s "fighting attacker"    target=14 members= 6 attack=true  sea=false c=false x=8239.867
+  t=140s "random move: bad target" target=10 members= 9 attack=true  sea=true  c=false x=6159.967
+  t=140s "random move"          target=14 members=14 attack=true  sea=false c=false x=4719.967
+  t=140s null                   target=14 members= 8 attack=true  sea=false c=false x=1199.8817
+  t=140s null                   target=10 members= 0 attack=true  sea=true  c=false x=1199.8817
+  t=155s "random move"          target=10 members=10 attack=false sea=false c=false x=39410.95
+  t=155s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=39410.95
+  t=155s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=17840.006
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=13439.901
+  t=155s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=9360.01
+  t=155s "attacking main target" target=14 members=14 attack=true  sea=false c=false x=7920.007
+  t=155s null                   target=14 members=14 attack=true  sea=false c=false x=4399.927
+  t=155s "random move: bad target" target=10 members= 6 attack=true  sea=true  c=false x=4399.927
+  t=155s null                   target=14 members= 9 attack=true  sea=false c=false x=1679.9425
+  t=170s "random move"          target=10 members=10 attack=false sea=false c=false x=42451.035
+  t=170s "cannot reach main target" target=10 members= 3 attack=true  sea=true  c=false x=42451.035
+  t=170s "fighting attacker"    target=10 members= 9 attack=true  sea=true  c=false x=20880.018
+  t=170s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=16479.93
+  t=170s "random move: bad target" target=10 members=10 attack=true  sea=true  c=false x=12400.038
+  t=170s "attacking main target" target=14 members= 7 attack=true  sea=false c=false x=10960.034
+  t=170s "attacking main target" target=14 members= 7 attack=true  sea=false c=false x=7439.947
+  t=170s "random move"          target=10 members=10 attack=true  sea=true  c=false x=7439.947
+  t=170s null                   target=14 members=14 attack=true  sea=false c=false x=4719.9663
+  t=170s null                   target=10 members= 7 attack=true  sea=true  c=false x=2399.9436
+  t=170s null                   target=14 members= 6 attack=true  sea=false c=false x=1760.0426
