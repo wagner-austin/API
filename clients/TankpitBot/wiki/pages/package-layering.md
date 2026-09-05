@@ -10,9 +10,9 @@ source_paths:
   - "src/tankpit_bot"
   - "scripts/layer_rules.py"
 source_git_blobs:
-  "src/tankpit_bot": "0c8b596c7022a130d131f51e210c6945bbb59cd8"
+  "src/tankpit_bot": "dcfc8ef145312a293178da152b4ca08321824b2d"
   "scripts/layer_rules.py": "d9e06727911f946d18b184ba2e5625447dba98c6"
-fact_checked: "2026-08-07"
+fact_checked: "2026-09-05"
 confidence: high
 hubs: [architecture]
 ---

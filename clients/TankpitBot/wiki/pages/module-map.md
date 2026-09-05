@@ -7,8 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "0c8b596c7022a130d131f51e210c6945bbb59cd8"
-fact_checked: "2026-09-03"
+  "src/tankpit_bot": "dcfc8ef145312a293178da152b4ca08321824b2d"
+fact_checked: "2026-09-05"
 confidence: high
 hubs: [codebase]
 ---

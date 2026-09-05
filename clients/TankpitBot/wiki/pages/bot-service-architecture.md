@@ -7,12 +7,12 @@ related:
 source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
-  - "src/tankpit_bot/browser/live_view.py"
+  - "src/tankpit_bot/stream"
 source_git_blobs:
-  "src/tankpit_bot/service": "1960dc175ef63744338161a8d30dc02ec128669f"
-  "src/tankpit_bot/bot/config.py": "557c01140481f9d7930663253279f2b2907f1ef8"
-  "src/tankpit_bot/browser/live_view.py": "f879a88de41caa9d860f3da554a8cea54a3304e8"
-fact_checked: "2026-09-03"
+  "src/tankpit_bot/service": "8fb55988f5c6b233fd3b9ab76b05e3c25ad6872f"
+  "src/tankpit_bot/bot/config.py": "f450fe3b0e900b48f024cb945a88846b7f02b3dd"
+  "src/tankpit_bot/stream": "b7a9be6f1d20c0006e73fb0d4b4c82abc4a8fe8f"
+fact_checked: "2026-09-05"
 confidence: medium
 hubs: [architecture]
 ---
