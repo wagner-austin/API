@@ -1,0 +1,20 @@
+# Ladder certification at difficulty 1 -- Hard (1.4x AI income).
+# The campaign goal claims 100% at Impossible and EVERY rung
+# below; the adopted champion evolve1-g4m2 measures 75% at Very
+# Hard and has never been measured below it. 12 fresh seeds
+# 8719745-8720889, champion doctrine only -- this is a
+# certification read, not a comparison.
+#
+# label | seed | doctrine | samples
+champ|8719745|doctrines/evolve1-g4m2.doctrine|10000
+champ|8719849|doctrines/evolve1-g4m2.doctrine|10000
+champ|8719953|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720057|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720161|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720265|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720369|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720473|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720577|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720681|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720785|doctrines/evolve1-g4m2.doctrine|10000
+champ|8720889|doctrines/evolve1-g4m2.doctrine|10000
