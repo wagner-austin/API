@@ -1,0 +1,69 @@
+# The hunt screen, second cut ([[impossible-economy-problem]] stage 3):
+# the first cut (imphunt60) read hunts-median ZERO in every arm -- the
+# draft was arbitrated against the ESCALATING wave rung, which the army
+# never clears at Impossible, so the screen measured a no-op. The bar
+# is now the opening rung (commit ffb72762); same five arms, fresh
+# seeds 8731001-8735577, difficulty 3, judged on paired margin,
+# survival, wave shape -- and the firing record FIRST.
+#
+# label | seed | doctrine | samples
+control|8731001|doctrines/flame-nocover.doctrine|10000
+hunt2|8731001|doctrines/imp-hunt2.doctrine|10000
+hunt4|8731001|doctrines/imp-hunt4.doctrine|10000
+hunt8|8731001|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8731001|doctrines/imp-hunt4g.doctrine|10000
+control|8731417|doctrines/flame-nocover.doctrine|10000
+hunt2|8731417|doctrines/imp-hunt2.doctrine|10000
+hunt4|8731417|doctrines/imp-hunt4.doctrine|10000
+hunt8|8731417|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8731417|doctrines/imp-hunt4g.doctrine|10000
+control|8731833|doctrines/flame-nocover.doctrine|10000
+hunt2|8731833|doctrines/imp-hunt2.doctrine|10000
+hunt4|8731833|doctrines/imp-hunt4.doctrine|10000
+hunt8|8731833|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8731833|doctrines/imp-hunt4g.doctrine|10000
+control|8732249|doctrines/flame-nocover.doctrine|10000
+hunt2|8732249|doctrines/imp-hunt2.doctrine|10000
+hunt4|8732249|doctrines/imp-hunt4.doctrine|10000
+hunt8|8732249|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8732249|doctrines/imp-hunt4g.doctrine|10000
+control|8732665|doctrines/flame-nocover.doctrine|10000
+hunt2|8732665|doctrines/imp-hunt2.doctrine|10000
+hunt4|8732665|doctrines/imp-hunt4.doctrine|10000
+hunt8|8732665|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8732665|doctrines/imp-hunt4g.doctrine|10000
+control|8733081|doctrines/flame-nocover.doctrine|10000
+hunt2|8733081|doctrines/imp-hunt2.doctrine|10000
+hunt4|8733081|doctrines/imp-hunt4.doctrine|10000
+hunt8|8733081|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8733081|doctrines/imp-hunt4g.doctrine|10000
+control|8733497|doctrines/flame-nocover.doctrine|10000
+hunt2|8733497|doctrines/imp-hunt2.doctrine|10000
+hunt4|8733497|doctrines/imp-hunt4.doctrine|10000
+hunt8|8733497|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8733497|doctrines/imp-hunt4g.doctrine|10000
+control|8733913|doctrines/flame-nocover.doctrine|10000
+hunt2|8733913|doctrines/imp-hunt2.doctrine|10000
+hunt4|8733913|doctrines/imp-hunt4.doctrine|10000
+hunt8|8733913|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8733913|doctrines/imp-hunt4g.doctrine|10000
+control|8734329|doctrines/flame-nocover.doctrine|10000
+hunt2|8734329|doctrines/imp-hunt2.doctrine|10000
+hunt4|8734329|doctrines/imp-hunt4.doctrine|10000
+hunt8|8734329|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8734329|doctrines/imp-hunt4g.doctrine|10000
+control|8734745|doctrines/flame-nocover.doctrine|10000
+hunt2|8734745|doctrines/imp-hunt2.doctrine|10000
+hunt4|8734745|doctrines/imp-hunt4.doctrine|10000
+hunt8|8734745|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8734745|doctrines/imp-hunt4g.doctrine|10000
+control|8735161|doctrines/flame-nocover.doctrine|10000
+hunt2|8735161|doctrines/imp-hunt2.doctrine|10000
+hunt4|8735161|doctrines/imp-hunt4.doctrine|10000
+hunt8|8735161|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8735161|doctrines/imp-hunt4g.doctrine|10000
+control|8735577|doctrines/flame-nocover.doctrine|10000
+hunt2|8735577|doctrines/imp-hunt2.doctrine|10000
+hunt4|8735577|doctrines/imp-hunt4.doctrine|10000
+hunt8|8735577|doctrines/imp-hunt8.doctrine|10000
+hunt4g|8735577|doctrines/imp-hunt4g.doctrine|10000
