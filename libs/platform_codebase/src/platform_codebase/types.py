@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     JSONValue,
     require_list,
     require_str,
+    require_str_list,
 )
 
 # -----------------------------------------------------------------------------
@@ -28,28 +29,6 @@ MatchRecommendation = Literal["strong_fit", "good_fit", "stretch", "new_territor
 # -----------------------------------------------------------------------------
 # Internal Validation Helpers
 # -----------------------------------------------------------------------------
-
-
-def _require_list_str(obj: JSONObject, key: str) -> list[str]:
-    """Extract required list of strings from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Field key.
-
-    Returns:
-        List of strings.
-
-    Raises:
-        JSONTypeError: If field is missing or contains non-strings.
-    """
-    items = require_list(obj, key)
-    result: list[str] = []
-    for i, item in enumerate(items):
-        if not isinstance(item, str):
-            raise JSONTypeError(f"Field '{key}[{i}]' must be a string, got {type(item).__name__}")
-        result.append(item)
-    return result
 
 
 def _require_dict_value(value: JSONValue, context: str) -> JSONObject:
@@ -190,7 +169,7 @@ def decode_capability(data: JSONObject) -> CodebaseCapability:
     return CodebaseCapability(
         name=require_str(data, "name"),
         strength=require_strength(data, "strength"),
-        tags=tuple(_require_list_str(data, "tags")),
+        tags=tuple(require_str_list(data, "tags")),
         description=require_str(data, "description"),
     )
 
@@ -290,11 +269,11 @@ def decode_profile(data: JSONObject) -> CodebaseProfile:
             decode_capability(_require_dict_value(c, f"capabilities[{i}]"))
             for i, c in enumerate(caps_raw)
         ),
-        technologies=tuple(_require_list_str(data, "technologies")),
-        frameworks=tuple(_require_list_str(data, "frameworks")),
-        ml_backends=tuple(_require_list_str(data, "ml_backends")),
-        data_formats=tuple(_require_list_str(data, "data_formats")),
-        task_types=tuple(_require_list_str(data, "task_types")),
+        technologies=tuple(require_str_list(data, "technologies")),
+        frameworks=tuple(require_str_list(data, "frameworks")),
+        ml_backends=tuple(require_str_list(data, "ml_backends")),
+        data_formats=tuple(require_str_list(data, "data_formats")),
+        task_types=tuple(require_str_list(data, "task_types")),
     )
 
 

@@ -31,6 +31,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     require_list,
+    require_str_list,
 )
 from typing_extensions import TypedDict
 
@@ -42,7 +43,6 @@ from hpc3.contracts.image_spec_fields import (
     require_non_empty_str,
     require_pinned_requirements,
     require_pinned_system_packages,
-    require_str_list,
     require_str_map,
 )
 from hpc3.contracts.layout import require_project

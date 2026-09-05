@@ -11,6 +11,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     require_bool,
     require_float,
+    require_str_list,
 )
 
 from platform_devpost._types_hackathon import (
@@ -21,7 +22,6 @@ from platform_devpost._types_hackathon import (
 from platform_devpost._types_validation import (
     HackathonState,
     _require_dict_value,
-    _require_list_str,
     _require_state_value,
 )
 
@@ -109,8 +109,8 @@ def decode_match(data: JSONObject) -> HackathonMatch:
     return HackathonMatch(
         hackathon=decode_hackathon(_require_dict_value(hackathon_raw, "hackathon")),
         match_score=require_float(data, "match_score"),
-        matched_capabilities=tuple(_require_list_str(data, "matched_capabilities")),
-        missing_capabilities=tuple(_require_list_str(data, "missing_capabilities")),
+        matched_capabilities=tuple(require_str_list(data, "matched_capabilities")),
+        missing_capabilities=tuple(require_str_list(data, "missing_capabilities")),
         recommendation=require_recommendation(data, "recommendation"),
     )
 
@@ -192,8 +192,8 @@ def decode_filter(data: JSONObject) -> InterestFilter:
         states = tuple(_require_state_value(s, f"states[{i}]") for i, s in enumerate(states_raw))
 
     return InterestFilter(
-        include_themes=tuple(_require_list_str(data, "include_themes")),
-        exclude_themes=tuple(_require_list_str(data, "exclude_themes")),
+        include_themes=tuple(require_str_list(data, "include_themes")),
+        exclude_themes=tuple(require_str_list(data, "exclude_themes")),
         states=states,
         featured_only=require_bool(data, "featured_only"),
     )

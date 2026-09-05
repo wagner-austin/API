@@ -6,12 +6,12 @@ from platform_core.json_utils import (
     JSONObject,
     require_int,
     require_str,
+    require_str_list,
 )
 
 from platform_kaggle._types_validation import (
     CompetitionCategory,
     _require_category,
-    _require_list_str,
 )
 
 # -----------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def decode_competition(data: JSONObject) -> Competition:
         reward=require_str(data, "reward"),
         deadline=require_str(data, "deadline"),
         team_count=require_int(data, "team_count"),
-        tags=tuple(_require_list_str(data, "tags")),
+        tags=tuple(require_str_list(data, "tags")),
         description=require_str(data, "description"),
         url=require_str(data, "url"),
     )

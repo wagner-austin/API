@@ -11,6 +11,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     optional_int,
     require_float,
+    require_str_list,
 )
 
 from platform_kaggle._types_competition import Competition, decode_competition, encode_competition
@@ -18,7 +19,6 @@ from platform_kaggle._types_validation import (
     CompetitionCategory,
     _require_category_value,
     _require_dict_value,
-    _require_list_str,
 )
 
 # -----------------------------------------------------------------------------
@@ -105,8 +105,8 @@ def decode_match(data: JSONObject) -> CompetitionMatch:
     return CompetitionMatch(
         competition=decode_competition(_require_dict_value(comp_raw, "competition")),
         match_score=require_float(data, "match_score"),
-        matched_capabilities=tuple(_require_list_str(data, "matched_capabilities")),
-        missing_capabilities=tuple(_require_list_str(data, "missing_capabilities")),
+        matched_capabilities=tuple(require_str_list(data, "matched_capabilities")),
+        missing_capabilities=tuple(require_str_list(data, "missing_capabilities")),
         recommendation=require_recommendation(data, "recommendation"),
     )
 
@@ -192,8 +192,8 @@ def decode_filter(data: JSONObject) -> InterestFilter:
         )
 
     return InterestFilter(
-        include_tags=tuple(_require_list_str(data, "include_tags")),
-        exclude_tags=tuple(_require_list_str(data, "exclude_tags")),
+        include_tags=tuple(require_str_list(data, "include_tags")),
+        exclude_tags=tuple(require_str_list(data, "exclude_tags")),
         min_reward=optional_int(data, "min_reward"),
         categories=categories,
     )

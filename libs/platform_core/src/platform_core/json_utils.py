@@ -220,6 +220,36 @@ def require_list(obj: JSONObject, key: str) -> list[JSONValue]:
     return value
 
 
+def require_str_list(obj: JSONObject, key: str) -> list[str]:
+    """Extract a required list field whose every element is a string.
+
+    Four packages decoded string arrays and each carried its own copy of this
+    loop. The index is named in the error because a decoder reporting only the
+    field leaves the caller to find which of forty tags was a number.
+
+    Args:
+        obj: JSON object to extract from.
+        key: Field key.
+
+    Returns:
+        The strings, in order. An empty list is permitted; a field that must
+        not be empty is the caller's own rule to enforce.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an array, or holds a
+            non-string. The message names the offending index.
+    """
+    items = require_list(obj, key)
+    values: list[str] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, str):
+            raise JSONTypeError(
+                f"Field '{key}[{index}]' must be a string, got {type(item).__name__}"
+            )
+        values.append(item)
+    return values
+
+
 def require_dict(obj: JSONObject, key: str) -> JSONObject:
     """Extract required dict field from JSON object.
 
@@ -313,4 +343,5 @@ __all__ = [
     "require_int",
     "require_list",
     "require_str",
+    "require_str_list",
 ]

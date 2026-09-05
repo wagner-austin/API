@@ -8,7 +8,6 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
-    require_list,
     require_str,
 )
 
@@ -24,28 +23,6 @@ CompetitionCategory = Literal[
 # -----------------------------------------------------------------------------
 # Internal Validation Helpers
 # -----------------------------------------------------------------------------
-
-
-def _require_list_str(obj: JSONObject, key: str) -> list[str]:
-    """Extract required list of strings from JSON object.
-
-    Args:
-        obj: JSON object to extract from.
-        key: Field key.
-
-    Returns:
-        List of strings.
-
-    Raises:
-        JSONTypeError: If field is missing or contains non-strings.
-    """
-    items = require_list(obj, key)
-    result: list[str] = []
-    for i, item in enumerate(items):
-        if not isinstance(item, str):
-            raise JSONTypeError(f"Field '{key}[{i}]' must be a string, got {type(item).__name__}")
-        result.append(item)
-    return result
 
 
 def _require_dict_value(value: JSONValue, context: str) -> JSONObject:

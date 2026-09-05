@@ -233,32 +233,6 @@ def require_bare_filenames(obj: JSONObject, key: str) -> list[str]:
     return names
 
 
-def require_str_list(obj: JSONObject, key: str) -> list[str]:
-    """Read a required list of strings, which may be empty.
-
-    Args:
-        obj: Object being decoded.
-        key: Field name.
-
-    Returns:
-        The values, in order.
-
-    Raises:
-        JSONTypeError: If the field is missing, not a list, or holds a
-            non-string. Emptiness is permitted here because a build with no
-            extra index is the ordinary case.
-    """
-    raw = require_list(obj, key)
-    values: list[str] = []
-    for index, item in enumerate(raw):
-        if not isinstance(item, str):
-            raise JSONTypeError(
-                f"Field '{key}[{index}]' must be a string, got {type(item).__name__}"
-            )
-        values.append(item)
-    return values
-
-
 def require_str_map(obj: JSONObject, key: str, *, allow_empty: bool) -> dict[str, str]:
     """Read a required object whose every value is a string.
 
@@ -330,6 +304,5 @@ __all__ = [
     "require_non_empty_str",
     "require_pinned_requirements",
     "require_pinned_system_packages",
-    "require_str_list",
     "require_str_map",
 ]
