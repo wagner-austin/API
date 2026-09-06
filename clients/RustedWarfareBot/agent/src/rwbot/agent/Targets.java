@@ -147,4 +147,31 @@ final class Targets {
 
     /** Where the rewired invokes land ({@link SideDraw#d}). */
     static final String SWAY_DRAW_TARGET = "rwbot/agent/SideDraw";
+
+    /**
+     * The data-driven unit class whose per-tick update jitters effect spawns
+     * from the sim stream, and the exact source lines that may move.
+     *
+     * <p>Line-scoped, not method-scoped, because method scope was measured
+     * too coarse here: the update holds TWELVE {@code f.c(FF)F} invokes and
+     * only these three were bytecode-verified effect-only -- an angle jitter
+     * feeding a particle spawn ({@code l.bR}'s manager returns the effect)
+     * and two velocity jitters written to the effect's own {@code P}/{@code
+     * Q} fields. The other nine sit on unread paths and STAY on the sim
+     * stream; {@code :4267}, in the projectile-spawning method, is
+     * shot-spread-shaped and is deliberately untouched (wiki log 2026-09-06,
+     * the routing-weave entry). These are the tap's own line numbers -- one
+     * identifier from measurement to lawfulness read to patch.
+     */
+    static final String EFFECT_JITTER_CLASS = "com/corrodinggames/rts/game/units/custom/j";
+
+    static final String EFFECT_JITTER_METHOD = "a(F)V";
+
+    static final String EFFECT_JITTER_NAME = "c";
+
+    static java.util.Set<Integer> effectJitterLines() {
+        return new java.util.LinkedHashSet<Integer>(
+                java.util.Arrays.asList(
+                        Integer.valueOf(2711), Integer.valueOf(2721), Integer.valueOf(2722)));
+    }
 }

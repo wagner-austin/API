@@ -146,11 +146,66 @@ final class ClassFilePatcher {
             String descriptor,
             String toOwner) {
         ClassFilePatcher patcher = new ClassFilePatcher(classFile);
-        return patcher.retarget(targets, fromOwner, name, descriptor, toOwner);
+        return patcher.retarget(targets, null, fromOwner, name, descriptor, toOwner);
     }
+
+    /**
+     * The line-scoped variant: rewrites only the invokes whose bytecode
+     * offsets the target method's own {@code LineNumberTable} attributes to
+     * one of {@code lines}.
+     *
+     * <p>Method scope is too coarse exactly once so far, and it is the case
+     * that motivated this: the data-driven unit class's per-tick update holds
+     * TWELVE {@code f.c(FF)F} invokes, of which three were bytecode-verified
+     * as effect-only (an angle jitter feeding a particle spawn and two
+     * velocity jitters written to the particle's own fields) while the other
+     * nine sit on unread paths that may be simulation. The draw tap names a
+     * site by its source line, the lawfulness read is performed against that
+     * line's bytecode, and this filter consumes the SAME line number -- one
+     * identifier from measurement to patch, resolved through the pinned
+     * jar's own line table rather than through offsets someone once copied
+     * (wiki: policy-determinism, the 2026-09-06 arc).
+     *
+     * @throws ClassFormatError if any requested line matched no rewritten
+     *     invoke -- a silent partial patch would measure as the very noise
+     *     this exists to remove -- or the method carries no line table to
+     *     resolve against.
+     */
+    static byte[] retargetStaticInvokesAtLines(
+            byte[] classFile,
+            String targetMethod,
+            java.util.Set<Integer> lines,
+            String fromOwner,
+            String name,
+            String descriptor,
+            String toOwner) {
+        ClassFilePatcher patcher = new ClassFilePatcher(classFile);
+        byte[] result =
+                patcher.retarget(
+                        java.util.Collections.singleton(targetMethod),
+                        lines,
+                        fromOwner,
+                        name,
+                        descriptor,
+                        toOwner);
+        if (result != null && !patcher.unmatchedLines.isEmpty()) {
+            throw new ClassFormatError(
+                    "requested lines matched no " + fromOwner + "." + name + descriptor
+                            + " invoke in " + targetMethod + ": " + patcher.unmatchedLines
+                            + " -- the pinned jar's line table moved, or the read was wrong");
+        }
+        return result;
+    }
+
+    // Lines the caller asked for that no rewritten invoke resolved to;
+    // populated by the line-scoped walk so the entry point can refuse a
+    // partial patch loudly.
+    private final java.util.Set<Integer> unmatchedLines =
+            new java.util.LinkedHashSet<Integer>();
 
     private byte[] retarget(
             java.util.Set<String> targets,
+            java.util.Set<Integer> lines,
             String fromOwner,
             String name,
             String descriptor,
@@ -189,10 +244,13 @@ final class ClassFilePatcher {
         skip(interfaceCount * 2);
         skipMembers(); // fields
 
+        if (lines != null) {
+            unmatchedLines.addAll(lines);
+        }
         java.util.List<Edit> edits = new java.util.ArrayList<Edit>();
         int methodCount = readU2();
         for (int i = 0; i < methodCount; i++) {
-            collectInvokeEdits(pool, targets, fromRef, newRef, edits);
+            collectInvokeEdits(pool, targets, lines, fromRef, newRef, edits);
         }
         if (edits.isEmpty()) {
             return null;
@@ -226,6 +284,7 @@ final class ClassFilePatcher {
     private void collectInvokeEdits(
             String[] pool,
             java.util.Set<String> targets,
+            java.util.Set<Integer> lines,
             int fromRef,
             int newRef,
             java.util.List<Edit> edits) {
@@ -244,16 +303,30 @@ final class ClassFilePatcher {
                         | ((buf[pos + 6] & 0xff) << 8)
                         | (buf[pos + 7] & 0xff);
                 int codeStart = pos + 8; // max_stack, max_locals, code_length.
+                int[] lineStarts = null;
+                int[] lineNumbers = null;
+                if (lines != null) {
+                    int[][] table = Bytecode.readLineTable(buf, pool, codeStart, codeLength);
+                    lineStarts = table[0];
+                    lineNumbers = table[1];
+                    if (lineStarts.length == 0) {
+                        throw new ClassFormatError(
+                                "no LineNumberTable in " + name + descriptor
+                                        + " to resolve a line-scoped retarget against");
+                    }
+                }
                 byte[] operand = {(byte) ((newRef >>> 8) & 0xff), (byte) (newRef & 0xff)};
                 int at = 0;
                 while (at < codeLength) {
                     int opcode = buf[codeStart + at] & 0xff;
                     if (opcode == 0xb8 // invokestatic
                             && ((buf[codeStart + at + 1] & 0xff) << 8 | (buf[codeStart + at + 2] & 0xff))
-                                    == fromRef) {
+                                    == fromRef
+                            && (lines == null
+                                    || matchesLine(lines, lineStarts, lineNumbers, at))) {
                         edits.add(new Edit(codeStart + at + 1, codeStart + at + 3, operand));
                     }
-                    at += instructionLength(opcode, codeStart, at);
+                    at += Bytecode.instructionLength(buf, opcode, codeStart, at);
                 }
             }
             skip(length);
@@ -261,83 +334,18 @@ final class ClassFilePatcher {
     }
 
     /**
-     * The byte length of one instruction, including its opcode.
-     *
-     * <p>Complete over the instruction set the pinned jar's methods use, with
-     * the three variable-length shapes ({@code wide}, {@code tableswitch},
-     * {@code lookupswitch}) computed rather than refused: a walker that bails
-     * on a switch would quietly narrow which methods can ever be retargeted.
-     *
-     * @param opcode The instruction's first byte.
-     * @param codeStart Buffer offset of the code array's first byte, from
-     *     which the switch shapes compute their 4-byte alignment padding.
-     * @param at The instruction's offset within the code array.
-     * @throws ClassFormatError on an opcode outside the JVMS table -- a
-     *     mis-walk would rewrite arbitrary bytes, so unknown means stop.
+     * Whether the instruction at {@code at} belongs to one of the requested
+     * source lines. A hit is also consumed from {@link #unmatchedLines},
+     * which is how the entry point knows every requested line did real work.
      */
-    private int instructionLength(int opcode, int codeStart, int at) {
-        if (opcode <= 0x0f || (opcode >= 0x1a && opcode <= 0x35)
-                || (opcode >= 0x3b && opcode <= 0x83 && opcode != 0x84)
-                || (opcode >= 0x85 && opcode <= 0x98)
-                || (opcode >= 0xac && opcode <= 0xb1)
-                || opcode == 0x5f || opcode == 0xbe || opcode == 0xbf
-                || opcode == 0xc2 || opcode == 0xc3) {
-            return 1;
+    private boolean matchesLine(
+            java.util.Set<Integer> lines, int[] lineStarts, int[] lineNumbers, int at) {
+        Integer line = Integer.valueOf(Bytecode.lineAt(lineStarts, lineNumbers, at));
+        if (lines.contains(line)) {
+            unmatchedLines.remove(line);
+            return true;
         }
-        switch (opcode) {
-            case 0x10: // bipush
-            case 0x12: // ldc
-            case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: // loads
-            case 0x36: case 0x37: case 0x38: case 0x39: case 0x3a: // stores
-            case 0xbc: // newarray
-                return 2;
-            case 0x11: // sipush
-            case 0x13: case 0x14: // ldc_w, ldc2_w
-            case 0x84: // iinc
-            case 0xb2: case 0xb3: case 0xb4: case 0xb5: // get/putstatic, get/putfield
-            case 0xb6: case 0xb7: case 0xb8: // invokevirtual/special/static
-            case 0xbb: // new
-            case 0xbd: // anewarray
-            case 0xc0: case 0xc1: // checkcast, instanceof
-            case 0xc6: case 0xc7: // ifnull, ifnonnull
-                return 3;
-            case 0xc5: // multianewarray
-                return 4;
-            case 0xb9: // invokeinterface
-            case 0xba: // invokedynamic
-            case 0xc8: case 0xc9: // goto_w, jsr_w
-                return 5;
-            case 0xc4: // wide
-                return (buf[codeStart + at + 1] & 0xff) == 0x84 ? 6 : 4;
-            case 0xaa: { // tableswitch
-                int aligned = (at + 4 + 3) & ~3;
-                int low = readInt(codeStart + aligned + 4);
-                int high = readInt(codeStart + aligned + 8);
-                return (aligned - at) + 12 + (high - low + 1) * 4;
-            }
-            case 0xab: { // lookupswitch
-                int aligned = (at + 4 + 3) & ~3;
-                int pairs = readInt(codeStart + aligned + 4);
-                return (aligned - at) + 8 + pairs * 8;
-            }
-            default:
-                if (opcode >= 0x99 && opcode <= 0xa8) { // ifs, goto, jsr
-                    return 3;
-                }
-                if (opcode == 0xa9) { // ret
-                    return 2;
-                }
-                throw new ClassFormatError(
-                        "unmodeled opcode 0x" + Integer.toHexString(opcode) + " at code offset " + at);
-        }
-    }
-
-    /** A big-endian s4 read at an absolute buffer offset, for the switch shapes. */
-    private int readInt(int offset) {
-        return ((buf[offset] & 0xff) << 24)
-                | ((buf[offset + 1] & 0xff) << 16)
-                | ((buf[offset + 2] & 0xff) << 8)
-                | (buf[offset + 3] & 0xff);
+        return false;
     }
 
     private byte[] patch(

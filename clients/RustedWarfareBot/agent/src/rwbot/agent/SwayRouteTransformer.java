@@ -37,8 +37,9 @@ final class SwayRouteTransformer implements ClassFileTransformer {
         if (className == null) {
             return null;
         }
+        boolean jitter = Targets.EFFECT_JITTER_CLASS.equals(className);
         java.util.Set<String> methods = targets.get(className);
-        if (methods == null) {
+        if (methods == null && !jitter) {
             return null;
         }
 
@@ -48,13 +49,22 @@ final class SwayRouteTransformer implements ClassFileTransformer {
         byte[] result;
         try {
             result =
-                    ClassFilePatcher.retargetStaticInvokes(
-                            classfileBuffer,
-                            methods,
-                            Targets.SWAY_DRAW_OWNER,
-                            Targets.SWAY_DRAW_NAME,
-                            Targets.SWAY_DRAW_DESCRIPTOR,
-                            Targets.SWAY_DRAW_TARGET);
+                    jitter
+                            ? ClassFilePatcher.retargetStaticInvokesAtLines(
+                                    classfileBuffer,
+                                    Targets.EFFECT_JITTER_METHOD,
+                                    Targets.effectJitterLines(),
+                                    Targets.SWAY_DRAW_OWNER,
+                                    Targets.EFFECT_JITTER_NAME,
+                                    Targets.SWAY_DRAW_DESCRIPTOR,
+                                    Targets.SWAY_DRAW_TARGET)
+                            : ClassFilePatcher.retargetStaticInvokes(
+                                    classfileBuffer,
+                                    methods,
+                                    Targets.SWAY_DRAW_OWNER,
+                                    Targets.SWAY_DRAW_NAME,
+                                    Targets.SWAY_DRAW_DESCRIPTOR,
+                                    Targets.SWAY_DRAW_TARGET);
         } catch (RuntimeException e) {
             Log.error("failed to rewire " + className + ": " + e);
             return null;
@@ -64,7 +74,7 @@ final class SwayRouteTransformer implements ClassFileTransformer {
         }
 
         if (result == null) {
-            Log.error("no sway draw to rewire in " + className + "; wanted " + methods);
+            Log.error("no sway draw to rewire in " + className);
             return null;
         }
 
@@ -76,11 +86,19 @@ final class SwayRouteTransformer implements ClassFileTransformer {
     /** Targeted classes that were never rewired, in declaration order. */
     java.util.List<String> unseen() {
         java.util.List<String> missing = new java.util.ArrayList<String>();
-        for (String className : targets.keySet()) {
+        for (String className : expected()) {
             if (!patched.contains(className)) {
                 missing.add(className);
             }
         }
         return missing;
+    }
+
+    /** Every class this transformer must see: the sway trio plus the jitter class. */
+    static java.util.Set<String> expected() {
+        java.util.Set<String> classes =
+                new java.util.LinkedHashSet<String>(Targets.swayRewires().keySet());
+        classes.add(Targets.EFFECT_JITTER_CLASS);
+        return classes;
     }
 }

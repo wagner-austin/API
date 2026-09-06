@@ -211,10 +211,58 @@ final class JarChecks {
                         "ok   " + internalName + " [f.d -> SideDraw.d in " + entry.getValue()
                                 + "]  (" + original.length + " -> " + rewired.length + " bytes)");
             }
+            failures += checkJitterRewire(jar, loader);
         } finally {
             jar.close();
         }
         return failures;
+    }
+
+    /**
+     * The line-scoped half of the sway check: rewires the data-driven unit
+     * class's three effect-jitter draws exactly as the live transformer does
+     * -- including the entry point's own refusal when a requested line
+     * matches nothing -- and lets the verifier judge the result.
+     */
+    private static int checkJitterRewire(JarFile jar, PatchingLoader loader)
+            throws java.io.IOException {
+        String internalName = Targets.EFFECT_JITTER_CLASS;
+        java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+        if (classEntry == null) {
+            System.out.println("FAIL " + internalName + ": not present in jar");
+            return 1;
+        }
+        byte[] original = readFully(jar, classEntry);
+        byte[] rewired;
+        try {
+            rewired =
+                    ClassFilePatcher.retargetStaticInvokesAtLines(
+                            original,
+                            Targets.EFFECT_JITTER_METHOD,
+                            Targets.effectJitterLines(),
+                            Targets.SWAY_DRAW_OWNER,
+                            Targets.EFFECT_JITTER_NAME,
+                            Targets.SWAY_DRAW_DESCRIPTOR,
+                            Targets.SWAY_DRAW_TARGET);
+        } catch (ClassFormatError e) {
+            System.out.println("FAIL " + internalName + ": " + e.getMessage());
+            return 1;
+        }
+        if (rewired == null) {
+            System.out.println("FAIL " + internalName + ": no f.c invoke found");
+            return 1;
+        }
+        try {
+            loader.definePatched(internalName.replace('/', '.'), rewired);
+        } catch (LinkageError e) {
+            System.out.println("FAIL " + internalName + ": did not verify: " + e);
+            return 1;
+        }
+        System.out.println(
+                "ok   " + internalName + " [f.c -> SideDraw.c at lines "
+                        + Targets.effectJitterLines() + "]  ("
+                        + original.length + " -> " + rewired.length + " bytes)");
+        return 0;
     }
 
     /**

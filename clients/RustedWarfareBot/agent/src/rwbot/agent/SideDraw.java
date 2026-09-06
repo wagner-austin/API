@@ -59,4 +59,18 @@ public final class SideDraw {
     public static float d(float lo, float hi) {
         return stream.nextFloat() * (hi - lo) + lo;
     }
+
+    /**
+     * The same contract under the engine's other name for it: {@code f.c(FF)F}
+     * and {@code f.d(FF)F} have byte-identical bodies in the pinned jar, and
+     * the retarget reuses the original call's NameAndType, so a rewired
+     * {@code f.c} site can only land on a method NAMED {@code c}.
+     *
+     * @param lo Inclusive lower bound.
+     * @param hi Exclusive upper bound.
+     * @return The draw.
+     */
+    public static float c(float lo, float hi) {
+        return stream.nextFloat() * (hi - lo) + lo;
+    }
 }

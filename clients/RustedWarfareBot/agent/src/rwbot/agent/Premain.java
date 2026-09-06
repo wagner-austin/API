@@ -84,7 +84,7 @@ public final class Premain {
         if (!options.hostRequested()) {
             SwayRouteTransformer swayTransformer = new SwayRouteTransformer();
             instrumentation.addTransformer(swayTransformer);
-            forceLoad(Targets.swayRewires().keySet());
+            forceLoad(SwayRouteTransformer.expected());
             java.util.List<String> unrouted = swayTransformer.unseen();
             if (!unrouted.isEmpty()) {
                 throw new IllegalStateException(
