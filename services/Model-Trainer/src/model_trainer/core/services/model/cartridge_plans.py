@@ -90,6 +90,39 @@ CARTRIDGE_PLANS: Final[dict[str, CartridgePlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # ``gpt2-wiki`` at nine seeds, every other field identical, because the
+    # three-seed run could not resolve its own top two steps: 32->128 and
+    # 128->512 moved by 2.3x and 60% across four kernel-control arms -- more
+    # than their own size -- while 2->8 and 8->32 held to +/-0.001. Those two
+    # steps are the only thing this plan exists to settle.
+    #
+    # THE FIRST THREE SEEDS ARE THE ORIGINAL DRAW, DELIBERATELY. The 7/8/9
+    # subset of this run must reproduce ``gpt2-wiki``'s recorded gains under
+    # the same controls; if it does not, something other than replication
+    # changed and no number here can be read until that is explained.
+    #
+    # READ ITS FLOOR AGAINST ITS OWN ARMS ONLY, NEVER AGAINST gpt2-wiki'S.
+    # ``noise_floor`` is a max over ``max(gains) - min(gains)``, and the
+    # expected RANGE of a sample grows with its size -- sigma*d2(n), with
+    # d2(3)=1.69 against d2(9)=2.97. This plan's floor is therefore ~75%
+    # larger than the three-seed plan's for the same underlying noise, before
+    # any effect of the sweep. That is not a defect in ``noise_floor``: within
+    # one plan every arm shares n, so the maximum range is a fair estimate of
+    # how much one arm of that kind wobbles. It only breaks ACROSS plans with
+    # different seed counts, which is exactly the comparison "just add seeds"
+    # invites. A step's verdict against this plan's floor is a strictly
+    # harsher test than the same step's verdict under gpt2-wiki, and the two
+    # verdicts are not the same measurement.
+    "gpt2-wiki-9seed": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "slot_counts": (2, 8, 32, 128, 512),
+        "composition_slots": 128,
+        "seeds": (7, 8, 9, 10, 11, 12, 13, 14, 15),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
+from platform_core.run_record import Observation
 
 from model_trainer.core.contracts.replicated_measurement import (
     MIN_SEEDS,
@@ -21,6 +22,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     encode_replicated_gain,
     gain_observations,
     noise_floor,
+    per_seed_observations,
     replicate,
     retention,
     separates,
@@ -186,6 +188,69 @@ class TestGainObservations:
             {"name": "slots-8_mean", "value": pytest.approx(0.85)},
             {"name": "slots-8_spread", "value": pytest.approx(0.10)},
         )
+
+
+class TestPerSeedObservations:
+    def test_each_seed_is_named_with_its_own_gain(self) -> None:
+        named = per_seed_observations(_gain("slots-8", (0.80, 0.90, 0.85)))
+
+        assert named == (
+            {"name": "slots-8_seed7_gain", "value": pytest.approx(0.80)},
+            {"name": "slots-8_seed8_gain", "value": pytest.approx(0.90)},
+            {"name": "slots-8_seed9_gain", "value": pytest.approx(0.85)},
+        )
+
+    def test_the_names_pair_across_arms_on_the_seed(self) -> None:
+        """THE PROPERTY THE WHOLE FUNCTION EXISTS FOR, asserted rather than
+        implied by the format string.
+
+        Every arm of a run trains under the same seeds, so one seed's gain at
+        two slot counts are two measurements of ONE draw. A later reader
+        recovers that by matching the seed segment of the name; if the names
+        did not agree the record would carry the numbers and still not permit
+        the paired comparison, which is the state this replaced.
+        """
+        smaller = per_seed_observations(_gain("slots-32", (0.10, 0.20, 0.30)))
+        larger = per_seed_observations(_gain("slots-128", (0.15, 0.35, 0.25)))
+
+        def by_seed(named: tuple[Observation, ...], arm: str) -> dict[str, float]:
+            return {
+                observation["name"].removeprefix(f"{arm}_"): observation["value"]
+                for observation in named
+            }
+
+        assert set(by_seed(smaller, "slots-32")) == set(by_seed(larger, "slots-128"))
+        paired = {
+            key: by_seed(larger, "slots-128")[key] - value
+            for key, value in by_seed(smaller, "slots-32").items()
+        }
+        assert paired == {
+            "seed7_gain": pytest.approx(0.05),
+            "seed8_gain": pytest.approx(0.15),
+            "seed9_gain": pytest.approx(-0.05),
+        }
+
+    def test_a_paired_difference_is_not_recoverable_from_mean_and_spread(self) -> None:
+        """WHY mean+spread WAS NOT ENOUGH, shown rather than argued.
+
+        These two arms have IDENTICAL means and IDENTICAL spreads, so the
+        record as it stood could not tell them apart -- yet their paired
+        differences are +0.2/0.0/-0.2 in one case and 0.0/0.0/0.0 in the
+        other. One of those is an arm that moved every draw; the other did
+        nothing at all.
+        """
+        base = _gain("base", (0.10, 0.20, 0.30))
+        moved = _gain("moved", (0.30, 0.20, 0.10))
+
+        assert base["mean"] == pytest.approx(moved["mean"])
+        assert base["spread"] == pytest.approx(moved["spread"])
+
+        gains = {
+            observation["name"].split("_")[-2]: observation["value"]
+            for observation in per_seed_observations(moved)
+        }
+        assert gains["seed7"] == pytest.approx(0.30)
+        assert gains["seed9"] == pytest.approx(0.10)
 
 
 class TestRoundTrip:

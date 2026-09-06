@@ -61,6 +61,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
     noise_floor,
+    per_seed_observations,
     retention,
     separates,
 )
@@ -237,6 +238,14 @@ def measure_plan(
     observations: list[Observation] = []
     for arm in [untrained, *sweep, alone, composed]:
         observations.extend(gain_observations(arm))
+        # THE PER-SEED GAINS, WITHOUT WHICH THIS RECORD CANNOT ANSWER ITS OWN
+        # HARDEST QUESTION. Every arm runs under the same seeds, so a seed's
+        # gain at 32 slots and at 128 slots are two measurements of one draw
+        # -- and the sweep's top steps are decided by those paired
+        # differences, not by two means with their pairing discarded. The
+        # record carried mean and spread only, so the numbers existed in this
+        # process and were dropped on the way out.
+        observations.extend(per_seed_observations(arm))
     observations.extend(sweep_observations(sweep, sweep_floor))
     observations.append(Observation(name="sweep_noise_floor", value=sweep_floor))
     observations.append(Observation(name="composition_noise_floor", value=composition_floor))

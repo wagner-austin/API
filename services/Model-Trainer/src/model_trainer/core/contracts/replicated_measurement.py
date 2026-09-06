@@ -242,6 +242,43 @@ def retention(alone: ReplicatedGain, combined: ReplicatedGain) -> float:
     return combined["mean"] / alone["mean"]
 
 
+def per_seed_observations(measurement: ReplicatedGain) -> tuple[Observation, ...]:
+    """Name every seed's OWN gain, so the arms stay paired in the record.
+
+    THE MEAN AND THE SPREAD LOSE THE PAIRING, and the pairing is the evidence.
+    Every arm of a run trains under the SAME seeds, so seed 7's 32-slot gain
+    and seed 7's 128-slot gain are two measurements of one draw. Comparing two
+    arms through their means alone throws that away and asks a much weaker
+    question -- and a spread cannot give it back, because a range carries no
+    information about which replicate produced which end of it.
+
+    It matters most exactly where the run is least conclusive. On the
+    ``gpt2-wiki`` plan the top two 4x steps sat inside the spread at three
+    seeds; whether they are real is a question about paired differences, and
+    the record as it stood could not be asked it.
+
+    A RANGE ALSO SCALES WITH THE SEED COUNT -- sigma*d2(n), d2(3)=1.69 against
+    d2(9)=2.97 -- so a plan cannot be made more conclusive simply by adding
+    seeds and re-reading its floor. Per-seed numbers are what let a later
+    reader compute a statistic that does not move with n.
+
+    Emitted as named scalars rather than as a nested array because that is
+    what :class:`~platform_core.run_record.RunRecord` carries: one flat
+    mapping of name to float, sorted at construction. ``arm_seed7_gain`` is
+    both a legal observation name and a key a reader can pair across arms.
+
+    Args:
+        measurement: The arm to name.
+
+    Returns:
+        One observation per seed, named ``<arm>_seed<seed>_gain``.
+    """
+    return tuple(
+        Observation(name=f"{measurement['arm']}_seed{seed}_gain", value=gain)
+        for seed, gain in zip(measurement["seeds"], measurement["gains"], strict=True)
+    )
+
+
 def gain_observations(measurement: ReplicatedGain) -> tuple[Observation, ...]:
     """Name a gain's numbers for a run record.
 
@@ -342,6 +379,7 @@ __all__ = [
     "encode_replicated_gain",
     "gain_observations",
     "noise_floor",
+    "per_seed_observations",
     "replicate",
     "retention",
     "separates",
