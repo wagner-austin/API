@@ -95,3 +95,18 @@ test:
 # command rebuilt every virtualenv in the monorepo to answer a question about
 # one project, so it was too slow to actually be run. Run `make check` inside
 # the project you changed.
+
+# ---------------------------------------------------------------------------
+# Git hooks: point this clone at the versioned .githooks directory
+# ---------------------------------------------------------------------------
+# `core.hooksPath` is LOCAL config and cannot be committed, so a fresh clone
+# runs no hooks until this is done once. That is the one weakness of the hook
+# route and it is stated rather than hidden: `check-hooks` reports the clone's
+# actual setting, so "we have a pre-commit hook" is verifiable instead of
+# assumed.
+install-hooks:
+	git config core.hooksPath .githooks
+	Write-Host "core.hooksPath = $$(git config --get core.hooksPath)" -ForegroundColor Green
+
+check-hooks:
+	$$configured = git config --get core.hooksPath; if ($$configured -eq ".githooks") { Write-Host "hooks installed: core.hooksPath = $$configured" -ForegroundColor Green } else { Write-Host "hooks NOT installed. This clone runs no pre-commit checks; the shared-index sweep is unguarded here. Run: make install-hooks" -ForegroundColor Red; exit 1 }

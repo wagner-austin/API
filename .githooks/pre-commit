@@ -1,0 +1,48 @@
+#!/bin/sh
+# Refuse a commit carrying staged paths its author did not declare.
+#
+# THE INDEX IS SHARED AND `git commit` TAKES ALL OF IT. `git add <path>`
+# protects the ADD, not the COMMIT, so anything another session stages
+# between one and the other ships under your message and your authorship.
+# Measured twice in three hours on 2026-09-04/05: 9d945451 swept another
+# session's staged deletions, and 09d2a04b did the same through --amend.
+#
+# Declare what is yours and a sweep is refused:
+#
+#   COMMIT_SCOPE="tools/commit-scope,libs/platform_core" git commit -m "..."
+#
+# Declare nothing and the staged set is printed and the commit proceeds --
+# a narrowing, not a close. `git commit -- <paths>` is git's native close,
+# and it does not save an --amend.
+#
+# THE LOGIC IS NOT IN THIS FILE, deliberately. Everything decidable lives in
+# tools/commit-scope, with its own guards, mypy, and tests at 100% coverage.
+# This hook is the invoker, and the only thing that can be wrong here is
+# which interpreter runs it -- which is why the resolution below is explicit
+# rather than clever.
+#
+# INSTALLED PER CLONE: `git config core.hooksPath .githooks`, or
+# `make install-hooks` from the repository root. git's hooksPath is local
+# config and cannot be committed, so a fresh clone runs no hooks until that
+# is done once. `make check-hooks` reports whether this clone has it.
+
+set -eu
+
+REPO="$(git rev-parse --show-toplevel)"
+TOOL="$REPO/tools/commit-scope"
+
+# Prefer the tool's own virtualenv: it is the interpreter its suite ran
+# against, so a green `make check` in that package is evidence about THIS
+# invocation. Fall back to whatever `python` is on PATH only when the venv
+# has not been created -- the package's only dependency is platform_core,
+# which is why that fallback can work at all.
+if [ -x "$TOOL/.venv/Scripts/python.exe" ]; then
+    PYTHON="$TOOL/.venv/Scripts/python.exe"
+elif [ -x "$TOOL/.venv/bin/python" ]; then
+    PYTHON="$TOOL/.venv/bin/python"
+else
+    PYTHON=python
+fi
+
+PYTHONPATH="$TOOL/src:$REPO/libs/platform_core/src${PYTHONPATH:+:$PYTHONPATH}" \
+    "$PYTHON" -m commit_scope.cli.check

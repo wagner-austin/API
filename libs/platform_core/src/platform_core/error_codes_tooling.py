@@ -284,6 +284,42 @@ class BoardWatchErrorCode(ErrorCodeBase):
     FOOTER_MALFORMED = "FOOTER_MALFORMED"
 
 
+class CommitScopeErrorCode(ErrorCodeBase):
+    """Checking that a commit carries only the paths its author declared.
+
+    The git index is shared mutable state with no lock, and ``git commit``
+    takes ALL of it -- so anything another session stages between your ``git
+    add`` and your ``git commit`` ships under your message and your
+    authorship. Measured twice in three hours on 2026-09-04/05: ``9d945451``
+    swept another session's staged deletions, and ``09d2a04b`` did the same
+    through ``--amend``.
+
+    These codes cover only what can FAIL, which is a smaller set than what
+    can be REFUSED. A commit carrying undeclared paths is a decision this
+    package returns, not an exception it raises -- the caller is a git hook
+    and its answer is an exit code. What raises is the environment being
+    unable to answer the question at all.
+
+    Same discipline as its siblings: no generic member. A code that covers
+    everything identifies nothing.
+    """
+
+    # The two ways git itself cannot answer. Separate members because the
+    # operator fixes them in different places: one is a broken or absent git,
+    # the other is running the hook somewhere that is not a work tree.
+    GIT_INDEX_UNREADABLE = "GIT_INDEX_UNREADABLE"
+    GIT_REPO_ROOT_UNRESOLVED = "GIT_REPO_ROOT_UNRESOLVED"
+
+    # The two ways a DECLARATION cannot mean anything, both of which would
+    # otherwise fail open. git reports staged paths repo-relative with forward
+    # slashes, so an absolute entry and an entry climbing out of the tree can
+    # never match one -- and an entry that matches nothing silently widens
+    # nothing while looking like protection. Refusing at decode is the only
+    # point where the author is still present to fix it.
+    SCOPE_ENTRY_NOT_RELATIVE = "SCOPE_ENTRY_NOT_RELATIVE"
+    SCOPE_ENTRY_ESCAPES_REPO = "SCOPE_ENTRY_ESCAPES_REPO"
+
+
 class BoardBridgeErrorCode(ErrorCodeBase):
     """What ANY bridge announcing terminal work on the board can get wrong.
 
