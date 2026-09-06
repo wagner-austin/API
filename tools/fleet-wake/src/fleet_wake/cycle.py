@@ -28,12 +28,12 @@ from board_watch.config import load_credentials
 from fleet.cli._config import LoadedWorkspace
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import records
+from platform_core.board import post_to_task
 from platform_core.json_utils import load_json_str
 
 from fleet_wake import _test_hooks
 from fleet_wake.announce import announcements, terminal_unannounced
-from fleet_wake.board import post_announcement
-from fleet_wake.identity import load_task_id
+from fleet_wake.identity import IDENTITY, load_task_id
 from fleet_wake.position import AnnouncedRun, append_announced, position_path, read_announced
 
 
@@ -66,7 +66,19 @@ def run_cycle(loaded: LoadedWorkspace) -> None:
         return
 
     for announcement in announcements(fresh):
-        post_announcement(credentials, task_id, announcement)
+        # CALLED DIRECTLY, WITH NO PACKAGE-LOCAL post_announcement IN FRONT OF
+        # IT. There was one, and it did nothing but bind this package's HTTP
+        # seam and identity into this same call from a single call site --
+        # which is a wrapper, not a boundary. The two constants it bound are
+        # right here and read as what they are.
+        post_to_task(
+            _test_hooks.http_post,
+            credentials,
+            IDENTITY,
+            task_id=task_id,
+            kind="note",
+            body=announcement["body"],
+        )
         _test_hooks.emit(f"posted {announcement['project']}: tagged @{announcement['agent']}")
 
     at = _test_hooks.now()

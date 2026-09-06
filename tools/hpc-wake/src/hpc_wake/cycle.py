@@ -28,11 +28,11 @@ from hpc3.core import ledger
 from hpc3.core.remote import run_remote_batched
 from hpc3.core.status import parse_sacct_output, sacct_commands
 from hpc3.core.triage import closures_for, open_entries
+from platform_core.board import post_to_task
 
 from hpc_wake import _test_hooks
 from hpc_wake.announce import announcements
-from hpc_wake.board import post_announcement
-from hpc_wake.identity import load_task_id
+from hpc_wake.identity import IDENTITY, load_task_id
 
 
 def run_cycle(connection: WorkspaceConnection, cluster: ClusterFacts) -> None:
@@ -82,7 +82,20 @@ def run_cycle(connection: WorkspaceConnection, cluster: ClusterFacts) -> None:
 
     entries_by_id: dict[str, LedgerEntry] = {entry["job_id"]: entry for entry in entries}
     for announcement in announcements(fresh, entries_by_id):
-        post_announcement(credentials, task_id, announcement)
+        # CALLED DIRECTLY. Until the 2026-09-06 lift this package's board.py
+        # held the argument-building and the transport call, and was a real
+        # module; moving that into platform_core.board left it binding two
+        # local constants into one call from one call site, which is a
+        # wrapper. Deleted rather than kept for symmetry with a sibling that
+        # had the same husk for the same reason.
+        post_to_task(
+            _test_hooks.http_post,
+            credentials,
+            IDENTITY,
+            task_id=task_id,
+            kind="note",
+            body=announcement["body"],
+        )
         _test_hooks.emit(
             f"posted {announcement['project']}: "
             + (

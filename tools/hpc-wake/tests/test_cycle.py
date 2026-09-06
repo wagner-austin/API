@@ -18,7 +18,7 @@ from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
 from hpc_wake import _test_hooks
 from hpc_wake.announce import MARKER
 from hpc_wake.cycle import run_cycle
-from tests.conftest import CONFIGURED_ENV, FakeRun, pin_env
+from tests.conftest import CONFIGURED_ENV, TASK_ID, FakeRun, pin_env
 
 
 def _connection(tmp_path: pathlib.Path) -> WorkspaceConnection:
@@ -168,7 +168,20 @@ class TestAnnouncingCycles:
 
         run_cycle(_connection(tmp_path), HPC3)
 
-        body = require_str(sent_arguments(fake_http.bodies[0]), "body")
+        arguments = sent_arguments(fake_http.bodies[0])
+        # THE IDENTITY BINDING, asserted here since board.py was deleted.
+        # That module existed to bind these two constants into the call and
+        # was a wrapper doing nothing else; the binding itself is still worth
+        # pinning, because posting under the wrong label is refused by the
+        # board permanently and posting under the wrong cwd silently rewrites
+        # this bridge's audit trail.
+        assert arguments["agent"] == "bridge-hpc-wake-0906"
+        assert arguments["sessionId"] == "b6048b2e-2e32-5247-a488-7b4ccc35f2cc"
+        assert arguments["cwd"] == "service://hpc-wake"
+        assert arguments["taskId"] == TASK_ID
+        assert arguments["kind"] == "note"
+
+        body = require_str(arguments, "body")
         assert body.startswith(f"{MARKER} abl: 1 job(s) ended (COMPLETED x1)")
         assert "101 abl.job-101 COMPLETED 4688s" in body
         assert "@label-a-0906" in body
