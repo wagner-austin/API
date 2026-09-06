@@ -228,6 +228,19 @@ citation checkable at all.
   anything deserialized from an external source. Enforced by
   `dataclass_ban_segments`.
 - **Strict typing**: no `Any`, no `cast`, no `type: ignore`, no `.pyi`.
+- **The git index is SHARED, and `git commit` takes all of it.** `git add
+  <path>` protects the ADD, not the COMMIT — anything another session stages
+  between your add and your commit ships under your message and authorship.
+  Measured twice in three hours on 2026-09-04/05 (`9d945451` here,
+  `09d2a04b` in MCPs), both by sessions already following the explicit-path
+  rule. Commit as `COMMIT_SCOPE="<your paths>" git commit …` and the
+  pre-commit hook REFUSES anything outside it; undeclared commits print a
+  receipt of what is about to ship, which narrows rather than closes.
+  `git commit -- <paths>` is git's native close. **Never `--amend` in this
+  tree** — amend takes the index too, and `--only` rebases the named paths
+  onto a commit that already swept the rest; a junk follow-up commit is
+  cheaper, measured twice. Hooks are per-clone: `make install-hooks` once,
+  `make check-hooks` to verify. (`tools/commit-scope`, board task `757e67e6`)
 - **100% statement + branch coverage.** A task is not done until green
   `make check` output is in the conversation.
 - Fleet: `make infra`, then `make up-<service>`. `make status`, `make logs`.
