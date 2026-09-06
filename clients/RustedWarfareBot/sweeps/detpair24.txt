@@ -1,0 +1,31 @@
+# The determinism probe: two byte-identical doctrines (name aside) on
+# 12 shared fresh seeds at Impossible. The paired survival delta's
+# distribution IS the harness noise floor -- if play is deterministic
+# it reads exactly zero, and evolve5's +614 same-mix finale says it
+# will not. Seeds 8771001-8775577, difficulty 3.
+#
+# label | seed | doctrine | samples
+stand|8771001|doctrines/evolve3-g3m10.doctrine|10000
+twin|8771001|doctrines/det-twin.doctrine|10000
+stand|8771417|doctrines/evolve3-g3m10.doctrine|10000
+twin|8771417|doctrines/det-twin.doctrine|10000
+stand|8771833|doctrines/evolve3-g3m10.doctrine|10000
+twin|8771833|doctrines/det-twin.doctrine|10000
+stand|8772249|doctrines/evolve3-g3m10.doctrine|10000
+twin|8772249|doctrines/det-twin.doctrine|10000
+stand|8772665|doctrines/evolve3-g3m10.doctrine|10000
+twin|8772665|doctrines/det-twin.doctrine|10000
+stand|8773081|doctrines/evolve3-g3m10.doctrine|10000
+twin|8773081|doctrines/det-twin.doctrine|10000
+stand|8773497|doctrines/evolve3-g3m10.doctrine|10000
+twin|8773497|doctrines/det-twin.doctrine|10000
+stand|8773913|doctrines/evolve3-g3m10.doctrine|10000
+twin|8773913|doctrines/det-twin.doctrine|10000
+stand|8774329|doctrines/evolve3-g3m10.doctrine|10000
+twin|8774329|doctrines/det-twin.doctrine|10000
+stand|8774745|doctrines/evolve3-g3m10.doctrine|10000
+twin|8774745|doctrines/det-twin.doctrine|10000
+stand|8775161|doctrines/evolve3-g3m10.doctrine|10000
+twin|8775161|doctrines/det-twin.doctrine|10000
+stand|8775577|doctrines/evolve3-g3m10.doctrine|10000
+twin|8775577|doctrines/det-twin.doctrine|10000
