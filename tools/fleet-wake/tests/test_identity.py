@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 import pytest
-from platform_core.error_codes import BoardBridgeErrorCode
+from platform_core.error_codes_tooling import BoardBridgeErrorCode
 from platform_core.errors import AppError
 
 from fleet_wake.identity import BRIDGE_AGENT, IDENTITY, TASK_ID_VARIABLE, load_task_id

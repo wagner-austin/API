@@ -9,7 +9,7 @@ watcher that parses nothing and reports quiet.
 from __future__ import annotations
 
 import pytest
-from platform_core.error_codes import BoardWatchErrorCode
+from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError
 
 from board_watch.contracts import (

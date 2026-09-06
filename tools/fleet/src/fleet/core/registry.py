@@ -38,7 +38,7 @@ from __future__ import annotations
 import pathlib
 from typing import TypedDict
 
-from platform_core.error_codes import FleetErrorCode
+from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import (
     JSONValue,

@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 from typing import Final, TypedDict
 
-from platform_core.error_codes import BoardWatchErrorCode
+from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError
 
 #: One event row, as ``encodeAgentTaskEventLine`` renders it.

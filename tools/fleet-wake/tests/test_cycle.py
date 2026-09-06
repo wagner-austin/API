@@ -21,7 +21,7 @@ import pathlib
 import pytest
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.core import records
-from platform_core.error_codes import BoardBridgeErrorCode, McpClientErrorCode
+from platform_core.error_codes_tooling import BoardBridgeErrorCode, McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, dump_json_str, require_str
 from platform_core.mcp_client import McpHttpResponse

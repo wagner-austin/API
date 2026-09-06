@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Final, Literal
 
-from platform_core.error_codes import FleetErrorCode
+from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from typing_extensions import TypedDict

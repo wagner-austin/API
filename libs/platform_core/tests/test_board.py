@@ -23,7 +23,7 @@ from platform_core.board import (
     require_task_id,
     service_identity,
 )
-from platform_core.error_codes import BoardBridgeErrorCode, McpClientErrorCode
+from platform_core.error_codes_tooling import BoardBridgeErrorCode, McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpHttpResponse
 from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments

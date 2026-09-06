@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from platform_core.error_codes import FleetErrorCode
+from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.mcp_client import McpCredentials, call_mcp_tool

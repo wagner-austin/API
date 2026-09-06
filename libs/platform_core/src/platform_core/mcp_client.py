@@ -36,7 +36,7 @@ import http.client
 import urllib.request
 from typing import Final, Protocol, TypedDict
 
-from platform_core.error_codes import McpClientErrorCode
+from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import (
     JSONObject,

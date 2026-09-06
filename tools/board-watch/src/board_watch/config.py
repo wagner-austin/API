@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from platform_core.error_codes import BoardWatchErrorCode
+from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials
 

@@ -9,7 +9,7 @@ from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.workspace import WorkspaceConnection, decode_workspace_connection
 from hpc3.core import ledger
-from platform_core.error_codes import McpClientErrorCode
+from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, require_str
 from platform_core.mcp_client import McpHttpResponse

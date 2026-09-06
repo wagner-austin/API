@@ -43,7 +43,7 @@ from __future__ import annotations
 import uuid
 from typing import Final, TypedDict
 
-from platform_core.error_codes import BoardBridgeErrorCode
+from platform_core.error_codes_tooling import BoardBridgeErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.mcp_client import McpCredentials, McpPostProtocol, call_mcp_tool

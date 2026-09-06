@@ -7,7 +7,7 @@ import runpy
 import sys
 
 import pytest
-from platform_core.error_codes import BoardWatchErrorCode
+from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError
 
 from board_watch import _test_hooks

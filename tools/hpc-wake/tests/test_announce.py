@@ -6,7 +6,7 @@ import pytest
 from hpc3.contracts.closure import Closure
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.status import JobState
-from platform_core.error_codes import HpcWakeErrorCode
+from platform_core.error_codes_tooling import HpcWakeErrorCode
 from platform_core.errors import AppError
 
 from hpc_wake.announce import LINE_CAP, MARKER, announcements

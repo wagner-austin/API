@@ -27,13 +27,12 @@ from platform_core.error_codes import (
     EmailErrorCode,
     ErrorCode,
     ErrorCodeBase,
-    FleetErrorCode,
     HandwritingErrorCode,
-    Hpc3ErrorCode,
     ModelTrainerErrorCode,
     OAuthErrorCode,
     TranscriptErrorCode,
 )
+from platform_core.error_codes_tooling import FleetErrorCode, Hpc3ErrorCode
 
 ErrorCodeType = TypeVar("ErrorCodeType", bound=ErrorCodeBase)
 

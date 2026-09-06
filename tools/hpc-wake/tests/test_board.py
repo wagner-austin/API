@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.error_codes import McpClientErrorCode
+from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpHttpResponse
 from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
