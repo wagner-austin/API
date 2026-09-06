@@ -1,0 +1,35 @@
+{
+  "project": "mi",
+  "name": "cartridge-medium-content-lora-v100-v40-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v40/abl.sif",
+    "sha256": "798d234aa50a2e7750bf04ee7815007381e18856d9ddcb5f6af121fa06ea8018",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 300,
+  "mem_gb": 32,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_content_lora_sweep --plan gpt2-medium-content-lora --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --pool-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-medium-content-lora-v100-v40-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-medium-content-lora-v100-v40-twin.json",
+  "experiment": {
+    "measurement": "cartridge-content-lora-composition",
+    "plan": "gpt2-medium-content-lora",
+    "base_model": "gpt2-medium",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "pool_corpora": "epi.metabolomics.atmospheric-chemistry",
+    "seeds": "7.8.9",
+    "image_commit": "7288bc8f18a59372892f5a11650c31f122ce0361",
+    "baseline_record": "372cee59",
+    "medium_lora_diverse_n4_retention": "0.593",
+    "medium_lora_diverse_n8_retention": "-0.794",
+    "medium_n8_content_gap": "1.04",
+    "why": "bit-identity-certificate-for-55801429"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}

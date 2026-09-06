@@ -385,6 +385,54 @@ arm prices the LoRA itself.
   under the stacked recipe; the 7B rung once a content-at-depth lever
   exists.
 
+#### `cartridge_content_lora_sweep` — crowd-invariance distillation closes the content gap at depth
+
+The content lever the previous subsection filed, run the same day (board
+task `a85fbabe`, operator-directed). The LM objective cannot close the
+content gap even in principle — it rewards reading past a crowd's
+SHAPE, not ignoring what the crowd SAYS — so the lever changes the
+objective and nothing else: same LoRA, same pool, same grid, same seeds,
+plan rows pinned equal to `gpt2-medium-base-lora` field for field by
+test and by image smoke.
+
+- **The objective** (`cartridge_content_lora.py`, commit `7288bc8f`):
+  per step, draw a roster of frozen pool cartridges and a TARGET member,
+  take the window from the target's own corpus, and minimise the KL from
+  the plain base's predictions behind the target ALONE to the adapted
+  base's predictions behind the full roster. The target is drawn over
+  every roster position (no positional shortcut; every compartment stays
+  live, matching serving semantics) and counts draw 1..8 (a count of one
+  distils "the LoRA does not disturb the alone case"). Teacher is a
+  second frozen base instance — PEFT injects adapters into the wrapped
+  module tree, so one loaded base cannot play both roles.
+- **Result, measured 2026-09-06 on HPC3** (job 55801429, V100, 103 min,
+  image v40 `798d234a…` from `7288bc8f`, run document
+  `tools/hpc3/runs/cartridge-medium-content-lora-v100-v40{,-twin}.json`,
+  record sha256 `9abd901a…`; twin 55801941 submitted for the
+  certificate): **the depth collapse is repaired, and then some.**
+  Diverse n8 at medium: composed +0.3090 against alone +0.8113 —
+  **+38.1% retention where the LM objective recorded −79.4%**, clearing
+  the 0.1625 family floor by 1.9× and BEATING gpt2-small's own best n8
+  (+33.3%). Diverse n4 sets the program record at **+63.2%** (was
+  +59.3%). Plain cartridges flip positive at both counts (n4 −11.5% →
+  +30.1%, n8 −48.4% → +15.8%). The content gap — composed below its own
+  noise-composition control — shrinks from **1.04 to 0.30** at n8. And
+  the alone arms RISE (+0.8503/+0.8113 vs +0.8058/+0.7817): the
+  invariance objective is free at solo, as the count-1 anchor was built
+  to guarantee. KL converged 290 → 153 → 129 over three epochs;
+  companion-cross stays negative (no leakage).
+- **What this settles for the serving design:** with crowd-invariance
+  distillation on the base, EIGHT simultaneous compartments are
+  deliverable at depth (+38.1%), and four compartments at +63.2% is the
+  best cell the program has produced on any base. The ≤4 scope router
+  for deep bases is no longer forced by the measurements. The two
+  named interference mechanisms — structural and content — now each
+  have a working lever, and both levers live base-side.
+- **Open, filed rather than implied:** the gpt2-small rung under the
+  same objective (cross-scale anchor; plan row `gpt2-content-lora`
+  already certified equal to its twin); the remaining 0.30 gap at n8;
+  the 7B rung, now unblocked by measurement.
+
 ### `mi-cu128` — the Blackwell determinism baseline
 
 Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
