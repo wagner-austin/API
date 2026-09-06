@@ -15,14 +15,14 @@ source_paths:
   - "wiki/sources/m17-movement/reachability.txt"
   - "wiki/sources/m6-wire/world-sample.ndjson"
   - "src/rw_bot/policy/build_order.py"
-  - "src/rw_bot/policy/siting.py:355"
-  - "src/rw_bot/policy/siting.py:466"
+  - "src/rw_bot/policy/siting.py:360"
+  - "src/rw_bot/policy/siting.py:482"
 source_git_blobs:
   "wiki/sources/m16-enums/enum-names.txt": "919c505b3f4d41a4c8dc599a37653ddbfb4e5e1e"
   "wiki/sources/m17-movement/reachability.txt": "6e1637370797ebac09c7e3f6429318c57a99ed67"
   "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
-  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
+  "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03
 confidence: high

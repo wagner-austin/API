@@ -16,9 +16,9 @@ source_paths:
   - "agent/src/rwbot/agent/Orders.java"
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
-  - "src/rw_bot/policy/campaign.py:305"
-  - "src/rw_bot/policy/dispatching.py:304"
-  - "src/rw_bot/policy/match_report.py:68"
+  - "src/rw_bot/policy/campaign.py:310"
+  - "src/rw_bot/policy/dispatching.py:337"
+  - "src/rw_bot/policy/match_report.py:71"
 source_git_blobs:
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
   "wiki/sources/m15-production/sustained-run.log": "259d966dc1a8164be5252977c78bda56dd0a38c5"
@@ -28,9 +28,9 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "8afff52d08a953cafe435d3543c337652cab3f47"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "cb6a4ed7e6df2f29fba64b2b7da17c955e4f74ce"
-  "src/rw_bot/policy/dispatching.py": "c612a63cd632775bc0dd90ca7daed06a09327cb3"
-  "src/rw_bot/policy/match_report.py": "d5ece8f39080b2e4869eea62b40b8492b0f7fe96"
+  "src/rw_bot/policy/campaign.py": "85a4a357c27a4fbc90a1d35fb39a18bfa380c96f"
+  "src/rw_bot/policy/dispatching.py": "bc9178f263566abf5bdb21cfc85b051be0ca094c"
+  "src/rw_bot/policy/match_report.py": "72a04db3c287bdd73bb58daade2ac5321ed8e74d"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03
 confidence: high

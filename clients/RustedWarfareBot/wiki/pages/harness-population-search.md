@@ -11,7 +11,7 @@ source_paths:
   - "src/rw_bot/policy/situation.py"
 source_git_blobs:
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/doctrine.py": "4a5a782f08dfc8638bc3b79bc3ba994f5bb24245"
+  "src/rw_bot/policy/doctrine.py": "471ca3f7b0437a3037f6c1f8d1aab71c76340fbd"
   "src/rw_bot/policy/situation.py": "4cf16f1d98b8bbe2e1f3611935f872b196533543"
 provenance:
   - "wiki/log.md 2026-08-07 'the arm ladder' — the wiki's own journal, kept as provenance rather than as a source_path: SCHEMA bans citing this wiki as evidence for a claim, and log.md is append-only so a pin on it would drift on every wiki operation"
@@ -106,7 +106,14 @@ construction, and only untouched-seed panels adopt.
   composition read ZERO wins and +0.21 margin at Impossible
   (g4m2imp48), the third composition wash at that rung -- so evolving
   the army simplex there would spend larger generations measuring a
-  dimension already known flat. What remains for learning at
+  dimension already known flat. SUPERSEDED AGAIN (2026-09-06), in both
+  directions: the simplex was flat under MARGIN fitness, and the first
+  run under SURVIVAL fitness (the `fitness` spec field, `batch_survivals`)
+  found +510.6 paired standing samples in it at t=4.20, replicated and
+  ADOPTED (evolve3-g3m10) -- the dimension was not flat, the objective
+  was wrong. Then evolve4 and evolve5 exhausted it: the graduate's best
+  neighbor is itself, and the finale's +614 was the harness noise floor
+  read as fitness ([[policy-determinism]]). What remains for learning at
   Impossible is the original plan's step three, the corpus-trained
   heads: policy above the doctrine vocabulary, not better points
   within it ([[impossible-economy-problem]] carries the closed-roads

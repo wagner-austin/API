@@ -12,7 +12,7 @@ source_paths:
   - "scripts/margin.py"
   - "scripts/search.py"
 source_git_blobs:
-  "src/rw_bot/harness/margin.py": "11a9f454ce79405a6494e7d2dd72485cf89eef58"
+  "src/rw_bot/harness/margin.py": "28d7eed62b38823d4892d67d7303d5f264106714"
   "src/rw_bot/harness/search.py": "01e1923a6b6e2f0f5f565dd38d5491960323db90"
   "scripts/margin.py": "1b40454709d859c785bded3e3337b0ed06438736"
   "scripts/search.py": "344576525bb482cbf8b8effd2cf755538665ea1b"

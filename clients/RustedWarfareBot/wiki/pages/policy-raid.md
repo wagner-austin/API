@@ -8,8 +8,10 @@ related:
   - "[[community-play-strategies]]"
 source_paths:
   - "src/rw_bot/policy/raid.py"
+  - "src/rw_bot/policy/party.py"
 source_git_blobs:
-  "src/rw_bot/policy/raid.py": "4d6240b22965277824d1476c7dc8957b0310e74f"
+  "src/rw_bot/policy/raid.py": "1b3d826a823ce7e5907dfab11976d5fc75420c4f"
+  "src/rw_bot/policy/party.py": "8015a8aa7edc445b5ca227391003e7cf1b5a211f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
@@ -74,7 +76,10 @@ army could *spare* a party.
 Three rules: **a party or nothing** — survivors below strength disband and
 attack-move home, and only a full party is ever drafted; **drafted whole,
 from the gathered** — recruits come from inside the rally radius of the
-anchor, so a party starts together the way a wave does; and **surplus only**
+anchor, so a party starts together the way a wave does (the draft and the
+homeward walk were lifted to `policy/party.py` on 2026-09-05 when the hunt
+adopted the same discipline; the rules here are unchanged, shared rather
+than copied); and **surplus only**
 — the draft is gated on the army exceeding the current wave rung's need plus
 the party size (`WaveController.need()`), judged in the campaign where the
 withholding already lives. A `marches` report line rides along, because the

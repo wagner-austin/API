@@ -11,7 +11,7 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1189"
 source_git_blobs:
   "src/rw_bot/policy/guard.py": "3dacb9802da4a42ad8c8593bc97b26a5aaedcdbb"
-  "src/rw_bot/policy/dispatch.py": "00de7ee6898666e0459d7bf2d822d368b61dba7d"
+  "src/rw_bot/policy/dispatch.py": "e49fe0bb5793f60a67e587a35739ef44eeaf0f84"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

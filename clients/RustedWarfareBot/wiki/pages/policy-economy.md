@@ -16,7 +16,7 @@ source_paths:
   - ".game/assets/units/extractor/extractor.ini"
   - ".game/assets/units/fabricator/fabricatorT1.ini"
   - "src/rw_bot/policy/economy.py:221"
-  - "src/rw_bot/policy/siting.py:355"
+  - "src/rw_bot/policy/siting.py:360"
   - "src/rw_bot/policy/ledger.py"
   - "wiki/sources/m28-holding/diag-post-worker-fix.ndjson"
   - "src/rw_bot/mechanics/income.py"
@@ -26,8 +26,8 @@ source_git_blobs:
   "wiki/sources/m19-income/income-windows.ndjson": "6ac6751249e68b8f8c162c80da456c1a9c8d656b"
   "wiki/sources/m19-income/economy-run.txt": "c97cf41d0a9cb028f2efd76a96d1de5178281271"
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
-  "src/rw_bot/policy/economy.py": "90e570f62b5b7abc44386179d53d94ff70b4b1e8"
-  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
+  "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
+  "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
   "src/rw_bot/policy/ledger.py": "20d0641969fd6c7f69e9f469270f3294752ea7c3"
   "wiki/sources/m28-holding/diag-post-worker-fix.ndjson": "f294e4c69824a7661d702a2bc66aa33bd9d395f6"
   "src/rw_bot/mechanics/income.py": "a5cb0fdc641c0aa91be35b5a906f27f2335443e7"
@@ -81,6 +81,12 @@ The upgrade chain is real — an `extractorT1` lists `extractorT2` as a build ed
 A new T1 extractor is **four times** more credit-efficient than upgrading one and **twelve and a half times** more efficient than a fabricator.
 
 This reading is not imposed on the data. It is how the game's own authors annotated the files: `#price per credit: $87` in `extractor.ini`, `#price per credit: $800 (+10)` beside the overclocked upgrade, `#price per credit: $1100` in `fabricatorT1.ini`.[^3] Those are exactly the marginal figures above.
+
+Measured at Impossible 2026-09-06 (impincome96, 48 pairs, log entry of
+that date): forcing the T2→T3 conversion to fund via the income_ladder
+saving rule fired in every match and read paired survival −201 (sd 878)
+— the 500-second payback does not fit a ~790-second median match, so
+the table's warning holds under fire, not just in the ledger.
 
 So the rule is: **take every free pool before upgrading anything, and never build a fabricator while a pool is free.** Upgrades and fabricators are what you buy when the map runs out — the fabricator's whole value is that it needs no pool.
 

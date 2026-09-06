@@ -18,8 +18,8 @@ source_paths:
   - "src/rw_bot/policy/threat.py"
   - "src/rw_bot/policy/build_order.py"
   - "src/rw_bot/policy/siting.py:329"
-  - "src/rw_bot/policy/siting.py:355"
-  - "src/rw_bot/policy/siting.py:534"
+  - "src/rw_bot/policy/siting.py:360"
+  - "src/rw_bot/policy/siting.py:550"
   - "agent/src/rwbot/agent/Perception.java"
 source_git_blobs:
   "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
@@ -27,7 +27,7 @@ source_git_blobs:
   "wiki/sources/m18-reach/attack-range.txt": "473274e62d337bdad4342210f921112b2c1cd72c"
   "src/rw_bot/policy/threat.py": "0c81fc3abc464da9e16197c55cd718f450ea2ff9"
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
-  "src/rw_bot/policy/siting.py": "ecd32e7a48b295da6e276f66497cccb0b40bc4d1"
+  "src/rw_bot/policy/siting.py": "82023004583aac091037280e8f864070c317f6b8"
   "agent/src/rwbot/agent/Perception.java": "78629ad554596a6fd28fbd245c37a57a6b1e4743"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03

@@ -13,8 +13,8 @@ source_paths:
   - "src/rw_bot/harness/results_layout.py:106"
   - "runs/traces"
 source_git_blobs:
-  "src/rw_bot/policy/trace.py": "18789b61934efeb623eb921215cba4e6f53c60fa"
-  "src/rw_bot/policy/recorder.py": "274d44e2c5b1176069c6720defaee018ed6afb5b"
+  "src/rw_bot/policy/trace.py": "1494fc9ecdde3c89c833f0046faef92b0ac817d7"
+  "src/rw_bot/policy/recorder.py": "888a0a116b5c9cd4bcc87899509566d3a7bda650"
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
   "src/rw_bot/harness/results_layout.py": "bf31143781274b48e5f24bc1dffc6fcdfd372879"
 game_version: "1.15 (code 176, build #28)"
@@ -42,7 +42,15 @@ the coverage trio 2026-08-15 -- `eco_covered`, `own_covered`,
 `foe_covered`: how much of each side stands inside the other's guns per
 sample, the spatial layer's first recorded slice (`rw_bot/policy/field.py`,
 log 2026-08-15). This answers *where the guns are*, which no count or
-rate before it carried.
+rate before it carried. `rival_army` appended 2026-09-03 after
+`foe_covered`, per the same appendix rule: the strongest surviving
+hostile's ARMY value -- the exact figure the momentum window reads, as
+distinct from `rival`, which is worth and understates army drops
+whenever buildings grow through a wave's death; zero means "no
+scoreboard this sample" and a drop reader must skip zeros exactly as
+Momentum does. The `events` letter vocabulary has grown with the
+verbs: `B` (the brace armed) and `H` (the hunt took a new objective)
+joined 2026-09-04/05 beside the original codes.
 
 **Per loss** — the unit, its type, and where it was standing when last seen. This answers *where*, which is what separates "dying on the walk home" from "dying at the enemy front".
 

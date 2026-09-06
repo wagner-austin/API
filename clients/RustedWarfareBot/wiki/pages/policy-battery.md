@@ -16,6 +16,10 @@ source_paths:
   - "src/rw_bot/policy/quartermaster.py"
   - "src/rw_bot/policy/convert.py"
 source_git_blobs:
+  "wiki/sources/m28-battery/probe-run.txt": "f0e0b4a64cdff10338594e0fc2fa86ff8d120d81"
+  "wiki/sources/m28-battery/pilot1-card.txt": "de49930043de65818d21bf177d9c82ce84ae70f7"
+  "wiki/sources/m28-battery/pilot5-card.txt": "ab3098e4d2045d9fe4e793d539b204e58f2cc52d"
+  "wiki/sources/m28-battery/pilot7-card.txt": "fb2a884c2b247ed33522d33d6b8d80762234c4ee"
   "src/rw_bot/policy/battery.py": "0b647333fa48f5f7694bddf0fc1dff41452bccfc"
   "src/rw_bot/policy/quartermaster.py": "2e82e5dc22e984e1096bad96dacfc2a4aaab86d0"
   "src/rw_bot/policy/convert.py": "6930c93a62cba09ebade77e6cbfa17516831ee8b"
