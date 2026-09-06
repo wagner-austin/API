@@ -289,6 +289,76 @@ class TestProvenance:
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
         assert run_wiki_rules(tmp_path) == 0
 
+    def test_vanished_gitignored_source_is_a_runtime_artifact(self, tmp_path: Path) -> None:
+        """A missing entry under a gitignored directory passes.
+
+        A capture session under ``runs/`` exists only on the box that
+        captured it — git never carries it, so its absence from a
+        fresh checkout proves nothing (found 2026-09-06: CI reported
+        22 'vanished' sources, every one a gitignored runtime
+        artifact, green on the capture box forever). The repo's own
+        ``.gitignore`` is the authority, not a hand-kept list.
+        """
+        _green_tree(tmp_path)
+        (tmp_path / ".gitignore").write_text("# artifacts\n\nruns/\n", encoding="utf-8")
+        page = GREEN_FRONTMATTER.replace(
+            '- "src/fixture.py"', '- "runs/bot/bot-20260619.capture_session.json"'
+        )
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
+
+    def test_gitignored_basename_pattern_excuses_the_dump(self, tmp_path: Path) -> None:
+        """A slashless ignore pattern matches the entry's basename."""
+        _green_tree(tmp_path)
+        (tmp_path / ".gitignore").write_text("tpclient.pretty.js\n", encoding="utf-8")
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "tpclient.pretty.js"')
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
+
+    def test_gitignored_glob_matches_by_basename(self, tmp_path: Path) -> None:
+        """A slashless glob pattern (``_sniff_*.out``) goes through fnmatch."""
+        _green_tree(tmp_path)
+        (tmp_path / ".gitignore").write_text("_sniff_*.out\n", encoding="utf-8")
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "_sniff_20260620.out"')
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
+
+    def test_gitignored_root_relative_pattern_matches_whole_path(self, tmp_path: Path) -> None:
+        """A pattern containing ``/`` matches the path from the root."""
+        _green_tree(tmp_path)
+        (tmp_path / ".gitignore").write_text("data/secret.json\n", encoding="utf-8")
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "data/secret.json"')
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        assert run_wiki_rules(tmp_path) == 0
+
+    def test_unignored_missing_source_still_fails_beside_a_gitignore(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The excuse is exactly the ignore rules — a typo'd repo path
+        stays a violation even when a ``.gitignore`` exists.
+
+        The ignore file carries all three pattern forms (directory,
+        root-relative, slashless glob) and NONE of them covers the
+        entry, so every matcher runs and declines.
+        """
+        _green_tree(tmp_path)
+        (tmp_path / ".gitignore").write_text("runs/\ndata/secret.json\n*.tmp\n", encoding="utf-8")
+        page = GREEN_FRONTMATTER.replace('- "src/fixture.py"', '- "src/deleted.py"')
+        page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
+        page = page.replace("source_git_blobs:\n", "")
+        (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "source_paths entry 'src/deleted.py' does not exist" in out
+
     def test_line_locator_suffix_is_stripped(self, tmp_path: Path) -> None:
         """``file.md:42`` checks the file, not the literal string."""
         _green_tree(tmp_path)

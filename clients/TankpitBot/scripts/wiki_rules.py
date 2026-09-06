@@ -40,6 +40,7 @@ from __future__ import annotations
 import re
 import sys
 from datetime import datetime
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import TypedDict
 
@@ -238,6 +239,55 @@ def _frontmatter_violations(matter: ParsedFrontmatter, page: str) -> list[str]:
     return violations
 
 
+def _ignored_by_project(project_root: Path, relative: str) -> bool:
+    """Return True when the project's ``.gitignore`` covers a path.
+
+    A ``source_paths`` entry naming a runtime artifact — a capture
+    session under ``runs/``, the prettified client dump — cites
+    evidence that exists only on the box that captured it and can
+    NEVER be committed, so its absence from a fresh checkout proves
+    nothing about the page. The repo itself already declares which
+    paths those are: ``.gitignore`` is the authoritative list of what
+    git will not carry, so the existence check consults it instead of
+    a hand-kept exemption table (found 2026-09-06: CI ran the check on
+    a fresh checkout and reported 22 "vanished" sources that were all
+    gitignored runtime artifacts, green on the capture box forever).
+
+    Subset semantics, sufficient for this project's ignore file and
+    checked by tests: a ``dir/`` pattern matches the directory and
+    everything under it; a pattern containing ``/`` elsewhere matches
+    the whole path from the project root; a slashless pattern matches
+    the basename. Globs go through :func:`fnmatch.fnmatch` in every
+    form.
+
+    Args:
+        project_root: Project root holding the ``.gitignore``.
+        relative: Path relative to the project root, ``/``-separated.
+
+    Returns:
+        True when any ignore pattern covers the path.
+    """
+    ignore_file = project_root / ".gitignore"
+    if not ignore_file.exists():
+        return False
+    posix = relative.replace("\\", "/").rstrip("/")
+    basename = posix.rsplit("/", 1)[-1]
+    for raw in ignore_file.read_text(encoding="utf-8").splitlines():
+        pattern = raw.strip()
+        if not pattern or pattern.startswith("#"):
+            continue
+        if pattern.endswith("/"):
+            prefix = pattern.rstrip("/")
+            if posix == prefix or posix.startswith(prefix + "/"):
+                return True
+        elif "/" in pattern:
+            if fnmatch(posix, pattern):
+                return True
+        elif fnmatch(basename, pattern):
+            return True
+    return False
+
+
 def _provenance_violations(
     matter: ParsedFrontmatter,
     page: str,
@@ -270,6 +320,12 @@ def _provenance_violations(
             # not orphan the page that cites it — the pin IS the
             # provenance. First case: the analysis_scripts retirement,
             # 2026-08-17 (board task f0c3a532).
+            continue
+        if _ignored_by_project(project_root, target):
+            # A RUNTIME artifact: gitignored evidence (capture
+            # sessions, the prettified client) that exists only on
+            # the box that captured it. Absent here means "not this
+            # machine", not "vanished" — see _ignored_by_project.
             continue
         violations.append(f"{page}: source_paths entry '{source}' does not exist")
     # Compare the pin key against the FILE each source_paths entry names,
