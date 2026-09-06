@@ -15,13 +15,108 @@ rule of any intermediate shell can change them.
 NOTHING HERE CATCHES. Commands run with ``check=False`` and their status is
 inspected, so a remote failure becomes an :class:`~platform_core.errors.AppError`
 naming the node and carrying its own stderr.
+
+EVERY OPERATION EXISTS TWICE: an ``attempt_*`` that returns the failure as a
+VALUE, and the raising boundary built on top of it. Not two implementations --
+the raising one is three lines over the other -- and not a "best-effort"
+variant either. It exists because a node being off is a different question in
+two different callers, and only one of them wants an exception.
+
+  fleet-run --node lavender   asked for a specific machine. If it is down that
+                              is an ERROR: silently running somewhere else
+                              would answer a question nobody asked.
+  fleet-run (auto-select)     asked for ANY machine with room. A node being
+                              off is a REFUSAL to fold in beside "full" and
+                              "no disk", not a reason to abandon the fleet.
+
+Measured 2026-09-05, and it is why this split exists: the first real
+auto-select dispatch was refused with ``NODE_UNREACHABLE: ssh to loki failed``
+while lavender had already answered and had room. loki was powered off for a
+trip. One laptop being asleep disabled the whole fleet, because the probe loop
+raised instead of collecting.
 """
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import _test_hooks
+
+
+class RemoteFailure(TypedDict):
+    """Why a remote operation did not produce output.
+
+    Attributes:
+        code: The typed code the raising boundary will carry.
+            ``NODE_UNREACHABLE`` when ssh itself could not reach the node,
+            ``DISPATCH_FAILED`` when it reached it and the command exited
+            non-zero. Two faults with two different fixes -- one is the
+            tailnet, the other is the work.
+        message: The full explanation, naming the node and carrying its own
+            stderr.
+    """
+
+    code: FleetErrorCode
+    message: str
+
+
+class RemoteOutcome(TypedDict):
+    """What a remote operation produced, or why it produced nothing.
+
+    Attributes:
+        output: The command's standard output. Empty when ``failure`` is set.
+        failure: ``None`` on success; otherwise the reason.
+    """
+
+    output: str
+    failure: RemoteFailure | None
+
+
+def _failure_for(
+    host: str, context: str, result: _test_hooks.CommandResult
+) -> RemoteFailure | None:
+    """Classify one command result, or report success.
+
+    The single place a remote exit status becomes a fault, so ssh's own
+    failure and the remote command's failure cannot be told apart differently
+    in two callers.
+
+    Args:
+        host: The node, for the message.
+        context: What was being attempted, e.g. ``"sending C:/x.ps1"``.
+        result: What the command did.
+
+    Returns:
+        The failure, or None when the command succeeded.
+    """
+    detail = result["stderr"].strip() or "<no stderr>"
+    if result["returncode"] == SSH_FAILURE:
+        return RemoteFailure(
+            code=FleetErrorCode.NODE_UNREACHABLE,
+            message=f"ssh to {host} failed while {context}: {detail}",
+        )
+    if result["returncode"] != 0:
+        return RemoteFailure(
+            code=FleetErrorCode.DISPATCH_FAILED,
+            message=f"{context} on {host} exited {result['returncode']}: {detail}",
+        )
+    return None
+
+
+def _raise_on(failure: RemoteFailure | None) -> None:
+    """Turn a failure value into the typed exception, if there is one.
+
+    Args:
+        failure: What :func:`_failure_for` decided.
+
+    Raises:
+        AppError: Carrying the failure's own code and message.
+    """
+    if failure is not None:
+        raise AppError(failure["code"], failure["message"])
+
 
 #: Options every ssh invocation carries.
 #:
@@ -73,13 +168,31 @@ _WRITE_COMMAND = (
 )
 
 
-def run_ssh(host: str, argv: tuple[str, ...]) -> str:
-    """Run one argv on a node and return its standard output.
+def attempt_ssh(host: str, argv: tuple[str, ...]) -> RemoteOutcome:
+    """Run one argv on a node, reporting failure as a value.
 
     Args:
         host: SSH destination, an alias from the user's ssh config.
         argv: The remote command as a list of words. A list rather than a
             string so nothing local re-splits it.
+
+    Returns:
+        The command's standard output, or the reason there is none.
+    """
+    result = _test_hooks.run(["ssh", *SSH_OPTIONS, host, *argv])
+    failure = _failure_for(host, f"running `{' '.join(argv)}`", result)
+    return RemoteOutcome(output="" if failure is not None else result["stdout"], failure=failure)
+
+
+def run_ssh(host: str, argv: tuple[str, ...]) -> str:
+    """Run one argv on a node and return its standard output.
+
+    The raising boundary over :func:`attempt_ssh`, for callers that have
+    already committed to this node.
+
+    Args:
+        host: SSH destination, an alias from the user's ssh config.
+        argv: The remote command as a list of words.
 
     Returns:
         The command's standard output.
@@ -91,23 +204,13 @@ def run_ssh(host: str, argv: tuple[str, ...]) -> str:
             fixes -- one is the tailnet, the other is the work -- and ssh
             reports its own failures with status 255.
     """
-    result = _test_hooks.run(["ssh", *SSH_OPTIONS, host, *argv])
-    if result["returncode"] == SSH_FAILURE:
-        raise AppError(
-            FleetErrorCode.NODE_UNREACHABLE,
-            f"ssh to {host} failed: {result['stderr'].strip() or '<no stderr>'}",
-        )
-    if result["returncode"] != 0:
-        raise AppError(
-            FleetErrorCode.DISPATCH_FAILED,
-            f"`{' '.join(argv)}` on {host} exited {result['returncode']}: "
-            f"{result['stderr'].strip() or '<no stderr>'}",
-        )
-    return result["stdout"]
+    outcome = attempt_ssh(host, argv)
+    _raise_on(outcome["failure"])
+    return outcome["output"]
 
 
-def send_script(host: str, remote_path: str, body: str) -> None:
-    """Place a script on a node.
+def attempt_send(host: str, remote_path: str, body: str) -> RemoteFailure | None:
+    """Place a script on a node, reporting failure as a value.
 
     The body is streamed over stdin into a file on the far side rather than
     passed as an argument, so its content cannot be interpreted by any shell
@@ -119,30 +222,57 @@ def send_script(host: str, remote_path: str, body: str) -> None:
         remote_path: Absolute path on the node to write.
         body: The script's complete text.
 
-    Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
-            :func:`run_ssh` describes.
+    Returns:
+        The reason it did not land, or None when it did.
     """
     result = _test_hooks.run(
         ["ssh", *SSH_OPTIONS, host, _WRITE_COMMAND.format(path=remote_path)],
         stdin_bytes=body.encode("utf-8"),
     )
-    if result["returncode"] == SSH_FAILURE:
-        raise AppError(
-            FleetErrorCode.NODE_UNREACHABLE,
-            f"ssh to {host} failed while sending {remote_path}: "
-            f"{result['stderr'].strip() or '<no stderr>'}",
-        )
-    if result["returncode"] != 0:
-        raise AppError(
-            FleetErrorCode.DISPATCH_FAILED,
-            f"writing {remote_path} on {host} exited {result['returncode']}: "
-            f"{result['stderr'].strip() or '<no stderr>'}",
-        )
+    return _failure_for(host, f"sending {remote_path}", result)
+
+
+def send_script(host: str, remote_path: str, body: str) -> None:
+    """Place a script on a node.
+
+    The raising boundary over :func:`attempt_send`.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write.
+        body: The script's complete text.
+
+    Raises:
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
+            :func:`run_ssh` describes.
+    """
+    _raise_on(attempt_send(host, remote_path, body))
+
+
+def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
+    """Send a script to a node and run it by path, reporting failure as a value.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write and then execute.
+        body: The script's complete text.
+
+    Returns:
+        The script's standard output, or the reason there is none. A send that
+        fails short-circuits: running a path that was never written would
+        answer with the far side's "file not found" rather than with the
+        transport fault that actually happened.
+    """
+    failure = attempt_send(host, remote_path, body)
+    if failure is not None:
+        return RemoteOutcome(output="", failure=failure)
+    return attempt_ssh(host, (*POWERSHELL_INVOCATION, remote_path))
 
 
 def run_script(host: str, remote_path: str, body: str) -> str:
     """Send a script to a node and run it by path.
+
+    The raising boundary over :func:`attempt_script`.
 
     Args:
         host: SSH destination.
@@ -155,14 +285,20 @@ def run_script(host: str, remote_path: str, body: str) -> str:
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``.
     """
-    send_script(host, remote_path, body)
-    return run_ssh(host, (*POWERSHELL_INVOCATION, remote_path))
+    outcome = attempt_script(host, remote_path, body)
+    _raise_on(outcome["failure"])
+    return outcome["output"]
 
 
 __all__ = [
     "POWERSHELL_INVOCATION",
     "SSH_FAILURE",
     "SSH_OPTIONS",
+    "RemoteFailure",
+    "RemoteOutcome",
+    "attempt_script",
+    "attempt_send",
+    "attempt_ssh",
     "run_script",
     "run_ssh",
     "send_script",

@@ -91,9 +91,21 @@ def choose(
         return named, node, capacity.plan_dispatch(node, state, plan)
 
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
+    unassessable: list[tuple[str, str]] = []
     for name, declared in sorted(loaded.workspace["nodes"].items()):
-        candidates.append((name, declared, _probe(loaded, name=name, node=declared)))
-    chosen, workers = capacity.first_fit(tuple(candidates), plan)
+        # The VALUE form, deliberately. A node that does not answer is one
+        # fewer candidate, not the end of the search -- see
+        # ``capacity.first_fit``'s ``unassessable`` for the dispatch that was
+        # refused because loki was asleep while lavender had room.
+        outcome = probe.attempt_probe(
+            declared, live_runs=records.live_runs(loaded.ledger, node=name)
+        )
+        answered: NodeState | None = outcome["state"]
+        if answered is None:
+            unassessable.append((name, outcome["reason"]))
+            continue
+        candidates.append((name, declared, answered))
+    chosen, workers = capacity.first_fit(tuple(candidates), plan, unassessable=tuple(unassessable))
     return chosen, loaded.workspace["nodes"][chosen], workers
 
 

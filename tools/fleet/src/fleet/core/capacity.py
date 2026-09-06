@@ -155,6 +155,8 @@ def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) ->
 def first_fit(
     candidates: tuple[tuple[str, NodeConfig, NodeState], ...],
     project: ProjectConfig,
+    *,
+    unassessable: tuple[tuple[str, str], ...] = (),
 ) -> tuple[str, int]:
     """Choose the node that affords this project the most workers.
 
@@ -165,24 +167,41 @@ def first_fit(
     Ties keep the earlier candidate, so a workspace's node order is a
     tie-break a person can control rather than a detail of iteration.
 
+    A NODE THAT COULD NOT BE ASSESSED IS A REFUSAL, NOT AN ABORT, and that is
+    the whole reason ``unassessable`` exists. Two of this fleet's three nodes
+    are laptops; one being asleep is the ordinary case, not a fault. Measured
+    2026-09-05: the first real auto-select dispatch was refused outright
+    because loki was off for a trip, while lavender had already answered and
+    had room. Folding those nodes in here means a caller learns "loki is off
+    AND sedona is full" in one answer, instead of learning about whichever
+    node happened to be probed first.
+
     Args:
-        candidates: ``(name, node, state)`` for every node that may be used,
-            in workspace order.
+        candidates: ``(name, node, state)`` for every node that answered, in
+            workspace order.
         project: The work being dispatched.
+        unassessable: ``(name, reason)`` for every node that did not answer.
+            Never chosen; carried so the refusal names them.
 
     Returns:
         The chosen node's name and its worker count.
 
     Raises:
-        AppError: With ``NODE_MEMORY_EXHAUSTED`` when no candidate can take
-            the work, carrying EVERY node's own refusal rather than the first.
-            "No node has room" and "one is full while the other has no disk"
-            call for different actions, and a message naming only one of them
-            sends the reader to the wrong machine.
+        AppError: With ``NODE_UNREACHABLE`` when nodes were tried and NONE of
+            them answered, and with ``NODE_MEMORY_EXHAUSTED`` otherwise --
+            including for a workspace that declares no nodes at all, which is
+            a configuration fault rather than a fleet that is down. Both carry
+            EVERY node's own refusal rather than the first.
+
+            The two codes are the point, not a detail. "The fleet is off" and
+            "the fleet is busy" send a reader to different places -- the
+            tailnet, or the clock -- and a single code for both would send
+            half of them to the wrong one. It is the same distinction
+            ``refused`` draws against ``failed`` one layer up.
     """
     best_name = ""
     best_workers = 0
-    refusals: list[str] = []
+    refusals: list[str] = [f"{name}: {reason}" for name, reason in unassessable]
     for name, node, state in candidates:
         verdict = assess(node, state, project)
         if verdict["code"] is not None:
@@ -191,8 +210,11 @@ def first_fit(
         if verdict["workers"] > best_workers:
             best_name, best_workers = name, verdict["workers"]
     if best_workers == 0:
+        nothing_answered = not candidates and bool(unassessable)
         raise AppError(
-            FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+            FleetErrorCode.NODE_UNREACHABLE
+            if nothing_answered
+            else FleetErrorCode.NODE_MEMORY_EXHAUSTED,
             "no node can take this dispatch right now. " + " | ".join(refusals),
         )
     return best_name, best_workers
