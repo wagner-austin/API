@@ -454,3 +454,7 @@ def _dispatch_command(command_str: str, args: argparse.Namespace) -> None:
 def main() -> None:
     """Main entry point."""
     run_subcommand_cli(sys.argv[1:], build_parser=_build_parser, dispatch=_dispatch_command)
+
+
+if __name__ == "__main__":
+    main()

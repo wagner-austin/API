@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import runpy
+import sys
 from datetime import datetime
 
 from platform_core.json_utils import JSONObject
@@ -417,3 +419,30 @@ class TestEdgeCases:
         no_title_events = [e for e in result if e.summary == "(no title)"]
         assert no_title_events != []
         assert no_title_events[0].summary == "(no title)"
+
+
+class TestRunningTheModuleDirectly:
+    """`python -m platform_calendar.cli` is how this CLI is invoked.
+
+    The package declares no console script, so the __main__ block is the
+    ONLY production path into main(). Without it this module's seven
+    tests were the only callers -- a CLI with no way to run it.
+    """
+
+    def test_the_module_runs_as_main(self) -> None:
+        """Reaches main() through the __main__ block, in-process."""
+        output = io.StringIO()
+        console = Console(file=output, force_terminal=True)
+        hooks.cli_get_console = lambda: console
+        hooks.cli_get_env = lambda key: None
+        hooks.cli_get_now = lambda: datetime(2026, 2, 20, 10, 0, 0)
+
+        original = list(sys.argv)
+        sys.argv[:] = ["calendar", "list", "2026-02-20"]
+        sys.modules.pop("platform_calendar.cli", None)
+        try:
+            runpy.run_module("platform_calendar.cli", run_name="__main__")
+        finally:
+            sys.argv[:] = original
+
+        assert "February 20" in output.getvalue()
