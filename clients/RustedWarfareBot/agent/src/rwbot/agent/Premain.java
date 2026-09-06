@@ -76,6 +76,25 @@ public final class Premain {
             }
         }
 
+        // The sway updaters' draws move to the side stream -- the per-call-site
+        // routing the phase split cannot express, because these draws are
+        // in-tick and render-only at once (SwayRouteTransformer). Alters which
+        // draws the simulation consumes, so it gets the hosting containment
+        // like the two patches above.
+        if (!options.hostRequested()) {
+            SwayRouteTransformer swayTransformer = new SwayRouteTransformer();
+            instrumentation.addTransformer(swayTransformer);
+            forceLoad(Targets.swayRewires().keySet());
+            java.util.List<String> unrouted = swayTransformer.unseen();
+            if (!unrouted.isEmpty()) {
+                throw new IllegalStateException(
+                        "rw-agent: the sway updaters were not rewired: "
+                                + unrouted
+                                + " -- the pinned build is 1.15 (code 176, build #28);"
+                                + " re-derive the names against this jar and update Targets.");
+            }
+        }
+
         // Intent only: the swap itself waits for match start, because a
         // premain swap was measured being overwritten by the holder's own
         // <clinit> (see RandomTap).

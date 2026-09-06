@@ -36,6 +36,7 @@ public final class SelfTest {
                         Targets.EFFECT_SPAWNER_CLASS, Targets.effectSpawners()));
 
         failures += JarChecks.checkSyncPath(args[0]);
+        failures += JarChecks.checkSwayRewire(args[0]);
         failures += OptionChecks.checkOptions();
         failures += DiscoveryChecks.checkDiscovery();
         failures += JarChecks.checkOrderBindings();

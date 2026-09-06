@@ -103,4 +103,48 @@ final class Targets {
                         "a(Lcom/corrodinggames/rts/game/units/am;FI)V",
                         "b(Lcom/corrodinggames/rts/game/units/am;FI)V"));
     }
+
+    /**
+     * The classes whose engagement-sway updater has its {@code f.d} draws
+     * rewired to the side stream, and the one method the rewrite touches in
+     * each.
+     *
+     * <p>These are the survivors of the effect-spawner sweep, and the reason
+     * they survived is measured, not stylistic: the updater cannot be
+     * no-opped because it maintains the {@code aN} has-target flag the
+     * opponent AI reads in its own unit-selection logic
+     * ({@code game/a/a.java:1586}), so the method keeps running and only its
+     * draws move ({@link SideDraw}; wiki log 2026-09-06, findings #4/#5).
+     * The draws it makes are mark redraws for a render-only beam-sway
+     * effect -- the arrays' single reader outside the updater is a draw
+     * method -- but they run inside the tick on an engagement-paced
+     * schedule, which is exactly the event count byte-identical twins
+     * disagree on.
+     *
+     * <p>Inventory by javap against the pinned jar, 2026-09-06: exactly
+     * three classes invoke {@code f.d(FF)F} from this method shape; the
+     * other sway-array implementors ({@code units/h/b}, {@code custom/j})
+     * carry no draw of their own.
+     */
+    static java.util.Map<String, java.util.Set<String>> swayRewires() {
+        java.util.Map<String, java.util.Set<String>> byClass =
+                new java.util.LinkedHashMap<String, java.util.Set<String>>();
+        java.util.Set<String> updater =
+                java.util.Collections.singleton(
+                        "a(FLcom/corrodinggames/rts/game/units/d;)V");
+        byClass.put("com/corrodinggames/rts/game/units/e/b", updater);
+        byClass.put("com/corrodinggames/rts/game/units/g", updater);
+        byClass.put("com/corrodinggames/rts/game/units/h", updater);
+        return byClass;
+    }
+
+    /** The engine draw helper the sway updaters call. */
+    static final String SWAY_DRAW_OWNER = "com/corrodinggames/rts/gameFramework/f";
+
+    static final String SWAY_DRAW_NAME = "d";
+
+    static final String SWAY_DRAW_DESCRIPTOR = "(FF)F";
+
+    /** Where the rewired invokes land ({@link SideDraw#d}). */
+    static final String SWAY_DRAW_TARGET = "rwbot/agent/SideDraw";
 }

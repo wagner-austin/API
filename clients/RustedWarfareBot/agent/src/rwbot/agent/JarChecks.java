@@ -150,6 +150,74 @@ final class JarChecks {
     }
 
     /**
+     * Rewires the sway updaters in the real jar and verifies each result links.
+     *
+     * <p>Separate from {@link #checkPatcher} for the same reason the sync-path
+     * check is: the edit is different -- a constant-pool append plus operand
+     * rewrites, applied by {@link ClassFilePatcher#retargetStaticInvokes}
+     * exactly as {@link SwayRouteTransformer} applies it live -- and HotSpot's
+     * verifier judging the grown pool is the whole point of defining the
+     * result rather than re-reading the bytes this code wrote.
+     *
+     * @param jarPath Path to the pinned {@code game-lib.jar}.
+     * @return The number of targets that failed.
+     * @throws java.io.IOException When the jar cannot be read.
+     */
+    static int checkSwayRewire(String jarPath) throws java.io.IOException {
+        PatchingLoader loader = new PatchingLoader(JarChecks.class.getClassLoader());
+        int failures = 0;
+        JarFile jar = new JarFile(jarPath);
+        try {
+            for (java.util.Map.Entry<String, java.util.Set<String>> entry
+                    : Targets.swayRewires().entrySet()) {
+                String internalName = entry.getKey();
+                java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+                if (classEntry == null) {
+                    System.out.println("FAIL " + internalName + ": not present in jar");
+                    failures++;
+                    continue;
+                }
+                byte[] original = readFully(jar, classEntry);
+                byte[] rewired;
+                try {
+                    rewired =
+                            ClassFilePatcher.retargetStaticInvokes(
+                                    original,
+                                    entry.getValue(),
+                                    Targets.SWAY_DRAW_OWNER,
+                                    Targets.SWAY_DRAW_NAME,
+                                    Targets.SWAY_DRAW_DESCRIPTOR,
+                                    Targets.SWAY_DRAW_TARGET);
+                } catch (ClassFormatError e) {
+                    System.out.println("FAIL " + internalName + ": " + e.getMessage());
+                    failures++;
+                    continue;
+                }
+                if (rewired == null) {
+                    System.out.println(
+                            "FAIL " + internalName + ": no f.d invoke found in "
+                                    + entry.getValue());
+                    failures++;
+                    continue;
+                }
+                try {
+                    loader.definePatched(internalName.replace('/', '.'), rewired);
+                } catch (LinkageError e) {
+                    System.out.println("FAIL " + internalName + ": did not verify: " + e);
+                    failures++;
+                    continue;
+                }
+                System.out.println(
+                        "ok   " + internalName + " [f.d -> SideDraw.d in " + entry.getValue()
+                                + "]  (" + original.length + " -> " + rewired.length + " bytes)");
+            }
+        } finally {
+            jar.close();
+        }
+        return failures;
+    }
+
+    /**
      * Resolves every obfuscated name the order path uses, against the real jar.
      *
      * <p>No running game is needed: the classes, fields and method signatures

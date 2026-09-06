@@ -110,6 +110,236 @@ final class ClassFilePatcher {
                 java.util.Collections.singleton(target), delegateName, delegateDescriptor);
     }
 
+    /**
+     * Returns a copy of {@code classFile} in which, inside every method named
+     * in {@code targets}, each {@code invokestatic} of
+     * {@code fromOwner.name:descriptor} is retargeted to
+     * {@code toOwner.name:descriptor}; {@code null} if the class holds no
+     * Methodref for the source call (nothing to rewrite) or no target method
+     * invokes it.
+     *
+     * <p>This is the one edit here that grows the constant pool -- by exactly
+     * three entries (a Utf8 for {@code toOwner}, a Class over it, and a
+     * Methodref pairing that Class with the ORIGINAL call's NameAndType, so
+     * name and descriptor are shared rather than duplicated and the callee
+     * must match the caller's expectations by construction). The pool count
+     * is a fixed-offset u2 and the entries append at the pool's end, so the
+     * rest of the file is untouched except the two operand bytes of each
+     * rewritten invoke -- same instruction length, so no attribute length
+     * anywhere changes.
+     *
+     * <p>The rewrite is scoped to the NAMED methods on purpose: other methods
+     * of the same class may draw through the same helper for simulation
+     * purposes, and a class-wide rewrite would move draws nobody audited
+     * (wiki: policy-determinism, the 2026-09-06 arc).
+     *
+     * @throws ClassFormatError if the class cannot be parsed, or a targeted
+     *     method's bytecode contains an instruction the walker does not
+     *     model -- a loud stop at class load beats a mis-parsed operand
+     *     silently rewriting the wrong bytes.
+     */
+    static byte[] retargetStaticInvokes(
+            byte[] classFile,
+            java.util.Set<String> targets,
+            String fromOwner,
+            String name,
+            String descriptor,
+            String toOwner) {
+        ClassFilePatcher patcher = new ClassFilePatcher(classFile);
+        return patcher.retarget(targets, fromOwner, name, descriptor, toOwner);
+    }
+
+    private byte[] retarget(
+            java.util.Set<String> targets,
+            String fromOwner,
+            String name,
+            String descriptor,
+            String toOwner) {
+        String[] pool = readHeaderAndConstantPool();
+        int poolEnd = pos;
+        int poolCount = tags.length;
+
+        int fromRef = -1;
+        for (int i = 1; i < poolCount; i++) {
+            if (tags[i] != CONSTANT_METHODREF) {
+                continue;
+            }
+            int nat = operandB[i];
+            if (pool[operandA[operandA[i]]].equals(fromOwner)
+                    && name.equals(pool[operandA[nat]])
+                    && descriptor.equals(pool[operandB[nat]])) {
+                fromRef = i;
+                break;
+            }
+        }
+        if (fromRef < 0) {
+            return null;
+        }
+        if (poolCount + 3 > 0xffff) {
+            // The three appended indices must fit a u2; past this the writes
+            // would truncate into a silently corrupt pool.
+            throw new ClassFormatError("constant pool too large to grow: " + poolCount);
+        }
+        int newRef = poolCount + 2; // Utf8 at poolCount, Class at +1, Methodref at +2.
+
+        skip(2); // access_flags
+        skip(2); // this_class
+        skip(2); // super_class
+        int interfaceCount = readU2();
+        skip(interfaceCount * 2);
+        skipMembers(); // fields
+
+        java.util.List<Edit> edits = new java.util.ArrayList<Edit>();
+        int methodCount = readU2();
+        for (int i = 0; i < methodCount; i++) {
+            collectInvokeEdits(pool, targets, fromRef, newRef, edits);
+        }
+        if (edits.isEmpty()) {
+            return null;
+        }
+
+        // The pool grows only when something was actually rewritten, and the
+        // count patch plus the appended entries go FIRST in the edit list so
+        // applyEdits' last-to-first order splices the later (larger-offset)
+        // operand rewrites before the insertion shifts anything.
+        byte[] countPatch = {(byte) (((poolCount + 3) >>> 8) & 0xff), (byte) ((poolCount + 3) & 0xff)};
+        edits.add(0, new Edit(8, 10, countPatch));
+        byte[] toOwnerUtf8 = toOwner.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        java.io.ByteArrayOutputStream appended = new java.io.ByteArrayOutputStream();
+        appended.write(CONSTANT_UTF8);
+        CodeBodies.writeU2(appended, toOwnerUtf8.length);
+        appended.write(toOwnerUtf8, 0, toOwnerUtf8.length);
+        appended.write(CONSTANT_CLASS);
+        CodeBodies.writeU2(appended, poolCount);
+        appended.write(CONSTANT_METHODREF);
+        CodeBodies.writeU2(appended, poolCount + 1);
+        CodeBodies.writeU2(appended, operandB[fromRef]);
+        edits.add(1, new Edit(poolEnd, poolEnd, appended.toByteArray()));
+        return applyEdits(edits);
+    }
+
+    /**
+     * Parses one method_info; when it is a retarget target, walks its Code
+     * attribute and records a two-byte operand edit for every
+     * {@code invokestatic fromRef}.
+     */
+    private void collectInvokeEdits(
+            String[] pool,
+            java.util.Set<String> targets,
+            int fromRef,
+            int newRef,
+            java.util.List<Edit> edits) {
+        skip(2); // access_flags
+        String name = pool[readU2()];
+        String descriptor = pool[readU2()];
+        boolean wanted = targets.contains(name) || targets.contains(name + descriptor);
+
+        int attributeCount = readU2();
+        for (int i = 0; i < attributeCount; i++) {
+            String attributeName = pool[readU2()];
+            int length = readU4();
+            if (wanted && "Code".equals(attributeName)) {
+                int codeLength = ((buf[pos + 4] & 0xff) << 24)
+                        | ((buf[pos + 5] & 0xff) << 16)
+                        | ((buf[pos + 6] & 0xff) << 8)
+                        | (buf[pos + 7] & 0xff);
+                int codeStart = pos + 8; // max_stack, max_locals, code_length.
+                byte[] operand = {(byte) ((newRef >>> 8) & 0xff), (byte) (newRef & 0xff)};
+                int at = 0;
+                while (at < codeLength) {
+                    int opcode = buf[codeStart + at] & 0xff;
+                    if (opcode == 0xb8 // invokestatic
+                            && ((buf[codeStart + at + 1] & 0xff) << 8 | (buf[codeStart + at + 2] & 0xff))
+                                    == fromRef) {
+                        edits.add(new Edit(codeStart + at + 1, codeStart + at + 3, operand));
+                    }
+                    at += instructionLength(opcode, codeStart, at);
+                }
+            }
+            skip(length);
+        }
+    }
+
+    /**
+     * The byte length of one instruction, including its opcode.
+     *
+     * <p>Complete over the instruction set the pinned jar's methods use, with
+     * the three variable-length shapes ({@code wide}, {@code tableswitch},
+     * {@code lookupswitch}) computed rather than refused: a walker that bails
+     * on a switch would quietly narrow which methods can ever be retargeted.
+     *
+     * @param opcode The instruction's first byte.
+     * @param codeStart Buffer offset of the code array's first byte, from
+     *     which the switch shapes compute their 4-byte alignment padding.
+     * @param at The instruction's offset within the code array.
+     * @throws ClassFormatError on an opcode outside the JVMS table -- a
+     *     mis-walk would rewrite arbitrary bytes, so unknown means stop.
+     */
+    private int instructionLength(int opcode, int codeStart, int at) {
+        if (opcode <= 0x0f || (opcode >= 0x1a && opcode <= 0x35)
+                || (opcode >= 0x3b && opcode <= 0x83 && opcode != 0x84)
+                || (opcode >= 0x85 && opcode <= 0x98)
+                || (opcode >= 0xac && opcode <= 0xb1)
+                || opcode == 0x5f || opcode == 0xbe || opcode == 0xbf
+                || opcode == 0xc2 || opcode == 0xc3) {
+            return 1;
+        }
+        switch (opcode) {
+            case 0x10: // bipush
+            case 0x12: // ldc
+            case 0x15: case 0x16: case 0x17: case 0x18: case 0x19: // loads
+            case 0x36: case 0x37: case 0x38: case 0x39: case 0x3a: // stores
+            case 0xbc: // newarray
+                return 2;
+            case 0x11: // sipush
+            case 0x13: case 0x14: // ldc_w, ldc2_w
+            case 0x84: // iinc
+            case 0xb2: case 0xb3: case 0xb4: case 0xb5: // get/putstatic, get/putfield
+            case 0xb6: case 0xb7: case 0xb8: // invokevirtual/special/static
+            case 0xbb: // new
+            case 0xbd: // anewarray
+            case 0xc0: case 0xc1: // checkcast, instanceof
+            case 0xc6: case 0xc7: // ifnull, ifnonnull
+                return 3;
+            case 0xc5: // multianewarray
+                return 4;
+            case 0xb9: // invokeinterface
+            case 0xba: // invokedynamic
+            case 0xc8: case 0xc9: // goto_w, jsr_w
+                return 5;
+            case 0xc4: // wide
+                return (buf[codeStart + at + 1] & 0xff) == 0x84 ? 6 : 4;
+            case 0xaa: { // tableswitch
+                int aligned = (at + 4 + 3) & ~3;
+                int low = readInt(codeStart + aligned + 4);
+                int high = readInt(codeStart + aligned + 8);
+                return (aligned - at) + 12 + (high - low + 1) * 4;
+            }
+            case 0xab: { // lookupswitch
+                int aligned = (at + 4 + 3) & ~3;
+                int pairs = readInt(codeStart + aligned + 4);
+                return (aligned - at) + 8 + pairs * 8;
+            }
+            default:
+                if (opcode >= 0x99 && opcode <= 0xa8) { // ifs, goto, jsr
+                    return 3;
+                }
+                if (opcode == 0xa9) { // ret
+                    return 2;
+                }
+                throw new ClassFormatError(
+                        "unmodeled opcode 0x" + Integer.toHexString(opcode) + " at code offset " + at);
+        }
+    }
+
+    /** A big-endian s4 read at an absolute buffer offset, for the switch shapes. */
+    private int readInt(int offset) {
+        return ((buf[offset] & 0xff) << 24)
+                | ((buf[offset + 1] & 0xff) << 16)
+                | ((buf[offset + 2] & 0xff) << 8)
+                | (buf[offset + 3] & 0xff);
+    }
+
     private byte[] patch(
             java.util.Set<String> targets, String delegateName, String delegateDescriptor) {
         String[] pool = readHeaderAndConstantPool();
@@ -278,122 +508,13 @@ final class ClassFilePatcher {
                 // self-call has a branch to map.
                 byte[] body =
                         delegateRef >= 0
-                                ? buildDelegateCodeAttribute(descriptor, accessFlags, delegateRef)
-                                : buildCodeAttribute(descriptor, accessFlags);
+                                ? CodeBodies.delegate(descriptor, accessFlags, delegateRef)
+                                : CodeBodies.noOp(descriptor, accessFlags);
                 edit = new Edit(lengthOffset, pos + length, body);
             }
             skip(length);
         }
         return edit;
-    }
-
-    /**
-     * Builds a complete Code attribute body (attribute_length included) holding
-     * the smallest legal body that satisfies {@code descriptor}'s return type.
-     */
-    private static byte[] buildCodeAttribute(String descriptor, int accessFlags) {
-        byte[] code = returnSequence(descriptor);
-        int maxStack = maxStackFor(descriptor);
-        int maxLocals = argumentSlots(descriptor) + ((accessFlags & ACC_STATIC) != 0 ? 0 : 1);
-
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        int attributeLength = 2 + 2 + 4 + code.length + 2 + 2;
-        writeU4(out, attributeLength);
-        writeU2(out, maxStack);
-        writeU2(out, maxLocals);
-        writeU4(out, code.length);
-        out.write(code, 0, code.length);
-        writeU2(out, 0); // exception_table_length
-        writeU2(out, 0); // attributes_count
-        return out.toByteArray();
-    }
-
-    /**
-     * Builds a complete Code attribute whose body is {@code this.<delegate>();
-     * return}. Straight-line, so no StackMapTable is needed at any class file
-     * version; one reference on the stack, so max_stack is one.
-     */
-    private static byte[] buildDelegateCodeAttribute(
-            String descriptor, int accessFlags, int methodRef) {
-        byte[] code = {
-            (byte) 0x2a, // aload_0
-            (byte) 0xb6, // invokevirtual
-            (byte) ((methodRef >>> 8) & 0xff),
-            (byte) (methodRef & 0xff),
-            (byte) 0xb1, // return
-        };
-        int maxLocals = argumentSlots(descriptor) + ((accessFlags & ACC_STATIC) != 0 ? 0 : 1);
-
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        int attributeLength = 2 + 2 + 4 + code.length + 2 + 2;
-        writeU4(out, attributeLength);
-        writeU2(out, 1); // max_stack
-        writeU2(out, maxLocals);
-        writeU4(out, code.length);
-        out.write(code, 0, code.length);
-        writeU2(out, 0); // exception_table_length
-        writeU2(out, 0); // attributes_count
-        return out.toByteArray();
-    }
-
-    /** The minimal instruction sequence returning a default value of the descriptor's return type. */
-    private static byte[] returnSequence(String descriptor) {
-        char returnType = descriptor.charAt(descriptor.indexOf(')') + 1);
-        switch (returnType) {
-            case 'V':
-                return new byte[] {(byte) 0xb1}; // return
-            case 'Z':
-            case 'B':
-            case 'C':
-            case 'S':
-            case 'I':
-                return new byte[] {(byte) 0x03, (byte) 0xac}; // iconst_0; ireturn
-            case 'J':
-                return new byte[] {(byte) 0x09, (byte) 0xad}; // lconst_0; lreturn
-            case 'F':
-                return new byte[] {(byte) 0x0b, (byte) 0xae}; // fconst_0; freturn
-            case 'D':
-                return new byte[] {(byte) 0x0e, (byte) 0xaf}; // dconst_0; dreturn
-            case 'L':
-            case '[':
-                return new byte[] {(byte) 0x01, (byte) 0xb0}; // aconst_null; areturn
-            default:
-                throw new ClassFormatError("unsupported return type '" + returnType + "' in " + descriptor);
-        }
-    }
-
-    private static int maxStackFor(String descriptor) {
-        char returnType = descriptor.charAt(descriptor.indexOf(')') + 1);
-        switch (returnType) {
-            case 'V':
-                return 0;
-            case 'J':
-            case 'D':
-                return 2;
-            default:
-                return 1;
-        }
-    }
-
-    /** Counts argument slots in a method descriptor; long and double take two. */
-    private static int argumentSlots(String descriptor) {
-        int slots = 0;
-        int i = descriptor.indexOf('(') + 1;
-        while (descriptor.charAt(i) != ')') {
-            char c = descriptor.charAt(i);
-            if (c == '[') {
-                i++;
-                continue;
-            }
-            if (c == 'L') {
-                i = descriptor.indexOf(';', i) + 1;
-                slots++;
-                continue;
-            }
-            slots += (c == 'J' || c == 'D') ? 2 : 1;
-            i++;
-        }
-        return slots;
     }
 
     /** Splices every edit into a fresh buffer, applying last-to-first so offsets stay valid. */
@@ -424,18 +545,6 @@ final class ClassFilePatcher {
 
     private void skip(int count) {
         pos += count;
-    }
-
-    private static void writeU2(java.io.ByteArrayOutputStream out, int value) {
-        out.write((value >>> 8) & 0xff);
-        out.write(value & 0xff);
-    }
-
-    private static void writeU4(java.io.ByteArrayOutputStream out, int value) {
-        out.write((value >>> 24) & 0xff);
-        out.write((value >>> 16) & 0xff);
-        out.write((value >>> 8) & 0xff);
-        out.write(value & 0xff);
     }
 
     /** A byte range in the original class file and the bytes replacing it. */

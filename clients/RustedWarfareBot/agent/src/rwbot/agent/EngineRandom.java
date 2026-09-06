@@ -92,6 +92,8 @@ final class EngineRandom {
         Log.info("Math.random seeded with " + seed + "; opponent placement is now repeatable");
         shuffleGenerator().setSeed(seed);
         Log.info("Collections.shuffle seeded with " + seed + "; unit-mix order is now repeatable");
+        SideDraw.reseed(seed);
+        Log.info("sway side stream re-based; rewired draw sites no longer touch the sim stream");
     }
 
     /**
