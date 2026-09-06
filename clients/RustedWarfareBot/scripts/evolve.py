@@ -38,7 +38,7 @@ from __future__ import annotations
 import random
 import sys
 from collections.abc import Sequence
-from math import exp, sqrt
+from math import exp, log, sqrt
 from pathlib import Path
 
 from rw_bot.harness import _test_hooks as host_hooks
@@ -148,6 +148,35 @@ def softmax(logits: Sequence[float]) -> tuple[float, ...]:
     exps = [exp(value - peak) for value in logits]
     total = sum(exps)
     return tuple(value / total for value in exps)
+
+
+def seed_mean(base_path: Path) -> tuple[float, ...]:
+    """Return the logit mean that centres the search on the base itself.
+
+    The CEM used to open at the uniform mean, which was free when the
+    base was a hand doctrine any random mix could rival -- and a measured
+    defect the first time a run climbed FROM a graduate: evolve4's whole
+    g1 read negative against its own base (best -742, elite drifting
+    toward the least bad of sixteen losers) because every sample was a
+    step AWAY from the mix being perturbed. Centred here, generation 0
+    samples the base's own neighborhood, which is what "perturbs the
+    champion" always meant.
+
+    Args:
+        base_path: The doctrine the population perturbs.
+
+    Returns:
+        One logit per vocabulary unit: the log of the base's army share,
+        floored by a quarter-slot pseudo-count so an absent unit stays
+        reachable rather than at negative infinity.
+    """
+    base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
+    counts = dict.fromkeys(ARMY_VOCABULARY, 0)
+    for entry in base["goals"]:
+        if entry in counts:
+            counts[entry] += 1
+    slots = sum(counts.values())
+    return tuple(log((counts[unit] + 0.25) / (slots + 1.0)) for unit in ARMY_VOCABULARY)
 
 
 def sample_population(
@@ -314,7 +343,7 @@ def run_evolution(
     base_path = Path(spec["base"])
     scorer = batch_survivals if spec["fitness"] == "survival" else batch_margins
     rng = random.Random(rng_seed)
-    mean: tuple[float, ...] = (0.0,) * len(ARMY_VOCABULARY)
+    mean: tuple[float, ...] = seed_mean(base_path)
     sigma: tuple[float, ...] = (SIGMA_START,) * len(ARMY_VOCABULARY)
     note(
         f"# evolve {name} (rng {rng_seed}, spec {spec_name}, fitness {spec['fitness']}): "

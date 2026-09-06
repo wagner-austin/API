@@ -100,6 +100,23 @@ def _run(tmp_path: Path, tag: str) -> tuple[tuple[str, ...], list[str]]:
     return lines, cluster.job_lines
 
 
+def test_the_search_opens_centred_on_the_base_it_perturbs() -> None:
+    """evolve4's measured defect: a uniform opening mean read its whole g1
+    negative against a graduate base. The seed logits must recover the
+    base's own army shares through softmax -- read off the committed
+    graduate, whose goals carry c_tank x2, heavyTank x2, c_artillery and
+    NO hover -- with the absent unit floored reachable rather than at
+    negative infinity."""
+    from math import isfinite
+
+    from scripts.evolve import seed_mean, softmax
+
+    weights = softmax(seed_mean(Path("doctrines/evolve3-g3m10.doctrine")))
+    by_unit = dict(zip(("c_artillery", "c_tank", "heavyTank", "hoverTank"), weights, strict=True))
+    assert by_unit["c_tank"] == by_unit["heavyTank"] > by_unit["c_artillery"] > by_unit["hoverTank"]
+    assert all(isfinite(w) and w > 0 for w in weights)
+
+
 def test_the_survival_fitness_ranks_the_longest_stand_first(tmp_path: Path) -> None:
     """Every member loses -- the Impossible shape -- and the loop still has
     a gradient: member 0 stands nine times longer than control, ranks
