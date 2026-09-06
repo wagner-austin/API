@@ -31,17 +31,30 @@ set -eu
 REPO="$(git rev-parse --show-toplevel)"
 TOOL="$REPO/tools/commit-scope"
 
-# Prefer the tool's own virtualenv: it is the interpreter its suite ran
-# against, so a green `make check` in that package is evidence about THIS
-# invocation. Fall back to whatever `python` is on PATH only when the venv
-# has not been created -- the package's only dependency is platform_core,
-# which is why that fallback can work at all.
+# The tool's own virtualenv, and NOTHING ELSE. It is the interpreter its
+# suite ran against, so a green `make check` in that package is evidence
+# about this invocation.
+#
+# The two branches are PLATFORM DETECTION, not a fallback: Windows puts the
+# interpreter at Scripts/python.exe and POSIX at bin/python, and they are the
+# same venv.
+#
+# There is deliberately no "else use whatever python is on PATH". That is a
+# fallback, and it fails in the worst available direction: an interpreter
+# without platform_core raises ImportError, git sees a non-zero hook, and
+# EVERY commit in the repository is blocked by a traceback that reads as
+# "the hook is broken" rather than as "the venv is missing". Refusing here
+# names the actual fix in one line instead.
 if [ -x "$TOOL/.venv/Scripts/python.exe" ]; then
     PYTHON="$TOOL/.venv/Scripts/python.exe"
 elif [ -x "$TOOL/.venv/bin/python" ]; then
     PYTHON="$TOOL/.venv/bin/python"
 else
-    PYTHON=python
+    echo "commit-scope: no virtualenv at $TOOL/.venv" >&2
+    echo "The pre-commit hook cannot run and is not guessing an interpreter." >&2
+    echo "Create it once:  make -C tools/commit-scope lint" >&2
+    echo "Or, if you are deliberately working without it:  git config --unset core.hooksPath" >&2
+    exit 1
 fi
 
 PYTHONPATH="$TOOL/src:$REPO/libs/platform_core/src${PYTHONPATH:+:$PYTHONPATH}" \
