@@ -27,6 +27,7 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Campaign Ledger — The Standing Scoreboard](../pages/campaign-ledger.md) -- the at-a-glance position: champion per rung, adoption history, open and closed questions, the laws
 [The Impossible Economy Problem](../pages/impossible-economy-problem.md) -- the ladder's blocker pinned from 96 scorecards: the economy is built then razed, and all three named capability classes measured closed with their mechanisms proven firing
 [Step three at Impossible](../pages/impossible-step-three-design.md) -- what a learned head may drive at the top rung and what it may not: the navdoom constraint, the three learnable surfaces, the honest cost
+[The Build-Priority Head](../pages/impossible-build-priority-head.md) -- step three's option 2 made concrete: the budget-walk decision point, the 7,830-trace corpus, and the label problem the noise floor prices
 [Doctrine — A Gameplay Style as One File](../pages/policy-doctrine.md) -- every knob in one required-field file; one-field arms, in-batch controls, the pinned default
 [Interception — Mobile Defence at the Engine's Own Radius](../pages/policy-interception.md) -- the reserve turns on intruders inside the AI's own outpost radius; measured at two rungs
 [Intel and Scouting — Remembering the Fog, Carefully](../pages/policy-intel-and-scouting.md) -- the sighting memory and the scout circuit, with v1's refutation and the two fixes it forced
