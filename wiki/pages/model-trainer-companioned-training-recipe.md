@@ -13,6 +13,8 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py
+  - services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py
   - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 832de4e79068336b1cb8e6491d8b0553029f528a
@@ -21,9 +23,11 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 944a2a1033890596c7c3d722647df505a023e63a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": f681da3c6c2d27b81e564483706c64bf31673e92
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 0e811873fc7de79554218e97baf2af909bc4fcdf
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": c191ab72218c03978e73d2804babad28b99cece6
-  "docs/RESEARCH.md": f0dd100494d687bae715e19c03787f1e6f419f6f
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 8fe2794c8df1f8494db45224cf0366187ad2a687
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": 58900c5ea2f7dbf300c12bce6243189205bddda5
+  "docs/RESEARCH.md": ae83aff837c0ec4f4b0639c1e5244867c05c59e8
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -37,6 +41,8 @@ provenance:
   - "scale rung measured 2026-09-05 on HPC3: job 55776517 on hpc3-gpu-16-00 (V100) + twin 55786853 on hpc3-gpu-18-00, image v37 sha256 2adee62f (truncated), plan gpt2-medium-companions-diverse, plan commit e5476201, records CROSS-NODE BIT-IDENTICAL sha256 5179b893 (truncated)"
   - "base-LoRA cells measured 2026-09-05 on HPC3: gpt2 jobs 55787810 (gpu-16-05) + 55788364 (gpu-18-02) CROSS-NODE BIT-IDENTICAL sha256 efad0a93 (truncated), image v38 sha256 13bd47e9, plan commit e1bc2009; gpt2-medium job 55790169 (gpu-17-02), image v39 sha256 0bd7983b, plan commit f7f696a8, board task 6c752568"
   - "gpt2-medium base-LoRA record CROSS-NODE BIT-IDENTICAL 2026-09-06: job 55790169 (gpu-17-02, 78 min) + twin 55798416 (gpu-18-02, 2h13m -- same bytes, slower node), both records sha256 372cee59 (truncated)"
+  - "content-lora (crowd-invariance) cells measured 2026-09-06 on HPC3: job 55801429 (V100, 103 min), image v40 sha256 798d234a (truncated) from commit 7288bc8f, plan gpt2-medium-content-lora, record sha256 9abd901a (truncated), board task a85fbabe; twin 55801941 submitted for the certificate"
+  - "the v40 build and the medium run were both caught by the hpc-wake bridge's tagged board announcements (task f6b04193) with no manual sacct polling -- the arm that retired hand-rolled waits"
 fact_checked: "2026-09-06"
 confidence: high
 hubs: [services]
@@ -195,6 +201,33 @@ control, cell floor 0.53 -- seed-chaotic). Depth amplifies CONTENT
 interference in a way neither lever touches; structure is solved at both
 scales.
 
+## The objective is the measured quantity: crowd-invariance closes depth
+
+The content lever the previous section's residual named, run 2026-09-06
+with ONE change from the base-LoRA arm: the LoRA's training objective.
+Language modeling behind a crowd rewards reading past the crowd's shape
+and says nothing about ignoring its content, so
+`train_composition_lora_invariant` (source pinned above) distils
+crowd-invariance instead -- per step it draws a roster and a target
+member, takes the window from the target's own corpus, and minimises the
+KL from the plain base's predictions behind the target ALONE to the
+adapted base's predictions behind the full roster. Every roster position
+is drawable as target, so no positional shortcut exists and every
+compartment stays live; counts draw one to eight, so the alone case is
+distilled too. The plan rows are pinned equal to their base-LoRA twins
+field for field, by test and by image smoke, so the two records isolate
+exactly the objective.
+
+At gpt2-medium the depth collapse is repaired and surpassed: diverse n8
+retains +38.1% where the LM objective recorded -79.4% -- clearing its
+family floor by 1.9x and beating gpt2-small's own best n8 -- and diverse
+n4 sets the program record at +63.2%. Plain cartridges flip positive at
+both counts, the composed-below-noise-control content gap shrinks from
+1.04 to 0.30, and the alone arms RISE, so the objective is free at solo
+-- the count-one anchor working as designed. Both interference
+mechanisms the arc named now have a working lever, and both levers are
+base-side: the cartridges themselves need nothing.
+
 ## What this binds, and what is still open
 
 For the compartmental serving design the recipe changes the operating
@@ -207,11 +240,12 @@ replicated on a V100 with every verdict surviving the card (provenance
 below). The base-side LoRA has since been measured on both bases (section
 below): the operating point of record is base-LoRA + diverse cartridges
 at up to FOUR simultaneous compartments, scale-robust at ~58-59% on both
-bases; eight is deliverable on the 12-layer base (+33.3%) and not on the
-24-layer one, where a scope router selecting at most four compartments
-per query remains the honest deployment. Still open, filed rather than
-implied: a CONTENT-side lever for depth (more diverse voices in the
-medium pool, or content-aware LoRA objectives) with the medium record as
-its baseline; the budget slot policy under the stacked recipe; and the
-7B rung once a content-at-depth lever exists. The RESEARCH.md entry
-under `mi` carries all six run summaries and the extension list.
+bases. The content lever has since been measured (section above) and
+retires the deep-base caveat: with crowd-invariance distillation on the
+base, eight compartments are deliverable at depth (+38.1%) and four at
++63.2% is the best cell on any base -- the scope-router constraint is no
+longer forced by measurement. Still open, filed rather than implied: the
+gpt2-small rung under the invariance objective, the remaining 0.30
+content gap at n8, the budget slot policy, and the 7B rung, now
+unblocked. The RESEARCH.md entry under `mi` carries all seven run
+summaries and the extension list.
