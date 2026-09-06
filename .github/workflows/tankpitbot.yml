@@ -92,6 +92,19 @@ jobs:
       - name: Guards
         run: poetry run python -m scripts.guard
 
+      # These two are lint steps in the Makefile and this workflow does not
+      # call make -- it restates the step list. Anything added to `make lint`
+      # and not also added here runs on a developer's box and nowhere else.
+      # The wiki gates were in exactly that position between 9f88148a and
+      # this commit: enforced through pytest, but a violation arriving as
+      # `assert 22 == 0` after the whole suite rather than as a named page
+      # in a fast step, which was the entire motive for wiring them.
+      - name: Undecoded-field check
+        run: poetry run tankpit-check-undecoded-fields
+
+      - name: Wiki gates
+        run: poetry run tankpit-check-wiki
+
       - name: Lint
         run: |
           poetry run ruff check .
