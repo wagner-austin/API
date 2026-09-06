@@ -522,3 +522,27 @@ def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
 
     assert process.is_running() is False
     assert process.exit_code() == handle.wait(timeout=30)
+
+
+def test_a_second_bot_on_a_live_account_is_refused(spawner: _FakeSpawner) -> None:
+    """The game refuses a second login on one account, so the manager does.
+
+    This refusal had no test. It was covered on the developer's box and
+    missed on CI, and the difference was `accounts.json`: the file is
+    gitignored, so `configured_accounts()` answers with real accounts
+    here and with nothing on a fresh checkout. With nothing configured,
+    `account not in configured` refuses first and this branch is never
+    reached -- so the line's coverage was reporting the presence of an
+    untracked file rather than the presence of a test.
+    """
+    originals = _with_configured_accounts()
+    try:
+        manager = FleetManager()
+        first = manager.spawn(instance="alpha", account="second", kills=0, seconds=0)
+        with pytest.raises(FleetError, match="already has a live bot"):
+            manager.spawn(instance="bravo", account="second", kills=0, seconds=0)
+    finally:
+        _restore_account_hooks(originals)
+
+    assert first["instance"] == "alpha"
+    assert [process.pid for process in spawner.processes] == [1001]
