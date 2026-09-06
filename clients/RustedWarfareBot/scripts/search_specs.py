@@ -228,12 +228,13 @@ SPECS: Mapping[str, SearchSpec] = {
     # The win path's Phase A regime ([[impossible-economy-problem]]):
     # survival, not margin -- at a rung with zero wins the margin collapses
     # every loss toward one anchor, and standing time is the gradient the
-    # turtle-bank-nuke chain needs first. The base is re-aimed at the
-    # turtle screen's winner when impturtle96 reads out; until then it is
-    # the champion base, the same doctrine the margin regime perturbs.
+    # turtle-bank-nuke chain needs first. Re-aimed 2026-09-06 at evolve3's
+    # own graduate (+510.6 paired survival at t=4.20 on its first panel):
+    # the iterated climb searches AROUND the current best stander, the
+    # same re-aiming the vh regime performed at each adoption.
     "imp-survival": decode_search_spec(
         {
-            "base": "doctrines/flame-nocover.doctrine",
+            "base": "doctrines/evolve3-g3m10.doctrine",
             "space": {
                 "guns": [1, 2],
                 "nukes": [1],
