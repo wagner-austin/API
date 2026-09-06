@@ -10,11 +10,13 @@ source_paths:
 source_git_blobs:
   "src/rw_bot/policy/doom.py": 69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c
   "models/fleetdoom.ndjson": 7083f4c071b6a9372a4e65916fd9430ff1deeb58
-  "wiki/log.md": 89b7e75fb26e4b2b6cd9f3a448609405b830bd53
+  "wiki/log.md": 3f64813691cbcbb22e17fcd3266a000fb8819c1d
 provenance:
   - "runs/sweeps/impstrike48 — sweep run directory, untracked by git"
+  - "runs/sweeps/impincome96 — sweep run directory, untracked by git"
   - "wiki/log.md entry dated 2026-09-04"
-fact_checked: 2026-09-04
+  - "wiki/log.md impincome96 verdict entry dated 2026-09-06"
+fact_checked: 2026-09-06
 confidence: high
 ---
 
@@ -58,7 +60,13 @@ express:
    and the ratio; nothing learns WHAT TO BUY NEXT as the match
    unfolds. A learned build-priority head drives a response class no
    knob expresses (the income_ladder/withhold family all failed as
-   STATIC rules; a contextual one is unmeasured).
+   STATIC rules; a contextual one is unmeasured). Measured at this
+   rung 2026-09-06: the static ladder fired in 48/48 impincome96
+   matches and read paired survival -201.0 (sd 878.5) -- the
+   conversion's ~500-second payback does not fit a ~790-second median
+   match, so a STATIC rule pays for income the match never collects.
+   Exactly the trade a contextual head could refuse to make, and the
+   one no static knob can.
 3. **The doom template generalized to VH-and-below**, where responses
    are alive: the ledger's open "a response worth driving with the
    banked doom model" is still the cheapest head-shaped win, just not
