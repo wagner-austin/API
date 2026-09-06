@@ -360,9 +360,12 @@ arm prices the LoRA itself.
   `gpt2-medium-base-lora` differing only in the base, pinned by test and
   by the v39 image's smoke; job 55790169, image v39 `0bd7983b…` from
   `f7f696a8`, run document
-  `tools/hpc3/runs/cartridge-medium-base-lora-v100-v39.json`; twin
-  55798416 for the certificate): **a split decision that completes the
-  mechanism map.** The structural repair TRANSFERS to depth — medium's
+  `tools/hpc3/runs/cartridge-medium-base-lora-v100-v39{,-twin}.json`;
+  twin 55798416 ran on hpc3-gpu-18-02 against the original's
+  hpc3-gpu-17-02 and the two records are byte-identical — sha256
+  `372cee59da557974421fc8a6e38ba67cf53ee3b51a488e4dfc1848e29eabef77`
+  both, a CROSS-NODE certificate, the strongest class): **a split
+  decision that completes the mechanism map.** The structural repair TRANSFERS to depth — medium's
   n8 noise-composition control flips −0.29 → +0.42, a +0.71 swing on the
   exact quantity the scale rung measured as the collapse's structural
   half — and n4 sets a new medium best (**+59.3%** vs 54.1% without the
