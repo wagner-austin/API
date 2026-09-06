@@ -253,3 +253,130 @@ class TestFleetNodesReportsAndReconciles:
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
         assert nodes.main([_config.CONFIG_FLAG, str(mixed_config)]) == 0
+
+
+class TestReconcilingWithoutTouchingTheNetwork:
+    """``--probe never``: the two-file comparison, and nothing else.
+
+    THE CALLER IS A SCHEDULE. Reconciliation asks whether two files on one
+    disk agree, so paying an ssh round trip per node every N minutes to
+    answer it is the wrong shape -- and it puts two schedules on the same
+    fleet, producing two answers about one node minutes apart. Asked for by
+    the owner of ``fleet-nodes.json`` on board task df6f1dc8.
+    """
+
+    def _registry(self, tmp_path: pathlib.Path, **enabled: bool) -> pathlib.Path:
+        """Write an identity registry declaring the given nodes.
+
+        Args:
+            tmp_path: pytest's per-test temporary directory.
+            **enabled: Node name to whether the registry says it should
+                answer.
+
+        Returns:
+            Path to the written registry.
+        """
+        path = tmp_path / "fleet-nodes.json"
+        path.write_text(
+            dump_json_str({"nodes": [{"name": name, "enabled": v} for name, v in enabled.items()]}),
+            encoding="utf-8",
+        )
+        return path
+
+    def test_not_one_ssh_call_is_made(
+        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """THE MEASURED COST, and the only reason the flag exists. The
+        scripted runner holds NOTHING, so any command sent to any node --
+        including the enabled one -- raises "unscripted call" rather than
+        passing quietly."""
+        runner = FakeRun([])
+        _test_hooks.run = runner
+
+        assert (
+            nodes.main(
+                [
+                    _config.CONFIG_FLAG,
+                    str(mixed_config),
+                    nodes.REGISTRY_FLAG,
+                    str(self._registry(tmp_path, lavender=True, asleep=False)),
+                    nodes.PROBE_FLAG,
+                    nodes.PROBE_NEVER,
+                ]
+            )
+            == 0
+        )
+
+        assert runner.calls == []
+
+    def test_drift_still_sets_the_status(
+        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """Skipping the probe must not also skip the finding. A schedule that
+        exits 0 on drift is a schedule nobody would notice."""
+        _test_hooks.run = FakeRun([])
+
+        assert (
+            nodes.main(
+                [
+                    _config.CONFIG_FLAG,
+                    str(mixed_config),
+                    nodes.REGISTRY_FLAG,
+                    str(self._registry(tmp_path, lavender=True, asleep=True)),
+                    nodes.PROBE_FLAG,
+                    nodes.PROBE_NEVER,
+                ]
+            )
+            == 1
+        )
+
+    def test_asking_always_is_the_same_as_not_asking(self, mixed_config: pathlib.Path) -> None:
+        """The default has to stay the default. Every existing caller and the
+        20-minute fleet audit depend on the bare command probing."""
+        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
+
+        assert (
+            nodes.main(
+                [
+                    _config.CONFIG_FLAG,
+                    str(mixed_config),
+                    nodes.PROBE_FLAG,
+                    nodes.PROBE_ALWAYS,
+                ]
+            )
+            == 0
+        )
+
+    def test_a_mode_that_does_not_exist_is_refused(self, mixed_config: pathlib.Path) -> None:
+        """``--probe no`` must not be read as ``never``. A schedule that
+        quietly probed anyway would reintroduce the exact cost the flag was
+        added to remove, while reporting success."""
+        _test_hooks.run = FakeRun([])
+
+        with pytest.raises(ValueError, match=r"--probe must be one of"):
+            nodes.main(
+                [
+                    _config.CONFIG_FLAG,
+                    str(mixed_config),
+                    nodes.PROBE_FLAG,
+                    "no",
+                ]
+            )
+
+    def test_probing_nothing_and_reconciling_nothing_is_refused(
+        self, mixed_config: pathlib.Path
+    ) -> None:
+        """It would print no lines and exit 0 -- a silence indistinguishable
+        from a fleet in perfect health, which is the one thing an exit status
+        must never be able to mean by accident."""
+        _test_hooks.run = FakeRun([])
+
+        with pytest.raises(ValueError, match=r"needs --registry"):
+            nodes.main(
+                [
+                    _config.CONFIG_FLAG,
+                    str(mixed_config),
+                    nodes.PROBE_FLAG,
+                    nodes.PROBE_NEVER,
+                ]
+            )

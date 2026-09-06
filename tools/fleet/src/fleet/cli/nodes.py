@@ -30,6 +30,21 @@ other kept dispatching to it all day.
 THE PATH IS PASSED, NEVER SEARCHED FOR. Omit the flag and no reconciliation is
 claimed; a command that hunted for the other repo would report agreement on
 any machine where it simply failed to find it.
+
+``--probe never`` RECONCILES WITHOUT TOUCHING THE NETWORK, and it exists for
+one caller: a scheduled drift check. Reconciliation compares two files on one
+disk, so paying an ssh round trip per node every N minutes to answer it is the
+wrong shape -- and worse, it means two schedules probing the same fleet and
+producing two answers about one node minutes apart. Requested by the owner of
+``fleet-nodes.json`` for exactly that schedule (board task df6f1dc8).
+
+A VALUED FLAG RATHER THAN A BARE SWITCH, deliberately. ``cli_args``'s hand
+parser holds every flag to one value, on the reasoning that ``--host
+--verbose`` must not bind a flag as a hostname; adding switch support to a
+helper shared with hpc3 and Model-Trainer to save four characters here would
+be a shared-library change driven by one caller. ``--probe never`` also reads
+correctly in a Task Scheduler action line, where this will actually live, and
+leaves room for a third mode without changing shape.
 """
 
 from __future__ import annotations
@@ -49,7 +64,19 @@ _log = get_logger(__name__)
 
 REGISTRY_FLAG = "--registry"
 
-_FLAGS = (_config.CONFIG_FLAG, REGISTRY_FLAG)
+PROBE_FLAG = "--probe"
+
+PROBE_ALWAYS = "always"
+"""Ask every enabled node what it has free. The default, and the whole point
+of the command when no reconciliation was requested."""
+
+PROBE_NEVER = "never"
+"""Touch no node. Reconciliation only, for a schedule that wants the two-file
+comparison and nothing else."""
+
+_PROBE_MODES = (PROBE_ALWAYS, PROBE_NEVER)
+
+_FLAGS = (_config.CONFIG_FLAG, REGISTRY_FLAG, PROBE_FLAG)
 
 
 def describe_fleet(loaded: _config.LoadedWorkspace) -> tuple[list[str], int]:
@@ -103,6 +130,38 @@ def _probe_line(name: str, node: NodeConfig, live: int) -> tuple[str, int]:
     return f"{name}: {describe_node(node, state)}", 0
 
 
+def probe_mode(parsed: dict[str, str], registry_path: str | None) -> str:
+    """Decide whether to ask the nodes anything, refusing a mode that does nothing.
+
+    Args:
+        parsed: Flags already read from the command line.
+        registry_path: What ``--registry`` was given, or None.
+
+    Returns:
+        One of :data:`PROBE_ALWAYS` or :data:`PROBE_NEVER`, defaulting to
+        always -- the behaviour every existing caller and schedule already
+        depends on.
+
+    Raises:
+        ValueError: When ``--probe`` names a mode that does not exist, or
+            when ``--probe never`` is given with no ``--registry``. That
+            second combination probes nothing and reconciles nothing, so it
+            would print no lines and exit 0 -- a silence indistinguishable
+            from a fleet in perfect health. Refused rather than allowed to
+            mean "everything is fine".
+    """
+    mode = parsed.get(PROBE_FLAG, PROBE_ALWAYS)
+    if mode not in _PROBE_MODES:
+        raise ValueError(f"{PROBE_FLAG} must be one of {list(_PROBE_MODES)}, got {mode!r}")
+    if mode == PROBE_NEVER and registry_path is None:
+        raise ValueError(
+            f"{PROBE_FLAG} {PROBE_NEVER} asks no node anything, so it needs {REGISTRY_FLAG} "
+            "to have something left to do. Without it this command would print nothing and "
+            "exit 0, which reads exactly like a healthy fleet."
+        )
+    return mode
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Describe every node in the workspace.
 
@@ -111,12 +170,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             the process arguments.
 
     Returns:
-        0 when every enabled node answered and, if ``--registry`` was given,
-        the two registries agree. 1 when any enabled node did not answer or
-        the registries have drifted.
+        0 when every probed node answered and, if ``--registry`` was given,
+        the two registries agree. 1 when any probed node did not answer or
+        the registries have drifted. Under ``--probe never`` the status is
+        the reconciliation's alone, because nothing was asked of any node
+        and a node therefore cannot have failed.
 
     Raises:
-        ValueError: When a flag is unknown, repeated, or missing its value.
+        ValueError: When a flag is unknown, repeated, missing its value, or
+            names a probe mode that does not exist.
         JSONTypeError: If the workspace document is invalid.
         AppError: ``NODE_REGISTRY_UNREADABLE`` when ``--registry`` names
             something this cannot read. Raised rather than reported as a
@@ -126,12 +188,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     loaded = _config.load_workspace(parsed)
+    registry_path = parsed.get(REGISTRY_FLAG)
 
-    lines, unreachable = describe_fleet(loaded)
-    for line in lines:
-        _log.info("%s", line)
+    unreachable = 0
+    if probe_mode(parsed, registry_path) == PROBE_ALWAYS:
+        lines, unreachable = describe_fleet(loaded)
+        for line in lines:
+            _log.info("%s", line)
 
-    drift = _reconcile(loaded, parsed.get(REGISTRY_FLAG))
+    drift = _reconcile(loaded, registry_path)
     for line in drift:
         _log.info("REGISTRY DRIFT %s", line)
 
@@ -181,7 +246,16 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["REGISTRY_FLAG", "describe_fleet", "entrypoint", "main"]
+__all__ = [
+    "PROBE_ALWAYS",
+    "PROBE_FLAG",
+    "PROBE_NEVER",
+    "REGISTRY_FLAG",
+    "describe_fleet",
+    "entrypoint",
+    "main",
+    "probe_mode",
+]
 
 
 # Without this, `python -m fleet.cli.nodes` imports the module, runs nothing
