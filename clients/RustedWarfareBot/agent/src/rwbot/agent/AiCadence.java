@@ -25,7 +25,114 @@ package rwbot.agent;
  */
 final class AiCadence {
 
+    /**
+     * Ticks logged so far by the early-window tracker; stops at
+     * {@link #EARLY_WINDOW}. One counter, on the tick thread only.
+     */
+    private static int earlyTicks;
+
+    /**
+     * How many ticks the per-tick tracker records from liveness. The E/F and
+     * G/H pairs forked inside the first sample window (75 frames), so 120
+     * covers the whole contested region with margin and bounds the log.
+     */
+    private static final int EARLY_WINDOW = 120;
+
     private AiCadence() {
+    }
+
+    /**
+     * Logs the AI's task-aim state for one tick of the early window.
+     *
+     * <p>Rides {@link TickBracket}'s ENTER, which the engine drains at the
+     * top of every tick body -- per-FRAME resolution where the sample line
+     * has only per-75-frames. The per-sample probes proved the state layer
+     * identical across forking twins while exactly one task re-aim ran in
+     * one twin and not the other; only a per-tick timestamp of the aim
+     * fields can say WHICH tick diverged and what the aim changed from and
+     * to. Reads only, armed only with the draw tap, bounded to
+     * {@link #EARLY_WINDOW} lines: a diagnostic that ran forever would bloat
+     * every log for a window that ends two seconds in.
+     */
+    static void onTick() {
+        if (!RandomTap.requested()) {
+            return;
+        }
+        int tick = earlyTicks;
+        if (tick >= EARLY_WINDOW) {
+            return;
+        }
+        earlyTicks = tick + 1;
+        Object engine = EngineHandle.current();
+        if (engine == null) {
+            return;
+        }
+        StringBuilder out = new StringBuilder();
+        Class<?> teams = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        Class<?> ai = EngineAccess.pinnedClass(EngineNames.AI_CLASS);
+        java.lang.reflect.Method lookup =
+                EngineAccess.pinnedMethod(teams, EngineNames.TEAM_LOOKUP, int.class);
+        int count = EngineAccess.readStaticIntField(teams, EngineNames.TEAM_COUNT);
+        for (int index = 0; index < count; index++) {
+            Object team = EngineAccess.invoke(lookup, null, Integer.valueOf(index));
+            if (team == null || !ai.isInstance(team)) {
+                continue;
+            }
+            Object held = EngineAccess.readField(team, EngineNames.AI_SUBCONTROLLERS);
+            java.util.Collection<?> roster = held == null ? null : ObjectView.containedValues(held);
+            out.append(" team=")
+                    .append(EngineAccess.readIntField(team, EngineNames.TEAM_ID))
+                    .append(" bm=")
+                    .append(roster == null ? "?" : Integer.valueOf(roster.size()));
+            if (roster == null) {
+                continue;
+            }
+            for (Object controller : roster) {
+                if (controller == null
+                        || !EngineNames.AI_TASK_CLASS.equals(controller.getClass().getName())) {
+                    continue;
+                }
+                out.append(" n#")
+                        .append(fieldValueOrAbsent(controller, "Q"))
+                        .append(" S=")
+                        .append(fieldValueOrAbsent(controller, "S"))
+                        .append(",")
+                        .append(fieldValueOrAbsent(controller, "T"))
+                        .append(" d=")
+                        .append(taskChoice(controller));
+            }
+        }
+        Log.info("aitick t=" + tick + out);
+    }
+
+    /**
+     * Renders a task's chosen group as class:category, or its plain value
+     * when it is not a roster object -- the task's {@code d} holds either a
+     * chosen group or null, and which group it holds is the fact the tick
+     * line exists to timestamp.
+     *
+     * @param task The n-task.
+     * @return A compact signature of the choice.
+     */
+    private static String taskChoice(Object task) {
+        java.lang.reflect.Field field;
+        try {
+            field = task.getClass().getDeclaredField("d");
+        } catch (NoSuchFieldException absent) {
+            return "absent";
+        }
+        try {
+            field.setAccessible(true);
+            Object chosen = field.get(task);
+            if (chosen == null) {
+                return "null";
+            }
+            return chosen.getClass().getSimpleName() + ':'
+                    + fieldValueOrAbsent(chosen, "b") + '/' + fieldValueOrAbsent(chosen, "c");
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read task choice on " + task.getClass().getName(), e);
+        }
     }
 
     /**

@@ -87,6 +87,11 @@ final class TickBracket {
     private static void enterAndChain() {
         tickThread = Thread.currentThread();
         inTick = true;
+        // Diagnostic ride-along, tap-armed only and read-only: per-tick AI
+        // task-aim timestamps for the early window (AiCadence). Draws
+        // nothing, mutates nothing, and is inert on every production panel,
+        // so the bracket's determinism contract is untouched.
+        AiCadence.onTick();
         Orders.onGameThread(TickBracket::exitAndChain);
     }
 
