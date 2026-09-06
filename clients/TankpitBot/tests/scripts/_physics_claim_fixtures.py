@@ -66,6 +66,14 @@ def _claims_page(claims_json: str) -> str:
     return f"# Page\n\n{CLAIM_FENCE_OPEN}\n{claims_json}\n```\n"
 
 
+#: Where the fixture package's dotted name is rooted. The wiki half of
+#: these tests lives in a tmp_path tree while the code half lives here,
+#: so the source root has to be stated: the rule now reads bound
+#: symbols out of a tree rather than importing them, and tmp_path has
+#: no ``src`` for ``tests.scripts.physics_fixture`` to resolve under.
+_FIXTURE_SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+
 def _run(project_root: Path) -> int:
     """Run the rule against a fake tree bound to the fixture package.
 
@@ -75,4 +83,8 @@ def _run(project_root: Path) -> int:
     Returns:
         Violation count.
     """
-    return run_physics_claim_rules(project_root, package_name=FIXTURE_PACKAGE)
+    return run_physics_claim_rules(
+        project_root,
+        package_name=FIXTURE_PACKAGE,
+        source_root=_FIXTURE_SOURCE_ROOT,
+    )

@@ -9,9 +9,8 @@ claim target must carry a claim. The per-kind checkers are
 
 from __future__ import annotations
 
+import ast
 import importlib
-import importlib.util
-import pkgutil
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -152,6 +151,80 @@ def _import_claim_module(
     return module, []
 
 
+def _symbol_is_exported(module_name: str, symbol_name: str, source_root: Path) -> bool:
+    """Report whether a module in THIS tree exports the claimed symbol.
+
+    The existence half of a claim, answered from source so that it
+    describes the tree under check. ``_import_claim_module`` below
+    still imports, because the per-kind checks compare a claimed value
+    against the live object and no amount of parsing produces one --
+    so a claim's VALUE is only ever verified against the installed
+    tree, while its BINDING is verified against whichever tree this is
+    pointed at. Committing a wiki page ahead of the code it describes
+    fails the binding half, which is the case this separation exists
+    for.
+
+    Args:
+        module_name: Dotted module from the claim's code address.
+        symbol_name: The symbol the claim binds to.
+        source_root: Directory the dotted name is rooted at.
+
+    Returns:
+        True when the module binds the name at module level. This is
+        the source-level reading of ``hasattr``, which is what it
+        replaces -- NOT ``__all__`` membership, which is a stricter
+        question the reverse-coverage half asks separately. A claim may
+        legitimately name a symbol the module does not re-export.
+    """
+    module_path = _module_source_path(module_name, source_root)
+    if module_path is None:
+        return False
+    return symbol_name in _module_level_names(module_path.read_text(encoding="utf-8"))
+
+
+def _module_source_path(module_name: str, source_root: Path) -> Path | None:
+    """Locate the ``.py`` file a dotted module name names in a tree.
+
+    Args:
+        module_name: Dotted module path.
+        source_root: Directory the dotted name is rooted at.
+
+    Returns:
+        The module file, a package's ``__init__.py``, or None when the
+        tree holds neither.
+    """
+    module_path = _target_path(module_name, source_root).with_suffix(".py")
+    if module_path.is_file():
+        return module_path
+    package_init = _target_path(module_name, source_root) / "__init__.py"
+    return package_init if package_init.is_file() else None
+
+
+def _module_level_names(source: str) -> frozenset[str]:
+    """Collect every name a module binds at module level.
+
+    Args:
+        source: A module's source text.
+
+    Returns:
+        Names an importer would find as attributes: assignments,
+        annotated assignments, functions, classes, and imported names
+        under whichever spelling they land as.
+    """
+    names: set[str] = set()
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                names.add(node.target.id)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            names.update(a.asname or a.name.split(".")[0] for a in node.names)
+    return frozenset(names)
+
+
 def _binds_into_target(module_name: str, target: str) -> bool:
     """Report whether a claim's module sits inside one bound target.
 
@@ -174,6 +247,7 @@ def _check_claim(
     claim: JSONObject,
     page: str,
     targets: tuple[str, ...],
+    source_root: Path,
 ) -> tuple[str, str, list[str]]:
     """Fully verify one claim.
 
@@ -181,6 +255,7 @@ def _check_claim(
         claim: Claim object.
         page: Page name for violation messages.
         targets: Bound targets; the claim must bind into one of them.
+        source_root: Directory the claim's dotted module is rooted at.
 
     Returns:
         Tuple of (claim id, bound code address, violations). The id and
@@ -201,6 +276,13 @@ def _check_claim(
     if not any(_binds_into_target(module_name, target) for target in targets):
         joined = ", ".join(targets)
         return claim_id, code, [f"{prefix}: '{module_name}' is outside {joined}"]
+    # Absent MODULE and absent SYMBOL are different repairs, so they stay
+    # different messages -- and both are answered from the tree under
+    # check, before the import that can only speak for the installed one.
+    if _module_source_path(module_name, source_root) is None:
+        return claim_id, code, [f"{prefix}: module '{module_name}' does not import"]
+    if not _symbol_is_exported(module_name, symbol_name, source_root):
+        return claim_id, code, [f"{prefix}: '{symbol_name}' not found in {module_name}"]
     module, import_violations = _import_claim_module(module_name, prefix)
     if module is None:
         return claim_id, code, import_violations
@@ -209,23 +291,85 @@ def _check_claim(
     return claim_id, code, _run_kind_check(kinds_present[0], claim, module, symbol_name, prefix)
 
 
-def _module_addresses(module_name: str) -> tuple[list[str], list[str]]:
+def _exported_names(source: str) -> list[str] | None:
+    """Read a module's ``__all__`` out of its source text.
+
+    Read rather than imported, and that is the whole point of this
+    module's binding half. Importing resolves through ``sys.path`` to
+    the INSTALLED package, which under an editable install is the
+    working tree -- so a run that points the wiki half at one revision
+    and the code half at another compares a pair that exists nowhere.
+    Reading the source makes both halves functions of the same tree,
+    which is what lets the rule be run against a committed revision.
+
+    Args:
+        source: A module's source text.
+
+    Returns:
+        The exported names in declaration order, or None when the
+        module declares no ``__all__`` or declares one this cannot
+        read. Every one of tankpit_bot's 495 declarations is a literal
+        list of literal strings; a computed one returns None and is
+        reported as missing rather than guessed at.
+    """
+    for node in ast.parse(source).body:
+        # Both spellings occur here: a bare `__all__ = [...]` and an
+        # annotated `__all__: tuple[str, ...] = ()`. Reading only the
+        # first reported `ledger.outcome` as undeclared when it
+        # declares an explicitly empty one.
+        value: ast.expr | None
+        if isinstance(node, ast.Assign):
+            named = any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets)
+            value = node.value
+        elif isinstance(node, ast.AnnAssign):
+            named = isinstance(node.target, ast.Name) and node.target.id == "__all__"
+            value = node.value
+        else:
+            continue
+        if not named or value is None:
+            continue
+        if not isinstance(value, ast.List | ast.Tuple):
+            return None
+        names: list[str] = []
+        for element in value.elts:
+            if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
+                return None
+            names.append(element.value)
+        return names
+    return None
+
+
+def _module_addresses(module_name: str, module_path: Path) -> tuple[list[str], list[str]]:
     """Enumerate one module's public symbol addresses.
 
     Args:
-        module_name: Dotted module to read ``__all__`` from.
+        module_name: Dotted module the addresses are reported under.
+        module_path: The ``.py`` file to read ``__all__`` from.
 
     Returns:
         Pair of (addresses ``module:symbol``, violations).
     """
-    module = importlib.import_module(module_name)
-    exported: list[str] | None = getattr(module, "__all__", None)
+    exported = _exported_names(module_path.read_text(encoding="utf-8"))
     if exported is None:
         return [], [f"{module_name}: bound module lacks __all__"]
     return [f"{module_name}:{name}" for name in exported], []
 
 
-def _public_symbol_addresses(target_name: str) -> tuple[list[str], list[str]]:
+def _target_path(target_name: str, source_root: Path) -> Path:
+    """Locate a dotted target inside a source tree.
+
+    Args:
+        target_name: Dotted package or module.
+        source_root: Directory the dotted name is rooted at.
+
+    Returns:
+        The package directory or the module file; the returned path
+        may not exist, which the caller reports.
+    """
+    return source_root.joinpath(*target_name.split("."))
+
+
+def _public_symbol_addresses(target_name: str, source_root: Path) -> tuple[list[str], list[str]]:
     """Enumerate every public symbol address of one bound target.
 
     A target that resolves to a package contributes every public
@@ -235,33 +379,47 @@ def _public_symbol_addresses(target_name: str) -> tuple[list[str], list[str]]:
 
     Args:
         target_name: Dotted package or module to enumerate.
+        source_root: Directory the dotted name is rooted at, so the
+            target is read from the tree under check rather than from
+            whichever copy happens to be installed.
 
     Returns:
         Pair of (addresses ``module:symbol``, violations).
     """
-    spec = importlib.util.find_spec(target_name)
-    if spec is None:
-        return [], [f"target '{target_name}' does not resolve"]
-    if spec.submodule_search_locations is None:
-        return _module_addresses(target_name)
-    addresses: list[str] = []
-    violations: list[str] = []
-    for module_info in pkgutil.iter_modules(list(spec.submodule_search_locations)):
-        module_addresses, module_violations = _module_addresses(f"{target_name}.{module_info.name}")
-        addresses.extend(module_addresses)
-        violations.extend(module_violations)
-    return addresses, violations
+    target = _target_path(target_name, source_root)
+    if target.is_dir() and (target / "__init__.py").is_file():
+        addresses: list[str] = []
+        violations: list[str] = []
+        for child in sorted(target.iterdir()):
+            if child.name == "__init__.py":
+                continue
+            if child.is_dir() and (child / "__init__.py").is_file():
+                name, path = f"{target_name}.{child.name}", child / "__init__.py"
+            elif child.suffix == ".py":
+                name, path = f"{target_name}.{child.stem}", child
+            else:
+                continue
+            child_addresses, child_violations = _module_addresses(name, path)
+            addresses.extend(child_addresses)
+            violations.extend(child_violations)
+        return addresses, violations
+    module = target.with_suffix(".py")
+    if module.is_file():
+        return _module_addresses(target_name, module)
+    return [], [f"target '{target_name}' does not resolve"]
 
 
 def _scan_wiki_claims(
     pages_dir: Path,
     targets: tuple[str, ...],
+    source_root: Path,
 ) -> tuple[dict[str, str], list[str]]:
     """Check every claim block under a wiki pages directory.
 
     Args:
         pages_dir: Directory holding the wiki content pages.
         targets: Bound targets every claim must bind into.
+        source_root: Directory the bound targets are rooted at.
 
     Returns:
         Pair of (claim id -> bound code address, violations).
@@ -278,7 +436,7 @@ def _scan_wiki_claims(
             claims, parse_violations = _parse_claim_block(raw, page)
             violations.extend(parse_violations)
             for claim in claims:
-                claim_id, code, claim_violations = _check_claim(claim, page, targets)
+                claim_id, code, claim_violations = _check_claim(claim, page, targets, source_root)
                 violations.extend(claim_violations)
                 if claim_id and claim_id in claim_codes:
                     violations.append(f"{page}#{claim_id}: duplicate claim id")
@@ -315,14 +473,27 @@ def run_physics_claim_rules(
     project_root: Path,
     *,
     package_name: str | None = None,
+    source_root: Path | None = None,
 ) -> int:
     """Run the wiki-claim binding rule over a project tree.
+
+    Both halves of the comparison -- the claims in ``wiki/pages`` and
+    the public symbols they must bind to -- are read from the tree this
+    is pointed at. That is what makes the rule answerable about a
+    COMMITTED revision: extract one with ``git archive`` and pass its
+    root, and the answer describes that revision rather than whatever
+    is installed. Binding by import instead would read the wiki from
+    the extracted tree and the symbols from the editable install, a
+    pair that exists in no revision and is green by construction.
 
     Args:
         project_root: Project root containing ``wiki/pages``.
         package_name: Bind this single target instead of
             :const:`CLAIM_TARGETS`. Used by tests to drive the rule
             against a synthetic fixture package.
+        source_root: Directory the target's dotted name is rooted at.
+            Defaults to ``project_root / "src"``, the layout every
+            package here uses.
 
     Returns:
         Number of violations found (0 means the rule passes).
@@ -330,11 +501,12 @@ def run_physics_claim_rules(
     pages_dir = project_root / "wiki" / "pages"
     if not pages_dir.is_dir():
         return 0
+    roots = project_root / "src" if source_root is None else source_root
     targets = CLAIM_TARGETS if package_name is None else (package_name,)
-    claim_codes, violations = _scan_wiki_claims(pages_dir, targets)
+    claim_codes, violations = _scan_wiki_claims(pages_dir, targets, roots)
     addresses: list[str] = []
     for target in targets:
-        target_addresses, target_violations = _public_symbol_addresses(target)
+        target_addresses, target_violations = _public_symbol_addresses(target, roots)
         addresses.extend(target_addresses)
         violations.extend(target_violations)
     violations.extend(_reverse_coverage_violations(addresses, claim_codes))
