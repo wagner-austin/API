@@ -188,6 +188,23 @@ final class EngineAccess {
     }
 
     /**
+     * Reads a {@code float} field through the same pinned-name machinery.
+     *
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field's value.
+     * @throws IllegalStateException When the field is absent or not a float.
+     */
+    static float readFloatField(Object target, String name) {
+        try {
+            return pinnedField(target.getClass(), name).getFloat(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read float " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
      * Writes a {@code float} field through the same pinned-name machinery.
      *
      * @param target Object to write to.

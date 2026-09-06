@@ -312,6 +312,16 @@ final class EngineNames {
     /** The engine's map instance. */
     static final String MAP = "bL";
 
+    /**
+     * The map's scanned pool-point list, {@code ArrayList<Point>} on the map
+     * instance. The AI's expansion chooser {@code an()} draws a random index
+     * into this list and returns null WITHOUT drawing while it is empty
+     * (decompile {@code game/a/a.java an()}), which is what makes its
+     * population frame part of the determinism story rather than a detail
+     * (wiki: policy-determinism, the 2026-09-06 section).
+     */
+    static final String MAP_POOL_POINTS = "A";
+
     /** Map size in tiles. Positions are world units; these are not. */
     static final String MAP_TILES_X = "C";
 
@@ -480,6 +490,21 @@ final class EngineNames {
 
     /** The AI's list of sub-controllers, driven once per AI update. */
     static final String AI_SUBCONTROLLERS = "bm";
+
+    /**
+     * The AI's base-group creation clock: drains by the frame delta and on
+     * zero the AI attempts an expansion group via its pool chooser, re-arming
+     * to 300 or 2000 (decompile {@code game/a/a.java} ~1190). Restored by
+     * {@link #AI_INIT}; read by the cadence probe (AiCadence).
+     */
+    static final String AI_CLOCK_BASE_GROUP = "aT";
+
+    /**
+     * The AI's unit-group creation clock, same drain shape, re-arming to 100
+     * or 5000 (decompile {@code game/a/a.java} ~1219). Restored by
+     * {@link #AI_INIT}; read by the cadence probe (AiCadence).
+     */
+    static final String AI_CLOCK_UNIT_GROUP = "aU";
 
     /**
      * The two sub-controller classes that carry delta-driven cadence clocks.

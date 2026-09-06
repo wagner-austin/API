@@ -374,6 +374,14 @@ final class CommandChannel {
                 // draws desynced -- or prove no stream did (see RandomLedger).
                 Log.info("rng frame=" + frame + " " + RandomLedger.describe());
                 RandomTap.flush(frame);
+                if (RandomTap.requested()) {
+                    // Beside the tap on purpose: the tap names WHICH call
+                    // site's draw count varied, this names what fed it --
+                    // the pool count the expansion chooser declines on and
+                    // the creation clocks that schedule the attempt
+                    // (AiCadence; wiki: policy-determinism 2026-09-06).
+                    Log.info("aicadence frame=" + frame + " " + AiCadence.describe(engine));
+                }
                 offer(StateStream.sample(engine));
                 if (awaitAck()) {
                     nextSampleFrame = frame + lockstepFrames;
