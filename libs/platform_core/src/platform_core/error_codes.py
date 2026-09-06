@@ -541,6 +541,29 @@ class BoardWatchErrorCode(ErrorCodeBase):
     FOOTER_MALFORMED = "FOOTER_MALFORMED"
 
 
+class HpcWakeErrorCode(ErrorCodeBase):
+    """Announcing Slurm terminal states on the agent board.
+
+    A sibling of :class:`BoardWatchErrorCode` for the same reason that is a
+    sibling of :class:`FleetErrorCode`: the failures live at this package's
+    own layer. Transport is :class:`McpClientErrorCode`'s, credentials are
+    :class:`BoardWatchErrorCode`'s (the bridge loads them through the same
+    reader), and the cluster's are :class:`Hpc3ErrorCode`'s. What is left is
+    what only this package can get wrong.
+    """
+
+    # Configuration: the standing task announcements land in. Required, not
+    # discovered -- an announcement posted to a guessed task is one nobody
+    # subscribed to, which reads exactly like the bridge working.
+    TASK_ID_MISSING = "TASK_ID_MISSING"
+
+    # A terminal accounting row for a job the ledger never recorded. The
+    # query is BUILT from the ledger, so this is a contract violation --
+    # answering it with a skip would hide whichever expansion bug produced
+    # it behind a quiet cycle.
+    JOB_UNKNOWN_TO_LEDGER = "JOB_UNKNOWN_TO_LEDGER"
+
+
 __all__ = [
     "BoardWatchErrorCode",
     "CalendarErrorCode",
@@ -550,6 +573,7 @@ __all__ = [
     "FleetErrorCode",
     "HandwritingErrorCode",
     "Hpc3ErrorCode",
+    "HpcWakeErrorCode",
     "McpClientErrorCode",
     "ModelTrainerErrorCode",
     "OAuthErrorCode",
