@@ -19,7 +19,7 @@ from hpc3.core.image_sbatch import (
     TMP_DIR,
     render_build_sbatch,
 )
-from tests.conftest import bash_beside_git, is_wsl_launcher, posix_bash
+from tests.bash_discovery import bash_beside_git, is_wsl_launcher, posix_bash
 
 _SMOKE = "/opt/env/bin/python -m pkg.probe --device cpu --out /tmp/probe.json"
 

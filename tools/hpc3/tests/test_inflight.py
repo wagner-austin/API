@@ -184,6 +184,7 @@ class TestSubmitEnforcesIt:
             log_dir="/pub/wagnera3/logs",
             ledger_path=self._ledger(tmp_path, artifact),
             submitted_at=_AT,
+            submitter="",
             cluster=cluster(),
             charge_account="",
         )

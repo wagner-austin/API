@@ -172,6 +172,7 @@ def submit_array(
     log_dir: str,
     ledger_path: pathlib.Path,
     submitted_at: str,
+    submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
 ) -> list[SubmittedMember]:
@@ -189,6 +190,10 @@ def submit_array(
             ids are returned.
         submitted_at: ISO-8601 timestamp for the records, supplied by the
             caller so this function reads no clock.
+        submitter: The submitting session's agent-board label, or ``""``
+            when it declared none -- supplied by the caller so this
+            function reads no environment. One value for every member: an
+            array has one submitter.
         cluster: The cluster whose measured limits preflight and the audit
             record are taken from.
         charge_account: Slurm account to bill, or empty for none.
@@ -253,6 +258,7 @@ def submit_array(
                 deterministic=member["deterministic"],
                 experiment=member["experiment"],
                 image_digest="" if image is None else image["sha256"],
+                submitter=submitter,
                 artifact=member["artifact"],
             ),
         )

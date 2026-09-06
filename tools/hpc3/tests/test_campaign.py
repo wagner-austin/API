@@ -364,6 +364,7 @@ class TestTheCommand:
                 "deterministic": False,
                 "experiment": {"corpus": "v3"},
                 "image_digest": "",
+                "submitter": "",
                 "artifact": _AZ,
             }
         )

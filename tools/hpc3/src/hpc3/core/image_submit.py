@@ -150,6 +150,7 @@ def submit_build(
     artifact: str,
     ledger_path: pathlib.Path,
     submitted_at: str,
+    submitter: str,
     cluster: ClusterFacts,
 ) -> str:
     """Preflight, submit and record an already-rendered image build.
@@ -174,6 +175,9 @@ def submit_build(
         ledger_path: Local append-only record of submitted jobs.
         submitted_at: ISO-8601 timestamp, supplied by the caller so this
             function reads no clock.
+        submitter: The submitting session's agent-board label, or ``""``
+            when it declared none -- supplied by the caller so this
+            function reads no environment.
         cluster: The cluster whose measured limits the verdict is checked
             against.
 
@@ -225,6 +229,7 @@ def submit_build(
             # the image, so it cannot have run inside one. That is a positive
             # fact and differs from every real digest rather than matching any.
             image_digest="",
+            submitter=submitter,
             artifact=artifact,
         ),
     )

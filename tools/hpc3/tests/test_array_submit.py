@@ -71,6 +71,7 @@ def _submit(
             log_dir="/l",
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
+            submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
         )
@@ -154,7 +155,7 @@ class TestRefusals:
             '{"job_id": "500", "project": "abl", "name": "abl.older", "host": "hpc3", '
             '"partition": "free-gpu", "submitted_at": "2026-09-01T00:00:00+00:00", '
             '"log_dir": "/l", "deterministic": false, "experiment": {"rung": "774M"}, '
-            '"image_digest": "", "artifact": "/pub/a0.pt"}\n',
+            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt"}\n',
             encoding="utf-8",
         )
         fake_run.add("squeue --me", stdout="500|abl.older|RUNNING\n")
@@ -204,7 +205,7 @@ class TestRefusals:
             '{"job_id": "55678543_2", "project": "abl", "name": "abl.older-s2", "host": "hpc3", '
             '"partition": "free-gpu", "submitted_at": "2026-09-01T00:00:00+00:00", '
             '"log_dir": "/l", "deterministic": false, "experiment": {"rung": "774M"}, '
-            '"image_digest": "", "artifact": "/pub/a0.pt"}\n',
+            '"image_digest": "", "submitter": "", "artifact": "/pub/a0.pt"}\n',
             encoding="utf-8",
         )
         fake_run.add("squeue --me", stdout="55678543_[2-3%2]|abl.older|PENDING\n")

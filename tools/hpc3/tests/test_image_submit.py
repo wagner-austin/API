@@ -130,6 +130,7 @@ class TestSubmittingAndRecording:
             artifact="/pub/wagnera3/images/v22/abl.sif",
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
+            submitter="fable-brain-audit-0903",
             cluster=HPC3,
         )
 

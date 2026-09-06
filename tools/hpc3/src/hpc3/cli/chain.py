@@ -79,6 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         log_dir=log_dir(root, project),
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
+        submitter=_config.submitter_label(),
         cluster=cluster,
         charge_account=budget["charge_account"],
     )

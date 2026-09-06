@@ -247,6 +247,7 @@ class TestSubmitChain:
             log_dir="/pub/wagnera3/logs",
             ledger_path=tmp_path / "ledger.jsonl",
             submitted_at=_AT,
+            submitter="fable-brain-audit-0903",
             cluster=cluster(),
             charge_account="",
         )

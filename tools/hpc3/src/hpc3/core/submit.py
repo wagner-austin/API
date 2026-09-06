@@ -75,6 +75,7 @@ def submit(
     log_dir: str,
     ledger_path: pathlib.Path,
     submitted_at: str,
+    submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
 ) -> str:
@@ -95,6 +96,10 @@ def submit(
         ledger_path: Local append-only record of submitted jobs.
         submitted_at: ISO-8601 timestamp for the record, supplied by the
             caller so this function reads no clock and stays testable.
+        submitter: The submitting session's agent-board label, or ``""``
+            when it declared none -- supplied by the caller so this
+            function reads no environment. Recorded so a terminal-state
+            announcement can tag the party waiting for this job.
         cluster: The cluster whose measured limits preflight and the audit
             record are taken from.
 
@@ -157,6 +162,7 @@ def submit(
             # of a directory environment, which differs from every real digest
             # rather than matching any of them.
             image_digest="" if spec["image"] is None else spec["image"]["sha256"],
+            submitter=submitter,
             artifact=spec["artifact"],
         ),
     )

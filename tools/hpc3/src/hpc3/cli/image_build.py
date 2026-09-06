@@ -94,6 +94,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         artifact=f"{image_dir}/{image_name}",
         ledger_path=pathlib.Path(connection["ledger"]),
         submitted_at=_test_hooks.now_iso(),
+        submitter=_config.submitter_label(),
         cluster=cluster,
     )
 

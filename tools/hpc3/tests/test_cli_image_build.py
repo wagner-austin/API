@@ -88,7 +88,12 @@ class TestItSubmitsAndRecords:
         assert emitted[2] == "  logs /pub/wagnera3/images/v22/build-55645549.out"
 
     def test_the_ledger_row_lands_where_the_workspace_says(
-        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str
+        self,
+        tmp_path: pathlib.Path,
+        fake_run: FakeRun,
+        emitted: list[str],
+        frozen_clock: str,
+        declared_label: str,
     ) -> None:
         """The same ledger triage reads, which is what stops the build showing
         as unclaimed for the two hours it runs."""
@@ -99,6 +104,7 @@ class TestItSubmitsAndRecords:
             ("55645549", "abl", "abl.image-v22")
         ]
         assert entries[0]["submitted_at"] == frozen_clock
+        assert entries[0]["submitter"] == declared_label
 
     def test_the_watch_line_carries_the_config_that_was_used(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str], frozen_clock: str

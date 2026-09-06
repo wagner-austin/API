@@ -31,6 +31,7 @@ def submit_sweep(
     log_dir: str,
     ledger_path: pathlib.Path,
     submitted_at: str,
+    submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
 ) -> list[SubmittedMember]:
@@ -45,6 +46,9 @@ def submit_sweep(
         log_dir: Absolute cluster directory for the tasks' output.
         ledger_path: Local append-only record, one entry per member.
         submitted_at: ISO-8601 timestamp for the records.
+        submitter: The submitting session's agent-board label, or ``""``
+            when it declared none. One value for every member: a sweep has
+            one submitter.
         cluster: The cluster whose measured limits each member is validated
             against.
         charge_account: Slurm account to bill, or empty for none.
@@ -67,6 +71,7 @@ def submit_sweep(
         log_dir=log_dir,
         ledger_path=ledger_path,
         submitted_at=submitted_at,
+        submitter=submitter,
         cluster=cluster,
         charge_account=charge_account,
     )

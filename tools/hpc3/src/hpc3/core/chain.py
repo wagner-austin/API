@@ -51,6 +51,7 @@ def submit_chain(
     log_dir: str,
     ledger_path: pathlib.Path,
     submitted_at: str,
+    submitter: str,
     cluster: ClusterFacts,
     charge_account: str,
 ) -> list[SubmittedMember]:
@@ -66,6 +67,9 @@ def submit_chain(
         ledger_path: Local append-only record, written per stage as it is
             submitted.
         submitted_at: ISO-8601 timestamp for the records.
+        submitter: The submitting session's agent-board label, or ``""``
+            when it declared none. One value for every stage: a chain has
+            one submitter.
         cluster: The cluster whose measured limits each stage is validated
             against.
 
@@ -91,6 +95,7 @@ def submit_chain(
             log_dir=log_dir,
             ledger_path=ledger_path,
             submitted_at=submitted_at,
+            submitter=submitter,
             cluster=cluster,
             charge_account=charge_account,
         )

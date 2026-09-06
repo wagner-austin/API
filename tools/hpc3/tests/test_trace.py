@@ -59,6 +59,7 @@ def _entry(
         "deterministic": False,
         "experiment": experiment,
         "image_digest": image_digest,
+        "submitter": None,
         "artifact": artifact,
     }
 

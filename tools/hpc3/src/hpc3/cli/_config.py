@@ -14,6 +14,7 @@ from __future__ import annotations
 import pathlib
 
 from platform_core import cli_args
+from platform_core.config import _optional_env_str
 from platform_core.json_utils import JSONValue, load_json_str
 
 from hpc3.contracts.workspace import (
@@ -91,8 +92,34 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
     return decode_workspace(value, config_dir=config_dir)
 
 
+SUBMITTER_ENV = "BOARD_AGENT_LABEL"
+"""Where a session declares the board label its submissions record."""
+
+
+def submitter_label() -> str:
+    """Read the submitting session's declared agent-board label.
+
+    Shared by every submitting entry point for the same reason
+    :func:`load_workspace` is: the ledger's ``submitter`` field must mean
+    one thing, not five slightly different readings of the environment.
+
+    Returns:
+        The label from :data:`SUBMITTER_ENV`, or ``""`` when the variable
+        is unset, empty, or whitespace -- the ledger's positive "declared
+        none". The spellings of not-declaring collapse deliberately: an
+        empty export names nobody to tag, exactly like no export. Read
+        through :func:`platform_core.config._optional_env_str` because that
+        is the workspace's one sanctioned environment reader; the guard
+        bans a second one.
+    """
+    value = _optional_env_str(SUBMITTER_ENV)
+    return "" if value is None else value
+
+
 __all__ = [
     "CONFIG_FLAG",
+    "SUBMITTER_ENV",
     "load_workspace",
     "load_workspace_connection",
+    "submitter_label",
 ]

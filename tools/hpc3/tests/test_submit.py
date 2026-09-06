@@ -29,6 +29,7 @@ from tests.conftest import (
 )
 
 _AT = "2026-08-22T16:00:00+00:00"
+_SUBMITTER = "fable-brain-audit-0903"
 
 
 def _spec(**overrides: JSONValue) -> JobSpec:
@@ -77,6 +78,7 @@ def _submit(tmp_path: pathlib.Path) -> str:
         log_dir="/pub/wagnera3/logs",
         ledger_path=tmp_path / "ledger.jsonl",
         submitted_at=_AT,
+        submitter=_SUBMITTER,
         cluster=cluster(),
         charge_account="",
     )
@@ -191,6 +193,7 @@ class TestSubmitRecordsTheJob:
                 deterministic=False,
                 experiment={"arm": "B", "seed": "42"},
                 image_digest="",
+                submitter=_SUBMITTER,
                 artifact=None,
             )
         ]

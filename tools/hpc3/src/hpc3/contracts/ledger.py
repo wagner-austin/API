@@ -85,6 +85,24 @@ class LedgerEntry(TypedDict):
               as "no image", because rows named ``...-v4`` and
               ``ka-probe-v5-...`` demonstrably ran inside images that
               nothing recorded.
+        submitter: The agent-board label of the session that submitted the
+            job, so a bridge announcing the job's terminal state on the
+            board can tag the one party that is waiting for it. Recorded
+            here because the ledger is the only durable record of who asked
+            for a job: Slurm knows the cluster account, which is the same
+            for every session on this machine.
+
+            THREE states, mirroring ``image_digest`` for the same reason:
+
+            - a label -- the submitting session declared its board label
+              (``BOARD_AGENT_LABEL`` in its environment);
+            - ``""`` -- the submitter was asked and declared no label,
+              which is a positive fact: the job is announceable but there
+              is nobody specific to tag;
+            - ``None`` -- this row does not record it. Only rows written
+              before the field existed carry this, backfilled in one
+              auditable pass like the 122 pre-``artifact`` rows; every
+              writer now records one of the first two.
         artifact: Where the run was TOLD to write its manifest, or None when
             the row does not name one -- whether because the run declared
             none or because it predates the field, which are the same thing
@@ -111,6 +129,7 @@ class LedgerEntry(TypedDict):
     deterministic: bool
     experiment: dict[str, str]
     image_digest: str | None
+    submitter: str | None
     artifact: str | None
 
 
@@ -216,6 +235,7 @@ def encode_ledger_entry(entry: LedgerEntry) -> dict[str, JSONValue]:
         "deterministic": entry["deterministic"],
         "experiment": encode_experiment(entry["experiment"]),
         "image_digest": entry["image_digest"],
+        "submitter": entry["submitter"],
         "artifact": entry["artifact"],
     }
 
@@ -252,6 +272,7 @@ def decode_ledger_entry(value: JSONValue, cluster: ClusterFacts) -> LedgerEntry:
         deterministic=require_bool(value, "deterministic"),
         experiment=require_experiment(value, "experiment"),
         image_digest=_require_str_or_null(value, "image_digest"),
+        submitter=_require_str_or_null(value, "submitter"),
         artifact=_require_path_or_null(value, "artifact"),
     )
 

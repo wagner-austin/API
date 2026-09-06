@@ -39,6 +39,7 @@ def _entry(**overrides: str) -> LedgerEntry:
         "deterministic": False,
         "experiment": {"arm": "B", "seed": "42"},
         "image_digest": None,
+        "submitter": None,
         "artifact": None,
     }
     base.update(overrides)
@@ -116,6 +117,7 @@ class TestLedgerEntryContract:
             "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
             "image_digest": "sha256:" + "ab" * 32,
+            "submitter": "fable-brain-audit-0903",
             "artifact": "/pub/wagnera3/floor/results/run.json",
         }
         assert encode_ledger_entry(decode_ledger_entry(payload)) == payload
@@ -138,6 +140,7 @@ class TestLedgerEntryContract:
             "deterministic": False,
             "experiment": {"arm": "B", "seed": "42"},
             "image_digest": None,
+            "submitter": None,
             "artifact": None,
         }
 
@@ -150,9 +153,9 @@ class TestLedgerEntryContract:
         as "unknown" silently. The backfill happened once and is in git; the
         tolerance would have been permanent.
         """
-        for key in ("image_digest", "artifact"):
+        for key in ("image_digest", "submitter", "artifact"):
             broken = dict(self._row())
-            broken.update({"image_digest": None, "artifact": None})
+            broken.update({"image_digest": None, "submitter": None, "artifact": None})
             del broken[key]
             with pytest.raises(JSONTypeError, match=f"Field '{key}' is required"):
                 decode_ledger_entry(broken)
@@ -174,6 +177,22 @@ class TestLedgerEntryContract:
 
         assert unrecorded["image_digest"] is None
         assert directory["image_digest"] == ""
+
+    def test_an_unrecorded_submitter_is_not_the_same_as_declaring_none(self) -> None:
+        """Same three states as the image digest, for the same reason: the
+        8989 pre-field rows were backfilled to null, and reading them as
+        "declared no label" would assert something nobody said."""
+        unrecorded = decode_ledger_entry({**self._row(), "submitter": None})
+        undeclared = decode_ledger_entry({**self._row(), "submitter": ""})
+        labelled = decode_ledger_entry({**self._row(), "submitter": "fable-brain-audit-0903"})
+
+        assert unrecorded["submitter"] is None
+        assert undeclared["submitter"] == ""
+        assert labelled["submitter"] == "fable-brain-audit-0903"
+
+    def test_a_mistyped_submitter_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a string or null"):
+            decode_ledger_entry({**self._row(), "submitter": 7})
 
     def test_a_mistyped_image_digest_is_a_corrupted_row_not_an_old_one(self) -> None:
         """Absent is history; present-and-wrong is corruption, and they differ."""
