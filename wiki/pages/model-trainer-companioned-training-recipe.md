@@ -11,6 +11,8 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py
   - services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py
+  - services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py
   - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 832de4e79068336b1cb8e6491d8b0553029f528a
@@ -19,7 +21,9 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 944a2a1033890596c7c3d722647df505a023e63a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "docs/RESEARCH.md": 34510e8ff2fa12467f1a28058c91ffafe67fbf9f
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": f681da3c6c2d27b81e564483706c64bf31673e92
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": c191ab72218c03978e73d2804babad28b99cece6
+  "docs/RESEARCH.md": a7c8a524418102c422f6f3ef3a9262945c14081b
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -31,6 +35,7 @@ provenance:
   - "diverse-pool cells measured 2026-09-05 on HPC3: job 55772675 on hpc3-gpu-17-03 (V100) + twin 55773234, image v36 sha256 0401aa9b (truncated), plan gpt2-companions-diverse, board task d2c03dd4; companion-cross instrument in-record"
   - "n2/n4 grid REPLICATED on a V100 2026-09-05 (job 55773639, v36): every verdict survives the card -- trained-p0.5 78.0%/41.4% vs the 3090 Ti's 78.3%/44.6%, orderings identical, overdose replicated in both kinds"
   - "scale rung measured 2026-09-05 on HPC3: job 55776517 on hpc3-gpu-16-00 (V100) + twin 55786853 on hpc3-gpu-18-00, image v37 sha256 2adee62f (truncated), plan gpt2-medium-companions-diverse, plan commit e5476201, records CROSS-NODE BIT-IDENTICAL sha256 5179b893 (truncated)"
+  - "base-LoRA cells measured 2026-09-05 on HPC3: gpt2 jobs 55787810 (gpu-16-05) + 55788364 (gpu-18-02) CROSS-NODE BIT-IDENTICAL sha256 efad0a93 (truncated), image v38 sha256 13bd47e9, plan commit e1bc2009; gpt2-medium job 55790169 (gpu-17-02), image v39 sha256 0bd7983b, plan commit f7f696a8, board task 6c752568"
 fact_checked: "2026-09-04"
 confidence: high
 hubs: [services]
@@ -166,6 +171,29 @@ many-compartment composition rather than buying it, and the larger-base
 path runs through base-side adaptation. Four-compartment deployment,
 by contrast, is scale-robust at ~55% on both bases.
 
+## The base learns the crowd, and the two levers stack
+
+The lever every cartridge-side measurement pointed at: a rank-8 LoRA on
+the base's attention trains to do language modeling behind a DRAWN number
+of frozen composed cartridges (uniform one to eight, from the three
+held-out pool corpora), through the same ``train_on`` loop that trained
+every recorded cartridge -- only which side learns switched. On gpt2 it
+settles both questions at once. Base-side alone repairs the STRUCTURAL
+catastrophe (plain cartridges at n4: -45.4% naive to -6.9% adapted, with
+the noise-composition control leaping -0.12 to +0.28) but leaves content
+interference untouched -- necessary, not sufficient. Stacked with the
+diverse recipe it sets the program's records: **n4 +58.1%, n8 +33.3%**
+(against diverse-alone's 55.5%/28.0%, the n8 gain at twice the tightest
+floor in the program), at ~zero solo cost. On gpt2-medium the verdict
+splits and completes the mechanism map: the structural repair TRANSFERS
+to depth (the n8 noise control flips -0.29 to +0.42, exactly the
+quantity the scale rung measured as the collapse's structural half) and
+n4 sets a new medium best (+59.3%), but real-content composition at n8
+still collapses (-79.4%, composed a full 1.04 below the repaired noise
+control, cell floor 0.53 -- seed-chaotic). Depth amplifies CONTENT
+interference in a way neither lever touches; structure is solved at both
+scales.
+
 ## What this binds, and what is still open
 
 For the compartmental serving design the recipe changes the operating
@@ -175,8 +203,14 @@ quarter of the solo gain where naive training erased it -- with the
 diverse pool as the recipe of record. Companionship itself is EXHAUSTED
 as an n8 lever, by three convergent measurements. The n2/n4 grid has since been
 replicated on a V100 with every verdict surviving the card (provenance
-below). Still open, filed rather than implied: the budget slot policy under
-diverse-companioned training, and base-side composition LoRA -- after
-the scale rung, not merely the next lever but the ONLY standing lever
-for many-compartment composition on larger bases. The RESEARCH.md entry under
-`mi` carries all four run summaries and the extension list.
+below). The base-side LoRA has since been measured on both bases (section
+below): the operating point of record is base-LoRA + diverse cartridges
+at up to FOUR simultaneous compartments, scale-robust at ~58-59% on both
+bases; eight is deliverable on the 12-layer base (+33.3%) and not on the
+24-layer one, where a scope router selecting at most four compartments
+per query remains the honest deployment. Still open, filed rather than
+implied: a CONTENT-side lever for depth (more diverse voices in the
+medium pool, or content-aware LoRA objectives) with the medium record as
+its baseline; the budget slot policy under the stacked recipe; and the
+7B rung once a content-at-depth lever exists. The RESEARCH.md entry
+under `mi` carries all six run summaries and the extension list.
