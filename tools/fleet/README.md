@@ -181,6 +181,59 @@ the owner's reservation — never the other way round.
 `reserved_cores` and `reserved_ram_gb` have no cluster analogue at all. Slurm
 never has to leave a core for the person sitting at the node.
 
+## `enabled`, and why the fleet is written down twice
+
+Every node in `fleet.json` declares `enabled`, and the decoder refuses a node
+that leaves it out. Neither default is safe: defaulting it to `true` is the
+defect this field was added for, and defaulting it to `false` would silently
+shrink the fleet with nothing to notice the missing capacity.
+
+**"Was never asked" is not "did not answer."** Three states, three codes,
+three different next actions:
+
+| state | what happened | what to do |
+|---|---|---|
+| `NODE_DISABLED` | deliberately off; not probed at all | edit `fleet.json` |
+| `NODE_UNREACHABLE` | should have answered, did not | check the tailnet |
+| `NODE_MEMORY_EXHAUSTED` | answered, no room | wait |
+
+A reader handed one code for all three goes to the wrong place twice. A named
+`--node` that is disabled is refused rather than rerouted, for the same reason
+an unreachable one is: running somewhere else answers a question nobody asked.
+In auto-select a disabled node is skipped **without an ssh call**, which is the
+whole saving — the alternative costs a ten-second `ConnectTimeout` per node per
+dispatch.
+
+The fleet is described in two repositories and the columns barely overlap:
+
+| file | carries |
+|---|---|
+| `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
+| `API/tools/fleet/fleet.json` | host, stage root, cores, RAM, GPU, budget, **enabled** — what a dispatch may take |
+
+Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
+make this repo depend on a checkout of the other one, which dispatch must work
+without. They are two views. The one fact they share is whether a machine is
+expected to answer, and on 2026-09-05 they disagreed about it: the identity
+registry marked `loki` off for a trip, this workspace had no field to learn
+that into, and every auto-select dispatch paid an ssh timeout rediscovering it
+until one was refused outright.
+
+So they are made **checkable** against each other:
+
+```bash
+fleet-nodes --config fleet.json --registry ../../../MCPs/fleet-mcp/fleet-nodes.json
+```
+
+One line per disagreement — each saying which way it runs and what it costs,
+because the two directions call for opposite edits — and exit 1. This is
+detection, not prevention: nothing stops somebody editing one file and not the
+other, it stops that going unnoticed.
+
+**The path is passed, never searched for.** Omitting the flag claims no
+reconciliation at all, and a version that hunted for the other repo would
+report agreement on any machine where it merely failed to find it.
+
 ## The lease is the part that fixes incident (1)
 
 A dispatch takes a lease on `(node, project)` and holds it for the run, so two

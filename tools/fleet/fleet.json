@@ -17,7 +17,8 @@
         "worker_ram_gb": 1.1,
         "max_concurrent_runs": 1,
         "max_disk_gb": 40.0
-      }
+      },
+      "enabled": true
     },
     "lavender": {
       "host": "lavender",
@@ -36,7 +37,8 @@
         "worker_ram_gb": 1.1,
         "max_concurrent_runs": 2,
         "max_disk_gb": 40.0
-      }
+      },
+      "enabled": true
     },
     "loki": {
       "host": "loki",
@@ -50,7 +52,8 @@
         "worker_ram_gb": 1.1,
         "max_concurrent_runs": 2,
         "max_disk_gb": 40.0
-      }
+      },
+      "enabled": false
     }
   },
   "projects": {

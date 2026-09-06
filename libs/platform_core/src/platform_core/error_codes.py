@@ -406,6 +406,19 @@ class FleetErrorCode(ErrorCodeBase):
     NODE_DISK_EXHAUSTED = "NODE_DISK_EXHAUSTED"
     NODE_OWNER_RESERVED = "NODE_OWNER_RESERVED"
     NODE_UNREACHABLE = "NODE_UNREACHABLE"
+    # Distinct from NODE_UNREACHABLE, and the distinction is the whole point:
+    # "was never asked" is not "did not answer". A node the workspace declares
+    # disabled is deliberately off -- travelling, unprovisioned, retired --
+    # and dispatching to it is a request that should never have left the
+    # ground, not a fault to investigate on the tailnet.
+    NODE_DISABLED = "NODE_DISABLED"
+    # The identity registry named by `fleet-nodes --registry` could not be
+    # read. Drift itself has NO code, deliberately: it is reported as one
+    # printed line per disagreement plus a non-zero exit, the same shape as an
+    # unreachable node, because raising on the first disagreement would hide
+    # the rest. An unreadable registry is the opposite case -- nothing was
+    # compared at all, and reporting that as "no drift" would be a lie.
+    NODE_REGISTRY_UNREADABLE = "NODE_REGISTRY_UNREADABLE"
 
     # The lease -- one project's environment, mutated by one dispatch at a
     # time. This is the code that answers the incident the package was written

@@ -79,33 +79,58 @@ def choose(
         The node's workspace name, its declaration, and the worker count.
 
     Raises:
-        AppError: With a workspace code if a name is undeclared, a capacity
-            code if the chosen node refuses, or ``NODE_MEMORY_EXHAUSTED`` if
-            no node can take the work.
+        AppError: With a workspace code if a name is undeclared,
+            ``NODE_DISABLED`` if the named node is one the workspace says is
+            off, a capacity code if the chosen node refuses, or -- when no
+            node can take the work -- whichever of ``NODE_UNREACHABLE`` /
+            ``NODE_DISABLED`` / ``NODE_MEMORY_EXHAUSTED``
+            :func:`capacity.first_fit` classifies the fleet-wide refusal as.
     """
     plan = require_project(loaded.workspace, project)
     require_resources_free(loaded, plan)
     if named is not None:
         node = require_node(loaded.workspace, named)
+        if not node["enabled"]:
+            # Its own code, not NODE_UNREACHABLE. "Was never asked" is not
+            # "did not answer", and silently rerouting to another machine
+            # would answer a question nobody put.
+            raise AppError(
+                FleetErrorCode.NODE_DISABLED,
+                f"{named} is declared disabled in this workspace, so nothing was asked of "
+                "it. Re-enable it in fleet.json once it is expected to answer, or dispatch "
+                "without --node to let the fleet choose among the machines that are.",
+            )
         state = _probe(loaded, name=named, node=node)
         return named, node, capacity.plan_dispatch(node, state, plan)
 
     candidates: list[tuple[str, NodeConfig, NodeState]] = []
-    unassessable: list[tuple[str, str]] = []
+    unassessed: list[capacity.Unassessed] = []
     for name, declared in sorted(loaded.workspace["nodes"].items()):
+        if not declared["enabled"]:
+            # NOT PROBED AT ALL, and ``asked=False`` is how the refusal knows
+            # to say so. A disabled node is one nobody expects to answer, and
+            # asking anyway costs a ten-second ssh timeout per dispatch --
+            # which is what this workspace did for loki, every time, for the
+            # whole of 2026-09-05.
+            unassessed.append(
+                capacity.Unassessed(
+                    name=name, reason="declared disabled in this workspace", asked=False
+                )
+            )
+            continue
         # The VALUE form, deliberately. A node that does not answer is one
         # fewer candidate, not the end of the search -- see
-        # ``capacity.first_fit``'s ``unassessable`` for the dispatch that was
+        # ``capacity.first_fit``'s ``unassessed`` for the dispatch that was
         # refused because loki was asleep while lavender had room.
         outcome = probe.attempt_probe(
             declared, live_runs=records.live_runs(loaded.ledger, node=name)
         )
         answered: NodeState | None = outcome["state"]
         if answered is None:
-            unassessable.append((name, outcome["reason"]))
+            unassessed.append(capacity.Unassessed(name=name, reason=outcome["reason"], asked=True))
             continue
         candidates.append((name, declared, answered))
-    chosen, workers = capacity.first_fit(tuple(candidates), plan, unassessable=tuple(unassessable))
+    chosen, workers = capacity.first_fit(tuple(candidates), plan, unassessed=tuple(unassessed))
     return chosen, loaded.workspace["nodes"][chosen], workers
 
 

@@ -19,6 +19,7 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_bool,
     require_dict,
     require_float,
     require_int,
@@ -74,6 +75,20 @@ class NodeConfig(TypedDict):
         ram_gb: Total physical memory.
         gpu: The node's CUDA device, or None for a CPU-only node. Explicitly
             None rather than absent -- see the module docstring.
+        enabled: Whether this machine is expected to answer at all. False for
+            one that is deliberately off -- travelling, unprovisioned,
+            retired -- and it is the difference between "did not answer" and
+            "was never asked".
+
+            THIS FIELD IS THE HALF OF THE FLEET REGISTRY THIS FILE WAS
+            MISSING. ``fleet-mcp/fleet-nodes.json`` in the MCPs repo has
+            carried ``enabled`` since the fleet was first written down; this
+            workspace had no way to say it. On 2026-09-05 that registry marked
+            loki off for a trip, this one never learned, and every auto-select
+            dispatch paid a ten-second ssh timeout rediscovering it -- one of
+            which was refused outright. Declared here rather than derived,
+            because the API repo must be able to dispatch without an MCPs
+            checkout; ``fleet-nodes --registry`` reconciles the two.
         budget: What share of this machine a dispatch may take.
     """
 
@@ -82,6 +97,7 @@ class NodeConfig(TypedDict):
     logical_cores: int
     ram_gb: float
     gpu: NodeGpu | None
+    enabled: bool
     budget: NodeBudget
 
 
@@ -175,6 +191,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "logical_cores": node["logical_cores"],
         "ram_gb": node["ram_gb"],
         "gpu": None if gpu is None else encode_node_gpu(gpu),
+        "enabled": node["enabled"],
         "budget": encode_node_budget(node["budget"]),
     }
 
@@ -201,6 +218,13 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
             "indistinguishable from one nobody has filled in, and the difference matters "
             "the moment a measurement is pinned to a card."
         )
+    if "enabled" not in value:
+        raise JSONTypeError(
+            "node must declare 'enabled'. Defaulting it to true is what let a machine that "
+            "was deliberately powered off keep being dispatched to, ten seconds of ssh "
+            "timeout at a time; defaulting it to false would silently shrink the fleet. "
+            "Neither guess is safe, so the workspace says which."
+        )
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -214,6 +238,7 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
         logical_cores=logical_cores,
         ram_gb=_positive_float(value, "ram_gb"),
         gpu=None if gpu_value is None else decode_node_gpu(gpu_value),
+        enabled=require_bool(value, "enabled"),
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 

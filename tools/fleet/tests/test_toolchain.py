@@ -90,6 +90,7 @@ def _node(host: str = "lavender") -> NodeConfig:
         logical_cores=16,
         ram_gb=32.0,
         gpu=None,
+        enabled=True,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,
@@ -119,6 +120,7 @@ def _workspace_document() -> JSONObject:
         "logical_cores": 16,
         "ram_gb": 32.0,
         "gpu": None,
+        "enabled": True,
         "budget": budget,
     }
     return {

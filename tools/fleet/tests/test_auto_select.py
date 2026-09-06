@@ -34,7 +34,7 @@ from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
-from fleet.core.capacity import first_fit
+from fleet.core.capacity import Unassessed, first_fit
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -65,6 +65,7 @@ def _node(host: str) -> NodeConfig:
         logical_cores=16,
         ram_gb=32.0,
         gpu=None,
+        enabled=True,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,
@@ -103,13 +104,38 @@ def _project() -> ProjectConfig:
     )
 
 
+def _silent(name: str, reason: str) -> Unassessed:
+    """A node that was asked over ssh and did not answer.
+
+    Args:
+        name: Its workspace name.
+        reason: What the ssh call reported.
+
+    Returns:
+        The entry to hand ``first_fit``.
+    """
+    return Unassessed(name=name, reason=reason, asked=True)
+
+
+def _off(name: str) -> Unassessed:
+    """A node the workspace declares disabled, so nothing was sent to it.
+
+    Args:
+        name: Its workspace name.
+
+    Returns:
+        The entry to hand ``first_fit``.
+    """
+    return Unassessed(name=name, reason="declared disabled in this workspace", asked=False)
+
+
 class TestFirstFitWeighsWhatAnswered:
     def test_an_unreachable_node_does_not_stop_a_healthy_one_winning(self) -> None:
         """THE REGRESSION. loki asleep, lavender fine -> lavender takes it."""
         chosen, workers = first_fit(
             ((("lavender"), _node("lavender"), _state("lavender")),),
             _project(),
-            unassessable=(("loki", "ssh to loki failed: bad handshake"),),
+            unassessed=(_silent("loki", "ssh to loki failed: bad handshake"),),
         )
 
         assert chosen == "lavender"
@@ -125,7 +151,7 @@ class TestFirstFitWeighsWhatAnswered:
             first_fit(
                 (("sedona", _node("sedona"), _state("sedona", free_ram_gb=0.2)),),
                 _project(),
-                unassessable=(("loki", "ssh to loki failed: bad handshake"),),
+                unassessed=(_silent("loki", "ssh to loki failed: bad handshake"),),
             )
 
         assert excinfo.value.code is FleetErrorCode.NODE_MEMORY_EXHAUSTED
@@ -139,12 +165,40 @@ class TestFirstFitWeighsWhatAnswered:
             first_fit(
                 (),
                 _project(),
-                unassessable=(("loki", "ssh to loki failed"), ("sedona", "timed out")),
+                unassessed=(_silent("loki", "ssh to loki failed"), _silent("sedona", "timed out")),
             )
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert "loki:" in excinfo.value.message
         assert "sedona:" in excinfo.value.message
+
+    def test_a_fleet_that_was_never_asked_is_not_called_unreachable(self) -> None:
+        """NOTHING FAILED HERE. Every node is switched off in the workspace,
+        so no ssh was sent and no machine declined to answer. Calling that
+        NODE_UNREACHABLE sends the reader to the tailnet to debug a network
+        that is fine, when the fix is one boolean in fleet.json."""
+        with pytest.raises(AppError) as excinfo:
+            first_fit(
+                (),
+                _project(),
+                unassessed=(_off("loki"), _off("sedona")),
+            )
+
+        assert excinfo.value.code is FleetErrorCode.NODE_DISABLED
+        assert "loki: declared disabled" in excinfo.value.message
+        assert "sedona: declared disabled" in excinfo.value.message
+
+    def test_one_silent_node_outranks_the_disabled_ones(self) -> None:
+        """A machine that was asked and said nothing is the only one of the
+        three with something to investigate, so it names the refusal."""
+        with pytest.raises(AppError) as excinfo:
+            first_fit(
+                (),
+                _project(),
+                unassessed=(_off("loki"), _silent("sedona", "timed out")),
+            )
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 
     def test_a_workspace_with_no_nodes_is_not_called_unreachable(self) -> None:
         """Declaring zero nodes is a config fault, not a fleet that is down.

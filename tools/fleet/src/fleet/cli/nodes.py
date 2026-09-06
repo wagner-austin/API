@@ -2,6 +2,7 @@
 
 Usage:
     fleet-nodes --config fleet.json
+    fleet-nodes --config fleet.json --registry ../MCPs/fleet-mcp/fleet-nodes.json
 
 The ``sinfo`` of this package, and the command to run before wondering why a
 dispatch was refused. It probes every declared node and prints one line each,
@@ -15,6 +16,20 @@ useless exactly when the fleet is degraded. The unreachable node's own error
 message is printed on its line, so the reason is visible without a second
 command -- and the exit status is non-zero, so a script cannot read a partial
 fleet as a whole one.
+
+A DISABLED NODE IS NOT PROBED, and says so. Nobody expects it to answer, and
+asking costs a ten-second ssh timeout per node per run.
+
+``--registry`` RECONCILES THIS WORKSPACE AGAINST THE FLEET'S IDENTITY REGISTRY
+(``fleet-mcp/fleet-nodes.json``, in the MCPs repo) and exits non-zero if they
+disagree about which machines are expected to answer. The fleet is written down
+in two repositories -- see :mod:`fleet.core.registry` for why merging them
+would be wrong -- and on 2026-09-05 one marked loki off for a trip while the
+other kept dispatching to it all day.
+
+THE PATH IS PASSED, NEVER SEARCHED FOR. Omit the flag and no reconciliation is
+claimed; a command that hunted for the other repo would report agreement on
+any machine where it simply failed to find it.
 """
 
 from __future__ import annotations
@@ -28,11 +43,13 @@ from platform_core.logging import get_logger, setup_logging
 
 from fleet.cli import _config
 from fleet.contracts.node import NodeConfig, describe_node
-from fleet.core import probe, records
+from fleet.core import probe, records, registry
 
 _log = get_logger(__name__)
 
-_FLAGS = (_config.CONFIG_FLAG,)
+REGISTRY_FLAG = "--registry"
+
+_FLAGS = (_config.CONFIG_FLAG, REGISTRY_FLAG)
 
 
 def describe_fleet(loaded: _config.LoadedWorkspace) -> tuple[list[str], int]:
@@ -50,6 +67,11 @@ def describe_fleet(loaded: _config.LoadedWorkspace) -> tuple[list[str], int]:
     lines: list[str] = []
     unreachable = 0
     for name, node in sorted(loaded.workspace["nodes"].items()):
+        if not node["enabled"]:
+            # Not probed, and not counted against the exit status. A machine
+            # nobody expects to answer has not failed to.
+            lines.append(f"{name}: DISABLED -- declared off in this workspace, not probed")
+            continue
         live = records.live_runs(loaded.ledger, node=name)
         verdict = _probe_line(name, node, live)
         lines.append(verdict[0])
@@ -89,22 +111,58 @@ def main(argv: Sequence[str] | None = None) -> int:
             the process arguments.
 
     Returns:
-        0 when every node answered, 1 when any did not.
+        0 when every enabled node answered and, if ``--registry`` was given,
+        the two registries agree. 1 when any enabled node did not answer or
+        the registries have drifted.
 
     Raises:
         ValueError: When a flag is unknown, repeated, or missing its value.
         JSONTypeError: If the workspace document is invalid.
+        AppError: ``NODE_REGISTRY_UNREADABLE`` when ``--registry`` names
+            something this cannot read. Raised rather than reported as a
+            line: a reconciliation that could not run has established
+            nothing, and must not be mistaken for one that found agreement.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
-    loaded = _config.load_workspace(cli_args.parse_single_flags(tokens, _FLAGS))
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    loaded = _config.load_workspace(parsed)
 
     lines, unreachable = describe_fleet(loaded)
     for line in lines:
         _log.info("%s", line)
+
+    drift = _reconcile(loaded, parsed.get(REGISTRY_FLAG))
+    for line in drift:
+        _log.info("REGISTRY DRIFT %s", line)
+
     if unreachable:
         _log.info("%d node(s) did not answer", unreachable)
+    if drift:
+        _log.info("%d registry disagreement(s); the fleet is written down twice", len(drift))
+    if unreachable or drift:
         return 1
     return 0
+
+
+def _reconcile(loaded: _config.LoadedWorkspace, registry_path: str | None) -> tuple[str, ...]:
+    """Reconcile against the identity registry, if one was named.
+
+    Args:
+        loaded: The workspace and its resolved record paths.
+        registry_path: What ``--registry`` was given, or None.
+
+    Returns:
+        One line per disagreement, empty when none were found OR when no
+        registry was named. Those two are deliberately the same value: the
+        caller's exit status is driven by drift FOUND, and a reconciliation
+        nobody asked for cannot find any.
+
+    Raises:
+        AppError: ``NODE_REGISTRY_UNREADABLE`` from the reader.
+    """
+    if registry_path is None:
+        return ()
+    return registry.reconcile(loaded.workspace, registry_path=registry_path)
 
 
 def entrypoint() -> None:
@@ -123,7 +181,7 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["describe_fleet", "entrypoint", "main"]
+__all__ = ["REGISTRY_FLAG", "describe_fleet", "entrypoint", "main"]
 
 
 # Without this, `python -m fleet.cli.nodes` imports the module, runs nothing

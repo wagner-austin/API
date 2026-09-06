@@ -37,6 +37,30 @@ from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 
 
+class Unassessed(TypedDict):
+    """A node that produced no verdict, and whether it was asked for one.
+
+    THE ``asked`` FLAG IS THE WHOLE TYPE. Both kinds of node are equally
+    unusable for this dispatch, so the obvious shape is one list of excuses --
+    and that shape loses the only fact that tells the reader where to go. A
+    node that was asked and stayed silent is a tailnet problem; a node nobody
+    asked is a line in ``fleet.json``. Merging them sends half of every
+    refusal's readers to the wrong file.
+
+    Attributes:
+        name: The node's workspace name.
+        reason: Why it produced no verdict, in its own words where it had
+            any.
+        asked: Whether an ssh probe was actually made. False for a node the
+            workspace declares disabled, which costs nothing precisely
+            because nothing was sent.
+    """
+
+    name: str
+    reason: str
+    asked: bool
+
+
 class DispatchVerdict(TypedDict):
     """What one node would do with one project, right now.
 
@@ -152,11 +176,36 @@ def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) ->
     return verdict["workers"]
 
 
+def _nothing_fits_code(
+    candidates: tuple[tuple[str, NodeConfig, NodeState], ...],
+    unassessed: tuple[Unassessed, ...],
+) -> FleetErrorCode:
+    """Classify a fleet-wide refusal by what actually happened.
+
+    Three answers, because they send a reader to three different places: the
+    tailnet, ``fleet.json``, or the clock. Order matters -- a node that was
+    asked and stayed silent outranks one nobody asked, because it is the only
+    one of the three with something to investigate.
+
+    Args:
+        candidates: Nodes that answered and were weighed.
+        unassessed: Nodes that produced no verdict.
+
+    Returns:
+        The code the refusal carries.
+    """
+    if not candidates and any(entry["asked"] for entry in unassessed):
+        return FleetErrorCode.NODE_UNREACHABLE
+    if not candidates and unassessed:
+        return FleetErrorCode.NODE_DISABLED
+    return FleetErrorCode.NODE_MEMORY_EXHAUSTED
+
+
 def first_fit(
     candidates: tuple[tuple[str, NodeConfig, NodeState], ...],
     project: ProjectConfig,
     *,
-    unassessable: tuple[tuple[str, str], ...] = (),
+    unassessed: tuple[Unassessed, ...] = (),
 ) -> tuple[str, int]:
     """Choose the node that affords this project the most workers.
 
@@ -168,7 +217,7 @@ def first_fit(
     tie-break a person can control rather than a detail of iteration.
 
     A NODE THAT COULD NOT BE ASSESSED IS A REFUSAL, NOT AN ABORT, and that is
-    the whole reason ``unassessable`` exists. Two of this fleet's three nodes
+    the whole reason ``unassessed`` exists. Two of this fleet's three nodes
     are laptops; one being asleep is the ordinary case, not a fault. Measured
     2026-09-05: the first real auto-select dispatch was refused outright
     because loki was off for a trip, while lavender had already answered and
@@ -180,28 +229,36 @@ def first_fit(
         candidates: ``(name, node, state)`` for every node that answered, in
             workspace order.
         project: The work being dispatched.
-        unassessable: ``(name, reason)`` for every node that did not answer.
-            Never chosen; carried so the refusal names them.
+        unassessed: Every node that produced no verdict, each carrying
+            whether it was asked for one. Never chosen; carried so the
+            refusal names them and can say which kind of nothing happened.
 
     Returns:
         The chosen node's name and its worker count.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` when nodes were tried and NONE of
-            them answered, and with ``NODE_MEMORY_EXHAUSTED`` otherwise --
-            including for a workspace that declares no nodes at all, which is
-            a configuration fault rather than a fleet that is down. Both carry
-            EVERY node's own refusal rather than the first.
+        AppError: With one of three codes, chosen by
+            :func:`_nothing_fits_code` and all carrying EVERY node's own
+            refusal rather than the first:
 
-            The two codes are the point, not a detail. "The fleet is off" and
-            "the fleet is busy" send a reader to different places -- the
-            tailnet, or the clock -- and a single code for both would send
-            half of them to the wrong one. It is the same distinction
-            ``refused`` draws against ``failed`` one layer up.
+            ``NODE_UNREACHABLE`` -- nodes were asked and none answered. The
+            fleet is off; look at the tailnet.
+
+            ``NODE_DISABLED`` -- nothing was asked, because every node this
+            workspace declares is switched off in it. Nothing failed; look at
+            ``fleet.json``.
+
+            ``NODE_MEMORY_EXHAUSTED`` -- nodes answered and all refused, or
+            the workspace declares no nodes at all, which is a configuration
+            fault rather than a fleet that is down.
+
+            The three are the point, not a detail. A single code would send
+            two thirds of its readers to the wrong file. It is the same
+            distinction ``refused`` draws against ``failed`` one layer up.
     """
     best_name = ""
     best_workers = 0
-    refusals: list[str] = [f"{name}: {reason}" for name, reason in unassessable]
+    refusals: list[str] = [f"{entry['name']}: {entry['reason']}" for entry in unassessed]
     for name, node, state in candidates:
         verdict = assess(node, state, project)
         if verdict["code"] is not None:
@@ -210,14 +267,11 @@ def first_fit(
         if verdict["workers"] > best_workers:
             best_name, best_workers = name, verdict["workers"]
     if best_workers == 0:
-        nothing_answered = not candidates and bool(unassessable)
         raise AppError(
-            FleetErrorCode.NODE_UNREACHABLE
-            if nothing_answered
-            else FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+            _nothing_fits_code(candidates, unassessed),
             "no node can take this dispatch right now. " + " | ".join(refusals),
         )
     return best_name, best_workers
 
 
-__all__ = ["DispatchVerdict", "assess", "first_fit", "plan_dispatch"]
+__all__ = ["DispatchVerdict", "Unassessed", "assess", "first_fit", "plan_dispatch"]

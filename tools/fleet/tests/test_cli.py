@@ -64,6 +64,7 @@ def _workspace_document() -> JSONObject:
             "compute_capability": "7.5",
             "driver_version": "591.86",
         },
+        "enabled": True,
         "budget": budget,
     }
     return {

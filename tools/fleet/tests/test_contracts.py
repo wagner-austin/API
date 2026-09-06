@@ -85,6 +85,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
         logical_cores=cores,
         ram_gb=32.0,
         gpu=gpu,
+        enabled=True,
         budget=_BUDGET,
     )
 
@@ -204,6 +205,21 @@ class TestNodeConfig:
         del encoded["gpu"]
 
         with pytest.raises(JSONTypeError, match="must declare 'gpu'"):
+            decode_node_config(encoded)
+
+    def test_an_absent_enabled_key_is_refused(self) -> None:
+        """Neither default is safe, so the workspace has to say which.
+
+        Defaulting to true is the exact defect this field was added for --
+        loki was marked off in the fleet's identity registry on 2026-09-05 and
+        this workspace kept dispatching to it, ten seconds of ssh timeout at a
+        time. Defaulting to false would fail the other way and silently shrink
+        the fleet, with nothing to notice the missing capacity.
+        """
+        encoded = encode_node_config(_node())
+        del encoded["enabled"]
+
+        with pytest.raises(JSONTypeError, match="must declare 'enabled'"):
             decode_node_config(encoded)
 
     def test_a_non_object_is_refused(self) -> None:

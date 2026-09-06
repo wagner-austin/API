@@ -44,6 +44,7 @@ def _node(
         logical_cores=cores,
         ram_gb=32.0,
         gpu=None,
+        enabled=True,
         budget=NodeBudget(
             reserved_cores=reserved_cores,
             reserved_ram_gb=reserved_ram_gb,
