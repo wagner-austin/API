@@ -1,0 +1,58 @@
+# The tail's nature ([[campaign-ledger]] Hard row): hardwide192's four
+# non-win seeds replayed 12x each under the unchanged champion. Cluster
+# members are nondeterministic per match ([[policy-determinism]],
+# 2026-09-06), so a seed's outcome is a DISTRIBUTION -- if these seeds
+# re-roll to ~12/12 wins the tail is a per-match coin any seed can
+# flip (and levers need wide fresh panels); if they stay bad the tail
+# is seed-anchored and lever arms aim here. Replicates take distinct
+# labels because results file by label-seed.
+#
+# label | seed | doctrine | samples
+r01|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r02|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r03|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r04|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r05|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r06|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r07|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r08|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r09|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r10|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r11|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r12|8784433|doctrines/evolve1-g4m2.doctrine|10000
+r01|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r02|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r03|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r04|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r05|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r06|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r07|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r08|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r09|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r10|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r11|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r12|8789633|doctrines/evolve1-g4m2.doctrine|10000
+r01|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r02|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r03|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r04|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r05|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r06|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r07|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r08|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r09|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r10|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r11|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r12|8794209|doctrines/evolve1-g4m2.doctrine|10000
+r01|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r02|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r03|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r04|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r05|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r06|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r07|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r08|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r09|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r10|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r11|8795665|doctrines/evolve1-g4m2.doctrine|10000
+r12|8795665|doctrines/evolve1-g4m2.doctrine|10000
