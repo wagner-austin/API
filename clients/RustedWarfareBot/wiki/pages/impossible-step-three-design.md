@@ -6,15 +6,13 @@ related: ["[[impossible-economy-problem]]", "[[harness-population-search]]", "[[
 source_paths:
   - "src/rw_bot/policy/doom.py"
   - "models/fleetdoom.ndjson"
-  - "wiki/log.md"
 source_git_blobs:
   "src/rw_bot/policy/doom.py": 69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c
   "models/fleetdoom.ndjson": 7083f4c071b6a9372a4e65916fd9430ff1deeb58
-  "wiki/log.md": 3f64813691cbcbb22e17fcd3266a000fb8819c1d
 provenance:
   - "runs/sweeps/impstrike48 — sweep run directory, untracked by git"
   - "runs/sweeps/impincome96 — sweep run directory, untracked by git"
-  - "wiki/log.md entry dated 2026-09-04"
+  - "wiki/log.md entry dated 2026-09-04 — kept as provenance rather than a source_path: log.md is append-only, so a blob pin on it drifts on every wiki operation while the cited entry itself cannot change"
   - "wiki/log.md impincome96 verdict entry dated 2026-09-06"
 fact_checked: 2026-09-06
 confidence: high
