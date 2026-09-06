@@ -83,11 +83,17 @@ class RegistryDrift(TypedDict):
             exists and is not being used, with nothing to notice it.
         missing_from_registry: Nodes this workspace dispatches to that the
             registry has never heard of. Unprovisioned, or renamed.
+        enabled_there_absent_here: Machines the registry says are live that
+            this workspace neither dispatches to NOR declares
+            ``not_dispatchable``. Capacity nobody has decided about --
+            distinct from ``disabled_here_enabled_there``, where a decision
+            was made and disagrees.
     """
 
     enabled_here_disabled_there: tuple[str, ...]
     disabled_here_enabled_there: tuple[str, ...]
     missing_from_registry: tuple[str, ...]
+    enabled_there_absent_here: tuple[str, ...]
 
 
 def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
@@ -141,10 +147,20 @@ def _unreadable(detail: str) -> AppError[FleetErrorCode]:
 def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> RegistryDrift:
     """Compare this workspace's nodes against the identity registry.
 
-    ONE-DIRECTIONAL BY DESIGN. A node in the registry that this workspace does
-    not declare is NOT drift: the registry holds every machine on the tailnet,
-    including a phone and two boxes that have been offline since August, and
-    nothing dispatches to those. Only nodes this workspace claims are checked.
+    MOSTLY ONE-DIRECTIONAL. A node in the registry that this workspace does
+    not declare is usually not drift: the registry holds every machine on the
+    tailnet, including a phone and boxes offline since August, and nothing
+    dispatches to those. Reporting them would be the noise that gets a check
+    switched off.
+
+    THE ONE EXCEPTION IS A MACHINE THE REGISTRY SAYS IS LIVE. Silence about a
+    box that is off is a safe silence; silence about one that is running is
+    capacity nobody has decided about, and it hides in exactly the direction
+    that never announces itself. ``austinpc`` sat there for weeks: enabled,
+    24 logical cores, and invisible to the scheduler, with no way to tell a
+    deliberate exclusion from an oversight. So the workspace's
+    ``not_dispatchable`` map answers it, and only an undecided machine is
+    reported.
 
     Args:
         workspace: The dispatch workspace.
@@ -152,11 +168,12 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             :func:`decode_registry_nodes`.
 
     Returns:
-        The three ways they can disagree, each a sorted tuple of node names.
+        The four ways they can disagree, each a sorted tuple of node names.
     """
     enabled_here_disabled_there: list[str] = []
     disabled_here_enabled_there: list[str] = []
     missing: list[str] = []
+    undecided: list[str] = []
     for name, node in sorted(workspace["nodes"].items()):
         declared = registry.get(name)
         if declared is None:
@@ -166,10 +183,15 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             enabled_here_disabled_there.append(name)
         if not node["enabled"] and declared["enabled"]:
             disabled_here_enabled_there.append(name)
+    for name, declared in sorted(registry.items()):
+        unmentioned = name not in workspace["nodes"] and name not in workspace["not_dispatchable"]
+        if declared["enabled"] and unmentioned:
+            undecided.append(name)
     return RegistryDrift(
         enabled_here_disabled_there=tuple(enabled_here_disabled_there),
         disabled_here_enabled_there=tuple(disabled_here_enabled_there),
         missing_from_registry=tuple(missing),
+        enabled_there_absent_here=tuple(undecided),
     )
 
 
@@ -180,12 +202,13 @@ def has_drifted(drift: RegistryDrift) -> bool:
         drift: What :func:`compare` found.
 
     Returns:
-        True when any of the three disagreements is non-empty.
+        True when any of the four disagreements is non-empty.
     """
     return bool(
         drift["enabled_here_disabled_there"]
         or drift["disabled_here_enabled_there"]
         or drift["missing_from_registry"]
+        or drift["enabled_there_absent_here"]
     )
 
 
@@ -219,6 +242,12 @@ def describe(drift: RegistryDrift, *, registry_path: str) -> tuple[str, ...]:
         lines.append(
             f"{name}: this workspace dispatches to it and {registry_path} has never "
             "heard of it. Unprovisioned, or renamed on one side only."
+        )
+    for name in drift["enabled_there_absent_here"]:
+        lines.append(
+            f"{name}: {registry_path} says it is enabled and this workspace says nothing "
+            "at all. Declare it as a node, or as not_dispatchable with the reason -- "
+            "silence cannot be told apart from an oversight."
         )
     return tuple(lines)
 

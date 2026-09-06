@@ -117,6 +117,7 @@ def _workspace() -> FleetWorkspace:
     """
     return FleetWorkspace(
         nodes={"lavender": _node(), "loki": _node(gpu=None)},
+        not_dispatchable={},
         projects={"services/Model-Trainer": _project()},
         ledger="ledger.jsonl",
         feed="feed.jsonl",
@@ -323,6 +324,45 @@ class TestWorkspace:
     def test_a_workspace_with_no_projects_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="declares no projects"):
             decode_fleet_workspace({**encode_fleet_workspace(_workspace()), "projects": {}})
+
+    def test_excluding_nothing_is_a_real_answer_unlike_declaring_no_nodes(self) -> None:
+        """An empty exclusion map is a fleet that has decided about every
+        machine and excluded none, which is a legitimate state. That is why
+        it is not run through the same emptiness refusal as nodes."""
+        assert decode_fleet_workspace(encode_fleet_workspace(_workspace()))["not_dispatchable"] == (
+            {}
+        )
+
+    def test_an_exclusion_survives_encoding_with_its_reason(self) -> None:
+        reason = "the hub the dispatcher itself runs on; it shares the .venv"
+        original = _workspace()
+        original["not_dispatchable"] = {"austinpc": reason}
+
+        decoded = decode_fleet_workspace(
+            load_json_str(dump_json_str(encode_fleet_workspace(original)))
+        )
+
+        assert decoded["not_dispatchable"] == {"austinpc": reason}
+
+    def test_an_exclusion_with_a_blank_reason_is_refused(self) -> None:
+        """It says no more than leaving the machine out entirely, which is
+        exactly the ambiguity the field was added to remove."""
+        with pytest.raises(JSONTypeError, match="has an empty reason"):
+            decode_fleet_workspace(
+                {**encode_fleet_workspace(_workspace()), "not_dispatchable": {"austinpc": ""}}
+            )
+
+    def test_a_machine_both_declared_and_excluded_is_refused(self) -> None:
+        """The document says two opposite things about one machine. Honouring
+        either would be a guess, and the quiet guess -- excluded wins -- would
+        remove a node somebody declared with full capacity numbers."""
+        with pytest.raises(JSONTypeError, match="both as a dispatchable node"):
+            decode_fleet_workspace(
+                {
+                    **encode_fleet_workspace(_workspace()),
+                    "not_dispatchable": {"loki": "travels"},
+                }
+            )
 
     def test_an_unknown_node_names_the_declared_ones(self) -> None:
         with pytest.raises(AppError) as excinfo:

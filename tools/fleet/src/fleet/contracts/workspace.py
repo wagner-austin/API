@@ -46,6 +46,15 @@ class FleetWorkspace(TypedDict):
             usually the same string and are deliberately separate fields, so
             renaming a node in the workspace does not require the ssh config
             to agree.
+        not_dispatchable: Machines this workspace deliberately will NOT
+            dispatch to, keyed by their registry name, each carrying why.
+            SILENCE IS NOT A DECISION, which is the whole reason this field
+            exists: a machine simply absent from ``nodes`` is
+            indistinguishable from one nobody has got round to adding, and
+            ``austinpc`` -- the hub the dispatcher itself runs on, enabled
+            and 24-core in the identity registry -- had been reading as both
+            for weeks. Named here, its absence becomes a claim the drift
+            check can honour; absent from both, it is drift.
         projects: The work that may be dispatched, keyed by repo-relative
             path.
         ledger: Path to the append-only dispatch record. Relative paths
@@ -56,6 +65,7 @@ class FleetWorkspace(TypedDict):
     """
 
     nodes: dict[str, NodeConfig]
+    not_dispatchable: dict[str, str]
     projects: dict[str, ProjectConfig]
     ledger: str
     feed: str
@@ -125,6 +135,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
     """
     return {
         "nodes": {name: encode_node_config(node) for name, node in workspace["nodes"].items()},
+        "not_dispatchable": dict(workspace["not_dispatchable"]),
         "projects": {
             path: encode_project_config(project) for path, project in workspace["projects"].items()
         },
@@ -160,6 +171,50 @@ def _decode_named(value: JSONObject, field: str) -> dict[str, JSONValue]:
     return found
 
 
+def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) -> dict[str, str]:
+    """Read the deliberate exclusions, refusing an empty or contradicted one.
+
+    THE REASON IS REQUIRED AND MAY NOT BE BLANK. An exclusion whose reason is
+    an empty string carries no more than absence did, which is the thing this
+    field exists to stop being ambiguous. The next reader has to be able to
+    tell "we decided against this machine, here is why" from "nobody has got
+    round to it".
+
+    Args:
+        value: The workspace object.
+        nodes: The already-decoded dispatch targets.
+
+    Returns:
+        Machine name to why this workspace will not dispatch to it. Empty is
+        allowed -- a fleet that excludes nothing is a real answer, unlike a
+        fleet that declares no nodes.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an object, a reason is
+            not a non-empty string, or a name is BOTH declared as a node and
+            excluded. That last one is a document that says two opposite
+            things, and picking either would be a guess.
+    """
+    declared = require_dict(value, "not_dispatchable")
+    excluded: dict[str, str] = {}
+    for name in sorted(declared):
+        reason = require_str(declared, name)
+        if not reason:
+            raise JSONTypeError(
+                f"not_dispatchable[{name!r}] has an empty reason. An exclusion with no reason "
+                "says no more than leaving the machine out entirely, which is the ambiguity "
+                "this field exists to remove."
+            )
+        if name in nodes:
+            raise JSONTypeError(
+                f"{name!r} is declared both as a dispatchable node and as not_dispatchable. "
+                "The workspace says two opposite things about the same machine and neither "
+                "reading is safe to pick."
+            )
+        excluded[name] = reason
+    return excluded
+
+
 def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
     """Decode and validate a workspace.
 
@@ -171,8 +226,9 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, either mapping is empty, or a node or project fails its
-            own decoder.
+            mistyped, the node or project mapping is empty, a machine is both
+            declared and excluded, or a node or project fails its own
+            decoder.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"workspace must be a JSON object, got {type(value).__name__}")
@@ -183,6 +239,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
     }
     return FleetWorkspace(
         nodes=nodes,
+        not_dispatchable=_decode_not_dispatchable(value, nodes),
         projects=projects,
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),

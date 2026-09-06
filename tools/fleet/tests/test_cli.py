@@ -72,6 +72,7 @@ def _workspace_document() -> JSONObject:
             "lavender": node,
             "loki": {**node, "host": "loki", "gpu": None},
         },
+        "not_dispatchable": {},
         "projects": {
             "services/Model-Trainer": {
                 "worker_ram_gb": 1.1,

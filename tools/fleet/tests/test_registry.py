@@ -56,16 +56,18 @@ def _registry_document(**enabled: bool) -> str:
     return dump_json_str(document)
 
 
-def _workspace(**enabled: bool) -> FleetWorkspace:
+def _workspace(*, excluding: dict[str, str] | None = None, **enabled: bool) -> FleetWorkspace:
     """Build a dispatch workspace declaring the given nodes.
 
     Args:
+        excluding: Machines it deliberately will not dispatch to, and why.
         **enabled: Node name to whether this workspace will dispatch to it.
 
     Returns:
         The decoded workspace.
     """
     document = workspace_document()
+    document["not_dispatchable"] = dict(excluding or {})
     nodes = document["nodes"]
     if not isinstance(nodes, dict):
         raise AssertionError("the fixture workspace must declare nodes")
@@ -140,16 +142,45 @@ class TestTheDriftThatHappened:
         assert registry.has_drifted(drift) is False
         assert registry.describe(drift, registry_path="/x/r.json") == ()
 
-    def test_a_registry_node_this_workspace_ignores_is_not_drift(self) -> None:
-        """The registry holds every machine on the tailnet -- a phone, two
-        boxes offline since August. Nothing dispatches to those, and calling
-        their absence here a disagreement would make the check cry wolf on
-        its first run."""
+    def test_a_registry_node_that_is_off_and_unmentioned_is_not_drift(self) -> None:
+        """The registry holds every machine on the tailnet, including two
+        boxes offline since August. Nothing dispatches to those and none of
+        them is capacity, so calling their absence a disagreement would make
+        the check cry wolf on its first run."""
         drift = registry.compare(
             _workspace(lavender=True),
             registry.decode_registry_nodes(
-                _registry_document(lavender=True, emerald=False, pendragon=False, austinpc=True)
+                _registry_document(lavender=True, emerald=False, pendragon=False)
             ),
+        )
+
+        assert registry.has_drifted(drift) is False
+
+    def test_a_live_registry_node_this_workspace_never_mentions_is_drift(self) -> None:
+        """austinpc, exactly: enabled, 24 logical cores, and invisible to the
+        scheduler for weeks. SILENCE IS NOT A DECISION -- absence here cannot
+        be told apart from an oversight, and this is the only drift direction
+        that hides capacity rather than wasting it."""
+        drift = registry.compare(
+            _workspace(lavender=True),
+            registry.decode_registry_nodes(_registry_document(lavender=True, austinpc=True)),
+        )
+
+        assert drift["enabled_there_absent_here"] == ("austinpc",)
+        lines = registry.describe(drift, registry_path="/x/r.json")
+        assert "says it is enabled and this workspace says nothing at all" in lines[0]
+        assert "not_dispatchable" in lines[0]
+
+    def test_naming_it_not_dispatchable_settles_it(self) -> None:
+        """The exclusion is not a suppression: it is the workspace answering
+        the question the check asked, in writing, where the next reader sees
+        the reason rather than an absence."""
+        drift = registry.compare(
+            _workspace(
+                lavender=True,
+                excluding={"austinpc": "the hub the dispatcher runs on; it shares the .venv"},
+            ),
+            registry.decode_registry_nodes(_registry_document(lavender=True, austinpc=True)),
         )
 
         assert registry.has_drifted(drift) is False

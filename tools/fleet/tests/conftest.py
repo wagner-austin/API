@@ -251,6 +251,7 @@ def workspace_document() -> JSONObject:
                 },
             }
         },
+        "not_dispatchable": {},
         "projects": {
             DEMO_PROJECT: {
                 "worker_ram_gb": 1.1,

@@ -226,9 +226,34 @@ fleet-nodes --config fleet.json --registry ../../../MCPs/fleet-mcp/fleet-nodes.j
 ```
 
 One line per disagreement — each saying which way it runs and what it costs,
-because the two directions call for opposite edits — and exit 1. This is
-detection, not prevention: nothing stops somebody editing one file and not the
-other, it stops that going unnoticed.
+because the directions call for opposite edits — and exit 1. This is detection,
+not prevention: nothing stops somebody editing one file and not the other, it
+stops that going unnoticed.
+
+Four ways they can disagree:
+
+| disagreement | what it costs |
+|---|---|
+| enabled here, disabled there | an ssh timeout on every auto-select dispatch |
+| disabled here, enabled there | capacity that exists and is not being used |
+| here, and the registry never heard of it | unprovisioned, or renamed on one side |
+| enabled there, unmentioned here | capacity nobody has decided about |
+
+**The last one is why `fleet.json` has `not_dispatchable`.** A machine that is
+merely *absent* from `nodes` is indistinguishable from one nobody has got round
+to adding — and `austinpc`, the hub this dispatcher runs on, sat in exactly
+that gap for weeks: enabled in the registry, 24 logical cores, invisible to the
+scheduler, with no way to tell a decision from an oversight. Named in
+`not_dispatchable` with its reason, the absence becomes a claim the check can
+honour. That map is not a suppression list: a machine that is *off* in the
+registry is never reported, so nothing needs pre-silencing, and a box being
+onboarded (the Surface Go) must stay out of it so the check speaks up the day
+it comes online.
+
+A name in both `nodes` and `not_dispatchable` is refused at load. The document
+would be saying two opposite things about one machine, and the quiet guess —
+excluded wins — would silently drop a node somebody declared with full capacity
+numbers.
 
 **The path is passed, never searched for.** Omitting the flag claims no
 reconciliation at all, and a version that hunted for the other repo would
