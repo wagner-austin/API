@@ -2,16 +2,16 @@
 title: Closures, or why the unaccounted check does not rot
 tags: [operations, ledger, triage]
 hubs: [operations]
-related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]", "[[command-length-limits]]"]
+related: ["[[triage-conditions]]", "[[job-identity-on-cluster]]", "[[command-length-limits]]", "[[job-arrays]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/ledger.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "c891d961275455e106a3b12b41e336353ac9a8cf"
+  "src/hpc3/cli/triage.py": "46fd93061aff3ed3ebd76e0bc9407657d3db5859"
   "src/hpc3/core/ledger.py": "94065680790919c0a68e097320d228400805b564"
 provenance:
   - "MinJobAge 300s, read from scontrol show config"
-fact_checked: 2026-09-05
+fact_checked: 2026-09-06
 confidence: high
 ---
 
@@ -40,6 +40,15 @@ The moment accounting reports a terminal state, triage writes it to
 *after* the findings are built, so the run that closes a job still reports on
 it. Failures close exactly as successes do — accounting forgets both on the
 same schedule.
+
+**One closure per TASK, not per accounting row.** A closure is looked up by
+the ledger's own id, and the ledger records array tasks individually — but an
+array cancelled while still pending reports one aggregate row for the whole
+array (`55765275_[0-5]|CANCELLED by 2422328`, HPC3 2026-09-06). A closure
+keyed on that expression matches no ledger entry, so its six tasks would never
+be filtered out and would be re-queried and re-reported on every run, forever.
+The always-red board this record exists to prevent, reached through the record
+itself. Terminal rows are expanded ([[job-arrays]]).
 
 A job that vanished before triage ever saw it end has no closure and stays
 reportable forever, which is correct: that is the case the finding exists

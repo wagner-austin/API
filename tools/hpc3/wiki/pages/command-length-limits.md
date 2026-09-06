@@ -2,7 +2,7 @@
 title: Two command-length ceilings, and the token count that met both
 tags: [operations, remote, incidents]
 hubs: [operations]
-related: ["[[triage-conditions]]", "[[ledger-closures]]", "[[preemption-and-campaigns]]", "[[job-arrays]]"]
+related: ["[[triage-conditions]]", "[[ledger-closures]]", "[[preemption-and-campaigns]]", "[[job-arrays]]", "[[submission-rules]]"]
 source_paths:
   - "src/hpc3/core/remote.py"
   - "src/hpc3/core/status.py"
@@ -18,14 +18,14 @@ source_git_blobs:
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
   "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
   "src/hpc3/core/cancel.py": "7587c162b2b98e55431303b5eb21723926a6a623"
-  "src/hpc3/cli/triage.py": "c891d961275455e106a3b12b41e336353ac9a8cf"
+  "src/hpc3/cli/triage.py": "46fd93061aff3ed3ebd76e0bc9407657d3db5859"
 provenance:
   - "campaign existence probe truncated mid-loop, vhsearch2-r0, 2026-09-02"
   - "hpc3-triage WinError 206 with runs/ledger.jsonl at 6645 rows, austinpc, 2026-09-05"
   - "bash 'unexpected EOF while looking for matching' from a ~29 KB age probe, hpc3 login-i15, 2026-09-05"
   - "hpc3-triage 2026-09-05 run 1: 6706 recorded, 6417 open, 12 findings, 6345 newly closed; run 2: 72 open, 0 newly closed"
   - "fix committed fa8f87f9 (repo ~/PROJECTS/API)"
-fact_checked: 2026-09-05
+fact_checked: 2026-09-06
 confidence: high
 ---
 
@@ -46,9 +46,11 @@ command arrived at the remote bash **truncated** and died on `unexpected end
 of file` (vhsearch2-r0, 2026-09-02; `src/hpc3/core/campaign.py`,
 `existence_commands`).
 
-**32767, at `CreateProcess`.** `hpc3-triage` (`src/hpc3/cli/triage.py`) asks
-accounting about every open ledger entry. At 6645 rows of `runs/ledger.jsonl`
-the argv reached ~70 KB and Python raised
+**32767, at `CreateProcess`.** `hpc3-triage` (`src/hpc3/cli/triage.py`) asked
+accounting about every open ledger entry — one id per row, and since
+2026-09-06 one per array BASE, which collapses a 60-task array into a single
+id ([[job-arrays]]). At 6645 rows of `runs/ledger.jsonl` the argv reached
+~70 KB and Python raised
 
 ```
 FileNotFoundError: [WinError 206] The filename or extension is too long

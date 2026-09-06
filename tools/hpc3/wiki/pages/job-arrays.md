@@ -2,7 +2,7 @@
 title: A sweep is one sbatch call, and the script is the member table
 tags: [submission, arrays, identity]
 hubs: [submission]
-related: ["[[sweeps-and-artifacts]]", "[[preemption-and-campaigns]]", "[[job-identity-on-cluster]]", "[[node-local-scratch]]"]
+related: ["[[sweeps-and-artifacts]]", "[[preemption-and-campaigns]]", "[[job-identity-on-cluster]]", "[[node-local-scratch]]", "[[triage-conditions]]"]
 source_paths:
   - "src/hpc3/core/array_sbatch.py"
   - "src/hpc3/core/array_submit.py"
@@ -10,10 +10,10 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/array_sbatch.py": "8ebc37d14ba8fb7d1dcd8b629225fddb57e1cd53"
   "src/hpc3/core/array_submit.py": "97a1d6240ff6a7032bbba3a86710c3220d624061"
-  "src/hpc3/contracts/array.py": "cc4f4723f7da7cc3705442e8fe4ec89d68040b72"
+  "src/hpc3/contracts/array.py": "cb1ed261958a7a3b541d972e0d64a69da681692e"
 provenance:
   - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-06
 confidence: high
 ---
 
@@ -58,6 +58,20 @@ once) fixed the facts every parser relies on:
 and triage's unclaimed-job check both expand before matching -- unexpanded,
 every pending member reads as not-live, and the double-submission race the
 package exists to refuse would be waved through.
+
+**Three of triage's readers did not, until 2026-09-06.** `unaccounted_jobs`,
+`live_entries` and `closures_for` matched raw ids, so all six tasks of a
+healthy queued array were reported as jobs accounting had never heard of, and
+a terminal aggregate (`55765275_[0-5]|CANCELLED by 2422328`) produced a
+closure keyed on an expression no ledger entry carries. They expand now.
+
+**Expanding is only half of it, and the half that changes nothing alone.** A
+reader can only expand a row it was given, and `sacct -j 55678543_2` does not
+return one. The query has to be built from the array BASE id -- `sacct -j
+55678543` -- which answers with the aggregate while pending and with every
+per-task row once they have run. `base_job_ids` is that reduction, and it
+also collapses a 60-task array into a single asked id. See
+[[triage-conditions]] and [[command-length-limits]].
 
 ## What the ledger and audit now say
 

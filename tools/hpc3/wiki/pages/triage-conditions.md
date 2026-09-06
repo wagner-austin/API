@@ -2,16 +2,16 @@
 title: The five triage conditions that look like health
 tags: [operations, triage, ledger]
 hubs: [operations]
-related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]", "[[command-length-limits]]"]
+related: ["[[ledger-closures]]", "[[image-ledger-lessons]]", "[[budget-model]]", "[[command-length-limits]]", "[[job-arrays]]"]
 source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/triage.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "c891d961275455e106a3b12b41e336353ac9a8cf"
-  "src/hpc3/core/triage.py": "fcff2038f7e816e0342f0c6fda663e0c2a55a129"
+  "src/hpc3/cli/triage.py": "46fd93061aff3ed3ebd76e0bc9407657d3db5859"
+  "src/hpc3/core/triage.py": "d9ffb293b5da749729ff21c83c935d849166f56e"
 provenance:
   - "261 of 621 pending GPU jobs on DependencyNeverSatisfied (squeue sample)"
-fact_checked: 2026-09-05
+fact_checked: 2026-09-06
 confidence: high
 ---
 
@@ -28,6 +28,14 @@ and exits non-zero if anything is found.
 - **unaccounted** — we recorded submitting it and accounting has never heard
   of it. No cluster-side query can find these: the evidence is the *absence*
   of a cluster-side record, which is what the local ledger exists to supply.
+  **Absence is only meaningful once you have asked correctly**, and until
+  2026-09-06 this check had not: a queued job array is ONE accounting row
+  standing for every task the ledger recorded separately, and `sacct -j
+  <base>_<index>` returns nothing at all while that task is inside it. Twelve
+  healthy queued tasks were reported as jobs the cluster had never heard of.
+  The query is now built from array base ids and the rows expanded before
+  matching ([[job-arrays]]) — a task genuinely missing from a started array,
+  or from a sparse aggregate that does not name it, is still reported.
 - **unclaimed** — the cluster is holding it and the ledger has never heard of
   *it*. No ledger-side query can find these either, for the mirror reason:
   the check has to ask the account to enumerate itself (`squeue --me`).
