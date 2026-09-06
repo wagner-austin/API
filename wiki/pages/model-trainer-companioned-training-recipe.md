@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": c191ab72218c03978e73d2804babad28b99cece6
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 8fe2794c8df1f8494db45224cf0366187ad2a687
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": 58900c5ea2f7dbf300c12bce6243189205bddda5
-  "docs/RESEARCH.md": ae83aff837c0ec4f4b0639c1e5244867c05c59e8
+  "docs/RESEARCH.md": b383e33e94e16a0c2dfd777d530d0e3703576b6e
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -41,7 +41,7 @@ provenance:
   - "scale rung measured 2026-09-05 on HPC3: job 55776517 on hpc3-gpu-16-00 (V100) + twin 55786853 on hpc3-gpu-18-00, image v37 sha256 2adee62f (truncated), plan gpt2-medium-companions-diverse, plan commit e5476201, records CROSS-NODE BIT-IDENTICAL sha256 5179b893 (truncated)"
   - "base-LoRA cells measured 2026-09-05 on HPC3: gpt2 jobs 55787810 (gpu-16-05) + 55788364 (gpu-18-02) CROSS-NODE BIT-IDENTICAL sha256 efad0a93 (truncated), image v38 sha256 13bd47e9, plan commit e1bc2009; gpt2-medium job 55790169 (gpu-17-02), image v39 sha256 0bd7983b, plan commit f7f696a8, board task 6c752568"
   - "gpt2-medium base-LoRA record CROSS-NODE BIT-IDENTICAL 2026-09-06: job 55790169 (gpu-17-02, 78 min) + twin 55798416 (gpu-18-02, 2h13m -- same bytes, slower node), both records sha256 372cee59 (truncated)"
-  - "content-lora (crowd-invariance) cells measured 2026-09-06 on HPC3: job 55801429 (V100, 103 min), image v40 sha256 798d234a (truncated) from commit 7288bc8f, plan gpt2-medium-content-lora, record sha256 9abd901a (truncated), board task a85fbabe; twin 55801941 submitted for the certificate"
+  - "content-lora (crowd-invariance) cells measured 2026-09-06 on HPC3: job 55801429 (V100, 103 min), image v40 sha256 798d234a (truncated) from commit 7288bc8f, plan gpt2-medium-content-lora, board task a85fbabe; twin 55801941 BYTE-IDENTICAL, both records sha256 9abd901a (truncated) -- SAME-NODE certificate (queue placed both on hpc3-gpu-16-01); the arc's four cross-node certificates establish the pipeline's cross-node determinism separately"
   - "the v40 build and the medium run were both caught by the hpc-wake bridge's tagged board announcements (task f6b04193) with no manual sacct polling -- the arm that retired hand-rolled waits"
 fact_checked: "2026-09-06"
 confidence: high
