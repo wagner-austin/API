@@ -21,7 +21,6 @@ from tankpit_bot.analysis.command_coverage import (
     format_command_coverage,
 )
 from tankpit_bot.analysis.command_coverage_types import (
-    STATUS_DECLARED_UNMODELLED,
     STATUS_HANDLED,
     CommandByteRowDict,
     CommandCoverageDict,
@@ -30,11 +29,14 @@ from tankpit_bot.analysis.command_coverage_types import (
     encode_command_byte_row,
     encode_command_coverage,
 )
-from tankpit_bot.protocol.command_builders import build_query_command
+from tankpit_bot.protocol.command_builders import (
+    build_deposit_fuel_command,
+    build_query_command,
+)
 from tankpit_bot.protocol.commands import (
+    CMD_DEPOSIT_FUEL,
     CMD_KEEPALIVE,
     CMD_RADAR,
-    CMD_UNMODELLED_COMBAT,
 )
 from tankpit_bot.protocol.commands import COMMAND_PREFIX as _PREFIX
 from tests.analysis._capture_fixtures import (
@@ -55,13 +57,17 @@ _UNKNOWN_BYTE = 0xFE
 
 
 def _client_command(command: int) -> bytes:
-    """One query-family command frame, built by the PRODUCTION builder.
+    """One client command frame, built by the PRODUCTION builder.
 
-    Every byte the audit classifies rides the same
-    ``[len][!][type][cmd]`` shape, so the real builder makes all of
-    them — including the ones no constant names. A hand-rolled frame
-    here would let the fixture and the decoder drift apart and agree
-    on the wrong bytes.
+    A hand-rolled frame here would let the fixture and the decoder
+    drift apart and agree on the wrong bytes, so every frame comes
+    from the real builder — including for the bytes no constant names,
+    which ride the bare ``[len][!][type][cmd]`` query shape.
+
+    The deposit is the exception that has to be spelled out: its
+    decoder requires six payload bytes, so a bare query frame for it
+    would be discarded as truncated noise and the audit would report
+    no row at all.
 
     Args:
         command: The command byte.
@@ -69,6 +75,8 @@ def _client_command(command: int) -> bytes:
     Returns:
         Framed command bytes, length header included.
     """
+    if command == CMD_DEPOSIT_FUEL:
+        return build_deposit_fuel_command(174, 49, 294)
     return build_query_command(command)
 
 
@@ -122,19 +130,21 @@ def test_an_unmapped_byte_is_reported_as_a_crash(tmp_path: Path) -> None:
     assert [row["constant"] for row in crashing] == [""]
 
 
-def test_the_declared_unmodelled_byte_is_not_a_crash(tmp_path: Path) -> None:
-    """0x44 is refused BY NAME, which is a decision rather than a gap.
+def test_the_audit_is_binary_with_no_parking_status(tmp_path: Path) -> None:
+    """0x44 was the audit's one ``declared_unmodelled`` row, and is not.
 
-    It decodes to ``other`` exactly like an unknown byte, so the only
-    thing separating them is that this one has been looked at and
-    named. The audit must not report a settled decision as an
-    outstanding defect.
+    That status existed for a byte the decoder mapped and the sim had
+    no law for. Reading the JS serializer and six archive windows made
+    it the fuel-deposit law, so the class emptied and was deleted:
+    every byte is now handled or a crash, and there is nowhere to park
+    the next one where it stops counting as a defect.
     """
-    coverage = analyze_command_coverage([_archive(tmp_path, (CMD_UNMODELLED_COMBAT,))])
+    coverage = analyze_command_coverage([_archive(tmp_path, (CMD_DEPOSIT_FUEL,))])
 
-    rows = [row for row in coverage["rows"] if row["byte"] == CMD_UNMODELLED_COMBAT]
-    assert [row["status"] for row in rows] == [STATUS_DECLARED_UNMODELLED]
-    assert [row["constant"] for row in rows] == ["CMD_UNMODELLED_COMBAT"]
+    rows = [row for row in coverage["rows"] if row["byte"] == CMD_DEPOSIT_FUEL]
+    assert [row["status"] for row in rows] == [STATUS_HANDLED]
+    assert [row["kind"] for row in rows] == ["deposit_fuel"]
+    assert [row["constant"] for row in rows] == ["CMD_DEPOSIT_FUEL"]
     assert crashing_rows(coverage) == []
 
 
@@ -166,7 +176,7 @@ def test_constants_never_sent_are_named(tmp_path: Path) -> None:
 def test_the_report_says_plainly_when_something_would_crash(tmp_path: Path) -> None:
     """A reader must not have to scan a table to find the danger."""
     clean = format_command_coverage(analyze_command_coverage([_archive(tmp_path, (CMD_RADAR,))]))
-    assert "Every command byte in this archive is handled" in clean
+    assert "Every command byte in this archive is handled." in clean
 
     broken = format_command_coverage(
         analyze_command_coverage([_archive(tmp_path, (_UNKNOWN_BYTE,), name="broken")])

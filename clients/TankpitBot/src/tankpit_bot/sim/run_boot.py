@@ -337,6 +337,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
                     slot=0,
                     message_id=0,
                     direction=0,
+                    amount=0,
                 ),
             )
         elif event["kind"] == "mine":
@@ -358,6 +359,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
                     slot=0,
                     message_id=0,
                     direction=0,
+                    amount=0,
                 ),
             )
         else:
@@ -372,6 +374,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
                     slot=0,
                     message_id=event["message_id"],
                     direction=0,
+                    amount=0,
                 ),
             )
     return frozenset(acted)

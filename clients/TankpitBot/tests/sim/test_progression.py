@@ -115,7 +115,15 @@ def test_the_server_demotes_on_the_clients_own_deactivation() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="shoot", command=115, x=10, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="shoot",
+            command=115,
+            x=10,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
 
@@ -140,7 +148,15 @@ def test_another_tanks_deactivation_leaves_the_clients_rank_alone() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot", command=115, x=12, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="shoot",
+            command=115,
+            x=12,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
 

@@ -143,6 +143,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
         slot=2,
         message_id=0,
         direction=0,
+        amount=0,
     )
     server.queue_command(9, toggle)
     messages = server.advance_tick()
@@ -160,6 +161,7 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
         slot=9,
         message_id=0,
         direction=0,
+        amount=0,
     )
     server.queue_command(9, out_of_range)
     ignored = server.advance_tick()
@@ -211,7 +213,15 @@ def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
     """
     server = _server()
     chat = ClientCommandDict(
-        kind="chat", command=0x6D, x=10, y=10, target_id=0, slot=0, message_id=41, direction=0
+        kind="chat",
+        command=0x6D,
+        x=10,
+        y=10,
+        target_id=0,
+        slot=0,
+        message_id=41,
+        direction=0,
+        amount=0,
     )
     server.queue_command(9, chat)
     messages = server.advance_tick()
@@ -247,6 +257,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     own = _supervisors(server.advance_tick())
@@ -262,6 +273,7 @@ def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     assert _supervisors(server.advance_tick()) == []
@@ -377,10 +389,26 @@ def test_only_map_open_is_answered_with_a_map_dump() -> None:
     assertions would pass against a server that never dumps at all.
     """
     scope_shift = ClientCommandDict(
-        kind="scope", command=115, x=0, y=0, target_id=0, slot=0, message_id=0, direction=2
+        kind="scope",
+        command=115,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=2,
+        amount=0,
     )
     press = ClientCommandDict(
-        kind="block", command=98, x=10, y=11, target_id=0, slot=0, message_id=0, direction=0
+        kind="block",
+        command=98,
+        x=10,
+        y=11,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
     for label, command, expected in (

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from tankpit_bot.protocol.commands import (
     CMD_BLOCK,
+    CMD_DEPOSIT_FUEL,
     CMD_MAP_TELEPORT,
     CMD_MOVE,
     CMD_PICKUP_EQUIPMENT,
@@ -178,6 +179,38 @@ def build_shoot_command(x: int, y: int, target_id: int = 0) -> bytes:
     return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
 
 
+def build_deposit_fuel_command(x: int, y: int, amount: int) -> bytes:
+    """Build a DEPOSIT_FUEL command ready to send (with length header).
+
+    Format: [len_lo, len_hi] + ! + 0x06 + 0x44 + amount_lo + amount_hi
+    + X + Y (8 bytes total). The AMOUNT leads and the tile follows —
+    the opposite of every other coordinate command, and the reason
+    the byte read as "shoot-shaped" until the JS serializer
+    (``Wb.prototype.h``) settled it.
+
+    Args:
+        x: Destination tile X coordinate (0-255).
+        y: Destination tile Y coordinate (0-255).
+        amount: Fuel units to deposit (0-65535).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes(
+        [
+            COMMAND_PREFIX,
+            TYPE_COMBAT,
+            CMD_DEPOSIT_FUEL,
+            amount & 0xFF,
+            (amount >> 8) & 0xFF,
+            x & 0xFF,
+            y & 0xFF,
+        ]
+    )
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
 def build_scope_command(direction: int) -> bytes:
     """Build a SCOPE (pan camera) command ready to send.
 
@@ -214,6 +247,7 @@ def build_toggle_equipment_command(slot: int) -> bytes:
 
 __all__ = [
     "build_block_command",
+    "build_deposit_fuel_command",
     "build_move_command",
     "build_pickup_equipment_command",
     "build_pickup_fuel_command",

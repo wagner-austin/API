@@ -25,7 +25,15 @@ _GHOST = 500
 def _shoot(x: int, y: int) -> ClientCommandDict:
     """A shoot command at one tile."""
     return ClientCommandDict(
-        kind="shoot", command=115, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+        kind="shoot",
+        command=115,
+        x=x,
+        y=y,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 

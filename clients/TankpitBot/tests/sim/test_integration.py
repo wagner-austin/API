@@ -163,7 +163,15 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     server.queue_command(
         _CLIENT,
         ClientCommandDict(
-            kind="shoot", command=115, x=107, y=100, target_id=0, slot=0, message_id=0, direction=0
+            kind="shoot",
+            command=115,
+            x=107,
+            y=100,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     _deliver(ws, server.advance_tick(), table)

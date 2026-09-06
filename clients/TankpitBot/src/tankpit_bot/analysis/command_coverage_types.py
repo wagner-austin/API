@@ -9,6 +9,14 @@ That happened three times on 2026-09-03 alone (the keep-alive, the
 enter-game and the inventory request), each found by a one-off sweep
 rather than by a mechanism. This is the mechanism.
 
+The audit is binary on purpose. It briefly carried a third status,
+``declared_unmodelled``, for the one byte that was decoded but had no
+measured law — 0x44. Reading the JS serializer and six archive windows
+turned that byte into the fuel-deposit law ([[fuel-system]]), leaving
+the status with no members, and a status nothing can be is a hiding
+place for the next one: a byte parked there stops counting as a defect
+while still being one.
+
 Every dict carries an encode/decode codec: the audit is written to an
 artifact and read back, which is the boundary where the codec rule
 binds ([[coding-standards]]).
@@ -29,10 +37,6 @@ from platform_core.json_utils import (
 
 #: The sim decodes the byte, routes it, and answers it.
 STATUS_HANDLED = "handled"
-
-#: The sim decodes the byte to a named kind but has NO measured law, so
-#: it refuses by name. Declared, not forgotten.
-STATUS_DECLARED_UNMODELLED = "declared_unmodelled"
 
 #: The sim does not map the byte at all: it decodes to ``other`` and
 #: ``queue_command`` raises. A real client sending it kills the server.
@@ -179,7 +183,6 @@ def _require_name(value: JSONValue) -> str:
 
 __all__ = [
     "STATUS_CRASHES",
-    "STATUS_DECLARED_UNMODELLED",
     "STATUS_HANDLED",
     "CommandByteRowDict",
     "CommandCoverageDict",

@@ -231,7 +231,15 @@ def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
         The decoded command.
     """
     return ClientCommandDict(
-        kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0, message_id=0, direction=0
+        kind="shoot",
+        command=115,
+        x=x,
+        y=y,
+        target_id=target_id,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 

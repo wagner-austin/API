@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/physics"
 source_git_blobs:
   "src/tankpit_bot/physics": "c7425148961158380776c7c1b63191af18e37afa"
-fact_checked: "2026-08-07"
+fact_checked: "2026-09-03"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -159,17 +159,28 @@ emits with them, the bot predicts with them.[^8]
 
 ## The fuel-deposit wire choreography (byte-mined 2026-08-03)
 
-Five manual deposits from the user-piloted session
-sniff-20260620-190228 (2026-06-20, the capacity-verification
-experiments), every window field-verified:[^9]
+Six manual deposits, every window field-verified:[^9] five from the
+user-piloted session sniff-20260620-190228 (2026-06-20, the
+capacity-verification experiments) and one from
+sniff-20260620-143345, found 2026-09-03 when the archive was swept
+for the COMMAND rather than for the answer.
 
-| # | Fuel before -> after | Container record | Amount |
-|---|---|---|---|
-| 1 | 1100 -> 300 | (174,47) remaining 800 | 800 |
-| 2 | 294 -> 100 | (174,49) remaining 194 | 194 (max-deposit -> the floor) |
-| 3 | (post) 686 | (178,54) remaining 400 | 400 |
-| 4 | 1100 -> 800 | (177,51) remaining 300 | 300 |
-| 5 | 1100 -> 900 | (178,50) remaining 200 | 200 |
+| # | Requested | Fuel before -> after | Container record | Deposited |
+|---|---|---|---|---|
+| 0 | 100 | 1034 -> 934 | (170,174) remaining 100 | 100 |
+| 1 | 800 | 1100 -> 300 | (174,47) remaining 800 | 800 |
+| 2 | 294 | 294 -> 100 | (174,49) remaining 194 | 194 (max-deposit -> the floor) |
+| 3 | 400 | 1086 -> 686 | (178,54) remaining 400 | 400 |
+| 4 | 300 | 1100 -> 800 | (177,51) remaining 300 | 300 |
+| 5 | 200 | 1100 -> 900 | (178,50) remaining 200 | 200 |
+
+The **Requested** column is new (2026-09-03) and it is what makes row
+2 a measurement rather than a coincidence. The client clamps its own
+request to the tank's fuel before sending, so a request of 294 — not a
+multiple of the 100-unit hold granularity — pins the fuel before the
+transfer at exactly 294. 194 landed and 100 stayed: `deposited =
+min(requested, fuel - DEPOSIT_FLOOR)`, with the floor independently
+measured at four ranks in July 2026.
 
 The measured shape, single server tick: **self 0x2E (absolute
 post-deposit fuel) + 0x64 FuelDeposit (the same absolute fuel) +
@@ -189,9 +200,24 @@ laws inside it:[^9]
   zero cross-tank 0x64s and zero cross-tank refill records despite
   hundreds of inferred refills) — the 0x64 AND the record are
   client-only sends to the depositor.
-* The sent command is type 0x07 with an XOR-encoded payload
-  (coordinates + amount; encoding not yet cracked — only needed if
-  the bot ever deposits).
+* **The sent command is `CMD_DEPOSIT_FUEL` (0x44), cracked
+  2026-09-03** ([[client-commands]]). This bullet used to read "type
+  0x07 with an XOR-encoded payload (coordinates + amount; encoding
+  not yet cracked)" and was wrong twice over: the type is **6**, and
+  sent commands are **not** XOR-encoded at all — the cipher applies
+  only to what the server sends back. The layout is
+  `[6][0x44][amount_lo][amount_hi][x][y]`: the amount is LE u16 and
+  it LEADS the tile, which is why the payloads read as arbitrary
+  under a shoot-shaped parse. `06442601ae31` is row 2 of the table
+  above. `sim.fuel_deposit` resolves it and
+  `sim.narrate.resources.narrate_fuel_deposit` narrates it; the sim
+  has performed deposits since 2026-09-03.
+* The command is a windowed click like every other: the client's
+  `ae()` gate bounds it to the 1..16 viewport, so an out-of-window
+  tile draws the same 0x52 code 0 a move would.
+* The deposit resolves on ARRIVAL — two of the six windows walked
+  first and carry the 0x47 echo — and draws **no 0x3F sync**, where a
+  plain move of the same distance does.
 
 ## Fuel recovery cascade
 

@@ -23,7 +23,6 @@ from tankpit_bot.protocol.commands import (
     CMD_INVENTORY,
     CMD_KEEPALIVE,
     CMD_MAP_OPEN,
-    CMD_UNMODELLED_COMBAT,
     COMMAND_PREFIX,
     TYPE_QUERY,
 )
@@ -285,15 +284,22 @@ def test_an_inventory_request_is_answered_with_a_snapshot() -> None:
     assert snapshots[0]["show"] is True
 
 
-def test_a_command_with_no_measured_law_is_refused_by_name() -> None:
-    """0x44 is real, observed seven times, and NOT modelled.
+#: A command byte no constant names and the decoder cannot map.
+_UNMAPPED_COMMAND_BYTE = 0xFE
 
-    Its payloads vary every send and the sim has no law for it, so it
-    refuses rather than inventing a response — and the refusal names
-    the command and its byte instead of the build phase the old
-    message described.
+
+def test_a_command_with_no_measured_law_is_refused_by_name() -> None:
+    """A byte the decoder cannot map is refused, naming the byte.
+
+    The refusal names the command and its byte rather than the build
+    phase the old message described. This test used to fire 0x44 —
+    the one byte the sim knew of and had no law for — until the JS
+    serializer and six archive windows made it the fuel-deposit law
+    ([[fuel-system]]). The path it covers is unchanged and still
+    load-bearing: ``queue_command`` refuses any kind outside
+    ``SUPPORTED_KINDS``, and an unmapped byte decodes to ``other``.
     """
     _bot, _server, link, table = boot_seam()
 
     with pytest.raises(SimError, match="no modelled law"):
-        link.send_page_frame(_query_frame(table, CMD_UNMODELLED_COMBAT))
+        link.send_page_frame(_query_frame(table, _UNMAPPED_COMMAND_BYTE))

@@ -68,6 +68,7 @@ SUPPORTED_KINDS: frozenset[str] = frozenset(
         "map_open",
         "pickup_fuel",
         "pickup_equipment",
+        "deposit_fuel",
         "toggle_equipment",
         "block",
         "chat",
@@ -78,7 +79,7 @@ SUPPORTED_KINDS: frozenset[str] = frozenset(
         "inventory",
     }
 )
-_MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
+_MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment", "deposit_fuel"})
 
 
 class SimServer(SimServerCombatMixin, SimServerMoveMixin, SimServerQueriesMixin):

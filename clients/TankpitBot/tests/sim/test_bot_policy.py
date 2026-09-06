@@ -156,6 +156,7 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     first = server.advance_tick()
@@ -290,6 +291,7 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     server.queue_command(
@@ -303,6 +305,7 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     batch = server.advance_tick()

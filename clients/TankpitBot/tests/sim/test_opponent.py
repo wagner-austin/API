@@ -73,7 +73,15 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="move",
+            command=112,
+            x=16,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     blocked = server.advance_tick()
@@ -82,7 +90,15 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0, direction=0
+            kind="teleport",
+            command=116,
+            x=40,
+            y=40,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     poor = server.advance_tick()
@@ -90,7 +106,15 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move", command=112, x=20, y=14, target_id=0, slot=0, message_id=0, direction=0
+            kind="move",
+            command=112,
+            x=20,
+            y=14,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     broke = server.advance_tick()
@@ -106,6 +130,7 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         ),
     )
     ghost = server.advance_tick()
@@ -198,7 +223,15 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="move",
+            command=112,
+            x=16,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     messages = server.advance_tick()

@@ -13,6 +13,7 @@ from tankpit_bot.protocol.types import (
     BinaryMessage,
     EquipmentGainDict,
     EquipmentToggleDict,
+    FuelDepositDict,
     InventoryDict,
     RadarResultDict,
     RadarScanResultDict,
@@ -20,8 +21,10 @@ from tankpit_bot.protocol.types import (
 )
 from tankpit_bot.sim.actions import MinePressOutcomeDict, RadarOutcomeDict
 from tankpit_bot.sim.equipment import EquipmentGrantDict
+from tankpit_bot.sim.fuel_deposit import FuelDepositOutcomeDict
 from tankpit_bot.sim.movement import PickupRecordDict
 from tankpit_bot.sim.narrate.movement import pickup_message
+from tankpit_bot.sim.wire_statements import status_sync
 from tankpit_bot.sim.world import SimWorldDict
 
 
@@ -177,6 +180,59 @@ def narrate_equipment_pickup(
     ]
 
 
+def narrate_fuel_deposit(
+    world: SimWorldDict,
+    outcome: FuelDepositOutcomeDict,
+    observer_id: int,
+) -> list[BinaryMessage]:
+    """Narrate one resolved fuel deposit to a single observer.
+
+    Three messages, in this order, byte-mined 2026-08-03 and confirmed
+    against all six archived deposits: the depositor's own 0x2E status
+    sync carrying the post-transfer fuel, the 0x64 FuelDeposit
+    repeating that absolute fuel, then ONE container record carrying
+    the tile's new remaining volume ([[fuel-system]]).
+
+    The single record is the byte-level discriminator between a drink
+    and a deposit: every pickup doubles its record, and the deposit
+    does not.
+
+    What is NOT there matters as much. No 0x52 close — the pickup
+    choreography ends with one and this does not. No 0x3F sync
+    either, in either of the two deposits that walked first, though a
+    plain move of the same distance would draw one.
+
+    All three are PER-RECIPIENT, the record included. That is
+    measured, not assumed from the fuel statements: the 120-day atlas
+    found zero cross-tank 0x64s and zero cross-tank refill records
+    against hundreds of INFERRED refills, so a third party's deposit
+    is wire-invisible and this connection is told nothing
+    ([[recipient-policy]]). Narrating one anyway would be worse than
+    noise — production reads any fuel-bearing message as SELF fuel.
+
+    Args:
+        world: Simulated world, post-transfer. Read only.
+        outcome: The deposit's resolved outcome.
+        observer_id: The connection being narrated for.
+
+    Returns:
+        The messages this observer receives, in emission order.
+    """
+    if outcome["tank_id"] != observer_id:
+        return []
+    return [
+        status_sync(outcome["tank_id"], world, include_fuel=True),
+        FuelDepositDict(msg_type=0x64, fuel_total=outcome["fuel_total"]),
+        pickup_message(
+            [
+                PickupRecordDict(
+                    x=outcome["x"], y=outcome["y"], remaining_volume=outcome["tile_volume"]
+                )
+            ]
+        ),
+    ]
+
+
 def narrate_equipment_toggle(
     world: SimWorldDict,
     tank_id: int,
@@ -204,6 +260,7 @@ def narrate_equipment_toggle(
 __all__ = [
     "narrate_equipment_pickup",
     "narrate_equipment_toggle",
+    "narrate_fuel_deposit",
     "narrate_mine_press",
     "narrate_radar",
 ]

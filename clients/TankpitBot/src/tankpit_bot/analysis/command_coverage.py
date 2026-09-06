@@ -27,14 +27,13 @@ from pathlib import Path
 
 from tankpit_bot.analysis.command_coverage_types import (
     STATUS_CRASHES,
-    STATUS_DECLARED_UNMODELLED,
     STATUS_HANDLED,
     CommandByteRowDict,
     CommandCoverageDict,
 )
 from tankpit_bot.analysis.scan import scan_archive
 from tankpit_bot.protocol import commands as vocabulary
-from tankpit_bot.protocol.commands import CMD_UNMODELLED_COMBAT, COMMAND_PREFIX
+from tankpit_bot.protocol.commands import COMMAND_PREFIX
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sim.server import SUPPORTED_KINDS
 from tankpit_bot.wire.helpers import DecodeError
@@ -61,18 +60,17 @@ def _constant_names() -> dict[int, str]:
     return names
 
 
-def _status(byte: int, kind: str) -> str:
+def _status(kind: str) -> str:
     """Classify one command byte against what the sim can do with it.
 
     Args:
-        byte: The command byte.
-        kind: The kind the decoder resolved it to.
+        kind: The kind the decoder resolved the byte to. A byte the
+            decoder cannot map resolves to ``other``, which is in no
+            supported set — that IS the crash.
 
     Returns:
         One of the ``STATUS_*`` values.
     """
-    if byte == CMD_UNMODELLED_COMBAT:
-        return STATUS_DECLARED_UNMODELLED
     if kind in SUPPORTED_KINDS:
         return STATUS_HANDLED
     return STATUS_CRASHES
@@ -120,7 +118,7 @@ def analyze_command_coverage(directories: list[Path]) -> CommandCoverageDict:
             constant=names.get(byte, ""),
             kind=kinds[byte],
             sends=count,
-            status=_status(byte, kinds[byte]),
+            status=_status(kinds[byte]),
         )
         for byte, count in sends.most_common()
     ]
@@ -168,7 +166,7 @@ def format_command_coverage(coverage: CommandCoverageDict) -> str:
         for row in crashing:
             lines.append(f"  0x{row['byte']:02X} ({row['sends']} sends) decodes to {row['kind']!r}")
     else:
-        lines.append("Every command byte in this archive is handled or declared unmodelled.")
+        lines.append("Every command byte in this archive is handled.")
     if coverage["unsent_constants"]:
         lines.append("")
         lines.append("Defined but never sent in this archive:")

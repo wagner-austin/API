@@ -21,10 +21,12 @@ from tankpit_bot.sim.actions import process_teleport
 from tankpit_bot.sim.client_session import ClientSession
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.equipment import resolve_equipment_pickup
+from tankpit_bot.sim.fuel_deposit import resolve_fuel_deposit
 from tankpit_bot.sim.fuel_pickup import resolve_fuel_pickup
 from tankpit_bot.sim.movement import process_move
 from tankpit_bot.sim.narrate import (
     narrate_equipment_pickup,
+    narrate_fuel_deposit,
     narrate_fuel_pickup,
     narrate_move,
     narrate_teleport,
@@ -141,6 +143,17 @@ class SimServerMoveMixin(SimServerSessionsMixin):
             messages.extend(narrate_fuel_pickup(pickup, self.session.client_id))
         if outcome["kind"] == "moved":
             self._resolve_arrival_equipment(tank_id, kind, messages)
+            if kind == "deposit_fuel":
+                # The deposit resolves on ARRIVAL, after the walk that
+                # carried the tank to the tile, and it draws no 0x3F —
+                # both of the archive's two walked deposits end at the
+                # 0x43 with no sync behind it, where a plain move of
+                # the same distance draws one ([[fuel-system]]).
+                deposit = resolve_fuel_deposit(
+                    self.world, tank_id, command["x"], command["y"], command["amount"]
+                )
+                messages.extend(narrate_fuel_deposit(self.world, deposit, self.session.client_id))
+                return
             if tank_id == self.session.client_id and outcome["path"] != "":
                 # The 0x3F Sync trails a walk that actually relocated
                 # the client — an own-tile click resolves as a "moved"

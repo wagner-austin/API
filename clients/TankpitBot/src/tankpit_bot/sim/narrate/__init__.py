@@ -29,6 +29,7 @@ from tankpit_bot.sim.narrate.movement import (
 from tankpit_bot.sim.narrate.resources import (
     narrate_equipment_pickup,
     narrate_equipment_toggle,
+    narrate_fuel_deposit,
     narrate_mine_press,
     narrate_radar,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "narrate_corpse_removals",
     "narrate_equipment_pickup",
     "narrate_equipment_toggle",
+    "narrate_fuel_deposit",
     "narrate_fuel_pickup",
     "narrate_mine_press",
     "narrate_move",

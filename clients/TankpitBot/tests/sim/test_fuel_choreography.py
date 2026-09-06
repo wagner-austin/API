@@ -22,7 +22,15 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 def _pickup(x: int, y: int) -> ClientCommandDict:
     return ClientCommandDict(
-        kind="pickup_fuel", command=100, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+        kind="pickup_fuel",
+        command=100,
+        x=x,
+        y=y,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 

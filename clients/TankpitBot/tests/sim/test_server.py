@@ -44,7 +44,15 @@ def test_unsupported_kind_and_unknown_tank_raise() -> None:
     """Out-of-scope kinds and unknown/dead tanks fail loudly at queue time."""
     server = _server()
     unknown = ClientCommandDict(
-        kind="other", command=90, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
+        kind="other",
+        command=90,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
     with pytest.raises(SimError):
         server.queue_command(9, unknown)

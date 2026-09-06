@@ -24,14 +24,30 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 def _move(x: int, y: int) -> ClientCommandDict:
     """A decoded move command to (x, y)."""
     return ClientCommandDict(
-        kind="move", command=112, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+        kind="move",
+        command=112,
+        x=x,
+        y=y,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 
 def _shoot(x: int, y: int) -> ClientCommandDict:
     """A decoded shoot command at (x, y)."""
     return ClientCommandDict(
-        kind="shoot", command=115, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+        kind="shoot",
+        command=115,
+        x=x,
+        y=y,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 
@@ -88,7 +104,15 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
     """A decoded client command of the given (kind, byte) pair."""
     kind, command = kind_command
     move_kind: ClientCommandDict = ClientCommandDict(
-        kind="move", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+        kind="move",
+        command=command,
+        x=x,
+        y=y,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
     if kind == "teleport":
         return ClientCommandDict(
@@ -100,14 +124,31 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     if kind == "radar":
         return ClientCommandDict(
-            kind="radar", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+            kind="radar",
+            command=command,
+            x=x,
+            y=y,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         )
     if kind == "mine":
         return ClientCommandDict(
-            kind="mine", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+            kind="mine",
+            command=command,
+            x=x,
+            y=y,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         )
     if kind == "map_open":
         return ClientCommandDict(
@@ -119,6 +160,7 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     if kind == "pickup_fuel":
         return ClientCommandDict(
@@ -130,6 +172,7 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     return move_kind
 
@@ -137,5 +180,13 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
 def _statistics_key() -> ClientCommandDict:
     """The decoded ``CMD_STATISTICS`` key press."""
     return ClientCommandDict(
-        kind="statistics", command=118, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
+        kind="statistics",
+        command=118,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )

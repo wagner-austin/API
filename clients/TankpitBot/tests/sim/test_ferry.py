@@ -177,7 +177,15 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="move", command=112, x=11, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="move",
+            command=112,
+            x=11,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     batch = server.advance_tick()
@@ -223,7 +231,15 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="teleport", command=116, x=40, y=10, target_id=0, slot=0, message_id=0, direction=0
+            kind="teleport",
+            command=116,
+            x=40,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=0,
         ),
     )
     batch = server.advance_tick()

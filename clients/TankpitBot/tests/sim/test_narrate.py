@@ -66,7 +66,15 @@ def _kinds(messages: list[BinaryMessage]) -> list[int | str]:
 def _chat() -> ClientCommandDict:
     """A decoded chat command."""
     return ClientCommandDict(
-        kind="chat", command=77, x=1, y=2, target_id=0, slot=0, message_id=3, direction=0
+        kind="chat",
+        command=77,
+        x=1,
+        y=2,
+        target_id=0,
+        slot=0,
+        message_id=3,
+        direction=0,
+        amount=0,
     )
 
 

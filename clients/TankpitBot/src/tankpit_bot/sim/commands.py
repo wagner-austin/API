@@ -13,6 +13,7 @@ from typing import Literal, TypedDict
 from tankpit_bot.protocol.chat import CMD_CHAT
 from tankpit_bot.protocol.commands import (
     CMD_BLOCK,
+    CMD_DEPOSIT_FUEL,
     CMD_ENTER_GAME,
     CMD_INVENTORY,
     CMD_KEEPALIVE,
@@ -39,6 +40,7 @@ ClientCommandKind = Literal[
     "map_open",
     "pickup_fuel",
     "pickup_equipment",
+    "deposit_fuel",
     "toggle_equipment",
     "block",
     "chat",
@@ -90,8 +92,9 @@ class ClientCommandDict(TypedDict):
     kind); ``message_id`` is the chat command's preset message id
     (0 for every other kind); ``direction`` is the scope command's
     compass byte (0=N clockwise through 7=NW, 0 for every other
-    kind). ``command`` preserves the raw command byte for ``other``
-    kinds.
+    kind); ``amount`` is the fuel-deposit command's requested units
+    (0 for every other kind). ``command`` preserves the raw command
+    byte for ``other`` kinds.
     """
 
     kind: ClientCommandKind
@@ -102,6 +105,7 @@ class ClientCommandDict(TypedDict):
     slot: int
     message_id: int
     direction: int
+    amount: int
 
 
 def decode_client_command(payload: bytes) -> ClientCommandDict:
@@ -131,6 +135,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     if command == CMD_SHOOT:
         require_min_length(payload, 4, "ClientCommand.shoot")
@@ -144,6 +149,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     if command == CMD_TOGGLE_EQUIPMENT:
         require_min_length(payload, 3, "ClientCommand.toggle")
@@ -156,6 +162,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=payload[2] - ord("0"),
             message_id=0,
             direction=0,
+            amount=0,
         )
     if command == CMD_CHAT:
         # [type][0x6D][message_id][x][y][flag] — the 6-byte Hb frame
@@ -170,6 +177,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=0,
             message_id=payload[2],
             direction=0,
+            amount=0,
         )
     if command == CMD_SCOPE:
         # [type]['Z'][direction] — the 3-byte Rb scope-extend frame
@@ -184,6 +192,25 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=0,
             message_id=0,
             direction=payload[2],
+            amount=0,
+        )
+    if command == CMD_DEPOSIT_FUEL:
+        # [type][0x44][amount_lo][amount_hi][x][y] -- the AMOUNT leads
+        # and the tile follows, which is why the byte read as
+        # shoot-shaped for months. JS ``Wb.prototype.h`` writes it in
+        # that order and six live deposits confirm it
+        # ([[fuel-system]], [[client-commands]]).
+        require_min_length(payload, 6, "ClientCommand.deposit_fuel")
+        return ClientCommandDict(
+            kind="deposit_fuel",
+            command=command,
+            x=payload[4],
+            y=payload[5],
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+            amount=x16(payload[2], payload[3]),
         )
     if command in _BARE_KINDS:
         return ClientCommandDict(
@@ -195,9 +222,18 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             slot=0,
             message_id=0,
             direction=0,
+            amount=0,
         )
     return ClientCommandDict(
-        kind="other", command=command, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
+        kind="other",
+        command=command,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=0,
+        message_id=0,
+        direction=0,
+        amount=0,
     )
 
 
