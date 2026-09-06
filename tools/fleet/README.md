@@ -219,6 +219,16 @@ registry marked `loki` off for a trip, this workspace had no field to learn
 that into, and every auto-select dispatch paid an ssh timeout rediscovering it
 until one was refused outright.
 
+**Which copy is authoritative:** `fleet-nodes.json` owns *which machines exist
+and whether one should answer*; this file owns *what a machine can run*. The
+dependency only runs that way — `stage_root` and `ram_gb` are meaningless for a
+box that cannot be reached, while `tailnetIp` and `user` mean something with no
+capacity data at all — so `enabled` here is a **replica**, and when the two
+disagree the registry is right until somebody changes it on purpose. Agreed
+2026-09-05 between the owners of the two files (`opus-fleet-mcp-0904` for the
+registry, this package for the workspace) and **not yet ratified by the
+operator**; if it goes the other way, moving it is cheaper than the fork was.
+
 So they are made **checkable** against each other:
 
 ```bash
