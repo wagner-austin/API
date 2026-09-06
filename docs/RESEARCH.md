@@ -325,6 +325,63 @@ every earlier grid assumed it.
   base-side adaptation** (composition LoRA), now the only standing n8
   lever at scale; n4 deployment is scale-robust at ~55% on both bases.
 
+#### `cartridge_base_lora_sweep` — the base learns the crowd, and the two levers stack
+
+Added 2026-09-05 (board task `6c752568`), the arm the whole cartridge-side
+arc pointed at: a rank-8 LoRA on the base's attention (`c_attn`) trains to
+do language modeling behind a DRAWN number (uniform 1..8) of frozen
+composed cartridges from the three held-out pool corpora, then the
+recorded grid's own measurement functions run with the adapted base
+underneath — `train_on`, the loop that trained every recorded cartridge,
+drives the LoRA unchanged, with only which side learns switched. Two cell
+families: plain-trained cartridges on the adapted base (is base-side
+alone enough?) and diverse-companioned cartridges on it (do the levers
+stack?). Companion-cross and per-family floors carried over; every alone
+arm prices the LoRA itself.
+
+- **Command:** `python -m model_trainer.cli.cartridge_base_lora_sweep
+  --plan gpt2-base-lora --corpus <dir> --other-corpora <d1..d7>
+  --pool-corpora <c1,c2,c3> --device cuda --out <file>`
+- **gpt2 result, measured 2026-09-05 on HPC3** (job 55787810 + twin
+  55788364 BIT-IDENTICAL ACROSS V100 NODES, sha256 `efad0a93…`, image
+  v38 `13bd47e9…` from `e1bc2009`, run documents
+  `tools/hpc3/runs/cartridge-base-lora-v100-v38{,-twin}.json`, 0 SU):
+  **the levers attack different components and stack to program bests.**
+  LoRA + plain cartridges repairs the STRUCTURAL catastrophe (n4
+  −45.4% → −6.9%; noise-composition controls leap n4 −0.12 → +0.28) but
+  plain cartridges still bleed content interference — base-side is
+  necessary, not sufficient. LoRA + diverse cartridges: **n4 +58.1%, n8
+  +33.3%** (vs diverse-alone 55.5%/28.0%; the n8 gain is ~2× the 0.027
+  floor, the program's tightest family). Solo cost ≈ zero for plain
+  cartridges, a solo GAIN for diverse ones. Full n8 ladder: naive −7.0 →
+  lora-plain −5.6 → same-content 18.3 → single 26.5 → diverse 28.0 →
+  **lora+diverse 33.3**.
+- **gpt2-medium result, measured 2026-09-05/06** (plan
+  `gpt2-medium-base-lora` differing only in the base, pinned by test and
+  by the v39 image's smoke; job 55790169, image v39 `0bd7983b…` from
+  `f7f696a8`, run document
+  `tools/hpc3/runs/cartridge-medium-base-lora-v100-v39.json`; twin
+  55798416 for the certificate): **a split decision that completes the
+  mechanism map.** The structural repair TRANSFERS to depth — medium's
+  n8 noise-composition control flips −0.29 → +0.42, a +0.71 swing on the
+  exact quantity the scale rung measured as the collapse's structural
+  half — and n4 sets a new medium best (**+59.3%** vs 54.1% without the
+  LoRA). But medium's n8 with real content still collapses (−79.4% vs
+  −86.6%; composed −0.62 sits 1.04 BELOW the repaired noise control,
+  where gpt2-small's gap is 0.15) with a 0.53 cell floor — seed-chaotic,
+  near a bifurcation. **Depth amplifies content interference in a way
+  neither current lever touches**; structure is solved at both scales.
+- **Operating points this fixes for the serving design:** base-LoRA +
+  diverse cartridges at up to FOUR simultaneous compartments is
+  scale-robust and best-in-program (~58–59% on both bases); eight is
+  deliverable on the 12-layer base (+33.3%) and NOT on the 24-layer base,
+  where a ≤4-compartment scope router remains the honest deployment.
+- **Open, filed rather than implied:** a content-side lever for depth
+  (more diverse voices in medium's pool, or content-aware LoRA
+  objectives) with the medium record as baseline; the budget slot policy
+  under the stacked recipe; the 7B rung once a content-at-depth lever
+  exists.
+
 ### `mi-cu128` — the Blackwell determinism baseline
 
 Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
