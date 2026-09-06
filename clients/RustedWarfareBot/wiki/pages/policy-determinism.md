@@ -10,6 +10,7 @@ source_paths:
   - "runs/sweeps/noise"
   - "runs/sweeps/noise-seeded"
   - "runs/sweeps/detpair24"
+  - "runs/dettap"
   - "agent/src/rwbot/agent/EngineRandom.java"
   - "agent/src/rwbot/agent/TickBracket.java"
   - "runs/bracket-ff1-trace.ndjson"
@@ -212,9 +213,26 @@ fields enough units to exercise draw-count-varying call sites the
 certification never touched. Until the per-call-site routing lands, the
 Impossible rung is measured through this floor, and every screen is sized
 against it: the 2-se minimum detectable paired-survival effect is roughly
-**850 samples at n=8, 700 at n=12, 350 at n=48**. The named next
-instrument step is one same-node tapped pair (`RandomTap`,
-`PLAY_RNGTAP=1`) to name the call site whose count varies.
+**850 samples at n=8, 700 at n=12, 350 at n=48**.
+
+The tapped follow-up ran same-day (`runs/dettap/`, four byte-identical
+local invocations of seed 8773497 under the cluster's exact parameters)
+and moved the diagnosis one level up. The fork reproduces on one machine
+(2,734 vs 4,425 samples); a second pair under
+`-XX:+UnlockExperimentalVMOptions -XX:hashCode=2` still forked (3,456 vs
+3,496), exonerating identity-hash iteration order here as the 2026-08-07
+flag test did at the old fork. And the tap names what varies: the AI's
+randomized evaluation passes land at **process-varying frames** — one
+twin consulted the candidate gate `game.a.n.a:709` (bytecode: `f.c(3)`,
+a 1-in-3 accept) at frame 75 exactly as both cluster runs did, its twin
+first at frame 51,450; one twin ran its whole opening think-burst in the
+frame-300 window, its twin nothing before 10,725. The variance is
+upstream of every draw — in *when* the AI evaluates, not what it draws —
+which is why the seeded streams, the bracket, the pinned delta and
+deterministic identity hashes all leave it standing. The suspect is the
+AI think scheduler (the `aR`-family cadence accumulators); naming the
+exact clock is the instrument lane's banked next step (log, 2026-09-06
+tap entry).
 
 ## The standing rules
 
