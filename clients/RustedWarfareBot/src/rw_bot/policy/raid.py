@@ -198,7 +198,7 @@ class Raider:
             return self._disband(survivors, anchor)
         party = survivors
         if not party and may_draft:
-            party = self._draft(army, anchor)
+            party = draft_gathered(army, anchor, self.size)
         self._party = frozenset(party)
         if not self._party:
             return ()
@@ -240,19 +240,6 @@ class Raider:
         self._objective = 0
         self._ordered = {}
         return homeward(survivors, anchor)
-
-    def _draft(self, army: Sequence[Entity], anchor: Entity) -> list[int]:
-        """Pick a whole party from the units gathered at the anchor, or none.
-
-        Args:
-            army: Units available to fight.
-            anchor: The structure the reserve gathers at.
-
-        Returns:
-            The new party in id order, empty when the gathering ground holds
-            fewer than a party.
-        """
-        return draft_gathered(army, anchor, self.size)
 
 
 __all__ = ["INCOME_TYPES", "Raider", "income_objectives"]
