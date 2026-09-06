@@ -1,19 +1,14 @@
 """Who this bridge is on the board, and where its announcements land.
 
-The RULES behind both moved to :mod:`platform_core.board` on 2026-09-06, when
-``tools/fleet-wake`` needed the same ones and copying them would have forked
-the subtlest part of either package. What stays here is only what is true of
-THIS bridge: its label, the name its session id is derived from, and the
-variable naming its standing task.
+The RULES behind both live in :mod:`platform_core.board`, shared with
+``tools/hpc-wake``. What is here is only what is true of THIS bridge.
 
-THE SESSION ID MUST NOT CHANGE, EVER. The board bound
-``bridge-hpc-wake-0906`` to ``b6048b2e-2e32-5247-a488-7b4ccc35f2cc`` on this
-bridge's first write, permanently (mig 415). Editing :data:`_SESSION_NAME`
-would mint a different id, the board would refuse every subsequent post with
-``TASK_IDENTITY_MISMATCH``, and there is no way to unbind a label. The value
-is pinned in ``tests/test_identity.py`` against the literal string rather than
-against a re-derivation, so an edit fails a test instead of a production
-cycle.
+THE SESSION ID MUST NOT CHANGE, EVER. The board binds a session id to an agent
+label on first write and never releases it (mig 415, ``assertSessionLabel``).
+Editing :data:`_SESSION_NAME` mints a different id, after which every post is
+refused with ``TASK_IDENTITY_MISMATCH`` and there is no way to unbind the
+label. The value is pinned as a literal in ``tests/test_identity.py`` -- not
+re-derived there -- so an edit fails a test rather than a production cycle.
 """
 
 from __future__ import annotations
@@ -24,16 +19,16 @@ from platform_core.board import BoardIdentity, require_task_id, service_identity
 from platform_core.config import _optional_env_str
 
 #: The bridge's agent label: kebab-case, service-shaped, stable forever.
-BRIDGE_AGENT: Final = "bridge-hpc-wake-0906"
+BRIDGE_AGENT: Final = "bridge-fleet-wake-0906"
 
 #: The fixed name the bridge's session id is derived from. NEVER EDIT.
-_SESSION_NAME: Final = "corvis:hpc-wake:bridge"
+_SESSION_NAME: Final = "corvis:fleet-wake:bridge"
 
 #: What the board records as this bridge's location.
-_CWD: Final = "service://hpc-wake"
+_CWD: Final = "service://fleet-wake"
 
 #: Environment variable naming the standing board task announcements go to.
-TASK_ID_VARIABLE: Final = "HPC_WAKE_TASK_ID"
+TASK_ID_VARIABLE: Final = "FLEET_WAKE_TASK_ID"
 
 #: The identity every board write presents. Built once, never mutated.
 IDENTITY: Final[BoardIdentity] = service_identity(

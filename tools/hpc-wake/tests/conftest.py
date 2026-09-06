@@ -22,13 +22,6 @@ import pytest
 from hpc3.core import _test_hooks as hpc3_hooks
 from hpc3.core._test_hooks import CommandResult
 from platform_core.config import config_test_hooks
-from platform_core.json_utils import (
-    JSONObject,
-    dump_json_str,
-    load_json_str,
-    narrow_json_to_dict,
-)
-from platform_core.mcp_client import McpHttpResponse
 
 from hpc_wake import _test_hooks
 from hpc_wake.identity import TASK_ID_VARIABLE
@@ -102,116 +95,6 @@ def _make_emitted() -> Generator[list[str], None, None]:
     _test_hooks.emit = _emit
     yield lines
     _test_hooks.reset_hooks()
-
-
-def sse(payload: str) -> str:
-    """Wrap a JSON payload the way the endpoint's event stream does.
-
-    Args:
-        payload: The JSON-RPC body.
-
-    Returns:
-        The response body, with the ``event:`` and ``data:`` framing.
-    """
-    return f"event: message\ndata: {payload}\n\n"
-
-
-def tool_text(text: str) -> str:
-    """Build a successful ``tools/call`` response body carrying one text block.
-
-    Args:
-        text: The rendered text the tool returns.
-
-    Returns:
-        The whole response body.
-    """
-    payload: JSONObject = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {"content": [{"type": "text", "text": text}]},
-    }
-    return sse(dump_json_str(payload))
-
-
-def posted_ok() -> McpHttpResponse:
-    """A 200 whose payload is a successful ``task_post``.
-
-    Returns:
-        The response.
-    """
-    return McpHttpResponse(status=200, body=tool_text("posted"), content_type="text/event-stream")
-
-
-def sent_arguments(body: bytes) -> JSONObject:
-    """Read back the tool arguments from a recorded request body.
-
-    Args:
-        body: The bytes the fake poster recorded.
-
-    Returns:
-        The ``params.arguments`` object that was sent.
-    """
-    envelope = narrow_json_to_dict(load_json_str(body.decode("utf-8")))
-    return narrow_json_to_dict(narrow_json_to_dict(envelope["params"])["arguments"])
-
-
-class FakeHttpPost:
-    """An HTTP poster that answers from a script and records the calls.
-
-    Satisfies :class:`~platform_core.mcp_client.McpPostProtocol`.
-
-    Attributes:
-        urls: Every URL it was given, in order.
-        headers: Every header mapping it was given, in order.
-        bodies: Every request body it was given, in order.
-    """
-
-    urls: list[str]
-    headers: list[dict[str, str]]
-    bodies: list[bytes]
-
-    def __init__(self, replies: Sequence[McpHttpResponse]) -> None:
-        """Build a poster that will answer with these responses in order.
-
-        Args:
-            replies: One response per expected call. Running out is an
-                error rather than a default: a test that made more calls
-                than it declared has changed behaviour it did not mean to
-                assert on.
-        """
-        self.urls = []
-        self.headers = []
-        self.bodies = []
-        self._replies = list(replies)
-
-    def __call__(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str],
-        body: bytes,
-        timeout_seconds: int,
-    ) -> McpHttpResponse:
-        """Record a call and answer with the next scripted response.
-
-        Args:
-            url: The URL posted to.
-            headers: The request headers.
-            body: The request body.
-            timeout_seconds: The timeout the caller chose.
-
-        Returns:
-            The next scripted response.
-
-        Raises:
-            AssertionError: If more calls are made than responses were
-                scripted.
-        """
-        self.urls.append(url)
-        self.headers.append(dict(headers))
-        self.bodies.append(body)
-        assert self._replies, f"unscripted POST to {url}"
-        return self._replies.pop(0)
 
 
 class FakeRun:

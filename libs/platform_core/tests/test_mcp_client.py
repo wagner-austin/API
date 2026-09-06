@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import socketserver
 import threading
-from collections.abc import Generator, Sequence
+from collections.abc import Generator
 from typing import Final
 
 import pytest
@@ -43,6 +43,12 @@ from platform_core.mcp_client import (
     call_mcp_tool,
     urllib_mcp_post,
 )
+from platform_core.mcp_testing import (
+    FakeHttpPost,
+    sent_arguments,
+    sse_body,
+    tool_text_body,
+)
 
 #: The credentials every client test posts with.
 TEST_CREDENTIALS: Final = McpCredentials(
@@ -55,63 +61,14 @@ TEST_CREDENTIALS: Final = McpCredentials(
 _TEMPLATE = '{{"seen":"{body}","key":"{key}"}}'
 
 
-class FakeHttpPost:
-    """A poster that answers canned replies and records every request.
-
-    A fake, not a mock: it implements
-    :class:`~platform_core.mcp_client.McpPostProtocol` and records what it was
-    asked for, so an assertion is about the request the client built rather
-    than about a patching library's call-recording API.
-    """
-
-    def __init__(self, replies: Sequence[McpHttpResponse]) -> None:
-        """Store the replies to hand out, oldest first.
-
-        Args:
-            replies: One per expected call, in order.
-        """
-        self._replies = list(replies)
-        self.urls: list[str] = []
-        self.headers: list[dict[str, str]] = []
-        self.bodies: list[bytes] = []
-        self.timeouts: list[int] = []
-
-    def __call__(
-        self,
-        url: str,
-        *,
-        headers: dict[str, str],
-        body: bytes,
-        timeout_seconds: int,
-    ) -> McpHttpResponse:
-        """Record the request and answer the next canned reply.
-
-        Args:
-            url: Absolute URL posted to.
-            headers: Every request header.
-            body: The encoded request body.
-            timeout_seconds: The caller's timeout.
-
-        Returns:
-            The next canned reply.
-
-        Raises:
-            AssertionError: When the client made more calls than the test
-                prepared replies for, which means the test's expectation of
-                the call sequence is wrong and silently answering again would
-                hide it.
-        """
-        self.urls.append(url)
-        self.headers.append(dict(headers))
-        self.bodies.append(body)
-        self.timeouts.append(timeout_seconds)
-        if not self._replies:
-            raise AssertionError(f"unexpected extra POST to {url}")
-        return self._replies.pop(0)
-
-
 def rpc_body(payload: JSONObject) -> str:
-    """Wrap a JSON-RPC payload in the SSE framing the server sends.
+    """Serialise a JSON-RPC payload and frame it as the server sends it.
+
+    Composes with :func:`~platform_core.mcp_testing.sse_body` rather than
+    repeating the framing: that function owns what the wire looks like, this
+    one owns turning an object into the string it frames. The tests below
+    build malformed payloads deliberately, which is why this takes an object
+    the caller can misshape rather than a finished body.
 
     Args:
         payload: The payload object.
@@ -119,19 +76,7 @@ def rpc_body(payload: JSONObject) -> str:
     Returns:
         The whole response body.
     """
-    return f"event: message\ndata: {dump_json_str(payload)}\n\n"
-
-
-def tool_text(text: str) -> str:
-    """Build a successful single-block tool result body.
-
-    Args:
-        text: The block's text.
-
-    Returns:
-        The whole response body.
-    """
-    return rpc_body({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"text": text}]}})
+    return sse_body(dump_json_str(payload))
 
 
 def ok(body: str) -> McpHttpResponse:
@@ -159,20 +104,6 @@ def refused(status: int, body: str) -> McpHttpResponse:
     return McpHttpResponse(status=status, content_type="application/json", body=body)
 
 
-def sent_arguments(body: bytes) -> JSONObject:
-    """Pull the tool arguments back out of a posted envelope.
-
-    Args:
-        body: The posted request body.
-
-    Returns:
-        The arguments object.
-    """
-    envelope = narrow_json_to_dict(load_json_str(body.decode("utf-8")))
-    params = narrow_json_to_dict(envelope["params"])
-    return narrow_json_to_dict(params["arguments"])
-
-
 def test_posts_a_jsonrpc_tool_call_with_both_headers() -> None:
     """The request shape is the contract the endpoint accepts.
 
@@ -180,7 +111,7 @@ def test_posts_a_jsonrpc_tool_call_with_both_headers() -> None:
     endpoint answers 401, and without ``X-Tenant-Id`` it answers a tenant
     error from inside the tool. Both were found by making the call.
     """
-    poster = FakeHttpPost([ok(tool_text("rendered"))])
+    poster = FakeHttpPost([ok(tool_text_body("rendered"))])
 
     assert call_mcp_tool(poster, TEST_CREDENTIALS, "task_events", {"limit": 5}) == "rendered"
     assert poster.urls == [TEST_CREDENTIALS["url"]]
@@ -215,7 +146,7 @@ def test_carries_a_json_answer_through_unchanged() -> None:
     and both arrive the same way. A client that "helpfully" parsed would
     break one of them.
     """
-    body = tool_text('{"claimed": null}')
+    body = tool_text_body('{"claimed": null}')
 
     answer = call_mcp_tool(FakeHttpPost([ok(body)]), TEST_CREDENTIALS, "dispatch_claim", {})
 
@@ -305,7 +236,7 @@ def test_a_result_not_flagged_is_returned_normally() -> None:
 
 def test_the_timeout_reaches_the_transport() -> None:
     """A caller-set timeout has to arrive at the socket to mean anything."""
-    poster = FakeHttpPost([ok(tool_text("x")), ok(tool_text("x"))])
+    poster = FakeHttpPost([ok(tool_text_body("x")), ok(tool_text_body("x"))])
 
     call_mcp_tool(poster, TEST_CREDENTIALS, "task_events", {}, timeout_seconds=3)
     call_mcp_tool(poster, TEST_CREDENTIALS, "task_events", {})
@@ -396,11 +327,9 @@ def test_the_real_poster_returns_a_401_instead_of_raising(server_url: str) -> No
 
 __all__ = [
     "TEST_CREDENTIALS",
-    "FakeHttpPost",
     "ok",
     "refused",
     "rpc_body",
-    "sent_arguments",
     "test_a_body_with_no_data_line_raises_its_own_code",
     "test_a_jsonrpc_error_raises_its_own_code",
     "test_a_refused_status_raises_with_the_status_in_the_message",
@@ -412,5 +341,4 @@ __all__ = [
     "test_the_real_poster_returns_a_401_instead_of_raising",
     "test_the_real_poster_sends_headers_and_body",
     "test_the_timeout_reaches_the_transport",
-    "tool_text",
 ]

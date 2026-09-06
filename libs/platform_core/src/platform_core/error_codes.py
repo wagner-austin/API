@@ -541,6 +541,21 @@ class BoardWatchErrorCode(ErrorCodeBase):
     FOOTER_MALFORMED = "FOOTER_MALFORMED"
 
 
+class BoardBridgeErrorCode(ErrorCodeBase):
+    """What ANY bridge announcing terminal work on the board can get wrong.
+
+    Shared by ``tools/hpc-wake`` and ``tools/fleet-wake`` through
+    :mod:`platform_core.board`, so the two cannot describe the same condition
+    differently. A bridge's own domain failures stay in its own enum below --
+    this holds only what the shared code raises.
+    """
+
+    # Configuration: the standing task announcements land in. Required, not
+    # discovered -- an announcement posted to a guessed task is one nobody
+    # subscribed to, which reads exactly like the bridge working.
+    TASK_ID_MISSING = "TASK_ID_MISSING"
+
+
 class HpcWakeErrorCode(ErrorCodeBase):
     """Announcing Slurm terminal states on the agent board.
 
@@ -548,14 +563,10 @@ class HpcWakeErrorCode(ErrorCodeBase):
     sibling of :class:`FleetErrorCode`: the failures live at this package's
     own layer. Transport is :class:`McpClientErrorCode`'s, credentials are
     :class:`BoardWatchErrorCode`'s (the bridge loads them through the same
-    reader), and the cluster's are :class:`Hpc3ErrorCode`'s. What is left is
-    what only this package can get wrong.
+    reader), the cluster's are :class:`Hpc3ErrorCode`'s, and everything a
+    bridge shares with the fleet bridge is :class:`BoardBridgeErrorCode`'s.
+    What is left is what only this package can get wrong.
     """
-
-    # Configuration: the standing task announcements land in. Required, not
-    # discovered -- an announcement posted to a guessed task is one nobody
-    # subscribed to, which reads exactly like the bridge working.
-    TASK_ID_MISSING = "TASK_ID_MISSING"
 
     # A terminal accounting row for a job the ledger never recorded. The
     # query is BUILT from the ledger, so this is a contract violation --
@@ -565,6 +576,7 @@ class HpcWakeErrorCode(ErrorCodeBase):
 
 
 __all__ = [
+    "BoardBridgeErrorCode",
     "BoardWatchErrorCode",
     "CalendarErrorCode",
     "EmailErrorCode",

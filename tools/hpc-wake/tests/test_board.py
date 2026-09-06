@@ -6,12 +6,13 @@ import pytest
 from platform_core.error_codes import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpHttpResponse
+from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
 
 from hpc_wake import _test_hooks
 from hpc_wake.announce import Announcement
 from hpc_wake.board import post_announcement
-from hpc_wake.identity import BRIDGE_AGENT, BRIDGE_SESSION_ID
-from tests.conftest import TASK_ID, FakeHttpPost, posted_ok, sent_arguments
+from hpc_wake.identity import BRIDGE_AGENT, IDENTITY
+from tests.conftest import TASK_ID
 
 CREDENTIALS = McpCredentials(
     url="http://127.0.0.1:8033/mcp",
@@ -43,7 +44,7 @@ class TestPostAnnouncement:
             "kind": "note",
             "body": ANNOUNCEMENT["body"],
             "agent": BRIDGE_AGENT,
-            "sessionId": BRIDGE_SESSION_ID,
+            "sessionId": IDENTITY["session_id"],
             "cwd": "service://hpc-wake",
         }
 

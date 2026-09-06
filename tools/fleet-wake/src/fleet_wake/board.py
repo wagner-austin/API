@@ -1,11 +1,10 @@
 """The one board write this package makes.
 
 Everything mechanical about it -- the argument shape, the identity, the
-decision not to read the board back -- moved to :mod:`platform_core.board` on
-2026-09-06 so ``tools/fleet-wake`` could share it rather than fork it. What is
-left here is the BINDING: this package's HTTP seam and this package's identity,
-joined to the shared call in one place, so the cycle does not have to know
-about either.
+decision not to read the board back -- lives in :mod:`platform_core.board`,
+shared with ``tools/hpc-wake``. What is here is the BINDING: this package's
+HTTP seam and this package's identity, joined to the shared call in one place,
+so the cycle does not have to know about either.
 """
 
 from __future__ import annotations
@@ -13,9 +12,9 @@ from __future__ import annotations
 from platform_core.board import post_to_task
 from platform_core.mcp_client import McpCredentials
 
-from hpc_wake import _test_hooks
-from hpc_wake.announce import Announcement
-from hpc_wake.identity import IDENTITY
+from fleet_wake import _test_hooks
+from fleet_wake.announce import Announcement
+from fleet_wake.identity import IDENTITY
 
 
 def post_announcement(
@@ -32,7 +31,9 @@ def post_announcement(
         AppError: Through :func:`platform_core.board.post_to_task` --
             ``HTTP_STATUS`` when the endpoint refused (a rotated key is the
             ordinary case), ``RPC_ERROR`` when the board did (an identity
-            mismatch would land here, naming the established label).
+            mismatch would land here, naming the established label). Not
+            caught: see :func:`fleet_wake.cycle.run_cycle` on why a failed
+            post must end the cycle before anything is recorded.
     """
     post_to_task(
         _test_hooks.http_post,

@@ -8,10 +8,11 @@ import sys
 
 import pytest
 from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.mcp_testing import FakeHttpPost, posted_ok
 
 from hpc_wake import _test_hooks
 from hpc_wake.cli import wake as wake_cli
-from tests.conftest import CONFIGURED_ENV, FakeHttpPost, FakeRun, pin_env, posted_ok
+from tests.conftest import CONFIGURED_ENV, FakeRun, pin_env
 
 
 def _write_workspace(tmp_path: pathlib.Path) -> str:

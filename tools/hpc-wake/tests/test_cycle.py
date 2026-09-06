@@ -13,18 +13,12 @@ from platform_core.error_codes import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, require_str
 from platform_core.mcp_client import McpHttpResponse
+from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
 
 from hpc_wake import _test_hooks
 from hpc_wake.announce import MARKER
 from hpc_wake.cycle import run_cycle
-from tests.conftest import (
-    CONFIGURED_ENV,
-    FakeHttpPost,
-    FakeRun,
-    pin_env,
-    posted_ok,
-    sent_arguments,
-)
+from tests.conftest import CONFIGURED_ENV, FakeRun, pin_env
 
 
 def _connection(tmp_path: pathlib.Path) -> WorkspaceConnection:
