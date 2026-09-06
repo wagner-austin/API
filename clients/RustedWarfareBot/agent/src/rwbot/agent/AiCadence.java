@@ -68,6 +68,12 @@ final class AiCadence {
             return;
         }
         StringBuilder out = new StringBuilder();
+        // The ledger's per-stream states and draw counts, per TICK where the
+        // sample line has them per 75: the tick where a count steps in one
+        // twin and not the other IS the divergent event, and whatever runs
+        // on that tick is its mechanism -- the pinpoint the sample cadence
+        // structurally cannot give.
+        out.append(' ').append(RandomLedger.describe());
         Class<?> teams = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
         Class<?> ai = EngineAccess.pinnedClass(EngineNames.AI_CLASS);
         java.lang.reflect.Method lookup =
