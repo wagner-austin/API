@@ -10,7 +10,7 @@ source_paths:
   - "src/rw_bot/policy/raid.py"
   - "src/rw_bot/policy/party.py"
 source_git_blobs:
-  "src/rw_bot/policy/raid.py": "1b3d826a823ce7e5907dfab11976d5fc75420c4f"
+  "src/rw_bot/policy/raid.py": "535a2b93667873701b9fc07ec2d963460be116b7"
   "src/rw_bot/policy/party.py": "8015a8aa7edc445b5ca227391003e7cf1b5a211f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
