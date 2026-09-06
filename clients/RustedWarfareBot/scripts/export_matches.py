@@ -17,6 +17,18 @@ point of the dataset -- the race law in one column per sample ([[policy-economy]
 13-column archive trace has no honest value to put there. Skips are counted
 and printed, never silent.
 
+Columns past the income shape -- the plan word, the worker count, the
+enemy-shape trio, the ``events`` letters, the coverage trio, and
+``rival_army`` ([[policy-trace]]) -- export verbatim when the trace's era
+recorded them and as EMPTY fields when it did not: a blank says "not
+recorded", where a padded zero would claim a measurement nobody took
+(the same rule that skips the 13-column shape outright). The ``doctrine``
+column joins the batch's committed job file (``sweeps/<batch>.txt``,
+``label|seed|doctrine|samples``) so the training side can group arms by
+what they actually played; batches without a job file -- the evolve
+generations, whose member label already names the doctrine under
+``doctrines/evolve/`` -- carry a blank ([[impossible-build-priority-head]]).
+
 Run as ``python -m scripts.export_matches <batch-name> [<batch-name> ...]``.
 """
 
@@ -32,6 +44,10 @@ from scripts.ledger import scorecard_fields
 
 SWEEP_ROOT = Path("runs/sweeps")
 TRACE_ROOT = Path("runs/traces")
+
+#: Where committed job files live -- the experiment descriptions, one
+#: ``label|seed|doctrine|samples`` line per match ([[harness-run-lifecycle]]).
+JOB_ROOT = Path("sweeps")
 
 #: Where the covenant-radar service's external datasets live, one directory
 #: per dataset name. Written relative to this repository because the two are
@@ -73,7 +89,24 @@ HEADER = (
     "income",
     "rival_income",
     "difficulty",
+    "plan",
+    "workers",
+    "navy_seen",
+    "air_seen",
+    "navy_blood",
+    "events",
+    "eco_covered",
+    "own_covered",
+    "foe_covered",
+    "rival_army",
+    "doctrine",
 )
+
+#: The columns a full-shape tick row carries past the income pair and the
+#: world digest, in trace order ([[policy-trace]]): the plan word at 15
+#: through ``rival_army`` at 24. The digest itself (column 14) is identity,
+#: not a feature, and stays out of the export.
+_EXTRA_COLUMNS = 10
 
 #: Fewest columns a tick row must split into to export -- the shape with
 #: the income pair at 12-13. Later columns (plan at 15, workers at 16) are
@@ -95,12 +128,16 @@ class ParsedTrace(TypedDict):
 
     Attributes:
         ticks: The 15-column sample rows, as integers, in recorded order.
+        extras: Per tick, the columns past the digest as recorded text --
+            plan through ``rival_army`` -- padded with empty fields to
+            :data:`_EXTRA_COLUMNS` when the trace's era stops short.
         losses: ``(frame, attributed)`` per loss-ledger row, where attributed
             means the row names a killer.
         legacy: Whether the file held tick rows of the pre-income shape.
     """
 
     ticks: tuple[tuple[int, ...], ...]
+    extras: tuple[tuple[str, ...], ...]
     losses: tuple[tuple[int, bool], ...]
     legacy: bool
 
@@ -119,6 +156,7 @@ def parse_trace(text: str) -> ParsedTrace:
         The parsed trace.
     """
     ticks: list[tuple[int, ...]] = []
+    extras: list[tuple[str, ...]] = []
     losses: list[tuple[int, bool]] = []
     legacy = False
     for line in text.splitlines():
@@ -127,16 +165,26 @@ def parse_trace(text: str) -> ParsedTrace:
             continue
         if len(parts) >= _TICK_COLUMNS:
             ticks.append(tuple(int(p) for p in parts[:_TICK_COLUMNS]))
+            tail = parts[_TICK_COLUMNS : _TICK_COLUMNS + _EXTRA_COLUMNS]
+            extras.append((*tail, *[""] * (_EXTRA_COLUMNS - len(tail))))
         elif len(parts) in _LOSS_COLUMNS:
             killer = parts[5] if len(parts) == 6 else _NO_KILLER
             losses.append((int(parts[0]), killer != _NO_KILLER))
         else:
             legacy = True
-    return ParsedTrace(ticks=tuple(ticks), losses=tuple(losses), legacy=legacy)
+    return ParsedTrace(
+        ticks=tuple(ticks), extras=tuple(extras), losses=tuple(losses), legacy=legacy
+    )
 
 
 def match_rows(
-    match: str, arm: str, seed: str, verdict: str, difficulty: str, parsed: ParsedTrace
+    match: str,
+    arm: str,
+    seed: str,
+    verdict: str,
+    difficulty: str,
+    doctrine: str,
+    parsed: ParsedTrace,
 ) -> tuple[str, ...]:
     """Join one match's ticks with its loss ledger and verdict.
 
@@ -147,6 +195,8 @@ def match_rows(
         verdict: The scorecard's grade, first word.
         difficulty: The card's stated difficulty, empty when the card
             predates the ``match`` line.
+        doctrine: The job file's doctrine stem for this arm and seed,
+            empty when no committed job file names it.
         parsed: The match's parsed trace.
 
     Returns:
@@ -157,7 +207,7 @@ def match_rows(
     rows = []
     lost_cum = 0
     killed = 0
-    for tick in parsed["ticks"]:
+    for tick, extra in zip(parsed["ticks"], parsed["extras"], strict=True):
         lost_cum += tick[5]
         while killed < len(kills) and kills[killed] <= tick[0]:
             killed += 1
@@ -175,19 +225,47 @@ def match_rows(
                     str(killed),
                     *(str(value) for value in tick[6:14]),
                     difficulty,
+                    *extra,
+                    doctrine,
                 )
             )
         )
     return tuple(rows)
 
 
-def export(batches: Sequence[str], sweeps: Path, traces: Path) -> tuple[list[str], list[str]]:
+def job_doctrines(job_file: Path) -> dict[tuple[str, str], str]:
+    """Read a batch's job file into an ``(arm, seed) -> doctrine stem`` map.
+
+    Args:
+        job_file: The committed sweep description, ``label|seed|doctrine|samples``
+            per line, ``#`` comments throughout.
+
+    Returns:
+        The map, empty when the file does not exist -- an evolve generation's
+        jobs are described by its driver, not a committed file, and its blank
+        doctrine column is the honest record of that.
+    """
+    if not job_file.exists():
+        return {}
+    doctrines: dict[tuple[str, str], str] = {}
+    for line in job_file.read_text(encoding="utf-8").splitlines():
+        fields = line.split("|")
+        if line.startswith("#") or len(fields) < 3:
+            continue
+        doctrines[(fields[0], fields[1])] = Path(fields[2]).stem
+    return doctrines
+
+
+def export(
+    batches: Sequence[str], sweeps: Path, traces: Path, jobs: Path
+) -> tuple[list[str], list[str]]:
     """Collect every exportable match of the named batches.
 
     Args:
         batches: The batch names, in the order given.
         sweeps: The scorecard root.
         traces: The trace root.
+        jobs: The committed job-file directory, ``<batch>.txt`` per batch.
 
     Returns:
         The CSV data rows, and one note per skipped match saying why.
@@ -195,6 +273,7 @@ def export(batches: Sequence[str], sweeps: Path, traces: Path) -> tuple[list[str
     rows: list[str] = []
     skipped: list[str] = []
     for batch in batches:
+        doctrines = job_doctrines(jobs / f"{batch}.txt")
         for path in sorted((traces / batch).glob("*.ndjson")):
             parsed = parse_trace(path.read_text(encoding="utf-8"))
             card = sweeps / batch / f"{path.stem}.txt"
@@ -210,7 +289,17 @@ def export(batches: Sequence[str], sweeps: Path, traces: Path) -> tuple[list[str
             found = re.search(r"difficulty (-?\d+)", fields.get("match", ""))
             difficulty = found.group(1) if found else ""
             arm, _, seed = path.stem.rpartition("-s")
-            rows.extend(match_rows(f"{batch}/{path.stem}", arm, seed, verdict, difficulty, parsed))
+            rows.extend(
+                match_rows(
+                    f"{batch}/{path.stem}",
+                    arm,
+                    seed,
+                    verdict,
+                    difficulty,
+                    doctrines.get((arm, seed), ""),
+                    parsed,
+                )
+            )
     return rows, skipped
 
 
@@ -219,6 +308,7 @@ def main(
     sweeps: Path = SWEEP_ROOT,
     traces: Path = TRACE_ROOT,
     dest: Path = EXPORT_ROOT,
+    jobs: Path = JOB_ROOT,
 ) -> int:
     """Write the dataset for the batches named on the command line.
 
@@ -229,6 +319,7 @@ def main(
             scratch tree.
         traces: The trace root, likewise.
         dest: The dataset directory, likewise. Gains ``data.csv``.
+        jobs: The committed job-file directory, likewise.
 
     Returns:
         ``EXIT_OK``, ``EXIT_EMPTY`` when nothing exported, or
@@ -238,7 +329,7 @@ def main(
     if not args:
         sys.stdout.write("usage: export_matches <batch-name> [<batch-name> ...]\n")
         return EXIT_BAD_USAGE
-    rows, skipped = export(args, sweeps, traces)
+    rows, skipped = export(args, sweeps, traces, jobs)
     for note in skipped:
         sys.stdout.write(f"skipped {note}\n")
     if not rows:

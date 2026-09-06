@@ -34,22 +34,29 @@ def _tick(frame: int, lost: int = 0, income: int = 54, rival_income: int = 180) 
     return f"{frame} 3 4000 2 5 {lost} 2 1 1 0 3500 9000 {income} {rival_income} 42\n"
 
 
+def _full_tick(frame: int) -> str:
+    """A current-era row: plan through ``rival_army`` after the digest."""
+    return _tick(frame).rstrip("\n") + " building 4 0 1 0 WH 12 34 56 8900\n"
+
+
 def _loss(frame: int, killer: str) -> str:
     return f"{frame} 8 c_tank 900 250 {killer}\n"
 
 
 def _write_match(
     tmp_path: Path, batch: str, stem: str, trace: str, verdict: str | None
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     traces = tmp_path / "traces"
     sweeps = tmp_path / "sweeps"
+    jobs = tmp_path / "jobs"
     (traces / batch).mkdir(parents=True, exist_ok=True)
     (sweeps / batch).mkdir(parents=True, exist_ok=True)
+    jobs.mkdir(exist_ok=True)
     (traces / batch / f"{stem}.ndjson").write_text(trace, encoding="utf-8")
     if verdict is not None:
         card = f"### {stem}\n{'verdict':<15}{verdict}\n"
         (sweeps / batch / f"{stem}.txt").write_text(card, encoding="utf-8")
-    return sweeps, traces
+    return sweeps, traces, jobs
 
 
 def test_both_tables_parse_and_headers_are_skipped_by_shape() -> None:
@@ -92,9 +99,11 @@ def test_rows_join_the_verdict_the_ledger_and_the_ticks(
         + _loss(75, "c_artillery")
         + _loss(75, "-")
     )
-    sweeps, traces = _write_match(tmp_path, "night", "flame-close-s777", trace, "won (wiped_out)")
+    sweeps, traces, jobs = _write_match(
+        tmp_path, "night", "flame-close-s777", trace, "won (wiped_out)"
+    )
     dest = tmp_path / "dataset"
-    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest) == EXIT_OK
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
     lines = (dest / "data.csv").read_text(encoding="utf-8").splitlines()
     assert lines[0] == ",".join(HEADER)
     assert len(lines) == 4
@@ -112,11 +121,11 @@ def test_rows_join_the_verdict_the_ledger_and_the_ticks(
 
 
 def test_a_lost_match_labels_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    sweeps, traces = _write_match(
+    sweeps, traces, jobs = _write_match(
         tmp_path, "night", "flame-close-s1", _TICK_HEADER + _tick(0), "defeated"
     )
     dest = tmp_path / "dataset"
-    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest) == EXIT_OK
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
     row = (dest / "data.csv").read_text(encoding="utf-8").splitlines()[1].split(",")
     assert row[3:5] == ["defeated", "0"]
     capsys.readouterr()
@@ -127,12 +136,13 @@ def test_legacy_cardless_and_empty_traces_are_skipped_aloud(
 ) -> None:
     """Three ways a match can fail to export, each named on stdout -- a
     silently shrunk dataset reads as a complete one."""
-    sweeps, traces = _write_match(
+    sweeps, traces, jobs = _write_match(
         tmp_path, "night", "old-s1", "0 3 4000 2 5 0 2 1 1 0 3500 9000 42\n", "won"
     )
     _write_match(tmp_path, "night", "bare-s2", _TICK_HEADER, "won")
     _write_match(tmp_path, "night", "orphan-s3", _TICK_HEADER + _tick(0), None)
-    assert main(["night"], sweeps=sweeps, traces=traces, dest=tmp_path / "d") == EXIT_EMPTY
+    exit_code = main(["night"], sweeps=sweeps, traces=traces, dest=tmp_path / "d", jobs=jobs)
+    assert exit_code == EXIT_EMPTY
     assert capsys.readouterr().out == (
         "skipped night/bare-s2: empty trace\n"
         "skipped night/old-s1: pre-income trace shape\n"
@@ -147,11 +157,11 @@ def test_a_missing_verdict_field_exports_as_a_question_mark(
 ) -> None:
     """A card without the field is a fact about the card, carried rather than
     guessed over."""
-    sweeps, traces = _write_match(tmp_path, "night", "odd-s4", _TICK_HEADER + _tick(0), "won")
+    sweeps, traces, jobs = _write_match(tmp_path, "night", "odd-s4", _TICK_HEADER + _tick(0), "won")
     card = sweeps / "night" / "odd-s4.txt"
     card.write_text("### odd-s4\n", encoding="utf-8")
     dest = tmp_path / "dataset"
-    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest) == EXIT_OK
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
     row = (dest / "data.csv").read_text(encoding="utf-8").splitlines()[1].split(",")
     assert row[3:5] == ["?", "0"]
     capsys.readouterr()
@@ -162,7 +172,7 @@ def test_the_difficulty_rides_every_row_when_the_card_states_its_match(
 ) -> None:
     """Cards file their setup since 2026-08-06; older cards leave the column
     blank rather than inventing a difficulty."""
-    sweeps, traces = _write_match(
+    sweeps, traces, jobs = _write_match(
         tmp_path, "night", "flame-close-s777", _TICK_HEADER + _tick(0), "won"
     )
     card = sweeps / "night" / "flame-close-s777.txt"
@@ -176,11 +186,72 @@ def test_the_difficulty_rides_every_row_when_the_card_states_its_match(
     )
     card.write_text(stated, encoding="utf-8")
     dest = tmp_path / "dataset"
-    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest) == EXIT_OK
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
     lines = (dest / "data.csv").read_text(encoding="utf-8").splitlines()
     by_column = dict(zip(HEADER, lines[1].split(","), strict=True))
     assert by_column["difficulty"] == "2"
     assert by_column["won"] == "1"
+    capsys.readouterr()
+
+
+def test_full_shape_extras_export_verbatim_and_the_job_file_names_the_doctrine(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A current-era trace carries plan through ``rival_army`` into the CSV
+    untouched -- the ``-`` events marker included, because "no events" is a
+    measurement -- and the doctrine column joins the committed job file by
+    arm and seed."""
+    sweeps, traces, jobs = _write_match(
+        tmp_path, "night", "flame-close-s777", _TICK_HEADER + _full_tick(0), "won"
+    )
+    (jobs / "night.txt").write_text(
+        "# label | seed | doctrine | samples\n"
+        "short|line\n"
+        "flame-close|777|doctrines/evolve3-g3m10.doctrine|10000\n",
+        encoding="utf-8",
+    )
+    dest = tmp_path / "dataset"
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
+    by_column = dict(
+        zip(
+            HEADER,
+            (dest / "data.csv").read_text(encoding="utf-8").splitlines()[1].split(","),
+            strict=True,
+        )
+    )
+    assert by_column["plan"] == "building"
+    assert by_column["workers"] == "4"
+    assert by_column["navy_seen"] == "0"
+    assert by_column["events"] == "WH"
+    assert by_column["eco_covered"] == "12"
+    assert by_column["rival_army"] == "8900"
+    assert by_column["doctrine"] == "evolve3-g3m10"
+    capsys.readouterr()
+
+
+def test_income_era_rows_leave_the_late_columns_blank_not_zero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A 15-column trace exports empty strings for every column its era never
+    recorded -- a padded zero would claim a worker count nobody measured --
+    and a batch with no committed job file carries a blank doctrine."""
+    sweeps, traces, jobs = _write_match(
+        tmp_path, "night", "flame-close-s777", _TICK_HEADER + _tick(0), "won"
+    )
+    dest = tmp_path / "dataset"
+    assert main(["night"], sweeps=sweeps, traces=traces, dest=dest, jobs=jobs) == EXIT_OK
+    by_column = dict(
+        zip(
+            HEADER,
+            (dest / "data.csv").read_text(encoding="utf-8").splitlines()[1].split(","),
+            strict=True,
+        )
+    )
+    assert by_column["plan"] == ""
+    assert by_column["workers"] == ""
+    assert by_column["events"] == ""
+    assert by_column["rival_army"] == ""
+    assert by_column["doctrine"] == ""
     capsys.readouterr()
 
 
