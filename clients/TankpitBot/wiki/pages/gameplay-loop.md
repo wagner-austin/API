@@ -6,8 +6,8 @@ related:
   - "[[enemy-bot-behavior]]"
   - "[[radar-mechanics]]"
   - "[[teleport-mechanics]]"
-source_paths:
-  - "runs/bot"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-04"
 confidence: high
 hubs: [combat]

@@ -6,12 +6,13 @@ related:
   - "[[teleport-mechanics]]"
   - "[[fuel-system]]"
 source_paths:
-  - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
   - "src/tankpit_bot/analysis/scan.py"
 source_git_blobs:
   "src/tankpit_bot/analysis/scan.py": "507dcc1e35be2504b4973af43d98c7c2fd0b84a4"
   "src/tankpit_bot/sim/movement.py": "d3486ee8310ce26c9c5bc6939fe7a7007fe27bd3"
+provenance:
+  - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [game-mechanics]

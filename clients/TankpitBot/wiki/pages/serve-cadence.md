@@ -6,12 +6,13 @@ related:
   - "[[game-economy]]"
   - "[[shoot-event-format]]"
 source_paths:
-  - "runs/probe"
   - "src/tankpit_bot/action_lab/cadence_probe.py"
   - "src/tankpit_bot/action_lab/weave_probe.py"
 source_git_blobs:
   "src/tankpit_bot/action_lab/cadence_probe.py": "98b6e6054572fc4be297e462ecdd09dbee01ad9a"
   "src/tankpit_bot/action_lab/weave_probe.py": "b4e46e1e69cf516a832f63a2a85c7e359f7b3734"
+provenance:
+  - "runs/probe -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-27"
 confidence: high
 hubs: [combat, protocol]

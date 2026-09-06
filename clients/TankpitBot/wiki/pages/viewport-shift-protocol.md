@@ -7,9 +7,9 @@ related:
   - "[[v-table-complete]]"
   - "[[js-source-map]]"
   - "[[executor-rejection-loops]]"
-source_paths:
-  - "runs/bot"
-  - "runs/sniff"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-05"
 confidence: high
 hubs: [protocol]

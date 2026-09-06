@@ -242,16 +242,17 @@ def _frontmatter_violations(matter: ParsedFrontmatter, page: str) -> list[str]:
 def _ignored_by_project(project_root: Path, relative: str) -> bool:
     """Return True when the project's ``.gitignore`` covers a path.
 
-    A ``source_paths`` entry naming a runtime artifact — a capture
-    session under ``runs/``, the prettified client dump — cites
-    evidence that exists only on the box that captured it and can
-    NEVER be committed, so its absence from a fresh checkout proves
-    nothing about the page. The repo itself already declares which
-    paths those are: ``.gitignore`` is the authoritative list of what
-    git will not carry, so the existence check consults it instead of
-    a hand-kept exemption table (found 2026-09-06: CI ran the check on
-    a fresh checkout and reported 22 "vanished" sources that were all
-    gitignored runtime artifacts, green on the capture box forever).
+    ``source_paths`` means "this path resolves in the repo". A
+    gitignored path never can — it is a runtime artifact (a capture
+    session under ``runs/``, the prettified client dump) that exists
+    only on the box that captured it, and the code-paths contract
+    (API/CLAUDE.md) files such citations under ``provenance:``
+    instead. The rule therefore REJECTS gitignored entries outright:
+    before 2026-09-06 it demanded they exist, which held green on the
+    capture box and permanently red on any fresh checkout — CI
+    reported 22 "vanished" sources that no commit could ever fix.
+    The repo's own ``.gitignore`` is the authority on which paths
+    those are; no hand-kept exemption table.
 
     Subset semantics, sufficient for this project's ignore file and
     checked by tests: a ``dir/`` pattern matches the directory and
@@ -310,6 +311,18 @@ def _provenance_violations(
         if source.startswith(URL_PREFIXES):
             continue
         target = _LINE_LOCATOR.sub("", source)
+        if _ignored_by_project(project_root, target):
+            # A gitignored path can never resolve in the repo, so it
+            # is never a source_path — even when the artifact exists
+            # on this box. Flagging it HERE, before the existence
+            # check, is what keeps the gate answering identically on
+            # the capture box and on a fresh checkout.
+            violations.append(
+                f"{page}: source_paths entry '{source}' is gitignored - "
+                "a runtime artifact citation belongs under 'provenance:' "
+                "(code-paths contract)"
+            )
+            continue
         if (project_root / target).exists():
             continue
         if source in blob_pins:
@@ -320,12 +333,6 @@ def _provenance_violations(
             # not orphan the page that cites it — the pin IS the
             # provenance. First case: the analysis_scripts retirement,
             # 2026-08-17 (board task f0c3a532).
-            continue
-        if _ignored_by_project(project_root, target):
-            # A RUNTIME artifact: gitignored evidence (capture
-            # sessions, the prettified client) that exists only on
-            # the box that captured it. Absent here means "not this
-            # machine", not "vanished" — see _ignored_by_project.
             continue
         violations.append(f"{page}: source_paths entry '{source}' does not exist")
     # Compare the pin key against the FILE each source_paths entry names,

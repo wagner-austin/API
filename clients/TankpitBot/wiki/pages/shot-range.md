@@ -5,8 +5,8 @@ related:
   - "[[shoot-event-format]]"
   - "[[tank-registry]]"
   - "[[combat-chase-bug]]"
-source_paths:
-  - "runs/bot"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-07-03"
 confidence: high
 hubs: [combat]

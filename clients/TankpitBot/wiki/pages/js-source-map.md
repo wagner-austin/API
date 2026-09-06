@@ -7,9 +7,10 @@ related:
   - "[[client-constants]]"
 source_paths:
   - "tpclient.js"
-  - "tpclient.pretty.js"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+provenance:
+  - "tpclient.pretty.js -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete manual walk of all 329 lines)

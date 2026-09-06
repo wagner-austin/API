@@ -289,27 +289,38 @@ class TestProvenance:
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
         assert run_wiki_rules(tmp_path) == 0
 
-    def test_vanished_gitignored_source_is_a_runtime_artifact(self, tmp_path: Path) -> None:
-        """A missing entry under a gitignored directory passes.
+    def test_gitignored_source_path_is_rejected_even_when_present(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A gitignored entry is a violation EVEN IF the file exists here.
 
-        A capture session under ``runs/`` exists only on the box that
-        captured it — git never carries it, so its absence from a
-        fresh checkout proves nothing (found 2026-09-06: CI reported
-        22 'vanished' sources, every one a gitignored runtime
-        artifact, green on the capture box forever). The repo's own
-        ``.gitignore`` is the authority, not a hand-kept list.
+        ``source_paths`` means "resolves in the repo", and a gitignored
+        path never can — the code-paths contract files runtime-artifact
+        citations under ``provenance:`` instead. Before 2026-09-06 the
+        rule demanded these exist, which held green on the capture box
+        and permanently red on every fresh checkout (CI reported 22
+        'vanished' sources no commit could fix). Rejecting them makes
+        the gate answer identically on both.
         """
         _green_tree(tmp_path)
         (tmp_path / ".gitignore").write_text("# artifacts\n\nruns/\n", encoding="utf-8")
+        artifact = tmp_path / "runs" / "bot" / "bot-20260619.capture_session.json"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_text("{}", encoding="utf-8")
         page = GREEN_FRONTMATTER.replace(
             '- "src/fixture.py"', '- "runs/bot/bot-20260619.capture_session.json"'
         )
         page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
         page = page.replace("source_git_blobs:\n", "")
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
-        assert run_wiki_rules(tmp_path) == 0
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "is gitignored" in out
+        assert "belongs under 'provenance:'" in out
 
-    def test_gitignored_basename_pattern_excuses_the_dump(self, tmp_path: Path) -> None:
+    def test_gitignored_basename_pattern_is_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """A slashless ignore pattern matches the entry's basename."""
         _green_tree(tmp_path)
         (tmp_path / ".gitignore").write_text("tpclient.pretty.js\n", encoding="utf-8")
@@ -317,9 +328,13 @@ class TestProvenance:
         page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
         page = page.replace("source_git_blobs:\n", "")
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
-        assert run_wiki_rules(tmp_path) == 0
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "source_paths entry 'tpclient.pretty.js' is gitignored" in out
 
-    def test_gitignored_glob_matches_by_basename(self, tmp_path: Path) -> None:
+    def test_gitignored_glob_matches_by_basename(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """A slashless glob pattern (``_sniff_*.out``) goes through fnmatch."""
         _green_tree(tmp_path)
         (tmp_path / ".gitignore").write_text("_sniff_*.out\n", encoding="utf-8")
@@ -327,9 +342,13 @@ class TestProvenance:
         page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
         page = page.replace("source_git_blobs:\n", "")
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
-        assert run_wiki_rules(tmp_path) == 0
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "source_paths entry '_sniff_20260620.out' is gitignored" in out
 
-    def test_gitignored_root_relative_pattern_matches_whole_path(self, tmp_path: Path) -> None:
+    def test_gitignored_root_relative_pattern_matches_whole_path(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """A pattern containing ``/`` matches the path from the root."""
         _green_tree(tmp_path)
         (tmp_path / ".gitignore").write_text("data/secret.json\n", encoding="utf-8")
@@ -337,7 +356,9 @@ class TestProvenance:
         page = page.replace('  "src/fixture.py": "0123456789abcdef0123456789abcdef01234567"\n', "")
         page = page.replace("source_git_blobs:\n", "")
         (tmp_path / "wiki" / "pages" / "alpha.md").write_text(page, encoding="utf-8")
-        assert run_wiki_rules(tmp_path) == 0
+        count, out = _capture(tmp_path, capsys)
+        assert count == 1
+        assert "source_paths entry 'data/secret.json' is gitignored" in out
 
     def test_unignored_missing_source_still_fails_beside_a_gitignore(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -6,10 +6,11 @@ related:
   - "[[fuel-system]]"
   - "[[map-mechanics]]"
 source_paths:
-  - "runs/bot"
   - "src/tankpit_bot/physics/costs.py"
 source_git_blobs:
   "src/tankpit_bot/physics/costs.py": "cfd4ecc3b7dca858aebb7fdc7e4b5c9f93d77f62"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-06-12"
 confidence: high
 hubs: [game-mechanics]

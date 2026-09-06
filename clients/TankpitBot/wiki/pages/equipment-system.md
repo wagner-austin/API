@@ -5,11 +5,12 @@ related:
   - "[[radar-mechanics]]"
   - "[[fuel-system]]"
 source_paths:
-  - "runs/bot"
-  - "runs/sniff"
   - "src/tankpit_bot/sim/equipment.py"
 source_git_blobs:
   "src/tankpit_bot/sim/equipment.py": "384f9b4724ae30bbb56e97d7482705c5a6f931a0"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-28"
 confidence: high
 hubs: [game-mechanics]

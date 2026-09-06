@@ -15,9 +15,6 @@ source_paths:
   - "src/tankpit_bot/sim/narrate/world.py"
   - "src/tankpit_bot/sim/server.py"
   - "src/tankpit_bot/sim/server_queries.py"
-  - "runs/bot"
-  - "runs/sniff"
-  - "runs/bot/bot-20260826-003928.capture_session.json"
 source_git_blobs:
   "src/tankpit_bot/sim/narrate/movement.py": "7d6be21f2147defcb6e773f553960fc1015eef7c"
   "src/tankpit_bot/sim/narrate/combat.py": "cc68c7a022eeeca830d2038489b6c4962c9c97ff"
@@ -27,6 +24,9 @@ source_git_blobs:
   "src/tankpit_bot/sim/server_queries.py": "29c39c2a53aeafb6d45974dd4a5a4f4962dc4473"
 provenance:
   - "src/tankpit_bot/sim/emissions.py and sim/combat_emissions.py -- cited here until 2026-09-03. Both were split into the sim/narrate/ package this page already lists (combat, movement, resources, world); the four successors are now pinned in their place rather than the two dead paths being repinned"
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/bot/bot-20260826-003928.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-01"
 confidence: high
 verified: 2026-09-01 (341-session archive sweep, zero-trigger test)

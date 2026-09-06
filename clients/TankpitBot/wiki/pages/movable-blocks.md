@@ -8,11 +8,12 @@ related:
   - "[[weapon-selection]]"
   - "[[js-source-map]]"
 source_paths:
-  - "runs/sniff/sniff-20260720-214839.capture_session.json"
-  - "runs/sniff/sniff-20260720-215930.capture_session.json"
   - "src/tankpit_bot/sim/blocks.py"
 source_git_blobs:
   "src/tankpit_bot/sim/blocks.py": "905a4e0f19383dbd2c342055e1e819376a70be29"
+provenance:
+  - "runs/sniff/sniff-20260720-214839.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff/sniff-20260720-215930.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [combat, game-mechanics]

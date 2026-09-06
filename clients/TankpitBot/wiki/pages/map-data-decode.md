@@ -8,9 +8,10 @@ related:
   - "[[map-data-algorithm]]"
 source_paths:
   - "tpclient.js"
-  - "runs/bot"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-07-25"
 confidence: high
 hubs: [protocol]

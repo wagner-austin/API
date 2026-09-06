@@ -6,10 +6,11 @@ related:
   - "[[weapon-log-markers]]"
   - "[[shot-range]]"
 source_paths:
-  - "runs/bot"
   - "src/tankpit_bot/sim/combat.py"
 source_git_blobs:
   "src/tankpit_bot/sim/combat.py": "dba943c9a5163bf6faa09fa4d8558311d30474a0"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [combat, protocol]

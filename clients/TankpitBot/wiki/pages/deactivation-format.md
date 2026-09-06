@@ -7,11 +7,12 @@ related:
 source_paths:
   - "tpclient.js"
   - "src/tankpit_bot/physics/capacity.py"
-  - "runs/bot"
-  - "runs/sniff"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
   "src/tankpit_bot/physics/capacity.py": "4210d51e4d200e8031493d0ba23808c9ebbcc162"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-07-19"
 confidence: high
 hubs: [protocol]

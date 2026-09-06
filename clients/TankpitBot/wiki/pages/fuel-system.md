@@ -6,10 +6,11 @@ related:
   - "[[radar-mechanics]]"
   - "[[map-data-decode]]"
 source_paths:
-  - "runs/bot"
   - "src/tankpit_bot/physics"
 source_git_blobs:
   "src/tankpit_bot/physics": "c7425148961158380776c7c1b63191af18e37afa"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-03"
 confidence: high
 hubs: [game-mechanics]

@@ -8,12 +8,13 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[fuel-system]]"
 source_paths:
-  - "runs/sniff/sniff-20260620-150155.capture_session.json"
-  - "runs/sniff/sniff-20260620-155103.capture_session.json"
-  - "runs/sniff/sniff-20260620-173727.capture_session.json"
   - "tpclient.js"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+provenance:
+  - "runs/sniff/sniff-20260620-150155.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff/sniff-20260620-155103.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
+  - "runs/sniff/sniff-20260620-173727.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-01"
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)

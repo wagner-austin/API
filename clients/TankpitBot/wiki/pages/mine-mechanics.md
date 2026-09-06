@@ -7,10 +7,11 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[gameplay-loop]]"
 source_paths:
-  - "runs/sniff/sniff-20260620-150155.capture_session.json"
   - "tpclient.js"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+provenance:
+  - "runs/sniff/sniff-20260620-150155.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-07-28"
 confidence: high
 verified: 2026-07-21 (cascade re-confirmed in manual capture sniff-20260721-212348; original 2026-06-20 real-combat capture matched the documented mechanic byte-for-byte)

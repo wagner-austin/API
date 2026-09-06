@@ -7,12 +7,13 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[game-economy]]"
 source_paths:
-  - "runs/bot/bot-20260729-232252.events.jsonl"
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
 source_git_blobs:
   "src/tankpit_bot/bot/ai/resource_search.py": "a833600b7b71a469608603c5407fb022979d595d"
   "src/tankpit_bot/state/scan_coverage.py": "143210fd78dd06544d635b734ca459b6b4de348f"
+provenance:
+  - "runs/bot/bot-20260729-232252.events.jsonl -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [architecture, combat]

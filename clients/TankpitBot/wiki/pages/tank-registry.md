@@ -6,9 +6,10 @@ related:
   - "[[shot-range]]"
 source_paths:
   - "src/tankpit_bot/state"
-  - "runs/bot"
 source_git_blobs:
   "src/tankpit_bot/state": "3d5819f5304e97e195d8f0fa44ae930ced2ce573"
+provenance:
+  - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-08-07"
 confidence: high
 hubs: [protocol]

@@ -8,10 +8,11 @@ related:
   - "[[mine-mechanics]]"
   - "[[physics-module-roadmap]]"
 source_paths:
-  - "runs/sniff/sniff-20260721-212348.capture_session.json"
   - "src/tankpit_bot/validate/archive.py"
 source_git_blobs:
   "src/tankpit_bot/validate/archive.py": "67932554437cedff2d01b820d227dc5033c7edb5"
+provenance:
+  - "runs/sniff/sniff-20260721-212348.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-07-21"
 confidence: high
 verified: 2026-07-21 (manual capture + two full-archive probes agree)

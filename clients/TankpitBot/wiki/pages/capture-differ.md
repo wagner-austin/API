@@ -9,12 +9,12 @@ related:
 source_paths:
   - "scripts/build_sim_baseline.py"
   - "scripts/analyze_response_shapes.py"
-  - "runs/analysis"
 source_git_blobs:
   "scripts/build_sim_baseline.py": "dab6c6baf9bf97e811c6da40e7c33032326b092d"
   "scripts/analyze_response_shapes.py": "9977e89500553254584f34e00651bd921b337364"
 provenance:
   - "analysis_scripts/mine_container_atlas.py and analysis_scripts/diff_server_laws.py -- cited here until 2026-09-03, then removed rather than repinned: the whole analysis_scripts/ tree was DELIBERATELY retired in 48cda6bd ('Retire the 44 ungated one-shot scripts', board task f0c3a532). No prose on this page depended on either; they were frontmatter-only citations. Recoverable at git show 48cda6bd^:clients/TankpitBot/analysis_scripts/"
+  - "runs/analysis -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
 fact_checked: "2026-09-02"
 confidence: high
 hubs: [protocol]
