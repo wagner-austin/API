@@ -130,6 +130,23 @@ class TestClosuresFor:
         """Not when the job ended -- that is not something this can claim."""
         assert closures_for([_status("101", "COMPLETED")], closed_at=_AT)[0]["closed_at"] == _AT
 
+    def test_a_terminal_aggregate_closes_every_task_it_names(self) -> None:
+        """`55765275_[0-5]|CANCELLED by 2422328`, measured on HPC3 2026-09-06:
+        a pending array cancelled before it started reports ONE terminal row
+        for the whole array.
+
+        A closure keyed on that aggregate id matches no ledger entry, so
+        `open_entries` never filters the six tasks out -- they are re-queried
+        and re-reported on every run, forever, which is the always-red board
+        closures exist to prevent."""
+        closures = closures_for([_status("55765275_[0-5]", "CANCELLED")], closed_at=_AT)
+        assert [c["job_id"] for c in closures] == [f"55765275_{index}" for index in range(6)]
+        assert {c["state"] for c in closures} == {"CANCELLED"}
+
+    def test_a_plain_job_still_closes_as_exactly_one(self) -> None:
+        closures = closures_for([_status("101", "COMPLETED")], closed_at=_AT)
+        assert [c["job_id"] for c in closures] == ["101"]
+
 
 class TestClosureStore:
     def test_closures_live_beside_their_ledger(self, tmp_path: pathlib.Path) -> None:

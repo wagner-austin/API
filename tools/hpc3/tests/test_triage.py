@@ -189,6 +189,45 @@ class TestUnaccountedJobs:
         assert "hpc3" in findings[0].detail
 
 
+class TestUnaccountedAgainstArrayAggregates:
+    """A pending array is ONE accounting row standing for many ledger rows.
+
+    Measured on HPC3 2026-09-05: `sacct -j 55765275_0` returned nothing while
+    `sacct -j 55765275` returned `55765275_[0-5]|PENDING`. The ledger records
+    each task separately, so all six read as "accounting has never heard of
+    it" -- twelve findings across two healthy queued arrays.
+
+    `hpc3.contracts.array` documented this ("every reader that matches
+    recorded task ids against cluster output must expand aggregates first")
+    and `unclaimed_jobs` already obeyed it. This reader did not.
+    """
+
+    def test_a_pending_aggregate_accounts_for_every_task_it_names(self) -> None:
+        entries = [_entry(f"55765275_{index}") for index in range(6)]
+        assert unaccounted_jobs(entries, [_status("55765275_[0-5]", "PENDING")]) == []
+
+    def test_a_sparse_aggregate_accounts_for_exactly_the_tasks_it_names(self) -> None:
+        """The form a campaign resubmitting a gap produces. Task 100 is NOT in
+        the expression, so it stays a finding -- expanding must not degrade
+        into "anything sharing a base id is fine"."""
+        entries = [_entry("55765275_99"), _entry("55765275_100"), _entry("55765275_103")]
+        statuses = [_status("55765275_[99,101-103]", "PENDING")]
+        assert [f.job_id for f in unaccounted_jobs(entries, statuses)] == ["55765275_100"]
+
+    def test_the_throttle_suffix_does_not_hide_a_task(self) -> None:
+        """`%2` says how fast tasks may start, not which tasks exist."""
+        entries = [_entry("55678543_2"), _entry("55678543_3")]
+        assert unaccounted_jobs(entries, [_status("55678543_[2-3%2]", "PENDING")]) == []
+
+    def test_a_task_missing_from_a_started_array_is_still_unaccounted(self) -> None:
+        """Once tasks start they are reported per-task, so a task with no row
+        of its own is genuinely absent and must still be reported. This is the
+        half the fix must not trade away."""
+        entries = [_entry("55765275_0"), _entry("55765275_1")]
+        statuses = [_status("55765275_0", "RUNNING")]
+        assert [f.job_id for f in unaccounted_jobs(entries, statuses)] == ["55765275_1"]
+
+
 class TestUnclaimedJobs:
     """The mirror of unaccounted, and the direction that went unbuilt.
 
@@ -290,6 +329,14 @@ class TestLiveEntries:
         entries = [_entry("101"), _entry("102")]
         statuses = [_status("101", "COMPLETED"), _status("102", "RUNNING")]
         assert [e["job_id"] for e in live_entries(entries, statuses)] == ["102"]
+
+    def test_a_terminal_aggregate_finishes_every_task_it_names(self) -> None:
+        """A pending array cancelled before it starts reports ONE terminal row
+        for the whole array -- `55765275_[0-5]|CANCELLED by 2422328`, live on
+        HPC3 2026-09-06. Unexpanded, its six tasks stay live forever and their
+        logs are probed forever."""
+        entries = [_entry(f"55765275_{index}") for index in range(6)]
+        assert live_entries(entries, [_status("55765275_[0-5]", "CANCELLED")]) == []
 
     def test_an_unaccounted_job_counts_as_live(self) -> None:
         """It might be running; the cluster simply has not said."""

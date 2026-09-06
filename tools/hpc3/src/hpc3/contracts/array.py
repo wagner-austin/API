@@ -26,6 +26,7 @@ expand aggregates first, and this module is the one place that knows how.
 from __future__ import annotations
 
 import itertools
+from collections.abc import Sequence
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 
@@ -43,6 +44,51 @@ def array_task_id(base_id: str, index: int) -> str:
         ``"55678543_2"`` for base ``"55678543"`` and index ``2``.
     """
     return f"{base_id}_{index}"
+
+
+def base_job_id(job_id: str) -> str:
+    """Reduce any task or aggregate id to the id ``sbatch`` announced.
+
+    The inverse of :func:`array_task_id`, and the id you must ASK accounting
+    about. Expanding what comes back is only half the job: ``sacct -j
+    55765275_0`` returns NOTHING while task 0 sits inside a pending aggregate,
+    so a query built from per-task ids cannot see the row it needs to expand.
+    ``sacct -j 55765275`` returns the aggregate while pending and every
+    per-task row once the tasks have run -- measured both ways on HPC3
+    2026-09-06, against 55765275 (cancelled while pending) and 55786856 (60
+    tasks, COMPLETED).
+
+    Args:
+        job_id: A plain id, a task id, or a pending aggregate.
+
+    Returns:
+        ``"55765275"`` for ``"55765275"``, ``"55765275_3"`` and
+        ``"55765275_[0-5]"`` alike.
+    """
+    return job_id.partition("_")[0]
+
+
+def base_job_ids(job_ids: Sequence[str]) -> list[str]:
+    """Reduce many recorded ids to the distinct bases worth asking about.
+
+    Args:
+        job_ids: Ids as the ledger recorded them, one per task.
+
+    Returns:
+        Each distinct base once, in first-seen order. Order is preserved
+        because the accounting query is built from this and a stable query is
+        one a reader can compare across runs; deduplicating collapses a
+        60-task array into the single id that answers for all of it.
+    """
+    seen: set[str] = set()
+    bases: list[str] = []
+    for job_id in job_ids:
+        base = base_job_id(job_id)
+        if base in seen:
+            continue
+        seen.add(base)
+        bases.append(base)
+    return bases
 
 
 def format_array_indices(indices: tuple[int, ...]) -> str:
@@ -182,6 +228,8 @@ def expand_job_id(job_id: str) -> tuple[str, ...]:
 
 __all__ = [
     "array_task_id",
+    "base_job_id",
+    "base_job_ids",
     "expand_job_id",
     "format_array_indices",
 ]

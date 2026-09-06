@@ -40,6 +40,7 @@ from collections.abc import Sequence
 from platform_core import cli_args
 
 from hpc3.cli import _config, _fatal, _test_hooks
+from hpc3.contracts.array import base_job_ids, expand_job_id
 from hpc3.contracts.pending import PendingJob
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import ledger, logs
@@ -162,7 +163,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # form built a ~70 KB argv and died in CreateProcess before ssh was
     # spawned, so triage was unrunnable on this machine and said so in a
     # FileNotFoundError that named no command (2026-09-05).
-    job_ids = [entry["job_id"] for entry in entries]
+    # Asked by ARRAY BASE id, deduplicated in first-seen order. `sacct -j
+    # 55765275_0` returns NOTHING while task 0 sits inside a pending aggregate,
+    # so a query built from the ledger's per-task ids cannot see the row it
+    # needs -- the six tasks of a healthy queued array all read as jobs
+    # accounting had never heard of. Asking the base returns the aggregate
+    # while pending and every per-task row once they have run (measured both
+    # ways, HPC3 2026-09-06), and collapses a 60-task array into one id.
+    job_ids = base_job_ids([entry["job_id"] for entry in entries])
     statuses = parse_sacct_output(run_remote_batched(host, sacct_commands(job_ids)), cluster)
 
     # squeue is asked ONLY about jobs accounting reports as queued. It holds a
@@ -171,7 +179,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     # measured on the real cluster against a job that had completed perfectly.
     # That is not a triage failure, but asking would report it as one, and the
     # blocked-job check only concerns pending jobs anyway.
-    pending_ids = [status["job_id"] for status in statuses if status["state"] == "PENDING"]
+    #
+    # EXPANDED to task ids, because a pending row is exactly where an
+    # aggregate appears and squeue REFUSES one: `squeue -h -j '55765284_[0-5]'`
+    # exits 1 with "Invalid job id: 55765284_[0-5]", which run_remote turns
+    # into an AppError that ends the whole triage run. The same tasks named
+    # individually are accepted, and squeue re-aggregates its own answer
+    # (measured, HPC3 2026-09-06).
+    pending_ids = [
+        task_id
+        for status in statuses
+        if status["state"] == "PENDING"
+        for task_id in expand_job_id(status["job_id"])
+    ]
     pending: list[PendingJob] = []
     if pending_ids != []:
         pending = parse_squeue_output(run_remote_batched(host, squeue_commands(pending_ids)))

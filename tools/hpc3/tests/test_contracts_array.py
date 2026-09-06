@@ -11,12 +11,50 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
 
-from hpc3.contracts.array import array_task_id, expand_job_id, format_array_indices
+from hpc3.contracts.array import (
+    array_task_id,
+    base_job_id,
+    base_job_ids,
+    expand_job_id,
+    format_array_indices,
+)
 
 
 class TestTaskIds:
     def test_a_task_id_is_base_underscore_index(self) -> None:
         assert array_task_id("55678543", 2) == "55678543_2"
+
+
+class TestBaseIds:
+    """The id you must ASK about, and the inverse of :func:`array_task_id`.
+
+    Expanding what comes back is only half the job: `sacct -j 55765275_0`
+    returns NOTHING while task 0 sits inside a pending aggregate, so a query
+    built from per-task ids never sees the row it needs to expand.
+    """
+
+    def test_a_plain_id_is_its_own_base(self) -> None:
+        assert base_job_id("55674054") == "55674054"
+
+    def test_a_task_id_reduces_to_the_submitted_id(self) -> None:
+        assert base_job_id("55765275_3") == "55765275"
+
+    def test_an_aggregate_reduces_to_the_same_base(self) -> None:
+        assert base_job_id("55765275_[0-5]") == "55765275"
+
+    def test_a_throttled_aggregate_reduces_to_the_same_base(self) -> None:
+        assert base_job_id("55678543_[2-3%2]") == "55678543"
+
+    def test_every_task_of_one_array_collapses_to_a_single_asked_id(self) -> None:
+        """A 60-task array is one accounting query, not sixty ids."""
+        assert base_job_ids([f"55786856_{index}" for index in range(60)]) == ["55786856"]
+
+    def test_distinct_arrays_are_kept_in_first_seen_order(self) -> None:
+        recorded = ["55765284_0", "55765275_0", "55765284_1", "101"]
+        assert base_job_ids(recorded) == ["55765284", "55765275", "101"]
+
+    def test_no_ids_produce_no_query(self) -> None:
+        assert base_job_ids([]) == []
 
 
 class TestExpandingClusterIds:

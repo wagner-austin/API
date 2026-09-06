@@ -121,23 +121,40 @@ def closures_for(statuses: Sequence[JobStatus], *, closed_at: str) -> list[Closu
             caller so this function reads no clock.
 
     Returns:
-        One closure per terminal row, in the order reported. ``REQUEUED`` is
-        not terminal and produces none: the job is going back to the queue,
-        which is protection working rather than the run ending.
+        One closure per TASK of each terminal row, in the order reported.
+        ``REQUEUED`` is not terminal and produces none: the job is going back
+        to the queue, which is protection working rather than the run ending.
+
+        Per task rather than per row, because a closure is looked up by the
+        ledger's own id (:func:`open_entries`) and the ledger records array
+        tasks individually. An array cancelled while still pending reports one
+        aggregate row -- ``55765275_[0-5]|CANCELLED by 2422328``, HPC3
+        2026-09-06 -- and a closure keyed on that expression matches no ledger
+        entry at all, so its six tasks are never closed, never filtered, and
+        re-reported on every subsequent run. Forever. That is the always-red
+        board closures exist to prevent, reached through the closure record
+        itself.
     """
     return [
         Closure(
-            job_id=status["job_id"],
+            job_id=task_id,
             state=status["state"],
             closed_at=closed_at,
             # Captured here because this is the last moment it is available:
             # sacct's retention is finite, and this is the only place the
             # package will ever be able to answer "how long does this
             # project's work actually take".
+            #
+            # The row's elapsed applies to each task it names. For the case
+            # that motivated the expansion it is 0 -- a pending array cancelled
+            # before it started ran for no time, and that is what each of its
+            # tasks did. Right-sizing takes evidence only from COMPLETED runs,
+            # so these zeroes cannot become a project's idea of its runtime.
             elapsed_seconds=status["elapsed_seconds"],
         )
         for status in statuses
         if is_terminal(status["state"])
+        for task_id in expand_job_id(status["job_id"])
     ]
 
 
@@ -158,7 +175,17 @@ def unaccounted_jobs(
         condition no cluster-side query can detect, because the evidence is
         precisely the absence of a cluster-side record.
     """
-    known = {status["job_id"] for status in statuses}
+    # Expanded for the reason :mod:`hpc3.contracts.array` gives: a PENDING
+    # array is ONE accounting row -- 55765275_[0-5] -- standing for every task
+    # the ledger recorded separately. Matching raw ids reported all six of a
+    # healthy queued array as jobs the cluster had never heard of, which is
+    # this check's most alarming finding fired on its most ordinary input
+    # (12 findings across two queued arrays, HPC3 2026-09-05).
+    #
+    # It expands to exactly the tasks the expression NAMES, so a task absent
+    # from a sparse aggregate -- or from an array whose tasks have started and
+    # are therefore reported individually -- is still found.
+    known = {task_id for status in statuses for task_id in expand_job_id(status["job_id"])}
     return [
         Finding(
             entry["job_id"],
@@ -288,7 +315,17 @@ def live_entries(
         the ones worth asking further questions about; a job that completed
         needs no triage.
     """
-    finished = {status["job_id"] for status in statuses if is_terminal(status["state"])}
+    # Expanded for the same reason as :func:`unaccounted_jobs`, and a
+    # terminal aggregate is not hypothetical: an array cancelled while still
+    # pending reports one row for the whole array -- `55765275_[0-5]|CANCELLED
+    # by 2422328`, HPC3 2026-09-06. Unexpanded, its tasks stay live forever
+    # and their logs are probed on every run for files that will never exist.
+    finished = {
+        task_id
+        for status in statuses
+        if is_terminal(status["state"])
+        for task_id in expand_job_id(status["job_id"])
+    }
     return [entry for entry in entries if entry["job_id"] not in finished]
 
 
