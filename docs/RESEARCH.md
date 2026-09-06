@@ -407,9 +407,13 @@ test and by image smoke.
   module tree, so one loaded base cannot play both roles.
 - **Result, measured 2026-09-06 on HPC3** (job 55801429, V100, 103 min,
   image v40 `798d234a…` from `7288bc8f`, run document
-  `tools/hpc3/runs/cartridge-medium-content-lora-v100-v40{,-twin}.json`,
-  record sha256 `9abd901a…`; twin 55801941 submitted for the
-  certificate): **the depth collapse is repaired, and then some.**
+  `tools/hpc3/runs/cartridge-medium-content-lora-v100-v40{,-twin}.json`;
+  twin 55801941 reproduced the record byte for byte, sha256
+  `9abd901a1346d854f1085a553ffee3002f3d60ad3773a02b4c1d3731ec0ca34e`
+  both — a SAME-NODE certificate, the queue having placed both runs on
+  hpc3-gpu-16-01; the pipeline's cross-node determinism is separately
+  established by the arc's four cross-node certificates): **the depth
+  collapse is repaired, and then some.**
   Diverse n8 at medium: composed +0.3090 against alone +0.8113 —
   **+38.1% retention where the LM objective recorded −79.4%**, clearing
   the 0.1625 family floor by 1.9× and BEATING gpt2-small's own best n8
