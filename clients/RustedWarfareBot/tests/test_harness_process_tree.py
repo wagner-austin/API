@@ -86,8 +86,22 @@ class TestSpawnIsolation:
         """The value is written out because the NAME exists only in a Windows
         Python, and importing it would break the module on the platform this
         port is for. This is what stops the literal drifting from the constant
-        it stands in for."""
-        assert ABOVE_NORMAL_PRIORITY_CLASS == subprocess.ABOVE_NORMAL_PRIORITY_CLASS
+        it stands in for.
+
+        The inner guard is for the TYPE CHECKER, not the runtime -- the marker
+        above already stops this running off Windows. mypy analyses a skipped
+        test's body like any other, so on a Linux runner it resolves the
+        attribute against Linux stubs, does not find it, and fails the lint.
+        Narrowing on ``sys.platform`` makes the block statically unreachable
+        there while leaving it fully checked on Windows.
+
+        The comparison must be against the LITERAL ``"win32"``. mypy narrows
+        this on the syntactic form alone: ``sys.platform == WINDOWS``, using
+        this package's own constant, does not narrow and leaves the lint red.
+        That is why the string is spelled out here and nowhere else.
+        """
+        if sys.platform == "win32":
+            assert ABOVE_NORMAL_PRIORITY_CLASS == subprocess.ABOVE_NORMAL_PRIORITY_CLASS
 
 
 class TestFellingTheTree:

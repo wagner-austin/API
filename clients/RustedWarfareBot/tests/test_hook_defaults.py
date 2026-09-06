@@ -291,10 +291,21 @@ def test_the_spawn_flags_are_accepted_by_the_standard_library() -> None:
     """The pair this package passes -- a priority class and a session flag --
     is legal on both platforms, which is what lets one call site serve both.
     Windows ignores the session; POSIX rejects any non-zero creation flag.
+
+    The inner guard is for the TYPE CHECKER, not the runtime -- the marker
+    above already stops this running off Windows. mypy analyses a skipped
+    test's body like any other, so on a Linux runner it resolves the priority
+    class against Linux stubs, does not find it, and fails the lint. Narrowing
+    on ``sys.platform`` makes the block statically unreachable there while
+    leaving it fully checked on Windows.
+
+    The comparison must be against the LITERAL ``"win32"``: mypy narrows on
+    the syntactic form, and ``sys.platform == WINDOWS`` does not narrow.
     """
-    isolation = spawn_isolation(sys.platform)
-    assert isolation["creationflags"] == subprocess.ABOVE_NORMAL_PRIORITY_CLASS
-    assert isolation["start_new_session"] is False
+    if sys.platform == "win32":
+        isolation = spawn_isolation(sys.platform)
+        assert isolation["creationflags"] == subprocess.ABOVE_NORMAL_PRIORITY_CLASS
+        assert isolation["start_new_session"] is False
 
 
 class TestCopyingAnEntry:
