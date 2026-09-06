@@ -53,6 +53,16 @@ once) fixed the facts every parser relies on:
 * ``sbatch --test-only`` on an array answers with the same single verdict
   line a plain job gets; ``sbatch`` announces ``Submitted batch job N``
   unchanged; logs land per task via ``%A_%a``.
+* A cancelled array reports an aggregate **only if it was WHOLLY pending** --
+  ``55765275_[0-5]|CANCELLED by 2422328`` (submitted 2026-09-04T16:18, never
+  started a task, cancelled 2026-09-06). A mid-drain cancellation of a
+  partly-started array reports per task instead: ``rusted.evolve4`` was
+  scancelled the same night with tasks COMPLETED, RUNNING and PENDING at once
+  and left 507 individual rows and no aggregate. Account-wide there were
+  exactly two aggregate rows since 2026-09-01, both from arrays that never
+  started. **The reproduction condition is "never started", not "cancelled
+  while some tasks were queued"** -- worth stating because the second is the
+  intuitive guess and it does not reproduce.
 
 ``contracts/array.py`` owns the expansion, and the in-flight artifact check
 and triage's unclaimed-job check both expand before matching -- unexpanded,
