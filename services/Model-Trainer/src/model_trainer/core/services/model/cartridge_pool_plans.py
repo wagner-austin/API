@@ -246,6 +246,67 @@ BASE_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
 }
 
 
+#: Fixed for the reason the other experiment names are. The content-LoRA
+#: sweep REUSES :class:`BaseLoraSweepPlan` -- every knob is identical and
+#: only the LoRA's TRAINING OBJECTIVE differs (crowd-invariance distillation
+#: instead of language modeling) -- but it is a different measurement
+#: answering a different question, so it records under its own experiment,
+#: exactly as the diverse sweep reuses the varied plan.
+CONTENT_LORA_SWEEP_EXPERIMENT = "cartridge-content-lora-composition"
+
+
+#: The content-LoRA plans. Each row matches its ``*-base-lora`` twin on
+#: EVERY field -- pinned by test -- so the two records isolate exactly one
+#: difference: what the LoRA was trained to do. The lever aims at the one
+#: enemy the base-LoRA record left standing (372cee59, cross-node
+#: bit-identical): gpt2-medium's n8 with real content collapses (-79.4%)
+#: while its repaired noise control sits +0.42, a 1.04 gap that is CONTENT
+#: interference at depth. The LM objective teaches the base to read past a
+#: crowd's structure; crowd-invariance distillation teaches it to read past
+#: the crowd's CONTENT, by matching, behind a full roster, the predictions
+#: the plain base makes behind the target member alone.
+CONTENT_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
+    "gpt2-content-lora": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+    # The verdict-carrier: depth is where content interference lives, so
+    # gpt2-medium runs first and gpt2-small is its cross-scale anchor.
+    "gpt2-medium-content-lora": {
+        "model_id": "gpt2-medium",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+}
+
+
 def base_lora_sweep_label(name: str, plan: BaseLoraSweepPlan, *, digest: str) -> str:
     """Build the label identifying one base-LoRA sweep on one primary corpus.
 
@@ -317,6 +378,8 @@ def varied_companion_sweep_label(name: str, plan: VariedCompanionSweepPlan, *, d
 __all__ = [
     "BASE_LORA_SWEEP_EXPERIMENT",
     "BASE_LORA_SWEEP_PLANS",
+    "CONTENT_LORA_SWEEP_EXPERIMENT",
+    "CONTENT_LORA_SWEEP_PLANS",
     "DIVERSE_COMPANION_SWEEP_EXPERIMENT",
     "DIVERSE_COMPANION_SWEEP_PLANS",
     "VARIED_COMPANION_SWEEP_EXPERIMENT",

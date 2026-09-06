@@ -33,6 +33,7 @@ from model_trainer.core.services.model.cartridge_plans import (
 )
 from model_trainer.core.services.model.cartridge_pool_plans import (
     BASE_LORA_SWEEP_PLANS,
+    CONTENT_LORA_SWEEP_PLANS,
     DIVERSE_COMPANION_SWEEP_PLANS,
     VARIED_COMPANION_SWEEP_PLANS,
     BaseLoraSweepPlan,
@@ -385,6 +386,21 @@ def _default_base_lora_sweep_plans() -> Mapping[str, BaseLoraSweepPlan]:
 
 base_lora_sweep_plans: BaseLoraSweepPlansProto = _default_base_lora_sweep_plans
 
+
+def _default_content_lora_sweep_plans() -> Mapping[str, BaseLoraSweepPlan]:
+    """Production content-LoRA plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return CONTENT_LORA_SWEEP_PLANS
+
+
+#: Same protocol as the base-LoRA table: the plan SHAPE is shared and only
+#: the LoRA's training objective differs, which is a trainer concern, not a
+#: table one -- the diverse/varied precedent, one layer up.
+content_lora_sweep_plans: BaseLoraSweepPlansProto = _default_content_lora_sweep_plans
+
 qa_plans: QaPlansProto = _default_qa_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -421,6 +437,7 @@ __all__ = [
     "cartridge_plans",
     "companion_sweep_plans",
     "composition_sweep_plans",
+    "content_lora_sweep_plans",
     "cost_shapes_hook",
     "diverse_companion_sweep_plans",
     "forward_shapes",

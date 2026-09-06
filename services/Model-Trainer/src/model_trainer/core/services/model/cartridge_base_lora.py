@@ -44,6 +44,38 @@ from model_trainer.core.types import (
 )
 
 
+def composed_prefix_blocks(
+    members: Sequence[CartridgeSlots], *, batch_size: int
+) -> list[tuple[torch.Tensor, torch.Tensor]]:
+    """Concatenate members' slot blocks into one detached prefix, in order.
+
+    The one place a crowd becomes a prefix, shared by the LM-objective
+    trainer here and the crowd-invariance trainer beside it -- the
+    concatenation ORDER is part of what a record means, so two trainers must
+    not each own a copy of it.
+
+    Args:
+        members: The cartridges standing in the prefix, in prefix order. At
+            least one; every member cut for the same model.
+        batch_size: Batch dimension the blocks must present.
+
+    Returns:
+        One ``(key, value)`` pair per layer, every block detached, members
+        concatenated along :data:`SLOT_AXIS` in the given order.
+    """
+    num_layers = members[0].geometry["num_layers"]
+    blocks: list[tuple[torch.Tensor, torch.Tensor]] = []
+    for layer in range(num_layers):
+        keys: list[torch.Tensor] = []
+        values: list[torch.Tensor] = []
+        for member in members:
+            member_key, member_value = member.layer_blocks(layer, batch_size=batch_size)
+            keys.append(member_key.detach())
+            values.append(member_value.detach())
+        blocks.append((torch.cat(keys, dim=SLOT_AXIS), torch.cat(values, dim=SLOT_AXIS)))
+    return blocks
+
+
 class CrowdedPrefixModel:
     """A PEFT-adapted base doing language modeling behind drawn company.
 
@@ -57,7 +89,6 @@ class CrowdedPrefixModel:
     _adapted: CacheCapableLMProto
     _pool: tuple[CartridgeSlots, ...]
     _max_drawn: int
-    _num_layers: int
     _slots_per_member: int
 
     def __init__(
@@ -104,7 +135,6 @@ class CrowdedPrefixModel:
         self._adapted = adapted
         self._pool = pool
         self._max_drawn = max_drawn
-        self._num_layers = pool[0].geometry["num_layers"]
         self._slots_per_member = pool[0].geometry["num_slots"]
         device = str(next(iter(adapted.named_parameters()))[1].detach().device)
         for member in self._pool:
@@ -142,15 +172,7 @@ class CrowdedPrefixModel:
         order = torch.randperm(len(self._pool))
         chosen = [self._pool[int(order[position].item())] for position in range(count)]
         batch_size = int(input_ids.shape[0])
-        blocks: list[tuple[torch.Tensor, torch.Tensor]] = []
-        for layer in range(self._num_layers):
-            keys: list[torch.Tensor] = []
-            values: list[torch.Tensor] = []
-            for member in chosen:
-                member_key, member_value = member.layer_blocks(layer, batch_size=batch_size)
-                keys.append(member_key.detach())
-                values.append(member_value.detach())
-            blocks.append((torch.cat(keys, dim=SLOT_AXIS), torch.cat(values, dim=SLOT_AXIS)))
+        blocks = composed_prefix_blocks(chosen, batch_size=batch_size)
         attended = int(input_ids.shape[1]) + count * self._slots_per_member
         return self._adapted(
             input_ids=input_ids,
@@ -222,6 +244,7 @@ def freeze_adapted(adapted: LMModelProto) -> None:
 
 __all__ = [
     "CrowdedPrefixModel",
+    "composed_prefix_blocks",
     "freeze_adapted",
     "train_composition_lora",
 ]
