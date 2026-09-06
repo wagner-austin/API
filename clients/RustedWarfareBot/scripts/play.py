@@ -474,10 +474,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     # SAME model continuously, so one read serves whichever knobs want it.
     brace_model: HeadModel | None = None
     gate_model: HeadModel | None = None
-    if doctrine["brace"] or doctrine["huntgate"]:
+    if doctrine["brace"] or doctrine["huntgate"] or doctrine["bank"]:
         razing = load_head_model("razebrace.ndjson")
         brace_model = razing if doctrine["brace"] else None
-        gate_model = razing if doctrine["huntgate"] else None
+        gate_model = razing if doctrine["huntgate"] or doctrine["bank"] else None
     report = play(
         channel,
         plan,
@@ -519,6 +519,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         nukes=doctrine["nukes"],
         rebuild=doctrine["rebuild"],
         hunt=doctrine["hunt"],
+        bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],
         kite=doctrine["kite"],

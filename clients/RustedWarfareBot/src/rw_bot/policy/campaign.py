@@ -130,6 +130,7 @@ def play(
     nukes: int = 0,
     rebuild: int = 0,
     hunt: int = 0,
+    bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
@@ -199,6 +200,7 @@ def play(
         nukes: Nuke launchers stood, firing at the priciest hostile seen. See Doctrine.
         rebuild: Rival army-value drop before a razed pool re-claims. See Doctrine.
         hunt: The hunt party's size, pressing visible enemy movers. See Doctrine.
+        bank: The razing head's safe window funds the finisher. See Doctrine.
         income_ladder: Refused extractor conversions save toward themselves. See Doctrine.
 
         Each of these is one doctrine field; the reasoning and the
@@ -334,9 +336,8 @@ def play(
             # sampled even on observations that never reach a decision.
             free = workforce.free(sample)
 
-            # Braced, the reserve floor is zero: the razing is predicted,
-            # so credits stop being long-run money (law eight;
-            # [[impossible-step-three-design]]).
+            # Braced, the reserve floor is zero: razing predicted, credits
+            # stop being long-run money ([[impossible-step-three-design]]).
             budget = Budget(sample["credits"], 0 if sentries.braced else reserve)
 
             plan_step = build_plan(
@@ -378,10 +379,9 @@ def play(
             )
             if counter:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
-                # The bloodied gate joins two existing records: the fleet
-                # types ever seen this match, and the death ledger's kills
-                # by those types. A game the fleet never touched can never
-                # read bloodied -- the two-panel calibration's whole point.
+                # The bloodied gate joins two records: fleet types ever seen,
+                # and the death ledger's kills by them -- a game the fleet
+                # never touched can never read bloodied (the calibration).
                 fleet_seen.update(fleet_types(threats))
                 bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
                 predicted = sentries.predicted
@@ -402,20 +402,20 @@ def play(
             # drained every credit into units that traded even and
             # equilibrated. The reserve still protects replacing a loss, so
             # production is deferred, not starved ([[policy-economy]]).
-            # Tech claims before income conversions. The unlock saves toward
-            # itself when refused, and the T2 extractor conversion funds at a
-            # 2,300 balance where the unlock needs 2,900 -- ordered the other
-            # way round, every accrual is sniped just short of the goal and
-            # the tech arm never reaches the roster it exists for.
+            # Tech claims before income conversions: the unlock saves toward
+            # itself when refused, and the T2 conversion funds at 2,300 where
+            # the unlock needs 2,900 -- the other order snipes every accrual
+            # just short of the goal.
             send_tech(channel, tech, sample, budget, teched)
-            # The finisher claims right after tech: its 45,000 withhold is
-            # the doctrine's stated intent -- the fortress survives on what
-            # already stands while the launcher funds -- and an end-of-chain
-            # save would be drained by every channel below, exactly as the
-            # probe measured cover doing (`runs/nuke-probe.out`).
+            # The finisher claims right after tech (an end-of-chain save is
+            # drained by every channel below, `runs/nuke-probe.out`), and the
+            # bank is its third funding gate: dominance never happens at
+            # Impossible, so without it `nukes` was inert there by
+            # construction (law eight; See Doctrine).
+            funding = committed_close or (bank and sentries.gate_ready and not sentries.razing_near)
             send_nukes(
                 channel,
-                nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
+                nuker.advance(sample, catalogue, budget, free, workforce, nukes, funding),
             )
             # The standing purchases, in the quartermaster's stated order:
             # guard before subs, battery's fork last so its re-send wins a
@@ -565,7 +565,7 @@ def play(
                 allin=allin,
                 strike=strike,
                 committed_close=committed_close,
-                hunt_held=sentries.hunted_down,
+                hunt_held=sentries.razing_near,
                 pending_events=pending_events,
             )
         finally:

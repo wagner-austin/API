@@ -393,6 +393,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     rebuild=0,
                     hunt=0,
                     huntgate=False,
+                    bank=False,
                     brace=False,
                 )
             )

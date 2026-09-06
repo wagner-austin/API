@@ -81,12 +81,25 @@ class Sentries:
         return self._brace is not None and self._brace.armed
 
     @property
-    def hunted_down(self) -> bool:
-        """Whether the hunt gate holds the party home right now.
+    def gate_ready(self) -> bool:
+        """Whether the continuous gate has a full window to score.
+
+        The bank reads this beside :attr:`razing_near`: banking on an
+        UNFILLED window would open the vault from tick one, which is the
+        exact ungated-withhold failure the pre-cluster nuke arms starved
+        on -- no prediction, no bank (law eight).
+        """
+        return self._gate is not None and self._gate_watch is not None and self._gate_watch.full()
+
+    @property
+    def razing_near(self) -> bool:
+        """Whether the continuous head predicts the razing right now.
 
         False without a gate, while the window is still filling, and
-        whenever the score sits below the model's own threshold --
-        exactly the samples on which hunting is allowed.
+        whenever the score sits below the model's own threshold. Two
+        consumers, opposite verbs: the hunt goes HOME when this is true,
+        and the bank stops saving -- both are the same read of the same
+        model ([[impossible-step-three-design]]).
         """
         if self._gate is None or self._gate_watch is None or not self._gate_watch.full():
             return False

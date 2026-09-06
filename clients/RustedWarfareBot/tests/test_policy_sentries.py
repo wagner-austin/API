@@ -108,13 +108,13 @@ def test_the_hunt_gate_is_a_continuous_verdict_not_a_latch() -> None:
         ]
     )
     sentries = Sentries(None, None, {}, gate=swing)
-    assert sentries.hunted_down is False  # window of 2 still open
+    assert sentries.razing_near is False  # window of 2 still open
     _observe(sentries, _world(rival_army=9_000))
-    assert sentries.hunted_down is False  # still filling
+    assert sentries.razing_near is False  # still filling
     _observe(sentries, _world(rival_army=9_000))
-    assert sentries.hunted_down is True  # rival army above the mean: doom
+    assert sentries.razing_near is True  # rival army above the mean: doom
     _observe(sentries, _world(rival_army=6_000))
-    assert sentries.hunted_down is False  # the score cleared: hunt again
+    assert sentries.razing_near is False  # the score cleared: hunt again
 
 
 def test_the_gate_keeps_reading_after_the_brace_arms() -> None:
@@ -130,7 +130,7 @@ def test_the_gate_keeps_reading_after_the_brace_arms() -> None:
     _observe(sentries, _world(rival_army=9_000))
     assert _observe(sentries, _world(rival_army=9_000)) is True  # brace edge
     assert sentries.braced is True
-    assert sentries.hunted_down is True
+    assert sentries.razing_near is True
     _observe(sentries, _world(rival_army=6_000))
     assert sentries.braced is True  # the latch holds
-    assert sentries.hunted_down is False  # the gate released
+    assert sentries.razing_near is False  # the gate released

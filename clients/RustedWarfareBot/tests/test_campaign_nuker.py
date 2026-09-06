@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.policy.campaign import play
+from rw_bot.policy.head import decode_head_model
 from rw_bot.policy.nuker import LAUNCHER_TYPE
 from rw_bot.policy.situation import CLOSE_HOLD
 from tests.campaign_fixtures import (
@@ -53,6 +54,66 @@ def test_the_nukes_knob_places_a_funded_launcher_once_committed_and_off_places_n
     built = [line for line in arming.sent if '"build"' in line and LAUNCHER_TYPE in line]
     assert len(built) == 1
     assert '"unit_id":214' in built[0]
+
+
+def test_the_bank_funds_the_launcher_through_the_safe_window_and_doom_holds_it() -> None:
+    """The third funding gate, end to end: no dominance anywhere (the rival
+    is eight times our army), yet with the bank on the launcher leaves the
+    moment the head's window fills reading SAFE -- and with a head that
+    reads doom, the same world funds nothing (law eight: no prediction,
+    no bank)."""
+    world = sample(
+        CENTRE,
+        BUILDER,
+        credits=90_000,
+        options=(option(214, LAUNCHER_TYPE, key="u_nuke", placed=True),),
+        players=(
+            player(0, index=0, local=True, hostile=False, income=60, army_value=900),
+            player(1, index=1, income=60, army_value=8_000),
+        ),
+    )
+    script = (world, world, world)
+
+    safe = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": -6.0}',
+            '{"name": "credits_last", "mean": 90000.0, "std": 1000.0, "coef": 0.0}',
+        ]
+    )
+    banked = ScriptedPeer(lines(*script))
+    play(
+        AgentChannel(banked),
+        (),
+        _CATALOGUE,
+        PLACEMENTS,
+        _PROFILES,
+        len(script),
+        nukes=1,
+        bank=True,
+        gate_model=safe,
+    )
+    built = [line for line in banked.sent if '"build"' in line and LAUNCHER_TYPE in line]
+    assert len(built) == 1
+
+    doom = decode_head_model(
+        [
+            '{"window": 2, "threshold": 0.5, "intercept": 6.0}',
+            '{"name": "credits_last", "mean": 90000.0, "std": 1000.0, "coef": 0.0}',
+        ]
+    )
+    held = ScriptedPeer(lines(*script))
+    play(
+        AgentChannel(held),
+        (),
+        _CATALOGUE,
+        PLACEMENTS,
+        _PROFILES,
+        len(script),
+        nukes=1,
+        bank=True,
+        gate_model=doom,
+    )
+    assert [line for line in held.sent if '"build"' in line and LAUNCHER_TYPE in line] == []
 
 
 def test_a_standing_launcher_arms_and_fires_over_the_wire() -> None:

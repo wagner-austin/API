@@ -52,6 +52,7 @@ _BAD_BATTERY_COUNT = "RW-DOCTRINE-028"
 _BAD_REBUILD_DROP = "RW-DOCTRINE-029"
 _BAD_HUNT_SIZE = "RW-DOCTRINE-030"
 _GATE_ON_NOTHING = "RW-DOCTRINE-031"
+_BANK_ON_NOTHING = "RW-DOCTRINE-032"
 
 
 def _count(
@@ -144,6 +145,13 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             "field 'huntgate' recalls the hunt party, and this doctrine fields none: "
             "set hunt to a party size or turn the gate off",
         )
+    bank = require_bool(payload, "bank")
+    if bank and nukes == 0:
+        raise DoctrineError(
+            _BANK_ON_NOTHING,
+            "field 'bank' funds the finisher through the razing head's safe window, "
+            "and this doctrine stands no launchers: set nukes or turn the bank off",
+        )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -209,6 +217,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         rebuild=rebuild,
         hunt=hunt,
         huntgate=huntgate,
+        bank=bank,
     )
 
 
@@ -264,6 +273,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "rebuild": doctrine["rebuild"],
         "hunt": doctrine["hunt"],
         "huntgate": doctrine["huntgate"],
+        "bank": doctrine["bank"],
     }
 
 

@@ -101,6 +101,7 @@ FLAG_FIELDS: Final = (
     "income_ladder",
     "brace",
     "huntgate",
+    "bank",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -344,6 +345,18 @@ class Doctrine(TypedDict):
             decision driving a live tactical response
             ([[impossible-step-three-design]]). Requires a hunt party;
             a gate on nothing is refused at decode.
+        bank: Whether the razing head's SAFE window funds the finisher.
+            The nuker's build gate was sustained dominance only -- a state
+            Impossible never reaches, so `nukes` was inert there by
+            construction. On, the loop scores ``models/razebrace.ndjson``
+            continuously and the launcher funds exactly while the head
+            reads the match as standing: no prediction, no bank (law
+            eight -- the ungated withhold starved a garrison to defeat
+            while accumulating 23,446 of 45,000, `runs/sweeps/vh-nuke`).
+            When the razing is predicted the withhold stops that tick and
+            credits flow back to defence. Requires ``nukes``; a bank with
+            no finisher to fund is refused at decode
+            ([[impossible-economy-problem]] win path, Phase B).
         income_ladder: Whether a refused extractor conversion saves toward
             itself. Off is the Impossible measurement: unconditional saving
             doubled income and lost, because the army pauses let the enemy's
@@ -417,6 +430,7 @@ class Doctrine(TypedDict):
     rebuild: int
     hunt: int
     huntgate: bool
+    bank: bool
 
 
 #: The style everything so far was measured under, exactly.
@@ -475,6 +489,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     rebuild=0,
     hunt=0,
     huntgate=False,
+    bank=False,
 )
 
 

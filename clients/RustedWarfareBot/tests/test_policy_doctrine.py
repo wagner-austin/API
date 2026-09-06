@@ -65,6 +65,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         rebuild=0,
         hunt=0,
         huntgate=False,
+        bank=False,
     )
 
 
@@ -317,6 +318,25 @@ def test_a_gate_without_a_party_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-031"
+
+
+def test_a_bank_without_a_finisher_is_refused() -> None:
+    """The bank funds the launcher; with no launcher to stand it is a
+    silent no-op, refused like the gate on no party."""
+    payload = encode_doctrine(_doctrine())
+    payload["bank"] = True
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-032"
+
+
+def test_a_banked_finisher_round_trips() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["nukes"] = 1
+    payload["bank"] = True
+    decoded = decode_doctrine(payload)
+    assert decoded["nukes"] == 1
+    assert decoded["bank"] is True
 
 
 def test_a_gated_party_round_trips() -> None:
