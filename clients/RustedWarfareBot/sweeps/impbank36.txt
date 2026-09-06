@@ -1,0 +1,45 @@
+# The bank screen ([[impossible-economy-problem]] win path, Phase B):
+# the adopted standing base vs base+nukes (placebo -- the dominance
+# gate never opens at Impossible, so it is inert by construction) vs
+# base+banked finisher (the razing head's safe window funds the
+# launcher; law eight mechanized in 3c79b98e). Judged on the outlay
+# ledger's nuke rows FIRST (did the bank accumulate, and how far),
+# then survival. 12 shared fresh seeds 8766001-8770577, difficulty 3.
+#
+# label | seed | doctrine | samples
+stand|8766001|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8766001|doctrines/stand-nuke.doctrine|10000
+bank|8766001|doctrines/stand-bank.doctrine|10000
+stand|8766417|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8766417|doctrines/stand-nuke.doctrine|10000
+bank|8766417|doctrines/stand-bank.doctrine|10000
+stand|8766833|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8766833|doctrines/stand-nuke.doctrine|10000
+bank|8766833|doctrines/stand-bank.doctrine|10000
+stand|8767249|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8767249|doctrines/stand-nuke.doctrine|10000
+bank|8767249|doctrines/stand-bank.doctrine|10000
+stand|8767665|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8767665|doctrines/stand-nuke.doctrine|10000
+bank|8767665|doctrines/stand-bank.doctrine|10000
+stand|8768081|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8768081|doctrines/stand-nuke.doctrine|10000
+bank|8768081|doctrines/stand-bank.doctrine|10000
+stand|8768497|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8768497|doctrines/stand-nuke.doctrine|10000
+bank|8768497|doctrines/stand-bank.doctrine|10000
+stand|8768913|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8768913|doctrines/stand-nuke.doctrine|10000
+bank|8768913|doctrines/stand-bank.doctrine|10000
+stand|8769329|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8769329|doctrines/stand-nuke.doctrine|10000
+bank|8769329|doctrines/stand-bank.doctrine|10000
+stand|8769745|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8769745|doctrines/stand-nuke.doctrine|10000
+bank|8769745|doctrines/stand-bank.doctrine|10000
+stand|8770161|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8770161|doctrines/stand-nuke.doctrine|10000
+bank|8770161|doctrines/stand-bank.doctrine|10000
+stand|8770577|doctrines/evolve3-g3m10.doctrine|10000
+nuke|8770577|doctrines/stand-nuke.doctrine|10000
+bank|8770577|doctrines/stand-bank.doctrine|10000
