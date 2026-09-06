@@ -9,6 +9,7 @@ related:
 source_paths:
   - "runs/sweeps/noise"
   - "runs/sweeps/noise-seeded"
+  - "runs/sweeps/detpair24"
   - "agent/src/rwbot/agent/EngineRandom.java"
   - "agent/src/rwbot/agent/TickBracket.java"
   - "runs/bracket-ff1-trace.ndjson"
@@ -18,7 +19,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/TickBracket.java": "8086893ba07baeec9c4173fc58533168e6ecf303"
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-06
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -181,6 +182,40 @@ cross-machine for all 250 samples and eighteen parting later — deterministic
 per environment, differing between them. Cross-environment identity is an
 open question, not a certified property.
 
+### 2026-09-06: the certification does not extend to Impossible — same node, same seed, different match
+
+detpair24 measured the floor on purpose: two doctrines byte-identical
+outside the name line (`doctrines/evolve3-g3m10.doctrine` vs
+`doctrines/det-twin.doctrine`), twelve shared fresh seeds at difficulty 3,
+one scheduled job per match (`runs/sweeps/detpair24/`). Deterministic play
+reads exactly zero on every row. It read zero on none:
+
+* **mean −118.1, sd 1,205, |diff| median 856, max |diff| 2,104** samples of
+  survival per pair — and the verdict label flips (wiped↔defeated) on
+  **7 of 12 seeds**.
+* The open cross-environment seam above is NOT the explanation: four pairs
+  ran both arms on the **same node** (sacct, job 55800776) and forked
+  anyway — +1,219, −1,637, −716, +226 — at frames 300–1,800, inside the
+  span the panel certification covered.
+* The rng ledger gives every same-node fork one shape: at the first
+  divergent frame two of the three seeded streams agree and the third
+  carries a different **draw count**. Three pairs desync in the engine
+  stream (draws 5 vs 10, 28 vs 29, 7 vs 5 — the fork anatomy's leak,
+  back at this rung); one in the math stream (4 extra draws — the in-tick
+  cosmetic drawers whose per-call-site routing is the structural fix
+  recorded above as not done).
+
+So the certified property keeps its exact wording and gains its regime:
+**same seed, same environment → same match was certified on the 24-member
+panel's regime and does not hold at difficulty 3**, where the opponent
+fields enough units to exercise draw-count-varying call sites the
+certification never touched. Until the per-call-site routing lands, the
+Impossible rung is measured through this floor, and every screen is sized
+against it: the 2-se minimum detectable paired-survival effect is roughly
+**850 samples at n=8, 700 at n=12, 350 at n=48**. The named next
+instrument step is one same-node tapped pair (`RandomTap`,
+`PLAY_RNGTAP=1`) to name the call site whose count varies.
+
 ## The standing rules
 
 **Score on survival time, or on worth share.** The endpoint figures the scorecard reports are the worst available: final worth has a standard deviation larger than its own mean. Computed from the per-sample trace instead, the mean share of worth held against the strongest rival has a coefficient of variation of **0.066**, and survival time **0.098** — the endpoint figure beside them is **0.67**.
@@ -190,6 +225,8 @@ open question, not a certified property.
 **Twelve runs an arm.** That gives a standard error near 87 samples on survival time, so a difference of about 250 samples is detectable. Detecting a change in the *verdict* rate from 25% to 50% would need roughly 58 matches an arm.
 
 **Do not run one-match-per-arm screens.** A twelve-way screen of army compositions would report about three survivals whichever compositions it held. Twelve are written up and parked for exactly this reason.
+
+**At Impossible, size against the measured identical-pair floor** (§ 2026-09-06 above): paired-survival sd 1,205 samples, so ~700-sample effects are the smallest an n=12 screen can see and ~350 the smallest a 48-pair panel can. Generation-tier fitness at n=8 pairs is ranking noise below ~850 and adopts nothing by itself.
 
 [^1]: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/`, twelve results each from `sweeps/noise.txt` — one job line repeated twelve times under distinct labels, since results are filed by label.
 [^2]: `.decompiled/com/corrodinggames/rts/game/a/a.java:1713,1737,1761`; `game/a/o.java:96-97,166-167` — `o.w()` returns a random point on a disc and `a.java:1575` hands it to a worker as a destination; `game/units/y.java:4811-4837`.
