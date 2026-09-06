@@ -84,6 +84,9 @@ lint:
 	@Write-Host "  -> undecoded-field check" -ForegroundColor DarkCyan
 	poetry run tankpit-check-undecoded-fields; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] undecoded-field check failed" -ForegroundColor Red; exit $$LASTEXITCODE }
 	@Write-Host ""
+	@Write-Host "  -> wiki gates (structure + claim binding)" -ForegroundColor DarkCyan
+	poetry run tankpit-check-wiki; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] wiki gates failed" -ForegroundColor Red; exit $$LASTEXITCODE }
+	@Write-Host ""
 	@Write-Host "  -> ruff check + format" -ForegroundColor DarkCyan
 	poetry run ruff check . --fix
 	poetry run ruff format .
