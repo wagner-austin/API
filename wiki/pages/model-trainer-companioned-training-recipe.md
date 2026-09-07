@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
-  "docs/RESEARCH.md": 30f467b165335bf40a2f4eb80c401e8fde8426ce
+  "docs/RESEARCH.md": f5ac8c106dfd4ed646be1fc1c01f9ee113b71170
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -46,6 +46,8 @@ provenance:
   - "gpt2-small invariance anchor measured 2026-09-07 on HPC3: job 55806539 + twin 55806826 on hpc3-gpu-18-01 and hpc3-gpu-16-00 (~40 min each), unchanged v40 image, plan gpt2-content-lora, records CROSS-NODE BIT-IDENTICAL sha256 9abfbdd4 (truncated), board task 7642f7f9"
   - "1.5B rung (gpt2-xl) measured 2026-09-07 on HPC3, BOTH objectives on A30-24GB: jobs 55808450 (LM, 3h27m) + 55808466 (invariance, 3h28m), image v41 sha256 f38bc982 (truncated) from commit 40c55fa5; first content attempt 55807973 hit CUDA OOM on V100-16GB by 50MiB at the KL step (two 1.5B fp32 models), so the pair moved cards together, gpu_pinned_because declared in both run documents"
   - "1.5B twins 55809977/55809982 BYTE-IDENTICAL 2026-09-07: LM pair sha256 cff9f3ce (truncated), invariance pair sha256 6269120d (truncated) -- SAME-NODE certificates, the queue having placed all four runs on hpc3-gpu-l54-09; cross-node determinism established separately by the arc's five cross-node certificates"
+  - "7B rung (Pythia-6.9B, GPT-NeoX, NF4 nf4+double-quant+bf16-compute) measured 2026-09-07 on A30, board task af35fc20: jobs 55810964 (LM, 3h04m) + 55810966 (invariance, 3h21m), image v42 sha256 270d8197 (truncated) from commit 09f5a4bb, 44/44 smokes incl. the dtype-boundary and architecture-policy self-asserts; model content-pinned (snapshot c0e3eee3 + shard sha256s) in the run documents"
+  - "7B LM twin 55811523 BYTE-IDENTICAL (sha256 6ef4b9c9 truncated, same-node hpc3-gpu-l54-09); 7B invariance twin 55811542 CROSS-NODE (k54-01 vs l54-09) with ALL 198 observations bit-equal -- record shas 254d0126 vs 8c48e82a differ solely in fingerprint/host/logical_cores 32 vs 64, so NF4 training is certified deterministic cross-node in every measured quantity"
 fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
@@ -273,9 +275,17 @@ base, eight compartments are deliverable at depth (+38.1%) and four at
 longer forced by measurement. The scale ladder has since completed
 (section above): four-compartment serving is scale-robust at +53-63% on
 every measured base, and the n8 question is depth-shaped -- worst at 24
-layers, gone at 48. Still open, filed rather than implied: the 7B
-architecture jump (Pythia-6.9B under NF4, both objectives, in flight on
-board task af35fc20), the mechanism of the mid-depth valley, the
-remaining 0.30 content gap at medium n8, and the budget slot policy.
-The RESEARCH.md entry under `mi` carries all the run summaries and the
-extension list.
+layers, gone at 48. The 7B architecture jump has since been measured
+(Pythia-6.9B under NF4, both objectives, provenance below) and the
+recipe does NOT survive it as-is: the failure is the measurement's
+PRECONDITION, not composition -- the solo cartridge gain nearly
+vanishes (~0.07-0.23 against ~0.81 on every GPT-2 rung, per-seed spans
+the size of the means), so retention there is a division artifact and
+no 7B composition claim in either direction is founded until the solo
+gain exists. NF4 training itself is certified deterministic, cross-node
+in every measured quantity. Still open, filed rather than implied:
+solo-gain recovery at 7B (headroom measurement first, then a
+slot-count/learning-rate rung), the mechanism of the mid-depth valley,
+the remaining 0.30 content gap at medium n8, and the budget slot
+policy. The RESEARCH.md entry under `mi` carries all the run summaries
+and the extension list.
