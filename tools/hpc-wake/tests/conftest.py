@@ -28,6 +28,12 @@ from hpc_wake.identity import TASK_ID_VARIABLE
 
 FROZEN_NOW: Final = "2026-09-06T07:00:00+00:00"
 
+#: Where :class:`MovingClock` starts. The same instant as FROZEN_NOW, in the
+#: representation the settling policy does arithmetic on -- the two are
+#: written by one cycle and never compared, so this is a convenience for
+#: readers rather than a coupling the code relies on.
+FROZEN_EPOCH: Final = 1757142000
+
 #: The standing task id every configured test posts into.
 TASK_ID: Final = "50e693d6-c3aa-4464-b43b-adbc07149a67"
 
@@ -78,6 +84,57 @@ def _make_frozen_clock() -> Generator[str, None, None]:
 
     _test_hooks.now_iso = _now
     yield FROZEN_NOW
+    _test_hooks.reset_hooks()
+
+
+class MovingClock:
+    """A settling clock the test advances by hand.
+
+    Satisfies ``NowEpochProtocol``. A frozen epoch cannot exercise settling
+    at all -- every group would be observed and judged at one instant, so
+    the quiet and aged rules could never fire and a suite could only ever
+    watch endings accumulate. Tests move this instead of waiting.
+
+    Attributes:
+        epoch: The Unix seconds every call currently returns.
+    """
+
+    epoch: int
+
+    def __init__(self, start: int) -> None:
+        """Start the clock.
+
+        Args:
+            start: Initial Unix seconds.
+        """
+        self.epoch = start
+
+    def __call__(self) -> int:
+        """Read the clock.
+
+        Returns:
+            The current Unix seconds.
+        """
+        return self.epoch
+
+    def advance(self, seconds: int) -> None:
+        """Move the clock forward.
+
+        Args:
+            seconds: How far forward.
+        """
+        self.epoch += seconds
+
+
+def _make_moving_clock() -> Generator[MovingClock, None, None]:
+    """Install a clock the test controls for the settling policy.
+
+    Yields:
+        The clock, for advancing between cycles.
+    """
+    clock = MovingClock(FROZEN_EPOCH)
+    _test_hooks.now_epoch = clock
+    yield clock
     _test_hooks.reset_hooks()
 
 
@@ -157,3 +214,4 @@ def _make_fake_run() -> Generator[FakeRun, None, None]:
 emitted = pytest.fixture(_make_emitted)
 fake_run = pytest.fixture(_make_fake_run)
 frozen_clock = pytest.fixture(_make_frozen_clock)
+moving_clock = pytest.fixture(_make_moving_clock)

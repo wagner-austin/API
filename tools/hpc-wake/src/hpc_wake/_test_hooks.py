@@ -42,6 +42,18 @@ class NowIsoProtocol(Protocol):
         ...
 
 
+class NowEpochProtocol(Protocol):
+    """Read the wall clock for the settling policy's arithmetic."""
+
+    def __call__(self) -> int:
+        """Read it.
+
+        Returns:
+            Whole Unix seconds.
+        """
+        ...
+
+
 def _default_emit(line: str) -> None:
     """Write one line to standard output and flush it.
 
@@ -66,24 +78,46 @@ def _default_now_iso() -> str:
     return datetime.datetime.now(tz=datetime.UTC).isoformat()
 
 
+def _default_now_epoch() -> int:
+    """Read the wall clock for the settling policy.
+
+    A SECOND READING OF THE SAME CLOCK, not a second clock, and the two are
+    never compared to each other. :func:`_default_now_iso` produces the
+    durable human-readable stamp the closure record keeps forever;
+    this produces the integer :mod:`hpc_wake.settling` does arithmetic on.
+    Storing the integer is what lets the policy stay pure and exception-free
+    -- the alternative is re-parsing an ISO string on every cycle, which is
+    the same arithmetic plus a failure mode when a hand-edited pending file
+    holds something ``fromisoformat`` refuses.
+
+    Returns:
+        Whole Unix seconds, floored.
+    """
+    return int(datetime.datetime.now(tz=datetime.UTC).timestamp())
+
+
 http_post: McpPostProtocol = urllib_mcp_post
 emit: EmitProtocol = _default_emit
 now_iso: NowIsoProtocol = _default_now_iso
+now_epoch: NowEpochProtocol = _default_now_epoch
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global http_post, emit, now_iso
+    global http_post, emit, now_iso, now_epoch
     http_post = urllib_mcp_post
     emit = _default_emit
     now_iso = _default_now_iso
+    now_epoch = _default_now_epoch
 
 
 __all__ = [
     "EmitProtocol",
+    "NowEpochProtocol",
     "NowIsoProtocol",
     "emit",
     "http_post",
+    "now_epoch",
     "now_iso",
     "reset_hooks",
 ]

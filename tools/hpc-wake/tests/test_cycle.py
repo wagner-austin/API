@@ -8,6 +8,7 @@ import pytest
 from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.workspace import WorkspaceConnection, decode_workspace_connection
+from hpc3.core import _test_hooks as hpc3_hooks
 from hpc3.core import ledger
 from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
@@ -18,7 +19,16 @@ from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
 from hpc_wake import _test_hooks
 from hpc_wake.announce import MARKER
 from hpc_wake.cycle import run_cycle
-from tests.conftest import CONFIGURED_ENV, TASK_ID, FakeRun, pin_env
+from hpc_wake.pending import PendingClosure, pending_path, read_pending, write_pending
+from hpc_wake.settling import MAX_HOLD_SECONDS, SETTLE_SECONDS
+from tests.conftest import (
+    CONFIGURED_ENV,
+    FROZEN_EPOCH,
+    TASK_ID,
+    FakeRun,
+    MovingClock,
+    pin_env,
+)
 
 
 def _connection(tmp_path: pathlib.Path) -> WorkspaceConnection:
@@ -79,6 +89,24 @@ def _sacct_row(job_id: str, state: str, *, elapsed: int = 4688) -> str:
     """
     tres = "billing=8,cpu=8,gres/gpu=1"
     return f"{job_id}|abl.job-{job_id}|free-gpu|{state}|{elapsed}|{tres}|hpc3-gpu-18-02"
+
+
+def _install_accounting(ended_ids: list[str]) -> None:
+    """Point the cluster seam at a fresh fake reporting these jobs as ended.
+
+    Rebuilt rather than extended because :class:`FakeRun` matches by
+    substring and the FIRST matching rule wins: adding a second ``sacct``
+    rule to an existing fake is dead code, and a multi-cycle test built that
+    way silently replays its first response forever.
+
+    Args:
+        ended_ids: Every job accounting should now report COMPLETED. All of
+            them, not only the newest -- that is what ``sacct`` does.
+    """
+    fake = FakeRun()
+    rows = "".join(_sacct_row(job_id, "COMPLETED") + "\n" for job_id in ended_ids)
+    fake.add("sacct", stdout=rows)
+    hpc3_hooks.run = fake
 
 
 def _write_ledger(tmp_path: pathlib.Path, entries: list[LedgerEntry]) -> pathlib.Path:
@@ -148,7 +176,7 @@ class TestQuietCycles:
 
         run_cycle(_connection(tmp_path), HPC3)
 
-        assert emitted == ["1 open job(s), none newly terminal"]
+        assert emitted == ["1 open job(s), none newly terminal and none waiting"]
         assert not ledger.closure_path(path).exists()
 
 
@@ -159,13 +187,31 @@ class TestAnnouncingCycles:
         fake_run: FakeRun,
         emitted: list[str],
         frozen_clock: str,
+        moving_clock: MovingClock,
     ) -> None:
+        """The full path, across the two cycles it now genuinely takes.
+
+        The first cycle OBSERVES the ending and posts nothing -- it cannot
+        know yet whether more members of the same sweep are seconds behind.
+        The second, one settle window later, finds the group quiet and
+        announces it. Asserting this over two cycles rather than pinning a
+        clock far enough ahead to collapse them is deliberate: the two-cycle
+        shape IS the behaviour, and a test that hid it would pass equally
+        well against the per-job posting this replaced.
+        """
         pin_env(CONFIGURED_ENV)
         fake_http = FakeHttpPost([posted_ok()])
         _test_hooks.http_post = fake_http
         path = _write_ledger(tmp_path, [_entry("101")])
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
 
+        run_cycle(_connection(tmp_path), HPC3)
+
+        assert fake_http.bodies == []
+        assert not ledger.closure_path(path).exists()
+        assert emitted == ["1 ending(s) waiting, none settled; 1 arrived this cycle"]
+
+        moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
         arguments = sent_arguments(fake_http.bodies[0])
@@ -191,9 +237,11 @@ class TestAnnouncingCycles:
         assert closed["101"]["closed_at"] == frozen_clock
         assert closed["101"]["elapsed_seconds"] == 4688
         assert emitted == [
+            "1 ending(s) waiting, none settled; 1 arrived this cycle",
             "posted abl: tagged @label-a-0906",
-            "cycle: 1 open, 1 newly terminal, closures recorded",
+            "cycle: 1 open, 0 newly terminal, 1 announced, 0 still settling",
         ]
+        assert not pending_path(path).read_text(encoding="utf-8")
 
     def test_a_refused_post_leaves_the_closure_unwritten(
         self,
@@ -201,9 +249,17 @@ class TestAnnouncingCycles:
         fake_run: FakeRun,
         emitted: list[str],
         frozen_clock: str,
+        moving_clock: MovingClock,
     ) -> None:
         """Post-then-close is the delivery guarantee: the next cycle must
-        retry an announcement the board never accepted."""
+        retry an announcement the board never accepted.
+
+        THE PENDING RECORD MUST SURVIVE THE REFUSAL TOO, which is the half
+        settling added. The ending is durable before the post is attempted,
+        so a board that refuses leaves the record in place and the retry
+        needs nothing from the cluster -- if the refusal had cleared it, the
+        ending would be closed by nobody and announced by nobody.
+        """
         pin_env(CONFIGURED_ENV)
         _test_hooks.http_post = FakeHttpPost(
             [McpHttpResponse(status=401, body="unauthorized", content_type="text/plain")]
@@ -211,11 +267,16 @@ class TestAnnouncingCycles:
         path = _write_ledger(tmp_path, [_entry("101")])
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
 
+        run_cycle(_connection(tmp_path), HPC3)
+        moving_clock.advance(SETTLE_SECONDS)
+
         with pytest.raises(AppError) as caught:
             run_cycle(_connection(tmp_path), HPC3)
 
         assert caught.value.code is McpClientErrorCode.HTTP_STATUS
         assert not ledger.closure_path(path).exists()
+        still_waiting = read_pending(pending_path(path))
+        assert [r["closure"]["job_id"] for r in still_waiting] == ["101"]
 
     def test_an_aggregate_row_announces_only_the_tasks_not_already_closed(
         self,
@@ -223,6 +284,7 @@ class TestAnnouncingCycles:
         fake_run: FakeRun,
         emitted: list[str],
         frozen_clock: str,
+        moving_clock: MovingClock,
     ) -> None:
         """``closures_for`` expands a cancelled pending aggregate to every
         task it names; re-announcing the already-closed ones would repeat
@@ -243,6 +305,8 @@ class TestAnnouncingCycles:
         fake_run.add("sacct", stdout=_sacct_row("555_[2-3]", "CANCELLED by 99", elapsed=0) + "\n")
 
         run_cycle(_connection(tmp_path), HPC3)
+        moving_clock.advance(SETTLE_SECONDS)
+        run_cycle(_connection(tmp_path), HPC3)
 
         body = require_str(sent_arguments(fake_http.bodies[0]), "body")
         assert "555_3" in body
@@ -257,6 +321,7 @@ class TestAnnouncingCycles:
         fake_run: FakeRun,
         emitted: list[str],
         frozen_clock: str,
+        moving_clock: MovingClock,
     ) -> None:
         pin_env(CONFIGURED_ENV)
         fake_http = FakeHttpPost([posted_ok()])
@@ -265,7 +330,137 @@ class TestAnnouncingCycles:
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
 
         run_cycle(_connection(tmp_path), HPC3)
+        moving_clock.advance(SETTLE_SECONDS)
+        run_cycle(_connection(tmp_path), HPC3)
 
         body = require_str(sent_arguments(fake_http.bodies[0]), "body")
         assert "@" not in body
-        assert emitted[0] == "posted abl: no submitter label on record"
+        assert emitted[1] == "posted abl: no submitter label on record"
+
+
+class TestSettlingAcrossCycles:
+    """The measured defect and its bounds, end to end through run_cycle."""
+
+    def test_a_trickling_array_produces_one_post_not_one_per_job(
+        self,
+        tmp_path: pathlib.Path,
+        fake_run: FakeRun,
+        emitted: list[str],
+        frozen_clock: str,
+        moving_clock: MovingClock,
+    ) -> None:
+        """THE DEFECT THIS PACKAGE WAS CHANGED FOR, as an end-to-end test.
+
+        Six members of one array finish 180 seconds apart -- the median gap
+        measured on the live board in the burst that produced 116 posts in
+        24 hours. Each is observed by its own cycle, exactly as the real
+        poller would observe it.
+
+        Under the previous behaviour this was six posts. It must now be one,
+        carrying all six, once the array stops and the group goes quiet.
+        """
+        pin_env(CONFIGURED_ENV)
+        fake_http = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = fake_http
+        ids = [f"777_{index}" for index in range(6)]
+        path = _write_ledger(tmp_path, [_entry(job_id) for job_id in ids])
+
+        for count in range(1, len(ids) + 1):
+            # Accounting reports EVERY ended job on every poll, not just the
+            # newest, so the fake is rebuilt each cycle with the cumulative
+            # set. Appending rules to one fake instead would have matched the
+            # first rule every time -- first match wins -- and the array
+            # would never have trickled at all. It did not, at first, and the
+            # test passed a post it should have caught.
+            _install_accounting(ids[:count])
+            run_cycle(_connection(tmp_path), HPC3)
+            assert fake_http.bodies == [], f"posted after {count} of {len(ids)} endings"
+            moving_clock.advance(180)
+        _install_accounting(ids)
+
+        # The array has stopped. One settle window of quiet, then one post.
+        moving_clock.advance(SETTLE_SECONDS)
+        run_cycle(_connection(tmp_path), HPC3)
+
+        assert len(fake_http.bodies) == 1
+        body = require_str(sent_arguments(fake_http.bodies[0]), "body")
+        assert body.startswith(f"{MARKER} abl: 6 job(s) ended (COMPLETED x6)")
+        for job_id in ids:
+            assert job_id in body
+        assert set(ledger.read_closures(ledger.closure_path(path))) == set(ids)
+        assert read_pending(pending_path(path)) == []
+
+    def test_a_group_that_never_goes_quiet_is_still_announced(
+        self,
+        tmp_path: pathlib.Path,
+        fake_run: FakeRun,
+        emitted: list[str],
+        frozen_clock: str,
+        moving_clock: MovingClock,
+    ) -> None:
+        """The latency ceiling, proved against a group that stays busy.
+
+        A member arrives every 180 seconds and never stops, so the quiet
+        rule can never fire. Without MAX_HOLD_SECONDS this array would be
+        announced never; the operator would have traded 116 posts for
+        silence, which is the same bug pointing the other way.
+        """
+        pin_env(CONFIGURED_ENV)
+        fake_http = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = fake_http
+        ids = [f"888_{index}" for index in range(MAX_HOLD_SECONDS // 180 + 2)]
+        _write_ledger(tmp_path, [_entry(job_id) for job_id in ids])
+
+        for count in range(1, len(ids) + 1):
+            _install_accounting(ids[:count])
+            run_cycle(_connection(tmp_path), HPC3)
+            if fake_http.bodies != []:
+                break
+            moving_clock.advance(180)
+
+        assert len(fake_http.bodies) == 1, "the hold ceiling never fired"
+        held_for = moving_clock.epoch - FROZEN_EPOCH
+        assert held_for >= MAX_HOLD_SECONDS
+
+    def test_an_announced_ending_is_never_announced_twice(
+        self,
+        tmp_path: pathlib.Path,
+        fake_run: FakeRun,
+        emitted: list[str],
+        frozen_clock: str,
+        moving_clock: MovingClock,
+    ) -> None:
+        """Idempotence across the crash window the ordering leaves open.
+
+        A cycle that dies after writing closures but before rewriting the
+        pending file leaves an ending in BOTH records. The next cycle must
+        drop it on the way in -- otherwise it is re-announced on every
+        subsequent cycle forever, which is the original defect made
+        permanent rather than fixed.
+
+        The state is constructed directly rather than by killing a process,
+        because that on-disk state is precisely what a crash leaves and it
+        is the state the code must survive.
+        """
+        pin_env(CONFIGURED_ENV)
+        fake_http = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = fake_http
+        path = _write_ledger(tmp_path, [_entry("101")])
+        fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
+
+        run_cycle(_connection(tmp_path), HPC3)
+        moving_clock.advance(SETTLE_SECONDS)
+        run_cycle(_connection(tmp_path), HPC3)
+        assert len(fake_http.bodies) == 1
+
+        # The crash: closures written, pending never cleared.
+        stranded = PendingClosure(
+            closure=ledger.read_closures(ledger.closure_path(path))["101"],
+            observed_epoch=moving_clock.epoch,
+        )
+        write_pending(pending_path(path), [*read_pending(pending_path(path)), stranded])
+        moving_clock.advance(SETTLE_SECONDS)
+        run_cycle(_connection(tmp_path), HPC3)
+
+        assert len(fake_http.bodies) == 1, "the ending was announced a second time"
+        assert read_pending(pending_path(path)) == []

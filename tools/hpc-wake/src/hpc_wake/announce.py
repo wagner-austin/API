@@ -45,6 +45,29 @@ class Announcement(TypedDict):
     body: str
 
 
+def group_key(entry: LedgerEntry) -> tuple[str, str]:
+    """Derive the key that decides which post an ending belongs to.
+
+    EXTRACTED SO THERE IS EXACTLY ONE OF IT. :mod:`hpc_wake.settling` must
+    decide ripeness over the same partition this module posts over -- a
+    group that settled together has to be a group that posts together -- and
+    two copies of "project, and submitter-or-empty" would be two definitions
+    of the same partition, free to drift the first time either changes.
+
+    Args:
+        entry: The ledger entry the ending belongs to.
+
+    Returns:
+        ``(project, submitter)``, where a ledger row whose ``submitter`` is
+        ``None`` -- written before the field existed -- yields ``""`` and so
+        groups with the declared-none rows. Either way there is nobody to
+        tag, and the distinction is not one a reader of the post could act
+        on.
+    """
+    recorded = entry["submitter"]
+    return (entry["project"], "" if recorded is None else recorded)
+
+
 def _entry_for(closure: Closure, entries_by_id: Mapping[str, LedgerEntry]) -> LedgerEntry:
     """Find the ledger entry a closure belongs to.
 
@@ -124,9 +147,7 @@ def announcements(
     groups: dict[tuple[str, str], list[tuple[Closure, LedgerEntry]]] = {}
     for closure in closures:
         entry = _entry_for(closure, entries_by_id)
-        recorded = entry["submitter"]
-        submitter = "" if recorded is None else recorded
-        groups.setdefault((entry["project"], submitter), []).append((closure, entry))
+        groups.setdefault(group_key(entry), []).append((closure, entry))
 
     return [
         Announcement(
@@ -138,4 +159,4 @@ def announcements(
     ]
 
 
-__all__ = ["LINE_CAP", "MARKER", "Announcement", "announcements"]
+__all__ = ["LINE_CAP", "MARKER", "Announcement", "announcements", "group_key"]
