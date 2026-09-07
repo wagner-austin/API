@@ -83,6 +83,7 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
 from model_trainer.core.services.model.cloze.score import score_cloze_items
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.corpus_cloze import build_items
+from model_trainer.core.services.model.gemm_timing import synchroniser
 
 _log = get_logger(__name__)
 
@@ -157,6 +158,58 @@ def build_question_set(
     )
 
 
+def latency_observations(
+    *,
+    base_seconds: float,
+    retrieval_seconds: float,
+    cartridge_seconds: float,
+    retrieval_build_seconds: float,
+) -> tuple[Observation, ...]:
+    """Name what each arm cost to SERVE, per pass over the question set.
+
+    WHAT IS BEING COMPARED, precisely, because the arms are not symmetric.
+    All three run the same scorer over the same items; they differ only in
+    what precedes the question -- nothing, retrieved evidence, or a trained
+    prefix. So the difference between them is prefill, which is the thing a
+    serving comparison is actually about: the retrieval arm re-encodes its
+    evidence on every query, and the cartridge arm does not.
+
+    THE ORACLE'S SELECTION IS MEASURED AND THEN EXCLUDED FROM THE COMPARISON,
+    rather than quietly left out. ``retrieval_build_seconds`` is the time to
+    pick each item's evidence by searching for its own ANSWER -- something no
+    real retriever can do, so charging it to retrieval would invent a cost,
+    and dropping it silently would hide that a step happened at all. It is
+    recorded so a reader can see both the number and the argument.
+
+    WHICH DIRECTION THIS BOUND CUTS. The oracle arm pays no embedding, no
+    index search and no ranking, so it is the CHEAPEST any retrieval could
+    be. A cartridge that beats it beats a real pipeline by more; a cartridge
+    that loses to it has proven nothing about real pipelines. Only the first
+    direction is conclusive, and the write-up has to say so.
+
+    Args:
+        base_seconds: Scoring the question set with no context added.
+        retrieval_seconds: Scoring it with evidence in the prompt.
+        cartridge_seconds: Scoring it behind a trained prefix, MEAN over the
+            plan's seeds so it is one pass like the other two rather than a
+            sum over however many seeds the plan happens to declare.
+        retrieval_build_seconds: Assembling the oracle's evidence. Reported,
+            not charged.
+
+    Returns:
+        The named durations.
+    """
+    return tuple(
+        Observation(name=name, value=value)
+        for name, value in (
+            ("base_serve_seconds", base_seconds),
+            ("retrieval_serve_seconds", retrieval_seconds),
+            ("cartridge_serve_seconds", cartridge_seconds),
+            ("retrieval_oracle_build_seconds", retrieval_build_seconds),
+        )
+    )
+
+
 def measure_qa_plan(
     plan: QaPlan, *, corpus: pathlib.Path, device: str
 ) -> tuple[tuple[Observation, ...], str]:
@@ -198,20 +251,43 @@ def measure_qa_plan(
     base.to(device)
     max_seq = plan["max_seq_len"]
 
+    # Every timed boundary waits first, for the reason `gemm_timing`'s
+    # docstring gives: a CUDA launch is asynchronous, so an unwaited clock
+    # read measures how long it took to QUEUE the work rather than to do it.
+    wait = synchroniser(device)
+    clock = _test_hooks.monotonic_clock
+
+    wait()
+    started = clock()
     scored_base = score_cloze_items(
         items=items, model=base, encoder=encoder, device=device, max_seq_len=max_seq
     )
+    wait()
+    base_seconds = clock() - started
+
+    # The oracle's SELECTION is timed apart from the scoring it feeds. It
+    # searches each item's own answer, which no real retriever can do, so its
+    # cost belongs in the record but not in the comparison.
+    started = clock()
+    retrieval_set = retrieval_items(items, [training_text], encoder, max_seq_len=max_seq)
+    retrieval_build_seconds = clock() - started
+
+    wait()
+    started = clock()
     scored_retrieval = score_cloze_items(
-        items=retrieval_items(items, [training_text], encoder, max_seq_len=max_seq),
+        items=retrieval_set,
         model=base,
         encoder=encoder,
         device=device,
         max_seq_len=max_seq,
     )
+    wait()
+    retrieval_seconds = clock() - started
     _log.info("base %.4f, retrieval %.4f", scored_base["accuracy"], scored_retrieval["accuracy"])
 
     accuracy_gains: list[tuple[int, float]] = []
     nll_gains: list[tuple[int, float]] = []
+    cartridge_seconds_total = 0.0
     for seed in plan["seeds"]:
         slots = train_cartridge(
             base,
@@ -222,9 +298,16 @@ def measure_qa_plan(
             learning_rate=plan["learning_rate"],
         )
         cartridge = CartridgeModel(base=base, slots=slots)
+        # Scoring only. Training the prefix is a ONE-TIME cost that the
+        # capacity benchmark already records; charging it to serving would
+        # compare a cartridge's whole life against retrieval's per-query.
+        wait()
+        started = clock()
         scored = score_cloze_items(
             items=items, model=cartridge, encoder=encoder, device=device, max_seq_len=max_seq
         )
+        wait()
+        cartridge_seconds_total += clock() - started
         nll = answer_nll_pairs(items, base, cartridge, encoder, device=device, max_seq_len=max_seq)
         accuracy_gains.append((seed, scored["accuracy"] - scored_base["accuracy"]))
         nll_gains.append((seed, nll["mean_baseline"] - nll["mean_treatment"]))
@@ -251,6 +334,14 @@ def measure_qa_plan(
     ]
     observations.extend(gain_observations(replicate("cartridge-accuracy-gain", accuracy_gains)))
     observations.extend(gain_observations(replicate("cartridge-answer-nll-gain", nll_gains)))
+    observations.extend(
+        latency_observations(
+            base_seconds=base_seconds,
+            retrieval_seconds=retrieval_seconds,
+            cartridge_seconds=cartridge_seconds_total / float(len(plan["seeds"])),
+            retrieval_build_seconds=retrieval_build_seconds,
+        )
+    )
     return tuple(observations), digest
 
 
@@ -360,6 +451,7 @@ __all__ = [
     "HFTokenizerEncoder",
     "build_question_set",
     "entrypoint",
+    "latency_observations",
     "main",
     "measure_qa_plan",
     "qa_run_record",

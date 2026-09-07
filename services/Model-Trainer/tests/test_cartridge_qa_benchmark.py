@@ -281,6 +281,109 @@ class TestMeasureQaPlan:
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
 
 
+class TestLatencyObservations:
+    def test_it_names_all_four_including_the_one_it_excludes(self) -> None:
+        """The oracle's build time is RECORDED, not silently dropped.
+
+        Leaving it out would hide that the step happened at all; charging it
+        to retrieval would invent a cost no real pipeline pays. It is named
+        so the reader sees both the number and the argument.
+        """
+        named = {
+            observation["name"]: observation["value"]
+            for observation in bench.latency_observations(
+                base_seconds=2.0,
+                retrieval_seconds=10.0,
+                cartridge_seconds=3.0,
+                retrieval_build_seconds=0.5,
+            )
+        }
+
+        assert named == {
+            "base_serve_seconds": 2.0,
+            "retrieval_serve_seconds": 10.0,
+            "cartridge_serve_seconds": 3.0,
+            "retrieval_oracle_build_seconds": 0.5,
+        }
+
+
+class TestServeLatency:
+    def test_each_arm_is_timed_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
+        """Twelve reads: base, oracle build, retrieval, then two per seed.
+
+        The load-bearing assertion is the cartridge one. Its three seeds are
+        scripted at 1.0, 2.0 and 3.0 seconds, so the MEAN is 2.0 and a sum
+        would be 6.0. Recording the sum would make the cartridge arm look
+        worse the more seeds a plan happened to declare, which is a property
+        of the plan and not of serving.
+        """
+        ticks = iter(
+            [
+                100.0,
+                102.0,  # base: 2.0
+                102.0,
+                102.5,  # oracle build: 0.5
+                200.0,
+                210.0,  # retrieval: 10.0
+                300.0,
+                301.0,  # seed 7: 1.0
+                400.0,
+                402.0,  # seed 8: 2.0
+                500.0,
+                503.0,  # seed 9: 3.0
+            ]
+        )
+        _test_hooks.monotonic_clock = lambda: next(ticks)
+        try:
+            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        finally:
+            _test_hooks.monotonic_clock = _test_hooks._default_monotonic_clock
+
+        named = {observation["name"]: observation["value"] for observation in observations}
+        assert named["base_serve_seconds"] == 2.0
+        assert named["retrieval_oracle_build_seconds"] == 0.5
+        assert named["retrieval_serve_seconds"] == 10.0
+        assert named["cartridge_serve_seconds"] == 2.0
+
+    def test_the_oracle_build_is_not_folded_into_the_retrieval_arm(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The two are adjacent in time and must stay separate in the record.
+
+        A single bracket around selection-plus-scoring would charge the
+        cartridge's competitor for an answer-aware search no real retriever
+        can run, which is the one way this comparison could be made dishonest
+        in retrieval's favour.
+        """
+        ticks = iter(
+            [
+                0.0,
+                1.0,  # base
+                1.0,
+                8.0,  # oracle build, deliberately large
+                10.0,
+                11.0,  # retrieval scoring, deliberately small
+                20.0,
+                21.0,
+                30.0,
+                31.0,
+                40.0,
+                41.0,
+            ]
+        )
+        _test_hooks.monotonic_clock = lambda: next(ticks)
+        try:
+            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        finally:
+            _test_hooks.monotonic_clock = _test_hooks._default_monotonic_clock
+
+        named = {observation["name"]: observation["value"] for observation in observations}
+        assert named["retrieval_serve_seconds"] == 1.0
+        assert named["retrieval_oracle_build_seconds"] == 7.0
+        # A single bracket from build-start to scoring-end would read 10.0.
+        assert named["retrieval_serve_seconds"] != 10.0
+
+
 class TestRunRecord:
     def test_it_carries_the_question_set_experiment(self, tmp_path: pathlib.Path) -> None:
         """Not the loss experiment's, so the two cannot be differenced."""
