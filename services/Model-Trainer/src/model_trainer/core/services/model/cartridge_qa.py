@@ -58,6 +58,7 @@ from model_trainer.core.contracts.paired_comparison import (
     summarise_pairs,
 )
 from model_trainer.core.encoding import Encoder
+from model_trainer.core.services.model.cartridge_retrieval import Bm25Index, retrieve
 from model_trainer.core.services.model.corpus_cloze import sentences
 from model_trainer.core.types import LogitsOutProto, ScoreableLMProto
 
@@ -226,6 +227,53 @@ def retrieval_items(
     return [
         with_evidence(
             item, evidence_for(item["answer"], documents), encoder, max_seq_len=max_seq_len
+        )
+        for item in items
+    ]
+
+
+def bm25_retrieval_items(
+    items: Sequence[ClozeItem],
+    index: Bm25Index,
+    encoder: Encoder,
+    *,
+    max_seq_len: int,
+) -> list[ClozeItem]:
+    """Build the REAL retrieval arm's item set, from the questions alone.
+
+    The counterpart to :func:`retrieval_items`. That one searches each item's
+    own answer and bounds what retrieval could ever do; this one searches the
+    question, gets some of them wrong, and is therefore the arm a cartridge
+    can lose to informatively.
+
+    THE BLANK MARKER IS REMOVED BEFORE QUERYING, and not because it currently
+    matters. ``<<BLANK>>`` yields the term ``blank``, which scores nothing
+    while no corpus sentence happens to contain that word -- and silently
+    starts retrieving on it the day one does. The marker is a rendering
+    artifact of how the item is posed, not part of what was asked.
+
+    Args:
+        items: The shared question set.
+        index: A BM25 index over the same training documents the oracle arm
+            draws its evidence from.
+        encoder: Tokenizer the scorer will use.
+        max_seq_len: The scorer's token budget.
+
+    Returns:
+        One item per input, each carrying what the retriever chose for it.
+
+    Raises:
+        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
+            when an item leaves no room for evidence. Not caught: a window
+            too small for the plan is a misconfiguration, and the real arm
+            refuses for the same reason the oracle arm does.
+    """
+    return [
+        with_evidence(
+            item,
+            retrieve(index, item["template"].replace(BLANK_MARKER, " ")),
+            encoder,
+            max_seq_len=max_seq_len,
         )
         for item in items
     ]
@@ -474,6 +522,7 @@ __all__ = [
     "answer_nll",
     "answer_nll_pairs",
     "answer_span",
+    "bm25_retrieval_items",
     "compare_arms",
     "evidence_budget_tokens",
     "evidence_for",

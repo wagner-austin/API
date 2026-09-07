@@ -72,6 +72,7 @@ from model_trainer.core.services.model.cartridge_plans import (
 )
 from model_trainer.core.services.model.cartridge_qa import (
     answer_nll_pairs,
+    bm25_retrieval_items,
     compare_arms,
     retrieval_items,
 )
@@ -80,6 +81,7 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     QaPlan,
     qa_plan_label,
 )
+from model_trainer.core.services.model.cartridge_retrieval import build_index
 from model_trainer.core.services.model.cloze.score import score_cloze_items
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.corpus_cloze import build_items
@@ -164,6 +166,9 @@ def latency_observations(
     retrieval_seconds: float,
     cartridge_seconds: float,
     retrieval_build_seconds: float,
+    real_seconds: float,
+    real_select_seconds: float,
+    real_index_seconds: float,
 ) -> tuple[Observation, ...]:
     """Name what each arm cost to SERVE, per pass over the question set.
 
@@ -195,6 +200,15 @@ def latency_observations(
             sum over however many seeds the plan happens to declare.
         retrieval_build_seconds: Assembling the oracle's evidence. Reported,
             not charged.
+        real_seconds: Scoring behind BM25-retrieved evidence.
+        real_select_seconds: Querying the index. CHARGED, unlike the oracle's
+            selection, because searching from the question is work every
+            deployment does per request. ``bm25_total_serve_seconds`` is the
+            sum, and it is the number to compare against the cartridge.
+        real_index_seconds: Building the index. Reported separately and NOT
+            in the total: a deployment pays it once when its corpus changes,
+            so charging it per query would overstate retrieval exactly as
+            charging the oracle's cheating would.
 
     Returns:
         The named durations.
@@ -206,6 +220,10 @@ def latency_observations(
             ("retrieval_serve_seconds", retrieval_seconds),
             ("cartridge_serve_seconds", cartridge_seconds),
             ("retrieval_oracle_build_seconds", retrieval_build_seconds),
+            ("bm25_serve_seconds", real_seconds),
+            ("bm25_select_seconds", real_select_seconds),
+            ("bm25_total_serve_seconds", real_seconds + real_select_seconds),
+            ("bm25_index_seconds", real_index_seconds),
         )
     )
 
@@ -295,6 +313,32 @@ def measure_qa_plan(
     )
     wait()
     retrieval_seconds = clock() - started
+
+    # THE REAL ARM. Indexing is timed apart from querying because a
+    # deployment pays them at different times -- the index is built once when
+    # the corpus changes, the query runs per request. Unlike the oracle's
+    # selection, the query time here IS chargeable: searching an index from
+    # the question is work every real retriever does.
+    started = clock()
+    index = build_index([training_text])
+    real_index_seconds = clock() - started
+
+    started = clock()
+    real_set = bm25_retrieval_items(items, index, encoder, max_seq_len=max_seq)
+    real_select_seconds = clock() - started
+
+    wait()
+    started = clock()
+    scored_real = score_cloze_items(
+        items=real_set,
+        model=base,
+        encoder=encoder,
+        device=device,
+        max_seq_len=max_seq,
+    )
+    wait()
+    real_seconds = clock() - started
+    _log.info("bm25 retrieval %.4f over %d chunks", scored_real["accuracy"], len(index["chunks"]))
     _log.info("base %.4f, retrieval %.4f", scored_base["accuracy"], scored_retrieval["accuracy"])
 
     accuracy_gains: list[tuple[int, float]] = []
@@ -343,6 +387,22 @@ def measure_qa_plan(
             value=scored_retrieval["accuracy"] - scored_base["accuracy"],
         ),
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
+        Observation(name="bm25_accuracy", value=scored_real["accuracy"]),
+        Observation(
+            name="bm25_accuracy_gain",
+            value=scored_real["accuracy"] - scored_base["accuracy"],
+        ),
+        Observation(
+            name="base_to_bm25_p_value",
+            value=compare_arms(scored_base, scored_real)["p_value"],
+        ),
+        # The gap the oracle arm exists to bound: how much of retrieval's
+        # advantage is the retriever finding the right sentences, and how
+        # much is knowing the answer outright.
+        Observation(
+            name="oracle_over_bm25_accuracy",
+            value=scored_retrieval["accuracy"] - scored_real["accuracy"],
+        ),
     ]
     observations.extend(gain_observations(replicate("cartridge-accuracy-gain", accuracy_gains)))
     observations.extend(gain_observations(replicate("cartridge-answer-nll-gain", nll_gains)))
@@ -352,6 +412,9 @@ def measure_qa_plan(
             retrieval_seconds=retrieval_seconds,
             cartridge_seconds=cartridge_seconds_total / float(len(plan["seeds"])),
             retrieval_build_seconds=retrieval_build_seconds,
+            real_seconds=real_seconds,
+            real_select_seconds=real_select_seconds,
+            real_index_seconds=real_index_seconds,
         )
     )
     return tuple(observations), digest

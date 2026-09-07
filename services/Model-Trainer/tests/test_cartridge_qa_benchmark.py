@@ -282,12 +282,15 @@ class TestMeasureQaPlan:
 
 
 class TestLatencyObservations:
-    def test_it_names_all_four_including_the_one_it_excludes(self) -> None:
-        """The oracle's build time is RECORDED, not silently dropped.
+    def test_it_names_every_arm_including_the_costs_it_excludes(self) -> None:
+        """Two costs are recorded and left OUT of their arm's total, for
+        opposite reasons, and the record has to show both.
 
-        Leaving it out would hide that the step happened at all; charging it
-        to retrieval would invent a cost no real pipeline pays. It is named
-        so the reader sees both the number and the argument.
+        The oracle's build is excluded because it cheats -- no real pipeline
+        pays it. The BM25 index build is excluded because it is OFFLINE -- a
+        deployment pays it once per corpus change, not per query. The BM25
+        SELECT is the one selection cost that is charged, because searching
+        from the question is what every real retriever does per request.
         """
         named = {
             observation["name"]: observation["value"]
@@ -296,6 +299,9 @@ class TestLatencyObservations:
                 retrieval_seconds=10.0,
                 cartridge_seconds=3.0,
                 retrieval_build_seconds=0.5,
+                real_seconds=7.0,
+                real_select_seconds=1.0,
+                real_index_seconds=0.25,
             )
         }
 
@@ -304,7 +310,29 @@ class TestLatencyObservations:
             "retrieval_serve_seconds": 10.0,
             "cartridge_serve_seconds": 3.0,
             "retrieval_oracle_build_seconds": 0.5,
+            "bm25_serve_seconds": 7.0,
+            "bm25_select_seconds": 1.0,
+            "bm25_total_serve_seconds": 8.0,
+            "bm25_index_seconds": 0.25,
         }
+
+    def test_the_bm25_total_charges_selection_and_not_indexing(self) -> None:
+        """The asymmetry is the whole design, so it is asserted directly."""
+        named = {
+            observation["name"]: observation["value"]
+            for observation in bench.latency_observations(
+                base_seconds=1.0,
+                retrieval_seconds=1.0,
+                cartridge_seconds=1.0,
+                retrieval_build_seconds=1.0,
+                real_seconds=7.0,
+                real_select_seconds=1.0,
+                real_index_seconds=100.0,
+            )
+        }
+
+        assert named["bm25_total_serve_seconds"] == 8.0
+        assert named["bm25_index_seconds"] == 100.0
 
 
 class TestServeLatency:
@@ -324,7 +352,13 @@ class TestServeLatency:
                 102.0,
                 102.5,  # oracle build: 0.5
                 200.0,
-                210.0,  # retrieval: 10.0
+                210.0,  # oracle retrieval: 10.0
+                210.0,
+                210.25,  # bm25 index: 0.25
+                211.0,
+                212.0,  # bm25 select: 1.0
+                220.0,
+                227.0,  # bm25 scoring: 7.0
                 300.0,
                 301.0,  # seed 7: 1.0
                 400.0,
@@ -343,6 +377,10 @@ class TestServeLatency:
         assert named["base_serve_seconds"] == 2.0
         assert named["retrieval_oracle_build_seconds"] == 0.5
         assert named["retrieval_serve_seconds"] == 10.0
+        assert named["bm25_index_seconds"] == 0.25
+        assert named["bm25_select_seconds"] == 1.0
+        assert named["bm25_serve_seconds"] == 7.0
+        assert named["bm25_total_serve_seconds"] == 8.0
         assert named["cartridge_serve_seconds"] == 2.0
 
     def test_the_oracle_build_is_not_folded_into_the_retrieval_arm(
@@ -362,7 +400,13 @@ class TestServeLatency:
                 1.0,
                 8.0,  # oracle build, deliberately large
                 10.0,
-                11.0,  # retrieval scoring, deliberately small
+                11.0,  # oracle scoring, deliberately small
+                11.0,
+                12.0,  # bm25 index
+                12.0,
+                13.0,  # bm25 select
+                13.0,
+                14.0,  # bm25 scoring
                 20.0,
                 21.0,
                 30.0,
