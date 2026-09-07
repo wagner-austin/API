@@ -46,6 +46,21 @@ class LoadHubModelProto(Protocol):
         ...
 
 
+class LoadRunModelProto(Protocol):
+    """Protocol for loading a TRAINED run from its saved artifact.
+
+    Distinct from :class:`LoadHubModelProto` by what it asserts rather than
+    by where it reads: a hub load is defined by having nothing applied, and
+    reports no strategy. This one reads the artifact's metadata and reapplies
+    the finetuning strategy that produced it, so the record it feeds names
+    that strategy instead of claiming there was none.
+    """
+
+    def __call__(self, artifact_path: str, /) -> PreparedLMModel:
+        """Load the trained model the artifact directory holds."""
+        ...
+
+
 class LoadContinuationArmProto(Protocol):
     """Protocol for loading one arm of a continuation sweep.
 
@@ -272,6 +287,30 @@ def _default_load_hub_model(hub_model_id: str, /) -> PreparedLMModel:
     return load_prepared_hf_lm_from_hub(hub_model_id)
 
 
+def _default_load_run_model(artifact_path: str, /) -> PreparedLMModel:
+    """Production trained-run loader - used as default hook.
+
+    Imported inside the function for the reason the hub loader is: importing
+    this module must not pull torch into a process that only wanted to parse
+    a command line and print a usage error.
+
+    Args:
+        artifact_path: Directory holding a finished run's saved model and its
+            metadata.
+
+    Returns:
+        The prepared model, with its own finetuning strategy reapplied and
+        named.
+    """
+    from model_trainer.core.services.model.backends.hf_lm.io import (
+        load_prepared_hf_lm_from_handle,
+    )
+
+    # The tokenizer parameter is accepted for protocol compatibility and
+    # unused: an HF LM's tokenizer comes from the hub id in its metadata.
+    return load_prepared_hf_lm_from_handle(artifact_path, None)
+
+
 def _default_score_cloze(
     *,
     items: list[ClozeItem],
@@ -429,6 +468,8 @@ def _default_read_corpus_documents(corpus_dir: Path, /) -> tuple[str, ...]:
 
 load_hub_model: LoadHubModelProto = _default_load_hub_model
 
+load_run_model: LoadRunModelProto = _default_load_run_model
+
 load_continuation_arm: LoadContinuationArmProto = _default_load_continuation_arm
 
 generate_continuation_batch: GenerateContinuationBatchProto = _default_generate_continuation_batch
@@ -452,6 +493,7 @@ __all__ = [
     "GenerateContinuationBatchProto",
     "LoadContinuationArmProto",
     "LoadHubModelProto",
+    "LoadRunModelProto",
     "ReadCorpusDocumentsProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
@@ -460,6 +502,7 @@ __all__ = [
     "generate_continuation_batch",
     "load_continuation_arm",
     "load_hub_model",
+    "load_run_model",
     "pin_torch_threads",
     "read_corpus_documents",
     "run_benchmark_child",
