@@ -112,6 +112,14 @@ final class AiCadence {
             java.util.Collection<?> roster = held == null ? null : ObjectView.containedValues(held);
             out.append(" team=")
                     .append(EngineAccess.readIntField(team, EngineNames.TEAM_ID))
+                    // Credits per tick, because the traced pair's FIRST
+                    // divergence is the rival's worth moving 100 credits one
+                    // sample apart with every stream still in lockstep -- a
+                    // deterministic build decision on an input that differs.
+                    // The tick where the balances part, and by how much,
+                    // names the purchase (wiki log 2026-09-07).
+                    .append(" cr=")
+                    .append((long) EngineAccess.readDoubleField(team, EngineNames.CREDITS))
                     .append(" bm=")
                     .append(roster == null ? "?" : Integer.valueOf(roster.size()));
             if (roster == null) {
@@ -214,6 +222,8 @@ final class AiCadence {
             java.util.Collection<?> roster = held == null ? null : ObjectView.containedValues(held);
             out.append(" | team=")
                     .append(EngineAccess.readIntField(team, EngineNames.TEAM_ID))
+                    .append(" cr=")
+                    .append((long) EngineAccess.readDoubleField(team, EngineNames.CREDITS))
                     .append(" aT=")
                     .append(EngineAccess.readFloatField(team, EngineNames.AI_CLOCK_BASE_GROUP))
                     .append(" aU=")

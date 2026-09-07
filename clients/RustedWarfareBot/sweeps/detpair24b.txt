@@ -1,0 +1,33 @@
+# The noise floor re-priced under the routing weaves ([[policy-determinism]]
+# 2026-09-06/07): detpair24 measured sd 1,205 BEFORE the sway and
+# effect-jitter draws left the sim stream and before the ledger's own
+# draw was deleted. Same design, fresh seeds, current agent: 12
+# identical-doctrine pairs, difficulty 3. If the tails shrank, every
+# screen at this rung gets cheaper without bit-determinism.
+# Seeds 8801001-8805577.
+#
+# label | seed | doctrine | samples
+stand|8801001|doctrines/evolve3-g3m10.doctrine|10000
+twin|8801001|doctrines/det-twin.doctrine|10000
+stand|8801417|doctrines/evolve3-g3m10.doctrine|10000
+twin|8801417|doctrines/det-twin.doctrine|10000
+stand|8801833|doctrines/evolve3-g3m10.doctrine|10000
+twin|8801833|doctrines/det-twin.doctrine|10000
+stand|8802249|doctrines/evolve3-g3m10.doctrine|10000
+twin|8802249|doctrines/det-twin.doctrine|10000
+stand|8802665|doctrines/evolve3-g3m10.doctrine|10000
+twin|8802665|doctrines/det-twin.doctrine|10000
+stand|8803081|doctrines/evolve3-g3m10.doctrine|10000
+twin|8803081|doctrines/det-twin.doctrine|10000
+stand|8803497|doctrines/evolve3-g3m10.doctrine|10000
+twin|8803497|doctrines/det-twin.doctrine|10000
+stand|8803913|doctrines/evolve3-g3m10.doctrine|10000
+twin|8803913|doctrines/det-twin.doctrine|10000
+stand|8804329|doctrines/evolve3-g3m10.doctrine|10000
+twin|8804329|doctrines/det-twin.doctrine|10000
+stand|8804745|doctrines/evolve3-g3m10.doctrine|10000
+twin|8804745|doctrines/det-twin.doctrine|10000
+stand|8805161|doctrines/evolve3-g3m10.doctrine|10000
+twin|8805161|doctrines/det-twin.doctrine|10000
+stand|8805577|doctrines/evolve3-g3m10.doctrine|10000
+twin|8805577|doctrines/det-twin.doctrine|10000
