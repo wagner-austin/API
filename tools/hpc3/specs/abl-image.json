@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "09f5a4bb33544163dc2f4bfa8fb2daf332213066",
+  "git_commit": "042fad855fc2fb8923317a44edceabfd680febda",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -407,6 +407,18 @@
     {
       "module": "model_trainer.core.services.finetuning.strategies.cartridge_slots",
       "attribute": "compute_dtype"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_headroom",
+      "attribute": "main"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_headroom",
+      "attribute": "measure_headroom"
+    },
+    {
+      "module": "model_trainer.core.services.model.cartridge_scoring",
+      "attribute": "base_loss"
     }
   ],
   "smoke_commands": [
@@ -453,7 +465,8 @@
     "/opt/env/bin/python -c \"from model_trainer.core.compute import device_selector as d; assert not hasattr(d, 'recommended_batch_size_for'), 'the silent batch-size override is back in this image'\"",
     "/opt/env/bin/python -c \"from model_trainer.cluster.preflight import check_model_available; from platform_core.errors import AppError, ModelTrainerErrorCode; import tempfile, os; d = tempfile.mkdtemp(); ok = os.path.join(d, 'm'); os.mkdir(ok); open(os.path.join(ok, 'config.json'), 'w').write('{\\\"model_type\\\": \\\"gpt2\\\"}'); check_model_available(ok); raised = None\ntry:\n    check_model_available(os.path.join(d, 'absent'))\nexcept AppError as e:\n    raised = e.code\nassert raised is ModelTrainerErrorCode.MODEL_NOT_FOUND, raised\"",
     "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_lora_policy import LORA_TARGET_MODULES, NEOX_TARGET_MODULES, PYTHIA_7B_QUANTIZATION, quantization_for, target_modules_for; assert target_modules_for('gpt2-xl') == LORA_TARGET_MODULES == ('c_attn',); assert target_modules_for('EleutherAI/pythia-6.9b') == NEOX_TARGET_MODULES == ('query_key_value',); assert quantization_for('gpt2') is None and quantization_for('gpt2-xl') is None, 'every fp32 record depends on the gpt2 family loading unquantized'; q = quantization_for('EleutherAI/pythia-6.9b'); assert q == PYTHIA_7B_QUANTIZATION and q['load_in_4bit'] and not q['load_in_8bit'] and q['bnb_4bit_quant_type'] == 'nf4' and q['bnb_4bit_compute_dtype'] == 'bfloat16' and q['bnb_4bit_use_double_quant'], q; from model_trainer.core.services.model.cartridge_pool_plans import BASE_LORA_SWEEP_PLANS, CONTENT_LORA_SWEEP_PLANS; pb = BASE_LORA_SWEEP_PLANS['pythia-6.9b-base-lora']; assert pb['model_id'] == 'EleutherAI/pythia-6.9b' and dict(pb, model_id='gpt2-xl') == BASE_LORA_SWEEP_PLANS['gpt2-xl-base-lora'], 'the 7B rung must differ only in the base'; assert CONTENT_LORA_SWEEP_PLANS['pythia-6.9b-content-lora'] == pb, 'the 7B pair must isolate exactly the objective'\"",
-    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots; g = {'num_layers': 1, 'num_kv_heads': 2, 'num_slots': 3, 'head_dim': 4}; k = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; v = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; s = CartridgeSlots(geometry=g, keys=k, values=v); bk, bv = s.layer_blocks(0, batch_size=2, dtype=torch.bfloat16); assert bk.dtype == torch.bfloat16 == bv.dtype, 'the boundary cast did not take'; assert k[0].dtype == torch.float32, 'masters must stay fp32'; fk, fv = s.layer_blocks(0, batch_size=2, dtype=torch.float32); assert fk.data_ptr() == k[0].data_ptr() and fv.data_ptr() == v[0].data_ptr(), 'the fp32 request must be the identity view, or every fp32 record changed'; grad = torch.autograd.grad(bk.float().sum(), [k[0]])[0]; assert grad.dtype == torch.float32, 'gradients must return to the fp32 masters'\""
+    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots; g = {'num_layers': 1, 'num_kv_heads': 2, 'num_slots': 3, 'head_dim': 4}; k = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; v = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; s = CartridgeSlots(geometry=g, keys=k, values=v); bk, bv = s.layer_blocks(0, batch_size=2, dtype=torch.bfloat16); assert bk.dtype == torch.bfloat16 == bv.dtype, 'the boundary cast did not take'; assert k[0].dtype == torch.float32, 'masters must stay fp32'; fk, fv = s.layer_blocks(0, batch_size=2, dtype=torch.float32); assert fk.data_ptr() == k[0].data_ptr() and fv.data_ptr() == v[0].data_ptr(), 'the fp32 request must be the identity view, or every fp32 record changed'; grad = torch.autograd.grad(bk.float().sum(), [k[0]])[0]; assert grad.dtype == torch.float32, 'gradients must return to the fp32 masters'\"",
+    "/opt/env/bin/python -c \"import pathlib; from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME, HEADROOM_EXPERIMENT, MEASURED_BASES, base_short, headroom_label; assert HEADROOM_EXPERIMENT == 'cartridge-headroom'; assert MEASURED_BASES == ('gpt2', 'gpt2-medium', 'gpt2-xl', 'EleutherAI/pythia-6.9b'), 'the headroom rows must cover exactly the measured ladder'; from model_trainer.core.services.model.cartridge_pool_plans import BASE_LORA_SWEEP_PLANS; row = BASE_LORA_SWEEP_PLANS[GEOMETRY_PLAN_NAME]; assert row['window'] == 256 and row['held_out_stride'] == 4, 'the headroom split must be the recorded split'; assert base_short('EleutherAI/pythia-6.9b') == 'pythia-6.9b' and base_short('gpt2-xl') == 'gpt2-xl'; assert headroom_label(bases=MEASURED_BASES, corpora=[pathlib.Path('a')], window=256, held_out_stride=4, digest='0' * 12) == 'cartridge-headroom-w256-s4-b4-c1-000000000000'; from model_trainer.core.services.model.cartridge_scoring import base_loss\""
   ],
   "labels": {
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"
