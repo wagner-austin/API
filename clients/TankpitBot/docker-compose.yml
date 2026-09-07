@@ -91,6 +91,14 @@ services:
       - ./.env:/app/.env:ro
     # N Chromiums, not one: the single-bot 1gb floor scaled up.
     shm_size: "2gb"
+    # A soft FLOOR, not a cap: under VM-wide memory pressure the
+    # kernel reclaims from unreserved containers first. Demo-1 died
+    # 2026-09-05 18:37 with malloc ENOMEM at ~800MB of its own usage
+    # while an MCPs 36-container deploy consumed the shared 14GB
+    # Docker VM around it — the fleet was the victim, so a mem_limit
+    # (a cap on the victim) is the wrong tool. Sized to roughly two
+    # streaming children (Chromium + Xvfb + ffmpeg ≈ 800MB each).
+    mem_reservation: "2gb"
     # docker stop must be a DRAIN, not a kill: SIGTERM starts the
     # teardown-to-lobby for every bot and the manager exits after the
     # last one lands. Killing a tank mid-game is how rank gets lost,
