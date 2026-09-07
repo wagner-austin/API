@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "cartridge-solo-seeds-xl-a30-v45-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v45/abl.sif",
+    "sha256": "567cb42d80ed021a56a62d45092184648662e4d6cad1d1ec888bd2e39c483fb1",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 600,
+  "mem_gb": 64,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_solo_seeds --model-id gpt2-xl --corpus /pub/wagnera3/mi/cartridge/corpus-me --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-xl-a30-v45-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-xl-a30-v45-twin.json",
+  "experiment": {
+    "measurement": "cartridge-solo-seeds",
+    "base_model": "gpt2-xl",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "seeds": "7.8.9.10.11.12.13.14.15",
+    "geometry": "w256-s4-c64-e12-lr0.01-from-the-recorded-gpt2-base-lora-row",
+    "image_commit": "4fc8dfbbfe0b70b547ad78635a284c5e4c592e94",
+    "baseline_record": "254d0126-7b-invariance-per-seed-rows-the-variance-this-denominates",
+    "why": "bit-identity-certificate",
+    "gpu_pinned_because": "the-7b-rows-must-match-the-recorded-a30-card-and-xl-control-stays-card-matched-to-them"
+  },
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  }
+}
