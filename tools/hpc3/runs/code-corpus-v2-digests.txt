@@ -24,10 +24,32 @@
 #   excluded       1 generated, 132 duplicate, 38 empty
 #   tokens approx  7,395,107 train, 3,315,732 holdout
 #
-# WHY THE HOLDOUT GREW. Termination is the only v1 comparison with power behind
-# it and a directional signal: 33% discordant, base finished 134/226 against
-# candidate 121/226, net -13, mid-p 0.135. Power 0.37 at n=226, 0.89 at n=800.
-# Guard-pass, at 5.6% discordant, is 0.21 and no amount of tuning rescues it.
+# WHY THE HOLDOUT GREW -- AND THE FIGURES THIS PARAGRAPH ORIGINALLY GAVE WERE
+# WRONG. It read: "33% discordant, base finished 134/226 against candidate
+# 121/226, net -13, mid-p 0.135. Power 0.37 at n=226, 0.89 at n=800." Not one
+# of those numbers matches the data. Recomputed 2026-09-07 from the v1
+# generation manifests, and confirmed three ways -- the manifests, an
+# independent count of `"finished":true`, and the arms' own RunRecords, which
+# all agree:
+#
+#   v1  base      132/226 = 0.5841     (not 134)
+#       candidate 108/226 = 0.4779     (not 121)
+#       paired difference -0.1062, -24 items   (not -13)
+#       discordant 82/226 = 0.3628     (not 0.33)
+#       McNemar mid-p two-sided 0.0080 (not 0.135)
+#
+# So v1 was ALREADY significant at p = 0.008, and the stated motive for this
+# re-emission -- "underpowered, needs n=800" -- was false when it was written.
+# The holdout growth is not thereby wasted, because the OTHER reason stands on
+# its own and is the one that actually required a re-run: v1 was emitted from
+# two dirty repositories and its own stage document records "not_citable". A
+# significant result you cannot reproduce is not a result. That is why v2
+# exists; "more power" was a mistaken bonus, not the reason.
+#
+# The guard-pass figure the original paragraph gave (5.6% discordant, power
+# 0.21) has NOT been re-verified and must not be relied on until it is. It came
+# from the same working that produced the wrong termination numbers. Scoring
+# guard-pass requires a separate off-cluster pass over the generated files.
 #
 # The larger holdout cost NO training data. Both repositories grew roughly 30%
 # between v1 and v2 (4,436 files to 5,791), so 3,996 train files here against
