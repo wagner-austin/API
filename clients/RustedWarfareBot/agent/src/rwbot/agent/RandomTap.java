@@ -197,16 +197,39 @@ final class RandomTap {
         private void record() {
             StackTraceElement[] stack = Thread.currentThread().getStackTrace();
             String site = "unattributed";
-            for (StackTraceElement element : stack) {
-                String name = element.getClassName();
+            int matched = -1;
+            for (int i = 0; i < stack.length; i++) {
+                String name = stack[i].getClassName();
                 // The helper class that owns the generator is skipped: every
                 // draw passes through it, so it names nothing.
                 if (name.startsWith(ENGINE_PREFIX)
                         && !name.equals(EngineNames.RANDOM_HOLDER_CLASS)) {
                     site = name.substring(ENGINE_PREFIX.length())
-                            + "." + element.getMethodName() + ":" + element.getLineNumber();
+                            + "." + stack[i].getMethodName() + ":" + stack[i].getLineNumber();
+                    matched = i;
                     break;
                 }
+            }
+            // When frames sit BETWEEN the matched engine frame and the
+            // generator that are neither the holder, this tap, nor the JDK,
+            // the engine frame is a dispatcher running someone else's code --
+            // the pre-tick queue's one-per-call drain executing a posted
+            // runnable is the measured case -- and collapsing the tally onto
+            // the dispatcher hid WHOSE runnable drew (wiki log 2026-09-06,
+            // the producer hunt). The deepest such frame names the actual
+            // drawer, appended so existing readers' site keys stay a prefix.
+            for (int i = 1; i < matched; i++) {
+                String name = stack[i].getClassName();
+                if (name.equals(EngineNames.RANDOM_HOLDER_CLASS)
+                        || name.startsWith("java.")
+                        || name.startsWith("rwbot.agent.RandomTap")
+                        || name.startsWith("rwbot.agent.SplitRandom")
+                        || name.startsWith("rwbot.agent.EngineRandom")) {
+                    continue;
+                }
+                site = site + "<-" + name + "." + stack[i].getMethodName()
+                        + ":" + stack[i].getLineNumber();
+                break;
             }
             // The thread is part of the name: a second thread sharing the
             // sim's stream is exactly the suspect this tap exists to catch

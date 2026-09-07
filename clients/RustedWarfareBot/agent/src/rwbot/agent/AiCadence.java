@@ -74,6 +74,30 @@ final class AiCadence {
         // on that tick is its mechanism -- the pinpoint the sample cadence
         // structurally cannot give.
         out.append(' ').append(RandomLedger.describe());
+        // The pre-tick queue's pending runnables, by class. The one-per-call
+        // drain at the engine's i.b:2271 executes whatever a producer thread
+        // managed to enqueue before this tick's boundary -- an OS race the
+        // pinned delta cannot reach -- and the math draws the tap attributes
+        // to that line happen INSIDE those runnables. Logging the queue's
+        // contents per tick names the racer by its class the moment it
+        // arrives (wiki log 2026-09-06, the pinpoint entry).
+        Object queue = EngineAccess.readField(engine, EngineNames.PRETICK_QUEUE);
+        java.util.Collection<?> pending = queue == null ? null : ObjectView.containedValues(queue);
+        out.append(" k=[");
+        if (pending != null) {
+            boolean first = true;
+            for (Object runnable : pending) {
+                if (runnable == null) {
+                    continue;
+                }
+                if (!first) {
+                    out.append(',');
+                }
+                first = false;
+                out.append(runnable.getClass().getName());
+            }
+        }
+        out.append(']');
         Class<?> teams = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
         Class<?> ai = EngineAccess.pinnedClass(EngineNames.AI_CLASS);
         java.lang.reflect.Method lookup =

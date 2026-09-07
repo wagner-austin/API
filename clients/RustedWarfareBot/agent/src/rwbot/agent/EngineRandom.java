@@ -132,9 +132,19 @@ final class EngineRandom {
     /**
      * The JVM-global generator behind {@link Math#random()}.
      *
-     * <p>The holder is initialised on first use, so {@link Math#random()} is
-     * called once before the field is read -- reading it beforehand would find
-     * the class uninitialised and construct nothing to reach.
+     * <p><b>Reached without drawing, and that wording is a correction paid
+     * for in contaminated measurements.</b> This method used to call
+     * {@link Math#random()} first "so the holder is initialised before the
+     * field is read" -- one draw from the very stream every caller was
+     * trying to OBSERVE, on every call. The ledger's per-sample state line
+     * paid it invisibly for weeks (deterministic cadence, so twins agreed),
+     * and the per-tick pinpoint probe multiplied it 75-fold and measured
+     * its own draws as the engine's (wiki log, the 2026-09-07 correction
+     * entry; the extended tap named {@code RandomLedger.describe:47} from
+     * the live stack). The {@code Class.forName} below already initialises
+     * the holder -- {@code initialize} defaults to true and the holder's
+     * static init constructs the generator without drawing -- so the draw
+     * bought nothing the reflection did not already have.
      *
      * @return The live generator instance.
      * @throws IllegalStateException When the holder cannot be reached, which on
@@ -143,7 +153,6 @@ final class EngineRandom {
      *     generator reads as a reproducible run that is not one.
      */
     static Random mathGenerator() {
-        Math.random();
         Object generator;
         try {
             java.lang.reflect.Field field =
