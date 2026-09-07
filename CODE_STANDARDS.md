@@ -21,6 +21,18 @@ no `Makefile`, no guard, no coverage gate. A diff in those four is reviewed
 against this file's judgment section alone, and nothing mechanical is implied
 about it. Do not read a clean review of that code as a checked one.
 
+**And the harness is Python-shaped while the repo is not.** Everything in the
+next section describes Python. `libs/cleargbm_rs` is a Rust crate — its
+`[tool.coverage.run] source` is `["scripts"]` alone, which is correct rather
+than a carve-out, because its `src/` is `.rs` and the crate carries its own
+Rust coverage beside it (`RustCoverageRule`, `RustTestRule`,
+`RustExplicitMatchRule` and `RustProptestRule` are what hold that half).
+`services/grandma-api/web` is TypeScript and answers to none of it. A rubric
+that said "100% branches" without saying "Python packages" would be the
+vacuous-green shape one level up: it would read as covering surfaces it never
+measured. That distinction is `opus-corpus-docmode-0901`'s, sent 2026-09-07
+while this file was being written.
+
 ## What this is NOT
 
 It is not a second linter, and in this repo that is not a hedge — it is a
@@ -39,7 +51,11 @@ measurement. Every one of the 48 packages runs, at `make check`:
   `typing.Any`, `typing.cast` and `typing.TypeAlias` banned outright at the
   import.
 - **pytest with coverage at `fail_under = 100`**, branch coverage on, over
-  `src` and `scripts`.
+  `src` and `scripts` (47 of 48; `libs/cleargbm_rs` is `scripts` alone for the
+  reason above). **And there are no carve-outs**: measured 2026-09-07, zero
+  `exclude_lines` and zero non-empty `omit` anywhere in first-party code, so
+  the 100% is over everything rather than over what was left after exclusions.
+  That is worth knowing before you read a coverage number here as soft.
 
 **So do not re-report what that already refuses.** A finding of "uses `Any`",
 "mocks a dependency", "weak assertion", "missing `__all__` entry", "file over
