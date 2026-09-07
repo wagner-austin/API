@@ -1,0 +1,15 @@
+{
+  "run_id": "code-style-qlora-qwen-v2",
+  "arm": "base",
+  "artifact_path": "/pub/wagnera3/code-style/adapters/code-style-qlora-qwen-v2",
+  "holdout_path": "/pub/wagnera3/code-style/corpora/code-corpus-v2.holdout.jsonl",
+  "prompt_lines": 20,
+  "max_new_tokens": 1536,
+  "max_prompt_tokens": 1024,
+  "batch_size": 32,
+  "repetition_penalty": 1.1,
+  "seed": 0,
+  "device": "cuda",
+  "experiment": "code-style-guard-pass",
+  "label": "qwen2.5-coder-1.5b-qlora-v2-base"
+}

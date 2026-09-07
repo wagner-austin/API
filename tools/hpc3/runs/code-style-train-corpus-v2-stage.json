@@ -1,0 +1,22 @@
+{
+  "destination": "/pub/wagnera3/code-style/train-corpora",
+  "provenance": {
+    "corpus": "code-corpus-v2, this monorepo's own Python plus the MCPs repo, read as documents",
+    "emitter": "tools/code-corpus, code-corpus-v2.jsonl.manifest.json",
+    "source_repos": "api 59beb485 (clean), mcp 782dd897 (clean)",
+    "citable": "Both source repositories were CLEAN at emission and the emitter's require_reproducible_pins refuses otherwise, so this corpus is reproducible from the two recorded commits alone. v1 was not: it was emitted dirty and its own stage document says so.",
+    "split": "seed 0, holdout_fraction 0.31, 3996 train files and 1795 holdout files. The fraction rose from v1's 0.1 to reach n~800 scored in both arms, which is where the termination comparison reaches 0.89 power. Because the repos grew ~30% since v1, the train set is UNCHANGED in size (3996 against 3993) -- the larger holdout cost no training data.",
+    "selection": "1 generated file, 132 duplicates and 38 empty files excluded; the duplicate check is by content, which matters here because scripts/guard.py is byte-identical across all 41 packages",
+    "tokens_approx": "7,395,107 train and 3,315,732 holdout",
+    "named_by_digest": "The train corpus is staged under its own sha256 because model_trainer.cluster.stores.StagedCorpus resolves corpus_dir/<file_id> and the file id IS the digest",
+    "replicates": "code-style-qlora-qwen-v1 at larger holdout. v1 remains on disk and reproducible-as-run, but is not CITABLE: both its source repos were dirty at emission. This is a replication, not an extension -- split_holdout resamples rather than nests, so 86 of v1's holdout items are v2 training items. 357 of v1's 443 (81%) remain held out, which leaves a per-item secondary comparison available if wanted.",
+    "why_v2": "Termination is the only comparison with power behind it AND a directional signal: 33% discordant, base finished 134/226 against candidate 121/226, net -13, mid-p 0.135 -- the fine-tune appears to make the model ramble more. Power 0.37 at n=226 against 0.89 at n=800. Guard-pass at 5.6% discordant is 0.21 and cannot be rescued by tuning."
+  },
+  "files": [
+    {
+      "name": "801a782087805858ab10aa8b264c96adb0a80049f53ae38fcfae22c3bd2738f4",
+      "sha256": "801a782087805858ab10aa8b264c96adb0a80049f53ae38fcfae22c3bd2738f4",
+      "size_bytes": 32205158
+    }
+  ]
+}

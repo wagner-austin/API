@@ -33,6 +33,11 @@ from hpc3.contracts.run import resolve_run
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
+from hpc3.core.inputs import (
+    declared_inputs,
+    present_on_cluster,
+    require_inputs_present,
+)
 from hpc3.core.submit import submit
 
 _FLAGS = (_config.CONFIG_FLAG, "--run")
@@ -83,6 +88,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     raw = core_hooks.read_bytes(run_path).decode("utf-8")
     spec = resolve_run(workspace, load_json_str(raw))
+
+    # The scheduler can say whether this would be ADMITTED; it cannot say
+    # whether the files the command reads are there. Job 55806418 was admitted
+    # with a clean preflight and died fourteen seconds later on an absent
+    # payload -- staged corpora, unstaged payload, and nothing between the two
+    # that asked. This is that question, asked before a job id exists.
+    require_inputs_present(
+        spec["command"], present_on_cluster(workspace["host"], declared_inputs(spec["command"]))
+    )
 
     # The cap is the project's, not this invocation's. A per-command budget is
     # a budget that is whatever the last person typed; a per-project one is a

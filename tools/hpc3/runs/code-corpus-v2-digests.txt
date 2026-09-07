@@ -1,0 +1,52 @@
+# Certified corpus digests: code-corpus-v2
+#
+# The record this corpus is anchored to. Its value is not that it verifies the
+# first staging -- nothing can, for bytes never published before -- but that
+# every later stage must match it, so a corpus regenerated from a different
+# source state is refused rather than silently trained on.
+#
+# WHAT MAKES v2 CITABLE AND v1 NOT. Both source repositories were CLEAN at
+# emission, so the two commits below reproduce the corpus on their own. v1 was
+# emitted with both repositories dirty; its own stage document records
+# "not_citable" and says no run built on it is citable until re-emitted clean.
+# This is that re-emission. The emitter now REFUSES a dirty emission outright
+# (code_corpus.core.select.require_reproducible_pins), so the shortcut v1 took
+# is no longer available to anyone.
+#
+# Emitted 2026-09-07 from local clones of both repositories at the commits
+# below, cloned rather than archived because `git archive` extracts carry no
+# .git and so cannot be pinned at all.
+#
+#   emitter        tools/code-corpus, code-corpus-emit
+#   seed           0
+#   holdout        0.31   (v1 used 0.10)
+#   kept           5,791 files -- 3,996 train, 1,795 holdout
+#   excluded       1 generated, 132 duplicate, 38 empty
+#   tokens approx  7,395,107 train, 3,315,732 holdout
+#
+# WHY THE HOLDOUT GREW. Termination is the only v1 comparison with power behind
+# it and a directional signal: 33% discordant, base finished 134/226 against
+# candidate 121/226, net -13, mid-p 0.135. Power 0.37 at n=226, 0.89 at n=800.
+# Guard-pass, at 5.6% discordant, is 0.21 and no amount of tuning rescues it.
+#
+# The larger holdout cost NO training data. Both repositories grew roughly 30%
+# between v1 and v2 (4,436 files to 5,791), so 3,996 train files here against
+# v1's 3,993. The 23% cut that was the stated risk of this design did not occur.
+
+source_repos:
+  api  59beb485493bd291657d678c3fbd0d79d57773cd  clean
+  mcp  782dd897e66481d7b0c9660785f0e1e919113658  clean
+
+train    code-corpus-v2.jsonl
+         801a782087805858ab10aa8b264c96adb0a80049f53ae38fcfae22c3bd2738f4
+         32,205,158 bytes
+         Staged under its digest, because
+         model_trainer.cluster.stores.StagedCorpus resolves corpus_dir/<file_id>
+         and the file id IS the digest.
+
+holdout  code-corpus-v2.holdout.jsonl
+         5c1697e2fe06d8a5819fdb0348031f242b6609d029c9263405337fad27709e20
+         14,445,021 bytes
+         Read by modeltrainer-continuations by PATH rather than by digest -- the
+         sweep document names it, so it is not addressed by content the way the
+         training corpus is.
