@@ -174,10 +174,40 @@ class TestStageCli:
         fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
 
         assert stage_cli.main(_stage_args(tmp_path)) == 0
-        assert emitted[-2:] == [
+        assert emitted[-3:] == [
             "staged /pub/wagnera3/corpora/armB.txt",
             "verified 1 file(s) on hpc3:/pub/wagnera3/corpora",
+            "certified by /pub/wagnera3/corpora/m-digests.txt",
         ]
+
+    def test_the_verified_count_excludes_the_certification_record(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The record is written, never read back. Counting it would inflate
+        a number whose whole meaning is how many files were proven."""
+        write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
+        _write_json(tmp_path / "m.json", _stage_manifest())
+        fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
+
+        stage_cli.main(_stage_args(tmp_path))
+
+        assert "verified 1 file(s) on hpc3:/pub/wagnera3/corpora" in emitted
+        assert "staged /pub/wagnera3/corpora/m-digests.txt" not in emitted
+
+    def test_the_record_is_named_after_the_manifest_not_the_destination(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Two manifests staging into one destination must not overwrite each
+        other's certification."""
+        write_file(tmp_path / "src" / "armB.txt", _PAYLOAD)
+        _write_json(tmp_path / "second.json", _stage_manifest())
+        fake_run.add("sha256sum", stdout=f"{_DIGEST}  x\n")
+        args = _stage_args(tmp_path)
+        args[args.index("--manifest") + 1] = str(tmp_path / "second.json")
+
+        stage_cli.main(args)
+
+        assert emitted[-1] == "certified by /pub/wagnera3/corpora/second-digests.txt"
 
     def test_it_reports_the_provenance_it_staged_under(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
@@ -286,8 +316,56 @@ class TestSubmitCli:
         _write_json(tmp_path / "run.json", _run_payload())
         script_healthy_cluster(fake_run)
         submit_cli.main(_submit_args(tmp_path))
-        assert emitted[3].endswith("--job 55519937")
-        assert emitted[3].startswith("watch: hpc3-watch --config ")
+        # Last rather than [3]: the watch line is the closing line of the
+        # summary, which is the property this test is about. Indexing it by
+        # position made the test fail when a line was added ABOVE it, which
+        # is not a regression in what it claims to check.
+        assert emitted[-1].endswith("--job 55519937")
+        assert emitted[-1].startswith("watch: hpc3-watch --config ")
+
+    def test_it_says_so_when_nothing_will_be_tagged_on_completion(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """An unset board label costs a wake and nothing said so.
+
+        Measured 2026-09-07: jobs 55809956 and 55809960 recorded submitter ""
+        because the submitting session had no BOARD_AGENT_LABEL, so the bridge
+        announced both terminal states tagging nobody. The same session's
+        earlier job carried a label and WAS tagged. Every component did what
+        it documents; the wake still did not arrive, and the only moment it
+        could have been known is this one.
+
+        This fixture supplies no label, which is why no `declared_label` is
+        requested here.
+        """
+        _write_json(tmp_path / "run.json", _run_payload())
+        script_healthy_cluster(fake_run)
+
+        submit_cli.main(_submit_args(tmp_path))
+
+        notices = [line for line in emitted if "BOARD_AGENT_LABEL is unset" in line]
+        assert len(notices) == 1
+        assert "without tagging anyone" in notices[0]
+
+    def test_a_declared_label_draws_no_notice(
+        self,
+        tmp_path: pathlib.Path,
+        fake_run: FakeRun,
+        emitted: list[str],
+        declared_label: str,
+    ) -> None:
+        """The notice must not fire on the case it is not about.
+
+        A line printed on every submission is a line nobody reads, and it
+        would be the third thing this package prints that means nothing.
+        """
+        _write_json(tmp_path / "run.json", _run_payload())
+        script_healthy_cluster(fake_run)
+
+        submit_cli.main(_submit_args(tmp_path))
+
+        assert declared_label
+        assert not [line for line in emitted if "BOARD_AGENT_LABEL" in line]
 
     def test_it_records_the_job_in_the_ledger_the_workspace_names(
         self,
@@ -397,7 +475,8 @@ class TestEntrypoints:
         with pytest.raises(SystemExit) as excinfo:
             stage_cli.entrypoint()
         assert excinfo.value.code == 0
-        assert emitted[-1] == "verified 1 file(s) on hpc3:/pub/x"
+        assert emitted[-2] == "verified 1 file(s) on hpc3:/pub/x"
+        assert emitted[-1] == "certified by /pub/x/m-digests.txt"
 
     def test_submit_reads_the_process_arguments(
         self,

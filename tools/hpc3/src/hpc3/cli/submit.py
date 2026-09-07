@@ -111,6 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     project = spec["project"]
     host = workspace["host"]
     root = workspace["root"]
+    submitter = _config.submitter_label()
     job_id = submit(
         spec,
         host=host,
@@ -118,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         log_dir=log_dir(root, project),
         ledger_path=pathlib.Path(workspace["ledger"]),
         submitted_at=_test_hooks.now_iso(),
-        submitter=_config.submitter_label(),
+        submitter=submitter,
         cluster=cluster,
         charge_account=budget["charge_account"],
     )
@@ -134,6 +135,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"{spec['cpus']} cpu, {spec['mem_gb']}G, {spec['minutes']} min"
     )
     _test_hooks.emit(f"  logs {log_dir(root, project)}")
+    if not submitter:
+        # NOT a refusal. An empty submitter is a supported, positive state --
+        # a job nobody is waiting on is announceable without a tag, and a
+        # human submitting by hand has no board label to give. What is not
+        # supported is learning it silently, hours later, from a notification
+        # that never came.
+        #
+        # Measured 2026-09-07: jobs 55809956 and 55809960 were submitted from
+        # a session whose BOARD_AGENT_LABEL was unset, so the ledger recorded
+        # "" and the bridge -- correctly -- announced their terminal states
+        # with nobody tagged. The same session's earlier job 55806443 carried
+        # the label and WAS tagged. Every component behaved as documented and
+        # the wake still did not arrive, because the one thing that decides it
+        # is read at submit time and reported nowhere.
+        _test_hooks.emit(
+            f"  note: {_config.SUBMITTER_ENV} is unset, so the ledger records no "
+            "submitter and a board bridge will announce this job's terminal "
+            "state without tagging anyone. Export it before submitting if you "
+            "want to be woken."
+        )
     _test_hooks.emit(f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {job_id}")
     return 0
 
