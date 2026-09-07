@@ -74,7 +74,7 @@ def _first_group_all(pattern: re.Pattern[str], text: str) -> tuple[str, ...]:
 #: the cluster), absent by design from every fresh clone. Their existence is
 #: the ARTIFACT tier's claim, not the repo contract's; see
 #: :func:`run_checks`.
-ARTIFACT_ROOTS = ("runs/", ".game/")
+ARTIFACT_ROOTS = ("runs/", ".game/", ".decompiled/")
 
 
 def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> list[str]:
