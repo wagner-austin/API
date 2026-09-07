@@ -116,11 +116,24 @@ Two things follow, and both are load-bearing here:
    `taskReference` and `encodeCursorPaginationFooter` — and `tests/test_contracts.py`
    pins each against a line captured verbatim from the live board. A
    server-side change fails there rather than in the field.
-2. **A missing cursor means "stay", not "start over".** `task_events` offers
-   a next cursor only on a FULL page; a short page means the caller has
-   caught up and keeps the cursor it holds. `watch.advance` is the one place
-   that decides this, and two tests assert the not-moving case, because
-   getting it backwards is silent.
+2. **A missing cursor means "stay", not "start over".** Only an EMPTY page
+   omits the cursor, and it means the caller has caught up and keeps the
+   cursor it holds. `watch.poll` is the one place that decides this, and a
+   test asserts the not-moving case, because getting it backwards is silent.
+
+   **This rule changed under us on 2026-09-06.** Until `edfa06ec` a cursor
+   came only on a FULL page, so a short page's events were re-served on
+   every poll forever — and `prime` carried a second request per page to
+   work around it. Every non-empty page now carries its last row's cursor.
+   The workaround is deleted rather than left inert, and a non-empty page
+   without a cursor now raises `PAGE_WITHOUT_CURSOR`: after the fix it can
+   only mean the server regressed, and tolerating it would silently
+   reinstate the original bug.
+
+   The general lesson, which cost more than the fix: **a regression test
+   pins a contract, and when the contract moves the test keeps passing while
+   documenting a lie.** Two tests here asserted the workaround and stayed
+   green for fifteen hours after the server stopped needing it.
 
 ## Failure is loud, on purpose
 

@@ -284,6 +284,17 @@ class BoardWatchErrorCode(ErrorCodeBase):
     FOOTER_MISSING = "FOOTER_MISSING"
     FOOTER_MALFORMED = "FOOTER_MALFORMED"
 
+    # Added 2026-09-07, when the server contract this package reads CHANGED.
+    # Until ``edfa06ec`` a cursor came only on a FULL page, so a short page's
+    # events were re-served on every poll forever; the fix makes every
+    # NON-EMPTY page carry its last row's cursor. This package now walks on
+    # that guarantee, which means a non-empty page arriving WITHOUT a cursor
+    # is the server contradicting itself. Raising is deliberate: returning
+    # early there would silently reinstate the original replay bug, and a
+    # watcher that hides a regression reports silence -- indistinguishable
+    # from a quiet board, which is the failure this package exists to remove.
+    PAGE_WITHOUT_CURSOR = "PAGE_WITHOUT_CURSOR"
+
 
 class CommitScopeErrorCode(ErrorCodeBase):
     """Checking that a commit carries only the paths its author declared.

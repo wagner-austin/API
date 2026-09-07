@@ -45,17 +45,17 @@ def test_the_first_call_primes_and_announces_without_replaying(
     _test_hooks.http_post = FakeHttpPost(
         [
             ok(tool_text(page_text([LIVE_MENTION_LINE], "one"))),
-            ok(tool_text(page_text([LIVE_TASK_LINE], None))),
             ok(tool_text(page_text([LIVE_TASK_LINE], "the-true-end"))),
+            ok(tool_text(page_text([], None))),
         ]
     )
     assert main(list(ARGV)) == 0
     assert len(emitted.lines) == 1
     assert emitted.lines[0].startswith(f"BOARD WATCH armed for @{AGENT}")
     assert "BOARD MENTION" not in emitted.lines[0]
-    # The END of the partial page, not the full-page boundary before it.
-    # Recording "one" here is what made the first live run announce two
-    # mentions that predated arming.
+    # The LAST page that carried rows, not the first cursor seen. Recording
+    # "one" here is what made the first live run announce two mentions that
+    # predated arming.
     assert decode_state(files.contents[state_path(AGENT, DIRECTORY)])["cursor"] == "the-true-end"
 
 

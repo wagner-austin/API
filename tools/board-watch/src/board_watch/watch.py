@@ -6,16 +6,26 @@ is testable without a clock or a socket. The loop that calls these lives in
 :mod:`board_watch.cli.watch` and does nothing but sequence them.
 
 THE RULE THAT IS EASY TO GET WRONG, and which this module exists to hold in
-one place: ``task_events`` offers a next cursor ONLY on a full page. A short
-page means the caller has caught up, carries no cursor, and the caller keeps
-the one it already holds. Treating a missing cursor as "start over" is what
-makes a watcher replay its whole history on every quiet poll.
+one place: ``task_events`` offers a next cursor on every NON-EMPTY page, and
+none on an empty one. An empty page means the caller has caught up and keeps
+the cursor it already holds. Treating that as "start over" is what makes a
+watcher replay its whole history on every quiet poll.
+
+That rule is the post-``edfa06ec`` contract (2026-09-06). Before it, a cursor
+came only on a FULL page, so a short page's events were re-served on every
+poll forever while the poller reported success -- and this package carried a
+second request per prime to work around it. The workaround is gone rather
+than left inert: a non-empty page without a cursor is now a contract
+violation this module raises on, because tolerating it is precisely how the
+original bug would come back unseen.
 """
 
 from __future__ import annotations
 
 from typing import Final, TypedDict
 
+from platform_core.error_codes_tooling import BoardWatchErrorCode
+from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
@@ -71,7 +81,7 @@ def subscription_arguments(spec: SubscriptionSpec, cursor: str | None) -> JSONOb
     return arguments
 
 
-def priming_arguments(cursor: str | None, limit: int = MAX_LIMIT) -> JSONObject:
+def priming_arguments(cursor: str | None) -> JSONObject:
     """Build the arguments for one step of establishing position.
 
     Deliberately UNFILTERED. Priming walks to the true end of the feed, not
@@ -83,52 +93,22 @@ def priming_arguments(cursor: str | None, limit: int = MAX_LIMIT) -> JSONObject:
     Args:
         cursor: The position to read forward from, or None to start at the
             oldest visible event.
-        limit: Rows to request. Defaults to the largest page; :func:`prime`
-            passes an exact row count on its final request, to turn a short
-            page into a full one so the board mints a cursor for its last row.
 
     Returns:
         The arguments object.
     """
-    arguments: JSONObject = {"limit": limit}
+    arguments: JSONObject = {"limit": MAX_LIMIT}
     if cursor is not None:
         arguments["cursor"] = cursor
     return arguments
 
 
-def advance(held: str | None, page: EventPage) -> str | None:
-    """Decide which cursor to hold after reading a page.
-
-    Args:
-        held: The cursor used to fetch this page.
-        page: What came back.
-
-    Returns:
-        The page's next cursor when it offered one, otherwise the cursor
-        already held. A short page is the board saying "you are caught up",
-        which leaves the position exactly where the caller put it.
-    """
-    if page["next_cursor"] is None:
-        return held
-    return page["next_cursor"]
-
-
 def prime(credentials: McpCredentials) -> str | None:
     """Walk the feed to its end and return the cursor for "from now on".
 
-    THE LAST PARTIAL PAGE NEEDS A SECOND REQUEST, and getting that wrong is
-    not visible from inside the walk. A cursor is offered only on a FULL
-    page, so walking with the maximum limit stops at the last full-page
-    BOUNDARY and never learns a position inside the partial page after it.
-    Measured against the live board on 2026-09-05: priming landed at
-    00:29:05 while the feed already held events at 00:42 and 02:17, so the
-    very first poll announced two mentions that predated arming -- the exact
-    backlog priming exists to skip.
-
-    The fix costs one request. A short page of ``k`` rows re-requested with
-    ``limit=k`` is by definition a full page, so the board mints a cursor for
-    its last row. Events arriving between the two calls are simply carried
-    into the next poll, which is correct: they are genuinely new.
+    Each page carries the cursor for its own last row, so the walk simply
+    follows them until the board offers none -- which it does only when the
+    page is empty, and an empty page is the end of the feed.
 
     Args:
         credentials: Endpoint and headers.
@@ -138,7 +118,9 @@ def prime(credentials: McpCredentials) -> str | None:
         the board has never had an event at all.
 
     Raises:
-        AppError: Any transport or contract failure from the underlying call.
+        AppError: ``PAGE_WITHOUT_CURSOR`` when a page carrying rows offers no
+            cursor, which the server contract forbids. Also any transport or
+            contract failure from the underlying call.
     """
     cursor: str | None = None
     while True:
@@ -150,20 +132,19 @@ def prime(credentials: McpCredentials) -> str | None:
                 priming_arguments(cursor),
             )
         )
-        if page["next_cursor"] is not None:
-            cursor = page["next_cursor"]
-            continue
-        if page["count"] == 0:
+        if page["next_cursor"] is None:
+            if page["count"] != 0:
+                raise AppError(
+                    code=BoardWatchErrorCode.PAGE_WITHOUT_CURSOR,
+                    message=(
+                        f"task_events returned {page['count']} events with no next "
+                        "cursor; every non-empty page must carry its last row's "
+                        "cursor. Priming cannot reach the end of the feed, and "
+                        "continuing would replay these events on every poll."
+                    ),
+                )
             return cursor
-        exact = decode_event_page(
-            call_mcp_tool(
-                _test_hooks.http_post,
-                credentials,
-                EVENTS_TOOL,
-                priming_arguments(cursor, limit=page["count"]),
-            )
-        )
-        return advance(cursor, exact)
+        cursor = page["next_cursor"]
 
 
 def poll(
@@ -177,7 +158,11 @@ def poll(
         cursor: The position to read forward from.
 
     Returns:
-        The page and the cursor to hold for the next poll.
+        The page, and the cursor to hold for the next poll: the page's own
+        next cursor when it offered one, otherwise the cursor already held.
+        An empty page is the board saying "you are caught up", which must
+        leave the position exactly where the caller put it -- moving it
+        backwards there is what replays the whole history on a quiet board.
 
     Raises:
         AppError: Any transport or contract failure from the underlying call.
@@ -190,7 +175,9 @@ def poll(
             subscription_arguments(spec, cursor),
         )
     )
-    return page, advance(cursor, page)
+    if page["next_cursor"] is None:
+        return page, cursor
+    return page, page["next_cursor"]
 
 
 def format_notification(event: BoardEvent) -> str:

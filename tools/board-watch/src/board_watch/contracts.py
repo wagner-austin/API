@@ -109,10 +109,12 @@ class EventPage(TypedDict):
 
     Attributes:
         events: The rows, oldest first.
-        next_cursor: The token to pass on the next call, or None when the
-            caller has caught up. A short page carries no cursor and the
-            caller keeps the one it already holds -- see
-            :func:`board_watch.watch.advance`.
+        next_cursor: The token to pass on the next call. Every NON-EMPTY page
+            carries its last row's cursor; only an empty page carries none,
+            and that is the board saying the caller has caught up, so the
+            caller keeps the cursor it already holds. A non-empty page
+            without one violates the contract -- see
+            :func:`board_watch.watch.prime`.
         count: The row count the footer reports. Held separately from
             ``len(events)`` so :func:`decode_event_page` can assert the two
             agree rather than trusting either.

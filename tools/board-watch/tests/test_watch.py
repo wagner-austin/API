@@ -1,18 +1,26 @@
 """Cursor arithmetic, priming, and one poll.
 
-The assertions that matter here are about NOT moving: a short page must leave
-the position where it was. Getting that backwards is what makes a watcher
-replay its history on every quiet poll while reporting success.
+The assertions that matter here are about NOT moving: an empty page must
+leave the position where it was. Getting that backwards is what makes a
+watcher replay its history on every quiet poll while reporting success.
+
+The cursor cases are driven through :func:`poll` and :func:`prime` rather
+than through a pure helper, because the decision is only ever made on a real
+response and a helper tested in isolation can agree with a contract the
+server no longer has -- which is what happened here before ``edfa06ec``.
 """
 
 from __future__ import annotations
 
+import pytest
+from platform_core.error_codes_tooling import BoardWatchErrorCode
+from platform_core.errors import AppError
+
 from board_watch import _test_hooks
-from board_watch.contracts import decode_event_line, decode_event_page
+from board_watch.contracts import decode_event_line
 from board_watch.watch import (
     MAX_LIMIT,
     SubscriptionSpec,
-    advance,
     format_notification,
     poll,
     prime,
@@ -35,26 +43,16 @@ from tests.conftest import (
 SPEC = SubscriptionSpec(agent="opus-nclex-licensure-0904", room=None, kind=None, limit=50)
 
 
-def test_a_short_page_leaves_the_cursor_where_it_was() -> None:
-    """The board offers no cursor when the caller has caught up.
+def test_an_empty_page_from_no_cursor_stays_at_no_cursor() -> None:
+    """A watcher that has never held a cursor must not invent one.
 
-    Treating that as "start over" is the replay bug; treating it as "stay"
-    is the contract.
+    Distinct from the quiet-board case below: there the held position is a
+    real token, here it is None, and the two are different states of the
+    ``str | None`` this package threads through every call.
     """
-    page = decode_event_page(page_text([LIVE_CHECKIN_LINE], None))
-    assert advance("held", page) == "held"
-
-
-def test_a_full_page_moves_the_cursor_forward() -> None:
-    """A full page is the only case that implies more may exist."""
-    page = decode_event_page(page_text([LIVE_CHECKIN_LINE], "onward"))
-    assert advance("held", page) == "onward"
-
-
-def test_a_short_page_from_no_cursor_stays_at_no_cursor() -> None:
-    """Priming an empty board leaves the watcher with nothing to hold."""
-    page = decode_event_page(page_text([], None))
-    assert advance(None, page) is None
+    _test_hooks.http_post = FakeHttpPost([ok(tool_text(page_text([], None)))])
+    _, moved = poll(TEST_CREDENTIALS, SPEC, None)
+    assert moved is None
 
 
 def test_subscription_arguments_filter_to_the_agent_both_ways() -> None:
@@ -91,52 +89,52 @@ def test_priming_is_unfiltered_and_uses_the_largest_page() -> None:
     assert priming_arguments("mid")["cursor"] == "mid"
 
 
-def test_prime_re_requests_the_last_partial_page_to_reach_its_end() -> None:
-    """The bug the live board found: a short page offers no cursor.
+def test_prime_follows_each_pages_cursor_until_the_board_offers_none() -> None:
+    """The walk ends at the empty page, and every step carries the cursor forward.
 
-    Walking with the maximum limit stops at the last full-page BOUNDARY, so
-    the events in the partial page after it would all arrive as new on the
-    first poll -- measured as two real mentions announced after arming. The
-    fix re-requests that page with ``limit`` equal to its own row count,
-    which makes it a full page and mints a cursor for its last row.
+    Asserting the ARGUMENTS, not just the result: a walk that reached the
+    right answer while re-sending the same cursor would pass a return-value
+    check and loop forever against a live board.
     """
     poster = FakeHttpPost(
         [
-            ok(tool_text(page_text([LIVE_CHECKIN_LINE], "boundary"))),
-            ok(tool_text(page_text([LIVE_TASK_LINE, LIVE_MENTION_LINE], None))),
+            ok(tool_text(page_text([LIVE_CHECKIN_LINE], "first"))),
             ok(tool_text(page_text([LIVE_TASK_LINE, LIVE_MENTION_LINE], "true-end"))),
+            ok(tool_text(page_text([], None))),
         ]
     )
     _test_hooks.http_post = poster
     assert prime(TEST_CREDENTIALS) == "true-end"
     assert sent_arguments(poster.bodies[0]) == {"limit": MAX_LIMIT}
-    assert sent_arguments(poster.bodies[1]) == {"limit": MAX_LIMIT, "cursor": "boundary"}
-    # The exact-count re-request is what turns the short page into a full one.
-    assert sent_arguments(poster.bodies[2]) == {"limit": 2, "cursor": "boundary"}
+    assert sent_arguments(poster.bodies[1]) == {"limit": MAX_LIMIT, "cursor": "first"}
+    assert sent_arguments(poster.bodies[2]) == {"limit": MAX_LIMIT, "cursor": "true-end"}
 
 
 def test_prime_on_an_empty_board_holds_no_cursor() -> None:
-    """A board with no events has no position to hold, and that is not an error.
-
-    No re-request is made either: a page of zero rows cannot be turned into
-    a full page, so asking again would be a call that could not answer.
-    """
+    """A board with no events has no position to hold, and that is not an error."""
     poster = FakeHttpPost([ok(tool_text(page_text([], None)))])
     _test_hooks.http_post = poster
     assert prime(TEST_CREDENTIALS) is None
     assert len(poster.bodies) == 1
 
 
-def test_prime_keeps_its_cursor_if_the_re_request_comes_back_short() -> None:
-    """Events can vanish between the two calls, and that is not a restart."""
+def test_prime_refuses_a_page_that_carries_rows_but_no_cursor() -> None:
+    """The server contract forbids it, and tolerating it reinstates the old bug.
+
+    Before ``edfa06ec`` this was the NORMAL response for a short page, and
+    this package worked around it. Now it can only mean the server has
+    regressed -- and returning the held cursor here would leave the watcher
+    permanently short of the feed's end, re-announcing those rows on every
+    poll while reporting success. That is the exact failure the package
+    exists to make impossible, so it raises instead.
+    """
     _test_hooks.http_post = FakeHttpPost(
-        [
-            ok(tool_text(page_text([LIVE_CHECKIN_LINE], "boundary"))),
-            ok(tool_text(page_text([LIVE_TASK_LINE], None))),
-            ok(tool_text(page_text([], None))),
-        ]
+        [ok(tool_text(page_text([LIVE_CHECKIN_LINE, LIVE_TASK_LINE], None)))]
     )
-    assert prime(TEST_CREDENTIALS) == "boundary"
+    with pytest.raises(AppError) as caught:
+        prime(TEST_CREDENTIALS)
+    assert caught.value.code is BoardWatchErrorCode.PAGE_WITHOUT_CURSOR
+    assert "2 events with no next cursor" in caught.value.message
 
 
 def test_poll_returns_the_page_and_the_new_position() -> None:
@@ -188,18 +186,16 @@ def test_a_notification_omits_the_task_when_there_is_none() -> None:
 
 
 __all__ = [
-    "test_a_full_page_moves_the_cursor_forward",
     "test_a_notification_collapses_a_multi_line_summary",
     "test_a_notification_leads_with_who_wants_you_and_why",
     "test_a_notification_omits_the_task_when_there_is_none",
     "test_a_notification_reports_a_truncated_body",
-    "test_a_short_page_from_no_cursor_stays_at_no_cursor",
-    "test_a_short_page_leaves_the_cursor_where_it_was",
+    "test_an_empty_page_from_no_cursor_stays_at_no_cursor",
     "test_poll_on_a_quiet_board_holds_its_position",
     "test_poll_returns_the_page_and_the_new_position",
-    "test_prime_keeps_its_cursor_if_the_re_request_comes_back_short",
+    "test_prime_follows_each_pages_cursor_until_the_board_offers_none",
     "test_prime_on_an_empty_board_holds_no_cursor",
-    "test_prime_re_requests_the_last_partial_page_to_reach_its_end",
+    "test_prime_refuses_a_page_that_carries_rows_but_no_cursor",
     "test_priming_is_unfiltered_and_uses_the_largest_page",
     "test_subscription_arguments_carry_every_optional_filter",
     "test_subscription_arguments_filter_to_the_agent_both_ways",

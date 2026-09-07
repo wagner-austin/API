@@ -27,6 +27,6 @@ WHAT IT DELIBERATELY DOES NOT DO. It does not retry, back off, or swallow a
 failed poll. A watcher that hides an outage reports silence, and silence is
 indistinguishable from "nothing has happened" -- which is the failure this
 whole area keeps producing. Every failure raises with a specific
-:class:`~platform_core.error_codes.BoardWatchErrorCode`, the process exits
+:class:`~platform_core.error_codes_tooling.BoardWatchErrorCode`, the process exits
 non-zero, and Monitor surfaces that as the event it is.
 """
