@@ -9,6 +9,13 @@ Typed Python monorepo: ML training, NLP, media services, quant-ML risk
 modeling. Strict mypy (no `Any`, no `cast`, no `type: ignore`), 100%
 statement + branch coverage, FastAPI + RQ + Redis + Kafka.
 
+**`CODE_STANDARDS.md` is the bar a change here is reviewed against — read it
+before you write code, not after.** It is deliberately not a restatement of the
+above: all 48 packages enforce the mechanical rules at `make check`, so the
+file points at that harness rather than duplicating it, and spends its length
+on the judgment items no linter expresses. The audit manager's standards arm
+reads it against your diff.
+
 ## Corvis: the tools this session actually has
 
 `corvis` is Austin's own MCP fleet — ~27 backends, 250+ tools behind a proxy
