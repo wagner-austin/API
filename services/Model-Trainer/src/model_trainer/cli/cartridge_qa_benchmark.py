@@ -257,6 +257,18 @@ def measure_qa_plan(
     wait = synchroniser(device)
     clock = _test_hooks.monotonic_clock
 
+    # ONE DISCARDED PASS BEFORE ANY CLOCK STARTS, and it is not politeness.
+    # Without it every one-time cost -- cuDNN autotuning, kernel selection,
+    # the caching allocator's first big reservation -- lands on whichever arm
+    # runs first, which is `base`. The first run measured that way reported
+    # the CARTRIDGE arm as faster than the base it wraps (1.733s against
+    # 2.325s), which cannot happen: a cartridge runs the same model over the
+    # same items with 128 extra prefix positions, so it is strictly more
+    # work. The impossible number was the warmup landing on base and nothing
+    # else. `gemm_timing` has carried WARMUP for the same reason all along;
+    # this module took its synchroniser and left its warmup behind.
+    score_cloze_items(items=items, model=base, encoder=encoder, device=device, max_seq_len=max_seq)
+
     wait()
     started = clock()
     scored_base = score_cloze_items(
