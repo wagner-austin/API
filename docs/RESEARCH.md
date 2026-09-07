@@ -432,10 +432,25 @@ test and by image smoke.
   for deep bases is no longer forced by the measurements. The two
   named interference mechanisms — structural and content — now each
   have a working lever, and both levers live base-side.
-- **Open, filed rather than implied:** the gpt2-small rung under the
-  same objective (cross-scale anchor; plan row `gpt2-content-lora`
-  already certified equal to its twin); the remaining 0.30 gap at n8;
-  the 7B rung, now unblocked by measurement.
+- **gpt2-small anchor, measured 2026-09-07** (job 55806539 + twin
+  55806826 on hpc3-gpu-18-01 and hpc3-gpu-16-00, ~40 min each, records
+  CROSS-NODE BIT-IDENTICAL sha256
+  `9abfbdd4a053bc7c16b7af3451f2307603b4b9c27c96b5ade201a4d6091eaad6`,
+  same v40 image as the medium record so the comparison isolates exactly
+  the base; run documents
+  `tools/hpc3/runs/cartridge-content-lora-v100-v40{,-twin}.json`):
+  **crowd-invariance beats the LM objective at both scales, and the n4
+  ceiling is scale-invariant.** Diverse n4 +63.3% (vs +58.1% under the
+  LM objective) — matching medium's +63.2% to a tenth of a point.
+  Diverse n8 +49.6% (vs +33.3%): the objective wins even where nothing
+  was collapsing. Plain flips positive at both counts (+17.3%/+17.4%),
+  alone arms rise again (+0.9053/+0.8584), KL converges 224 → 150 → 135.
+  Depth still prices n8 (49.6% at 12 layers vs 38.1% at 24) but no
+  longer breaks it.
+- **Open, filed rather than implied:** the 1.5B rung (both objectives,
+  plan rows landed in `40c55fa5`, in flight as this is written); the
+  remaining 0.30 gap at medium n8; the 7B architecture jump (split
+  q/k/v, grouped-query KV geometry), now unblocked by measurement.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
