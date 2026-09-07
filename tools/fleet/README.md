@@ -181,6 +181,23 @@ the owner's reservation — never the other way round.
 `reserved_cores` and `reserved_ram_gb` have no cluster analogue at all. Slurm
 never has to leave a core for the person sitting at the node.
 
+**lavender is at `max_concurrent_runs: 1`, and that is not a typo.** It became
+a CI runner on 2026-09-06, so the "other user" the reservations protect is no
+longer just the person at the keyboard — a second *system* now competes for the
+same box, and it is not in the arithmetic. The reservations still hold and
+`capacity.assess` reads free RAM and disk live, so a dispatch is refused rather
+than allowed to thrash; the concurrency cap is what stops us stacking two of
+our own suites on top of CI's load.
+
+The number came from a measurement rather than caution: `opus-artifact-sweep-0902`
+observed a heavy job saturating lavender until ssh connections were **reset**,
+while TCP 22 and 445 stayed open and tailscale stayed direct — a box that resets
+is alive and overloaded, not down. Disk is a non-issue on the same evidence
+(0.53 GB runner plus 3–5 GB expected, against 849 GB free and a 40 GB reserve),
+so the disk budget is untouched and `enabled` stays `true`.
+
+Raise it back to 2 when CI stops sharing the box, not before.
+
 ## `enabled`, and why the fleet is written down twice
 
 Every node in `fleet.json` declares `enabled`, and the decoder refuses a node
