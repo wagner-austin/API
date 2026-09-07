@@ -193,9 +193,41 @@ final class RandomTap {
             }
         }
 
+        /**
+         * Full stacks for the first draws of a run, because attribution by
+         * one frame ran out of discriminating power: byte-identical twins
+         * fork on ONE early draw whose single-frame site is shared by both
+         * runs' legitimate draws, and every state panel around it reads
+         * identical. The complete pedigree of each early draw, diffed
+         * across a pair, shows the divergent draw's whole caller chain with
+         * nothing left to infer (wiki log 2026-09-07).
+         */
+        private static final int FULL_STACK_DRAWS = 120;
+
+        private static final java.util.concurrent.atomic.AtomicInteger dumped =
+                new java.util.concurrent.atomic.AtomicInteger();
+
         /** Attributes one draw to its thread and nearest engine frame, and tallies it. */
         private void record() {
             StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+            int serial = dumped.incrementAndGet();
+            if (serial <= FULL_STACK_DRAWS) {
+                StringBuilder pedigree = new StringBuilder("rngstack #").append(serial);
+                for (StackTraceElement element : stack) {
+                    String frameName = element.getClassName();
+                    if (frameName.startsWith("java.lang.Thread")
+                            || frameName.startsWith("rwbot.agent.RandomTap")) {
+                        continue;
+                    }
+                    pedigree.append(" < ")
+                            .append(frameName)
+                            .append('.')
+                            .append(element.getMethodName())
+                            .append(':')
+                            .append(element.getLineNumber());
+                }
+                Log.info(pedigree.toString());
+            }
             String site = "unattributed";
             int matched = -1;
             for (int i = 0; i < stack.length; i++) {
