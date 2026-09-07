@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "cartridge-headroom-a30-v43-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v43/abl.sif",
+    "sha256": "bec75520344d6b965a3445ddafc4834f2e22d750fb320033b231cf6dd6437949",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 300,
+  "mem_gb": 64,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_headroom --corpora /pub/wagnera3/mi/cartridge/corpus-me,/pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco,/pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-headroom-a30-v43-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-headroom-a30-v43-twin.json",
+  "experiment": {
+    "measurement": "cartridge-headroom",
+    "bases": "gpt2.gpt2-medium.gpt2-xl.pythia-6.9b-nf4",
+    "corpora": "me.civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco.epi.metabolomics.atmospheric-chemistry",
+    "corpus_digest": "e2f23c635583",
+    "geometry": "w256-s4-from-the-recorded-gpt2-base-lora-row",
+    "image_commit": "042fad855fc2fb8923317a44edceabfd680febda",
+    "model_snapshot": "c0e3eee36dc47af0c49f361c74cfe459c09f7f23",
+    "baseline_record": "6ef4b9c9-7b-lm/254d0126-7b-invariance-the-precondition-finding-this-attributes",
+    "why": "bit-identity-certificate-for-the-headroom-record",
+    "gpu_pinned_because": "four-bases-stay-resident-xl-fp32-6GB-plus-nf4-7b-4GB-crowd-a-v100-16GB-and-the-7b-rows-must-match-the-recorded-a30-card"
+  },
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  }
+}
