@@ -522,13 +522,37 @@ test and by image smoke.
   observation-identity certificate — the stronger of the two — and
   4-bit dequant + bf16 compute + the boundary cast reproduce
   bit-for-bit in every measured quantity across nodes.
-- **Open, filed rather than implied:** solo-gain recovery at 7B (the
-  headroom measurement above, then a slot-count/learning-rate rung if
-  headroom is not the answer) — a 7B composition claim in either
-  direction is unfounded until the solo gain exists; the mechanism of
-  the mid-depth valley (why 24 layers is the worst depth for an
-  eight-crowd, when both neighbours tolerate it); the remaining 0.30
-  content gap at medium n8.
+- **The headroom measurement, run the same day (board task `afee6162`,
+  `cartridge_headroom` CLI, commit `77e12c3e`, image v44 `9e98d0a7…`;
+  jobs 55812858 + twin 55812861, four minutes each, records
+  BYTE-IDENTICAL sha256 `7668c51d…`, same-node hpc3-gpu-k54-01; the
+  first v43 pair died in 19 s on a device-placement bug a cpu-only
+  suite cannot see as a crash — fixed and pinned by a recording fake
+  in `77e12c3e`): **headroom is the dominant mechanism of the 7B
+  solo-gain collapse.** Plain-base held-out loss on the primary corpus
+  runs 4.57 (gpt2) → 4.27 (medium) → 4.11 (xl) → **3.66
+  (pythia-6.9b/NF4)**, and pythia sits 0.34-0.90 nats below every
+  GPT-2 base on ALL eleven corpora — so the 7B's plain base already
+  predicts at the level the smaller bases reach only WITH a cartridge
+  (gpt2's adapted level ≈ 4.57 − 0.81 ≈ 3.76). Most of the recorded
+  ~0.81-nat gain was never available at 7B. The remaining distance
+  down to xl's adapted level (3.66 − ~3.30 ≈ 0.36 nats) matches the
+  best measured 7B per-seed gain (+0.40) within the cells' floors —
+  CONSISTENT with a family-common adapted floor, stated as consistency
+  and not proof. What headroom does not explain is reliability: seeds
+  7/8 reach ~0.4 while seed 9 goes negative in the same cell, a
+  training-variance component headroom cannot produce. Tokenizer
+  caveat carried in-record: pythia tokenizes the same text ~7% shorter
+  (3328 vs 3584 held-out tokens on the primary), so its per-token
+  losses are mildly INFLATED relative to gpt2's at equal compression —
+  the headroom reading is conservative, not flattered.
+- **Open, filed rather than implied:** a 7B composition claim in
+  either direction remains unfounded — the available solo gain at 7B
+  is ~0.4 nats, half the family's, and reaching even that reliably
+  needs the seed-variance question answered before any composition
+  rung is worth a card; the mechanism of the mid-depth valley (why 24
+  layers is the worst depth for an eight-crowd, when both neighbours
+  tolerate it); the remaining 0.30 content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
