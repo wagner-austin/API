@@ -231,7 +231,7 @@ class CartridgeSlots:
             layer: Zero-based layer index.
             batch_size: Rows in the batch being run.
             dtype: The dtype of the model's hidden states, from
-                :func:`~model_trainer.core.services.finetuning.strategies.cartridge.compute_dtype`.
+                :func:`compute_dtype` in this module.
 
         Returns:
             The key and value blocks for this layer, batch-shaped, in
