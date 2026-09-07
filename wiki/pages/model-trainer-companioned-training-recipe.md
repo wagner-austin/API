@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
-  "docs/RESEARCH.md": f5ac8c106dfd4ed646be1fc1c01f9ee113b71170
+  "docs/RESEARCH.md": 97bec79231cab28f536aec413a2a83048aa9325f
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -48,6 +48,7 @@ provenance:
   - "1.5B twins 55809977/55809982 BYTE-IDENTICAL 2026-09-07: LM pair sha256 cff9f3ce (truncated), invariance pair sha256 6269120d (truncated) -- SAME-NODE certificates, the queue having placed all four runs on hpc3-gpu-l54-09; cross-node determinism established separately by the arc's five cross-node certificates"
   - "7B rung (Pythia-6.9B, GPT-NeoX, NF4 nf4+double-quant+bf16-compute) measured 2026-09-07 on A30, board task af35fc20: jobs 55810964 (LM, 3h04m) + 55810966 (invariance, 3h21m), image v42 sha256 270d8197 (truncated) from commit 09f5a4bb, 44/44 smokes incl. the dtype-boundary and architecture-policy self-asserts; model content-pinned (snapshot c0e3eee3 + shard sha256s) in the run documents"
   - "7B LM twin 55811523 BYTE-IDENTICAL (sha256 6ef4b9c9 truncated, same-node hpc3-gpu-l54-09); 7B invariance twin 55811542 CROSS-NODE (k54-01 vs l54-09) with ALL 198 observations bit-equal -- record shas 254d0126 vs 8c48e82a differ solely in fingerprint/host/logical_cores 32 vs 64, so NF4 training is certified deterministic cross-node in every measured quantity"
+  - "headroom measurement 2026-09-07, board task afee6162: cartridge_headroom CLI (commit 77e12c3e), image v44 sha256 9e98d0a7 (truncated), jobs 55812858 + twin 55812861 (~4 min each on A30), records BYTE-IDENTICAL sha256 7668c51d (truncated), same-node hpc3-gpu-k54-01; plain-base held-out loss on the primary corpus 4.57 (gpt2) / 4.27 (medium) / 4.11 (xl) / 3.66 (pythia-6.9b NF4), pythia 0.34-0.90 nats below every GPT-2 base on all 11 corpora; per-corpus character and token rows carried for the tokenizer caveat (pythia ~7% fewer tokens on the same text)"
 fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
@@ -283,9 +284,17 @@ vanishes (~0.07-0.23 against ~0.81 on every GPT-2 rung, per-seed spans
 the size of the means), so retention there is a division artifact and
 no 7B composition claim in either direction is founded until the solo
 gain exists. NF4 training itself is certified deterministic, cross-node
-in every measured quantity. Still open, filed rather than implied:
-solo-gain recovery at 7B (headroom measurement first, then a
-slot-count/learning-rate rung), the mechanism of the mid-depth valley,
+in every measured quantity. The headroom measurement (provenance below)
+has since ATTRIBUTED the collapse: the 7B's plain base already predicts
+every corpus at the level the smaller bases reach only with a cartridge
+-- plain-base loss 4.57/4.27/4.11/3.66 down the ladder on the primary
+corpus -- so most of the ~0.81-nat gain was never available at 7B, the
+residual (~0.36 nats to the family's adapted level) matches the best
+measured 7B per-seed gain (+0.40) within floors, and what headroom does
+not explain is seed variance (one seed negative where two reach ~0.4).
+Still open, filed rather than implied: the 7B seed-variance question
+(prerequisite to any 7B composition rung, whose available solo gain is
+~0.4 nats, half the family's), the mechanism of the mid-depth valley,
 the remaining 0.30 content gap at medium n8, and the budget slot
 policy. The RESEARCH.md entry under `mi` carries all the run summaries
 and the extension list.
