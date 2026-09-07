@@ -13,7 +13,8 @@ source_git_blobs:
 provenance:
   - "/pub/wagnera3/rusted/runs/traces -- 7,830 per-sample trace files, 931MB, one per cluster match through impincome96 (ls | wc -l and du -sh, read 2026-09-06)"
   - "wiki/log.md verdict entries 2026-09-06 (impincome96) and 2026-09-06 (detpair24)"
-fact_checked: 2026-09-06
+  - "wiki/log.md entries 2026-09-07 (detpair24b floor re-pricing; corpus label measurement over rw_matches/data.csv, 6,643,204 rows / 1,980 matches, exporter commit aaa8f780)"
+fact_checked: 2026-09-07
 confidence: medium
 hubs: [bot-architecture]
 ---
@@ -59,15 +60,35 @@ through the same class the exporter fits (`doom.py` is the worked
 example).
 
 The label is the open problem, and [[policy-determinism]] prices it:
-paired outcomes at this rung carry sd ~1,205 samples per pair, so any
-label built from ONE pair's delta is mostly noise. Candidates, none yet
-chosen: (a) outcome regression -- survival against spend-mix-by-phase
-across thousands of traces, where aggregation buys back what the floor
-takes; (b) within-pair contrast on shared seeds, honest only in bulk;
-(c) imitation is unavailable -- the corpus holds no Impossible wins to
-imitate. Whichever is chosen, the deployment gate is unchanged: laws six
-and nine, 48-pair panels, effect sized against the measured floor
-(2-se MDE ~350 samples at n=48).
+paired outcomes at this rung carry sd ~662 samples per pair (re-priced
+2026-09-07 -- the routing weaves nearly halved the original 1,205), so
+any label built from ONE pair's delta is mostly noise. Candidates:
+(a) outcome regression -- survival against spend-mix-by-phase across
+thousands of traces; (b) within-pair contrast on shared seeds, honest
+only in bulk; (c) imitation is unavailable -- the corpus holds no
+Impossible wins to imitate. Whichever is chosen, the deployment gate is
+unchanged: laws six and nine, 48-pair panels, effect sized against the
+measured floor (2-se MDE ~191 samples at n=48).
+
+## The offline pass answered the label question (2026-09-07)
+
+Candidate (a) in its within-doctrine form is measured EMPTY: over the
+168 standing-base matches, early-window spend-mix features fit against
+remaining survival generalize to nothing (leave-batch-out CV
+R-squared -0.002), and the within-doctrine survival sd (664) equals the
+identical-pair floor (662) -- under a byte-fixed doctrine there is no
+predictable survival component for a per-tick head to learn from at
+this corpus size. The trainable signal sits on the DOCTRINE axis
+instead, strong and coherent under within-generation and within-pair
+controls (log, 2026-09-07): order flow up, workers grown in phase 1
+not phase 0, credits off the balance sheet, raids drafted, fights kept
+inside our guns' reach. Two roads survive the measurement: a head
+trained on PROXIMATE EVENTS rather than survival (the brace head's
+AUC 0.94 razing fit proves event labels beat this same noise), or a
+tempo-family doctrine screen (raid draft rate, refusal avoidance,
+worker timing) -- the knob family the exhausted army-mix simplex never
+searched, whose surviving correlates converge on the only two causal
+arms ever measured positive at this rung (raid8 +217, kite +116).
 
 ## What is deliberately not decided here
 
