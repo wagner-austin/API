@@ -435,6 +435,34 @@ which is exactly how the field was found. A declared path that has since been
 renamed is refused at dispatch rather than at tar, because `tar: docs: Cannot
 stat` names a path and the reader's actual fix is to edit the workspace.
 
+### And sometimes the declaration cannot exist, which is why `tools/hpc3` is gone
+
+`tools/hpc3` was a declared project until 2026-09-06 and is not one now. Five
+dispatches of it failed over two days, every one recorded in the ledger as
+`failed`, and none of them was an hpc3 defect.
+
+Its suite asserts over the **whole monorepo**, not over its own directory.
+`tests/test_exported_env_readers.py` walks `("libs", "services", "clients",
+"tools")` to prove every exported variable is read by something, and
+`tests/test_committed_specs.py` resolves the `model_trainer.*` symbols an
+image spec names. On a staged tree those tests do not merely fail — **they
+answer wrongly**, reporting `HPC3_JOB_NAME: exported, read by nothing` when the
+reader exists and simply was not staged. The counts settle it: 1484 tests
+locally, and on lavender 1478 passed + 4 failed + 2 skipped, the same 1484,
+with only the tree differing.
+
+`external_paths` cannot express this. The four trees measure **139 GB**
+(`services` alone is 130 GB) against the ~34 MB archive an hpc3 dispatch
+currently ships. There is no declaration that makes this suite correct on a
+node, so the honest state is that it does not go to one.
+
+Removing it means `fleet-run --project tools/hpc3` now refuses with
+`WORKSPACE_PROJECT_UNKNOWN`, naming the projects that are declared. That
+refusal does not say *why*, which is the same silence
+[`not_dispatchable`](#enabled-and-why-the-fleet-is-written-down-twice) exists
+to end on the node side — so the reason lives here until the project side
+grows the same field. **Do not re-add it because the entry looks missing.**
+
 ## Cancelling
 
 `fleet-cancel` is the only command that kills anything, and it kills exactly
