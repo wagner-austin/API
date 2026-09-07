@@ -38,6 +38,7 @@ from model_trainer.core.services.model.cartridge_scoring import base_loss
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto
+from tests.core.services.finetuning.testing import FakeCacheCapableModel
 
 _VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
 
@@ -121,6 +122,31 @@ def _wired() -> Generator[None, None, None]:
     hf_hooks.Hooks.reset()
 
 
+class _PlacementRecordingModel(FakeCacheCapableModel):
+    """The canonical cache-capable fake, recording where it is placed.
+
+    Attributes:
+        placed_on: Every device string handed to :meth:`to`, in order.
+    """
+
+    def __init__(self) -> None:
+        """Configure a one-layer cache shape; only placement is asserted."""
+        super().__init__(num_layers=1, num_kv_heads=1, head_dim=2)
+        self.placed_on: list[str] = []
+
+    def to(self, device: str) -> LMModelProto:
+        """Record the placement and stay self.
+
+        Args:
+            device: Target device.
+
+        Returns:
+            Self.
+        """
+        self.placed_on.append(device)
+        return self
+
+
 def _staged(tmp_path: pathlib.Path, names: tuple[str, ...]) -> list[pathlib.Path]:
     """Create one directory per corpus name."""
     created: list[pathlib.Path] = []
@@ -189,6 +215,37 @@ class TestMeasureHeadroom:
         (alpha,) = _staged(tmp_path, ("alpha",))
         with pytest.raises(ValueError, match="no bases named"):
             headroom.measure_headroom([alpha], bases=(), window=8, held_out_stride=3, device="cpu")
+
+    def test_every_loaded_model_is_moved_to_the_measurement_device(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # Job 55812484 failed nineteen seconds in because the windows were
+        # on cuda and the weights were wherever the loader left them; this
+        # pins that the placement call happens, which a cpu-only suite
+        # cannot observe as a crash.
+        alpha, beta = _staged(tmp_path, ("alpha", "beta"))
+        loaded: list[_PlacementRecordingModel] = []
+
+        def _recording_loader(
+            model_id_or_path: str, quantization: QuantizationConfig | None
+        ) -> LMModelProto:
+            assert quantization == quantization_for(model_id_or_path)
+            model = _PlacementRecordingModel()
+            loaded.append(model)
+            return model
+
+        hf_hooks.Hooks.load_hf_model = _recording_loader
+
+        headroom.measure_headroom(
+            [alpha, beta],
+            bases=("gpt2", "gpt2-medium"),
+            window=8,
+            held_out_stride=3,
+            device="cpu",
+        )
+
+        assert len(loaded) == 2
+        assert all(model.placed_on == ["cpu"] for model in loaded)
 
 
 class TestPolicyPin:

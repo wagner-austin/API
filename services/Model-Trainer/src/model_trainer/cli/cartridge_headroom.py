@@ -185,6 +185,11 @@ def measure_headroom(
         base = require_cache_capable(
             hf_hooks.Hooks.load_hf_model(model_id, quantization_for(model_id))
         )
+        # The windows are built on ``device`` and the loader hands the
+        # model back wherever it materialised it -- measured 2026-09-07,
+        # job 55812484: cuda windows against cpu weights fail the first
+        # embedding lookup, nineteen seconds into a five-hour allocation.
+        base.to(device)
         base.eval()
         for path, documents in staged:
             encoded = [tokenizer.encode(document) for document in documents]
