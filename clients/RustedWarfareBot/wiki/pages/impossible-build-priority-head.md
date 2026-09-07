@@ -93,8 +93,12 @@ corpus adds beyond the causal record is one unscreened knob -- worker
 TIMING (growth in phase 1, not phase 0; the VH-era workers10 arm
 tested count, never timing) -- and one live road: a head trained on
 PROXIMATE EVENTS rather than survival, which the brace head's AUC
-0.94 razing fit proves can beat this noise. The lane's spend goes
-there.
+0.94 razing fit proves can beat this noise. The worker-timing arm was
+screened same-day and CLOSED FLAT (wwait24: mechanism 12/12, paired
+survival +282 at t=0.88, under the screen's own MDE -- log,
+2026-09-07), making the observational-to-causal ledger three for
+three. The proximate-event head is the lane's only remaining road,
+and the spend goes there.
 
 ## What is deliberately not decided here
 
