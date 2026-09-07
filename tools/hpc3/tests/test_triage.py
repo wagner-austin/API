@@ -219,6 +219,35 @@ class TestUnaccountedAgainstArrayAggregates:
         entries = [_entry("55678543_2"), _entry("55678543_3")]
         assert unaccounted_jobs(entries, [_status("55678543_[2-3%2]", "PENDING")]) == []
 
+    def test_a_half_started_array_mixes_per_task_rows_with_a_residual_aggregate(self) -> None:
+        """The shape a base-id query returns while an array is DRAINING, and
+        the one neither pure case covers. Measured live on HPC3 2026-09-06 as
+        55765284 started after 44 hours queued::
+
+            55765284_0|mi.redo-e2be2a3-1.5b|RUNNING
+            ...
+            55765284_3|mi.redo-e2be2a3-1.5b|RUNNING
+            55765284_[4-5]|mi.redo-e2be2a3-1.5b|PENDING
+
+        One query, both forms in one result set. Every recorded task is
+        covered by exactly one of them.
+        """
+        entries = [_entry(f"55765284_{index}") for index in range(6)]
+        statuses = [
+            *(_status(f"55765284_{index}", "RUNNING") for index in range(4)),
+            _status("55765284_[4-5]", "PENDING"),
+        ]
+        assert unaccounted_jobs(entries, statuses) == []
+
+    def test_a_task_outside_both_forms_of_a_draining_array_is_still_found(self) -> None:
+        """The mixed shape must not become a blanket pass for the base id."""
+        entries = [_entry(f"55765284_{index}") for index in range(7)]
+        statuses = [
+            *(_status(f"55765284_{index}", "RUNNING") for index in range(4)),
+            _status("55765284_[4-5]", "PENDING"),
+        ]
+        assert [f.job_id for f in unaccounted_jobs(entries, statuses)] == ["55765284_6"]
+
     def test_a_task_missing_from_a_started_array_is_still_unaccounted(self) -> None:
         """Once tasks start they are reported per-task, so a task with no row
         of its own is genuinely absent and must still be reported. This is the
