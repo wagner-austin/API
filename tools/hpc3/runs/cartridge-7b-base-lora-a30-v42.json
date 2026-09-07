@@ -1,0 +1,36 @@
+{
+  "project": "mi",
+  "name": "cartridge-7b-base-lora-a30-v42",
+  "image": {
+    "path": "/pub/wagnera3/images/v42/abl.sif",
+    "sha256": "270d8197190103649c876b875e70002625c88b456fd0c1cb57370639a16bb80e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 2400,
+  "mem_gb": 64,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_base_lora_sweep --plan pythia-6.9b-base-lora --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --pool-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/pythia-6.9b-base-lora-a30-v42.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/pythia-6.9b-base-lora-a30-v42.json",
+  "experiment": {
+    "measurement": "cartridge-base-lora-composition",
+    "plan": "pythia-6.9b-base-lora",
+    "base_model": "EleutherAI/pythia-6.9b",
+    "model_snapshot": "c0e3eee36dc47af0c49f361c74cfe459c09f7f23",
+    "model_shard_sha256": "34782c3cf3cd80d1eae11d42f1b23c024226651da9c3f2ad61e35afbd724f62b.f73019e3a2ce46f8a57f3a35509900df3bb21051da3d28408c646487e6c4451c",
+    "precision": "nf4-double-quant-bf16-compute-declared-by-cli-policy-not-plan",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
+    "pool_corpora": "epi.metabolomics.atmospheric-chemistry",
+    "seeds": "7.8.9",
+    "image_commit": "09f5a4bb33544163dc2f4bfa8fb2daf332213066",
+    "baseline_record": "cff9f3ce-xl-base-lora-twin-certificate-pending",
+    "why": "the-7B-rung-architecture-jump-GPT-NeoX-full-MHA-fused-qkv-measured-in-its-deployable-NF4-form",
+    "gpu_pinned_because": "nf4-puts-the-7b-pair-at-24GB-scale-a30s-are-plentiful-72-free-vs-8-contended-a100s-and-two-fp32-7b-models-56GB-fit-no-free-card"
+  },
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  }
+}
