@@ -163,6 +163,14 @@ class TestMeasureGrid:
         named = {observation["name"] for observation in observations}
         assert "max_drawn" in named
         assert "lora-train-epoch-0_loss" in named
+        # The seed pairing is the evidence: every arm carries one gain per
+        # seed, and the SAME seeds across arms of a cell, so a paired
+        # re-analysis is possible from the record alone.
+        for seed in (7, 8, 9):
+            assert f"lora-plain-n2-alone_seed{seed}_gain" in named
+            assert f"lora-plain-n2-composed_seed{seed}_gain" in named
+            assert f"lora-diverse-n3-untrained-composed_seed{seed}_gain" in named
+            assert f"lora-companion-cross-0_seed{seed}_gain" in named
         assert "lora-companion-cross-0_mean" in named
         assert "lora-companion-cross-1_spread" in named
         assert "lora-plain-n2-alone_mean" in named
@@ -287,6 +295,13 @@ class TestProductionPlan:
         medium = BASE_LORA_SWEEP_PLANS["gpt2-medium-base-lora"]
         assert medium["model_id"] == "gpt2-medium"
         assert {**medium, "model_id": recorded["model_id"]} == recorded
+
+    def test_the_xl_rung_differs_from_the_recorded_plan_only_in_the_base(self) -> None:
+        """The 1.5B rung of the depth ladder, same isolation rule."""
+        recorded = BASE_LORA_SWEEP_PLANS["gpt2-base-lora"]
+        xl = BASE_LORA_SWEEP_PLANS["gpt2-xl-base-lora"]
+        assert xl["model_id"] == "gpt2-xl"
+        assert {**xl, "model_id": recorded["model_id"]} == recorded
 
     def test_the_seed_geography_cannot_collide(self) -> None:
         """The LoRA and pool seeds sit past every measurement offset."""

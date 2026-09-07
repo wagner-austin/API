@@ -243,6 +243,29 @@ BASE_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # The 1.5B rung of the depth ladder (12 -> 24 -> 48 layers), LM
+    # objective's half: the content-vs-LM comparison must exist AT each
+    # depth for the trend to be readable, so gpt2-xl gets both rows. Every
+    # field but the base matches ``gpt2-base-lora``, per the medium
+    # precedent -- scale is never confounded with tuning.
+    "gpt2-xl-base-lora": {
+        "model_id": "gpt2-xl",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 
@@ -288,6 +311,27 @@ CONTENT_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
     # gpt2-medium runs first and gpt2-small is its cross-scale anchor.
     "gpt2-medium-content-lora": {
         "model_id": "gpt2-medium",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+    # The 1.5B rung, invariance half. Field-equal to its ``gpt2-xl-base-lora``
+    # twin, so the pair isolates the objective at 48 layers exactly as the
+    # medium pair does at 24.
+    "gpt2-xl-content-lora": {
+        "model_id": "gpt2-xl",
         "window": 256,
         "held_out_stride": 4,
         "compartment_counts": (4, 8),

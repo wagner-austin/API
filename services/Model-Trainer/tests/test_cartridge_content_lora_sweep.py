@@ -167,6 +167,12 @@ class TestMeasureGrid:
         assert "max_drawn" in named
         assert "invariance-train-epoch-0_kl" in named
         assert "lora-train-epoch-0_loss" not in named
+        # Same per-seed pairing rows as the base-LoRA grid, so paired
+        # re-analysis works identically on both objectives' records.
+        for seed in (7, 8, 9):
+            assert f"lora-plain-n2-alone_seed{seed}_gain" in named
+            assert f"lora-diverse-n2-composed_seed{seed}_gain" in named
+            assert f"lora-companion-cross-1_seed{seed}_gain" in named
         assert "lora-companion-cross-0_mean" in named
         assert "lora-companion-cross-1_spread" in named
         assert "lora-plain-n2-alone_mean" in named
@@ -255,6 +261,10 @@ class TestProductionPlan:
         assert (
             CONTENT_LORA_SWEEP_PLANS["gpt2-medium-content-lora"]
             == (BASE_LORA_SWEEP_PLANS["gpt2-medium-base-lora"])
+        )
+        assert (
+            CONTENT_LORA_SWEEP_PLANS["gpt2-xl-content-lora"]
+            == (BASE_LORA_SWEEP_PLANS["gpt2-xl-base-lora"])
         )
 
     def test_the_experiment_name_is_its_own(self) -> None:
