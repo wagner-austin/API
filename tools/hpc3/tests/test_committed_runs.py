@@ -46,6 +46,7 @@ from platform_core.json_utils import JSONValue, load_json_str
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, decode_workspace
+from hpc3.core.inputs import declared_inputs
 
 _RUNS = pathlib.Path(__file__).parent.parent / "runs"
 
@@ -401,3 +402,91 @@ class TestEveryCommittedSubmissionResolves:
         # so those checkpoints stay valid, and keeping them is what lets the
         # v4 run measure run-to-run variability against a real baseline.
         assert len(stated) == 18
+
+
+class TestTheInputCheckHasASubject:
+    """``declared_inputs`` must be seen to find something.
+
+    ``require_inputs_present`` refuses a run whose declared inputs are not on
+    the cluster. It is silent when a command declares nothing -- correctly,
+    since most do -- which means the whole check goes vacuously green the
+    moment the extractor stops recognising a flag. Rename ``--payload`` to
+    ``--payload-file`` and every code-style run declares nothing, every
+    submission passes, and the gap that killed job 55806418 is back with the
+    guard still reporting success.
+
+    The unit tests in :mod:`tests.test_inputs` cannot catch that: they pass
+    the extractor command strings they wrote themselves, so they agree with
+    it by construction. Only the committed documents are an independent
+    subject.
+    """
+
+    #: The flag spellings the committed commands actually use, written out
+    #: here rather than imported from :data:`~hpc3.core.inputs.INPUT_FLAGS`.
+    #: Reading them from the module under test would make this circular --
+    #: renaming the flag would rename the expectation with it, and the loop
+    #: would skip every command instead of failing. These are the strings on
+    #: the command lines, and they are the reason the extractor exists.
+    _SPELLINGS = ("--payload", "--spec", "--items", "--corpus")
+
+    def test_a_command_naming_an_input_flag_yields_that_input(self) -> None:
+        """The sharp form, with no count to keep up to date.
+
+        A committed command containing ``--payload`` and a ``/pub`` path MUST
+        produce a declared input. This fires on exactly the regression that
+        matters -- the extractor no longer recognising a flag that is right
+        there in the command -- with no magic number and no exemption list.
+        """
+        checked = 0
+        for name, _project, document in _submissions():
+            command = document.get("command")
+            if not isinstance(command, str):
+                continue
+            for flag in self._SPELLINGS:
+                if f"{flag} /pub/" not in command:
+                    continue
+                checked += 1
+                assert declared_inputs(command), (
+                    f"{name}: command names {flag} with a /pub path, "
+                    f"but declared_inputs found nothing: {command}"
+                )
+
+        # The loop above is vacuous if no committed command spells any of
+        # them, which is the reading this whole class exists to refuse.
+        assert checked >= 100
+
+    def test_the_committed_documents_actually_exercise_the_extractor(self) -> None:
+        """The subject exists at all.
+
+        Every assertion above is over a loop that a deleted or emptied
+        ``runs/`` would make vacuous. Measured 2026-09-07: 138 committed
+        submissions declare at least one input across 29 unique cluster
+        paths. Asserting a floor rather than the exact count keeps this from
+        failing every time a run document is added, while still refusing the
+        reading where the extractor has nothing to work on.
+        """
+        declaring = [
+            name
+            for name, _project, document in _submissions()
+            if isinstance(document.get("command"), str)
+            and declared_inputs(str(document["command"]))
+        ]
+
+        assert len(declaring) >= 100
+        assert "code-style-run-train-v2.json" in declaring
+        assert "code-style-run-gen-v2-base.json" in declaring
+
+    def test_an_output_flag_is_not_mistaken_for_an_input(self) -> None:
+        """The committed documents as an independent check on the split.
+
+        ``--record`` and ``--out-dir`` name files a job WRITES. If either were
+        ever added to ``INPUT_FLAGS`` the first run of everything would be
+        refused, and it would be refused in production rather than here.
+        """
+        for name, _project, document in _submissions():
+            command = document.get("command")
+            if not isinstance(command, str):
+                continue
+            for path in declared_inputs(command):
+                assert "/results/" not in path, f"{name}: {path} is written, not read"
+                assert "/generated/" not in path, f"{name}: {path} is written, not read"
