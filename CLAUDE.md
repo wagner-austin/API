@@ -9,8 +9,17 @@ Typed Python monorepo: ML training, NLP, media services, quant-ML risk
 modeling. Strict mypy (no `Any`, no `cast`, no `type: ignore`), 100%
 statement + branch coverage, FastAPI + RQ + Redis + Kafka.
 
-**`CODE_STANDARDS.md` is the bar a change here is reviewed against — read it
-before you write code, not after.** It is deliberately not a restatement of the
+**The operator's own coding instruction, VERBATIM, is
+`~/PROJECTS/MCPs/CODING_PROMPT.md` — read it before you write code.** He was
+pasting that text into every coding session by hand; it is the SOURCE, and if it
+and any document here disagree, it wins. **ONE copy, deliberately cross-repo:**
+the instruction is repo-agnostic, and a second copy in this tree would be two
+statements of one bar, free to drift while both look authoritative — which is
+the `passthrough-alias` failure applied to prose. TypeScript work appends one
+line and changes nothing else: *"but for typescript of course"*.
+
+**`CODE_STANDARDS.md` is that bar in GRADED form — what a change here is
+reviewed against, so read it before you write code, not after.** It is deliberately not a restatement of the
 above: all 48 packages enforce the mechanical rules at `make check`, so the
 file points at that harness rather than duplicating it, and spends its length
 on the judgment items no linter expresses. The audit manager's standards arm
