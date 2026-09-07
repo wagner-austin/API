@@ -1,0 +1,20 @@
+# Evidence files are byte-exact records, not source, and must survive a
+# checkout unchanged.
+#
+# The generation manifests are written with an explicit verbatim newline by
+# platform_core.continuation_task, for a stated reason: "a manifest whose rows
+# end differently on two machines is one whose digest differs for a reason
+# having nothing to do with the models". manifest_digest hashes those rows, so
+# a newline rewritten on checkout changes the digest of a record whose whole
+# job is to be comparable across machines.
+#
+# This repository has core.autocrlf=true and no other .gitattributes, so
+# without this rule `git add` warns "LF will be replaced by CRLF the next time
+# Git touches it" -- and it would be right. The outcome and comparison records
+# get the same treatment for the same reason: they are compared, digested and
+# cited, not edited.
+#
+# -text rather than `text eol=lf`: no conversion in either direction, so the
+# bytes committed are the bytes scored.
+runs/gen-*/*.jsonl -text
+runs/gen-*/*.json -text

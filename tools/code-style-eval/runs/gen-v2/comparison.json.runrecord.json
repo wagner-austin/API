@@ -1,0 +1,139 @@
+{
+  "experiment": "code-style-guard-pass",
+  "label": "qwen2.5-coder-1.5b-qlora-v2-cluster",
+  "fingerprint": {
+    "image_digest": "",
+    "gpu_model": "",
+    "driver_version": "",
+    "determinism": {
+      "stack": "none",
+      "settings": {}
+    },
+    "host": {
+      "platform": "Windows-10-10.0.26200-SP0",
+      "machine": "AMD64",
+      "logical_cores": 24
+    },
+    "packages": [
+      {
+        "name": "aiohttp",
+        "version": "3.14.3"
+      },
+      {
+        "name": "discord.py",
+        "version": "2.7.1"
+      },
+      {
+        "name": "fastapi",
+        "version": "0.124.4"
+      },
+      {
+        "name": "flask",
+        "version": "3.1.3"
+      },
+      {
+        "name": "google-api-python-client",
+        "version": "2.200.0"
+      },
+      {
+        "name": "httpx",
+        "version": "0.28.1"
+      },
+      {
+        "name": "kaggle",
+        "version": "2.2.4"
+      },
+      {
+        "name": "loguru",
+        "version": "0.7.3"
+      },
+      {
+        "name": "mujoco",
+        "version": "3.12.0"
+      },
+      {
+        "name": "mypy",
+        "version": "2.3.1"
+      },
+      {
+        "name": "numpy",
+        "version": "2.4.6"
+      },
+      {
+        "name": "pandas",
+        "version": "3.0.5"
+      },
+      {
+        "name": "pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "platform-core",
+        "version": "0.1.0"
+      },
+      {
+        "name": "python-dotenv",
+        "version": "1.2.3"
+      },
+      {
+        "name": "ruff",
+        "version": "0.16.6"
+      },
+      {
+        "name": "toml",
+        "version": "0.10.2"
+      },
+      {
+        "name": "torch",
+        "version": "2.14.0"
+      },
+      {
+        "name": "types-toml",
+        "version": "0.10.8.20260518"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "name": "baseline_only",
+      "value": 17.0
+    },
+    {
+      "name": "baseline_pass_rate",
+      "value": 0.03314285714285714
+    },
+    {
+      "name": "both_passed",
+      "value": 12.0
+    },
+    {
+      "name": "candidate_only",
+      "value": 12.0
+    },
+    {
+      "name": "candidate_pass_rate",
+      "value": 0.027428571428571427
+    },
+    {
+      "name": "exact_p",
+      "value": 0.45825831964612007
+    },
+    {
+      "name": "mid_p",
+      "value": 0.361594608053565
+    },
+    {
+      "name": "neither",
+      "value": 834.0
+    },
+    {
+      "name": "net_improvement",
+      "value": -5.0
+    },
+    {
+      "name": "shared_items",
+      "value": 875.0
+    }
+  ],
+  "payload_digest": "0e3e9080fafbe2c46057c27a01298fd84002518e441bde50e076d26f1e9ddb9f"
+}

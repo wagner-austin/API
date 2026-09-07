@@ -208,6 +208,37 @@ tools/hpc3/runs/*
 # hypothetical this rule prevents, it is the steady state everywhere a prefix
 # has not been negated.
 !tools/hpc3/runs/cartridge-*.json
+
+# code-style-eval OUTCOMES are the measurement, not run output. A guard-pass
+# comparison is a per-item boolean from ruff, mypy and scripts.guard over a
+# fixed holdout; the generations can be reproduced from a pinned adapter and a
+# digest-pinned corpus, but the SCORES cannot be recovered from anything in
+# this tree once the machine that ran them is gone.
+#
+# That was the state on 2026-09-07: the v1 outcomes had lived on one developer
+# machine since 2026-09-04, tracked by nothing, and were the only evidence for
+# a published comparison. The v2 run reproduced the same exposure. Committing
+# them is what makes the finding checkable by anyone who did not run it.
+#
+# Narrow on purpose -- outcomes, the generation manifests that carry each
+# item's termination flag, and the comparison record with its provenance. NOT
+# the holdout (14 MB, and pinned by sha256 in tools/hpc3/runs/
+# code-corpus-v2-digests.txt) and NOT the generated files themselves, which
+# are on the cluster and rebuildable.
+#
+# The termination manifests are not optional extras: the headline result --
+# that guard conformance IMPROVES on completions the model finishes and
+# collapses on the ones it truncates -- cannot be recomputed without them.
+!tools/code-style-eval/runs/
+tools/code-style-eval/runs/*
+!tools/code-style-eval/runs/gen-v1/
+tools/code-style-eval/runs/gen-v1/*
+!tools/code-style-eval/runs/gen-v2/
+tools/code-style-eval/runs/gen-v2/*
+!tools/code-style-eval/runs/gen-v*/*.outcomes.jsonl
+!tools/code-style-eval/runs/gen-v*/*.generation.jsonl
+!tools/code-style-eval/runs/gen-v*/comparison.json
+!tools/code-style-eval/runs/gen-v*/comparison.json.runrecord.json
 **/corpus/
 
 # But allow source code directories named "data"
