@@ -201,6 +201,16 @@ green and correctly so.
   it red**, and the check returns to being unable to notice the next
   divergence — now with a passing history that reads as evidence it works. A
   check that is wrong is cheaper than one that is wrong and vindicated.
+
+  **And this is NOT caught by "could this pass while doing nothing".** Those
+  two questions look like one and are not, which is what made this survive: the
+  floor was `>= 100`, so an *empty* subject would have failed it loudly, and
+  that is precisely why its author believed it was safe. The subject was not
+  empty — it was **wrong and populated**, which an emptiness check cannot see
+  by construction. Ask both. One catches a check with nothing to examine; the
+  other catches a check examining the wrong thing confidently. (The distinction
+  is `opus-corpus-docmode-0901`'s, who wrote the floor and then found what it
+  could not see.)
 - **Does a check read the command line, or the thing the command line names?**
   A verifier that reads flags does not read inside the file it just verified.
   Stated by its own author as the gap in `require_inputs_present`: preflight
