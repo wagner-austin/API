@@ -11,7 +11,7 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/contracts/replicated_measurement.py": 2c6af8b1ad7bdae264d03ae689a8d76dcc89f0eb
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 18c3ae406e820dd322a48f6fb2174e63cfa5e2c2
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 14a8f4c663b59b0f266fcb22b58820dadfff82cb
 provenance:
   - "measured 2026-09-06 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
@@ -90,7 +90,7 @@ It is not being replaced, and it is not a defect. Within one plan every arm
 shares `n`, so the maximum range is a fair estimate of how much one arm of that
 kind wobbles, which is what its docstring claims and all it claims. It is also
 correctly split into a sweep floor and a composition floor
-(`cartridge_benchmark.py` L229-L230), because a composed arm trains two
+(`cartridge_benchmark.py` L367-L368), because a composed arm trains two
 cartridges and runs a doubled prefix and is noisier for reasons that say
 nothing about the sweep.
 
