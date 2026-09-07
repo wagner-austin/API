@@ -72,6 +72,42 @@ a line, and let the author answer. The audit's whole credibility rests on not
 manufacturing findings — a checker that invents them gets routed around, and
 then it checks nothing.
 
+## The standing directive, and the rule that already refuses each part
+
+The operator's standing instruction, restated verbatim because it is given to
+sessions by hand and belongs where the bar is written:
+
+> "I want to ensure no back compat shims, no thin wrappers, no fallbacks, no
+> legacy code, no type alias."
+
+**Every clause is already enforced here by name.** This section is a map, not a
+new bar — it exists so a reviewer cites the rule that fails the build instead of
+paraphrasing the directive into a fresh one, and so a session that reads only
+this file knows the clauses are mechanical rather than aspirational:
+
+| clause | what refuses it |
+|---|---|
+| no fallbacks | `hook-fallback-dispatch`, and `hook-conditional-dispatch` for the sibling shape — a call site that branches on which implementation is installed |
+| no back-compat shims | `shim-compatibility-marker` |
+| no thin wrappers | `passthrough-alias` |
+| no legacy code | `qr-legacy-validators` |
+| no type alias | ruff bans `typing.TypeAlias` at the import; `typealias-forbidden` |
+| no `Any`, no `cast` | `any-usage`, `cast-call`, `ruff-missing-ban-typing-any`, `ruff-missing-ban-typing-cast`, and the `mypy-disallow-any-*-disabled` rules that stop a package relaxing its own config |
+| no `type: ignore`, no `.pyi` | `type-ignore`, `pyi-disallowed` |
+| no `if TYPE_CHECKING:` | `imports_rules.py` — `TYPE_CHECKING` is in `forbidden_typing_imports`, catching both `from typing import TYPE_CHECKING` and the `typing.TYPE_CHECKING` attribute form |
+| no dataclasses | `dataclass-decorator-forbidden`, `dataclass-import-forbidden` |
+| DI through hooks, not branching | `hook-dispatch`, `hook-conditional-dispatch` — production wires the real implementation at startup and tests swap it; no call site asks which one it got |
+
+Two consequences worth stating, because they are what the table is FOR:
+
+- **A directive violation is a build failure, not a review opinion.** If you are
+  about to write "this looks like a fallback" as a finding, name the rule
+  instead — and if no rule fires, ask whether it is really the thing the
+  directive names before saying so.
+- **The reverse also holds.** A shape none of these rules catches is a judgment
+  item, and belongs in the section below with its reasoning, not asserted as if
+  the tooling had already ruled on it.
+
 ## The harness a package must SHIP
 
 The section above is a description of the 48, not permission for the 49th to
