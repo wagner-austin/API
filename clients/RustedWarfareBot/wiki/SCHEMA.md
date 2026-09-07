@@ -77,7 +77,9 @@ Two frontmatter traps, both of which this file documented wrongly until
    so nothing it names is ever checked. Evidence that is not a repo path —
    a run label, a measurement, a log date range — goes in `provenance:`.
 
-`source_paths` follows the workspace's **`code-paths`** source contract, the same one the sibling TankpitBot wiki uses. Entries resolve relative to this client directory. Three shapes are recognised: a bare path (must exist), a `<path>:<line>` anchor (line must be within the file), and an external URL (skipped by the existence rules). Gitignored artifacts — everything under `runs/` and `.game/` — are unpinnable by nature and exempt from `source_git_blobs`, but their existence is still enforced, so a typo'd path fails loudly.
+`source_paths` follows the workspace's **`code-paths`** source contract, the same one the sibling TankpitBot wiki uses. Entries resolve relative to this client directory. Three shapes are recognised: a bare path (must exist), a `<path>:<line>` anchor (line must be within the file), and an external URL (skipped by the existence rules). Gitignored artifacts — everything under `runs/` and `.game/` — are unpinnable by nature and exempt from `source_git_blobs`.
+
+Enforcement runs in two tiers, split by what a machine can honestly assert (amended 2026-09-07, the day the first CI run on a fresh clone met the old single-tier rule). The **repo tier** — everything above except artifact existence — is a property of the checkout alone, so the test suite enforces it everywhere, fresh clones and CI runners included. The **artifact tier** additionally existence-checks `runs/` and `.game/` paths, so a typo'd artifact path still fails loudly — but only where the artifact store lives: `make sources` (and therefore `make check`) runs `wiki_check --artifacts` on the workstation. A fresh clone genuinely does not hold the measurement record, and a gate that only one machine can pass gates nothing anywhere else.
 
 A page whose sources are all untracked omits `source_git_blobs` entirely. A page citing tracked repo code must pin **every** tracked path it cites; partial pinning is a finding.
 

@@ -55,6 +55,38 @@ def test_a_clean_tree_passes_with_a_summary(
     assert capsys.readouterr().out == "[sources] 0 violation(s) across 2 pages\n"
 
 
+def test_a_missing_artifact_path_is_the_artifact_tiers_finding_alone(tmp_path: Path) -> None:
+    """The two-tier split (SCHEMA.md, 2026-09-07): a `runs/` citation that
+    does not resolve is invisible to the repo tier -- a fresh clone holds no
+    measurement record, honestly -- and fatal to the artifact tier, which is
+    what `make sources` runs beside the artifact store."""
+    _clean_tree(tmp_path)
+    _write(
+        tmp_path,
+        "wiki/pages/beta.md",
+        '---\ntitle: "Beta"\nsource_paths:\n  - "runs/sweeps/demo/absent.txt"\n---\n'
+        "# Beta\n\nPlain.\n",
+    )
+    assert run_checks(tmp_path) == ()
+    assert run_checks(tmp_path, artifacts=True) == (
+        "beta.md: source path does not resolve: runs/sweeps/demo/absent.txt",
+    )
+    assert main(["--artifacts"], root=tmp_path) == EXIT_VIOLATIONS
+
+
+def test_an_artifact_path_that_resolves_passes_both_tiers(tmp_path: Path) -> None:
+    _clean_tree(tmp_path)
+    _write(tmp_path, "runs/sweeps/demo/present.txt", "a scorecard\n")
+    _write(
+        tmp_path,
+        "wiki/pages/beta.md",
+        '---\ntitle: "Beta"\nsource_paths:\n  - "runs/sweeps/demo/present.txt"\n---\n'
+        "# Beta\n\nPlain.\n",
+    )
+    assert run_checks(tmp_path) == ()
+    assert main(["--artifacts"], root=tmp_path) == EXIT_OK
+
+
 def test_every_rule_fires_once_on_the_broken_tree(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:

@@ -336,10 +336,21 @@ def test_real_spawn_and_kill_run_a_live_child(tmp_path: Path) -> None:
     assert child.pid > 0
     assert child.poll() is None
 
+    # Wait for the line BEFORE killing: the kill can land before a loaded
+    # host has even started the child interpreter, and an empty transcript
+    # then reads as a redirection failure. Caught on the CI runner's first
+    # execution (2026-09-07) after passing on the workstation for weeks --
+    # the workstation was merely never slow enough to lose the race.
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if transcript.exists() and transcript.read_text(encoding="utf-8").startswith("spawned"):
+            break
+        time.sleep(0.05)
+    assert transcript.read_text(encoding="utf-8").startswith("spawned")
+
     _kill_tree_impl(child.pid)
     deadline = time.monotonic() + 30
     while child.poll() is None and time.monotonic() < deadline:
         time.sleep(0.05)
     if child.poll() is None:
         raise AssertionError("child still running after kill_tree")
-    assert transcript.read_text(encoding="utf-8").startswith("spawned")

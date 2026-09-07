@@ -108,7 +108,7 @@ test:
 sources:
 	@Write-Host ""
 	@Write-Host "==> sources (wiki provenance and navigation)" -ForegroundColor Cyan
-	poetry run python -m scripts.wiki_check
+	poetry run python -m scripts.wiki_check --artifacts
 
 # The Java half is gated here too. Without agent-selftest in the chain, a
 # patcher regression or an obfuscated name that moved in a game update stays

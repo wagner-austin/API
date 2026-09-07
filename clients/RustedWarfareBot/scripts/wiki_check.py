@@ -69,13 +69,34 @@ def _first_group_all(pattern: re.Pattern[str], text: str) -> tuple[str, ...]:
     return tuple(m.group(1) for m in pattern.finditer(text))
 
 
-def _check_sources(page: str, matter: str, root: Path) -> list[str]:
-    """Verify every cited path resolves and every line anchor is in bounds."""
+#: Roots whose contents are gitignored measurement records -- the artifact
+#: store, present only on machines that hold the mirror (the workstation and
+#: the cluster), absent by design from every fresh clone. Their existence is
+#: the ARTIFACT tier's claim, not the repo contract's; see
+#: :func:`run_checks`.
+ARTIFACT_ROOTS = ("runs/", ".game/")
+
+
+def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> list[str]:
+    """Verify every cited path resolves and every line anchor is in bounds.
+
+    Args:
+        page: The page filename, for the violation lines.
+        matter: The page's frontmatter block.
+        root: The client directory.
+        artifacts: Whether paths under :data:`ARTIFACT_ROOTS` are
+            existence-checked too. See :func:`run_checks`.
+
+    Returns:
+        One line per violation.
+    """
     found: list[str] = []
     for entry in [*_source_entries(matter), *_blob_paths(matter)]:
         if entry.startswith("http"):
             continue
         path_part, _, line_part = entry.partition(":")
+        if not artifacts and path_part.startswith(ARTIFACT_ROOTS):
+            continue
         cited = root / path_part
         if not cited.exists():
             found.append(f"{page}: source path does not resolve: {path_part}")
@@ -140,11 +161,25 @@ def _index_total(index: str) -> str | None:
     return None if total is None else total.group(1)
 
 
-def run_checks(root: Path) -> tuple[str, ...]:
+def run_checks(root: Path, artifacts: bool = False) -> tuple[str, ...]:
     """Run every check over the wiki tree.
+
+    Two tiers, split by what a machine can honestly assert (2026-09-07,
+    the first CI run on a fresh clone). The REPO tier -- frontmatter,
+    tracked-path resolution, anchors, links, navigation, counts -- is true
+    or false of the checkout alone, so the test suite enforces it on every
+    machine including CI. The ARTIFACT tier additionally
+    existence-checks paths under :data:`ARTIFACT_ROOTS`: those are
+    gitignored measurement records held only beside the artifact store,
+    so ``make sources`` on the workstation enforces it and a fresh clone
+    does not pretend to. Before the split, the schema enforced artifact
+    existence unconditionally -- which meant the gate could only ever pass
+    on one machine, and a gate that only one machine can pass gates
+    nothing anywhere else (``wiki/SCHEMA.md``).
 
     Args:
         root: The client directory holding ``wiki/``.
+        artifacts: Whether the artifact tier runs too.
 
     Returns:
         One line per violation, empty when the contract holds.
@@ -161,7 +196,7 @@ def run_checks(root: Path) -> tuple[str, ...]:
         matter = _frontmatter(text)
         if "title:" not in matter:
             found.append(f"{page.name}: no frontmatter title; the page is unpinnable")
-        found.extend(_check_sources(page.name, matter, root))
+        found.extend(_check_sources(page.name, matter, root, artifacts))
         found.extend(_check_links(page.name, text, slugs))
     found.extend(_check_navigation(root, pages, hubs))
     return tuple(found)
@@ -171,22 +206,23 @@ def main(argv: list[str] | None = None, root: Path | None = None) -> int:
     """Check the wiki and report.
 
     Args:
-        argv: No arguments are accepted; present for the entry-point shape.
-            ``None`` reads ``sys.argv[1:]``.
+        argv: ``--artifacts`` runs the artifact tier too (what
+            ``make sources`` passes on artifact-holding machines); no
+            other argument is accepted. ``None`` reads ``sys.argv[1:]``.
         root: The client directory, injectable for tests. ``None`` uses
             the working directory.
 
     Returns:
         ``EXIT_OK`` when the contract holds, ``EXIT_VIOLATIONS`` with one
         line per violation when it does not, ``EXIT_BAD_USAGE`` on any
-        argument.
+        other argument.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if args:
-        sys.stdout.write("usage: wiki_check\n")
+    if args not in ([], ["--artifacts"]):
+        sys.stdout.write("usage: wiki_check [--artifacts]\n")
         return EXIT_BAD_USAGE
     base = root if root is not None else Path()
-    found = run_checks(base)
+    found = run_checks(base, artifacts=args == ["--artifacts"])
     for line in found:
         sys.stdout.write(f"{line}\n")
     pages = len(list((base / "wiki" / "pages").glob("*.md")))
