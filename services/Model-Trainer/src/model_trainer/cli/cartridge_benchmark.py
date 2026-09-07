@@ -85,6 +85,7 @@ from model_trainer.core.services.model.cartridge_plans import (
     require_cartridge_plan,
 )
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
+from model_trainer.core.services.model.gemm_timing import synchroniser
 
 _log = get_logger(__name__)
 
@@ -210,6 +211,41 @@ def cost_observations(
     )
 
 
+def duration_observations(
+    *, sweep_seconds: float, composition_seconds: float
+) -> tuple[Observation, ...]:
+    """Name what the training arms COST IN TIME.
+
+    Separate from :func:`cost_observations` because the two are different
+    kinds of number and only one of them is reproducible. The counts are a
+    function of the plan and the corpus and come out identical on every
+    machine; these are a property of the card, the driver and whatever else
+    was scheduled at the time. Merging them would put a figure that moves
+    under load in the same bag as figures that cannot.
+
+    Reported as SECONDS, not as GPU-hours. The conversion needs to know the
+    device count, and the record already names the device in its fingerprint
+    -- deriving an hours figure here would bake an assumption the reader can
+    make better themselves.
+
+    Args:
+        sweep_seconds: Wall-clock across the whole slot sweep.
+        composition_seconds: Wall-clock across the composition arm, which
+            trains two cartridges per seed rather than one.
+
+    Returns:
+        The named durations, plus their total.
+    """
+    return tuple(
+        Observation(name=name, value=value)
+        for name, value in (
+            ("sweep_seconds", sweep_seconds),
+            ("composition_seconds", composition_seconds),
+            ("training_seconds", sweep_seconds + composition_seconds),
+        )
+    )
+
+
 def measure_plan(
     plan: CartridgePlan,
     *,
@@ -274,7 +310,18 @@ def measure_plan(
     )
     _log.info("untrained prefix: %+.4f (spread %.4f)", untrained["mean"], untrained["spread"])
 
+    # EVERY TIMED BOUNDARY BRACKETS A SYNCHRONISE, for the reason
+    # `gemm_timing`'s docstring gives: a CUDA launch is asynchronous, so a
+    # clock read taken without waiting measures how long it took to QUEUE the
+    # work. The arms here each end in a scored gain, which reads a loss back
+    # to the host and therefore syncs on its own -- but relying on that would
+    # make these numbers depend on an implementation detail of the scorer
+    # rather than on anything this function controls.
+    wait = synchroniser(device)
+
     sweep: list[ReplicatedGain] = []
+    wait()
+    sweep_started = _test_hooks.monotonic_clock()
     for num_slots in plan["slot_counts"]:
         arm = measure_slot_count(
             base,
@@ -288,6 +335,10 @@ def measure_plan(
         sweep.append(arm)
         _log.info("%s: %+.4f (spread %.4f)", arm["arm"], arm["mean"], arm["spread"])
 
+    wait()
+    sweep_seconds = _test_hooks.monotonic_clock() - sweep_started
+
+    composition_started = _test_hooks.monotonic_clock()
     alone, composed = measure_composition(
         base,
         first_train=train,
@@ -299,6 +350,8 @@ def measure_plan(
         epochs=plan["epochs"],
         learning_rate=plan["learning_rate"],
     )
+    wait()
+    composition_seconds = _test_hooks.monotonic_clock() - composition_started
     _log.info("composition: %+.4f alone -> %+.4f composed", alone["mean"], composed["mean"])
 
     # TWO FLOORS, NOT ONE, AND THIS WAS A DEFECT BEFORE IT WAS A DESIGN. The
@@ -341,6 +394,9 @@ def measure_plan(
             held_out_windows=len(held_out),
             second_train_windows=len(second_train),
         )
+    )
+    observations.extend(
+        duration_observations(sweep_seconds=sweep_seconds, composition_seconds=composition_seconds)
     )
     observations.append(Observation(name="sweep_noise_floor", value=sweep_floor))
     observations.append(Observation(name="composition_noise_floor", value=composition_floor))
@@ -478,6 +534,7 @@ def entrypoint() -> None:
 __all__ = [
     "cartridge_run_record",
     "cost_observations",
+    "duration_observations",
     "entrypoint",
     "main",
     "measure_plan",

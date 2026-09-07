@@ -185,6 +185,32 @@ class TestMeasurePlan:
         names = [observation["name"] for observation in observations]
         assert len(names) == len(set(names))
 
+    def test_it_records_each_phase_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
+        """The durations are ASSERTED, not merely observed to be present.
+
+        A real clock could only support "the name is there", which would pass
+        just as happily if the two phases were timed the wrong way round or
+        one bracket read the same instant twice. A scripted clock pins the
+        exact arithmetic: four reads, two differences, one sum.
+        """
+        first = tmp_path / "alpha"
+        second = tmp_path / "beta"
+        first.mkdir()
+        second.mkdir()
+        ticks = iter([100.0, 110.0, 110.0, 117.5])
+        cli_hooks.monotonic_clock = lambda: next(ticks)
+        try:
+            observations, _digest = bench.measure_plan(
+                TINY_PLAN, corpus=first, second_corpus=second, device="cpu"
+            )
+        finally:
+            cli_hooks.monotonic_clock = cli_hooks._default_monotonic_clock
+
+        named = {observation["name"]: observation["value"] for observation in observations}
+        assert named["sweep_seconds"] == 10.0
+        assert named["composition_seconds"] == 7.5
+        assert named["training_seconds"] == 17.5
+
     def test_it_names_the_floor_and_the_retention(self, tmp_path: pathlib.Path) -> None:
         first = tmp_path / "alpha"
         second = tmp_path / "beta"

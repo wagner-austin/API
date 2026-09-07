@@ -15,8 +15,10 @@ instead of two.
 
 from __future__ import annotations
 
+from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_benchmark as bench
 from model_trainer.core.services.model.cartridge_plans import CartridgePlan
+from model_trainer.core.services.model.gemm_timing import synchroniser
 from tests.test_cartridge_benchmark import TINY_PLAN
 
 
@@ -135,3 +137,73 @@ class TestCostObservations:
         assert named["corpus_tokens"] == 400.0
         assert named["windows_trained"] == 0.0
         assert named["training_tokens"] == 0.0
+
+
+class TestDurationObservations:
+    def test_the_total_is_the_two_phases_added(self) -> None:
+        named = {
+            observation["name"]: observation["value"]
+            for observation in bench.duration_observations(
+                sweep_seconds=12.5, composition_seconds=7.25
+            )
+        }
+
+        assert named == {
+            "sweep_seconds": 12.5,
+            "composition_seconds": 7.25,
+            "training_seconds": 19.75,
+        }
+
+    def test_the_phases_stay_separate(self) -> None:
+        """Recorded apart because they are not the same work.
+
+        The composition arm trains TWO cartridges per seed against the
+        sweep's one, so a single merged duration would hide the arm that
+        costs most per seed behind the arm that has most seeds.
+        """
+        named = {
+            observation["name"]: observation["value"]
+            for observation in bench.duration_observations(
+                sweep_seconds=1.0, composition_seconds=9.0
+            )
+        }
+
+        assert named["sweep_seconds"] != named["composition_seconds"]
+        assert named["training_seconds"] == 10.0
+
+
+class TestSynchroniserReuse:
+    """The timing brackets reuse `gemm_timing.synchroniser` rather than fork it.
+
+    A second spelling of "how do I wait for this device" is exactly the drift
+    that module's docstring was written to prevent, and the cuda arm is
+    unreachable on every machine that runs this suite -- so it is asserted by
+    identity, which is the trick the module itself documents.
+    """
+
+    def test_a_cpu_run_waits_for_nothing(self) -> None:
+        wait = synchroniser("cpu")
+
+        assert wait() is None
+
+    def test_a_cuda_run_waits_on_torch(self) -> None:
+        import torch
+
+        assert synchroniser("cuda") is torch.cuda.synchronize
+
+
+class TestClockHook:
+    def test_the_production_clock_does_not_go_backwards(self) -> None:
+        """`perf_counter`, not `time.time`.
+
+        The value is only ever read as a difference, so a clock an NTP
+        correction can move backwards would record a negative duration and
+        report it as a measurement.
+        """
+        first = cli_hooks._default_monotonic_clock()
+        second = cli_hooks._default_monotonic_clock()
+
+        assert second >= first
+
+    def test_the_installed_default_is_the_production_clock(self) -> None:
+        assert cli_hooks.monotonic_clock is cli_hooks._default_monotonic_clock

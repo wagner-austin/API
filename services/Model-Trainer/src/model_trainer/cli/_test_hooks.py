@@ -159,6 +159,38 @@ def _default_env_cublaslt_workspace() -> str | None:
     return value if value else None
 
 
+class MonotonicClockProto(Protocol):
+    """Protocol for the wall clock a measurement times itself against.
+
+    Behind a hook for the reason :class:`EnvCublasltWorkspaceProto` is: it
+    reads process-global state a test must be able to drive, and it is the
+    only way a recorded duration can be asserted rather than merely observed
+    to exist. A test installs a scripted clock and checks the exact seconds
+    the record carries; a real one would leave the assertion at "the name is
+    present", which is the weak assertion this suite refuses.
+    """
+
+    def __call__(self) -> float:
+        """Return a monotonically increasing seconds counter."""
+        ...
+
+
+def _default_monotonic_clock() -> float:
+    """Production clock - used as default hook.
+
+    ``perf_counter`` rather than ``time.time``: the value is only ever used
+    as a DIFFERENCE, and a wall clock that an NTP correction or a
+    daylight-saving change can move backwards would record a negative
+    duration and report it as a measurement.
+
+    Returns:
+        Seconds from an arbitrary origin, guaranteed non-decreasing.
+    """
+    import time
+
+    return time.perf_counter()
+
+
 class RunBenchmarkChildProto(Protocol):
     """Protocol for spawning the benchmark's second-condition process.
 
@@ -484,6 +516,8 @@ pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
 
 env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_workspace
 
+monotonic_clock: MonotonicClockProto = _default_monotonic_clock
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 
@@ -494,6 +528,7 @@ __all__ = [
     "LoadContinuationArmProto",
     "LoadHubModelProto",
     "LoadRunModelProto",
+    "MonotonicClockProto",
     "ReadCorpusDocumentsProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
@@ -503,6 +538,7 @@ __all__ = [
     "load_continuation_arm",
     "load_hub_model",
     "load_run_model",
+    "monotonic_clock",
     "pin_torch_threads",
     "read_corpus_documents",
     "run_benchmark_child",
