@@ -13,8 +13,8 @@ source_paths:
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_composition_sweep.py": 474530669efb45fff0d4725f11af1769068c7bf7
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py": 81d64e75ebb103e728c46352bac905e25dc6b46e
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 49362ef25268637e431de591599fb509795f77b0
-  "docs/RESEARCH.md": b383e33e94e16a0c2dfd777d530d0e3703576b6e
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 14a8f4c663b59b0f266fcb22b58820dadfff82cb
+  "docs/RESEARCH.md": 30f467b165335bf40a2f4eb80c401e8fde8426ce
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "v2 record bit-identical across two processes: sha256 aa61330b9692f4c4bc13b410f4bf1874 (truncated), plan label gpt2-compartments-gpt2-w256-s4-e12-lr0.01-n2.4.8-f64-b512-seeds7.8.9"

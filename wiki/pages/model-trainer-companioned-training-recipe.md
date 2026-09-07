@@ -22,12 +22,12 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": 86c614151f8752fb3e16f78fca41f949448bdfab
   "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 944a2a1033890596c7c3d722647df505a023e63a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
-  "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": cd34e3450a1372e042b41b1b70a181a5221347a3
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 0e811873fc7de79554218e97baf2af909bc4fcdf
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": c191ab72218c03978e73d2804babad28b99cece6
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 8fe2794c8df1f8494db45224cf0366187ad2a687
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": 58900c5ea2f7dbf300c12bce6243189205bddda5
-  "docs/RESEARCH.md": b383e33e94e16a0c2dfd777d530d0e3703576b6e
+  "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": 75b3370cb8fd7ba5a7d5cac712e2a61c3abe6fdb
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 51621f94781dd5b27149fcc5931c4bb6e7209006
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
+  "docs/RESEARCH.md": 30f467b165335bf40a2f4eb80c401e8fde8426ce
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -43,7 +43,10 @@ provenance:
   - "gpt2-medium base-LoRA record CROSS-NODE BIT-IDENTICAL 2026-09-06: job 55790169 (gpu-17-02, 78 min) + twin 55798416 (gpu-18-02, 2h13m -- same bytes, slower node), both records sha256 372cee59 (truncated)"
   - "content-lora (crowd-invariance) cells measured 2026-09-06 on HPC3: job 55801429 (V100, 103 min), image v40 sha256 798d234a (truncated) from commit 7288bc8f, plan gpt2-medium-content-lora, board task a85fbabe; twin 55801941 BYTE-IDENTICAL, both records sha256 9abd901a (truncated) -- SAME-NODE certificate (queue placed both on hpc3-gpu-16-01); the arc's four cross-node certificates establish the pipeline's cross-node determinism separately"
   - "the v40 build and the medium run were both caught by the hpc-wake bridge's tagged board announcements (task f6b04193) with no manual sacct polling -- the arm that retired hand-rolled waits"
-fact_checked: "2026-09-06"
+  - "gpt2-small invariance anchor measured 2026-09-07 on HPC3: job 55806539 + twin 55806826 on hpc3-gpu-18-01 and hpc3-gpu-16-00 (~40 min each), unchanged v40 image, plan gpt2-content-lora, records CROSS-NODE BIT-IDENTICAL sha256 9abfbdd4 (truncated), board task 7642f7f9"
+  - "1.5B rung (gpt2-xl) measured 2026-09-07 on HPC3, BOTH objectives on A30-24GB: jobs 55808450 (LM, 3h27m) + 55808466 (invariance, 3h28m), image v41 sha256 f38bc982 (truncated) from commit 40c55fa5; first content attempt 55807973 hit CUDA OOM on V100-16GB by 50MiB at the KL step (two 1.5B fp32 models), so the pair moved cards together, gpu_pinned_because declared in both run documents"
+  - "1.5B twins 55809977/55809982 BYTE-IDENTICAL 2026-09-07: LM pair sha256 cff9f3ce (truncated), invariance pair sha256 6269120d (truncated) -- SAME-NODE certificates, the queue having placed all four runs on hpc3-gpu-l54-09; cross-node determinism established separately by the arc's five cross-node certificates"
+fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
 ---
@@ -228,6 +231,29 @@ both counts, the composed-below-noise-control content gap shrinks from
 mechanisms the arc named now have a working lever, and both levers are
 base-side: the cartridges themselves need nothing.
 
+## The ladder verdict: the collapse is a mid-depth valley
+
+The scale ladder run down and up from the medium finding (provenance
+below) settles the depth question with measurements at 12, 24 and 48
+layers for both objectives. At gpt2-small the invariance objective wins
+where nothing was collapsing -- diverse n4 +63.3% (vs the LM
+objective's +58.1%), n8 +49.6% (vs +33.3%), plain positive at both
+counts -- and its n4 ceiling matches medium's +63.2% to a tenth of a
+point, so the four-compartment ceiling is scale-invariant under the
+objective. At gpt2-xl (1.5B, 48 layers) the count penalty VANISHES:
+diverse n8 equals n4 to a tenth under BOTH objectives (LM
++54.8%/+54.8%, invariance +52.8%/+52.8%; each record's own separation
+flag between the two cells reads 0.0), so the 24-layer n8 collapse is a
+mid-depth valley, not a depth law -- the ladder reads 33.3 → −79.4 →
++54.8 for LM n8 and 49.6 → 38.1 → 52.8 for invariance n8. The two
+objectives tie on diverse at 1.5B (composed means within both noise
+floors); the invariance objective's remaining margin there is plain
+cartridges (+22.5%/+5.8% against the LM objective's −11.5%/−27.9%) and
+the ladder-wide fact that it collapses nowhere. The n8
+composed-below-noise-control content gap reads ~0.21 under both
+objectives at 48 layers, so depth's content amplification at 24 layers
+(1.04) does not extrapolate either direction.
+
 ## What this binds, and what is still open
 
 For the compartmental serving design the recipe changes the operating
@@ -244,8 +270,12 @@ bases. The content lever has since been measured (section above) and
 retires the deep-base caveat: with crowd-invariance distillation on the
 base, eight compartments are deliverable at depth (+38.1%) and four at
 +63.2% is the best cell on any base -- the scope-router constraint is no
-longer forced by measurement. Still open, filed rather than implied: the
-gpt2-small rung under the invariance objective, the remaining 0.30
-content gap at n8, the budget slot policy, and the 7B rung, now
-unblocked. The RESEARCH.md entry under `mi` carries all seven run
-summaries and the extension list.
+longer forced by measurement. The scale ladder has since completed
+(section above): four-compartment serving is scale-robust at +53-63% on
+every measured base, and the n8 question is depth-shaped -- worst at 24
+layers, gone at 48. Still open, filed rather than implied: the 7B
+architecture jump (Pythia-6.9B under NF4, both objectives, in flight on
+board task af35fc20), the mechanism of the mid-depth valley, the
+remaining 0.30 content gap at medium n8, and the budget slot policy.
+The RESEARCH.md entry under `mi` carries all the run summaries and the
+extension list.
