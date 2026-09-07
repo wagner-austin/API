@@ -18,7 +18,7 @@ source_git_blobs:
   "wiki/sources/m11-pools/type-flags.ndjson": "f1d519832e75306a2497669e479224b26e731f3a"
   "src/rw_bot/mechanics/combat_profile.py": "4de76d4850ace0fd0cdcb25c121ff7ad7a299698"
   "agent/src/rwbot/agent/TypeFlags.java": "42595fca245020aff840b8e54c4580f69eba20b1"
-  "agent/src/rwbot/agent/EngineNames.java": "1333750031177517c2467091ff6ac9129d37e0ac"
+  "agent/src/rwbot/agent/EngineNames.java": "fd1ff57137ed03a1c587865adb80567171bca134"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
