@@ -78,9 +78,31 @@ on:
   push:
   pull_request:
 
-concurrency:
-  group: packages-${{ github.ref }}
-  cancel-in-progress: true
+# NO WORKFLOW-LEVEL CONCURRENCY, BECAUSE THE UNIT OF WORK IS NOT THE BRANCH.
+#
+# The other four workflows in this repo each check ONE package, so
+# `<name>-${{ github.ref }}` names their unit of work exactly and cancelling a
+# superseded run is right. This workflow fans out over forty-odd INDEPENDENT
+# packages, so a branch-keyed group made every package share one cancellation:
+# a push touching libs/platform_core cancelled the in-flight job for
+# clients/RustedWarfareBot, which it supersedes in no sense at all.
+#
+# That biased against SLOW jobs specifically -- a thirty-second job finishes
+# between pushes and a six-minute one does not -- so the packages most worth a
+# verdict were the ones that never reported. Measured 2026-09-06/07: three
+# RustedWarfareBot verdicts destroyed, one of them 53 seconds after starting.
+#
+# It cannot be fixed here. `concurrency` at workflow level admits only the
+# github, inputs and vars contexts; `matrix` is available ONLY at
+# `jobs.<job_id>.concurrency` (GitHub's context-availability table). The
+# package simply cannot be named at this level, which is why the group keyed
+# on the branch in the first place. So the policy moves to the job, where the
+# unit of work can be spelled -- same rule as the sibling workflows, applied
+# to the right key rather than replaced by a different rule.
+#
+# `discover` is left unguarded deliberately: it is seconds long, and this is a
+# public repository whose Actions minutes are free, so there is nothing to
+# save by cancelling it and a queued one costs nothing.
 
 jobs:
   discover:
@@ -136,6 +158,13 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.discover.outputs.packages) }}
+    # The unit of work, named. A second push touching THIS package supersedes
+    # this job and cancels it; a push touching any other package does not
+    # reach it. `matrix` resolves here and nowhere higher up, which is the
+    # whole reason this sits on the job rather than beside `on:`.
+    concurrency:
+      group: packages-${{ github.ref }}-${{ matrix.package }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: ${{ matrix.package }}
