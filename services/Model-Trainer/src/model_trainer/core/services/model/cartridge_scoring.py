@@ -29,7 +29,7 @@ from model_trainer.core.contracts.paired_comparison import (
 )
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.training.base_trainer_core import _get_optimizer_for_config
-from model_trainer.core.types import ForwardOutProto, ParameterLike
+from model_trainer.core.types import CacheCapableLMProto, ForwardOutProto, ParameterLike
 
 
 class PrefixTrainableProto(Protocol):
@@ -56,11 +56,30 @@ class PrefixTrainableProto(Protocol):
         ...
 
 
+def base_loss(base: CacheCapableLMProto, item: torch.Tensor) -> float:
+    """Score one item on a plain base: no prefix, no cache, no mask.
+
+    This is the model as it would answer without a cartridge existing --
+    the control arm of every recorded gain, and (public since the 7B
+    precondition finding) the headroom term on its own: how far a base
+    already sits from a corpus is exactly what bounds what a cartridge
+    can add. The caller owns evaluation mode; a measurement that left
+    dropout active would report a different number every run.
+
+    Args:
+        base: The plain model to score with.
+        item: Token ids shaped (1, positions).
+
+    Returns:
+        The item's loss.
+    """
+    with torch.no_grad():
+        out = base(input_ids=item, labels=item)
+    return float(out.loss.item())
+
+
 def _loss_without_prefix(model: CartridgeModel, item: torch.Tensor) -> float:
     """Score one item on the base model alone.
-
-    No cache and no mask: this is the model as it would answer without a
-    cartridge existing, which is the comparison being drawn.
 
     Args:
         model: The cartridge-wrapped model, used only to reach its base.
@@ -69,9 +88,7 @@ def _loss_without_prefix(model: CartridgeModel, item: torch.Tensor) -> float:
     Returns:
         The item's loss.
     """
-    with torch.no_grad():
-        out = model.base(input_ids=item, labels=item)
-    return float(out.loss.item())
+    return base_loss(model.base, item)
 
 
 def _loss_with_prefix(model: CartridgeModel, item: torch.Tensor) -> float:
@@ -167,6 +184,7 @@ def train_on(
 
 __all__ = [
     "PrefixTrainableProto",
+    "base_loss",
     "score_held_out",
     "train_on",
 ]
