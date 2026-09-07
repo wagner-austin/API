@@ -519,6 +519,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         nukes=doctrine["nukes"],
         rebuild=doctrine["rebuild"],
         hunt=doctrine["hunt"],
+        worker_wait=doctrine["worker_wait"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],

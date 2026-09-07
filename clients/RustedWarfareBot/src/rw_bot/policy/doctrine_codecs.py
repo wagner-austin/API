@@ -53,6 +53,7 @@ _BAD_REBUILD_DROP = "RW-DOCTRINE-029"
 _BAD_HUNT_SIZE = "RW-DOCTRINE-030"
 _GATE_ON_NOTHING = "RW-DOCTRINE-031"
 _BANK_ON_NOTHING = "RW-DOCTRINE-032"
+_BAD_WORKER_WAIT = "RW-DOCTRINE-033"
 
 
 def _count(
@@ -138,6 +139,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     nukes = _count(payload, "nukes", _BAD_NUKE_COUNT, "nuke launchers to stand, 0 none")
     rebuild = _count(payload, "rebuild", _BAD_REBUILD_DROP, "a rival army-value drop, 0 for off")
     hunt = _count(payload, "hunt", _BAD_HUNT_SIZE, "a party size with 0 meaning no hunting")
+    worker_wait = _count(
+        payload, "worker_wait", _BAD_WORKER_WAIT, "samples before extra builders, 0 immediately"
+    )
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -216,6 +220,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         nukes=nukes,
         rebuild=rebuild,
         hunt=hunt,
+        worker_wait=worker_wait,
         huntgate=huntgate,
         bank=bank,
     )
@@ -272,6 +277,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "nukes": doctrine["nukes"],
         "rebuild": doctrine["rebuild"],
         "hunt": doctrine["hunt"],
+        "worker_wait": doctrine["worker_wait"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

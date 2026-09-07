@@ -130,6 +130,7 @@ def play(
     nukes: int = 0,
     rebuild: int = 0,
     hunt: int = 0,
+    worker_wait: int = 0,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -169,9 +170,7 @@ def play(
         reinforce: Type names idle producers should keep making. Empty means
             fight with what exists and make nothing.
         reserve: Credits held back from expansion for the army.
-        max_workers: The most builders worth holding. See Doctrine.
         counter: Tilt production toward the layers the opponent fields.
-        navtilt: When the counter tilt's naval clause runs. See Doctrine.
         cover: Buy turrets beside bare structures at all.
         intercept: Turn the reserve on a raider inside our outpost radius.
         guard_cap: The most reserve units an interception commits; 0 is all.
@@ -180,33 +179,16 @@ def play(
         scout: Keep a scout walking the pools, feeding the counter tilt.
         rush: March released waves at the estimated enemy start.
         raid: The raid party's size, or zero for no raiding.
-        creep: Walk turrets toward the enemy start. See Doctrine.
-        hold: Percent of the line the reserve stands at. See Doctrine.
         riposte: Release the whole reserve the moment an intrusion ends.
-        tech: Factories to unlock a tier on, zero for none. See Doctrine.
-        lurk: Scouts kept alive at the enemy start, zero for none. See Doctrine.
-        decoys: Scatter scouts kept alive on our half, zero for none. See Doctrine.
-        kite: Reflex: armed mobile units hold the reach band. See Doctrine.
-        hp_floor: Reflex: flee below this percent of health. See Doctrine.
-        allin: Observation the whole reserve releases from, zero never. See Doctrine.
-        strike: Rival army-value drop that opens the release window. See Doctrine.
-        medics: Combat engineers kept alive via saving hires. See Doctrine.
-        navy: Attack submarines kept alive on the water. See Doctrine.
-        battery: Artillery batteries stood on the shore, at most one. See Doctrine.
-        bunkers: Mobile turrets kept alive the same way. See Doctrine.
-        flame: Flame turrets held by converting ground turrets. See Doctrine.
-        close: Dominance multiple that releases and marches everything. See Doctrine.
-        guns: Top-tier gun turrets held by walking the turret chain. See Doctrine.
-        nukes: Nuke launchers stood, firing at the priciest hostile seen. See Doctrine.
-        rebuild: Rival army-value drop before a razed pool re-claims. See Doctrine.
-        hunt: The hunt party's size, pressing visible enemy movers. See Doctrine.
-        bank: The razing head's safe window funds the finisher. See Doctrine.
-        income_ladder: Refused extractor conversions save toward themselves. See Doctrine.
-
-        Each of these is one doctrine field; the reasoning and the
-        measurements behind every flag live on
-        :class:`~rw_bot.policy.doctrine.Doctrine`, written once rather than
-        twice ([[policy-doctrine]]).
+        max_workers: One doctrine field each -- this one and ``navtilt``,
+            ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
+            ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
+            ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
+            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``, ``bank``
+            and ``income_ladder``. Each is documented ONCE, on
+            :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
+            measurements alike; repeating a summary line here is how the
+            two drifted apart before ([[policy-doctrine]]).
         expand: Whether to play the economy at all. False is the control arm of
             the A/B that measures whether expanding helps, and what a probe
             passes when it wants the economy held still ([[policy-economy]]).
@@ -357,12 +339,14 @@ def play(
             # Production runs before the army check, so a wave that has just
             # been wiped still queues its replacements on the sample that
             # notices.
+            # The wait gates the CEILING only -- worker_need's zero-worker
+            # branch ignores it, so a dead workforce is replaced either way.
             need = worker_need(
                 free,
                 workforce.size(sample),
                 budget.spendable(),
                 catalogue,
-                max_workers,
+                max_workers if scores.samples_seen >= worker_wait else 1,
             )
             # A wanted builder joins the composition rather than a channel of
             # its own: the separate channel was reachable only by a producer

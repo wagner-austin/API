@@ -84,6 +84,7 @@ INT_FIELDS: Final = (
     "nukes",
     "rebuild",
     "hunt",
+    "worker_wait",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -345,6 +346,17 @@ class Doctrine(TypedDict):
             decision driving a live tactical response
             ([[impossible-step-three-design]]). Requires a hunt party;
             a gate on nothing is refused at decode.
+        worker_wait: Samples before builders past the first may be
+            bought, zero for immediately. Until the wait expires the
+            worker ceiling reads as ONE -- the spawn builder works alone
+            and its emergency replacement still outranks everything
+            ([[policy-production]]) -- and afterwards ``max_workers``
+            applies unchanged. The knob exists because the corpus's one
+            surviving unscreened correlate is worker TIMING, not count:
+            phase-1 worker growth rides with a longer stand at 12/12
+            generations while phase-0 growth rides the other way, and
+            the workers10 arm only ever measured the count axis
+            ([[impossible-build-priority-head]]; log 2026-09-07).
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -429,6 +441,7 @@ class Doctrine(TypedDict):
     nukes: int
     rebuild: int
     hunt: int
+    worker_wait: int
     huntgate: bool
     bank: bool
 
@@ -488,6 +501,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     nukes=0,
     rebuild=0,
     hunt=0,
+    worker_wait=0,
     huntgate=False,
     bank=False,
 )

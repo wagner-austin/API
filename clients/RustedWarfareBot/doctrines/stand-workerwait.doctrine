@@ -1,0 +1,50 @@
+# The worker-timing arm of the corpus verdict (log 2026-09-07): the
+# standing base evolve3-g3m10 with worker_wait 300 -- no builder past
+# the first is bought before sample 300, then max_workers 8 applies
+# unchanged. The one surviving unscreened correlate: phase-1 worker
+# growth rides with a longer stand at 12/12 evolve generations while
+# phase-0 growth rides the other way, and the VH-era workers10 arm
+# measured COUNT, never timing. Every other line is byte-identical to
+# the base; the paired survival delta against it is the measurement.
+name stand-workerwait
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,heavyTank,heavyTank,c_artillery
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 2
+close 3
+guns 0
+nukes 0
+rebuild 0
+hunt 0
+worker_wait 300
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+brace 0
+huntgate 0
+bank 0

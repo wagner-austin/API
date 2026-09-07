@@ -64,6 +64,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         nukes=0,
         rebuild=0,
         hunt=0,
+        worker_wait=0,
         huntgate=False,
         bank=False,
     )
@@ -309,6 +310,22 @@ def test_a_negative_hunt_size_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-030"
+
+
+def test_a_negative_worker_wait_is_refused() -> None:
+    """Zero already means buy immediately; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["worker_wait"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-033"
+
+
+def test_a_worker_wait_round_trips() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["worker_wait"] = 300
+    decoded = decode_doctrine(payload)
+    assert decoded["worker_wait"] == 300
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

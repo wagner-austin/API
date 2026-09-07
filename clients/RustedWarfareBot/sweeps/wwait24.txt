@@ -1,0 +1,35 @@
+# Worker TIMING at Impossible, the corpus verdict's one unscreened knob
+# (log 2026-09-07): the standing base evolve3-g3m10 vs stand-workerwait
+# (worker_wait 300 -- no builder past the first before sample 300, then
+# max_workers 8 unchanged; every other line byte-identical). Phase-1
+# worker growth rides with a longer stand at 12/12 evolve generations
+# while phase-0 growth rides the other way, and the VH-era workers10 arm
+# measured COUNT, never timing. Screen tier, judged on PAIRED SURVIVAL
+# delta, sized against the detpair24b floor (sd 662): at n=12 the 2-se
+# minimum detectable effect is ~382 samples. Seeds 8806001-8810577.
+#
+# label | seed | doctrine | samples
+stand|8806001|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8806001|doctrines/stand-workerwait.doctrine|10000
+stand|8806417|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8806417|doctrines/stand-workerwait.doctrine|10000
+stand|8806833|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8806833|doctrines/stand-workerwait.doctrine|10000
+stand|8807249|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8807249|doctrines/stand-workerwait.doctrine|10000
+stand|8807665|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8807665|doctrines/stand-workerwait.doctrine|10000
+stand|8808081|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8808081|doctrines/stand-workerwait.doctrine|10000
+stand|8808497|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8808497|doctrines/stand-workerwait.doctrine|10000
+stand|8808913|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8808913|doctrines/stand-workerwait.doctrine|10000
+stand|8809329|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8809329|doctrines/stand-workerwait.doctrine|10000
+stand|8809745|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8809745|doctrines/stand-workerwait.doctrine|10000
+stand|8810161|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8810161|doctrines/stand-workerwait.doctrine|10000
+stand|8810577|doctrines/evolve3-g3m10.doctrine|10000
+wwait|8810577|doctrines/stand-workerwait.doctrine|10000

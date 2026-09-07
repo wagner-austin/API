@@ -50,6 +50,7 @@ guns 0
 nukes 0
 rebuild 0
 hunt 0
+worker_wait 0
 brace 0
 huntgate 0
 bank 0
