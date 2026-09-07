@@ -244,7 +244,7 @@ tap entry).
 
 **Do not run one-match-per-arm screens.** A twelve-way screen of army compositions would report about three survivals whichever compositions it held. Twelve are written up and parked for exactly this reason.
 
-**At Impossible, size against the measured identical-pair floor** (§ 2026-09-06 above): paired-survival sd 1,205 samples, so ~700-sample effects are the smallest an n=12 screen can see and ~350 the smallest a 48-pair panel can. Generation-tier fitness at n=8 pairs is ranking noise below ~850 and adopts nothing by itself.
+**At Impossible, size against the measured identical-pair floor.** Re-priced 2026-09-07 after the routing weaves and the ledger fix (detpair24b, 12 fresh identical pairs): **sd 661.8**, down from detpair24's pre-weave 1,205 — the variance ratio is significant even at n=12 (F=3.31 vs the 2.82 critical) because the weaves removed the engagement-paced draw classes outright. Current minimum detectable paired effects: ~468 at n=8, ~382 at n=12, **~191 at n=48**. Verdict labels still flip on identical pairs (7/12 both eras); the residual is the diffuse wall-coupling the 2026-09-07 arc characterized, and it binds the floor above zero until the static wall-read sweep is ever run.
 
 [^1]: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/`, twelve results each from `sweeps/noise.txt` — one job line repeated twelve times under distinct labels, since results are filed by label.
 [^2]: `.decompiled/com/corrodinggames/rts/game/a/a.java:1713,1737,1761`; `game/a/o.java:96-97,166-167` — `o.w()` returns a random point on a disc and `a.java:1575` hands it to a worker as a destination; `game/units/y.java:4811-4837`.
