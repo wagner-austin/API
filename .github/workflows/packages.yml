@@ -150,7 +150,16 @@ jobs:
   check:
     needs: discover
     if: needs.discover.outputs.packages != '[]'
-    runs-on: ubuntu-latest
+    # clients/RustedWarfareBot runs on the self-hosted pool and everything
+    # else stays on GitHub's. Its RunRecord fingerprints sha256 the REAL
+    # game binary by design (rw_bot/provenance.py -- the game build is the
+    # load-bearing provenance axis), and that binary is licensed: it can
+    # never enter this public repo, its caches, or a GitHub-hosted VM. The
+    # self-hosted boxes hold the operator's own licensed tree instead; the
+    # "Link the licensed game tree" step below asserts it loudly. Labels
+    # copied verbatim from the runner registration -- a label that matches
+    # nothing does not fail, it queues silently forever.
+    runs-on: ${{ matrix.package == 'clients/RustedWarfareBot' && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -247,6 +256,34 @@ jobs:
         run: |
           poetry config virtualenvs.in-project true
           poetry sync --with dev
+
+      # RustedWarfareBot only: the licensed game tree, held on the
+      # self-hosted runner's host and never in this repository. The
+      # provenance fingerprint digests the real engine jar by design, so 11
+      # tests and the coverage bar honestly require it. A runner without the
+      # tree fails HERE, naming the design, instead of nine minutes later as
+      # FileNotFoundError inside a test that looks like a code defect.
+      #
+      # The tree lives beside the other CI-only host asset under /opt/corvis
+      # and is SYMLINKED, not copied. That deliberately differs from the
+      # model-cache precedent next door (copied per job because
+      # transformers.js WRITES its cache on a miss, so a shared symlink
+      # races): this tree is immutable READ-ONLY provenance input -- nothing
+      # in the job writes it, every reader sha256-pins it -- so one shared
+      # directory across the runner pool is safe here and wrong there.
+      - name: Link the licensed game tree
+        if: matrix.package == 'clients/RustedWarfareBot'
+        run: |
+          set -euo pipefail
+          TREE=/opt/corvis/rw-game
+          if [ ! -f "$TREE/game-lib.jar" ]; then
+            echo "::error::This self-hosted runner does not hold the licensed game tree at $TREE."
+            echo "::error::Place the operator's Linux game tree there (see the board note 'RUSTED CI JAR WALL', 2026-09-07)."
+            echo "::error::The tree can never enter this public repository or any GitHub-hosted runner."
+            exit 1
+          fi
+          ln -sfn "$TREE" .game
+          ls -la .game/game-lib.jar
 
       - name: Guards
         run: poetry run python -m scripts.guard
