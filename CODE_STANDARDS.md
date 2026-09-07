@@ -180,6 +180,27 @@ green and correctly so.
   had just run all six packages green reported truthfully about every file it
   could see. Committing early is not tidiness; it is what puts your work inside
   other people's checks.
+- **Does this check measure the subject its NAME claims, or the one that
+  happened to be on disk?** The mirror of the item above, and the worse half:
+  that one is your work being invisible to everyone else's check, this one is
+  your check reading a set nobody else has — and it reports success while
+  doing it. `tools/hpc3/tests/test_committed_runs.py` asserted floors over
+  `runs/*.json` collected by a **filesystem glob**, while `.gitignore` ignores
+  `tools/hpc3/runs/*` with five re-inclusion rules. Measured 2026-09-07: 492
+  `.json` on disk against 263 tracked at HEAD. The floors were therefore
+  calibrated on the author's working tree and could only ever be met on the
+  machine that wrote them; CI, the one reader starting from a clean checkout,
+  saw 36 and went red. A file named `test_committed_runs.py` that never asks
+  git cannot measure committedness — the word in the filename was the claim it
+  failed to make. Fixed in `3c27ef82` by extracting `git archive HEAD` and
+  reading inside that, which is the general repair: **name the subject, then
+  read that subject, not whatever is nearest.**
+
+  The second-order half is why this is a judgment item and not a bug report.
+  Whoever commits the missing file turns CI green **without ever having seen
+  it red**, and the check returns to being unable to notice the next
+  divergence — now with a passing history that reads as evidence it works. A
+  check that is wrong is cheaper than one that is wrong and vindicated.
 - **Does a check read the command line, or the thing the command line names?**
   A verifier that reads flags does not read inside the file it just verified.
   Stated by its own author as the gap in `require_inputs_present`: preflight
