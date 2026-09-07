@@ -447,10 +447,51 @@ test and by image smoke.
   alone arms rise again (+0.9053/+0.8584), KL converges 224 → 150 → 135.
   Depth still prices n8 (49.6% at 12 layers vs 38.1% at 24) but no
   longer breaks it.
-- **Open, filed rather than implied:** the 1.5B rung (both objectives,
-  plan rows landed in `40c55fa5`, in flight as this is written); the
-  remaining 0.30 gap at medium n8; the 7B architecture jump (split
-  q/k/v, grouped-query KV geometry), now unblocked by measurement.
+- **The 1.5B rung (gpt2-xl, 48 layers), BOTH objectives, measured
+  2026-09-07** (jobs 55808450 LM / 55808466 invariance, ~3.5 h each on
+  A30-24GB after the first content attempt 55807973 hit CUDA OOM on
+  V100-16GB by 50 MiB at the KL step — two 1.5B fp32 models — so both
+  runs moved cards together, `gpu_pinned_because` declared; image v41
+  `f38bc982…` from `40c55fa5`, run documents
+  `tools/hpc3/runs/cartridge-xl-{base,content}-lora-a30-v41{,-twin}.json`;
+  twins 55809977/55809982 BYTE-IDENTICAL, sha256 `cff9f3ce…` (LM) and
+  `6269120d…` (invariance) — SAME-NODE certificates, the queue having
+  placed all four runs on hpc3-gpu-l54-09; cross-node determinism is
+  separately established by the arc's five cross-node certificates):
+  **the count penalty vanishes at 1.5B, so the 24-layer n8 collapse is a
+  MID-DEPTH VALLEY, not a depth law.** Under the LM objective diverse
+  retention reads n4 +54.8%, n8 +54.8%; under invariance +52.8%/+52.8%
+  — n8 EQUALS n4 to a tenth of a point under both objectives (composed
+  means differ by 0.0004/0.0001 against floors of 0.019/0.046; each
+  record's own separation flag reads 0.0), where 24 layers priced n8 at
+  −79.4% (LM) and 12 layers at +33.3%. The two objectives TIE on
+  diverse at 1.5B (composed means 0.4452-0.4456 vs 0.4367-0.4368,
+  within both floors — stated as a tie); the invariance objective's
+  remaining margin is plain cartridges, positive at both counts
+  (+22.5%/+5.8%) where the LM objective leaves them negative
+  (−11.5%/−27.9%), and the ladder-wide fact that it collapses NOWHERE.
+  The n8 content gap (composed below its untrained-composed control)
+  reads ~0.21 under BOTH objectives at 48 layers — depth's content
+  amplification at 24 layers (1.04) does not extrapolate. KL converged
+  148 → 121 → 110; LM loss 2.81 → 2.67 → 2.60; every companion-cross
+  and diverse-cross arm stays negative in both records (pools measured
+  clean).
+- **The ladder verdict** (acceptance of the scale-ladder arm): diverse
+  retention n4/n8 across 12 → 24 → 48 layers reads 58.1/33.3 →
+  59.3/−79.4 → 54.8/54.8 under the LM objective and 63.3/49.6 →
+  63.2/38.1 → 52.8/52.8 under crowd-invariance. Four-compartment
+  serving is scale-robust at +53-63% everywhere; the n8 question is
+  depth-shaped, worst at 24 layers, gone at 48; crowd-invariance is the
+  only objective that never collapses on any rung and the only one that
+  keeps plain cartridges positive everywhere it was measured.
+- **Open, filed rather than implied:** the 7B architecture jump —
+  Pythia-6.9B, GPT-NeoX (full MHA, fused `query_key_value`), NF4 with
+  bf16 compute, both objectives — in flight as this is written (board
+  task `af35fc20`, jobs 55810964/55810966 on A30, image v42 `270d8197…`
+  from `09f5a4bb`, the dtype-boundary cast that NF4 forced committed in
+  `44f95b52`); the mechanism of the mid-depth valley (why 24 layers is
+  the worst depth for an eight-crowd, when both neighbours tolerate
+  it); the remaining 0.30 content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
