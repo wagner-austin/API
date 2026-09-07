@@ -100,7 +100,7 @@ $Vout { У > w ;   $Vout { у > w ;
 # into what is supposed to be IPA. Each takes the value our own sourced
 # rule file gives it for the language that owns it.
 # ---------------------------------------------------------------------------
-Ѳ > θ ;  ѳ > θ ;    # FITA, Greek theta loans; ky_ipa.rules
+Ѳ > f ;  ѳ > f ;    # FITA; ru_ipa.rules owns it, Forbes 1916 gives f not θ
 Ҳ > h ;  ҳ > h ;    # Uzbek; uzc_ipa.rules (Ido 2025)
 Ҥ > ŋ ;  ҥ > ŋ ;    # EN WITH TAIL, velar nasal; ky_ipa.rules
 # U+045E is SHORT U, Belarusian /w/. Uzbek repurposes the letter for /o/

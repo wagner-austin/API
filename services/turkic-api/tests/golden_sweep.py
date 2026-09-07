@@ -13,6 +13,18 @@ table was recorded below. The digests therefore certify ICU agreement
 without ICU being present: reproducing a digest means reproducing, output
 for output, what ICU produced on the day it was measured.
 
+Re-verified on 2026-09-07 against PyICU 77.1 after the pre-1918 letters were
+sourced from Forbes (1916): ``ru_ipa`` gained rules for yat, decimal i,
+izhitsa and fita, and ``kk_ipa``, ``ky_ipa`` and ``uzc_ipa`` changed fita
+from ``θ`` to ``f``, which is the value the owning language's file now
+carries. 63,023 probes, 0 mismatches, and exactly those four digests moved.
+
+The probe count ROSE, from 61,796, and that is the measurement working
+rather than drifting: ``sweep_probes`` derives its probes from each rule
+set's own alphabet, so widening Russian's declared alphabet by four letters
+widens the sweep. A change that added rules without adding probes would be
+the thing to distrust.
+
 Re-verified on 2026-09-03 against PyICU 77.1 after ``ru_ipa`` gained the
 ``$Cunpaired`` rules, which stop a soft sign palatalising a consonant that
 has no palatalisation to take: 61,796 probes, 0 mismatches, and only
@@ -86,16 +98,16 @@ SWEEP_DIGESTS: Final[dict[str, str]] = {
     "ar_lat.rules": "1fe7c974279e2dc128a07150124a995c14293407eef813b6494ac211c623c981",
     "az_ipa.rules": "bcd33aed22d6dfc5d8349298b9f8c90de5d7226af4be38c6621d5d62ead96776",
     "fi_ipa.rules": "e73378c2eb1b66f3b34ec877d4d581665af5d1e3691e64d34c8d0d02bc0c324a",
-    "kk_ipa.rules": "7e5d90bee93c3628af8fdc86852b8468b293e0a8b62088e76f1b9544d84b19eb",
+    "kk_ipa.rules": "abab75f1e5ead24bbfccbe2b86e02a8b1ef20cecab204ac4f0d9a95977b7f6e8",
     "kk_lat.rules": "2cdfaf1c5e9b1b49c3ec79beccf86e2355f7b2e1e130baf2f8f0a50e6fcfe34f",
-    "ky_ipa.rules": "1ad2eec828d726897e15673c29b03f709fa036eaa5132939b35df1c697ec549f",
+    "ky_ipa.rules": "e6acb2fc21c7653ea75710a7f27ceed0921972c5cbc84aa1a6e5d6ddc0610b87",
     "ky_lat.rules": "3828c33ade262585900eba926325bf6c77d4e820468ebbf0b768455a856a7bb3",
-    "ru_ipa.rules": "8d08f51c2c3cb85d26edf4c6149a73c24200cedd1b1275f6afc37467b7d917e4",
+    "ru_ipa.rules": "74df8a69a178c65fb911370bb9fb2f58cb4b4c7bc153cc99c8dbbb243ca83210",
     "tr_ipa.rules": "49304f19db2cd3572a026d5ba3a3a6a6616004de26865ad7efe931356e271522",
     "tr_lat.rules": "cde1a9ba53a597dc4aac52b98bd21ef15c4a9908a5ca40631d32eeaa31c8b31d",
     "ug_ipa.rules": "ef379d45c3018d63ced79c77e0f27120245e34fc06ea3e67fae411bbe96b554a",
     "uz_ipa.rules": "a37b53541c69bede17fee674d252d6e8107388e34f3900a41827be55b9527295",
-    "uzc_ipa.rules": "2a49f34ad9f22c4dcb3b60cc604602307f99b96e520d58b2206e4dae77debdf6",
+    "uzc_ipa.rules": "27825cded252cfd6a92c3b279627f0a54f720d045566b7938f4245621249717e",
 }
 
 

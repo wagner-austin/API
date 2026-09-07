@@ -117,7 +117,13 @@ $Vout { у > w ;
 # ---------------------------------------------------------------------------
 
 # Archaic/variant Cyrillic letters (appear in OSCAR data)
-Ѳ > θ ;  ѳ > θ ;    # FITA - Greek theta loans
+#
+# ѳ was θ here until 2026-09-07, guessed from the letter's Greek theta
+# ancestry. Russian owns the letter and ru_ipa.rules now sources it: Forbes
+# (1916) heads its section as equal to f and gives Ѳома, the Russian form of
+# Thomas, as pronounced Famá. It descends from theta and is written where
+# Greek wrote theta, which is exactly what made θ the tempting wrong answer.
+Ѳ > f ;  ѳ > f ;    # FITA - Russian value, ru_ipa.rules
 Ҥ > ŋ ;  ҥ > ŋ ;    # EN WITH TAIL - velar nasal
 
 # Letters of neighbouring Cyrillic alphabets. None of these is a Kyrgyz

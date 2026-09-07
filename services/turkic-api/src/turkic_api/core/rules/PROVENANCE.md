@@ -60,16 +60,16 @@ disagreeing on a fresh Windows clone.
 | `ar_lat.rules` | `e4b3734d246a29bc2bb1948ba6e69eb806004f3c72a7bfe88a6214c22bf06e7b` | upstream |
 | `az_ipa.rules` | `9f02f13c0f10422d19526ccb341221646294a30695d3c0b4664a0625c80b45d3` | upstream |
 | `fi_ipa.rules` | `e79d45c4ac2316bfe0d39bc7ddd32b15ecdb52b85fdca1044b27045d39eeed27` | upstream |
-| `kk_ipa.rules` | `2b69fda41a28786b75c449184197b5209531b59cc23561226113380ac1f9e9c8` | upstream |
+| `kk_ipa.rules` | `b1bf67e9f6a6d42817cad90fbc6f65b24b17b01800de3f89537cd677d500854b` | upstream |
 | `kk_lat.rules` | `9e42fa6466f7a975bc153d0871db4af546f96ed2d244ebfb2af61a06f30d5fe0` | upstream |
-| `ky_ipa.rules` | `7897df2e2c7b60f2679704bcc5311394e2a44869b46f63329d7f77e14916cf89` | upstream |
+| `ky_ipa.rules` | `99c67d6ba7fcf722acef487adb8fc48443a6a0b6762d7bc0e2cda68f61869449` | upstream |
 | `ky_lat.rules` | `f88afc3e2e3da2b99a0bf33a442dee9fb2b53d3e441865aad9081e118aa9883d` | upstream |
 | `tr_ipa.rules` | `29ef747111224b1a4bdd0f4e1e61da10f0ce9f3342dd157bc31f87293f223de1` | upstream |
 | `tr_lat.rules` | `aa5f749d2b8d38b29481b0313c39c5ca135208e532b51d6b6816ab8b8611bfb7` | upstream |
 | `ug_ipa.rules` | `9112bdccddbffa65de7987a7d0bb5044c8f05c5d8c4fa75040f6c2b20fd84f02` | upstream |
 | `uz_ipa.rules` | `b0d81023d3e10df2fe5ae7e5f264a4e9ca5fa9e3f4ccd5bd66a6d637d9ce127f` | upstream |
-| `uzc_ipa.rules` | `190b29f00a7c2c99604fba750844090f5727ceceb58b186f03857acefa68f370` | upstream |
-| `ru_ipa.rules` | `205bcbe1f6473dc4b88d96c840652b8ff64d20553fe31073bdf42747aacfd681` | upstream |
+| `uzc_ipa.rules` | `6a4d302c6b22e67680fcd5542d6735e043e23334462e3f6dea559497c8a1686a` | upstream |
+| `ru_ipa.rules` | `941e158e5c8148d93123905e3069a518187780bd2b07f1bc7b34a160f3b8c88c` | upstream |
 
 `tests/test_rule_vendoring.py` asserts every hash in this table, so the table
 cannot drift from the files it describes. `tests/test_rule_provenance.py`

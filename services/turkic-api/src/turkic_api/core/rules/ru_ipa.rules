@@ -224,4 +224,70 @@ $Cunpaired { Ь >  ;  $Cunpaired { ь >  ;   # рожь roʒ, мышь mɨʃ, н
 Ь > ʲ ;  ь > ʲ ;
 Ъ >  ;   ъ >  ;
 
+# ---------------------------------------------------------------------------
+# 7. PRE-1918 LETTERS
+#
+# The orthographic reform of October 1918 abolished ѣ, і, ѵ, ѳ and ѯ. They
+# are here because Wiktionary carries pre-reform spellings, so any corpus
+# built from a Wiktionary-derived list inherits them: 479 of 420,614 distinct
+# WikiPron + VoxCommunis word forms, measured 2026-09-02, which this file
+# previously passed through as raw Cyrillic. A leak of 0.11% that nothing
+# reported.
+#
+# Sourced from a description written while the letters were still in use:
+# Forbes, N. (1916) Russian Grammar, Clarendon Press
+# (https://archive.org/details/russiangrammar00forbuoft). The two
+# descriptions above could not settle this. Both document the reform's
+# SPELLING replacements and neither states a pronunciation, and a mapping no
+# source supports is exactly what this file refuses to carry.
+#
+# ѣ takes the four Е rules unchanged, because Forbes derives an irregular
+# pronunciation of accented ѣ from the behaviour of accented е and gives as
+# the reason "the two letters being pronounced identically" (PDF p. 33). An
+# argument by analogy from one letter to the other only holds if the merger
+# is complete, so ѣ inherits iotation and palatalisation rather than being
+# mapped to a bare vowel.
+#
+# і and ѵ take the four И rules, because of и, й, і and ѵ Forbes writes
+# "These four letters represent only one sound", the Italian i, and calls
+# their continued use "purely conventional and traditional" (PDF p. 34) --
+# a statement about orthography, which is what says no sound distinction was
+# being marked. ѵ additionally transcribes Greek upsilon, "which in late
+# Greek acquired the value of" short i, and by 1916 was confined to a few
+# ecclesiastical words where и often replaced it anyway (PDF p. 34).
+#
+# The rules are DUPLICATED rather than normalised to е and и first, because
+# ICU advances the cursor past a replacement: a rule ѣ > е would emit literal
+# Cyrillic that no later rule re-examines, which is worse than the leak it
+# replaces. Contextual rules precede the anchored and general ones for the
+# same masking reason given in section 3.
+#
+# ѯ IS DELIBERATELY ABSENT. Forbes gives no Russian pronunciation for it,
+# because Russian writes the two letters кс instead (PDF p. 49), so it is not
+# part of the alphabet he describes and there is nothing here to map it from.
+# It is one occurrence in the 420,614 forms. A word carrying it is not modern
+# Russian and belongs to the cleaner, not to this file.
+# ---------------------------------------------------------------------------
+
+$Cpair { Ѣ > ʲe ;  $Cpair { ѣ > ʲe ;
+$Vout { Ѣ > je ;   $Vout { ѣ > je ;
+^ Ѣ > je ;  ^ ѣ > je ;
+Ѣ > e ;  ѣ > e ;
+
+ʒ { І > ɨ ;  ʒ { і > ɨ ;
+ʃ { І > ɨ ;  ʃ { і > ɨ ;
+$Cpair { І > ʲi ;  $Cpair { і > ʲi ;
+І > i ;  і > i ;
+
+ʒ { Ѵ > ɨ ;  ʒ { ѵ > ɨ ;
+ʃ { Ѵ > ɨ ;  ʃ { ѵ > ɨ ;
+$Cpair { Ѵ > ʲi ;  $Cpair { ѵ > ʲi ;
+Ѵ > i ;  ѵ > i ;
+
+# ѳ is f, not θ. Forbes heads its section as equal to f, names the letter
+# ѳита, and gives Ѳома, the Russian form of Thomas, as pronounced Famá
+# (PDF p. 49). The letter descends from Greek theta and is written where
+# Greek wrote theta, which is what makes θ the tempting and wrong mapping.
+Ѳ > f ;  ѳ > f ;
+
 :: NFC ;
