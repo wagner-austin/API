@@ -484,14 +484,51 @@ test and by image smoke.
   depth-shaped, worst at 24 layers, gone at 48; crowd-invariance is the
   only objective that never collapses on any rung and the only one that
   keeps plain cartridges positive everywhere it was measured.
-- **Open, filed rather than implied:** the 7B architecture jump —
-  Pythia-6.9B, GPT-NeoX (full MHA, fused `query_key_value`), NF4 with
-  bf16 compute, both objectives — in flight as this is written (board
-  task `af35fc20`, jobs 55810964/55810966 on A30, image v42 `270d8197…`
-  from `09f5a4bb`, the dtype-boundary cast that NF4 forced committed in
-  `44f95b52`); the mechanism of the mid-depth valley (why 24 layers is
-  the worst depth for an eight-crowd, when both neighbours tolerate
-  it); the remaining 0.30 content gap at medium n8.
+- **The 7B rung (Pythia-6.9B, GPT-NeoX, NF4), BOTH objectives, measured
+  2026-09-07** (board task `af35fc20`; jobs 55810964 LM 3h04m /
+  55810966 invariance 3h21m on A30-24GB; image v42 `270d8197…` from
+  `09f5a4bb`, 44/44 smokes green including the dtype-boundary and
+  architecture-policy self-asserts; the NF4-forced boundary cast — fp32
+  master slots cast to the model's compute dtype at `layer_blocks`,
+  read off the embedding weight — committed in `44f95b52` with the fp32
+  path pinned byte-unchanged by test AND by image smoke; model identity
+  content-pinned in the run documents, snapshot `c0e3eee3` + both
+  safetensors shard sha256s): **the recipe does not survive the
+  architecture jump AS-IS — and the failure is the measurement's
+  PRECONDITION, not composition.** The solo cartridge gain nearly
+  vanishes: alone arms read +0.068 diverse / −0.055 plain (LM) and
+  +0.211 / +0.229 (invariance) against ~0.81 on every GPT-2 rung, with
+  per-seed spans (−0.19..+0.19 LM, −0.09..+0.40 invariance) the same
+  order as the means, so retention ratios on these records are division
+  artifacts and composition (negative everywhere, both objectives)
+  cannot be attributed. The adaptation halves work normally — LM loss
+  2.89 → 2.74, KL 98 → 91, every cross arm negative (pools clean) — so
+  what failed to transfer is specifically the 64-slot cartridge's solo
+  gain under GPT-2-tuned hyperparameters on a 4-bit 4096-dim base.
+  Candidate mechanisms filed, deliberately unattributed: base headroom
+  (decidable by an absolute base-loss measurement on the held-out
+  corpora), NF4/bf16 slot-gradient precision (decidable by an
+  unquantized bf16 rung), hyperparameter scaling, and the measured
+  large floors.
+- **NF4 determinism is CERTIFIED, and the one divergence is explained
+  to the byte:** the LM pair (55810964 + twin 55811523, both placed on
+  hpc3-gpu-l54-09) is BYTE-IDENTICAL, sha256 `6ef4b9c9…` — a same-node
+  certificate. The invariance pair (55810966 on hpc3-gpu-k54-01 + twin
+  55811542 on hpc3-gpu-l54-09) diverges in record sha256 (`254d0126…`
+  vs `8c48e82a…`) while ALL 198 OBSERVATIONS ARE BIT-EQUAL: the sole
+  differing field in either file is `fingerprint/host/logical_cores`
+  (32 vs 64 — the two A30 nodes' CPU counts), the fingerprint doing
+  its job. That makes the invariance pair a CROSS-NODE
+  observation-identity certificate — the stronger of the two — and
+  4-bit dequant + bf16 compute + the boundary cast reproduce
+  bit-for-bit in every measured quantity across nodes.
+- **Open, filed rather than implied:** solo-gain recovery at 7B (the
+  headroom measurement above, then a slot-count/learning-rate rung if
+  headroom is not the answer) — a 7B composition claim in either
+  direction is unfounded until the solo gain exists; the mechanism of
+  the mid-depth valley (why 24 layers is the worst depth for an
+  eight-crowd, when both neighbours tolerate it); the remaining 0.30
+  content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
