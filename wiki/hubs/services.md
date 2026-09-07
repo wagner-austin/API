@@ -12,6 +12,8 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [A declared batch size trained at four times itself](../pages/model-trainer-declared-config-is-not-a-suggestion.md) -- the worker silently rewrote any declared batch of 4 or less on CUDA, and every record kept saying what the payload declared
 
+[The noise floor is a range](../pages/model-trainer-noise-floor-is-a-range.md) -- `noise_floor` is `max(gains) - min(gains)` maxed over arms, so it grows with the seed count (0.0202 at 3 seeds, 0.0546 at 9 -- same corpus, same code) and discards the seed pairing the sweep's steps are made of; replicating three times harder made the run reject THREE of four steps including one it had accepted, while the paired statistics show all four are real (t = 21.7 / 12.7 / 12.3 / 4.8) and gpt2 keeps gaining to 512 slots with no saturation in range
+
 [Companioned training recipe](../pages/model-trainer-companioned-training-recipe.md) -- the intervention that moves the composition ceiling: train every cartridge with a frozen held-out companion at p=0.5 and four-compartment retention goes from -45.4% to +44.6% (bit-identical record, 15x its floor) for a solo cost of four hundredths, with a dose curve and an overdose endpoint in both companion kinds; the arc ends with the base itself trained to read crowds twice over: the LM-objective LoRA solves the structural half at both scales, and crowd-invariance distillation closes the content half at depth (medium n8 -79.4% -> +38.1%, n4 +63.2% the program record; eight compartments deliverable on both bases, both levers base-side)
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
