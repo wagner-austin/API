@@ -39,9 +39,9 @@ source_git_blobs:
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
   "src/rw_bot/policy/progress.py": "2586afbd25ffeb0216657b153e28dd9c7c19b4cd"
   "src/rw_bot/policy/runner.py": "857d1e24c2cde142054e40c7bcb50b3a1d94b009"
-  "src/rw_bot/policy/campaign.py": "85a4a357c27a4fbc90a1d35fb39a18bfa380c96f"
+  "src/rw_bot/policy/campaign.py": "d32c85432385e1dc226c4a8722b5543f54bea7c2"
   "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
-  "scripts/play.py": "7aa64367cc0c59a7a930eb75fd5079ffb1d466ee"
+  "scripts/play.py": "f91ca4ae9751e54b7eb3226feaf6383492d6a667"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03
 confidence: high

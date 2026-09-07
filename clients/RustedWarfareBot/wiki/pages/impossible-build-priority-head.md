@@ -7,7 +7,7 @@ source_paths:
   - "src/rw_bot/policy/trace.py"
   - "src/rw_bot/policy/doom.py"
 source_git_blobs:
-  "src/rw_bot/policy/campaign.py": "85a4a357c27a4fbc90a1d35fb39a18bfa380c96f"
+  "src/rw_bot/policy/campaign.py": "d32c85432385e1dc226c4a8722b5543f54bea7c2"
   "src/rw_bot/policy/trace.py": "1494fc9ecdde3c89c833f0046faef92b0ac817d7"
   "src/rw_bot/policy/doom.py": "69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c"
 provenance:
