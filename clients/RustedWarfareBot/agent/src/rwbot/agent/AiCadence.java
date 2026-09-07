@@ -118,8 +118,24 @@ final class AiCadence {
                 continue;
             }
             for (Object controller : roster) {
-                if (controller == null
-                        || !EngineNames.AI_TASK_CLASS.equals(controller.getClass().getName())) {
+                if (controller == null) {
+                    continue;
+                }
+                if (EngineNames.AI_GROUP_CLASS.equals(controller.getClass().getName())) {
+                    // Per-TICK group clocks, because the sample cadence
+                    // measured them identical straight through a fork that
+                    // clearly ran one more build-think in one twin: a clock
+                    // that hits zero one tick apart and re-arms to the same
+                    // value is invisible at 75-frame resolution and decisive
+                    // at this one (wiki log 2026-09-07).
+                    out.append(" i{e=").append(fieldValueOrAbsent(controller, "e"))
+                            .append(",g=").append(fieldValueOrAbsent(controller, "g"))
+                            .append(",i=").append(fieldValueOrAbsent(controller, "i"))
+                            .append(",j=").append(fieldValueOrAbsent(controller, "j"))
+                            .append('}');
+                    continue;
+                }
+                if (!EngineNames.AI_TASK_CLASS.equals(controller.getClass().getName())) {
                     continue;
                 }
                 out.append(" n#")
@@ -245,6 +261,22 @@ final class AiCadence {
             }
             if (kind != null) {
                 out.append('/').append(kind);
+            }
+            if (EngineNames.AI_GROUP_CLASS.equals(controller.getClass().getName())) {
+                // The group's own cadence clocks, the six the reset table
+                // names. The clean pair forks on whether a group's
+                // build-a-building path runs at tick 33 (i.g -> o.e, the
+                // placement chooser), and these clocks are what schedule
+                // that think -- twin trajectories either drift here, naming
+                // the clock, or match and push the seam deeper (wiki log
+                // 2026-09-07).
+                out.append("{e=").append(fieldValueOrAbsent(controller, "e"))
+                        .append(" g=").append(fieldValueOrAbsent(controller, "g"))
+                        .append(" i=").append(fieldValueOrAbsent(controller, "i"))
+                        .append(" j=").append(fieldValueOrAbsent(controller, "j"))
+                        .append(" k=").append(fieldValueOrAbsent(controller, "k"))
+                        .append(" m=").append(fieldValueOrAbsent(controller, "m"))
+                        .append('}');
             }
         }
         out.append(']');
