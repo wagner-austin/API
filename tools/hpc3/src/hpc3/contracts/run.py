@@ -56,7 +56,30 @@ one is not an error -- it is a wait on a job that finished last week, which
 ``afterok`` satisfies instantly and silently.
 """
 
-SWEEP_IDENTITY_FIELDS = ("project", "name", "members", "experiment", "depends_on")
+SWEEP_IDENTITY_FIELDS = (
+    "project",
+    "name",
+    "members",
+    "experiment",
+    "depends_on",
+    "gpu_pinned_because",
+)
+"""What only a sweep can say.
+
+``gpu_pinned_because`` is here for the same reason it is a run field and NOT a
+project default: a sweep is one rung, submitted deliberately, whose members all
+pin the same card for the same reason, so it states that reason once. A project
+default would waive the gpu-supply rule for every future run of the project,
+which is the inherited-default queueing the rule exists to catch; a sweep
+cannot, because it expires with the sweep.
+
+It was absent until 2026-09-04, and its absence was not a missing feature but a
+contradiction: ``expand_sweep`` already READ ``base["gpu_pinned_because"]`` and
+``resolve_sweep`` never set it, so the field a sweep's every member carried
+could only ever be None. The effect was that a sweep pinning an exhausted card
+was refused by the gpu-supply rule with no way to answer it, and the only route
+left was submitting the rung one job at a time -- which is exactly the
+hand-rolled path the sweep contract exists to remove."""
 
 CHAIN_IDENTITY_FIELDS = ("project", "name", "stages", "experiment")
 """What a chain document may say for itself.
@@ -269,6 +292,10 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     # arms writing to one path are five results nobody can read. A value here
     # would be silently discarded, which is worse than declaring none.
     base["artifact"] = None
+    # Stated once for the rung rather than repeated per member: every member
+    # pins the same card, so a per-member reason would be the same sentence six
+    # times and could disagree with itself on the seventh.
+    base["gpu_pinned_because"] = document.get("gpu_pinned_because")
 
     members = require_list(document, "members")
     if members == []:

@@ -51,16 +51,75 @@ def stage_one(host: str, source_dir: pathlib.Path, destination: str, staged: Sta
     return remote_path
 
 
-def stage_manifest(host: str, source_dir: pathlib.Path, manifest: StageManifest) -> list[str]:
+#: Suffix of the certification record a staged corpus is admitted by.
+#:
+#: Read by ``model_trainer.cluster.preflight.check_corpus_certified``, which
+#: refuses a corpus whose digest no ``*-digests.txt`` beside it names. That
+#: check's docstring has always said "``hpc3-stage`` writes one, and a file put
+#: there by hand has none" -- and until 2026-09-04 this package wrote nothing,
+#: so the supported staging path produced corpora the supported training path
+#: refused, and the only way through was to hand-write the very file the rule
+#: exists to distinguish from a hand-placed one. The constant is duplicated
+#: rather than imported because hpc3 does not depend on Model-Trainer; the
+#: pairing is asserted by a test that reads the consumer's own value.
+CERTIFICATION_SUFFIX = "-digests.txt"
+
+
+def certification_text(manifest: StageManifest) -> str:
+    """Render the record that admits these files to a training run.
+
+    One ``<digest>  <name>`` line per staged file, then the provenance. The
+    consumer scans for 64-hex tokens anywhere in the text, so the provenance
+    is free-form and the digests are what carry meaning.
+
+    Args:
+        manifest: The manifest whose files were staged.
+
+    Returns:
+        The record's text, newline-terminated.
+    """
+    lines = [f"{staged['sha256']}  {staged['name']}" for staged in manifest["files"]]
+    lines.append(f"provenance {format_provenance(manifest['provenance'])}")
+    return "\n".join(lines) + "\n"
+
+
+def certification_path(manifest: StageManifest, record_name: str) -> str:
+    """Where this staging operation's certification record lands.
+
+    Args:
+        manifest: The manifest being staged.
+        record_name: Stem for the record, normally the manifest's own
+            filename stem, so two manifests staging into one destination do
+            not overwrite each other's record.
+
+    Returns:
+        The record's absolute path on the cluster.
+    """
+    return f"{manifest['destination']}/{record_name}{CERTIFICATION_SUFFIX}"
+
+
+def stage_manifest(
+    host: str, source_dir: pathlib.Path, manifest: StageManifest, *, record_name: str
+) -> list[str]:
     """Place every file a manifest describes, verifying each on both sides.
+
+    The certification record is written LAST, after every file has been
+    verified on the cluster. Written first, it would admit a corpus whose
+    transfer then failed -- a certification for bytes that are not there.
+
+    It is deliberately NOT in the returned list. The caller reports that list
+    as the files it verified on both sides, and the record is neither: it is
+    written once and never read back, so counting it would inflate a number
+    whose whole meaning is how many files were proven.
 
     Args:
         host: SSH destination.
         source_dir: Local directory holding the files.
         manifest: What to place and where.
+        record_name: Stem for the certification record.
 
     Returns:
-        Absolute cluster paths of the placed files, in manifest order.
+        Absolute cluster paths of the verified files, in manifest order.
 
     Raises:
         AppError: On the first file that cannot be verified or transferred.
@@ -72,6 +131,11 @@ def stage_manifest(host: str, source_dir: pathlib.Path, manifest: StageManifest)
     placed = [
         stage_one(host, source_dir, manifest["destination"], staged) for staged in manifest["files"]
     ]
+    remote.put_bytes(
+        host,
+        certification_path(manifest, record_name),
+        certification_text(manifest).encode("utf-8"),
+    )
     # Logged only after every file verified on the cluster: an event emitted
     # per file would record a partial stage as a sequence of successes.
     audit.files_staged(
@@ -83,4 +147,10 @@ def stage_manifest(host: str, source_dir: pathlib.Path, manifest: StageManifest)
     return placed
 
 
-__all__ = ["stage_manifest", "stage_one"]
+__all__ = [
+    "CERTIFICATION_SUFFIX",
+    "certification_path",
+    "certification_text",
+    "stage_manifest",
+    "stage_one",
+]

@@ -15,7 +15,7 @@
       "mem_gb": 64,
       "minutes": 240,
       "requeue": true,
-      "checkpoint_steps": 500,
+      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/images/v23/abl.sif",
         "sha256": "55651342e15d2a8652ea00e7c90c3b0d6bb6f9d3351350dc6a7afc415d76c437",
@@ -30,7 +30,7 @@
       },
       "deterministic": true,
       "budget": {
-        "self_imposed_gpu_hours": 12.0,
+        "self_imposed_gpu_hours": 500.0,
         "max_service_units": 0.0,
         "charge_account": ""
       },

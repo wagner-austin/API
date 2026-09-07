@@ -106,7 +106,7 @@ class TestStageManifest:
             files=[_record("armB.txt", _B), _record("armC.txt", _C)],
             provenance=_PROVENANCE,
         )
-        placed = stage_manifest("hpc3", tmp_path, manifest)
+        placed = stage_manifest("hpc3", tmp_path, manifest, record_name="m")
 
         assert placed == [f"{_DEST}/armB.txt", f"{_DEST}/armC.txt"]
         assert fake_run.commands()[0] == f"mkdir -p '{_DEST}'"
@@ -124,7 +124,7 @@ class TestStageManifest:
             provenance=_PROVENANCE,
         )
         with pytest.raises(AppError) as excinfo:
-            stage_manifest("hpc3", tmp_path, manifest)
+            stage_manifest("hpc3", tmp_path, manifest, record_name="m")
 
         assert excinfo.value.code is Hpc3ErrorCode.MANIFEST_FILE_MISSING
         assert "armC.txt" in excinfo.value.message
@@ -144,7 +144,7 @@ class TestStageAudit:
             files=[_record("armB.txt", _B), _record("armC.txt", _C)],
             provenance=_PROVENANCE,
         )
-        stage_manifest("hpc3", tmp_path, manifest)
+        stage_manifest("hpc3", tmp_path, manifest, record_name="m")
 
         assert [event.event for event in logged] == [audit.FILES_STAGED]
         assert logged[0].fields == {
@@ -167,5 +167,5 @@ class TestStageAudit:
             provenance=_PROVENANCE,
         )
         with pytest.raises(AppError):
-            stage_manifest("hpc3", tmp_path, manifest)
+            stage_manifest("hpc3", tmp_path, manifest, record_name="m")
         assert logged == []

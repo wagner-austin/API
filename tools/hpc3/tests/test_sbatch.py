@@ -105,9 +105,18 @@ class TestRenderSbatch:
         script = _render(spec())
         assert 'export PATH="/pub/wagnera3/envs/abl-pinned/bin:$PATH"' in script
 
-    def test_the_checkpoint_interval_reaches_the_payload(self) -> None:
+    def test_the_checkpoint_interval_does_not_reach_the_payload(self) -> None:
+        """``checkpoint_steps`` is an operator assertion, not a setting.
+
+        It was exported as ``HPC3_CHECKPOINT_STEPS`` and read by no payload in
+        any repository, while ``PREEMPTIBLE_RUN_UNPROTECTED`` credited a run
+        for declaring it -- a number whose only effect was satisfying the
+        guard that asked for it. Exporting it again would re-create the
+        appearance of a wired setting; the export returns when a payload
+        reads it, in that same change.
+        """
         job = spec(minutes=600, requeue=True, checkpoint_steps=50)
-        assert 'export HPC3_CHECKPOINT_STEPS="50"' in _render(job)
+        assert "HPC3_CHECKPOINT_STEPS" not in _render(job)
 
     def test_it_does_not_set_e_so_the_payload_status_survives(self) -> None:
         """`set -e` would let a failed run exit zero through this wrapper.
@@ -168,11 +177,17 @@ class TestJobIsSelfDescribing:
     def test_the_comment_tracks_a_multi_gpu_request(self) -> None:
         assert "gpu=A100x4" in job_comment(spec(gpu=gpus("A100", 4)))
 
-    def test_the_payload_can_read_its_own_project_and_label(self) -> None:
-        """A training script writing checkpoints needs to name them something."""
+    def test_the_payload_can_read_its_own_label(self) -> None:
+        """A sweep member writing output needs to name it something.
+
+        The label is exported because a payload reads it -- covenant-radar's
+        optimizer names its history and result files per job from it. The
+        project name was exported beside it and read by nothing, so it is
+        gone; the label carries the project as its own first segment anyway.
+        """
         script = _render(spec())
-        assert 'export HPC3_PROJECT="abl"' in script
         assert 'export HPC3_JOB_NAME="abl.arm-b-42"' in script
+        assert "HPC3_PROJECT" not in script
 
     def test_two_projects_cannot_produce_the_same_label(self) -> None:
         mine = _render(spec())
@@ -338,14 +353,19 @@ class TestDependencyIsNeverEmittedWithoutItsSafetyPairing:
 
 
 class TestResumeSurface:
-    """The package cannot resume for the payload -- only the payload knows
-    what its checkpoint means -- so it surfaces the restart count and leaves
-    the decision where the knowledge is.
+    """The restart count is logged, and is no longer offered as an interface.
+
+    It was exported as ``HPC3_RESTART_COUNT`` so a payload could notice a
+    requeue and resume; in five weeks no payload in any repository read it.
+    An export whose only consumer is the wrapper's own echo is a log
+    statement wearing an interface's clothes, and it made the launcher side
+    look wired when the payload side was empty. The count still reaches the
+    log, from Slurm's variable directly. When a payload resumes, the export
+    comes back in the same change as its reader.
     """
 
-    def test_the_restart_count_is_exported_from_slurms_own_variable(self) -> None:
-        script = _render(spec())
-        assert 'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"' in script
+    def test_the_restart_count_is_not_re_exported_under_our_own_name(self) -> None:
+        assert "HPC3_RESTART_COUNT" not in _render(spec())
 
     def test_it_defaults_to_zero_on_a_first_run(self) -> None:
         """The ':-0' is what makes a first run readable, not an unset variable
@@ -355,14 +375,19 @@ class TestResumeSurface:
 
     def test_the_restart_count_is_echoed_into_the_job_log(self) -> None:
         script = _render(spec())
-        assert 'echo "restart   ${HPC3_RESTART_COUNT}"' in script
+        assert 'echo "restart   ${SLURM_RESTART_COUNT:-0}"' in script
 
-    def test_a_protected_run_carries_both_requeue_and_the_count(self) -> None:
+    def test_a_protected_run_still_carries_requeue(self) -> None:
+        """Requeue is the half that does something: Slurm acts on it.
+
+        The checkpoint declaration beside it is an operator assertion the
+        tooling cannot verify, and nothing in the rendered script pretends
+        otherwise any more.
+        """
         job = spec(minutes=600, requeue=True, checkpoint_steps=50)
         script = _render(job)
         assert "#SBATCH --requeue" in script
-        assert "HPC3_RESTART_COUNT" in script
-        assert 'export HPC3_CHECKPOINT_STEPS="50"' in script
+        assert "HPC3_CHECKPOINT_STEPS" not in script
 
 
 class TestCodeProvenance:

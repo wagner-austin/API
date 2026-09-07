@@ -187,6 +187,28 @@ class TestUnknownFieldsAreRefused:
             resolve_sweep(_workspace(), _sweep(command="python train.py"))
         assert excinfo.value.code is Hpc3ErrorCode.RUN_FIELD_UNKNOWN
 
+    def test_a_sweep_may_say_why_it_pins_an_exhausted_card(self) -> None:
+        """A rung pins one card for one reason, so it states it once.
+
+        ``expand_sweep`` already read this off the template while
+        ``resolve_sweep`` never set it, so the field every member carried could
+        only be None and a sweep pinning a scarce card had no way to answer the
+        gpu-supply rule.
+        """
+        reason = "gpt2-xl peaks at 60.79 GB; the 80 GB card is the constraint"
+        resolved = resolve_sweep(_workspace(), _sweep(gpu_pinned_because=reason))
+        assert resolved["base"]["gpu_pinned_because"] == reason
+
+    def test_every_member_inherits_the_sweeps_pin_reason(self) -> None:
+        reason = "the card is the measurement"
+        expanded = expand_sweep(resolve_sweep(_workspace(), _sweep(gpu_pinned_because=reason)))
+        assert [job["gpu_pinned_because"] for job in expanded] == [reason] * 3
+
+    def test_a_sweep_that_says_nothing_pins_for_no_stated_reason(self) -> None:
+        """Absent stays absent. A default sentence here would waive the
+        gpu-supply rule for every sweep that forgot to think about it."""
+        assert resolve_sweep(_workspace(), _sweep())["base"]["gpu_pinned_because"] is None
+
 
 class TestOverridingCannotEvadeARule:
     def test_a_long_preemptible_override_still_needs_protection(self) -> None:

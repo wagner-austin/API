@@ -147,17 +147,16 @@ def render_array_sbatch(spec: SweepSpec, *, log_dir: str, charge_account: str) -
         "# not convert a failed run into a successful job.",
         "set -u",
         "",
-        f'export HPC3_PROJECT="{base["project"]}"',
-        f'export HPC3_CHECKPOINT_STEPS="{base["checkpoint_steps"]}"',
         *determinism_exports(base),
-        'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
         *runtime_module_lines(base),
         *image_digest_export(base),
         code_provenance_export(base),
         "",
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_ARRAY_JOB_ID:-none}_${SLURM_ARRAY_TASK_ID:-none}"',
-        'echo "restart   ${HPC3_RESTART_COUNT}"',
+        # Slurm's own variable, for the reason given in `sbatch.py`: the
+        # re-export under a name of ours was an interface no payload took up.
+        'echo "restart   ${SLURM_RESTART_COUNT:-0}"',
         'echo "commit    ${GIT_COMMIT:-<unstamped>}"',
         *(
             ['echo "gpu       cpu-only"']

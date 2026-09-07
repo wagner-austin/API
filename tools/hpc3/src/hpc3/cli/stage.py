@@ -31,7 +31,7 @@ from hpc3.contracts.provenance import format_provenance
 from hpc3.contracts.stage import decode_stage_manifest
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.expected import check_expected, read_expected_digests
-from hpc3.core.stage import stage_manifest
+from hpc3.core.stage import certification_path, stage_manifest
 
 _FLAGS = (_config.CONFIG_FLAG, "--manifest", "--source-dir", "--expect-from")
 
@@ -76,10 +76,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     _test_hooks.emit(f"digests vouched for by {expect_path}")
     _test_hooks.emit(f"provenance {format_provenance(manifest['provenance'])}")
 
-    placed = stage_manifest(host, source_dir, manifest)
+    placed = stage_manifest(host, source_dir, manifest, record_name=manifest_path.stem)
     for remote_path in placed:
         _test_hooks.emit(f"staged {remote_path}")
     _test_hooks.emit(f"verified {len(placed)} file(s) on {host}:{manifest['destination']}")
+    # Reported separately from the verified count, and after it, because this
+    # is what admits the staged bytes to a training run: a corpus whose digest
+    # no such record names is refused by
+    # `model_trainer.cluster.preflight.check_corpus_certified`.
+    _test_hooks.emit(f"certified by {certification_path(manifest, manifest_path.stem)}")
     return 0
 
 

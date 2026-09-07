@@ -24,6 +24,7 @@ from platform_core.determinism_env import (
     DETERMINISM_OFF,
     DETERMINISM_ON,
 )
+from platform_core.exported_env_audit import ExportedVariable
 
 from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.dependency import dependency_argument
@@ -34,6 +35,69 @@ from hpc3.core.image_exec import APPTAINER_MODULE, bind_arguments, gpu_arguments
 
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 1440
+
+#: Every variable this wrapper ORIGINATES in the payload's environment, with
+#: what the payload is expected to do with it.
+#:
+#: This is the single source of truth for the launcher-to-payload interface,
+#: and it is pinned in both directions: ``test_exported_env_readers`` fails if
+#: a rendered script exports a name absent here, and if a name here is absent
+#: from every rendered script. Adding an export without declaring it, or
+#: declaring one the renderer stopped emitting, is a test failure rather than
+#: a discovery months later.
+#:
+#: ``purpose`` is not decoration. An exported variable nothing reads is
+#: reported WITH the behaviour that is missing, because the name alone reads
+#: as an unused constant when the actual defect is an unimplemented contract
+#: -- which is how a declared checkpoint cadence satisfied a preemption guard
+#: while no payload had ever seen it.
+#:
+#: ``PATH`` is deliberately absent and is not an exemption: it extends a
+#: variable the operating system already set, so
+#: :func:`~platform_core.exported_env_audit.modifies_existing` puts it out of
+#: scope by the shape of its own assignment rather than by being listed.
+#: WHAT WAS REMOVED ON 2026-09-04, AND THE RULE IT ESTABLISHES. Three names
+#: were exported here and read by no payload in any repository:
+#: ``HPC3_PROJECT``, ``HPC3_CHECKPOINT_STEPS`` and ``HPC3_RESTART_COUNT``.
+#: They were offers -- surfaced so a payload could opt in -- and in five weeks
+#: none did. An offer nobody took is indistinguishable from a working
+#: interface when read from the launcher's side, which is how a declared
+#: checkpoint cadence came to satisfy a preemption guard against payloads
+#: that had never seen the number.
+#:
+#: They are not deleted ideas. When a payload resumes from a checkpoint, the
+#: export returns IN THE SAME CHANGE AS ITS READER -- the declaration becomes
+#: legal at the moment it becomes true, which is the rule this repository
+#: already applies to run documents that may not name an image predating the
+#: command they run.
+EXPORTED_VARIABLES: tuple[ExportedVariable, ...] = (
+    ExportedVariable(
+        name="HPC3_JOB_NAME",
+        purpose=(
+            "name the individual run, so concurrent sweep members write to distinct "
+            "paths instead of overwriting one another"
+        ),
+    ),
+    ExportedVariable(
+        name=DETERMINISM_ENV_VAR,
+        purpose="apply the determinism controls, and record which were applied",
+    ),
+    ExportedVariable(
+        name=CUBLAS_WORKSPACE_ENV_VAR,
+        purpose=(
+            "read by cuBLAS itself when the handle is created, which is why it is "
+            "exported before the process rather than set inside it"
+        ),
+    ),
+    ExportedVariable(
+        name="IMAGE_DIGEST",
+        purpose="stamp the run fingerprint with the image that produced it",
+    ),
+    ExportedVariable(
+        name="GIT_COMMIT",
+        purpose="stamp the run with the commit whose code it executed",
+    ),
+)
 
 
 def format_walltime(minutes: int) -> str:
@@ -318,9 +382,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
         "# not convert a failed run into a successful job.",
         "set -u",
         "",
-        f'export HPC3_PROJECT="{spec["project"]}"',
         f'export HPC3_JOB_NAME="{label}"',
-        f'export HPC3_CHECKPOINT_STEPS="{spec["checkpoint_steps"]}"',
         # Determinism is declared here and applied by the payload, because the
         # switch that matters is a torch call this submitter cannot make. What
         # the submitter CAN do is guarantee the half that must precede the
@@ -331,19 +393,21 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
         # which fails loudly, because deterministic mode raises when the
         # variable is absent.
         *determinism_exports(spec),
-        # Slurm increments SLURM_RESTART_COUNT each time it requeues a job,
-        # so a preempted run re-enters here with a non-zero value. This
-        # package cannot resume on the payload's behalf -- only the payload
-        # knows what its checkpoint means -- so it surfaces the count and
-        # leaves the decision where the knowledge is.
-        'export HPC3_RESTART_COUNT="${SLURM_RESTART_COUNT:-0}"',
         *runtime_module_lines(spec),
         *image_digest_export(spec),
         code_provenance_export(spec),
         "",
         'echo "host      $(hostname)"',
         'echo "job       ${SLURM_JOB_ID:-none}"',
-        'echo "restart   ${HPC3_RESTART_COUNT}"',
+        # Read from Slurm's own variable rather than re-exported under a name
+        # of ours. Slurm increments this each time it requeues a job, so a
+        # preempted run re-enters with a non-zero value and the log says so.
+        # It was exported as HPC3_RESTART_COUNT for a payload to resume from,
+        # and no payload in five weeks ever read it; an export that exists so
+        # that one line can echo it is a log statement wearing an interface's
+        # clothes. When a payload does resume, the export returns in the same
+        # change as its reader.
+        'echo "restart   ${SLURM_RESTART_COUNT:-0}"',
         # Echoed as well as exported: the manifest inside a tarball is the
         # durable record, but a log line answers "what did THIS job run"
         # without unpacking 462 MB, and it is visible while the job is live.
