@@ -82,13 +82,19 @@ this corpus size. The trainable signal sits on the DOCTRINE axis
 instead, strong and coherent under within-generation and within-pair
 controls (log, 2026-09-07): order flow up, workers grown in phase 1
 not phase 0, credits off the balance sheet, raids drafted, fights kept
-inside our guns' reach. Two roads survive the measurement: a head
-trained on PROXIMATE EVENTS rather than survival (the brace head's
-AUC 0.94 razing fit proves event labels beat this same noise), or a
-tempo-family doctrine screen (raid draft rate, refusal avoidance,
-worker timing) -- the knob family the exhausted army-mix simplex never
-searched, whose surviving correlates converge on the only two causal
-arms ever measured positive at this rung (raid8 +217, kite +116).
+inside our guns' reach. CORRECTED same-day (log, 2026-09-07, second
+entry): the causal record already arbitrates most of these correlates.
+The raid-draft correlate's causal twin is measured DEAD at every
+strength (raid8 retracted under law nine; impden48 closed denial at
+raid 3/6/8 alike), so `p3_evR` is prognostic, not a lever; the
+spend-don't-hold correlates AGREE with the closed hoard arms (bank
+-606, ladder -201, riposte -562) rather than adding to them. What the
+corpus adds beyond the causal record is one unscreened knob -- worker
+TIMING (growth in phase 1, not phase 0; the VH-era workers10 arm
+tested count, never timing) -- and one live road: a head trained on
+PROXIMATE EVENTS rather than survival, which the brace head's AUC
+0.94 razing fit proves can beat this noise. The lane's spend goes
+there.
 
 ## What is deliberately not decided here
 
