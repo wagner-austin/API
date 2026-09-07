@@ -326,21 +326,6 @@ def decode_listing(answer: str) -> tuple[DispatchJob, ...]:
     return tuple(decode_job(row, answer=answer) for row in jobs)
 
 
-def decode_submitted(answer: str) -> DispatchJob:
-    """Decode a ``dispatch_submit`` answer.
-
-    Args:
-        answer: The tool's text.
-
-    Returns:
-        The created job.
-
-    Raises:
-        AppError: ``QUEUE_ANSWER_MALFORMED`` on a shape this cannot read.
-    """
-    return decode_job(_envelope(answer, "submitted"), answer=answer)
-
-
 def encode_job_line(job: DispatchJob) -> str:
     """Render one job as the single line the agent logs.
 
@@ -367,6 +352,5 @@ __all__ = [
     "decode_job",
     "decode_listing",
     "decode_reported",
-    "decode_submitted",
     "encode_job_line",
 ]

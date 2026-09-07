@@ -20,7 +20,6 @@ from fleet.contracts.dispatch import (
     decode_claim,
     decode_listing,
     decode_reported,
-    decode_submitted,
     encode_job_line,
 )
 from tests._queue_fakes import queue_job
@@ -188,11 +187,6 @@ class TestOtherEnvelopes:
         job = decode_reported(answer({"job": queue_job(status="running")}))
 
         assert job["status"] == "running"
-
-    def test_a_submit_answer_is_read_from_its_submitted_member(self) -> None:
-        job = decode_submitted(answer({"submitted": queue_job()}))
-
-        assert job["status"] == "queued"
 
     def test_a_listing_decodes_every_row(self) -> None:
         jobs = decode_listing(
