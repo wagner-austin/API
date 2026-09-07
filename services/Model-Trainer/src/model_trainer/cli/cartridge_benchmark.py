@@ -125,6 +125,91 @@ def sweep_observations(sweep: Sequence[ReplicatedGain], floor: float) -> tuple[O
     return tuple(named)
 
 
+def windows_trained(plan: CartridgePlan, *, train_windows: int, second_train_windows: int) -> int:
+    """Count the window-passes one whole plan pushes through training.
+
+    EXACT, NOT AN ESTIMATE, and derived from what the measurement functions
+    actually do rather than from the shape of the plan:
+
+    * :func:`measure_slot_count` trains ONE cartridge per seed, over the
+      primary windows, once per slot count in the sweep.
+    * :func:`measure_composition` trains TWO per seed -- one on each corpus,
+      under different seeds so the pair are not one draw trained twice.
+    * :func:`measure_untrained` trains NOTHING. Its prefix is random, which
+      is the entire point of it as a control, so it contributes zero here.
+
+    Args:
+        plan: The measurement, which carries the seeds, epochs and slot
+            counts that multiply the per-arm cost.
+        train_windows: Training windows drawn from the primary corpus.
+        second_train_windows: Training windows drawn from the second corpus.
+            Counted separately rather than assumed equal to the primary: the
+            caller truncates it to at most the primary's length, so the two
+            are equal only when the second corpus is at least as large.
+
+    Returns:
+        Total passes over one window. Multiply by ``plan["window"]`` for
+        tokens.
+    """
+    seeds = len(plan["seeds"])
+    sweep = len(plan["slot_counts"]) * seeds * plan["epochs"] * train_windows
+    composition = seeds * plan["epochs"] * (train_windows + second_train_windows)
+    return sweep + composition
+
+
+def cost_observations(
+    plan: CartridgePlan,
+    *,
+    corpus_tokens: int,
+    second_corpus_tokens: int,
+    train_windows: int,
+    held_out_windows: int,
+    second_train_windows: int,
+) -> tuple[Observation, ...]:
+    """Name what the measurement COST, beside what it found.
+
+    THE RECORD COULD NOT ANSWER THIS AND NOW CAN, which is the same defect
+    :func:`per_seed_observations` was added to fix: every number here existed
+    inside the process and was dropped on the way out, so no stored run could
+    be asked how much work produced it. A gain that costs four window-passes
+    and a gain that costs four hundred thousand are not the same result, and
+    until now the record rendered them identically.
+
+    These are the COUNTS ONLY -- corpus size, and how many window-passes the
+    plan pushes through training. Wall-clock and GPU-hours are deliberately
+    absent: they need a clock behind a hook this module does not yet have,
+    and a duration recorded without one would be untestable. What is here is
+    exact, pure, and reproducible from the plan plus the corpus.
+
+    Args:
+        plan: The measurement being costed.
+        corpus_tokens: Tokens in the primary corpus, before windowing.
+        second_corpus_tokens: Tokens in the second corpus.
+        train_windows: Training windows from the primary corpus.
+        held_out_windows: Scored windows from the primary corpus.
+        second_train_windows: Training windows from the second corpus.
+
+    Returns:
+        The named counts.
+    """
+    trained = windows_trained(
+        plan, train_windows=train_windows, second_train_windows=second_train_windows
+    )
+    return tuple(
+        Observation(name=name, value=float(value))
+        for name, value in (
+            ("corpus_tokens", corpus_tokens),
+            ("second_corpus_tokens", second_corpus_tokens),
+            ("window_tokens", plan["window"]),
+            ("train_windows", train_windows),
+            ("held_out_windows", held_out_windows),
+            ("second_train_windows", second_train_windows),
+            ("windows_trained", trained),
+            ("training_tokens", trained * plan["window"]),
+        )
+    )
+
+
 def measure_plan(
     plan: CartridgePlan,
     *,
@@ -247,6 +332,16 @@ def measure_plan(
         # process and were dropped on the way out.
         observations.extend(per_seed_observations(arm))
     observations.extend(sweep_observations(sweep, sweep_floor))
+    observations.extend(
+        cost_observations(
+            plan,
+            corpus_tokens=sum(len(document) for document in encoded),
+            second_corpus_tokens=sum(len(document) for document in second_encoded),
+            train_windows=len(train),
+            held_out_windows=len(held_out),
+            second_train_windows=len(second_train),
+        )
+    )
     observations.append(Observation(name="sweep_noise_floor", value=sweep_floor))
     observations.append(Observation(name="composition_noise_floor", value=composition_floor))
     observations.append(Observation(name="composition_retention", value=retention(alone, composed)))
@@ -382,10 +477,12 @@ def entrypoint() -> None:
 
 __all__ = [
     "cartridge_run_record",
+    "cost_observations",
     "entrypoint",
     "main",
     "measure_plan",
     "sweep_observations",
+    "windows_trained",
 ]
 
 
