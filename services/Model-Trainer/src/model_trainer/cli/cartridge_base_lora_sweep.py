@@ -54,6 +54,7 @@ from model_trainer.cli.cartridge_companion_sweep import (
     cell_observations,
 )
 from model_trainer.cli.cartridge_composition_sweep import matched_other_train
+from model_trainer.cli.cartridge_lora_policy import quantization_for, target_modules_for
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
@@ -114,12 +115,6 @@ _FLAGS = (
     DEVICE_FLAG,
     OUT_FLAG,
 )
-
-#: The GPT-2 family fuses query, key and value into one projection; adapting
-#: it is adapting attention. A constant rather than a plan field because it
-#: is a property of the architecture the plan's ``model_id`` names, not a
-#: knob anyone sweeps.
-LORA_TARGET_MODULES = ("c_attn",)
 
 #: Seed for the LoRA's own training draw. Sits in the gap between the
 #: measurement offsets (at most 48 under the recorded plans) and the
@@ -316,7 +311,9 @@ def measure_grid(
             )
         )
 
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    base = require_cache_capable(
+        hf_hooks.Hooks.load_hf_model(plan["model_id"], quantization_for(plan["model_id"]))
+    )
     base.to(device)
 
     crowding_pool = tuple(
@@ -337,7 +334,7 @@ def measure_grid(
             r=plan["lora_rank"],
             lora_alpha=plan["lora_alpha"],
             lora_dropout=0.0,
-            target_modules=LORA_TARGET_MODULES,
+            target_modules=target_modules_for(plan["model_id"]),
             bias="none",
         )
     )
@@ -552,7 +549,6 @@ def entrypoint() -> None:
 
 
 __all__ = [
-    "LORA_TARGET_MODULES",
     "LORA_TRAIN_SEED",
     "POOL_SEED_BASE",
     "base_lora_sweep_run_record",

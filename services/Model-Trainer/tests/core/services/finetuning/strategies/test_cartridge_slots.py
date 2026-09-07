@@ -188,7 +188,7 @@ class TestBatchExpansion:
     def test_blocks_widen_to_the_batch(self) -> None:
         """Attention needs a block per row; the storage stays one."""
         slots = initialise_slots(make_geometry(), seed=1)
-        keys, values = slots.layer_blocks(0, batch_size=5)
+        keys, values = slots.layer_blocks(0, batch_size=5, dtype=torch.float32)
         assert tuple(keys.shape) == (5, 4, 3, 8)
         assert tuple(values.shape) == (5, 4, 3, 8)
 
@@ -196,18 +196,36 @@ class TestBatchExpansion:
         """A batch of 32 must not allocate 32 cartridges.
 
         Asserted on storage rather than on a memory figure: an expanded view
-        shares the base tensor's storage, a copy does not.
+        shares the base tensor's storage, a copy does not -- and the
+        matching-dtype cast must not reintroduce one, because ``Tensor.to``
+        on the identical dtype returns the same object. This is also the
+        proof every fp32 record's arithmetic is untouched by the dtype
+        parameter: same storage, same bytes, same view.
         """
         slots = initialise_slots(make_geometry(), seed=1)
-        keys, _ = slots.layer_blocks(0, batch_size=32)
+        keys, _ = slots.layer_blocks(0, batch_size=32, dtype=torch.float32)
         stored = slots.named_parameters()[0][1]
         assert keys.untyped_storage().data_ptr() == stored.detach().untyped_storage().data_ptr()
+
+    def test_a_mixed_precision_stream_gets_cast_blocks_with_fp32_masters(self) -> None:
+        """The master-weights boundary: blocks arrive in the stream's dtype,
+        the stored parameters stay fp32, and gradients still reach them."""
+        slots = initialise_slots(make_geometry(), seed=1)
+        keys, values = slots.layer_blocks(0, batch_size=2, dtype=torch.bfloat16)
+        assert keys.dtype == torch.bfloat16
+        assert values.dtype == torch.bfloat16
+        stored = next(iter(slots.state_dict().values()))
+        assert stored.dtype == torch.float32
+
+        (gradient,) = torch.autograd.grad(keys.float().sum(), [stored])
+        assert float(gradient.abs().sum().item()) > 0.0
+        assert gradient.dtype == torch.float32
 
     def test_each_layer_returns_its_own_blocks(self) -> None:
         """Returning layer zero for every layer would train one block four times."""
         slots = initialise_slots(make_geometry(num_layers=2), seed=1)
-        first, _ = slots.layer_blocks(0, batch_size=1)
-        second, _ = slots.layer_blocks(1, batch_size=1)
+        first, _ = slots.layer_blocks(0, batch_size=1, dtype=torch.float32)
+        second, _ = slots.layer_blocks(1, batch_size=1, dtype=torch.float32)
         assert not torch.equal(first, second)
 
 

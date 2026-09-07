@@ -266,6 +266,28 @@ BASE_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
         "epochs": 12,
         "learning_rate": 0.01,
     },
+    # The 7B rung, LM half: the architecture jump (GPT-NeoX, full MHA,
+    # NF4 via the CLI's precision policy -- declared there, not here,
+    # because precision is a property of how a base LOADS, and the plan's
+    # measurement knobs stay field-equal to every other rung's.
+    "pythia-6.9b-base-lora": {
+        "model_id": "EleutherAI/pythia-6.9b",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
 }
 
 
@@ -332,6 +354,25 @@ CONTENT_LORA_SWEEP_PLANS: Final[dict[str, BaseLoraSweepPlan]] = {
     # medium pair does at 24.
     "gpt2-xl-content-lora": {
         "model_id": "gpt2-xl",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "lora_rank": 8,
+        "lora_alpha": 16,
+        "lora_epochs": 3,
+        "lora_learning_rate": 0.0001,
+        "max_drawn": 8,
+        "pool_members_per_corpus": 3,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+    },
+    # The 7B rung, invariance half; field-equal to its base-lora twin.
+    "pythia-6.9b-content-lora": {
+        "model_id": "EleutherAI/pythia-6.9b",
         "window": 256,
         "held_out_stride": 4,
         "compartment_counts": (4, 8),

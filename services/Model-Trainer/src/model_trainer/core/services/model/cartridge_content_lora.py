@@ -36,7 +36,10 @@ import torch
 
 from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
-from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots
+from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
+    CartridgeSlots,
+    compute_dtype,
+)
 from model_trainer.core.services.model.cartridge_base_lora import composed_prefix_blocks
 from model_trainer.core.services.training.base_trainer_core import _get_optimizer_for_config
 from model_trainer.core.types import CacheCapableLMProto, ForwardOutProto, LogitsOutProto
@@ -61,9 +64,13 @@ def invariance_loss(student: torch.Tensor, teacher: torch.Tensor) -> torch.Tenso
     Returns:
         The scalar loss.
     """
+    # The softmax and the divergence sum run in fp32 whatever the logits
+    # arrived in: a bf16 log-sum over a 50k vocabulary loses the low bits
+    # the KL lives in. ``float()`` on an fp32 tensor returns it untouched,
+    # so every fp32 record's arithmetic is unchanged.
     return torch.nn.functional.kl_div(
-        torch.log_softmax(student, dim=-1),
-        torch.log_softmax(teacher, dim=-1),
+        torch.log_softmax(student.float(), dim=-1),
+        torch.log_softmax(teacher.float(), dim=-1),
         reduction="batchmean",
         log_target=True,
     )
@@ -168,6 +175,7 @@ def train_composition_lora_invariant(
         )
 
     teachers = tuple(CartridgeModel(base=teacher_base, slots=member) for member in pool)
+    student_dtype = compute_dtype(adapted)
     steps_per_epoch = sum(len(windows) for windows in member_windows)
     optimiser = _get_optimizer_for_config("adamw")(
         [parameter for parameter in adapted.parameters() if parameter.requires_grad],
@@ -197,7 +205,7 @@ def train_composition_lora_invariant(
             teacher_logits = _require_logits(teacher_out, side="teacher").detach()
 
             drawn = [pool[member] for member in roster]
-            blocks = composed_prefix_blocks(drawn, batch_size=batch_size)
+            blocks = composed_prefix_blocks(drawn, batch_size=batch_size, dtype=student_dtype)
             attended = int(window.shape[1]) + count * pool[0].geometry["num_slots"]
             student_out = adapted(
                 input_ids=window,

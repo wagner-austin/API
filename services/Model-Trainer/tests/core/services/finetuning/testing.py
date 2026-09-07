@@ -215,6 +215,15 @@ class FakeCacheOut(CacheCarryingOutProto):
         return self.cache
 
 
+class _FakeEmbedding:
+    """The one field of an embedding the dtype seam reads, fp32."""
+
+    @property
+    def weight(self) -> torch.Tensor:
+        """Return an fp32 tensor, the dtype answer this fake gives."""
+        return torch.zeros(1, dtype=torch.float32)
+
+
 class FakeCacheCapableModel(FakeModel):
     """A fake model that reports a key-value cache of a chosen shape.
 
@@ -252,6 +261,15 @@ class FakeCacheCapableModel(FakeModel):
         self._head_dim = head_dim
         self._key_dims = key_dims
         self.calls: list[RecordedCall] = []
+
+    def get_input_embeddings(self) -> _FakeEmbedding:
+        """Report an fp32 embedding, which is where the dtype seam reads.
+
+        Returns:
+            A module-shaped object whose weight is fp32, matching what every
+            real unquantized model this fake stands in for would report.
+        """
+        return _FakeEmbedding()
 
     def named_parameters(self) -> Sequence[tuple[str, NamedParameter]]:
         """Return one parameter, which is where the probe reads its device.

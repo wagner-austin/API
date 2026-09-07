@@ -18,7 +18,7 @@ from platform_core.errors import (
 )
 
 from model_trainer.core.contracts.cartridge import CartridgeGeometry
-from model_trainer.core.types import NamedParameter, ParameterLike
+from model_trainer.core.types import CacheCapableLMProto, NamedParameter, ParameterLike
 
 #: Standard deviation of the initial key and value blocks.
 #:
@@ -206,8 +206,10 @@ class CartridgeSlots:
         self._keys = [tensor.to(device).detach().requires_grad_(True) for tensor in self._keys]
         self._values = [tensor.to(device).detach().requires_grad_(True) for tensor in self._values]
 
-    def layer_blocks(self, layer: int, *, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return one layer's blocks widened to a batch.
+    def layer_blocks(
+        self, layer: int, *, batch_size: int, dtype: torch.dtype
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return one layer's blocks widened to a batch, in the stream's dtype.
 
         The stored blocks carry a batch dimension of one, because a cartridge
         is one object shared by every sequence that uses it. ``expand`` widens
@@ -215,12 +217,25 @@ class CartridgeSlots:
         cartridges, and gradients from every row accumulate into the one set
         of parameters -- which is the training signal wanted.
 
+        THE DTYPE IS THE CALLER'S MODEL'S, NOT THE SLOTS'. The slots stay
+        fp32 masters -- optimizer precision is theirs -- and the cast here is
+        the master-weights boundary: ``Tensor.to`` on the matching dtype
+        returns the expanded view untouched (every fp32 record's behaviour,
+        byte for byte), and on a mixed-precision model it puts the blocks
+        into the stream's dtype so the cache concat cannot promote, with
+        autograd casting the gradients back to the fp32 masters. Required
+        rather than defaulted: a defaulted fp32 here is exactly the silent
+        promotion this parameter exists to prevent.
+
         Args:
             layer: Zero-based layer index.
             batch_size: Rows in the batch being run.
+            dtype: The dtype of the model's hidden states, from
+                :func:`~model_trainer.core.services.finetuning.strategies.cartridge.compute_dtype`.
 
         Returns:
-            The key and value blocks for this layer, batch-shaped.
+            The key and value blocks for this layer, batch-shaped, in
+            ``dtype``.
         """
         geometry = self.geometry
         shape = (
@@ -229,7 +244,10 @@ class CartridgeSlots:
             geometry["num_slots"],
             geometry["head_dim"],
         )
-        return self._keys[layer].expand(shape), self._values[layer].expand(shape)
+        return (
+            self._keys[layer].expand(shape).to(dtype),
+            self._values[layer].expand(shape).to(dtype),
+        )
 
 
 def _empty_block(geometry: CartridgeGeometry, generator: torch.Generator) -> torch.Tensor:
@@ -469,10 +487,36 @@ def require_matching_geometry(
     )
 
 
+def compute_dtype(model: CacheCapableLMProto) -> torch.dtype:
+    """Read the dtype the model's hidden states carry.
+
+    The prefix boundary's one question: slot blocks joining the attention
+    stream must arrive in this dtype, or a mixed-precision model promotes
+    the cache concat and the mismatch surfaces layers away as an SDPA
+    dtype error (measured 2026-09-07, NF4 GPT-NeoX: fp32 slots against
+    bf16 states). Read from the input embedding rather than the first
+    parameter by iteration order, because quantization replaces LINEAR
+    layers only -- on a 4-bit model the first parameter can be a packed
+    uint8 blob while the embedding keeps the compute dtype. Lives in this
+    module, beside :meth:`CartridgeSlots.layer_blocks` whose ``dtype``
+    argument it exists to supply, and NOT in ``cartridge.py`` -- that
+    module imports the model classes, which import this one, and a helper
+    there closed the cycle.
+
+    Args:
+        model: The model whose stream the blocks will join.
+
+    Returns:
+        The embedding weight's dtype.
+    """
+    return model.get_input_embeddings().weight.dtype
+
+
 __all__ = [
     "SLOT_AXIS",
     "CartridgeSlots",
     "compose",
+    "compute_dtype",
     "discover_geometry",
     "initialise_slots",
     "require_matching_geometry",

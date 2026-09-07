@@ -34,6 +34,7 @@ from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     SLOT_AXIS,
     CartridgeSlots,
+    compute_dtype,
 )
 from model_trainer.core.services.model.cartridge_scoring import train_on
 from model_trainer.core.types import (
@@ -45,7 +46,7 @@ from model_trainer.core.types import (
 
 
 def composed_prefix_blocks(
-    members: Sequence[CartridgeSlots], *, batch_size: int
+    members: Sequence[CartridgeSlots], *, batch_size: int, dtype: torch.dtype
 ) -> list[tuple[torch.Tensor, torch.Tensor]]:
     """Concatenate members' slot blocks into one detached prefix, in order.
 
@@ -58,6 +59,11 @@ def composed_prefix_blocks(
         members: The cartridges standing in the prefix, in prefix order. At
             least one; every member cut for the same model.
         batch_size: Batch dimension the blocks must present.
+        dtype: The dtype of the consuming model's hidden states, from
+            :func:`~model_trainer.core.services.finetuning.strategies.cartridge.compute_dtype`
+            -- the fp32-master boundary
+            :meth:`~model_trainer.core.services.finetuning.strategies.cartridge_slots.CartridgeSlots.layer_blocks`
+            documents.
 
     Returns:
         One ``(key, value)`` pair per layer, every block detached, members
@@ -69,7 +75,9 @@ def composed_prefix_blocks(
         keys: list[torch.Tensor] = []
         values: list[torch.Tensor] = []
         for member in members:
-            member_key, member_value = member.layer_blocks(layer, batch_size=batch_size)
+            member_key, member_value = member.layer_blocks(
+                layer, batch_size=batch_size, dtype=dtype
+            )
             keys.append(member_key.detach())
             values.append(member_value.detach())
         blocks.append((torch.cat(keys, dim=SLOT_AXIS), torch.cat(values, dim=SLOT_AXIS)))
@@ -136,6 +144,7 @@ class CrowdedPrefixModel:
         self._pool = pool
         self._max_drawn = max_drawn
         self._slots_per_member = pool[0].geometry["num_slots"]
+        self._dtype = compute_dtype(adapted)
         device = str(next(iter(adapted.named_parameters()))[1].detach().device)
         for member in self._pool:
             member.to(device)
@@ -172,7 +181,7 @@ class CrowdedPrefixModel:
         order = torch.randperm(len(self._pool))
         chosen = [self._pool[int(order[position].item())] for position in range(count)]
         batch_size = int(input_ids.shape[0])
-        blocks = composed_prefix_blocks(chosen, batch_size=batch_size)
+        blocks = composed_prefix_blocks(chosen, batch_size=batch_size, dtype=self._dtype)
         attended = int(input_ids.shape[1]) + count * self._slots_per_member
         return self._adapted(
             input_ids=input_ids,

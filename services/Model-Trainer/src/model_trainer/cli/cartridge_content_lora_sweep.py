@@ -48,7 +48,6 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.cartridge_base_lora_sweep import (
-    LORA_TARGET_MODULES,
     LORA_TRAIN_SEED,
     POOL_SEED_BASE,
     _MeasurementPoolProvider,
@@ -59,6 +58,7 @@ from model_trainer.cli.cartridge_companion_sweep import (
     cell_observations,
 )
 from model_trainer.cli.cartridge_composition_sweep import matched_other_train
+from model_trainer.cli.cartridge_lora_policy import quantization_for, target_modules_for
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
@@ -197,7 +197,9 @@ def measure_grid(
             )
         )
 
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    base = require_cache_capable(
+        hf_hooks.Hooks.load_hf_model(plan["model_id"], quantization_for(plan["model_id"]))
+    )
     base.to(device)
 
     crowding_pool = tuple(
@@ -217,7 +219,9 @@ def measure_grid(
     # cannot also answer as the un-adapted base. Frozen before first use --
     # the teacher is a fixed reference, and a teacher that could drift under
     # the student's optimizer would make the objective chase itself.
-    teacher_base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    teacher_base = require_cache_capable(
+        hf_hooks.Hooks.load_hf_model(plan["model_id"], quantization_for(plan["model_id"]))
+    )
     teacher_base.to(device)
     freeze_adapted(teacher_base)
 
@@ -227,7 +231,7 @@ def measure_grid(
             r=plan["lora_rank"],
             lora_alpha=plan["lora_alpha"],
             lora_dropout=0.0,
-            target_modules=LORA_TARGET_MODULES,
+            target_modules=target_modules_for(plan["model_id"]),
             bias="none",
         )
     )

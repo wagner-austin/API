@@ -40,7 +40,7 @@ from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 #: A plan small enough to run in a test and shaped like the real one: two
 #: counts for the n-axis, a two-corpus pool so the roster draw is live.
 TINY_CONTENT_PLAN: BaseLoraSweepPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",  # a real policy id (the fakes return a tiny GPT-2 anyway)
     "window": 8,
     "held_out_stride": 3,
     "compartment_counts": (2, 3),
@@ -230,7 +230,7 @@ class TestRunRecord:
 
         assert record["experiment"] == CONTENT_LORA_SWEEP_EXPERIMENT
         assert record["label"].startswith(
-            "tiny-tiny-under-test-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-R2-a4-le1-llr0.05-D2-m1-seeds7.8.9-"
+            "tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-R2-a4-le1-llr0.05-D2-m1-seeds7.8.9-"
         )
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
@@ -265,6 +265,10 @@ class TestProductionPlan:
         assert (
             CONTENT_LORA_SWEEP_PLANS["gpt2-xl-content-lora"]
             == (BASE_LORA_SWEEP_PLANS["gpt2-xl-base-lora"])
+        )
+        assert (
+            CONTENT_LORA_SWEEP_PLANS["pythia-6.9b-content-lora"]
+            == (BASE_LORA_SWEEP_PLANS["pythia-6.9b-base-lora"])
         )
 
     def test_the_experiment_name_is_its_own(self) -> None:

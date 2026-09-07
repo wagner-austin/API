@@ -33,6 +33,7 @@ from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
 from model_trainer.core.services.finetuning.strategies.cartridge_slots import (
     SLOT_AXIS,
     CartridgeSlots,
+    compute_dtype,
     require_matching_geometry,
     slots_from_state,
 )
@@ -84,6 +85,9 @@ class CartridgeModel:
         """
         self._base = base
         self.slots = slots
+        # The stream's dtype, read once: every prefix block this model
+        # builds is cast to it at the boundary (fp32 masters stay fp32).
+        self._dtype = compute_dtype(base)
         for _, parameter in base.named_parameters():
             parameter.requires_grad = False
 
@@ -129,7 +133,7 @@ class CartridgeModel:
         """
         batch_size = int(input_ids.shape[0])
         blocks = [
-            self.slots.layer_blocks(layer, batch_size=batch_size)
+            self.slots.layer_blocks(layer, batch_size=batch_size, dtype=self._dtype)
             for layer in range(self.geometry["num_layers"])
         ]
         attended = int(input_ids.shape[1]) + self.geometry["num_slots"]
@@ -371,9 +375,11 @@ class CompanionedCartridgeModel(CartridgeModel):
         blocks: list[tuple[torch.Tensor, torch.Tensor]] = []
         for layer in range(self.geometry["num_layers"]):
             companion_key, companion_value = self._companion.layer_blocks(
-                layer, batch_size=batch_size
+                layer, batch_size=batch_size, dtype=self._dtype
             )
-            trainee_key, trainee_value = self.slots.layer_blocks(layer, batch_size=batch_size)
+            trainee_key, trainee_value = self.slots.layer_blocks(
+                layer, batch_size=batch_size, dtype=self._dtype
+            )
             blocks.append(
                 (
                     torch.cat([companion_key.detach(), trainee_key], dim=SLOT_AXIS),
@@ -514,11 +520,13 @@ class MultiCompanionedCartridgeModel(CartridgeModel):
             values: list[torch.Tensor] = []
             for companion in chosen:
                 companion_key, companion_value = companion.layer_blocks(
-                    layer, batch_size=batch_size
+                    layer, batch_size=batch_size, dtype=self._dtype
                 )
                 keys.append(companion_key.detach())
                 values.append(companion_value.detach())
-            trainee_key, trainee_value = self.slots.layer_blocks(layer, batch_size=batch_size)
+            trainee_key, trainee_value = self.slots.layer_blocks(
+                layer, batch_size=batch_size, dtype=self._dtype
+            )
             keys.append(trainee_key)
             values.append(trainee_value)
             blocks.append((torch.cat(keys, dim=SLOT_AXIS), torch.cat(values, dim=SLOT_AXIS)))

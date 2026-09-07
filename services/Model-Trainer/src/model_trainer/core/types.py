@@ -482,6 +482,26 @@ class CacheCapableLMProto(LMModelProto, Protocol):
         """
         ...
 
+    def get_input_embeddings(self) -> EmbeddingModuleProto:
+        """Return the input embedding module.
+
+        On the protocol because the embedding's weight dtype is the one
+        honest answer to "what dtype do this model's hidden states carry" --
+        the question a prefix cache must answer before its blocks join the
+        attention stream. Quantization replaces LINEAR layers only, so the
+        embedding keeps the compute dtype on a 4-bit model, where the first
+        parameter by iteration order might be a packed uint8 blob. Every
+        HuggingFace causal LM implements this accessor.
+        """
+        ...
+
+
+class EmbeddingModuleProto(Protocol):
+    """The one field of an embedding module the dtype question reads."""
+
+    @property
+    def weight(self) -> torch.Tensor: ...
+
 
 class EditableParameterProto(Protocol):
     """The parameter surface an in-place weight edit needs.

@@ -22,6 +22,7 @@ from platform_core.run_record import decode_run_record
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_base_lora_sweep as sweep
+from model_trainer.cli import cartridge_lora_policy as policy
 from model_trainer.core.contracts.model import QuantizationConfig
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
@@ -40,7 +41,7 @@ from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 #: A plan small enough to run in a test and shaped like the real one: two
 #: counts for the n-axis, a two-corpus pool so the crowd draw is live.
 TINY_LORA_PLAN: BaseLoraSweepPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",  # a real policy id (the fakes return a tiny GPT-2 anyway)
     "window": 8,
     "held_out_stride": 3,
     "compartment_counts": (2, 3),
@@ -248,7 +249,7 @@ class TestRunRecord:
 
         assert record["experiment"] == BASE_LORA_SWEEP_EXPERIMENT
         assert record["label"].startswith(
-            "tiny-tiny-under-test-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-R2-a4-le1-llr0.05-D2-m1-seeds7.8.9-"
+            "tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-R2-a4-le1-llr0.05-D2-m1-seeds7.8.9-"
         )
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
@@ -302,6 +303,42 @@ class TestProductionPlan:
         xl = BASE_LORA_SWEEP_PLANS["gpt2-xl-base-lora"]
         assert xl["model_id"] == "gpt2-xl"
         assert {**xl, "model_id": recorded["model_id"]} == recorded
+
+    def test_the_7b_rung_differs_from_the_recorded_plan_only_in_the_base(self) -> None:
+        """The architecture jump keeps every measurement knob: precision is
+        the CLI's loading policy, deliberately not a plan field."""
+        recorded = BASE_LORA_SWEEP_PLANS["gpt2-base-lora"]
+        pythia = BASE_LORA_SWEEP_PLANS["pythia-6.9b-base-lora"]
+        assert pythia["model_id"] == "EleutherAI/pythia-6.9b"
+        assert {**pythia, "model_id": recorded["model_id"]} == recorded
+
+
+class TestArchitecturePolicy:
+    """The two per-base decisions the CLI makes before anything loads."""
+
+    def test_every_gpt2_rung_adapts_the_fused_conv_and_loads_fp32(self) -> None:
+        for model_id in ("gpt2", "gpt2-medium", "gpt2-xl"):
+            assert policy.target_modules_for(model_id) == ("c_attn",)
+            assert policy.quantization_for(model_id) is None
+
+    def test_the_7b_rung_adapts_neox_attention_under_nf4(self) -> None:
+        assert policy.target_modules_for("EleutherAI/pythia-6.9b") == ("query_key_value",)
+        quantization = policy.quantization_for("EleutherAI/pythia-6.9b")
+        assert quantization == {
+            "load_in_4bit": True,
+            "load_in_8bit": False,
+            "bnb_4bit_quant_type": "nf4",
+            "bnb_4bit_compute_dtype": "bfloat16",
+            "bnb_4bit_use_double_quant": True,
+        }
+
+    def test_an_undeclared_base_refuses_in_both_policies(self) -> None:
+        """A heuristic here would silently adapt the wrong modules or load
+        an undeclared 7B in fp32; both must refuse by name instead."""
+        with pytest.raises(ValueError, match="no LoRA target modules"):
+            policy.target_modules_for("mistralai/Mistral-7B-v0.1")
+        with pytest.raises(ValueError, match="no loading precision"):
+            policy.quantization_for("mistralai/Mistral-7B-v0.1")
 
     def test_the_seed_geography_cannot_collide(self) -> None:
         """The LoRA and pool seeds sit past every measurement offset."""
