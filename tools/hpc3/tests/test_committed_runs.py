@@ -72,10 +72,17 @@ def _documents() -> list[tuple[str, dict[str, JSONValue]]]:
     """Read every JSON object COMMITTED under ``runs/``.
 
     READS THE COMMITTED TREE, NOT THE WORKING DIRECTORY, and the module's
-    name is the reason. ``.gitignore`` ignores ``tools/hpc3/runs/*`` wholesale
-    and un-ignores families by pattern, so a working tree holds 488 JSON
-    documents where a clean checkout holds 259. Globbing the filesystem
-    measured a set that exists only on the machine that wrote it.
+    name is the reason. ``.gitignore`` ignores ``tools/hpc3/runs/*`` and then
+    RE-INCLUDES five families by pattern -- ``hpc3*.json``, ``*-digests.txt``,
+    ``*-stage.json``, ``code-style-*.json``, ``cartridge-*.json`` -- which is
+    why a tracked set exists at all and why the two counts can diverge far
+    without either looking wrong. Globbing the filesystem measured a set that
+    exists only on the machine that wrote it.
+
+    A snapshot, not an invariant: on 2026-09-07 a working tree held 488 JSON
+    documents against 259 at HEAD, and a re-measure the same day read 492 and
+    263 as four more landed. Both spreads make the point; neither is a number
+    to check this against, which is why the assertions below use floors.
 
     That is not hypothetical: a floor calibrated at 138 locally arrived on CI
     as ``assert 36 >= 100`` (run 34104178998). Every developer's ``make
