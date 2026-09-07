@@ -22,6 +22,6 @@
     "card": "A30",
     "card_reason": "free-gpu-has-8-A100s-against-64-A30s;A30-is-Ampere-so-bf16-and-nf4-are-unchanged",
     "replicates": "code-style-qlora-qwen-v1",
-    "why_v2": "termination-power-0.89-at-n800-against-0.37-at-n226"
+    "why_v2": "v1-emitted-from-dirty-repos-and-not-citable;the-power-rationale-this-field-used-to-give-was-WRONG-v1-was-already-significant-at-mid-p-0.008-see-code-corpus-v2-digests.txt"
   }
 }
