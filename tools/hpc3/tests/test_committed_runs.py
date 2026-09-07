@@ -39,7 +39,11 @@ run" has no answer at all.
 
 from __future__ import annotations
 
+import io
 import pathlib
+import subprocess
+import tarfile
+import tempfile
 
 from platform_core.json_utils import JSONValue, load_json_str
 
@@ -49,6 +53,11 @@ from hpc3.contracts.workspace import Workspace, decode_workspace
 from hpc3.core.inputs import declared_inputs
 
 _RUNS = pathlib.Path(__file__).parent.parent / "runs"
+
+_REPO = pathlib.Path(__file__).parents[3]
+
+_RUNS_IN_REPO = "tools/hpc3/runs"
+"""``runs/`` as git spells it, which is the only spelling git accepts."""
 
 _INDEX = pathlib.Path(__file__).parents[3] / "docs" / "RESEARCH.md"
 """The research index, at the monorepo root rather than in this package.
@@ -60,16 +69,45 @@ package holds the check because this package holds the registry.
 
 
 def _documents() -> list[tuple[str, dict[str, JSONValue]]]:
-    """Read every JSON object in ``runs/``.
+    """Read every JSON object COMMITTED under ``runs/``.
+
+    READS THE COMMITTED TREE, NOT THE WORKING DIRECTORY, and the module's
+    name is the reason. ``.gitignore`` ignores ``tools/hpc3/runs/*`` wholesale
+    and un-ignores families by pattern, so a working tree holds 488 JSON
+    documents where a clean checkout holds 259. Globbing the filesystem
+    measured a set that exists only on the machine that wrote it.
+
+    That is not hypothetical: a floor calibrated at 138 locally arrived on CI
+    as ``assert 36 >= 100`` (run 34104178998). Every developer's ``make
+    check`` was green, because every working tree is self-consistent and CI
+    is the only reader that starts from a clean checkout. A module named
+    ``test_committed_runs`` that never asked git could not measure the
+    property it is named for.
+
+    ``git archive HEAD`` rather than a per-file ``git show``: one subprocess
+    instead of 259, and it works on the shallow clone ``actions/checkout``
+    produces by default, because HEAD's tree is present even at depth 1. An
+    older revision would not be, which is a separate trap this repo has
+    already paid for once.
 
     Returns:
         Each document's filename and parsed body, in filename order.
     """
+    archive = subprocess.run(
+        ["git", "archive", "HEAD", "--", _RUNS_IN_REPO],
+        cwd=_REPO,
+        capture_output=True,
+        check=True,
+    ).stdout
     found: list[tuple[str, dict[str, JSONValue]]] = []
-    for path in sorted(_RUNS.glob("*.json")):
-        document = load_json_str(path.read_text(encoding="utf-8"))
-        if isinstance(document, dict):
-            found.append((path.name, document))
+    with tempfile.TemporaryDirectory() as scratch:
+        root = pathlib.Path(scratch)
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            tar.extractall(root, filter="data")
+        for path in sorted((root / _RUNS_IN_REPO).glob("*.json")):
+            document = load_json_str(path.read_text(encoding="utf-8"))
+            if isinstance(document, dict):
+                found.append((path.name, document))
     return found
 
 
@@ -453,17 +491,31 @@ class TestTheInputCheckHasASubject:
 
         # The loop above is vacuous if no committed command spells any of
         # them, which is the reading this whole class exists to refuse.
-        assert checked >= 100
+        # 36 committed submissions spell one, measured against HEAD rather
+        # than against a working tree -- see _documents. The floor sits well
+        # under that so adding or retiring a run document does not fail this,
+        # and well over zero because zero is the failure it exists to catch:
+        # a renamed flag collapses this count to 0, not to 19.
+        assert checked >= 20
 
     def test_the_committed_documents_actually_exercise_the_extractor(self) -> None:
         """The subject exists at all.
 
         Every assertion above is over a loop that a deleted or emptied
-        ``runs/`` would make vacuous. Measured 2026-09-07: 138 committed
-        submissions declare at least one input across 29 unique cluster
-        paths. Asserting a floor rather than the exact count keeps this from
-        failing every time a run document is added, while still refusing the
-        reading where the extractor has nothing to work on.
+        ``runs/`` would make vacuous.
+
+        MEASURED AGAINST HEAD, 2026-09-07: 195 committed documents, 158 of
+        them submissions, 36 declaring at least one input across 10 unique
+        cluster paths.
+
+        The numbers this docstring first carried -- "138 committed
+        submissions ... 29 unique paths" -- were measured by globbing a
+        WORKING TREE and were wrong for any clean checkout. They put the
+        floor at 100, which CI met as ``assert 36 >= 100``. The word
+        "committed" was doing no work: nothing here asked git. Both halves
+        are fixed -- the set in :func:`_documents`, the floor here -- and the
+        floor is the lesser half. Raising it alone would have made the number
+        agree with CI while the check still measured the wrong set.
         """
         declaring = [
             name
@@ -472,7 +524,7 @@ class TestTheInputCheckHasASubject:
             and declared_inputs(str(document["command"]))
         ]
 
-        assert len(declaring) >= 100
+        assert len(declaring) >= 20
         assert "code-style-run-train-v2.json" in declaring
         assert "code-style-run-gen-v2-base.json" in declaring
 
