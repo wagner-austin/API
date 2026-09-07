@@ -35,8 +35,14 @@ from model_trainer.core import _test_hooks
 _CORPUS_BODY = b"kynI ospw bojenSa qojelGan surAqtar\n"
 _CORPUS_ID = hashlib.sha256(_CORPUS_BODY).hexdigest()
 
+#: The run id the payload carries, as a `str` rather than a `JSONValue`.
+#: Reading it back out of `_PAYLOAD` gives the union, which cannot be used
+#: with `in` against a message, and narrowing it at each use would be three
+#: lines of ceremony per assertion.
+_RUN_ID = "abl-armB-s42"
+
 _PAYLOAD: JSONObject = {
-    "run_id": "abl-armB-s42",
+    "run_id": _RUN_ID,
     "user_id": 1,
     "request": {"seed": 42, "corpus_file_id": _CORPUS_ID},
 }
@@ -263,6 +269,72 @@ class TestPublishingGoesThroughRealLogging:
         assert [_rendered(r, "%(channel)s|%(event_body)s") for r in published] == [
             "trainer:events|started"
         ]
+
+
+class TestTheResumeDecisionIsLegible:
+    """The decision must be READABLE in the log, not merely correct.
+
+    Its first production run logged
+
+        "event": "cluster_resume_decided", "run_id": "...-armCxl-s42"}
+
+    with `resume` absent. JsonFormatter emits its static fields, a configured
+    `extra_field_names`, and one fixed tuple of ML metrics; `resume` is in
+    none of them, so the single value the line exists to carry was dropped.
+
+    The behaviour was right that day and the log could not have told anyone.
+    A wrong decision would have rendered identically, which is why this
+    asserts on the RENDERED message rather than on a record attribute --
+    reading `record.resume` would pass against the very defect it is meant to
+    catch.
+    """
+
+    def _rendered_decision(self, tmp_path: pathlib.Path, *, with_checkpoint: bool) -> str:
+        """Run one decision through the real logger and return its message.
+
+        Args:
+            tmp_path: Test directory, whose artifacts root holds checkpoints.
+            with_checkpoint: Whether to place a checkpoint for the run first.
+
+        Returns:
+            The rendered log message for the decision.
+        """
+        if with_checkpoint:
+            ckpt = tmp_path / "artifacts" / "checkpoints"
+            ckpt.mkdir(parents=True, exist_ok=True)
+            (ckpt / f"{_RUN_ID}.pt").write_bytes(b"rolling state")
+
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        handler = _Capture()
+        logger = logging.getLogger("model_trainer.cluster.entry")
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            cluster_hooks.run_job = _Recorder()
+            cluster_entry.main(_args(tmp_path))
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
+
+        decisions = [r for r in records if "resume decided" in r.getMessage()]
+        assert len(decisions) == 1
+        return decisions[0].getMessage()
+
+    def test_a_fresh_run_says_so_in_the_message(self, tmp_path: pathlib.Path) -> None:
+        message = self._rendered_decision(tmp_path, with_checkpoint=False)
+        assert "resume=False" in message
+        assert _RUN_ID in message
+
+    def test_a_resume_says_so_in_the_message(self, tmp_path: pathlib.Path) -> None:
+        message = self._rendered_decision(tmp_path, with_checkpoint=True)
+        assert "resume=True" in message
+        assert _RUN_ID in message
 
 
 class TestMain:

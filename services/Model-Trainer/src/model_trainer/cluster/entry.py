@@ -216,13 +216,23 @@ def _resume_for_execution(settings: Settings, run_id: str) -> JSONObject:
         mutating the one it read.
     """
     resume = checkpoint_exists(settings, run_id)
+    # The decision is FORMATTED INTO the message, not passed only through
+    # `extra`, for the reason `_publish_to_log` records above: JsonFormatter
+    # emits its static fields, a configured `extra_field_names`, and one fixed
+    # tuple of ML metrics -- and `resume` is in none of them. The first
+    # production run of this code logged
+    #   "event": "cluster_resume_decided", "run_id": "...-armCxl-s42"}
+    # with the one value the line exists to report silently dropped. The
+    # decision was correct and unobservable, which is the worse half: a wrong
+    # decision would have looked identical.
     _log.info(
-        "resume decided from checkpoint state",
+        "resume decided from checkpoint state: resume=%s run_id=%s",
+        resume,
+        run_id,
         extra={
             "category": "training",
             "event": "cluster_resume_decided",
             "run_id": run_id,
-            "resume": resume,
         },
     )
     return {"resume": resume}
