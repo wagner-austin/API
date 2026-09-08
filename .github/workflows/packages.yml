@@ -243,11 +243,31 @@ jobs:
       # It costs one cache miss across the matrix whenever the Rust changes.
       # Rust changes here are rare; a green run against the wrong binary is
       # not a trade worth making.
+      #
+      # `github.workspace` is in the key because A VENV IS BOUND TO THE
+      # ABSOLUTE PATH IT WAS BUILT AT, and the runner that saves a cache is
+      # not always the runner that restores it. The self-hosted `lavender-wsl`
+      # label is a POOL of two installs on one host (actions-runner-api-1 and
+      # -api-2, different `_work` paths), and a poetry in-project `.venv`
+      # bakes its install path into every `bin/*` shebang. Restored across
+      # the pool, `poetry run pytest` execs `.venv/bin/pytest` whose shebang
+      # points at the OTHER install's venv -- which exists on the same box,
+      # so it runs, minus this workspace's `rw_bot`: ModuleNotFoundError in
+      # every collected module, coverage 4.21%, and a red that looks like a
+      # missing test suite. Measured 2026-09-07/08 on
+      # clients/RustedWarfareBot: 8/8 green on lavender-wsl, 6/6 red on
+      # lavender-wsl-2, same cache key, the log's rootdir under api-2 with
+      # its interpreter under api-1. Same failure class as the
+      # `target-cpu=native` incident above: a key that doesn't cover
+      # something the artifact is bound to. There it was the CPU; here it is
+      # the workspace path -- keyed on the path itself rather than
+      # `runner.name`, because hosted runners have unstable names but ONE
+      # stable workspace path, so for them this changes nothing.
       - name: Cache the virtualenv
         uses: actions/cache@v6
         with:
           path: ${{ matrix.package }}/.venv
-          key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package), 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}
+          key: pkg-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package), 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}-${{ github.workspace }}
 
       # `sync` rather than `install`, matching the other workflows: install
       # leaves behind anything the lock file no longer mentions, which is how
