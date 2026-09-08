@@ -338,6 +338,33 @@ def test_openai_captioner_caption_webp_image(tmp_path: Path) -> None:
     assert caption == "trigger, WebP image"
 
 
+def test_openai_captioner_real_imports_client(tmp_path: Path) -> None:
+    """Test OpenAICaptioner imports the real openai client without hooks.
+
+    This test verifies the import path for the real OpenAI client works.
+    Uses an invalid API key so the API call fails after imports succeed.
+    Mirrors test_gemini_captioner_real_imports_client, which covers the
+    default gemini client factory the same way.
+    """
+    # No hooks set - uses real imports
+    captioner = OpenAICaptioner(model_name=DEFAULT_MODEL, api_key="invalid-test-key")
+
+    # Create test image
+    image_path = tmp_path / "test_real_import.png"
+    img = Image.new("RGB", (64, 64), color=(255, 0, 0))
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    image_path.write_bytes(buffer.getvalue())
+
+    # Call caption - imports succeed but the API call fails with the invalid
+    # key (or without network); either way the failure is not an import error.
+    with pytest.raises(Exception) as exc_info:
+        captioner.caption(image_path, "test_trigger")
+
+    error_type = type(exc_info.value).__name__
+    assert error_type not in ("ModuleNotFoundError", "ImportError")
+
+
 def test_openai_captioner_integration_real_api(tmp_path: Path) -> None:
     """Integration test: OpenAICaptioner with real OpenAI API.
 
