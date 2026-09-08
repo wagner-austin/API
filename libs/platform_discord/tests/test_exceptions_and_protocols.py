@@ -213,7 +213,7 @@ def test_wrap_bot_fetch_user() -> None:
     fake_bot = _FakeDiscordBot(_FakeDiscordUser(user_id=99999))
     wrapped = wrap_bot(fake_bot)
 
-    user = asyncio.get_event_loop().run_until_complete(wrapped.fetch_user(123))
+    user = asyncio.run(wrapped.fetch_user(123))
     assert user.id == 99999
 
 
@@ -226,8 +226,8 @@ def test_wrap_bot_user_send() -> None:
     fake_bot = _FakeDiscordBot()
     wrapped = wrap_bot(fake_bot)
 
-    user = asyncio.get_event_loop().run_until_complete(wrapped.fetch_user(123))
-    msg = asyncio.get_event_loop().run_until_complete(user.send("Hello"))
+    user = asyncio.run(wrapped.fetch_user(123))
+    msg = asyncio.run(user.send("Hello"))
     assert msg.id == 789
 
 
@@ -240,7 +240,7 @@ def test_wrap_bot_message_edit() -> None:
     fake_bot = _FakeDiscordBot()
     wrapped = wrap_bot(fake_bot)
 
-    user = asyncio.get_event_loop().run_until_complete(wrapped.fetch_user(123))
-    msg = asyncio.get_event_loop().run_until_complete(user.send("Hello"))
-    edited = asyncio.get_event_loop().run_until_complete(msg.edit(content="Updated"))
+    user = asyncio.run(wrapped.fetch_user(123))
+    msg = asyncio.run(user.send("Hello"))
+    edited = asyncio.run(msg.edit(content="Updated"))
     assert edited.id == 789
