@@ -65,6 +65,8 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         rebuild=0,
         hunt=0,
         worker_wait=0,
+        groupcap=2,
+        prio=0,
         huntgate=False,
         bank=False,
     )
@@ -326,6 +328,33 @@ def test_a_worker_wait_round_trips() -> None:
     payload["worker_wait"] = 300
     decoded = decode_doctrine(payload)
     assert decoded["worker_wait"] == 300
+
+
+def test_a_negative_groupcap_is_refused() -> None:
+    """Zero already means one rolling group; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["groupcap"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-034"
+
+
+def test_a_prio_outside_the_allele_range_is_refused() -> None:
+    """Three alleles exist; a fourth is a typo, not a future."""
+    payload = encode_doctrine(_doctrine())
+    payload["prio"] = 3
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-035"
+
+
+def test_the_tactical_alleles_round_trip() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["groupcap"] = 4
+    payload["prio"] = 1
+    decoded = decode_doctrine(payload)
+    assert decoded["groupcap"] == 4
+    assert decoded["prio"] == 1
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

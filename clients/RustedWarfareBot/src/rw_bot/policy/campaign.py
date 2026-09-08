@@ -57,6 +57,7 @@ from rw_bot.policy.dispatching import (
 )
 from rw_bot.policy.doctrine import NAVTILT_OFF, NAVTILT_PREDICTED
 from rw_bot.policy.expander import Expander
+from rw_bot.policy.firing import MAX_OPEN_GROUPS, PRIO_CONVERGENCE
 from rw_bot.policy.head import HeadModel
 from rw_bot.policy.hunt import Hunter
 from rw_bot.policy.intel import Intel
@@ -131,6 +132,8 @@ def play(
     rebuild: int = 0,
     hunt: int = 0,
     worker_wait: int = 0,
+    groupcap: int = MAX_OPEN_GROUPS,
+    prio: int = PRIO_CONVERGENCE,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -184,8 +187,9 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``, ``bank``
-            and ``income_ladder``. Each is documented ONCE, on
+            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
+            ``groupcap``, ``prio``, ``bank`` and ``income_ladder``. Each
+            is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -241,6 +245,8 @@ def play(
         hold=hold,
         riposte=riposte,
         allin_at=allin,
+        groupcap=groupcap,
+        prio=prio,
     )
     intel = Intel()
     scouts = ScoutRunner()

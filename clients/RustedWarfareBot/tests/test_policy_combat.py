@@ -14,13 +14,12 @@ from __future__ import annotations
 import pytest
 
 from rw_bot.mechanics.combat_profile import CombatProfileError, is_armed
-from rw_bot.policy.combat import (
+from rw_bot.policy.combat import engageable, find_army, find_targets, is_mobile
+from rw_bot.policy.firing import (
+    PRIO_FRAIL,
+    PRIO_RANGE,
     choose_target,
-    engageable,
     engagements,
-    find_army,
-    find_targets,
-    is_mobile,
 )
 from tests.combat_fixtures import CATALOGUE, PROFILES, sample, unit, unit_stats
 from tests.wire_fixtures import entity, profile, profiles_for
@@ -221,6 +220,53 @@ def test_at_most_two_groups_fill_at_once() -> None:
     for order in orders:
         by_target[order["target_id"]] = by_target.get(order["target_id"], 0) + 1
     assert by_target == {90: 7, 91: 6}
+
+
+def test_the_groupcap_allele_bounds_the_open_groups() -> None:
+    """The first tactical allele ([[impossible-tactical-genome]]): the same
+    world as the two-group test opens three groups at groupcap 3, and at
+    groupcap 0 -- one rolling group, the pre-arc single focus -- every tank
+    piles onto the nearest target."""
+    targets = tuple(
+        unit(90 + n, "c_tank", 100.0 + 10.0 * n, 0.0, mine=False, hostile=True) for n in range(3)
+    )
+    world = sample(
+        *(unit(n, "c_tank", 0.0, float(n)) for n in range(1, 14)),
+        *targets,
+    )
+    spread: dict[int, int] = {}
+    for order in engagements(world, CATALOGUE, PROFILES, groups=3):
+        spread[order["target_id"]] = spread.get(order["target_id"], 0) + 1
+    assert spread == {90: 6, 91: 6, 92: 1}
+    mono: dict[int, int] = {}
+    for order in engagements(world, CATALOGUE, PROFILES, groups=0):
+        mono[order["target_id"]] = mono.get(order["target_id"], 0) + 1
+    assert mono == {90: 13}
+
+
+def test_prio_range_ranks_the_longest_reach_first() -> None:
+    """The RANGE allele: the target that outranges everything opens the
+    first group even when a shorter-armed one stands nearer, and the
+    identity keeps the convergence order on the same world."""
+    catalogue = dict(CATALOGUE)
+    catalogue["longarm"] = unit_stats("longarm")
+    profiles = dict(PROFILES)
+    profiles["longarm"] = profile("longarm", 250.0, land=True)
+    near = unit(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    arm = unit(10, "longarm", 150.0, 0.0, mine=False, hostile=True)
+    world = sample(unit(1, "c_tank", 0.0, 0.0), near, arm)
+    assert engagements(world, catalogue, profiles)[0]["target_id"] == 9
+    assert engagements(world, catalogue, profiles, prio=PRIO_RANGE)[0]["target_id"] == 10
+
+
+def test_prio_frail_ranks_the_lowest_hit_points_first() -> None:
+    """The FRAIL allele: the nearly-dead target fills first even when a
+    healthy one stands nearer."""
+    near = unit(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    hurt = entity(10, "c_tank", x=150.0, y=0.0, team=1, mine=False, hostile=True, hp=30.0)
+    world = sample(unit(1, "c_tank", 0.0, 0.0), near, hurt)
+    assert engagements(world, CATALOGUE, PROFILES)[0]["target_id"] == 9
+    assert engagements(world, CATALOGUE, PROFILES, prio=PRIO_FRAIL)[0]["target_id"] == 10
 
 
 def test_a_unit_armed_in_profile_but_weaponless_in_catalogue_contributes_nothing() -> None:

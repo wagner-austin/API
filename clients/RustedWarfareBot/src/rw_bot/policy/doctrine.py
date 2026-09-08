@@ -22,6 +22,7 @@ from typing import Final, TypedDict
 
 from rw_bot import RwBotError
 from rw_bot.policy.combat import WAVE_SIZES
+from rw_bot.policy.firing import MAX_OPEN_GROUPS, PRIO_CONVERGENCE
 from rw_bot.policy.workforce import DEFAULT_MAX_WORKERS
 
 #: The ``heavies`` value that means "no extra composition entries".
@@ -85,6 +86,8 @@ INT_FIELDS: Final = (
     "rebuild",
     "hunt",
     "worker_wait",
+    "groupcap",
+    "prio",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -357,6 +360,23 @@ class Doctrine(TypedDict):
             generations while phase-0 growth rides the other way, and
             the workers10 arm only ever measured the count axis
             ([[impossible-build-priority-head]]; log 2026-09-07).
+        groupcap: Kill-groups that may fill at once -- the first allele
+            of the tactical genome ([[impossible-tactical-genome]]).
+            Identity 2, the constant every prior measurement ran under
+            (set on three seeds in the 2026-07-31 micro arc, "pending a
+            wins-based reason" -- the searcher owns it now). Zero behaves
+            as one rolling group, the pre-arc single focus, because only
+            a started group can accept members.
+        prio: The target-priority allele. Identity 0 orders by
+            convergence (nearest the army's centre, health breaking
+            ties -- the ordering that survived the economy-first
+            challenge); 1 ranks the longest-reaching engageable target
+            first (the artillery topping every Impossible death ledger
+            dies before the tanks screening it, at the measured risk of
+            pulling the army deeper); 2 ranks the lowest absolute hit
+            points first (the fastest removal of firing units). Variants
+            reorder only WITHIN the engageable set
+            ([[impossible-tactical-genome]]).
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -442,6 +462,8 @@ class Doctrine(TypedDict):
     rebuild: int
     hunt: int
     worker_wait: int
+    groupcap: int
+    prio: int
     huntgate: bool
     bank: bool
 
@@ -502,6 +524,8 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     rebuild=0,
     hunt=0,
     worker_wait=0,
+    groupcap=MAX_OPEN_GROUPS,
+    prio=PRIO_CONVERGENCE,
     huntgate=False,
     bank=False,
 )

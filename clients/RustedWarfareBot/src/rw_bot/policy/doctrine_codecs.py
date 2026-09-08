@@ -20,6 +20,7 @@ from rw_bot.policy.doctrine import (
     Doctrine,
     DoctrineError,
 )
+from rw_bot.policy.firing import PRIO_FRAIL
 from rw_bot.validation import (
     require_bool,
     require_int,
@@ -54,6 +55,8 @@ _BAD_HUNT_SIZE = "RW-DOCTRINE-030"
 _GATE_ON_NOTHING = "RW-DOCTRINE-031"
 _BANK_ON_NOTHING = "RW-DOCTRINE-032"
 _BAD_WORKER_WAIT = "RW-DOCTRINE-033"
+_BAD_GROUP_CAP = "RW-DOCTRINE-034"
+_BAD_PRIO = "RW-DOCTRINE-035"
 
 
 def _count(
@@ -84,6 +87,31 @@ def _count(
     if value < 0:
         raise DoctrineError(code, f"field {field!r} must be >= 0, {meaning}, got {value}")
     return value
+
+
+def _prio(payload: Mapping[str, str | int | float | bool]) -> int:
+    """Read the target-priority allele, refusing anything outside 0-2.
+
+    A count validator alone would accept a fourth allele that no code
+    implements, and an unimplemented allele must be a typo at decode, not
+    a silent identity at fire time ([[impossible-tactical-genome]]).
+
+    Args:
+        payload: Field values by name.
+
+    Returns:
+        The validated allele.
+
+    Raises:
+        DoctrineError: ``RW-DOCTRINE-035`` outside the allele range.
+    """
+    prio = _count(payload, "prio", _BAD_PRIO, "a target-priority allele, 0-2")
+    if prio > PRIO_FRAIL:
+        raise DoctrineError(
+            _BAD_PRIO,
+            f"field 'prio' names a target-priority allele, 0-2, got {prio}",
+        )
+    return prio
 
 
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
@@ -142,6 +170,10 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     worker_wait = _count(
         payload, "worker_wait", _BAD_WORKER_WAIT, "samples before extra builders, 0 immediately"
     )
+    groupcap = _count(
+        payload, "groupcap", _BAD_GROUP_CAP, "kill-groups filling at once, 0 one rolling group"
+    )
+    prio = _prio(payload)
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -221,6 +253,8 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         rebuild=rebuild,
         hunt=hunt,
         worker_wait=worker_wait,
+        groupcap=groupcap,
+        prio=prio,
         huntgate=huntgate,
         bank=bank,
     )
@@ -278,6 +312,8 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "rebuild": doctrine["rebuild"],
         "hunt": doctrine["hunt"],
         "worker_wait": doctrine["worker_wait"],
+        "groupcap": doctrine["groupcap"],
+        "prio": doctrine["prio"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

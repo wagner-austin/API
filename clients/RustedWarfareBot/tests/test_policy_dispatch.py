@@ -12,8 +12,9 @@ from __future__ import annotations
 
 from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.mechanics.combat_profile import CombatProfile
-from rw_bot.policy.combat import FIRST_WAVE, Engagement
+from rw_bot.policy.combat import FIRST_WAVE
 from rw_bot.policy.dispatch import WaveController, dispatch_attacks, gather_reserve
+from rw_bot.policy.firing import Engagement
 from rw_bot.wire.command import AttackOrder
 from rw_bot.wire.state import Entity, Sample
 from tests.wire_fixtures import entity, pool, profile, sample

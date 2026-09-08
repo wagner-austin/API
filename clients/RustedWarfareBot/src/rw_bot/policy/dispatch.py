@@ -19,12 +19,16 @@ from rw_bot.mechanics.combat_profile import CombatProfile, can_engage
 from rw_bot.mechanics.upgrades import satisfies
 from rw_bot.policy.combat import (
     WAVE_SIZES,
-    Engagement,
-    engagements,
     find_targets,
     muster,
     rally,
     wave_size,
+)
+from rw_bot.policy.firing import (
+    MAX_OPEN_GROUPS,
+    PRIO_CONVERGENCE,
+    Engagement,
+    engagements,
 )
 from rw_bot.policy.guard import deepest_intruder
 from rw_bot.policy.rush import mirror_point
@@ -221,6 +225,8 @@ class WaveController:
         hold: int = 0,
         riposte: bool = False,
         allin_at: int = 0,
+        groupcap: int = MAX_OPEN_GROUPS,
+        prio: int = PRIO_CONVERGENCE,
     ) -> None:
         """Open a controller.
 
@@ -258,6 +264,12 @@ class WaveController:
                 later unit straight in. The anti-trickle floor still holds:
                 a release below the first wave's size is a trickle whatever
                 the clock says ([[policy-combat]]).
+            groupcap: Kill-groups that may fill at once, and
+            prio: the target-priority allele -- the first two fields of
+                the tactical genome, threaded whole to
+                :func:`~rw_bot.policy.combat.engagements`; identities are
+                the constants every prior measurement ran under
+                ([[impossible-tactical-genome]]).
         """
         self._ladder = tuple(ladder)
         self._intercept = intercept
@@ -266,6 +278,8 @@ class WaveController:
         self._hold = hold
         self._riposte = riposte
         self._allin_at = allin_at
+        self._groupcap = groupcap
+        self._prio = prio
         # Observations seen, counted here rather than passed in: the trigger
         # is about this controller's own timeline, and every caller already
         # calls command() exactly once per observation.
@@ -409,7 +423,9 @@ class WaveController:
         fighting = tuple(unit for unit in army if unit["unit_id"] in self._released)
         # Each attacker's current target is carried in, so the groups persist
         # across samples instead of being re-dealt every observation.
-        current = engagements(sample, catalogue, profiles, self._held, fighting)
+        current = engagements(
+            sample, catalogue, profiles, self._held, fighting, self._groupcap, self._prio
+        )
         self._held = {e["attacker_id"]: e["target_id"] for e in current}
         attacks = dispatch_attacks(current, self._ordered, self._attacked)
         self.attack_orders += len(attacks)

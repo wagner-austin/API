@@ -393,6 +393,8 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     rebuild=0,
                     hunt=0,
                     worker_wait=0,
+                    groupcap=2,
+                    prio=0,
                     huntgate=False,
                     bank=False,
                     brace=False,
