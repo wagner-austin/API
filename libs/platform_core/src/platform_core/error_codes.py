@@ -308,6 +308,50 @@ class EmailErrorCode(ErrorCodeBase):
     PROVIDER_ERROR = "PROVIDER_ERROR"
 
 
+class StatisticalPowerErrorCode(ErrorCodeBase):
+    """Codes for the shared minimum-detectable-effect helper.
+
+    Its own family rather than reuse of :class:`ModelTrainerErrorCode`:
+    the helper lives in ``platform_core`` and is consumed by
+    Model-Trainer, RustedWarfareBot, turkic-lstm and covenant_ml alike,
+    so a Model-Trainer code on a turkic-lstm failure would misattribute
+    the domain. Reuse of the HTTP-shaped :class:`ErrorCode` would be
+    worse still -- this module is arithmetic, not a request surface, and
+    ``INVALID_INPUT`` is exactly the vague code that family forbids.
+    """
+
+    # A power statement needs replicates. One observation has no spread,
+    # and a spread invented from one draw is the defect this whole
+    # helper exists to make impossible.
+    POWER_TOO_FEW_REPLICATES = "POWER_TOO_FEW_REPLICATES"
+
+    # Two-sided alpha outside (0, 1). Refused rather than clamped: a
+    # clamped alpha silently changes what the published number means.
+    POWER_ALPHA_OUT_OF_RANGE = "POWER_ALPHA_OUT_OF_RANGE"
+
+    # Clopper-Pearson confidence outside (0, 1), same reasoning.
+    POWER_CONFIDENCE_OUT_OF_RANGE = "POWER_CONFIDENCE_OUT_OF_RANGE"
+
+    # Discordant-pair count negative, or trial count non-positive.
+    POWER_SAMPLE_SIZE_INVALID = "POWER_SAMPLE_SIZE_INVALID"
+
+    # The smallest effect anyone would act on must be positive and
+    # stated. A verdict of TESTED is meaningless without it.
+    POWER_EFFECT_OF_INTEREST_INVALID = "POWER_EFFECT_OF_INTEREST_INVALID"
+
+    # Decode found a verdict string outside the published vocabulary.
+    POWER_VERDICT_UNKNOWN = "POWER_VERDICT_UNKNOWN"
+
+    # Decode found an instrument string outside the published vocabulary.
+    POWER_INSTRUMENT_UNKNOWN = "POWER_INSTRUMENT_UNKNOWN"
+
+    # Decode found a McNemar variant outside exact/mid_p. Its own code
+    # rather than reuse of POWER_INSTRUMENT_UNKNOWN because the two
+    # name different mistakes: the wrong record type, versus the right
+    # record type carrying a rejection region nobody computed against.
+    POWER_TEST_UNKNOWN = "POWER_TEST_UNKNOWN"
+
+
 __all__ = [
     "CalendarErrorCode",
     "EmailErrorCode",
@@ -316,5 +360,6 @@ __all__ = [
     "HandwritingErrorCode",
     "ModelTrainerErrorCode",
     "OAuthErrorCode",
+    "StatisticalPowerErrorCode",
     "TranscriptErrorCode",
 ]
