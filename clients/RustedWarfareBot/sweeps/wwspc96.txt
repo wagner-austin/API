@@ -1,0 +1,108 @@
+# The spacing panel (log 2026-09-08): spc90 -- the first positive screen
+# at Impossible since the retracted raid8 -- at verdict tier under laws
+# six and nine. Screen read +588.2 paired survival (sd 714.9, t=2.85,
+# longer 9/12) with the MECHANISM OPEN: loss rates went UP while
+# survival rose, so the designed splash-dilution story is refuted and
+# the panel's job is the effect, not the theory. 48 fresh shared seeds,
+# in-batch control; MDE ~191 at n=48 on the detpair24b floor -- powered
+# five-fold for the screen's effect size. raid8's ghost stands guard:
+# +217 at screen tier once flipped to -198 across trees.
+# Seeds 8826001-8830889.
+#
+# label | seed | doctrine | samples
+stand|8826001|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826001|doctrines/stand-spacing90.doctrine|10000
+stand|8826105|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826105|doctrines/stand-spacing90.doctrine|10000
+stand|8826209|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826209|doctrines/stand-spacing90.doctrine|10000
+stand|8826313|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826313|doctrines/stand-spacing90.doctrine|10000
+stand|8826417|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826417|doctrines/stand-spacing90.doctrine|10000
+stand|8826521|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826521|doctrines/stand-spacing90.doctrine|10000
+stand|8826625|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826625|doctrines/stand-spacing90.doctrine|10000
+stand|8826729|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826729|doctrines/stand-spacing90.doctrine|10000
+stand|8826833|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826833|doctrines/stand-spacing90.doctrine|10000
+stand|8826937|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8826937|doctrines/stand-spacing90.doctrine|10000
+stand|8827041|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827041|doctrines/stand-spacing90.doctrine|10000
+stand|8827145|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827145|doctrines/stand-spacing90.doctrine|10000
+stand|8827249|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827249|doctrines/stand-spacing90.doctrine|10000
+stand|8827353|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827353|doctrines/stand-spacing90.doctrine|10000
+stand|8827457|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827457|doctrines/stand-spacing90.doctrine|10000
+stand|8827561|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827561|doctrines/stand-spacing90.doctrine|10000
+stand|8827665|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827665|doctrines/stand-spacing90.doctrine|10000
+stand|8827769|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827769|doctrines/stand-spacing90.doctrine|10000
+stand|8827873|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827873|doctrines/stand-spacing90.doctrine|10000
+stand|8827977|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8827977|doctrines/stand-spacing90.doctrine|10000
+stand|8828081|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828081|doctrines/stand-spacing90.doctrine|10000
+stand|8828185|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828185|doctrines/stand-spacing90.doctrine|10000
+stand|8828289|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828289|doctrines/stand-spacing90.doctrine|10000
+stand|8828393|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828393|doctrines/stand-spacing90.doctrine|10000
+stand|8828497|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828497|doctrines/stand-spacing90.doctrine|10000
+stand|8828601|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828601|doctrines/stand-spacing90.doctrine|10000
+stand|8828705|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828705|doctrines/stand-spacing90.doctrine|10000
+stand|8828809|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828809|doctrines/stand-spacing90.doctrine|10000
+stand|8828913|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8828913|doctrines/stand-spacing90.doctrine|10000
+stand|8829017|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829017|doctrines/stand-spacing90.doctrine|10000
+stand|8829121|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829121|doctrines/stand-spacing90.doctrine|10000
+stand|8829225|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829225|doctrines/stand-spacing90.doctrine|10000
+stand|8829329|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829329|doctrines/stand-spacing90.doctrine|10000
+stand|8829433|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829433|doctrines/stand-spacing90.doctrine|10000
+stand|8829537|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829537|doctrines/stand-spacing90.doctrine|10000
+stand|8829641|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829641|doctrines/stand-spacing90.doctrine|10000
+stand|8829745|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829745|doctrines/stand-spacing90.doctrine|10000
+stand|8829849|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829849|doctrines/stand-spacing90.doctrine|10000
+stand|8829953|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8829953|doctrines/stand-spacing90.doctrine|10000
+stand|8830057|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830057|doctrines/stand-spacing90.doctrine|10000
+stand|8830161|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830161|doctrines/stand-spacing90.doctrine|10000
+stand|8830265|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830265|doctrines/stand-spacing90.doctrine|10000
+stand|8830369|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830369|doctrines/stand-spacing90.doctrine|10000
+stand|8830473|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830473|doctrines/stand-spacing90.doctrine|10000
+stand|8830577|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830577|doctrines/stand-spacing90.doctrine|10000
+stand|8830681|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830681|doctrines/stand-spacing90.doctrine|10000
+stand|8830785|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830785|doctrines/stand-spacing90.doctrine|10000
+stand|8830889|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8830889|doctrines/stand-spacing90.doctrine|10000
