@@ -14,7 +14,7 @@ provenance:
   - "wiki/log.md entries 2026-09-07: the corpus label measurement and its correction; the eighth closure (wwait24); the engagement-gate prevalence refutation"
   - "wiki/log.md 2026-07-31 micro arc (kill-sized fire groups built, capped at two; artillery-standoff refuted as engine-native)"
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java as() -- the uniform-random target chooser, read 2026-09-07"
-fact_checked: 2026-09-07
+fact_checked: 2026-09-08
 confidence: medium
 hubs: [bot-architecture]
 ---
@@ -64,8 +64,15 @@ code and the closures:
   a GROUP that disengages at a measured local disadvantage);
 * lottery posture (unit dispersion as target-distribution shaping --
   the chooser is uniform-random over our units, read from source, so
-  our placement IS the enemy's attack distribution; wwdec36 prices the
-  scatter end of this axis as a screen while this page is written).
+  our placement IS the enemy's attack distribution). wwdec36 priced the
+  scatter end at doses 12/24 and it INVERTED at t=-6.1/-5.0 -- the
+  largest effect ever measured at this rung, and it was production
+  displacement: tickets drafted through the army's own channel consume
+  the factories before dilution can matter (log 2026-09-08). The allele
+  survives with a design constraint the screen bought: tickets must be
+  priced in TEMPO -- structures, not drafted units; the front, not the
+  flanks -- and the searcher does not touch this axis until a
+  tempo-priced ticket exists.
 
 The inventory is phase one's deliverable and this list is its seed,
 not its bound. Every allele must pass the existing discipline: wired
