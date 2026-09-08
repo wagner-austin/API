@@ -37,8 +37,18 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
-from .protocols import ProcessInformationSetterProto, SetProcessInformationProto
-from .types import ERR_POWER_THROTTLING
+from .protocols import (
+    CloseHandleProto,
+    OpenProcessProto,
+    ProcessInformationSetterProto,
+    SetProcessInformationProto,
+    TargetedProcessInformationSetterProto,
+)
+from .types import (
+    ERR_POWER_TARGET_REFUSED,
+    ERR_POWER_TARGET_UNREACHABLE,
+    ERR_POWER_THROTTLING,
+)
 
 #: ``ProcessPowerThrottling`` from ``PROCESS_INFORMATION_CLASS``.
 PROCESS_POWER_THROTTLING: int = 4
@@ -51,6 +61,12 @@ STATE_VERSION: int = 1
 
 #: Byte length of ``PROCESS_POWER_THROTTLING_STATE``: three ``ULONG``.
 STATE_SIZE: int = 12
+
+#: ``PROCESS_SET_INFORMATION``: the single right needed to change another
+#: process's power state. Deliberately not ``PROCESS_ALL_ACCESS`` -- this
+#: opens someone else's process, and asking for more than the one right the
+#: call uses is how a handle becomes useful for something nobody reviewed.
+PROCESS_SET_INFORMATION: int = 0x0200
 
 #: What ``GetCurrentProcess`` returns: the documented ``(HANDLE)-1``
 #: pseudo-handle for the calling process.
@@ -176,14 +192,138 @@ def opt_out_of_power_throttling() -> None:
     disable_power_throttling(win32_process_information_setter)
 
 
+def win32_targeted_process_information_setter(
+    pid: int,
+    version: int,
+    control_mask: int,
+    state_mask: int,
+) -> tuple[bool, int]:
+    """Apply a power-throttling state to ANOTHER process, by pid, via Win32.
+
+    The by-pid counterpart of :func:`win32_process_information_setter`. That
+    one reaches its target through the ``(HANDLE)-1`` pseudo-handle, which
+    names the caller and nothing else; this one must open a real handle, and
+    so must close it.
+
+    The handle is closed on BOTH paths. Leaking it on the failure path would
+    be the harder bug to find, because the failure it accompanies already
+    explains the symptom.
+
+    Args:
+        pid: The target process.
+        version: ``PROCESS_POWER_THROTTLING_STATE.Version``.
+        control_mask: Which policies the target expresses a preference about.
+        state_mask: The preference itself, for the policies named by
+            ``control_mask``.
+
+    Returns:
+        ``(opened, code)`` as ``TargetedProcessInformationSetterProto`` defines
+        it: whether the process could be opened, and the Win32 error code or
+        ``0`` on acceptance.
+    """
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_process: OpenProcessProto = kernel32.OpenProcess
+    set_process_information: SetProcessInformationProto = kernel32.SetProcessInformation
+    close_handle: CloseHandleProto = kernel32.CloseHandle
+
+    handle = open_process(
+        ctypes.c_uint32(PROCESS_SET_INFORMATION),
+        ctypes.c_int(0),
+        ctypes.c_uint32(pid),
+    )
+    if handle == 0:
+        return (False, ctypes.get_last_error())
+
+    state = PowerThrottlingState(
+        Version=version,
+        ControlMask=control_mask,
+        StateMask=state_mask,
+    )
+    accepted = set_process_information(
+        ctypes.c_void_p(handle),
+        ctypes.c_int(PROCESS_POWER_THROTTLING),
+        ctypes.c_void_p(ctypes.addressof(state)),
+        ctypes.c_uint32(ctypes.sizeof(state)),
+    )
+    code = 0 if accepted != 0 else ctypes.get_last_error()
+    close_handle(ctypes.c_void_p(handle))
+    return (True, code)
+
+
+def disable_power_throttling_for(pid: int, setter: TargetedProcessInformationSetterProto) -> None:
+    """Opt one already-running process out of power throttling.
+
+    :func:`disable_power_throttling` can only reach the calling process, so it
+    cannot help a measurement that is already under way -- which is the case
+    that matters most, because the throttle lands part-way through a long run
+    and the run is exactly what one does not want to restart. Applied
+    successfully to a job hours in, without interrupting it.
+
+    Requests the same ``ControlMask = EXECUTION_SPEED`` with ``StateMask = 0``
+    the current-process form does; the two encodings must not drift apart, and
+    a test asserts they are identical.
+
+    Args:
+        pid: The process to opt out.
+        setter: Applies the state. Injected so both refusal paths are
+            reachable in tests without altering any real process.
+
+    Returns:
+        None. The call is made for its effect on the target.
+
+    Raises:
+        RuntimeError: Carrying
+            :data:`~covenant_ml.benchmarking.types.ERR_POWER_TARGET_UNREACHABLE`
+            when the process could not be opened, or
+            :data:`~covenant_ml.benchmarking.types.ERR_POWER_TARGET_REFUSED`
+            when it was opened and refused the change. Two codes rather than
+            one because the remedies differ: an unreachable pid has usually
+            exited or belongs to another user, while a refusal is a platform
+            policy answer about a process that is right there.
+    """
+    opened, code = setter(pid, STATE_VERSION, EXECUTION_SPEED, 0)
+    if not opened:
+        raise RuntimeError(
+            f"[{ERR_POWER_TARGET_UNREACHABLE}] Could not open process {pid} to lift power "
+            f"throttling (win32 {code}); it may have exited or belong to another user"
+        )
+    if code != 0:
+        raise RuntimeError(
+            f"[{ERR_POWER_TARGET_REFUSED}] Process {pid} refused the power-throttling "
+            f"opt-out (win32 {code}); its timings would mix two power regimes"
+        )
+
+
+def opt_process_out_of_power_throttling(pid: int) -> None:
+    """Opt one running process out, using the real Win32 boundary.
+
+    The single-argument shape a caller binds when it has a pid rather than
+    being the process in question.
+
+    Args:
+        pid: The process to opt out.
+
+    Returns:
+        None. The call is made for its effect on the target.
+
+    Raises:
+        RuntimeError: If the process cannot be opened or refuses the request.
+    """
+    disable_power_throttling_for(pid, win32_targeted_process_information_setter)
+
+
 __all__ = [
     "CURRENT_PROCESS_PSEUDO_HANDLE",
     "EXECUTION_SPEED",
     "PROCESS_POWER_THROTTLING",
+    "PROCESS_SET_INFORMATION",
     "STATE_SIZE",
     "STATE_VERSION",
     "PowerThrottlingState",
     "disable_power_throttling",
+    "disable_power_throttling_for",
     "opt_out_of_power_throttling",
+    "opt_process_out_of_power_throttling",
     "win32_process_information_setter",
+    "win32_targeted_process_information_setter",
 ]

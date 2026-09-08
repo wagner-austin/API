@@ -113,6 +113,86 @@ class SetProcessInformationProto(Protocol):
         ...
 
 
+class OpenProcessProto(Protocol):
+    """Protocol for the ``kernel32!OpenProcess`` foreign function.
+
+    Needed only by the by-pid form. The current-process form reaches its
+    target through the ``(HANDLE)-1`` pseudo-handle and opens nothing, which
+    is why it needs no handle lifetime and no close.
+    """
+
+    def __call__(
+        self,
+        desired_access: ctypes.c_uint32,
+        inherit_handle: ctypes.c_int,
+        process_id: ctypes.c_uint32,
+    ) -> int:
+        """Open an existing process.
+
+        Args:
+            desired_access: Rights requested on the handle.
+            inherit_handle: Whether child processes inherit it.
+            process_id: The target's pid.
+
+        Returns:
+            The handle as an integer, or ``0`` on failure.
+        """
+        ...
+
+
+class CloseHandleProto(Protocol):
+    """Protocol for the ``kernel32!CloseHandle`` foreign function.
+
+    Separated from :class:`OpenProcessProto` so a test can assert the handle
+    is closed even on the path where setting the state FAILED -- a leaked
+    handle on the error path is the defect a single combined seam would hide.
+    """
+
+    def __call__(self, handle: ctypes.c_void_p) -> int:
+        """Close an open object handle.
+
+        Args:
+            handle: The handle to close.
+
+        Returns:
+            Non-zero when the handle was closed.
+        """
+        ...
+
+
+class TargetedProcessInformationSetterProto(Protocol):
+    """Protocol for the Win32 boundary that sets ANOTHER process's power state.
+
+    The same three masks as :class:`ProcessInformationSetterProto` plus the
+    pid, and a two-part outcome rather than one code. Opening the target and
+    changing its state fail for different reasons -- a pid that has exited or
+    belongs to another user versus a state change the platform refused -- and
+    a caller's remedy differs between them, so they are not collapsed into a
+    single integer.
+    """
+
+    def __call__(
+        self, pid: int, version: int, control_mask: int, state_mask: int
+    ) -> tuple[bool, int]:
+        """Apply a power-throttling state to one process by pid.
+
+        Args:
+            pid: The target process.
+            version: ``PROCESS_POWER_THROTTLING_STATE.Version``.
+            control_mask: Which policies the target expresses a preference
+                about.
+            state_mask: The preference itself, for the policies named by
+                ``control_mask``.
+
+        Returns:
+            ``(opened, code)``. ``opened`` says whether the process could be
+            opened at all; ``code`` is the Win32 error, or ``0`` when the
+            request was accepted. ``(False, code)`` therefore names an
+            unreachable target and ``(True, code)`` a refused state change.
+        """
+        ...
+
+
 class ProcessInformationSetterProto(Protocol):
     """Protocol for the Win32 boundary that sets a process power state.
 
@@ -230,12 +310,15 @@ class SplitFactoryProto(Protocol):
 
 
 __all__ = [
+    "CloseHandleProto",
     "DataSplit",
     "MonotonicClockProto",
+    "OpenProcessProto",
     "PowerThrottlingOptOutProto",
     "ProcessInformationSetterProto",
     "SetProcessInformationProto",
     "SplitFactoryProto",
+    "TargetedProcessInformationSetterProto",
     "TrainedModelProto",
     "TrainerProto",
 ]

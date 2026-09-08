@@ -37,6 +37,15 @@ ERR_NO_RESULTS = "CVML-BENCH-017"
 ERR_TOO_FEW_TRAINERS = "CVML-BENCH-018"
 ERR_DUPLICATE_TRAINER = "CVML-BENCH-019"
 ERR_POWER_THROTTLING = "CVML-BENCH-020"
+#: Could not OPEN the target process to change its power state. Distinct from
+#: :data:`ERR_POWER_THROTTLING`, which is the state change itself being
+#: refused: this one usually means the pid is gone or belongs to another user,
+#: and the caller's remedy is different in each case.
+ERR_POWER_TARGET_UNREACHABLE = "CVML-BENCH-021"
+#: The target process was opened and then refused the state change. Separate
+#: from the current-process refusal so a trace says which of the two boundaries
+#: said no.
+ERR_POWER_TARGET_REFUSED = "CVML-BENCH-022"
 
 #: Schema version of :class:`BenchmarkManifest`. Bump on any field change so
 #: an old manifest is rejected loudly instead of decoded into wrong types.
@@ -239,6 +248,8 @@ __all__ = [
     "ERR_NO_SEEDS",
     "ERR_NO_TIMING_SAMPLES",
     "ERR_NO_TREES",
+    "ERR_POWER_TARGET_REFUSED",
+    "ERR_POWER_TARGET_UNREACHABLE",
     "ERR_POWER_THROTTLING",
     "ERR_SCHEMA_VERSION",
     "ERR_TOO_FEW_TRAINERS",
