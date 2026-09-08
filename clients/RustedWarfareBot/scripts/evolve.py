@@ -12,12 +12,18 @@ compiles each to an ordinary doctrine through
 as ONE interleaved batch against the sitting champion on fresh seeds,
 ranks by paired margin delta, and refits the Gaussian to the elite.
 
-v1 is the simplex ONLY -- four dimensions. The integer-knob space is
-deliberately absent from the genome: the night this was written, the
-knob vocabulary was measured a confirmed local optimum (vhsearch4 flat
-in every direction, flame2 rejected at the bar), so re-searching it
-inside the genome would spend the small population's power on a space
-already known flat. Knobs rejoin as v1.1 if the simplex proves the loop.
+v1 was the simplex ONLY -- four dimensions -- with the integer-knob
+space deliberately absent: the night it was written, the knob vocabulary
+was measured a confirmed local optimum (vhsearch4 flat in every
+direction, flame2 rejected at the bar), so re-searching it would have
+spent the small population's power on a space already known flat. v2
+(2026-09-08) appends the TACTICAL genome -- groupcap, prio, spacing
+([[impossible-tactical-genome]]) -- because that space's own singles
+also measured flat-to-dead, and searching JOINT moves in exactly such a
+landscape is how v1 found the standing base. The old credit-vocabulary
+knobs stay out; the tactical alleles ride as three appended dimensions
+whose means are the identity, so generation 0 still samples the
+champion's own neighborhood.
 
 Every draw comes from one seeded generator, so a relaunch replays the
 identical genomes and the cluster's converge turns completed generations
@@ -85,6 +91,26 @@ SIGMA_START = 1.0
 #: The refit never tightens below this, so a lucky elite cannot collapse
 #: exploration to a point after one generation.
 SIGMA_FLOOR = 0.15
+
+#: The tactical genome's dimensions, appended after the army logits --
+#: v2 of the search space ([[impossible-tactical-genome]], 2026-09-08:
+#: every SINGLE tactical move measured flat-to-dead, so the searcher
+#: explores JOINT moves, the exact precedent evolve3 set in an army-mix
+#: space whose own singles screened flat). Each mean is the allele's
+#: IDENTITY, so generation 0 samples the standing base's neighborhood --
+#: the seed_mean philosophy, extended: groupcap 2, prio 0, spacing 0.
+TACTICAL_MEANS = (2.0, 0.0, 0.0)
+
+#: World units per unit of the spacing dimension, so :data:`SIGMA_START`
+#: explores roughly one rally radius of station spread per sigma.
+SPACING_SCALE = 60
+
+#: The most kill-groups a sampled genome may open -- clamped, not
+#: refused, because a Gaussian tail is exploration rather than a typo.
+GROUPCAP_CEILING = 8
+
+#: The largest target-priority allele (:data:`~rw_bot.policy.firing.PRIO_FRAIL`).
+PRIO_CEILING = 2
 
 #: Where per-generation candidate doctrines land, gitignored run
 #: artifacts like the search's variants.
@@ -166,9 +192,11 @@ def seed_mean(base_path: Path) -> tuple[float, ...]:
         base_path: The doctrine the population perturbs.
 
     Returns:
-        One logit per vocabulary unit: the log of the base's army share,
-        floored by a quarter-slot pseudo-count so an absent unit stays
-        reachable rather than at negative infinity.
+        One logit per vocabulary unit -- the log of the base's army
+        share, floored by a quarter-slot pseudo-count so an absent unit
+        stays reachable rather than at negative infinity -- then the
+        tactical identity means (:data:`TACTICAL_MEANS`), so the centre
+        of generation 0 compiles to the base's own tactics too.
     """
     base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
     counts = dict.fromkeys(ARMY_VOCABULARY, 0)
@@ -176,7 +204,32 @@ def seed_mean(base_path: Path) -> tuple[float, ...]:
         if entry in counts:
             counts[entry] += 1
     slots = sum(counts.values())
-    return tuple(log((counts[unit] + 0.25) / (slots + 1.0)) for unit in ARMY_VOCABULARY)
+    army = tuple(log((counts[unit] + 0.25) / (slots + 1.0)) for unit in ARMY_VOCABULARY)
+    return (*army, *TACTICAL_MEANS)
+
+
+def tactical_knobs(tail: Sequence[float]) -> dict[str, int]:
+    """Map the vector's tactical tail onto doctrine knobs.
+
+    Rounded and clamped rather than refused: a Gaussian tail past a
+    ceiling is exploration, and the clamp keeps every sampled genome
+    compilable while the refit learns where the walls are. The zero
+    vector of :data:`TACTICAL_MEANS` maps to the identity exactly, so
+    generation 0's centre IS the standing base.
+
+    Args:
+        tail: The vector's dimensions past the army logits, in
+            :data:`TACTICAL_MEANS` order -- groupcap, prio, spacing.
+
+    Returns:
+        Knob overrides for :func:`~rw_bot.harness.genome.compile_genome`.
+    """
+    groupcap, prio, spacing = tail
+    return {
+        "groupcap": min(max(round(groupcap), 0), GROUPCAP_CEILING),
+        "prio": min(max(round(prio), 0), PRIO_CEILING),
+        "spacing": max(round(spacing), 0) * SPACING_SCALE,
+    }
 
 
 def sample_population(
@@ -259,9 +312,11 @@ def write_generation(
     base = parse_doctrine_lines(base_path.read_text(encoding="utf-8").splitlines())
     variant_dir.mkdir(parents=True, exist_ok=True)
     for index, logits in enumerate(genomes):
-        weights = dict(zip(ARMY_VOCABULARY, softmax(logits), strict=True))
+        army = logits[: len(ARMY_VOCABULARY)]
+        weights = dict(zip(ARMY_VOCABULARY, softmax(army), strict=True))
         label = member_label(generation, index)
-        variant = compile_genome(base, weights, {}, label)
+        knobs = tactical_knobs(logits[len(ARMY_VOCABULARY) :])
+        variant = compile_genome(base, weights, knobs, label)
         path = variant_dir / f"{label}.doctrine"
         path.write_text("".join(f"{line}\n" for line in format_doctrine(variant)), encoding="utf-8")
 
@@ -344,7 +399,7 @@ def run_evolution(
     scorer = batch_survivals if spec["fitness"] == "survival" else batch_margins
     rng = random.Random(rng_seed)
     mean: tuple[float, ...] = seed_mean(base_path)
-    sigma: tuple[float, ...] = (SIGMA_START,) * len(ARMY_VOCABULARY)
+    sigma: tuple[float, ...] = (SIGMA_START,) * (len(ARMY_VOCABULARY) + len(TACTICAL_MEANS))
     note(
         f"# evolve {name} (rng {rng_seed}, spec {spec_name}, fitness {spec['fitness']}): "
         f"population {POPULATION}, elite {ELITE}, "
@@ -379,13 +434,16 @@ def run_evolution(
         if top_delta > best_score:
             best_score = top_delta
             best_label = member_label(generation, top_index)
-        weights = softmax(elite[0])
+        weights = softmax(elite[0][: len(ARMY_VOCABULARY)])
+        knobs = tactical_knobs(elite[0][len(ARMY_VOCABULARY) :])
         note(
             f"# generation {generation} elite mean weights: "
             + ", ".join(
                 f"{unit}={weight:.2f}"
                 for unit, weight in zip(ARMY_VOCABULARY, weights, strict=True)
             )
+            + "; tactics "
+            + ", ".join(f"{field}={value}" for field, value in sorted(knobs.items()))
         )
         mean, sigma = refit(elite)
     note(

@@ -100,6 +100,28 @@ def _run(tmp_path: Path, tag: str) -> tuple[tuple[str, ...], list[str]]:
     return lines, cluster.job_lines
 
 
+def test_the_tactical_means_compile_to_the_identity() -> None:
+    """The zero vector of the tactical tail IS the standing base's
+    tactics, so generation 0's centre perturbs the champion, not a
+    stranger ([[impossible-tactical-genome]])."""
+    from scripts.evolve import TACTICAL_MEANS, tactical_knobs
+
+    assert tactical_knobs(TACTICAL_MEANS) == {"groupcap": 2, "prio": 0, "spacing": 0}
+
+
+def test_tactical_tails_are_clamped_not_refused() -> None:
+    """A Gaussian tail past a ceiling is exploration, and the clamp keeps
+    every sampled genome compilable while the refit learns the walls."""
+    from scripts.evolve import tactical_knobs
+
+    high = tactical_knobs((99.0, 99.0, 1.4))
+    assert high == {"groupcap": 8, "prio": 2, "spacing": 60}
+    low = tactical_knobs((-3.0, -1.0, -5.0))
+    assert low == {"groupcap": 0, "prio": 0, "spacing": 0}
+    two = tactical_knobs((3.4, 1.2, 2.0))
+    assert two == {"groupcap": 3, "prio": 1, "spacing": 120}
+
+
 def test_the_search_opens_centred_on_the_base_it_perturbs() -> None:
     """evolve4's measured defect: a uniform opening mean read its whole g1
     negative against a graduate base. The seed logits must recover the
@@ -109,9 +131,13 @@ def test_the_search_opens_centred_on_the_base_it_perturbs() -> None:
     negative infinity."""
     from math import isfinite
 
-    from scripts.evolve import seed_mean, softmax
+    from scripts.evolve import TACTICAL_MEANS, seed_mean, softmax
 
-    weights = softmax(seed_mean(Path("doctrines/evolve3-g3m10.doctrine")))
+    mean = seed_mean(Path("doctrines/evolve3-g3m10.doctrine"))
+    # v2: the tactical identity means ride after the army logits, so the
+    # centre of generation 0 compiles to the base's own tactics too.
+    assert mean[4:] == TACTICAL_MEANS
+    weights = softmax(mean[:4])
     by_unit = dict(zip(("c_artillery", "c_tank", "heavyTank", "hoverTank"), weights, strict=True))
     assert by_unit["c_tank"] == by_unit["heavyTank"] > by_unit["c_artillery"] > by_unit["hoverTank"]
     assert all(isfinite(w) and w > 0 for w in weights)
