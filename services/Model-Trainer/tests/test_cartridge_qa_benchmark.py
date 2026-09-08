@@ -283,6 +283,57 @@ class TestMeasureQaPlan:
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
 
 
+class TestHeldOutSplit:
+    """The split has to examine every page it trains on.
+
+    Measured on the real twelve-page corpus, the first version of this strode
+    over the GLOBAL window index, and three of twelve pages held out nothing:
+    trained on, never tested. A short question set looks exactly like a short
+    corpus, so nothing surfaced it.
+    """
+
+    def test_every_document_is_examined_not_only_trained_on(self) -> None:
+        """The assertion the global stride failed on the real corpus.
+
+        Asserted through the ITEM IDS, which carry their document index as a
+        ``d{index:03d}`` prefix, because that is the observable consequence:
+        a page that holds out nothing produces no item, and the arm is then
+        fitted to more pages than it is scored on.
+
+        `max_items` is raised for this test only. The tiny plan stops at six
+        items, which could exhaust the budget inside the first documents and
+        fail this for a reason that has nothing to do with the split.
+        """
+        plan: QaPlan = {**TINY_PLAN, "max_items": 120}
+        tok = _Tokenizer()
+        encoder = bench.HFTokenizerEncoder(tok)
+        encoded = [encoder.encode(document).ids for document in _DOCUMENTS]
+
+        items, _training = bench.build_question_set(_DOCUMENTS, encoded, encoder, plan)
+
+        examined = {item["item_id"].split("-")[0] for item in items}
+        assert examined == {f"d{index:03d}" for index in range(len(_DOCUMENTS))}
+
+    def test_a_single_window_document_is_trained_on_rather_than_tested(self) -> None:
+        """It cannot be both, and training is the useful half.
+
+        Holding out its only window would leave that page's terms absent from
+        the training text, and `build_items` would then refuse every item
+        drawn from it as unanswerable -- so the page would be excluded either
+        way, but silently and for a confusing reason.
+        """
+        one_window = "  ".join(_DOCUMENTS[0].split()[: TINY_PLAN["window"] - 2])
+        documents = (one_window, _DOCUMENTS[1], _DOCUMENTS[2], _DOCUMENTS[3])
+        tok = _Tokenizer()
+        encoder = bench.HFTokenizerEncoder(tok)
+        encoded = [encoder.encode(document).ids for document in documents]
+
+        _items, training = bench.build_question_set(documents, encoded, encoder, TINY_PLAN)
+
+        first_terms = set(one_window.split())
+        assert first_terms & set(training.split()), "the single-window page was not trained on"
+
+
 class TestLatencyObservations:
     def test_it_names_every_arm_including_the_costs_it_excludes(self) -> None:
         """Two costs are recorded and left OUT of their arm's total, for

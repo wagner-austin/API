@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+from collections import Counter
 from collections.abc import Sequence
 
 from platform_core import cli_args
@@ -133,15 +134,31 @@ def build_question_set(
     """
     owners = window_documents(encoded, window=plan["window"])
     stride = plan["held_out_stride"]
+    windows_per_document = Counter(owners)
     held_by_document: dict[int, list[str]] = {}
     training: list[str] = []
     seen_per_document: dict[int, int] = {}
-    for index, owner in enumerate(owners):
+    for owner in owners:
         start = seen_per_document.get(owner, 0)
         seen_per_document[owner] = start + 1
         window = plan["window"]
         text = encoder.decode(list(encoded[owner])[start * window : (start + 1) * window])
-        if index % stride == 0:
+        # THE STRIDE COUNTS WITHIN A DOCUMENT, NOT ACROSS THE CORPUS, and the
+        # first version of this counted across. That made which pages get
+        # tested a function of where their windows happened to land in the
+        # global sequence: measured on the twelve public me-wiki pages,
+        # THREE OF TWELVE held out nothing at all. Those pages were trained
+        # on and never examined, so the cartridge was fitted to twelve pages
+        # and scored on nine -- silently, because a short question set looks
+        # exactly like a short corpus.
+        #
+        # A SINGLE-WINDOW DOCUMENT IS TRAINED ON AND NOT TESTED. It cannot be
+        # both: holding out its only window would leave its terms absent from
+        # the training text, and `build_items` would then correctly refuse
+        # every item drawn from it as unanswerable. Training is the useful
+        # half -- its terms stay learnable and can serve as other pages'
+        # distractors -- so that is the side it goes to.
+        if windows_per_document[owner] > 1 and start % stride == 0:
             held_by_document.setdefault(owner, []).append(text)
         else:
             training.append(text)
