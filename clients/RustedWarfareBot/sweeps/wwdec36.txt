@@ -1,0 +1,49 @@
+# The lottery dose-response at Impossible (log 2026-09-07): the AI's
+# target chooser is UNIFORM RANDOM over our living units (a/a.java
+# as(), read from source), so our unit placement IS its attack
+# distribution. The July scatter screen (decoys 5, ~3 seeds, pre-floor
+# harness) diluted a tenth of waves and read +11% survival once --
+# underdosed and undersized, never rescreened. Arms: the standing base
+# vs decoys 12 vs decoys 24 (each one field from base), 12 shared
+# fresh seeds, in-batch control per the impbank36 shape. Sized against
+# the detpair24b floor (sd 662): at n=12 the 2-se MDE is ~382 samples
+# per pairing. Diversion also slows the 3->5->14 wave-escalation
+# counter, which counts COMMITTED waves. Seeds 8811001-8815577.
+#
+# label | seed | doctrine | samples
+stand|8811001|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8811001|doctrines/stand-decoys12.doctrine|10000
+dec24|8811001|doctrines/stand-decoys24.doctrine|10000
+stand|8811417|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8811417|doctrines/stand-decoys12.doctrine|10000
+dec24|8811417|doctrines/stand-decoys24.doctrine|10000
+stand|8811833|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8811833|doctrines/stand-decoys12.doctrine|10000
+dec24|8811833|doctrines/stand-decoys24.doctrine|10000
+stand|8812249|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8812249|doctrines/stand-decoys12.doctrine|10000
+dec24|8812249|doctrines/stand-decoys24.doctrine|10000
+stand|8812665|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8812665|doctrines/stand-decoys12.doctrine|10000
+dec24|8812665|doctrines/stand-decoys24.doctrine|10000
+stand|8813081|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8813081|doctrines/stand-decoys12.doctrine|10000
+dec24|8813081|doctrines/stand-decoys24.doctrine|10000
+stand|8813497|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8813497|doctrines/stand-decoys12.doctrine|10000
+dec24|8813497|doctrines/stand-decoys24.doctrine|10000
+stand|8813913|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8813913|doctrines/stand-decoys12.doctrine|10000
+dec24|8813913|doctrines/stand-decoys24.doctrine|10000
+stand|8814329|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8814329|doctrines/stand-decoys12.doctrine|10000
+dec24|8814329|doctrines/stand-decoys24.doctrine|10000
+stand|8814745|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8814745|doctrines/stand-decoys12.doctrine|10000
+dec24|8814745|doctrines/stand-decoys24.doctrine|10000
+stand|8815161|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8815161|doctrines/stand-decoys12.doctrine|10000
+dec24|8815161|doctrines/stand-decoys24.doctrine|10000
+stand|8815577|doctrines/evolve3-g3m10.doctrine|10000
+dec12|8815577|doctrines/stand-decoys12.doctrine|10000
+dec24|8815577|doctrines/stand-decoys24.doctrine|10000
