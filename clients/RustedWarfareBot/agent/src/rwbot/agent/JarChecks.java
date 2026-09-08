@@ -212,6 +212,7 @@ final class JarChecks {
                                 + "]  (" + original.length + " -> " + rewired.length + " bytes)");
             }
             failures += checkJitterRewire(jar, loader);
+            failures += checkJitterRefusesWrongLines(jar);
         } finally {
             jar.close();
         }
@@ -263,6 +264,44 @@ final class JarChecks {
                         + Targets.effectJitterLines() + "]  ("
                         + original.length + " -> " + rewired.length + " bytes)");
         return 0;
+    }
+
+    /**
+     * Proves the line-scoped retarget REFUSES a line that matches nothing.
+     *
+     * <p>The refusal is the guard against a silent partial patch -- a wrong
+     * line accepted quietly would ship a weave that measures as the very
+     * noise it exists to remove. A guard is only real if something fires it
+     * (the workspace's guard-must-fire rule), so this asks for line 1 of the
+     * jitter method -- a line its table cannot carry -- and FAILS if the
+     * patcher accepts it.
+     */
+    private static int checkJitterRefusesWrongLines(JarFile jar) throws java.io.IOException {
+        String internalName = Targets.EFFECT_JITTER_CLASS;
+        java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+        if (classEntry == null) {
+            System.out.println("FAIL " + internalName + ": not present in jar");
+            return 1;
+        }
+        byte[] original = readFully(jar, classEntry);
+        try {
+            ClassFilePatcher.retargetStaticInvokesAtLines(
+                    original,
+                    Targets.EFFECT_JITTER_METHOD,
+                    java.util.Collections.singleton(Integer.valueOf(1)),
+                    Targets.SWAY_DRAW_OWNER,
+                    Targets.EFFECT_JITTER_NAME,
+                    Targets.SWAY_DRAW_DESCRIPTOR,
+                    Targets.SWAY_DRAW_TARGET);
+        } catch (ClassFormatError e) {
+            System.out.println("ok   wrong-line retarget refused loudly: " + e.getMessage());
+            return 0;
+        }
+        System.out.println(
+                "FAIL " + internalName
+                        + ": a request for line 1 was ACCEPTED -- the partial-patch refusal"
+                        + " is dead and a wrong line would ship silently");
+        return 1;
     }
 
     /**

@@ -188,7 +188,12 @@ final class ClassFilePatcher {
                         name,
                         descriptor,
                         toOwner);
-        if (result != null && !patcher.unmatchedLines.isEmpty()) {
+        // Unconditionally, NOT only when something was rewritten: a request
+        // whose every line missed used to fall through the walk's
+        // nothing-to-edit null and return silently -- the exact partial-patch
+        // hole this throw documents, found the first time a guard-must-fire
+        // check asked for a line that matches nothing (2026-09-08).
+        if (!patcher.unmatchedLines.isEmpty()) {
             throw new ClassFormatError(
                     "requested lines matched no " + fromOwner + "." + name + descriptor
                             + " invoke in " + targetMethod + ": " + patcher.unmatchedLines
