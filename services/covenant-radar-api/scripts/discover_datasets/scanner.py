@@ -99,10 +99,12 @@ def _find_data_file(folder: Path) -> tuple[Path | None, str]:
     Returns:
         Tuple of (file path or None, status message).
     """
-    csv_files = list(folder.glob("*.csv"))
-    arff_files = list(folder.glob("*.arff"))
-    excel_files = list(folder.glob("*.xlsx")) + list(folder.glob("*.xls"))
-    data_files = list(folder.glob("*.data"))
+    # glob order is filesystem-dependent (arbitrary on Linux), so each list is
+    # sorted to make the selection deterministic across platforms.
+    csv_files = sorted(folder.glob("*.csv"))
+    arff_files = sorted(folder.glob("*.arff"))
+    excel_files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
+    data_files = sorted(folder.glob("*.data"))
 
     all_files = csv_files + arff_files + excel_files + data_files
 
