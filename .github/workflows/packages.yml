@@ -430,13 +430,24 @@ jobs:
       # with both suites on the GPU, Model-Trainer lost workers (KeyError:
       # WorkerController gw8) and two statistical training tests, and
       # handwriting-ai's calibration timed out in both stages -- while each
-      # was green with the card to itself, and handwriting-ai's calibration
-      # was ALREADY passing on hosted CPU-only runners before RAM killed
-      # those jobs. It came to this pool for the 26GB, not the GPU; the
-      # routing comment above says so, and this line makes it true.
+      # was green with the card to itself. It came to this pool for the
+      # 26GB, not the GPU.
+      #
+      # AND handwriting-ai runs -n 2, NOT the pool's 8, because two is the
+      # only concurrency its calibration has ever passed at. The hosted
+      # runners it was green on are 2-core VMs -- `-n auto` there created
+      # exactly 2 workers -- and every calibration test spawns its own
+      # 8-thread training candidate under a 45-second wall-clock budget, so
+      # worker count multiplies whole TRAINING RUNS, not just test
+      # processes. At 8 workers the candidates starved each other into the
+      # stage-A/B circuit breaker three runs straight (34285840438,
+      # 34287862046, 34289840729 -- the last one CPU-only, which acquitted
+      # the GPU and convicted the concurrency). The hosted 16GB VM
+      # OOM-killed the runner at ~98% AT that 2-worker setting, which is
+      # why the answer is 26GB at 2 workers rather than either half alone.
       - name: Tests
         run: >
           ${{ matrix.package == 'services/handwriting-ai' && 'CUDA_VISIBLE_DEVICES=-1' || '' }}
           poetry run pytest
-          -n ${{ contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && '8' || 'auto' }}
+          -n ${{ matrix.package == 'services/handwriting-ai' && '2' || (contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer"]'), matrix.package) && '8' || 'auto') }}
           --cov-branch --cov=src --cov=scripts --cov-report=term-missing
