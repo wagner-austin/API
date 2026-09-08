@@ -42,8 +42,9 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME, base_short
-from model_trainer.cli.cartridge_lora_policy import quantization_for
+from model_trainer.cli.cartridge_lora_policy import quantization_for, stored_bf16_for
 from model_trainer.cli.known_answer_probe import probe_determinism
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
@@ -69,8 +70,9 @@ MODEL_FLAG = "--model-id"
 CORPUS_FLAG = "--corpus"
 DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
+PRECISION_FLAG = "--precision"
 
-_FLAGS = (MODEL_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG)
+_FLAGS = (MODEL_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, PRECISION_FLAG)
 
 #: Fixed for the reason every experiment name here is: the string is what
 #: two records are grouped by, and a drifting one silently unpairs them.
@@ -81,24 +83,61 @@ SOLO_SEEDS_EXPERIMENT = "cartridge-solo-seeds"
 SOLO_SEEDS = (7, 8, 9, 10, 11, 12, 13, 14, 15)
 
 
-def solo_seeds_label(*, model_id: str, seeds: Sequence[int], digest: str) -> str:
+def resolve_precision(
+    model_id: str, selector: str
+) -> tuple[QuantizationConfig | StoredBf16Precision | None, str]:
+    """Resolve the precision selector to a declared load and a label token.
+
+    Args:
+        model_id: The base being measured.
+        selector: ``"policy"`` for the loading policy's declaration (the
+            precision every recorded rung ran at), or ``"stored-bf16"``
+            for the declared unquantized-bf16 control.
+
+    Returns:
+        ``(load, token)``: what the loader is handed, and the label
+        segment that keeps the two measurements' records unpaired --
+        empty for policy mode, so every recorded label is byte-unchanged.
+
+    Raises:
+        ValueError: For an unknown selector, or propagated from the
+            policy for an undeclared (model, precision) pair.
+    """
+    if selector == "policy":
+        return quantization_for(model_id), ""
+    if selector == "stored-bf16":
+        return stored_bf16_for(model_id), "-storedbf16"
+    raise ValueError(
+        f"unknown precision selector {selector!r}; the declared selectors are "
+        f"'policy' and 'stored-bf16', and a guessed one would run a "
+        f"measurement no record could name"
+    )
+
+
+def solo_seeds_label(
+    *, model_id: str, seeds: Sequence[int], precision_token: str, digest: str
+) -> str:
     """Build the label identifying one solo-seeds measurement.
 
     Args:
         model_id: The base measured.
         seeds: The seeds trained.
+        precision_token: ``""`` for the policy precision, or the
+            stored-bf16 token, so the two measurements cannot share a
+            label.
         digest: The corpus digest.
 
     Returns:
         The label.
     """
-    return f"cartridge-solo-seeds-{base_short(model_id)}-n{len(seeds)}-{digest}"
+    return f"cartridge-solo-seeds-{base_short(model_id)}{precision_token}-n{len(seeds)}-{digest}"
 
 
 def measure_solo_seeds(
     corpus: pathlib.Path,
     *,
     model_id: str,
+    load_precision: QuantizationConfig | StoredBf16Precision | None,
     seeds: Sequence[int],
     device: str,
 ) -> tuple[tuple[Observation, ...], str]:
@@ -107,7 +146,10 @@ def measure_solo_seeds(
     Args:
         corpus: Directory of markdown documents; its held-out split is
             what every cartridge is scored on.
-        model_id: The base, resolvable by the loading policy.
+        model_id: The base to load.
+        load_precision: What the loader is handed, from
+            :func:`resolve_precision` -- a declared value, so a record
+            can always say what precision it measured.
         seeds: Seeds to train, one cartridge each.
         device: Device to measure on.
 
@@ -136,7 +178,7 @@ def measure_solo_seeds(
         build_windows(encoded, window=geometry["window"], device=device),
         held_out_stride=geometry["held_out_stride"],
     )
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(model_id, quantization_for(model_id)))
+    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(model_id, load_precision))
     # The windows are on ``device``; the loader answers for where the
     # model materialised. Same boundary the headroom CLI shipped without
     # (job 55812484, 19 seconds), pinned by the same recording fake.
@@ -172,31 +214,46 @@ def measure_solo_seeds(
     return tuple(observations), digest
 
 
-def solo_seeds_run_record(corpus: pathlib.Path, *, model_id: str, device: str) -> RunRecord:
+def solo_seeds_run_record(
+    corpus: pathlib.Path, *, model_id: str, precision: str, device: str
+) -> RunRecord:
     """Pin determinism, run the measurement, and record it.
 
     Args:
         corpus: The corpus directory.
         model_id: The base to measure.
+        precision: The precision selector, resolved through
+            :func:`resolve_precision`.
         device: Device to measure on.
 
     Returns:
         The record.
 
     Raises:
-        ValueError: Propagated from :func:`measure_solo_seeds`.
+        ValueError: Propagated from :func:`resolve_precision` and
+            :func:`measure_solo_seeds`.
         AppError: Propagated from the corpus, loading and training
             layers.
     """
     fingerprint: RunFingerprint = capture_run_fingerprint(
         device, probe_determinism(device, remove_split_k=False, math_attention=False)
     )
+    load_precision, precision_token = resolve_precision(model_id, precision)
     observations, digest = measure_solo_seeds(
-        corpus, model_id=model_id, seeds=SOLO_SEEDS, device=device
+        corpus,
+        model_id=model_id,
+        load_precision=load_precision,
+        seeds=SOLO_SEEDS,
+        device=device,
     )
     return run_record(
         experiment=SOLO_SEEDS_EXPERIMENT,
-        label=solo_seeds_label(model_id=model_id, seeds=SOLO_SEEDS, digest=digest),
+        label=solo_seeds_label(
+            model_id=model_id,
+            seeds=SOLO_SEEDS,
+            precision_token=precision_token,
+            digest=digest,
+        ),
         fingerprint=fingerprint,
         observations=observations,
         payload_digest=NO_PAYLOAD,
@@ -223,6 +280,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     record = solo_seeds_run_record(
         pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         model_id=cli_args.require_flag(parsed, MODEL_FLAG),
+        precision=cli_args.require_flag(parsed, PRECISION_FLAG),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
     )
 
@@ -261,6 +319,7 @@ __all__ = [
     "entrypoint",
     "main",
     "measure_solo_seeds",
+    "resolve_precision",
     "solo_seeds_label",
     "solo_seeds_run_record",
 ]

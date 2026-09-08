@@ -6,7 +6,7 @@ from collections.abc import Generator
 
 import pytest
 
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     reset_hooks as reset_ft_hooks,
 )
@@ -31,7 +31,7 @@ class _FakeModelLoader:
     """Fake model loader for testing."""
 
     def __call__(
-        self, model_id_or_path: str, quantization: QuantizationConfig | None
+        self, model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
     ) -> LMModelProto:
         return FakeHFModel(model_id_or_path)
 
@@ -50,7 +50,7 @@ class _CapturingModelLoader:
         self.captured: list[str] = []
 
     def __call__(
-        self, model_id_or_path: str, quantization: QuantizationConfig | None
+        self, model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
     ) -> LMModelProto:
         self.captured.append(model_id_or_path)
         return FakeHFModel(model_id_or_path)

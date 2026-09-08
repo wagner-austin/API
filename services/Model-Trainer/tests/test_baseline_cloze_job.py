@@ -26,7 +26,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem, encode_cloze_item
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.contracts.queue import BaselineClozeJobPayload
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
 from model_trainer.core.services.model.backends.hf_lm.io import load_prepared_hf_lm_from_hub
@@ -73,7 +73,9 @@ def _install_hub_fakes(loaded: list[str]) -> None:
             assert the job asked the hub for the model it was given.
     """
 
-    def _load_model(model_id_or_path: str, quantization: QuantizationConfig | None) -> LMModelProto:
+    def _load_model(
+        model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+    ) -> LMModelProto:
         loaded.append(model_id_or_path)
         # A baseline must be loaded unquantized: it is the thing other arms are
         # compared against, so carrying an arm of its own would invalidate them.

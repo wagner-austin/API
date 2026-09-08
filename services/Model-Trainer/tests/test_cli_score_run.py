@@ -379,14 +379,16 @@ def test_the_default_loader_reapplies_the_strategy_rather_than_nothing(
     """
     from platform_core.json_utils import JSONObject, dump_json_str
 
-    from model_trainer.core.contracts.model import QuantizationConfig
+    from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
     from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks as FtHooks
     from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
     from model_trainer.core.types import LMModelProto
 
     loaded: list[str] = []
 
-    def _load_model(model_id_or_path: str, quantization: QuantizationConfig | None) -> LMModelProto:
+    def _load_model(
+        model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+    ) -> LMModelProto:
         loaded.append(model_id_or_path)
         assert quantization is None
         return FakeHFModel(model_id_or_path)

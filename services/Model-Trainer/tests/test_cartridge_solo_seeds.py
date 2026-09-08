@@ -26,7 +26,7 @@ from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_solo_seeds as solo
 from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME
 from model_trainer.cli.cartridge_lora_policy import quantization_for
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.finetuning.strategies.cartridge import require_cache_capable
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
@@ -90,7 +90,9 @@ def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
     return FakeHFTokenizer(vocab_size=_VOCAB)
 
 
-def _fake_model(model_id_or_path: str, quantization: QuantizationConfig | None) -> LMModelProto:
+def _fake_model(
+    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+) -> LMModelProto:
     """Stand in for the hub loader, asserting the policy value threads."""
     assert quantization == quantization_for(model_id_or_path)
     model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
@@ -291,7 +293,7 @@ class TestMeasureSoloSeeds:
         alpha = _staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", seeds=(7, 8), device="cpu"
+            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
         )
 
         recorded = {o["name"]: o["value"] for o in observations}
@@ -310,7 +312,7 @@ class TestMeasureSoloSeeds:
         alpha = _staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", seeds=(7,), device="cpu"
+            alpha, model_id="gpt2", load_precision=None, seeds=(7,), device="cpu"
         )
         recorded = {o["name"]: o["value"] for o in observations}
 
@@ -328,15 +330,21 @@ class TestMeasureSoloSeeds:
     def test_the_measurement_reproduces_itself(self, tmp_path: pathlib.Path) -> None:
         alpha = _staged(tmp_path, "alpha")
 
-        first, _ = solo.measure_solo_seeds(alpha, model_id="gpt2", seeds=(7, 8), device="cpu")
-        second, _ = solo.measure_solo_seeds(alpha, model_id="gpt2", seeds=(7, 8), device="cpu")
+        first, _ = solo.measure_solo_seeds(
+            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
+        )
+        second, _ = solo.measure_solo_seeds(
+            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
+        )
 
         assert first == second
 
     def test_no_seeds_is_refused(self, tmp_path: pathlib.Path) -> None:
         alpha = _staged(tmp_path, "alpha")
         with pytest.raises(ValueError, match="no seeds named"):
-            solo.measure_solo_seeds(alpha, model_id="gpt2", seeds=(), device="cpu")
+            solo.measure_solo_seeds(
+                alpha, model_id="gpt2", load_precision=None, seeds=(), device="cpu"
+            )
 
     def test_the_loaded_model_is_moved_to_the_measurement_device(
         self, tmp_path: pathlib.Path
@@ -345,14 +353,16 @@ class TestMeasureSoloSeeds:
         placed: list[str] = []
 
         def _recording_loader(
-            model_id_or_path: str, quantization: QuantizationConfig | None
+            model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
         ) -> LMModelProto:
             inner = require_cache_capable(_fake_model(model_id_or_path, quantization))
             return _PlacementRecordingBase(inner, placed)
 
         hf_hooks.Hooks.load_hf_model = _recording_loader
 
-        solo.measure_solo_seeds(alpha, model_id="gpt2", seeds=(7,), device="cpu")
+        solo.measure_solo_seeds(
+            alpha, model_id="gpt2", load_precision=None, seeds=(7,), device="cpu"
+        )
 
         # The measurement chain may place the base again downstream; the
         # load-bearing claim is that the FIRST placement is the requested
@@ -369,9 +379,43 @@ class TestSeedsPin:
 
     def test_the_label_names_the_base_and_the_draw_count(self) -> None:
         label = solo.solo_seeds_label(
-            model_id="EleutherAI/pythia-6.9b", seeds=solo.SOLO_SEEDS, digest="0" * 12
+            model_id="EleutherAI/pythia-6.9b",
+            seeds=solo.SOLO_SEEDS,
+            precision_token="",
+            digest="0" * 12,
         )
         assert label == "cartridge-solo-seeds-pythia-6.9b-n9-000000000000"
+
+    def test_the_stored_bf16_token_unpairs_the_label(self) -> None:
+        label = solo.solo_seeds_label(
+            model_id="EleutherAI/pythia-6.9b",
+            seeds=solo.SOLO_SEEDS,
+            precision_token="-storedbf16",
+            digest="0" * 12,
+        )
+        assert label == "cartridge-solo-seeds-pythia-6.9b-storedbf16-n9-000000000000"
+
+
+class TestResolvePrecision:
+    def test_policy_mode_is_the_policy_value_and_an_empty_token(self) -> None:
+        assert solo.resolve_precision("gpt2", "policy") == (None, "")
+        load, token = solo.resolve_precision("EleutherAI/pythia-6.9b", "policy")
+        assert load == quantization_for("EleutherAI/pythia-6.9b")
+        assert token == ""
+
+    def test_stored_bf16_is_the_declared_load_and_its_token(self) -> None:
+        assert solo.resolve_precision("EleutherAI/pythia-6.9b", "stored-bf16") == (
+            {"torch_dtype": "bfloat16"},
+            "-storedbf16",
+        )
+
+    def test_stored_bf16_refuses_an_undeclared_base(self) -> None:
+        with pytest.raises(ValueError, match="no stored-bf16 load is declared"):
+            solo.resolve_precision("gpt2", "stored-bf16")
+
+    def test_an_unknown_selector_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="unknown precision selector"):
+            solo.resolve_precision("gpt2", "fp8")
 
 
 class TestMain:
@@ -380,7 +424,18 @@ class TestMain:
         out = tmp_path / "record" / "solo.json"
 
         code = solo.main(
-            ["--model-id", "gpt2", "--corpus", str(alpha), "--device", "cpu", "--out", str(out)]
+            [
+                "--model-id",
+                "gpt2",
+                "--precision",
+                "policy",
+                "--corpus",
+                str(alpha),
+                "--device",
+                "cpu",
+                "--out",
+                str(out),
+            ]
         )
 
         assert code == 0
@@ -390,6 +445,42 @@ class TestMain:
         names = {o["name"] for o in record["observations"]}
         for seed in solo.SOLO_SEEDS:
             assert f"solo-gpt2-seed{seed}_gain" in names
+
+    def test_stored_bf16_reaches_the_loader_and_the_label(self, tmp_path: pathlib.Path) -> None:
+        alpha = _staged(tmp_path, "alpha")
+        out = tmp_path / "bf16" / "solo.json"
+        received: list[QuantizationConfig | StoredBf16Precision | None] = []
+
+        def _bf16_loader(
+            model_id_or_path: str,
+            quantization: QuantizationConfig | StoredBf16Precision | None,
+        ) -> LMModelProto:
+            assert model_id_or_path == "EleutherAI/pythia-6.9b"
+            received.append(quantization)
+            model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+            return model
+
+        hf_hooks.Hooks.load_hf_model = _bf16_loader
+
+        code = solo.main(
+            [
+                "--model-id",
+                "EleutherAI/pythia-6.9b",
+                "--precision",
+                "stored-bf16",
+                "--corpus",
+                str(alpha),
+                "--device",
+                "cpu",
+                "--out",
+                str(out),
+            ]
+        )
+
+        assert code == 0
+        assert received == [{"torch_dtype": "bfloat16"}]
+        record = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
+        assert record["label"].startswith("cartridge-solo-seeds-pythia-6.9b-storedbf16-n9-")
 
     def test_entrypoint_reads_process_argv_and_exits_with_mains_code(
         self, tmp_path: pathlib.Path
@@ -401,6 +492,8 @@ class TestMain:
             "prog",
             "--model-id",
             "gpt2",
+            "--precision",
+            "policy",
             "--corpus",
             str(alpha),
             "--device",
@@ -427,6 +520,8 @@ class TestMain:
             "x",
             "--model-id",
             "gpt2",
+            "--precision",
+            "policy",
             "--corpus",
             str(alpha),
             "--device",

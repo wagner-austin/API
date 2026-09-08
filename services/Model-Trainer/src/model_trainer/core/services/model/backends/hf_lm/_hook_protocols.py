@@ -15,6 +15,7 @@ from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
     QuantizationConfig,
+    StoredBf16Precision,
     TrainOutcome,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
@@ -180,16 +181,20 @@ class HFModelLoader(Protocol):
     """Protocol for loading HuggingFace models from hub or path."""
 
     def __call__(
-        self, model_id_or_path: str, quantization: QuantizationConfig | None
+        self,
+        model_id_or_path: str,
+        quantization: QuantizationConfig | StoredBf16Precision | None,
     ) -> LMModelProto:
         """Load a model from HuggingFace Hub or local path.
 
         Args:
             model_id_or_path: HuggingFace model ID or local path.
-            quantization: Quantization to apply while loading, or None to
-                load unquantized. Carried explicitly rather than read from a
-                config inside the loader, so that a caller cannot request a
-                quantized strategy and silently receive an unquantized model.
+            quantization: Quantization to apply while loading, a declared
+                stored-bf16 unquantized load, or None to load at stored
+                fp32. Carried explicitly rather than read from a config
+                inside the loader, so that a caller cannot request a
+                quantized strategy and silently receive an unquantized
+                model.
 
         Returns:
             Loaded language model.

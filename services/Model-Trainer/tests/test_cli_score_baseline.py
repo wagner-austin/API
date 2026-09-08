@@ -23,7 +23,11 @@ from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import score_baseline
 from model_trainer.core import _test_hooks as core_hooks
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem, ClozeItemOutcome
-from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
+from model_trainer.core.contracts.model import (
+    PreparedLMModel,
+    QuantizationConfig,
+    StoredBf16Precision,
+)
 from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
 from model_trainer.core.services.model.deterministic_gemm import CUBLAS_ARM
 from model_trainer.core.types import LMModelProto
@@ -459,7 +463,7 @@ class TestTheProductionHooks:
         loaded: list[str] = []
 
         def _load_model(
-            model_id_or_path: str, quantization: QuantizationConfig | None
+            model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
         ) -> LMModelProto:
             loaded.append(model_id_or_path)
             assert quantization is None

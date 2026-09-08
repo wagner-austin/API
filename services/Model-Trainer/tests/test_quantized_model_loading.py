@@ -184,6 +184,19 @@ class TestTheArgumentsAQuantizationChoiceImplies:
 
         assert dtype is torch.float16
 
+    def test_a_declared_stored_bf16_requests_no_config_and_bfloat16(self) -> None:
+        """The third state: unquantized, half precision, by declaration.
+
+        None cannot mean this -- every fp32 record depends on None
+        loading at float32, pinned above -- so the bf16 load is its own
+        shape, and requesting it must produce no quantization config at
+        all beside the half-precision dtype.
+        """
+        config, dtype = load_arguments({"torch_dtype": "bfloat16"})
+
+        assert config is None
+        assert dtype is torch.bfloat16
+
 
 class TestLoadingUnquantized:
     """The None path states its dtype rather than inheriting one."""

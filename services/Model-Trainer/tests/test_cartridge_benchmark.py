@@ -34,7 +34,7 @@ from platform_ml.determinism import (
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_benchmark as bench
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.contracts.replicated_measurement import replicate
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
@@ -77,7 +77,9 @@ def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
     return FakeHFTokenizer(vocab_size=_VOCAB)
 
 
-def _fake_model(model_id_or_path: str, quantization: QuantizationConfig | None) -> LMModelProto:
+def _fake_model(
+    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+) -> LMModelProto:
     """Stand in for the hub model loader, returning a real tiny GPT-2.
 
     The model is real. Only its PROVENANCE is faked: it comes from the

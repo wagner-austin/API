@@ -14,7 +14,7 @@ costs a line in this file instead.
 
 from __future__ import annotations
 
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 
 #: The GPT-2 family fuses query, key and value into one projection; adapting
 #: it is adapting attention. A constant rather than a plan field because it
@@ -91,10 +91,40 @@ def quantization_for(model_id: str) -> QuantizationConfig | None:
     )
 
 
+def stored_bf16_for(model_id: str) -> StoredBf16Precision:
+    """Declare the unquantized-bf16 load for a base measured that way.
+
+    The 7B precision-control arm (task ``c4b9a01b``): the NF4 rung's
+    training deficit needs a comparison with the quantization removed,
+    and 7B fp32 (27.6GB) fits no free card where bf16 (13.8GB) does.
+    Explicit ids like every map here: an undeclared base refuses, so a
+    control that silently ran at the wrong precision cannot exist.
+
+    Args:
+        model_id: The plan's base model.
+
+    Returns:
+        The declared stored-bf16 load.
+
+    Raises:
+        ValueError: For a base no row here names -- including the whole
+            gpt2 family, whose certified records are fp32 and which has
+            no declared bf16 arm.
+    """
+    if model_id == "EleutherAI/pythia-6.9b":
+        return {"torch_dtype": "bfloat16"}
+    raise ValueError(
+        f"no stored-bf16 load is declared for base {model_id!r}; the only "
+        f"declared precision-control arm is the 7B one, and an undeclared "
+        f"half-precision load would change what a record means silently"
+    )
+
+
 __all__ = [
     "LORA_TARGET_MODULES",
     "NEOX_TARGET_MODULES",
     "PYTHIA_7B_QUANTIZATION",
     "quantization_for",
+    "stored_bf16_for",
     "target_modules_for",
 ]

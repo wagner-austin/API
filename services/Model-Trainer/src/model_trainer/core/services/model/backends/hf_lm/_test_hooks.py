@@ -13,12 +13,14 @@ from typing import Final
 import torch
 from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
+from typing_extensions import TypeIs
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import (
     ModelTrainConfig,
     PreparedLMModel,
     QuantizationConfig,
+    StoredBf16Precision,
 )
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
@@ -92,29 +94,67 @@ def _bits_and_bytes_config(quantization: QuantizationConfig) -> BitsAndBytesConf
     )
 
 
+#: Stored-precision dtypes a declared unquantized load may name, resolved
+#: here for the same reason ``_COMPUTE_DTYPES`` is: the accepted set is the
+#: Literal on :class:`StoredBf16Precision`, not the torch namespace.
+_STORED_DTYPES: Final[dict[str, torch.dtype]] = {
+    "bfloat16": torch.bfloat16,
+}
+
+
+def _is_quantization(
+    precision: QuantizationConfig | StoredBf16Precision,
+) -> TypeIs[QuantizationConfig]:
+    """Discriminate the loader union by its required keys.
+
+    ``load_in_4bit`` is required on a quantized config and absent from a
+    stored-precision declaration, so key membership decides -- stated as
+    a TypeIs because the two shapes are TypedDicts and share a
+    runtime type.
+
+    Args:
+        precision: A non-None member of the loader union.
+
+    Returns:
+        Whether this is a quantized-load configuration.
+    """
+    return "load_in_4bit" in precision
+
+
 def load_arguments(
-    quantization: QuantizationConfig | None,
+    quantization: QuantizationConfig | StoredBf16Precision | None,
 ) -> tuple[BitsAndBytesConfigProto | None, torch.dtype]:
-    """Decide the two loading arguments a quantization choice implies.
+    """Decide the two loading arguments a precision choice implies.
 
     Separated from the load itself so the decision is testable without a
     CUDA device: building a 4-bit model requires one, and asserting what
     would be REQUESTED does not.
 
+    THE None BRANCH IS A CERTIFIED CONTRACT: every fp32 record on the
+    ladder depends on ``None -> torch.float32``, which is why the
+    stored-bf16 state is its own declared shape rather than a new meaning
+    for None. The union is discriminated by required key --
+    ``load_in_4bit`` exists only on a quantized config, ``torch_dtype``
+    only on a stored-precision declaration.
+
     Args:
-        quantization: The quantization to apply, or None for unquantized.
+        quantization: The quantization to apply, a declared stored-bf16
+            unquantized load, or None for stored-precision fp32.
 
     Returns:
         A tuple of (quantization config or None, dtype for the layers
-        quantization does not replace).
+        quantization does not replace -- or, unquantized, for all of
+        them).
     """
     if quantization is None:
         return None, torch.float32
-    return _bits_and_bytes_config(quantization), _compute_dtype(quantization)
+    if _is_quantization(quantization):
+        return _bits_and_bytes_config(quantization), _compute_dtype(quantization)
+    return None, _STORED_DTYPES[quantization["torch_dtype"]]
 
 
 def _default_load_hf_model(
-    model_id_or_path: str, quantization: QuantizationConfig | None
+    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
 ) -> LMModelProto:
     """Production implementation for loading HuggingFace models.
 

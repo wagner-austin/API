@@ -22,7 +22,11 @@ from platform_core.run_record import decode_run_record
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.core import _test_hooks as core_hooks
 from model_trainer.core.contracts.continuation_sweep import Completion, ContinuationArm
-from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
+from model_trainer.core.contracts.model import (
+    PreparedLMModel,
+    QuantizationConfig,
+    StoredBf16Precision,
+)
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import (
     HFTokenizerProto,
 )
@@ -49,7 +53,7 @@ LONG_SOURCE = "".join(f"line{index}\n" for index in range(30))
 
 
 def fake_model_loader(
-    model_id_or_path: str, quantization: QuantizationConfig | None
+    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
 ) -> LMModelProto:
     """Stand in for the HuggingFace model loader.
 

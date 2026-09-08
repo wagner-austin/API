@@ -25,7 +25,7 @@ from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_headroom as headroom
 from model_trainer.cli.cartridge_lora_policy import quantization_for
-from model_trainer.core.contracts.model import QuantizationConfig
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.finetuning.strategies.cartridge import require_cache_capable
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
@@ -56,7 +56,9 @@ def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
     return FakeHFTokenizer(vocab_size=_VOCAB)
 
 
-def _fake_model(model_id_or_path: str, quantization: QuantizationConfig | None) -> LMModelProto:
+def _fake_model(
+    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
+) -> LMModelProto:
     """Stand in for the hub loader, asserting the policy value threads.
 
     The loader is handed exactly what :func:`quantization_for` declares
@@ -227,7 +229,7 @@ class TestMeasureHeadroom:
         loaded: list[_PlacementRecordingModel] = []
 
         def _recording_loader(
-            model_id_or_path: str, quantization: QuantizationConfig | None
+            model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
         ) -> LMModelProto:
             assert quantization == quantization_for(model_id_or_path)
             model = _PlacementRecordingModel()

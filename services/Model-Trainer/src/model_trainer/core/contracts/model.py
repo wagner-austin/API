@@ -149,6 +149,24 @@ class QuantizationConfig(TypedDict):
     bnb_4bit_use_double_quant: bool
 
 
+class StoredBf16Precision(TypedDict):
+    """Load weights UNQUANTIZED at bfloat16 stored precision.
+
+    A third loading state beside quantization and None, declared as its
+    own shape because None already carries a certified meaning: every
+    fp32 record depends on ``quantization=None`` loading at
+    ``torch.float32`` (``load_arguments``), so half precision cannot
+    ride on None without changing what those records mean, and it must
+    not ride on a BitsAndBytes config with both load flags False,
+    because that shape's meaning would be transformers' to decide
+    rather than this contract's. The one required field keeps the
+    loader union discriminable by key: ``load_in_4bit`` names a
+    quantized load, ``torch_dtype`` names this one.
+    """
+
+    torch_dtype: Literal["bfloat16"]
+
+
 class GgufExportConfig(TypedDict):
     """Configuration for GGUF export of LoRA adapters.
 

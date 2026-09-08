@@ -11,7 +11,11 @@ import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 
-from model_trainer.core.contracts.model import PreparedLMModel, QuantizationConfig
+from model_trainer.core.contracts.model import (
+    PreparedLMModel,
+    QuantizationConfig,
+    StoredBf16Precision,
+)
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.finetuning.strategies._test_hooks import (
     reset_hooks as reset_ft_hooks,
@@ -44,7 +48,7 @@ class _FakeModelLoader:
         self._name_prefix = name_prefix
 
     def __call__(
-        self, model_id_or_path: str, quantization: QuantizationConfig | None
+        self, model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
     ) -> LMModelProto:
         return FakeHFModel(f"{self._name_prefix}{model_id_or_path}")
 
