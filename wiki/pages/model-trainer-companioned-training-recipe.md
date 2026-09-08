@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
-  "docs/RESEARCH.md": 97bec79231cab28f536aec413a2a83048aa9325f
+  "docs/RESEARCH.md": 655f45102f1dabc49dbe35c56c9e3d4fa1889221
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -49,6 +49,7 @@ provenance:
   - "7B rung (Pythia-6.9B, GPT-NeoX, NF4 nf4+double-quant+bf16-compute) measured 2026-09-07 on A30, board task af35fc20: jobs 55810964 (LM, 3h04m) + 55810966 (invariance, 3h21m), image v42 sha256 270d8197 (truncated) from commit 09f5a4bb, 44/44 smokes incl. the dtype-boundary and architecture-policy self-asserts; model content-pinned (snapshot c0e3eee3 + shard sha256s) in the run documents"
   - "7B LM twin 55811523 BYTE-IDENTICAL (sha256 6ef4b9c9 truncated, same-node hpc3-gpu-l54-09); 7B invariance twin 55811542 CROSS-NODE (k54-01 vs l54-09) with ALL 198 observations bit-equal -- record shas 254d0126 vs 8c48e82a differ solely in fingerprint/host/logical_cores 32 vs 64, so NF4 training is certified deterministic cross-node in every measured quantity"
   - "headroom measurement 2026-09-07, board task afee6162: cartridge_headroom CLI (commit 77e12c3e), image v44 sha256 9e98d0a7 (truncated), jobs 55812858 + twin 55812861 (~4 min each on A30), records BYTE-IDENTICAL sha256 7668c51d (truncated), same-node hpc3-gpu-k54-01; plain-base held-out loss on the primary corpus 4.57 (gpt2) / 4.27 (medium) / 4.11 (xl) / 3.66 (pythia-6.9b NF4), pythia 0.34-0.90 nats below every GPT-2 base on all 11 corpora; per-corpus character and token rows carried for the tokenizer caveat (pythia ~7% fewer tokens on the same text)"
+  - "nine-seed solo reliability 2026-09-07/08, board task b89cd348: cartridge_solo_seeds CLI (commit 4fc8dfbb), image v45 sha256 567cb42d (truncated), solo cartridges trained AND scored behind the PLAIN base at the recorded knobs; 7B pair 55813508 + twin 55813516 BYTE-IDENTICAL sha256 353ab575 (truncated, same-node k54-01); xl control pair 55818092 + twin 55813528 CROSS-NODE (l54-09 / l54-07) with all 14 observations bit-equal, shas differing solely in fingerprint/host/logical_cores 64 vs 32; xl mean +0.827 spread 0.079 over nine seeds, pythia-6.9b/NF4 mean +0.160 spread 0.320 with one negative draw"
 fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
@@ -292,9 +293,17 @@ corpus -- so most of the ~0.81-nat gain was never available at 7B, the
 residual (~0.36 nats to the family's adapted level) matches the best
 measured 7B per-seed gain (+0.40) within floors, and what headroom does
 not explain is seed variance (one seed negative where two reach ~0.4).
-Still open, filed rather than implied: the 7B seed-variance question
-(prerequisite to any 7B composition rung, whose available solo gain is
-~0.4 nats, half the family's), the mechanism of the mid-depth valley,
-the remaining 0.30 content gap at medium n8, and the budget slot
-policy. The RESEARCH.md entry under `mi` carries all the run summaries
+The seed-variance question has
+since been answered at nine seeds (provenance below): the family was
+never lucky -- gpt2-xl's nine draws all land in +0.78..+0.86 -- while
+7B/NF4 training behind the plain base delivers a mean of only +0.16
+with a spread twice that and one draw negative; the sweeps' ~0.4
+readings carried the adapted base's contribution, and
+pythia-plus-cartridge (~3.50) does not reach xl-plus-cartridge
+(~3.28), so the training-side deficit is real beside headroom. Still
+open, filed rather than implied: the 7B recovery levers (an
+architecture-scaled hyperparameter rung and an unquantized-bf16
+precision control) before any 7B composition rung, the mechanism of
+the mid-depth valley, the remaining 0.30 content gap at medium n8,
+and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
 and the extension list.
