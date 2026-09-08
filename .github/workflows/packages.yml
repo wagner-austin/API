@@ -37,6 +37,12 @@ name: packages
 #     is written against Windows separators and a case-insensitive filesystem
 #     -- 17 failures on ubuntu, none of them a defect in the bot, all of them
 #     a Windows path separator, which is an ordinary character on Linux.
+#   * libs/covenant_ml gets its own workflow on windows-latest (2026-09-08):
+#     its benchmarking tests exercise the REAL Win32 EcoQoS boundary through
+#     ctypes.WinDLL, which does not exist on Linux, and its struct-width
+#     assertion (12 bytes) reads 24 there because ulong doubles. The suite
+#     asserts a Windows contract; covenant-ml.yml runs it where that
+#     contract exists.
 #   * libs/cleargbm_rs is not a poetry project at all. It is a maturin/PEP-621
 #     Rust extension built with uv (`uv pip install -e ".[dev]"`), and its gate
 #     is cargo fmt, cargo clippy, cargo test and cargo llvm-cov at 100% SEGMENT
@@ -142,7 +148,7 @@ jobs:
           git diff --name-only "$base" "${{ github.sha }}" > changed.txt || true
           # Packages with a dedicated workflow are checked there, not here.
           selected="$(python scripts/ci_select_packages.py < changed.txt \
-            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels'}; \
+            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels','libs/covenant_ml'}; \
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"
@@ -169,7 +175,15 @@ jobs:
     # the GGUF export tests. On a hosted CPU runner those are 28 failures
     # that look like defects and are actually the machine. The host assets
     # live under the same /opt convention as the RWB game tree.
-    runs-on: ${{ (matrix.package == 'clients/RustedWarfareBot' || matrix.package == 'services/Model-Trainer') && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
+    #
+    # services/handwriting-ai joins for MEMORY, not GPU: twice (runs
+    # 34261012178 and 34263882633) the hosted 16GB VM received "a shutdown
+    # signal" at ~98%, mid-way through a real MNIST training test, with
+    # orphan python processes reaped after -- the OOM killer taking the
+    # runner agent, reported as infrastructure rather than as a failed
+    # assertion. Sixteen xdist workers each holding torch plus real
+    # training does not fit in 16GB; the lavender pool has 26GB.
+    runs-on: ${{ (matrix.package == 'clients/RustedWarfareBot' || matrix.package == 'services/Model-Trainer' || matrix.package == 'services/handwriting-ai') && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -274,14 +288,14 @@ jobs:
       # `runner.name`, because hosted runners have unstable names but ONE
       # stable workspace path, so for them this changes nothing.
       #
-      # Model-Trainer is excluded from the cache, not given a bigger one: its
-      # venv carries cu124 torch wheels (multi-GB), which would crowd the
-      # repo's 10GB cache quota and evict every other package's entry. It
-      # runs on the self-hosted pool, where the workspace -- venv included --
-      # persists between jobs anyway, so `poetry sync` is incremental without
-      # any cache step.
+      # Model-Trainer and handwriting-ai are excluded from the cache, not
+      # given bigger ones: their venvs carry cu124 torch wheels (multi-GB),
+      # which would crowd the repo's 10GB cache quota and evict every other
+      # package's entry. Both run on the self-hosted pool, where the
+      # workspace -- venv included -- persists between jobs anyway, so
+      # `poetry sync` is incremental without any cache step.
       - name: Cache the virtualenv
-        if: matrix.package != 'services/Model-Trainer'
+        if: matrix.package != 'services/Model-Trainer' && matrix.package != 'services/handwriting-ai'
         uses: actions/cache@v6
         with:
           path: ${{ matrix.package }}/.venv

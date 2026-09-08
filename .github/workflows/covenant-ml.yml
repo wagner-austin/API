@@ -1,0 +1,105 @@
+name: covenant-ml
+
+# covenant_ml's suite asserts the REAL Win32 boundary, so it runs on Windows.
+#
+# Its benchmarking layer opts the process out of Windows power throttling
+# (EcoQoS) through ctypes.WinDLL, and the tests exercise that boundary for
+# real rather than through a fake: `test_the_real_win32_boundary_accepts_the
+# _opt_out`, `test_state_struct_is_three_ulongs_wide` (12 bytes -- ulong is 4
+# on Win32 and 8 on Linux, so the same struct reads 24 there), and every
+# runner test that reaches the power opt-out on the way to a measurement.
+# On ubuntu in the shared `packages` matrix that is 8+ failures of the shape
+# `AttributeError: module 'ctypes' has no attribute 'WinDLL'` and
+# `assert 24 == 12` -- the platform, not the code. Same finding navprobe.yml
+# records (whose product is literally this boundary, one directory over),
+# same remedy: run the suite where its assumptions hold.
+#
+# The Windows verdict is real: 2026-09-08, this suite on Windows is green at
+# 100.00% statements AND branches (see the commit adding this file).
+#
+# The RUSTFLAGS baseline is copied from packages.yml for the same reason it
+# exists there: covenant_ml path-depends on cleargbm -> cleargbm_rs, whose
+# .cargo/config.toml sets `-C target-cpu=native`, and a cached .venv holding
+# a native-built extension can be restored onto a runner whose CPU lacks
+# those instructions. The cache key covers the Rust sources too -- editing
+# Rust changes no poetry.lock hash, and a lock-only key would greenlight a
+# suite against a binary no longer in the tree.
+#
+# `shell: bash` for the reason navprobe pins it: GitHub runs pwsh steps with
+# a single trailing `exit $LASTEXITCODE`, which propagates only the LAST
+# command's status.
+
+on:
+  push:
+    paths:
+      - "libs/covenant_ml/**"
+      - "libs/covenant_domain/**"
+      - "libs/platform_ml/**"
+      - "libs/cleargbm/**"
+      - "libs/cleargbm_rs/**"
+      - "libs/platform_core/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/covenant-ml.yml"
+  pull_request:
+    paths:
+      - "libs/covenant_ml/**"
+      - "libs/covenant_domain/**"
+      - "libs/platform_ml/**"
+      - "libs/cleargbm/**"
+      - "libs/cleargbm_rs/**"
+      - "libs/platform_core/**"
+      - "libs/monorepo_guards/**"
+      - "monorepo-guards.toml"
+      - ".github/workflows/covenant-ml.yml"
+
+concurrency:
+  group: covenant-ml-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: libs/covenant_ml
+        shell: bash
+    env:
+      RUSTFLAGS: -C target-cpu=x86-64-v2
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.4
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v6
+        with:
+          path: libs/covenant_ml/.venv
+          key: covenant-ml-venv-${{ hashFiles('libs/covenant_ml/poetry.lock', 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}
+
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry sync --with dev
+
+      - name: Guards
+        run: poetry run python -m scripts.guard
+
+      - name: Lint
+        run: |
+          poetry run ruff check .
+          poetry run ruff format --check .
+
+      - name: Types
+        run: poetry run mypy
+
+      - name: Tests
+        run: >
+          poetry run pytest -n auto
+          --cov-branch --cov=src --cov=scripts --cov-report=term-missing
