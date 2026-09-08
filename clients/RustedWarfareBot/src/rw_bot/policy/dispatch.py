@@ -18,6 +18,7 @@ from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, can_engage
 from rw_bot.mechanics.upgrades import satisfies
 from rw_bot.policy.combat import (
+    FIRST_WAVE,
     WAVE_SIZES,
     find_targets,
     muster,
@@ -232,6 +233,7 @@ class WaveController:
         groupcap: int = MAX_OPEN_GROUPS,
         prio: int = PRIO_CONVERGENCE,
         spacing: int = 0,
+        retreat: int = FIRST_WAVE,
     ) -> None:
         """Open a controller.
 
@@ -271,10 +273,12 @@ class WaveController:
                 the clock says ([[policy-combat]]).
             groupcap: Kill-groups that may fill at once, and
             prio: the target-priority allele, and
-            spacing: the reserve's per-unit station radius -- tactical
-                genome fields, threaded whole to
-                :func:`~rw_bot.policy.firing.engagements` and
-                :func:`~rw_bot.policy.combat.rally`; identities are the
+            spacing: the reserve's per-unit station radius, and
+            retreat: the survivor count below which a wave disbands --
+                tactical genome fields, threaded whole to
+                :func:`~rw_bot.policy.firing.engagements`,
+                :func:`~rw_bot.policy.combat.rally` and
+                :func:`~rw_bot.policy.combat.muster`; identities are the
                 constants every prior measurement ran under
                 ([[impossible-tactical-genome]]).
         """
@@ -288,6 +292,8 @@ class WaveController:
         self._groupcap = groupcap
         self._prio = prio
         self._spacing = spacing
+        self._retreat = retreat
+        self._strength = 0
         # Observations seen, counted here rather than passed in: the trigger
         # is about this controller's own timeline, and every caller already
         # calls command() exactly once per observation.
@@ -406,6 +412,8 @@ class WaveController:
             self._waves,
             self._ladder,
             force=self._avenging or self._committed or strike,
+            retreat=self._retreat,
+            strength=self._strength,
         )
         # Consumed whether or not it released: a riposte with too few units
         # to punch is a riposte missed, not one banked for an arbitrary
@@ -413,6 +421,7 @@ class WaveController:
         self._avenging = False
         self._released = wave["released"]
         self._waves = wave["waves"]
+        self._strength = wave["strength"]
         # A unit cleared to attack is no longer gathering, so it forgets it was
         # ever sent home. That is what lets a disbanded wave be sent home again
         # rather than standing where it died.

@@ -143,18 +143,56 @@ def test_a_decimated_wave_returns_to_the_reserve() -> None:
     alone ([[policy-combat]]). Below the ladder's own first rung the survivors
     go back to the reserve, rally home, and go out with the next wave.
     """
-    survivors = muster((unit(2, "c_tank"),), frozenset({1, 2, 3}), 1)
+    survivors = muster((unit(2, "c_tank"),), frozenset({1, 2, 3}), 1, strength=3)
     assert survivors["released"] == frozenset()
     assert survivors["gathering"] == 1
 
 
 def test_the_disband_threshold_is_the_ladders_own_first_rung() -> None:
-    """Reused rather than reinvented, so there is no new number to justify."""
+    """Reused rather than reinvented, so there is no new number to justify --
+    and since the retreat allele, the IDENTITY the margin defaults to."""
     assert WAVE_SIZES[0] == FIRST_WAVE
-    at_threshold = muster(_wave(FIRST_WAVE), frozenset({1, 2, 3, 4, 5}), 1)
+    at_threshold = muster(_wave(FIRST_WAVE), frozenset({1, 2, 3, 4, 5}), 1, strength=5)
     assert at_threshold["released"] == frozenset({1, 2, 3})
-    below = muster(_wave(FIRST_WAVE - 1), frozenset({1, 2, 3, 4, 5}), 1)
+    below = muster(_wave(FIRST_WAVE - 1), frozenset({1, 2, 3, 4, 5}), 1, strength=5)
     assert below["released"] == frozenset()
+
+
+def test_the_retreat_margin_disbands_a_bled_wave_early() -> None:
+    """The retreat-regroup allele ([[impossible-tactical-genome]]): a wave
+    released at ten and bled to four disbands at margin eight where the
+    identity would have held it to two survivors -- the GROUP goes home to
+    join the next wave instead of dying by ones."""
+    four = _wave(4)
+    ladder = (3, 3, 5, 5, 5, 25)
+    held = muster(four, frozenset(range(1, 11)), 5, ladder, strength=10)
+    assert held["released"] == frozenset({1, 2, 3, 4})
+    early = muster(four, frozenset(range(1, 11)), 5, ladder, strength=10, retreat=8)
+    assert early["released"] == frozenset()
+    assert early["strength"] == 0
+    assert early["gathering"] == 4
+
+
+def test_a_margin_larger_than_a_small_wave_keeps_the_identity_floor() -> None:
+    """min(retreat, strength): a wave of three under margin eight keeps
+    today's floor rather than churning -- released whole, it stands."""
+    three = _wave(3)
+    state = muster(three, frozenset({1, 2, 3}), 1, strength=3, retreat=8)
+    assert state["released"] == frozenset({1, 2, 3})
+    assert state["strength"] == 3
+
+
+def test_retreat_zero_fights_to_the_last_unit() -> None:
+    """The margin's off-state: one survivor of a ten-wave keeps clearance."""
+    lone = (unit(7, "c_tank"),)
+    state = muster(lone, frozenset(range(1, 11)), 1, strength=10, retreat=0)
+    assert state["released"] == frozenset({7})
+
+
+def test_a_release_records_its_strength() -> None:
+    state = muster(_wave(5), frozenset(), 2, ladder=(3, 5))
+    assert state["released"] == frozenset({1, 2, 3, 4, 5})
+    assert state["strength"] == 5
 
 
 def test_a_wiped_wave_leaves_nothing_released() -> None:

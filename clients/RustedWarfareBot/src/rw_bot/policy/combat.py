@@ -85,6 +85,13 @@ class Muster(TypedDict):
         gathering: Units waiting to form the next wave.
         wanted: How many the next wave needs.
         waves: Waves released so far, including any released this sample.
+        strength: How many units the current wave held at release, zero
+            when no wave stands. Carried so the retreat margin can be
+            judged against the wave AS RELEASED rather than against its
+            shrinking remnant -- a threshold measured against the
+            remnant can never fire early, and one measured against a
+            constant churns waves smaller than itself
+            ([[impossible-tactical-genome]]).
         reason: Human-readable justification, for the run log.
     """
 
@@ -92,6 +99,7 @@ class Muster(TypedDict):
     gathering: int
     wanted: int
     waves: int
+    strength: int
     reason: str
 
 
@@ -101,6 +109,8 @@ def muster(
     waves: int,
     ladder: Sequence[int] = WAVE_SIZES,
     force: bool = False,
+    retreat: int = FIRST_WAVE,
+    strength: int = 0,
 ) -> Muster:
     """Decide which units are cleared to attack, and which keep gathering.
 
@@ -147,16 +157,27 @@ def muster(
             stockpile converts ([[policy-combat]], [[ai-opponent-strategy]]).
             The anti-trickle floor still holds: fewer than a first wave is
             not a punch, forced or not.
+        retreat: Survivor count below which a wave disbands and re-gathers
+            -- the retreat-regroup allele ([[impossible-tactical-genome]]).
+            Identity :data:`FIRST_WAVE`, the ladder-rung constant every
+            prior measurement disbanded at; zero means a wave fights to
+            its last unit. Judged against ``min(retreat, strength)`` so a
+            margin larger than a small wave cannot churn it -- the wave
+            simply keeps today's floor.
+        strength: The current wave's size at release, from the previous
+            call; zero when none stands.
 
     Returns:
         The decision, carrying the state the next call needs.
     """
     alive = {unit["unit_id"] for unit in army}
     survivors = alive & released
-    if len(survivors) < FIRST_WAVE:
-        # Decimated, so no longer a wave. Handing them back to the reserve is
-        # what sends them home to re-gather rather than in to die one at a time.
+    if len(survivors) < min(retreat, strength):
+        # Below the margin, so no longer a wave. Handing them back to the
+        # reserve is what sends them home to re-gather rather than in to
+        # die one at a time.
         survivors = set()
+        strength = 0
     reserve = alive - survivors
     wanted = wave_size(waves, ladder)
     if force and len(reserve) >= FIRST_WAVE:
@@ -168,6 +189,7 @@ def muster(
             gathering=0,
             wanted=wave_size(waves + 1, ladder),
             waves=waves + 1,
+            strength=len(alive),
             reason=f"wave {waves + 1} of {len(reserve)} released",
         )
     return Muster(
@@ -175,6 +197,7 @@ def muster(
         gathering=len(reserve),
         wanted=wanted,
         waves=waves,
+        strength=strength if survivors else 0,
         reason=f"{len(survivors)} committed, mustering {len(reserve)}/{wanted}",
     )
 

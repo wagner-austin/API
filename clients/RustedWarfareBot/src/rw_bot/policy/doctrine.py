@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
-from rw_bot.policy.combat import WAVE_SIZES
+from rw_bot.policy.combat import FIRST_WAVE, WAVE_SIZES
 from rw_bot.policy.firing import MAX_OPEN_GROUPS, PRIO_CONVERGENCE
 from rw_bot.policy.workforce import DEFAULT_MAX_WORKERS
 
@@ -89,6 +89,7 @@ INT_FIELDS: Final = (
     "groupcap",
     "prio",
     "spacing",
+    "retreat",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -387,6 +388,17 @@ class Doctrine(TypedDict):
             arithmetic on the unit's engine id (golden-angle ring), so
             the spread costs no draw and holds across samples
             ([[policy-determinism]]).
+        retreat: Survivor count below which a released wave disbands and
+            re-gathers -- the retreat-regroup allele
+            ([[impossible-tactical-genome]]). Identity 3, the ladder's
+            first rung, the constant every prior measurement disbanded
+            at; zero means a wave fights to its last unit. Judged
+            against ``min(retreat, the wave's size at release)``, so a
+            margin larger than a small wave keeps that wave on today's
+            floor instead of churning it. Distinct from the dead
+            per-unit flee reflexes (``hp_floor``, kite): this disengages
+            a GROUP at a measured attrition margin and sends it home to
+            join the next wave.
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -475,6 +487,7 @@ class Doctrine(TypedDict):
     groupcap: int
     prio: int
     spacing: int
+    retreat: int
     huntgate: bool
     bank: bool
 
@@ -538,6 +551,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     groupcap=MAX_OPEN_GROUPS,
     prio=PRIO_CONVERGENCE,
     spacing=0,
+    retreat=FIRST_WAVE,
     huntgate=False,
     bank=False,
 )

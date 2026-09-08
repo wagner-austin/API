@@ -1,0 +1,45 @@
+# The retreat-regroup screen (log 2026-09-08): wave-disband margins 8
+# and 12 vs the identity's 3 (near annihilation) on 12 shared fresh
+# seeds with the in-batch control. The margin is judged against
+# min(retreat, the wave's size at release), so small early waves keep
+# the identity floor and only the sustained mass-25 wave regroups
+# early. The last unbuilt allele family the genome page names besides
+# the tempo ticket. MDE ~382 per pairing at n=12. Seeds 8836001-8840577.
+#
+# label | seed | doctrine | samples
+stand|8836001|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8836001|doctrines/stand-retreat8.doctrine|10000
+ret12|8836001|doctrines/stand-retreat12.doctrine|10000
+stand|8836417|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8836417|doctrines/stand-retreat8.doctrine|10000
+ret12|8836417|doctrines/stand-retreat12.doctrine|10000
+stand|8836833|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8836833|doctrines/stand-retreat8.doctrine|10000
+ret12|8836833|doctrines/stand-retreat12.doctrine|10000
+stand|8837249|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8837249|doctrines/stand-retreat8.doctrine|10000
+ret12|8837249|doctrines/stand-retreat12.doctrine|10000
+stand|8837665|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8837665|doctrines/stand-retreat8.doctrine|10000
+ret12|8837665|doctrines/stand-retreat12.doctrine|10000
+stand|8838081|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8838081|doctrines/stand-retreat8.doctrine|10000
+ret12|8838081|doctrines/stand-retreat12.doctrine|10000
+stand|8838497|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8838497|doctrines/stand-retreat8.doctrine|10000
+ret12|8838497|doctrines/stand-retreat12.doctrine|10000
+stand|8838913|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8838913|doctrines/stand-retreat8.doctrine|10000
+ret12|8838913|doctrines/stand-retreat12.doctrine|10000
+stand|8839329|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8839329|doctrines/stand-retreat8.doctrine|10000
+ret12|8839329|doctrines/stand-retreat12.doctrine|10000
+stand|8839745|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8839745|doctrines/stand-retreat8.doctrine|10000
+ret12|8839745|doctrines/stand-retreat12.doctrine|10000
+stand|8840161|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8840161|doctrines/stand-retreat8.doctrine|10000
+ret12|8840161|doctrines/stand-retreat12.doctrine|10000
+stand|8840577|doctrines/evolve3-g3m10.doctrine|10000
+ret8|8840577|doctrines/stand-retreat8.doctrine|10000
+ret12|8840577|doctrines/stand-retreat12.doctrine|10000

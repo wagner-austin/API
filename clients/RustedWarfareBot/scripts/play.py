@@ -523,6 +523,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         groupcap=doctrine["groupcap"],
         prio=doctrine["prio"],
         spacing=doctrine["spacing"],
+        retreat=doctrine["retreat"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],

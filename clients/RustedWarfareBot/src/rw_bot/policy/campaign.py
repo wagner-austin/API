@@ -33,7 +33,7 @@ from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
-from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
+from rw_bot.policy.combat import FIRST_WAVE, WAVE_SIZES, find_army, find_targets
 from rw_bot.policy.counter import (
     FLEET_BLOOD,
     counter_composition,
@@ -135,6 +135,7 @@ def play(
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
     spacing: int = 0,
+    retreat: int = FIRST_WAVE,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -189,8 +190,8 @@ def play(
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
-            ``groupcap``, ``prio``, ``spacing``, ``bank`` and
-            ``income_ladder``. Each is documented ONCE, on
+            ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``bank``
+            and ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -249,6 +250,7 @@ def play(
         groupcap=groupcap,
         prio=prio,
         spacing=spacing,
+        retreat=retreat,
     )
     intel = Intel()
     scouts = ScoutRunner()

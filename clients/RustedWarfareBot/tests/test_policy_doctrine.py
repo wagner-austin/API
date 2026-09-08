@@ -68,6 +68,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         groupcap=2,
         prio=0,
         spacing=0,
+        retreat=3,
         huntgate=False,
         bank=False,
     )
@@ -367,6 +368,17 @@ def test_a_negative_spacing_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-036"
+
+
+def test_a_negative_retreat_is_refused_and_a_margin_round_trips() -> None:
+    """Zero already means fight to the last unit; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["retreat"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-037"
+    payload["retreat"] = 10
+    assert decode_doctrine(payload)["retreat"] == 10
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

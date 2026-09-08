@@ -1,8 +1,10 @@
 # Tactical-genome screen arm (log 2026-09-08): the standing base with
-# groupcap 4 -- twice the identity's open groups, trading punch
-# density for spread against field targets. Every other line is
-# byte-identical to the base.
-name stand-groupcap4
+# retreat 8 -- a released wave disbands and re-gathers when its
+# survivors fall below min(8, its size at release), so the sustained 25-wave regroups below a third of itself;
+# today's constant disbands at 3, near annihilation. Distinct from
+# the dead per-unit flee reflexes: the GROUP goes home to join the
+# next wave. Every other line is byte-identical to the base.
+name stand-retreat8
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,heavyTank,heavyTank,c_artillery
 heavies heavyTank,heavyTank
 max_workers 8
@@ -30,10 +32,10 @@ nukes 0
 rebuild 0
 hunt 0
 worker_wait 0
-groupcap 4
+groupcap 2
 prio 0
 spacing 0
-retreat 3
+retreat 8
 expand 1
 counter 1
 cover 0
