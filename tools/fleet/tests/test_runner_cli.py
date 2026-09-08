@@ -13,10 +13,10 @@ import sys
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
 from fleet.cli import runners
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, runner_load
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -207,6 +207,99 @@ class TestRender:
             "PLACE BY HAND: /opt/corvis/rw-game/game-lib.jar" in record.message
             for record in caplog.records
         )
+
+
+class TestSampleAndReport:
+    """The load-sampling modes."""
+
+    _FOREST = "\n".join(
+        [
+            "1 0 /sbin/init",
+            "100 1 /home/gharunner/actions-runner-1/bin/Runner.Worker spawnclient",
+            "101 100 python -m pytest",
+            "102 101 pt_data_worker",
+        ]
+    )
+
+    def test_sample_appends_one_line_and_exits_zero(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        record = tmp_path / "load.jsonl"
+        _test_hooks.run = FakeRun([ok(self._FOREST)])
+        assert (
+            runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)]) == 0
+        )
+        lines = [line for line in record.read_text(encoding="utf-8").splitlines() if line]
+        assert len(lines) == 1
+        decoded = runner_load.decode_load_sample(load_json_str(lines[0]))
+        assert decoded["total"] == 2
+        assert decoded["host"] == "lavender"
+
+    def test_report_reads_the_record_back_and_exits_zero(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        record = tmp_path / "load.jsonl"
+        _test_hooks.run = FakeRun([ok(self._FOREST), ok(self._FOREST)])
+        runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)])
+        runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)])
+        with caplog.at_level("INFO"):
+            code = runners.main(["--spec", spec_path, "--report", str(record), "--cores", "16"])
+        assert code == 0
+        messages = [record_.getMessage() for record_ in caplog.records]
+        assert "samples: 2" in messages
+        assert any("at or under 16 cores: 100.0% of samples" in m for m in messages)
+
+    def test_report_filtered_to_an_unsampled_host_says_it_measured_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender"), _raw_host("loki")])
+        record = tmp_path / "load.jsonl"
+        _test_hooks.run = FakeRun([ok(self._FOREST)])
+        runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)])
+        with pytest.raises(ValueError, match="measured nothing"):
+            runners.main(
+                ["--spec", spec_path, "--host", "loki", "--report", str(record), "--cores", "16"]
+            )
+
+    def test_report_without_cores_is_refused(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="--report requires --cores"):
+            runners.main(["--spec", spec_path, "--report", str(tmp_path / "x.jsonl")])
+
+    @pytest.mark.parametrize("cores", ["0", "-3", "many"])
+    def test_a_non_positive_cores_value_is_refused(
+        self, tmp_path: pathlib.Path, cores: str
+    ) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="positive integer"):
+            runners.main(
+                ["--spec", spec_path, "--report", str(tmp_path / "x.jsonl"), "--cores", cores]
+            )
+
+    def test_two_mode_flags_are_refused(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="different acts"):
+            runners.main(
+                [
+                    "--spec",
+                    spec_path,
+                    "--host",
+                    "lavender",
+                    "--sample",
+                    str(tmp_path / "l.jsonl"),
+                    "--render",
+                    str(tmp_path / "out"),
+                ]
+            )
+
+    def test_an_unreachable_host_raises_rather_than_recording(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        record = tmp_path / "load.jsonl"
+        _test_hooks.run = FakeRun([failed(255, "No route to host")])
+        with pytest.raises(AppError) as fault:
+            runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)])
+        assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert not record.exists()
 
 
 class TestEntrypoint:

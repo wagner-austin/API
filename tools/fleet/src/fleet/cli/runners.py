@@ -1,9 +1,11 @@
-"""CLI: score the CI hosts against the runner roster, or render a new one.
+"""CLI: score the CI hosts against the runner roster, render, sample, report.
 
 Usage:
     fleet-runners --spec runners.json
     fleet-runners --spec runners.json --host lavender
     fleet-runners --spec runners.json --host lavender --render C:/provision
+    fleet-runners --spec runners.json --host lavender --sample load.jsonl
+    fleet-runners --spec runners.json --report load.jsonl --cores 16
 
 The ``fleet-nodes`` of GitHub Actions serving: one line per declared check,
 drift printed with the roster's own reason beside it, exit 0 only when every
@@ -16,6 +18,14 @@ fleet as a whole one.
 prints the run order plus every step no script can perform (the licensed game
 tree). It touches no network: rendering is a local act, and the audit
 afterwards is the proof the scripts were run.
+
+``--sample`` appends one load reading per selected host to a JSONL record --
+per install, the count of live processes UNDER its Runner.Worker, descendants
+and all, which is the number the worker literals in any one repo cannot see
+(:mod:`fleet.core.runner_load` carries the spec and the measured incident).
+A loop belongs in the shell or a schedule, never here, so one invocation is
+one sample. ``--report`` reads that record back and prints the distribution
+against ``--cores`` -- and judges nothing.
 
 THE PATH IS PASSED, NEVER SEARCHED FOR -- same rule as every document this
 package reads. A command that hunted for the roster would report a healthy
@@ -34,7 +44,7 @@ from platform_core.json_utils import JSONTypeError, load_json_str
 from platform_core.logging import get_logger, setup_logging
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, decode_runner_spec
-from fleet.core import _test_hooks, runner_audit, runner_render
+from fleet.core import _test_hooks, runner_audit, runner_load, runner_render
 
 _log = get_logger(__name__)
 
@@ -44,7 +54,13 @@ HOST_FLAG = "--host"
 
 RENDER_FLAG = "--render"
 
-_FLAGS = (SPEC_FLAG, HOST_FLAG, RENDER_FLAG)
+SAMPLE_FLAG = "--sample"
+
+REPORT_FLAG = "--report"
+
+CORES_FLAG = "--cores"
+
+_FLAGS = (SPEC_FLAG, HOST_FLAG, RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, CORES_FLAG)
 
 
 def load_runner_spec(path: str) -> RunnerSpec:
@@ -167,8 +183,69 @@ def _render(host: HostRunnerSpec, out_dir: str) -> int:
     return 0
 
 
+def _sample(hosts: Sequence[HostRunnerSpec], out_path: str) -> int:
+    """Append one load reading per host to the record file.
+
+    Args:
+        hosts: The hosts to sample.
+        out_path: The JSONL record to append to.
+
+    Returns:
+        0 always: an unreachable host RAISES here rather than scoring, per
+        :func:`fleet.core.runner_load.sample_host` -- a recorded zero from a
+        host the sampler could not see would be the healthiest possible
+        reading taken at the exact moment it knows nothing.
+    """
+    for host in hosts:
+        sample = runner_load.sample_host(host, at=_test_hooks.now())
+        _test_hooks.append_text(pathlib.Path(out_path), runner_load.render_sample_line(sample))
+        _log.info(
+            "%s total=%d %s",
+            host["name"],
+            sample["total"],
+            " ".join(
+                f"{install['runner_name']}({install['repo'].split('/')[1]})="
+                f"{install['descendants']}"
+                for install in sample["installs"]
+            ),
+        )
+    return 0
+
+
+def _report(record_path: str, *, cores: int, host_name: str | None) -> int:
+    """Print the distribution over a sample record.
+
+    Args:
+        record_path: The JSONL record ``--sample`` appended to.
+        cores: The reference core count. A reference line, not a threshold.
+        host_name: Restrict to one host's samples, or None for all.
+
+    Returns:
+        0 always: the report judges nothing, so it has no failing verdict
+        to exit with. See :class:`fleet.core.runner_load.LoadReport`.
+
+    Raises:
+        ValueError: From the reporter, on an empty selection or bad cores.
+        JSONTypeError: From the record decoder, on a corrupt line.
+    """
+    samples = runner_load.decode_sample_file(_test_hooks.read_text(pathlib.Path(record_path)))
+    if host_name is not None:
+        samples = [sample for sample in samples if sample["host"] == host_name]
+    report = runner_load.report_over_cores(samples, cores=cores)
+    _log.info("samples: %d", report["samples"])
+    _log.info("total descendants: min=%d max=%d", report["minimum"], report["maximum"])
+    _log.info(
+        "over %d cores: %.1f%% of samples (longest consecutive streak: %d)",
+        cores,
+        report["over_fraction"] * 100.0,
+        report["longest_over_streak"],
+    )
+    _log.info("at or under %d cores: %.1f%% of samples", cores, report["under_fraction"] * 100.0)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit the roster's hosts, or render one host's provision.
+    """Audit, render, sample or report, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
@@ -176,17 +253,19 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Returns:
         0 when the audit found every check passing on every reachable host,
-        or the render completed. 1 when any check drifted or any host did
-        not answer.
+        or the render, sample or report completed. 1 when any audited check
+        drifted or any audited host did not answer.
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value,
-            ``--spec`` is absent, or ``--render`` was given without
-            ``--host`` -- a render must name the machine it is for, because
-            emitting scripts for every host into one directory would
-            overwrite each with the next.
-        AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN`` or
-            ``RUNNER_AUDIT_UNPARSABLE`` as the helpers describe.
+            ``--spec`` is absent, more than one mode flag is given (each
+            names a different act and a combined invocation would do one
+            silently), ``--render`` was given without ``--host``,
+            ``--report`` without ``--cores``, or ``--cores`` is not a
+            positive integer.
+        AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
+            ``RUNNER_AUDIT_UNPARSABLE``, ``NODE_UNREACHABLE`` or
+            ``DISPATCH_FAILED`` as the helpers describe.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -194,6 +273,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if spec_path is None:
         raise ValueError(
             f"{SPEC_FLAG} is required: the roster's path is passed, never searched for"
+        )
+    modes = [flag for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG) if flag in parsed]
+    if len(modes) > 1:
+        raise ValueError(
+            f"{' and '.join(modes)} are different acts; give one, or neither for the audit"
         )
     spec = load_runner_spec(spec_path)
     hosts = select_hosts(spec, parsed.get(HOST_FLAG))
@@ -205,6 +289,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "rendering every host into one directory would overwrite each with the next"
             )
         return _render(hosts[0], render_dir)
+    sample_path = parsed.get(SAMPLE_FLAG)
+    if sample_path is not None:
+        return _sample(hosts, sample_path)
+    report_path = parsed.get(REPORT_FLAG)
+    if report_path is not None:
+        raw_cores = parsed.get(CORES_FLAG)
+        if raw_cores is None:
+            raise ValueError(
+                f"{REPORT_FLAG} requires {CORES_FLAG}: the distribution is read against "
+                "the host's core count, and guessing one would judge with a number "
+                "nobody chose"
+            )
+        if not raw_cores.isdigit() or int(raw_cores) <= 0:
+            raise ValueError(f"{CORES_FLAG} must be a positive integer, got {raw_cores!r}")
+        return _report(report_path, cores=int(raw_cores), host_name=parsed.get(HOST_FLAG))
     return _audit(hosts)
 
 
@@ -225,8 +324,11 @@ def entrypoint() -> None:
 
 
 __all__ = [
+    "CORES_FLAG",
     "HOST_FLAG",
     "RENDER_FLAG",
+    "REPORT_FLAG",
+    "SAMPLE_FLAG",
     "SPEC_FLAG",
     "entrypoint",
     "load_runner_spec",
