@@ -77,12 +77,12 @@ jobs:
       - name: Install Poetry
         run: pipx install poetry==2.3.4
 
-      - name: Cache the virtualenv
-        uses: actions/cache@v6
-        with:
-          path: libs/covenant_ml/.venv
-          key: covenant-ml-venv-${{ hashFiles('libs/covenant_ml/poetry.lock', 'libs/cleargbm_rs/Cargo.lock', 'libs/cleargbm_rs/src/**') }}
-
+      # NO VENV CACHE, DELIBERATELY. covenant_ml's venv carries cu124 torch
+      # and weighed in at 2.66GB on its first cached run -- a quarter of the
+      # repository's whole 10GB Actions cache quota for one package, which
+      # is the eviction-thrash arithmetic packages.yml documents at its own
+      # cache step. A fresh install per run is the honest price; the same
+      # trade every torch carrier in the shared matrix now makes.
       - name: Install dependencies
         run: |
           poetry config virtualenvs.in-project true

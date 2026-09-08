@@ -115,6 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.select.outputs.packages }}
+      uncacheable: ${{ steps.select.outputs.uncacheable }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -152,6 +153,15 @@ jobs:
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"
+          # The venvs the cache step must skip -- every package that installs
+          # torch, directly or through a path dependency. COMPUTED, not
+          # listed: the set is derived from the same pyproject manifests the
+          # selection graph reads, so it cannot rot when a package gains or
+          # loses a torch dependency. See torch_carriers() for the quota
+          # arithmetic that makes caching these actively harmful.
+          uncacheable="$(python scripts/ci_select_packages.py --torch-carriers)"
+          echo "uncacheable: $uncacheable"
+          echo "uncacheable=$uncacheable" >> "$GITHUB_OUTPUT"
 
   check:
     needs: discover
@@ -288,14 +298,26 @@ jobs:
       # `runner.name`, because hosted runners have unstable names but ONE
       # stable workspace path, so for them this changes nothing.
       #
-      # Model-Trainer and handwriting-ai are excluded from the cache, not
-      # given bigger ones: their venvs carry cu124 torch wheels (multi-GB),
-      # which would crowd the repo's 10GB cache quota and evict every other
-      # package's entry. Both run on the self-hosted pool, where the
-      # workspace -- venv included -- persists between jobs anyway, so
-      # `poetry sync` is incremental without any cache step.
+      # Torch-carrying venvs are excluded from the cache, not given bigger
+      # entries: each is multi-gigabyte (PyPI's default Linux torch wheel
+      # bundles the CUDA libraries, so the cu124 pin is not what decides),
+      # and a handful of them exceed the repository's 10GB quota outright --
+      # measured 2026-09-08 at 10.28GB across five entries, with the LRU
+      # eviction that followed thrashing every other package's cache: a
+      # procart-api entry was evicted mid-cycle and a corrupt restore
+      # shipped a pygame .so that could not import, red on a package nobody
+      # touched. The carrier set is COMPUTED by the discover job (the
+      # selector's --torch-carriers mode walks the same pyproject manifests
+      # the selection graph reads), so it cannot rot the way the two-name
+      # hand list it replaces already had: the computation found grandma-api
+      # and code-style-eval carrying torch that no one had listed. The
+      # quoted-name contains() is exact because package names are unique and
+      # the output is a JSON array of quoted strings. Self-hosted carriers
+      # lose nothing (the workspace persists between jobs); hosted carriers
+      # pay a fresh install per run, which Art-Trainer already proved
+      # tolerable the day its cache was silently evicted anyway.
       - name: Cache the virtualenv
-        if: matrix.package != 'services/Model-Trainer' && matrix.package != 'services/handwriting-ai'
+        if: ${{ !contains(needs.discover.outputs.uncacheable, format('"{0}"', matrix.package)) }}
         uses: actions/cache@v6
         with:
           path: ${{ matrix.package }}/.venv

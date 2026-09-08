@@ -55,6 +55,14 @@ CHECK_TARGET = re.compile(r"^check:", re.MULTILINE)
 #: Poetry path dependency, e.g. `platform-core = { path = "../../libs/platform_core" }`.
 PATH_DEPENDENCY = re.compile(r"""path\s*=\s*["']([^"']+)["']""")
 
+#: A pyproject line declaring torch or one of its stack-mates as a dependency.
+#:
+#: Matches the plain PyPI pin and the cu124-source pin alike, because BOTH are
+#: multi-gigabyte on Linux: PyPI's default torch wheel bundles the CUDA
+#: libraries too. What this decides is CACHEABILITY, not selection -- see
+#: :func:`torch_carriers`.
+TORCH_DEPENDENCY = re.compile(r"^\s*torch(?:audio|vision)?\s*=", re.MULTILINE)
+
 #: Changes here can affect any package, so they select all of them.
 GLOBAL_PATHS = ("monorepo-guards.toml", "scripts/", ".github/workflows/packages.yml")
 
@@ -176,20 +184,83 @@ def select(changed: list[str], packages: list[str], reverse: dict[str, set[str]]
     return sorted(selected)
 
 
+def _declares_torch(repo: pathlib.Path, package: str) -> bool:
+    """Whether a package's own pyproject declares torch (or a stack-mate).
+
+    Args:
+        repo: Repository root.
+        package: Repo-relative package directory.
+
+    Returns:
+        True when the manifest exists and pins torch, torchaudio or
+        torchvision directly.
+    """
+    manifest = repo / package / "pyproject.toml"
+    if not manifest.is_file():
+        return False
+    return TORCH_DEPENDENCY.search(manifest.read_text(encoding="utf-8", errors="replace")) is not None
+
+
+def torch_carriers(packages: list[str], repo: pathlib.Path) -> list[str]:
+    """Every gated package whose venv installs torch, directly or transitively.
+
+    WHY THIS IS COMPUTED RATHER THAN LISTED. These are the venvs the workflow
+    must not cache: a torch-carrying venv is multi-gigabyte, and a handful of
+    them exceed the repository's 10GB Actions cache quota outright -- measured
+    2026-09-08 at 10.28GB across five entries, with the resulting LRU
+    eviction thrashing every other package's cache (a procart-api entry was
+    evicted and its half-state restore shipped a pygame .so that could not
+    import). A hand-maintained exclusion list in the workflow would rot the
+    day a package gains or loses a torch dependency; this derives the set
+    from the same manifests the selection graph already reads.
+
+    Transitive on purpose: ``libs/platform_langid`` pins torch itself, and
+    ``services/grandma-api`` carries it only through a path dependency --
+    both venvs weigh the same.
+
+    Args:
+        packages: Every gated package.
+        repo: Repository root.
+
+    Returns:
+        The carriers, sorted.
+    """
+    carriers = {name for name in packages if _declares_torch(repo, name)}
+    grown = True
+    while grown:
+        grown = False
+        for name in packages:
+            if name in carriers:
+                continue
+            if any(dep in carriers for dep in direct_dependencies(repo, name)):
+                carriers.add(name)
+                grown = True
+    return sorted(carriers)
+
+
+#: Flag selecting the carrier listing instead of change selection.
+TORCH_CARRIERS_FLAG = "--torch-carriers"
+
+
 def main(argv: list[str]) -> int:
-    """Print the JSON matrix of packages to check.
+    """Print the JSON matrix of packages to check, or the torch carriers.
 
     Args:
         argv: Changed file paths, repo-relative. Reads standard input, one
-            path per line, when none are given.
+            path per line, when none are given. The single argument
+            ``--torch-carriers`` instead prints every gated package whose
+            venv installs torch -- the set the workflow must not cache.
 
     Returns:
-        Exit code 0. The selection is written to standard output as a JSON
-        array, which is what a workflow ``matrix`` consumes.
+        Exit code 0. Either listing is written to standard output as a JSON
+        array.
     """
     repo = pathlib.Path(__file__).resolve().parent.parent
-    changed = argv if argv else [line.strip() for line in sys.stdin if line.strip() != ""]
     packages = gated_packages(repo)
+    if argv == [TORCH_CARRIERS_FLAG]:
+        sys.stdout.write(json.dumps(torch_carriers(packages, repo)))
+        return 0
+    changed = argv if argv else [line.strip() for line in sys.stdin if line.strip() != ""]
     sys.stdout.write(json.dumps(select(changed, packages, dependents_of(packages, repo))))
     return 0
 
