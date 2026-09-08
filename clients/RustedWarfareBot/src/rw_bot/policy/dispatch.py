@@ -122,6 +122,7 @@ def gather_reserve(
     rallying: set[int],
     forward: bool = False,
     hold: int = 0,
+    spacing: int = 0,
 ) -> tuple[MoveOrder, ...]:
     """Send the units still gathering to the rally post, once each.
 
@@ -148,6 +149,9 @@ def gather_reserve(
             of the base (:func:`rally_post`).
         hold: Percent of the anchor-to-mirror line to stand at, zero for
             off (:func:`rally_post`).
+        spacing: World-unit radius of each unit's own station around the
+            post, zero for the single-point rally
+            (:func:`~rw_bot.policy.combat.rally`).
 
     Returns:
         The move orders to send, in roster order.
@@ -158,7 +162,7 @@ def gather_reserve(
         # structure has worse problems than formation.
         return ()
     orders: list[MoveOrder] = []
-    for move in rally(reserve, post):
+    for move in rally(reserve, post, spacing):
         if move["unit_id"] in rallying:
             continue
         rallying.add(move["unit_id"])
@@ -227,6 +231,7 @@ class WaveController:
         allin_at: int = 0,
         groupcap: int = MAX_OPEN_GROUPS,
         prio: int = PRIO_CONVERGENCE,
+        spacing: int = 0,
     ) -> None:
         """Open a controller.
 
@@ -265,10 +270,12 @@ class WaveController:
                 a release below the first wave's size is a trickle whatever
                 the clock says ([[policy-combat]]).
             groupcap: Kill-groups that may fill at once, and
-            prio: the target-priority allele -- the first two fields of
-                the tactical genome, threaded whole to
-                :func:`~rw_bot.policy.combat.engagements`; identities are
-                the constants every prior measurement ran under
+            prio: the target-priority allele, and
+            spacing: the reserve's per-unit station radius -- tactical
+                genome fields, threaded whole to
+                :func:`~rw_bot.policy.firing.engagements` and
+                :func:`~rw_bot.policy.combat.rally`; identities are the
+                constants every prior measurement ran under
                 ([[impossible-tactical-genome]]).
         """
         self._ladder = tuple(ladder)
@@ -280,6 +287,7 @@ class WaveController:
         self._allin_at = allin_at
         self._groupcap = groupcap
         self._prio = prio
+        self._spacing = spacing
         # Observations seen, counted here rather than passed in: the trigger
         # is about this controller's own timeline, and every caller already
         # calls command() exactly once per observation.
@@ -412,7 +420,7 @@ class WaveController:
 
         reserve = tuple(unit for unit in army if unit["unit_id"] not in self._released)
         moves = gather_reserve(
-            sample, catalogue, reserve, self._rallying, self._forward, self._hold
+            sample, catalogue, reserve, self._rallying, self._forward, self._hold, self._spacing
         )
         self.rallied += len(moves)
 

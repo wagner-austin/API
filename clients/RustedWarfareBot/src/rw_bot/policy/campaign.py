@@ -134,6 +134,7 @@ def play(
     worker_wait: int = 0,
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
+    spacing: int = 0,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -188,8 +189,8 @@ def play(
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
-            ``groupcap``, ``prio``, ``bank`` and ``income_ladder``. Each
-            is documented ONCE, on
+            ``groupcap``, ``prio``, ``spacing``, ``bank`` and
+            ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -247,6 +248,7 @@ def play(
         allin_at=allin,
         groupcap=groupcap,
         prio=prio,
+        spacing=spacing,
     )
     intel = Intel()
     scouts = ScoutRunner()

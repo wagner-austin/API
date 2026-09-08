@@ -88,6 +88,7 @@ INT_FIELDS: Final = (
     "worker_wait",
     "groupcap",
     "prio",
+    "spacing",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -377,6 +378,15 @@ class Doctrine(TypedDict):
             points first (the fastest removal of firing units). Variants
             reorder only WITHIN the engageable set
             ([[impossible-tactical-genome]]).
+        spacing: World-unit radius of each reserve unit's own gathering
+            station around the rally post, zero for the single-point
+            rally every prior measurement gathered under. The spacing
+            allele ([[impossible-tactical-genome]]): a one-point rally
+            packs the reserve inside one splash radius while artillery
+            tops every Impossible death ledger; stations are pure
+            arithmetic on the unit's engine id (golden-angle ring), so
+            the spread costs no draw and holds across samples
+            ([[policy-determinism]]).
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -464,6 +474,7 @@ class Doctrine(TypedDict):
     worker_wait: int
     groupcap: int
     prio: int
+    spacing: int
     huntgate: bool
     bank: bool
 
@@ -526,6 +537,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     worker_wait=0,
     groupcap=MAX_OPEN_GROUPS,
     prio=PRIO_CONVERGENCE,
+    spacing=0,
     huntgate=False,
     bank=False,
 )

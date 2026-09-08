@@ -12,6 +12,8 @@ share is :mod:`tests.combat_fixtures`.
 
 from __future__ import annotations
 
+from math import hypot
+
 from rw_bot.policy.combat import (
     FIRST_WAVE,
     RALLY_RADIUS,
@@ -186,3 +188,29 @@ def test_the_rally_boundary_is_the_engines_own_arrival_test() -> None:
 
 def test_an_empty_reserve_is_sent_nowhere() -> None:
     assert rally((), (0.0, 0.0)) == ()
+
+
+def test_spacing_gives_each_unit_its_own_station_and_holds_it() -> None:
+    """The spacing allele ([[impossible-tactical-genome]]): distinct
+    stations on the ring, distance equal to the allele, pure in the unit
+    id -- the same call yields the same stations, so an arrived unit is
+    left alone exactly as at the point rally."""
+    scattered = (unit(4, "c_tank", 900.0, 0.0), unit(5, "c_tank", 0.0, 900.0))
+    moves = rally(scattered, (0.0, 0.0), spacing=120)
+    assert [m["unit_id"] for m in moves] == [4, 5]
+    stations = {(m["x"], m["y"]) for m in moves}
+    assert len(stations) == 2
+    for x, y in stations:
+        assert abs(hypot(x, y) - 120.0) < 1e-6
+    again = rally(scattered, (0.0, 0.0), spacing=120)
+    assert moves == again
+    # A unit standing on its own station is not re-ordered.
+    x4, y4 = next((m["x"], m["y"]) for m in moves if m["unit_id"] == 4)
+    parked = unit(4, "c_tank", x4, y4)
+    assert rally((parked,), (0.0, 0.0), spacing=120) == ()
+
+
+def test_spacing_zero_is_the_point_rally_exactly() -> None:
+    """The identity: no station arithmetic, the same deployments as ever."""
+    scattered = (unit(4, "c_tank", 900.0, 0.0),)
+    assert rally(scattered, (0.0, 0.0), spacing=0) == rally(scattered, (0.0, 0.0))

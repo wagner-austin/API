@@ -14,6 +14,7 @@ credits from 8,539 to 21,164 and watching visible enemy units go from 54 to 126
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from math import cos, radians, sin
 from typing import TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
@@ -203,7 +204,9 @@ class Deployment(TypedDict):
     reason: str
 
 
-def rally(reserve: Sequence[Entity], point: tuple[float, float]) -> tuple[Deployment, ...]:
+def rally(
+    reserve: Sequence[Entity], point: tuple[float, float], spacing: int = 0
+) -> tuple[Deployment, ...]:
     """Send the units still gathering to the place they gather.
 
     The wave gate created a reserve and gave it nowhere to be. Units that are
@@ -220,25 +223,63 @@ def rally(reserve: Sequence[Entity], point: tuple[float, float]) -> tuple[Deploy
     sampling rate and nothing would ever arrive — the same failure the attack
     path already learned ([[policy-combat]]).
 
+    Spaced, each unit gathers at its OWN offset from the post — the spacing
+    allele ([[impossible-tactical-genome]]): a single-point rally packs the
+    reserve inside one splash radius, and artillery tops every Impossible
+    death ledger. The offset is pure arithmetic on the unit's engine id
+    (angle from the id, radius from the allele), so it is deterministic
+    across samples and processes — no draw, per [[policy-determinism]] —
+    and a unit keeps one station for its lifetime instead of milling.
+
     Args:
         reserve: Units still gathering, which is the army minus the released
             wave.
         point: Where to gather, as world x and y.
+        spacing: World-unit radius of each unit's own station around the
+            post, zero for the single-point rally every prior measurement
+            gathered under.
 
     Returns:
-        One deployment per unit not yet within :data:`RALLY_RADIUS`.
+        One deployment per unit not yet within :data:`RALLY_RADIUS` of its
+        station.
     """
     limit = RALLY_RADIUS**2
-    return tuple(
-        Deployment(
-            unit_id=unit["unit_id"],
-            x=point[0],
-            y=point[1],
-            reason=f"{unit['type_name']} rallying",
+    deployments = []
+    for unit in reserve:
+        station = _station(unit["unit_id"], point, spacing)
+        if (unit["x"] - station[0]) ** 2 + (unit["y"] - station[1]) ** 2 <= limit:
+            continue
+        deployments.append(
+            Deployment(
+                unit_id=unit["unit_id"],
+                x=station[0],
+                y=station[1],
+                reason=f"{unit['type_name']} rallying",
+            )
         )
-        for unit in reserve
-        if (unit["x"] - point[0]) ** 2 + (unit["y"] - point[1]) ** 2 > limit
-    )
+    return tuple(deployments)
+
+
+def _station(unit_id: int, point: tuple[float, float], spacing: int) -> tuple[float, float]:
+    """Return one unit's gathering station around the rally post.
+
+    Pure arithmetic on the engine id: the golden-angle multiple spreads
+    successive ids near-uniformly around the ring without a draw, and the
+    same id always lands on the same station — determinism and
+    stand-still-once-arrived both fall out of purity.
+
+    Args:
+        unit_id: The unit's engine identity.
+        point: The rally post.
+        spacing: The ring's radius in world units, zero for the post itself.
+
+    Returns:
+        The station, as world x and y.
+    """
+    if spacing == 0:
+        return point
+    angle = radians((unit_id * 137.508) % 360.0)
+    return (point[0] + spacing * cos(angle), point[1] + spacing * sin(angle))
 
 
 def is_mobile(entity: Entity, catalogue: Mapping[str, UnitStats]) -> bool:

@@ -522,6 +522,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         worker_wait=doctrine["worker_wait"],
         groupcap=doctrine["groupcap"],
         prio=doctrine["prio"],
+        spacing=doctrine["spacing"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],

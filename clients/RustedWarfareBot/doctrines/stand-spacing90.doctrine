@@ -1,9 +1,11 @@
 # Tactical-genome screen arm (log 2026-09-08): the standing base with
-# prio 1 -- the longest-reaching engageable target opens the first
-# kill group, so the artillery topping every Impossible death ledger
-# dies before the tanks screening it, at the measured risk of pulling
-# the army deeper. Every other line is byte-identical to the base.
-name stand-prio-range
+# spacing 90 -- each reserve unit gathers at its own golden-angle
+# station 90 world units (one and a half rally radii) from the rally post instead of
+# packing into one splash radius, against the artillery that tops
+# every Impossible death ledger. Stations are pure arithmetic on the
+# engine id: no draw, held across samples. Every other line is
+# byte-identical to the base.
+name stand-spacing90
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,heavyTank,heavyTank,c_artillery
 heavies heavyTank,heavyTank
 max_workers 8
@@ -32,8 +34,8 @@ rebuild 0
 hunt 0
 worker_wait 0
 groupcap 2
-prio 1
-spacing 0
+prio 0
+spacing 90
 expand 1
 counter 1
 cover 0

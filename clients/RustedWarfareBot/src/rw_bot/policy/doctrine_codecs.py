@@ -57,6 +57,7 @@ _BANK_ON_NOTHING = "RW-DOCTRINE-032"
 _BAD_WORKER_WAIT = "RW-DOCTRINE-033"
 _BAD_GROUP_CAP = "RW-DOCTRINE-034"
 _BAD_PRIO = "RW-DOCTRINE-035"
+_BAD_SPACING = "RW-DOCTRINE-036"
 
 
 def _count(
@@ -174,6 +175,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         payload, "groupcap", _BAD_GROUP_CAP, "kill-groups filling at once, 0 one rolling group"
     )
     prio = _prio(payload)
+    spacing = _count(
+        payload, "spacing", _BAD_SPACING, "a station radius in world units, 0 one point"
+    )
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -255,6 +259,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         worker_wait=worker_wait,
         groupcap=groupcap,
         prio=prio,
+        spacing=spacing,
         huntgate=huntgate,
         bank=bank,
     )
@@ -314,6 +319,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "worker_wait": doctrine["worker_wait"],
         "groupcap": doctrine["groupcap"],
         "prio": doctrine["prio"],
+        "spacing": doctrine["spacing"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

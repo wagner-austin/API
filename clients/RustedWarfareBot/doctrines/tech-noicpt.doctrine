@@ -45,6 +45,7 @@ hunt 0
 worker_wait 0
 groupcap 2
 prio 0
+spacing 0
 brace 0
 huntgate 0
 bank 0

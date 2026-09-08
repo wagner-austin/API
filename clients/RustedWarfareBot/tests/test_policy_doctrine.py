@@ -67,6 +67,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         worker_wait=0,
         groupcap=2,
         prio=0,
+        spacing=0,
         huntgate=False,
         bank=False,
     )
@@ -352,9 +353,20 @@ def test_the_tactical_alleles_round_trip() -> None:
     payload = encode_doctrine(_doctrine())
     payload["groupcap"] = 4
     payload["prio"] = 1
+    payload["spacing"] = 90
     decoded = decode_doctrine(payload)
     assert decoded["groupcap"] == 4
     assert decoded["prio"] == 1
+    assert decoded["spacing"] == 90
+
+
+def test_a_negative_spacing_is_refused() -> None:
+    """Zero already means the one-point rally; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["spacing"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-036"
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

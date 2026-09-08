@@ -1,0 +1,45 @@
+# The spacing allele's screen (log 2026-09-08): the reserve's per-unit
+# gathering stations at 90 and 180 world units vs the single-point rally,
+# 12 shared fresh seeds with the in-batch control. The mechanism aims at
+# the artillery topping every Impossible death ledger: a one-point rally
+# packs the reserve inside one splash radius. Stations are golden-angle
+# arithmetic on the engine id -- no draw. MDE ~382 per pairing at n=12 on
+# the detpair24b floor. Seeds 8821001-8825577.
+#
+# label | seed | doctrine | samples
+stand|8821001|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8821001|doctrines/stand-spacing90.doctrine|10000
+spc180|8821001|doctrines/stand-spacing180.doctrine|10000
+stand|8821417|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8821417|doctrines/stand-spacing90.doctrine|10000
+spc180|8821417|doctrines/stand-spacing180.doctrine|10000
+stand|8821833|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8821833|doctrines/stand-spacing90.doctrine|10000
+spc180|8821833|doctrines/stand-spacing180.doctrine|10000
+stand|8822249|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8822249|doctrines/stand-spacing90.doctrine|10000
+spc180|8822249|doctrines/stand-spacing180.doctrine|10000
+stand|8822665|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8822665|doctrines/stand-spacing90.doctrine|10000
+spc180|8822665|doctrines/stand-spacing180.doctrine|10000
+stand|8823081|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8823081|doctrines/stand-spacing90.doctrine|10000
+spc180|8823081|doctrines/stand-spacing180.doctrine|10000
+stand|8823497|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8823497|doctrines/stand-spacing90.doctrine|10000
+spc180|8823497|doctrines/stand-spacing180.doctrine|10000
+stand|8823913|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8823913|doctrines/stand-spacing90.doctrine|10000
+spc180|8823913|doctrines/stand-spacing180.doctrine|10000
+stand|8824329|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8824329|doctrines/stand-spacing90.doctrine|10000
+spc180|8824329|doctrines/stand-spacing180.doctrine|10000
+stand|8824745|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8824745|doctrines/stand-spacing90.doctrine|10000
+spc180|8824745|doctrines/stand-spacing180.doctrine|10000
+stand|8825161|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8825161|doctrines/stand-spacing90.doctrine|10000
+spc180|8825161|doctrines/stand-spacing180.doctrine|10000
+stand|8825577|doctrines/evolve3-g3m10.doctrine|10000
+spc90|8825577|doctrines/stand-spacing90.doctrine|10000
+spc180|8825577|doctrines/stand-spacing180.doctrine|10000

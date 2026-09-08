@@ -41,6 +41,7 @@ hunt 0
 worker_wait 0
 groupcap 2
 prio 0
+spacing 0
 expand 1
 counter 1
 cover 0
