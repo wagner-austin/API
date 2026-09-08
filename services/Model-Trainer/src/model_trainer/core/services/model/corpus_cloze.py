@@ -251,7 +251,21 @@ def build_items(
             all. Both mean the measurement cannot be built, and silently
             returning a short list would report a weaker result as a real one.
     """
-    learnable = terms_in(training_text)
+    # QUALIFIED AGAINST THE TRAINING SENTENCES, NOT THE RAW TRAINING TEXT,
+    # because those are two different views and the difference is load-bearing.
+    # `sentences` strips code fences, markdown table rows and URLs; `terms_in`
+    # on the raw string does not. A term living only inside a table row --
+    # measured on the me-wiki corpus: 'OC', 'ASUCI', 'WebSocket' and six more,
+    # nine of ninety-four -- would qualify an item that `evidence_for` can
+    # never support, because there is no SENTENCE containing it. That item
+    # then kills the retrieval arm outright with CLOZE_ITEM_UNSCOREABLE.
+    #
+    # It is also the fair choice rather than merely the working one. The
+    # cartridge trains on raw windows and does see those table rows, so an
+    # item drawn from one is answerable by the cartridge and unanswerable by
+    # every retrieval arm. Keeping it would tilt the comparison toward the
+    # cartridge on exactly the items its competitors cannot reach.
+    learnable = terms_in(" ".join(sentences(training_text)))
     per_document = [terms_in(document) for document in held_out_documents]
     everywhere = sorted({term for found in per_document for term in found} | learnable)
     if len(everywhere) <= distractor_count:

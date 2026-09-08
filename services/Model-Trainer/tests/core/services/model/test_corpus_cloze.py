@@ -132,6 +132,42 @@ class TestBuildItems:
             )
             assert restored["answer"] == item["answer"]
 
+    def test_a_term_living_only_in_a_table_row_never_qualifies(self) -> None:
+        """The bug this caught crashed the retrieval arm on a real corpus.
+
+        `sentences` strips markdown table rows and URLs; `terms_in` on the
+        raw string does not. A term found only in a stripped construct was
+        therefore "learnable" while no SENTENCE contained it, so
+        `evidence_for` returned nothing and `with_evidence` refused the item
+        with CLOZE_ITEM_UNSCOREABLE -- killing the whole run rather than one
+        item. Measured on the twelve me-wiki pages: nine such terms of
+        ninety-four, three of which reached an item.
+
+        It is also the fair reading. The cartridge trains on raw windows and
+        does see the table row, so keeping such an item would hand it a
+        question no retrieval arm could answer.
+        """
+        held = [
+            "The ledger records every dispatch that OCTOPUS ever issued to a node. "
+            "The ClearGBM engine rebuilt boosting from scratch in a Rust core here."
+        ]
+        # OCTOPUS appears ONLY in the table row, which `sentences` strips.
+        # The others appear in prose, so the corpus still yields real items
+        # and this test cannot pass by building nothing at all.
+        training = (
+            "| OCTOPUS registry | <https://example.invalid/octopus> |\n"
+            "ClearGBM is the gradient boosting engine the team measured carefully. "
+            "TankpitBot plays the game while NavProbe measures determinism of things. "
+            "LightGBM is the baseline that ClearGBM was compared against many times."
+        )
+
+        items = build_items(held, training, distractor_count=1, max_items=10)
+
+        assert items, "the fixture built no items, so the assertion below is vacuous"
+        assert all(item["answer"] != "OCTOPUS" for item in items), (
+            "a term that appears only in a stripped table row qualified an item"
+        )
+
     def test_the_answer_is_removed_from_the_template(self) -> None:
         held, training = _corpus()
 
