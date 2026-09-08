@@ -159,7 +159,17 @@ jobs:
     # "Link the licensed game tree" step below asserts it loudly. Labels
     # copied verbatim from the runner registration -- a label that matches
     # nothing does not fail, it queues silently forever.
-    runs-on: ${{ matrix.package == 'clients/RustedWarfareBot' && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
+    #
+    # services/Model-Trainer joins it 2026-09-08, for the same shape of
+    # reason: its suite honestly requires the host -- real CUDA (the default
+    # hooks digest the actual card; lavender's GTX 1630 is visible inside
+    # WSL), nvidia-smi (the driver-version fingerprint reads the real
+    # driver), a writable /data (the settings default APP__DATA_ROOT, the
+    # container convention), and a llama.cpp checkout at /opt/llama.cpp for
+    # the GGUF export tests. On a hosted CPU runner those are 28 failures
+    # that look like defects and are actually the machine. The host assets
+    # live under the same /opt convention as the RWB game tree.
+    runs-on: ${{ (matrix.package == 'clients/RustedWarfareBot' || matrix.package == 'services/Model-Trainer') && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -263,7 +273,15 @@ jobs:
       # the workspace path -- keyed on the path itself rather than
       # `runner.name`, because hosted runners have unstable names but ONE
       # stable workspace path, so for them this changes nothing.
+      #
+      # Model-Trainer is excluded from the cache, not given a bigger one: its
+      # venv carries cu124 torch wheels (multi-GB), which would crowd the
+      # repo's 10GB cache quota and evict every other package's entry. It
+      # runs on the self-hosted pool, where the workspace -- venv included --
+      # persists between jobs anyway, so `poetry sync` is incremental without
+      # any cache step.
       - name: Cache the virtualenv
+        if: matrix.package != 'services/Model-Trainer'
         uses: actions/cache@v6
         with:
           path: ${{ matrix.package }}/.venv
@@ -304,6 +322,41 @@ jobs:
           fi
           ln -sfn "$TREE" .game
           ls -la .game/game-lib.jar
+
+      # grandma-api only: ffmpeg for the real-conversion audio tests. The
+      # package's converter shells out to the real binary by design (no
+      # mocks), and the hosted ubuntu image does not carry it -- measured
+      # 2026-09-08 as FileNotFoundError: 'ffmpeg' in the one test that
+      # converts real bytes. That same red also caught the production
+      # Dockerfile missing ffmpeg, which is the test doing its job.
+      - name: Install ffmpeg
+        if: matrix.package == 'services/grandma-api'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      # Model-Trainer only, mirror of the RWB tree-link step: assert the
+      # host assets its suite honestly requires, loudly and early, instead
+      # of 28 failures that read as code defects. /data is the settings
+      # default APP__DATA_ROOT (the container convention); /opt/llama.cpp
+      # feeds the GGUF export tests' script finder; nvidia-smi proves the
+      # GPU passthrough this runner exists to provide.
+      - name: Assert the training host assets
+        if: matrix.package == 'services/Model-Trainer'
+        run: |
+          set -euo pipefail
+          fail=0
+          if [ ! -w /data ]; then
+            echo "::error::/data is missing or not writable -- Model-Trainer's APP__DATA_ROOT default. Create it writable on this runner's host."
+            fail=1
+          fi
+          if [ ! -f /opt/llama.cpp/convert_lora_to_gguf.py ]; then
+            echo "::error::/opt/llama.cpp/convert_lora_to_gguf.py is missing -- the GGUF export tests need a llama.cpp checkout there."
+            fail=1
+          fi
+          if ! nvidia-smi --query-gpu=name --format=csv,noheader; then
+            echo "::error::nvidia-smi failed -- this runner does not see a GPU, and Model-Trainer's suite digests the real card by design."
+            fail=1
+          fi
+          exit "$fail"
 
       - name: Guards
         run: poetry run python -m scripts.guard
