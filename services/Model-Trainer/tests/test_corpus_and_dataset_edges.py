@@ -72,7 +72,13 @@ def test_read_corpus_lines_concatenates_in_file_order_and_drops_blanks(
     (tmp_path / "a.txt").write_text("one\n\n  two  \n", encoding="utf-8")
     (tmp_path / "b.txt").write_text("\nthree\n", encoding="utf-8")
 
-    assert read_corpus_lines(list_text_files(str(tmp_path))) == ("one", "two", "three")
+    # The paths are passed explicitly rather than through list_text_files:
+    # read_corpus_lines' contract is "in the order given", while
+    # list_text_files is DELIBERATELY unsorted (its sibling's docstring
+    # records why), so routing through it asserted os.walk order -- stable on
+    # the machine this was written on, arbitrary on CI's filesystem.
+    files = [str(tmp_path / "a.txt"), str(tmp_path / "b.txt")]
+    assert read_corpus_lines(files) == ("one", "two", "three")
 
 
 def test_split_corpus_no_files_raises_corpus_empty(tmp_path: Path) -> None:
