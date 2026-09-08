@@ -4,22 +4,25 @@ tags: [ml, evaluation, measurement, code-style-eval, provenance, statistics]
 related:
   - "[[monorepo-discipline]]"
   - "[[determinism-env-read-once-at-library-load]]"
+  - "[[code-style-qlora-terminates-worse-conforms-better]]"
 source_paths:
   - tools/code-style-eval/src/code_style_eval/core/checks.py
   - tools/code-style-eval/src/code_style_eval/core/provenance.py
   - tools/code-style-eval/src/code_style_eval/cli/evaluate.py
   - tools/code-style-eval/pyproject.toml
+  - tools/code-style-eval/src/code_style_eval/core/scoring.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
   "tools/code-style-eval/src/code_style_eval/core/provenance.py": 96d1c2e03e64c90ed6c720d287c846049f67bdf2
-  "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 0bd476b39776c1a6f3fbe62a5dff1508816a9335
+  "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 7ee61da22b34a03c91377041ec92772af0679237
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
+  "tools/code-style-eval/src/code_style_eval/core/scoring.py": be9442c3047ea93eb16c955704a8e51a86c19907
 provenance:
   - "runs/sweep-v1/comparison.json + .runrecord.json (label sweep-v4-cap1536-reppen1.1-corpusdeps, 19 distributions recorded)"
   - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded)"
   - "runs/sweep-v1/{base,candidate}.outcomes.jsonl and .generation.jsonl — per-item verdicts and termination flags"
   - "runs/sweep-v1-cap384/perplexity.json — teacher-forced NLL per item, both arms"
-fact_checked: "2026-09-03"
+fact_checked: "2026-09-08"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -34,13 +37,31 @@ hubs: [infrastructure]
 
 Sweep `sweep-v3-cap1536-reppen1.1`: Qwen2.5-Coder-1.5B base against the QLoRA adapter, 1536-token budget, `repetition_penalty` 1.1, 392-item held-out corpus, 226 items scored in both arms[^2]. Every stratum below was computed by the shipped comparison CLI rather than by a hand statistic[^3]:
 
-| stratum | n | base | candidate | discordant | mid-p |
-|---|---|---|---|---|---|
-| all scored | 226 | 2.2% | 2.2% | 3 v 3 | 0.844 |
-| finished in both arms | 90 | 5.6% | 4.4% | 3 v 2 | 0.688 |
-| free of unresolvable imports too | 49 | 10.2% | 8.2% | 3 v 2 | 0.688 |
+| stratum | n | base | candidate | discordant | mid-p | mid-p floor | exact floor |
+|---|---|---|---|---|---|---|---|
+| all scored | 226 | 2.2% | 2.2% | 3 v 3 | 0.844 | 0.0156 | 0.0312 |
+| finished in both arms | 90 | 5.6% | 4.4% | 3 v 2 | 0.688 | 0.0312 | **0.0625** |
+| free of unresolvable imports too | 49 | 10.2% | 8.2% | 3 v 2 | 0.688 | 0.0312 | **0.0625** |
 
-The null holds in every stratum. **90% attrition between the corpus and the set on which the metric is actually measuring code style**[^2].
+**These nulls are very nearly unfalsifiable, and two of them are unfalsifiable
+outright under the exact test.** The last two columns are the *floor*: the
+smallest p the stratum could have produced under any outcome, given its
+discordant count. With *d* discordant pairs the most extreme attainable split
+is *d*:0, so the floor is fixed before the data arrive[^8].
+
+At *d*=5 the exact floor is 0.0625 — above α=0.05, so **no possible outcome
+rejects**[^8]. Under mid-p, which this page reports, *d*=5 rejects only on a
+perfect 5:0 split. Either way, "no difference detected" in those two strata is
+a statement about the sample size, not about the adapter.
+
+An earlier version of this page said "The null holds in every stratum" as
+though it were a finding. It was not one available to be made: two of the three
+strata could not have contradicted it. The MDEs make the same point in the
+other direction — 2.46pp, 5.07pp and 9.32pp at 80% power[^8] — each at or above
+its own stratum's base rate, so the smallest detectable effect was "the adapter
+flips essentially every item that flips at all, in one direction".
+
+**90% attrition between the corpus and the set on which the metric is actually measuring code style**[^2].
 
 ## Truncation is a hard gate, and it is signal
 
@@ -117,3 +138,12 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
 [^12]: `tools/code-style-eval/Makefile:9` and `tools/code-style-eval/Makefile:30` -- the `lint` and `test` targets, each running `poetry sync --with dev`.
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
+
+[^8]: `tools/code-style-eval/src/code_style_eval/core/scoring.py`
+      `mid_p_mcnemar_p` and `exact_mcnemar_p` [synthesis] — the floor is the
+      p-value each function returns at the most extreme attainable split for
+      the stratum's discordant count (*d*:0), and the MDE is the smallest true
+      split reaching 80% power against that function's own rejection region.
+      Both are arithmetic on *d* alone, which is why they are fixed before any
+      data is collected. The discordant counts are the table's own, from
+      `runs/sweep-v1/comparison.json`.

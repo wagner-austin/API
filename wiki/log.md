@@ -190,3 +190,21 @@ Not fixed here, deliberately: the README itself. Editing it to twelve buys agree
 **Why the determinism page is here rather than only in NavProbe's wiki.** `platform_core.determinism_env` is where this monorepo's run-comparability story actually lives, and it is unusually well-documented in place — measurements with dates, drivers and torch versions, and an explicit statement of what the control does NOT buy (not one of 72 SDPA digests moves, because the memory-efficient attention kernel is not a cuBLASLt call). NavProbe measures determinism in someone else's simulator; this configures it in ours. The clients hub now names that symmetry and links across, which is why the page declares three hubs.
 
 Verified: both pages `wiki_audit_page` 0 errors / 0 warnings. The determinism page's first pass failed `hubs-membership-consistent` — the cross-link from hubs/clients.md counted as membership while the frontmatter listed only libs + infrastructure. The check reads prose links, not just inclusion-list lines.
+
+## [2026-09-08] page | code-style QLoRA: guard conformance up, termination down
+Pages written: code-style-qlora-terminates-worse-conforms-better
+Hubs updated: services (+1), index 34 -> 35
+Notes: the page exists because the aggregate result and the split result disagree
+in SIGN, and only the split is informative. All 875 items read as uniform
+degradation (guards -72, ruff -56); conditioned on both arms terminating
+naturally, guards inverts to +18 at mid-p 0.020. The combined three-checker rate
+-- the number a reader would quote -- is the AND of three checkers at a 3% floor
+and is null in both corpora, so it reports "no effect" on a run containing two.
+The page states the post-treatment-conditioning caveat rather than burying it:
+termination is changed by the treatment, so the both-finished subset is not
+random and the +18 is evidence rather than a randomised contrast.
+Evidence was committed in 85632ff8 before the page was written; it had lived on
+one machine, tracked by nothing, since 2026-09-04 for v1. Every source_paths
+entry is blob-pinned, including the outcome and manifest records the tables
+recompute from, so a later reader can re-derive every number rather than trust
+the table.
