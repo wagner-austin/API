@@ -1,0 +1,82 @@
+POWER AUDIT paired statistics — computed 2026-09-08 from the repo-local scorecard mirrors
+under runs/sweeps/<batch>/ (masters on /pub/wagnera3/rusted/runs/sweeps). Survival figure
+is each scorecard's "samples seen" line; pairing is by the -s<seed> suffix; sd uses the
+n-1 (sample) divisor throughout; MDE = t_crit(df=n-1, two-sided 95%) * sd / sqrt(n).
+Note: some log.md entries published the population-divisor sd (e.g. e3stand96 842.6 vs
+851.5 here; impbank36 990.4 vs 1034.4) — a ~1-2% difference that changes no verdict.
+
+== survival-unit paired panels and screens ==
+batch         arm          ctrl       n      mean       sd      se      t    MDE
+imp48c6       close6       control   48     -64.2    713.8   103.0  -0.62    207
+imp48c0f4     c0f4         control   48     -86.4    818.9   118.2  -0.73    238
+g4m2imp48     g4m2         control   48    +102.8    727.3   105.0  +0.98    211
+imps5k48      s5k          control   48     -56.8    667.5    96.3  -0.59    194
+impden48      raid6        control   48     +31.0    680.6    98.2  +0.32    198
+impden48      raid8        control   48     -17.2    671.6    96.9  -0.18    195
+imprb48       rb15k        control   48     -20.8    762.1   110.0  -0.19    221
+imprb48       rb5k         control   48     -96.4    677.5    97.8  -0.99    197
+impstrike48   s2500        control   48    -153.5    745.2   107.6  -1.43    216
+impstrike48   s4000        control   48     -18.2    619.5    89.4  -0.20    180
+impbrace48b   brace        control   48     +53.5    633.2    91.4  +0.59    184
+impopen96     e1           control   12     -33.3    640.7   185.0  -0.18    407
+impopen96     e2           control   12    -248.2    532.1   153.6  -1.62    338
+impopen96     e4           control   12    +149.8    603.0   174.1  +0.86    383
+impopen96     e5           control   12     +31.8    917.5   264.9  +0.12    583
+impopen96     e6           control   12    -531.1    547.6   158.1  -3.36    348
+impopen96     fac2         control   12    +318.3    470.7   135.9  +2.34    299
+impopen96     tankfirst    control   12    +263.1    398.7   115.1  +2.29    253
+impe1v48      e1           control   48    -163.4    644.9    93.1  -1.76    187
+imphunt60     hunt2        control   12    -292.1    953.7   275.3  -1.06    606
+imphunt60     hunt4        control   12    -180.4    974.3   281.3  -0.64    619
+imphunt60     hunt4g       control   12    -290.8    841.9   243.0  -1.20    535
+imphunt60     hunt8        control   12    -566.6   1002.8   289.5  -1.96    637
+imphunt60b    hunt2        control   12     -25.6    736.4   212.6  -0.12    468
+imphunt60b    hunt4        control   12     +39.6    507.3   146.4  +0.27    322
+imphunt60b    hunt4g       control   12    -107.0    777.8   224.5  -0.48    494
+imphunt60b    hunt8        control   12     +62.7    414.7   119.7  +0.52    264
+impbank36     bank         stand     12    -605.9   1034.4   298.6  -2.03    657
+impbank36     nuke         stand     12    +322.7    965.0   278.6  +1.16    613
+impincome96   ladder       stand     48    -201.0    878.5   126.8  -1.59    255
+wwait24       wwait        stand     12    +281.6   1113.9   321.6  +0.88    708
+wwtac60       frail        stand     12    -634.8   1287.9   371.8  -1.71    818
+wwtac60       gcap1        stand     12    -179.7    941.4   271.8  -0.66    598
+wwtac60       gcap4        stand     12    -503.7   1073.9   310.0  -1.62    682
+wwtac60       range        stand     12    -507.9   1044.8   301.6  -1.68    664
+wwspc36       spc180       stand     12    +635.3   1200.2   346.5  +1.83    763
+wwspc36       spc90        stand     12    +588.2    714.9   206.4  +2.85    454
+wwspc96       spc90        stand     48     +25.1    837.5   120.9  +0.21    243
+wwdec36       dec12        stand     12   -1438.2    816.3   235.6  -6.10    519
+wwdec36       dec24        stand     12   -1515.2   1052.2   303.7  -4.99    669
+detpair24     twin         stand     12    +118.1   1205.0   347.8  +0.34    766
+detpair24b    twin         stand     12    +197.2    661.8   191.1  +1.03    421
+e3stand96     stand        control   48    +510.6    851.5   122.9  +4.15    247
+e3standrep    stand        control   48    +340.0    930.2   134.3  +2.53    270
+tacpanel96    g1m2         stand     48    -144.4    894.5   129.1  -1.12    260
+fac2x2        f2c0         control   48     -90.1   2867.7   413.9  -0.22    833
+fac2x2        f2c6         control   48    +747.2   2789.2   402.6  +1.86    810
+fac2x2        f4c6         control   48      -4.1   3143.5   453.7  -0.01    913
+
+== per-seed paired survival differences (arm minus control) for the screen-tier verdicts ==
+imphunt60b/hunt2: 8731001:-89 8731417:+256 8731833:-481 8732249:-287 8732665:-1700 8733081:+466 8733497:-709 8733913:+1078 8734329:-81 8734745:+118 8735161:+275 8735577:+847
+imphunt60b/hunt4: 8731001:-714 8731417:+888 8731833:-285 8732249:-362 8732665:+203 8733081:+716 8733497:-274 8733913:-27 8734329:-204 8734745:+762 8735161:+61 8735577:-289
+imphunt60b/hunt4g: 8731001:-360 8731417:+1370 8731833:-801 8732249:-805 8732665:-1532 8733081:-126 8733497:-236 8733913:-372 8734329:+770 8734745:+111 8735161:+135 8735577:+562
+imphunt60b/hunt8: 8731001:-31 8731417:+594 8731833:+572 8732249:-149 8732665:-291 8733081:-145 8733497:-465 8733913:-212 8734329:-16 8734745:-335 8735161:+627 8735577:+603
+wwtac60/gcap1: 8816001:+1452 8816417:-1288 8816833:+38 8817249:-1329 8817665:-1162 8818081:-1222 8818497:-316 8818913:+1074 8819329:+229 8819745:-396 8820161:+345 8820577:+419
+wwtac60/gcap4: 8816001:+473 8816417:-1455 8816833:-838 8817249:-925 8817665:-851 8818081:-2586 8818497:-1113 8818913:+435 8819329:-892 8819745:-324 8820161:+1133 8820577:+899
+wwtac60/range: 8816001:+225 8816417:-1783 8816833:-836 8817249:-753 8817665:-1181 8818081:-2014 8818497:-1899 8818913:+364 8819329:-180 8819745:+397 8820161:+744 8820577:+821
+wwtac60/frail: 8816001:+63 8816417:-2675 8816833:-1061 8817249:-985 8817665:-1028 8818081:-2777 8818497:-596 8818913:+1491 8819329:-382 8819745:-926 8820161:+45 8820577:+1214
+wwait24/wwait: 8806001:-520 8806417:-262 8806833:+413 8807249:+1641 8807665:+341 8808081:+733 8808497:-44 8808913:+1467 8809329:-1253 8809745:+1333 8810161:-1837 8810577:+1367
+impbank36/bank: 8766001:-631 8766417:-1474 8766833:+368 8767249:-2545 8767665:+111 8768081:-1733 8768497:+329 8768913:-1470 8769329:-475 8769745:-668 8770161:-96 8770577:+1013
+impbank36/nuke: 8766001:-761 8766417:+1827 8766833:+1553 8767249:-490 8767665:+556 8768081:-282 8768497:-269 8768913:-429 8769329:+312 8769745:-492 8770161:+404 8770577:+1943
+impopen96/tankfirst: 8711001:+74 8711417:-81 8711833:+758 8712249:-170 8712665:-226 8713081:-47 8713497:+220 8713913:+673 8714329:+749 8714745:+866 8715161:+312 8715577:+29
+impopen96/fac2: 8711001:-437 8711417:+290 8711833:+270 8712249:+349 8712665:+820 8713081:+935 8713497:+407 8713913:+467 8714329:+212 8714745:-486 8715161:+7 8715577:+986
+impopen96/e6: 8711001:-920 8711417:-183 8711833:-300 8712249:+88 8712665:-1784 8713081:+3 8713497:-22 8713913:-497 8714329:-351 8714745:-1160 8715161:-745 8715577:-502
+
+== Hard pace question: v7 vs v8 win pairs (ab24 + ab48 + ab48b) ==
+ab24: n=24 discordant v7-only:7 v8-only:2
+ab48: n=48 discordant v7-only:9 v8-only:4
+ab48b: n=48 discordant v7-only:9 v8-only:7
+combined: v7 102 wins, v8 90 wins; discordant 25:13
+sign test two-sided p = 0.073 on 38 discordant
+power of this test against its own observed split (0.66): 0.44 at alpha=.05 two-sided
+(a test with ~coin-flip power against its own point estimate cannot certify that estimate as noise)

@@ -53,3 +53,4 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [The Economy — Measured Credits per Second](../pages/policy-economy.md) -- 12.01 credits/s per extractor, the conversion ladder's paybacks, and the rules argued from them
 [The Trace — A Match as Data](../pages/policy-trace.md) -- one row per sample with a world digest, the file every verdict and autopsy reads
 [Community Play Strategies](../pages/community-play-strategies.md) -- what human players report works, kept at low confidence until measured
+[Power audit — every flat verdict beside its minimum detectable effect](../pages/power-audit-mde-ledger.md) -- the 2026-09-08 sweep: all 48-pair verdicts TESTED (MDE 180-270 vs the 340-sample SEI), the screen-tier closures priced at 264-818, and three corrections landed at source
