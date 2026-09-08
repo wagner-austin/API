@@ -86,7 +86,13 @@ TESTED at the +4 adoption bar** — its discordant counts (d = 21/21/28) give
 smallest rejecting splits of 16:5 / 16:5 / 20:8, i.e. minimum detectable
 win-deltas of 11–12, so bar-scale effects were invisible; the knob chapter's
 closure rests on the f2vh48 bar decision, a decision rule rather than a null
-certification.[^8] And the zero-failure claims get their exact bounds: a
+certification.[^8] The omission was structural, not arithmetic: fac2x2 sat
+enumerated in the evidence table while this page's TESTED/NOT TESTED lists
+are prose, so a row can fall out between inventory and verdict with nothing
+announcing the hole. The durable fix is a classification column in the
+enumeration itself — an unclassified row should be a visible blank, not an
+absence — and the shared helper's table format should carry that column.[^8]
+And the zero-failure claims get their exact bounds: a
 0/48-wins panel excludes a true win rate above 6.05%, the 0/~120 era above
 2.5% (1−α^(1/n)); byte-identity claims rest on construction plus the pinned
 campaign e2e, never on a t over sd = 0, which would read as infinite
