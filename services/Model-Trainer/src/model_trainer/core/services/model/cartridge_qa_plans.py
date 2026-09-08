@@ -100,6 +100,54 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "distractor_count": 3,
         "max_items": 120,
     },
+    # THE SCALE LADDER. Every field except `model_id` is copied from
+    # `gpt2-wiki-qa` deliberately: the 2026-09-07 verdict -- that a cartridge
+    # loses to BM25 on both accuracy and latency -- was measured at 124M and
+    # generalised to "bigger will not rescue it" on the strength of ANOTHER
+    # session's unfinished 7B run. These rungs answer that here instead.
+    #
+    # WHAT THEY DO NOT ANSWER, because it is the same ladder's blind spot:
+    # `max_seq_len` stays at 896 and evidence is still truncated to fit, so a
+    # bigger model reads the same short prompt. This tests MODEL SCALE and
+    # says nothing about CONTEXT LENGTH -- which is the axis a cartridge is
+    # supposed to win on, since it exists to compress a long context. A rung
+    # that gains here gains despite that, not because of it.
+    "gpt2-medium-wiki-qa": {
+        "model_id": "gpt2-medium",
+        "window": 256,
+        "held_out_stride": 4,
+        "num_slots": 128,
+        "max_seq_len": 896,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "distractor_count": 3,
+        "max_items": 120,
+    },
+    "gpt2-large-wiki-qa": {
+        "model_id": "gpt2-large",
+        "window": 256,
+        "held_out_stride": 4,
+        "num_slots": 128,
+        "max_seq_len": 896,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "distractor_count": 3,
+        "max_items": 120,
+    },
+    "gpt2-xl-wiki-qa": {
+        "model_id": "gpt2-xl",
+        "window": 256,
+        "held_out_stride": 4,
+        "num_slots": 128,
+        "max_seq_len": 896,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "distractor_count": 3,
+        "max_items": 120,
+    },
 }
 
 

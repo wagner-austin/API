@@ -96,6 +96,41 @@ class TestThePlanTable:
             assert plan["max_seq_len"] > plan["window"], name
             assert plan["num_slots"] < plan["max_seq_len"], name
 
+    def test_the_ladder_varies_the_model_and_nothing_else(self) -> None:
+        """A ladder that moved a second field would confound what it measures.
+
+        The rungs exist to answer whether "a cartridge loses to BM25" is a
+        fact about cartridges or a fact about gpt2's 124M. That question is
+        only answerable if `model_id` is the ONLY difference -- a rung that
+        also nudged `epochs` or `num_slots` would produce a number nobody
+        could attribute, and the attribution is the entire point.
+        """
+        # Built by SPREADING the base and overriding only `model_id`, rather
+        # than by comparing field names. Naming the fields would leave a
+        # field added to QaPlan later silently unchecked; this way the
+        # equality covers whatever the type holds on the day it runs.
+        base = QA_PLANS["gpt2-wiki-qa"]
+        rungs = ["gpt2-medium-wiki-qa", "gpt2-large-wiki-qa", "gpt2-xl-wiki-qa"]
+
+        for name in rungs:
+            rung = QA_PLANS[name]
+            expected: QaPlan = {**base, "model_id": rung["model_id"]}
+            assert rung == expected, name
+
+    def test_the_ladder_holds_the_window_fixed_and_so_tests_only_scale(self) -> None:
+        """Stated as an assertion because it BOUNDS what the ladder can claim.
+
+        `max_seq_len` is constant across the rungs, so a bigger model reads
+        the same short, truncated prompt. That makes this a test of model
+        scale and NOT of context length -- which is the axis a cartridge is
+        supposed to win on, since it exists to compress a long context. If
+        someone later varies the window here, this test fails and the ladder's
+        claim has to be restated.
+        """
+        windows = {QA_PLANS[name]["max_seq_len"] for name in QA_PLANS}
+
+        assert windows == {896}
+
     def test_the_experiment_is_not_the_loss_experiment_s(self) -> None:
         """A loss record and a question-set record must never be differenced.
 
