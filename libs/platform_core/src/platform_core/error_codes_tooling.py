@@ -222,6 +222,29 @@ class FleetErrorCode(ErrorCodeBase):
     QUEUE_ANSWER_MALFORMED = "QUEUE_ANSWER_MALFORMED"
     QUEUE_CREDENTIALS_MISSING = "QUEUE_CREDENTIALS_MISSING"
 
+    # The CI runner roster (`tools/fleet/runners.json`) -- which GitHub
+    # Actions runner installs each machine carries, and the host assets their
+    # job classes honestly require. Written 2026-09-08, the day that state
+    # was still folklore: a keepalive scheduled task nobody had recorded took
+    # six runners offline when a WSL restart missed it, and every host asset
+    # (licensed game tree, llama.cpp checkout, /data) had been placed by hand.
+    #
+    # Same split as the registry codes above. An unreadable spec raises --
+    # an audit that could not read its own roster has established nothing.
+    # Drift itself carries NO code: it is one printed line per disagreement
+    # plus a non-zero exit, because raising on the first would hide the rest.
+    RUNNER_SPEC_UNREADABLE = "RUNNER_SPEC_UNREADABLE"
+    # A host named on the command line that the roster does not declare.
+    # Distinct from drift: the operator asked about a machine this document
+    # has never heard of, and auditing nothing while exiting 0 would read as
+    # a healthy host.
+    RUNNER_HOST_UNKNOWN = "RUNNER_HOST_UNKNOWN"
+    # The audit script's output did not parse. The script promises one
+    # CHECK line per declared item; anything else on stdout means the
+    # transport or the script is corrupt, and scoring a corrupt transcript
+    # would let a mangled line read as a passing check.
+    RUNNER_AUDIT_UNPARSABLE = "RUNNER_AUDIT_UNPARSABLE"
+
 
 class McpClientErrorCode(ErrorCodeBase):
     """Calling one MCP tool over HTTP -- the transport, and nothing above it.

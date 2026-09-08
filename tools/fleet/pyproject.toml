@@ -40,6 +40,7 @@ fleet-agent = "fleet.cli.agent:entrypoint"
 fleet-watch = "fleet.cli.watch:entrypoint"
 fleet-cancel = "fleet.cli.cancel:entrypoint"
 fleet-bootstrap = "fleet.cli.bootstrap:entrypoint"
+fleet-runners = "fleet.cli.runners:entrypoint"
 
 [tool.mypy]
 python_version = "3.11"

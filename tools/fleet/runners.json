@@ -1,0 +1,84 @@
+{
+  "hosts": [
+    {
+      "name": "lavender",
+      "host": "lavender",
+      "wsl_distro": "Ubuntu",
+      "keepalive_task": "wsl-keepalive",
+      "wslconfig_min_memory_gb": 26,
+      "scratch_dir": "C:/fleet/stage",
+      "gpu_required": true,
+      "systemd_timers": ["ci-clean.timer"],
+      "installs": [
+        {
+          "repo": "wagner-austin/API",
+          "runner_name": "lavender-wsl",
+          "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
+          "workdir": "/home/gharunner/actions-runner-api-1/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/API",
+          "runner_name": "lavender-wsl-2",
+          "service": "actions.runner.wagner-austin-API.lavender-wsl-2.service",
+          "workdir": "/home/gharunner/actions-runner-api-2/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-wsl",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
+          "workdir": "/home/gharunner/actions-runner/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-wsl-2",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service",
+          "workdir": "/home/gharunner/actions-runner-2/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-wsl-3",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service",
+          "workdir": "/home/gharunner/actions-runner-3/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-wsl-4",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service",
+          "workdir": "/home/gharunner/actions-runner-4/_work",
+          "labels": ["lavender-wsl"]
+        }
+      ],
+      "assets": [
+        {
+          "path": "/opt/corvis/rw-game/game-lib.jar",
+          "sha256": "8a550a37e2d8a5430866090d4e7d5892f9010b47f52a5a09350fc66c620deec9",
+          "writable": false,
+          "reason": "RustedWarfareBot provenance fingerprints digest the real licensed engine jar",
+          "manual": true,
+          "provision_command": null
+        },
+        {
+          "path": "/opt/llama.cpp/convert_lora_to_gguf.py",
+          "sha256": null,
+          "writable": false,
+          "reason": "Model-Trainer's GGUF export tests run the real llama.cpp converter",
+          "manual": false,
+          "provision_command": "git clone --depth 1 https://github.com/ggml-org/llama.cpp /opt/llama.cpp && chown -R gharunner:gharunner /opt/llama.cpp"
+        },
+        {
+          "path": "/data",
+          "sha256": null,
+          "writable": true,
+          "reason": "Model-Trainer's APP__DATA_ROOT default; checkpoint tests write under it",
+          "manual": false,
+          "provision_command": null
+        }
+      ]
+    }
+  ]
+}
