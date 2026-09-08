@@ -546,13 +546,41 @@ test and by image smoke.
   (3328 vs 3584 held-out tokens on the primary), so its per-token
   losses are mildly INFLATED relative to gpt2's at equal compression —
   the headroom reading is conservative, not flattered.
-- **Open, filed rather than implied:** a 7B composition claim in
-  either direction remains unfounded — the available solo gain at 7B
-  is ~0.4 nats, half the family's, and reaching even that reliably
-  needs the seed-variance question answered before any composition
-  rung is worth a card; the mechanism of the mid-depth valley (why 24
-  layers is the worst depth for an eight-crowd, when both neighbours
-  tolerate it); the remaining 0.30 content gap at medium n8.
+- **The nine-seed reliability measurement, run the same day (board
+  task `b89cd348`, `cartridge_solo_seeds` CLI, commit `4fc8dfbb`,
+  image v45 `567cb42d…`; 7B pair jobs 55813508 + twin 55813516,
+  ~18 min each, records BYTE-IDENTICAL sha256 `353ab575…`, same-node
+  hpc3-gpu-k54-01; xl control pair 55818092 + twin 55813528 on
+  DIFFERENT nodes (l54-09 / l54-07) with ALL 14 observations bit-equal
+  and record shas differing solely in `fingerprint/host/logical_cores`
+  64 vs 32 — a cross-node observation-identity certificate, matching
+  the 7B invariance pair's; solo cartridges trained AND scored behind
+  the PLAIN base at exactly the recorded knobs, read through the
+  sweeps' own plan hook): **the family's tightness was never luck, and
+  7B/NF4 cartridge training is genuinely low and unreliable.**
+  gpt2-xl, nine seeds: mean +0.827, spread 0.079, every draw in
+  [+0.776, +0.855]. Pythia-6.9B/NF4, the same nine seeds: mean
+  **+0.160**, spread 0.320 — twice its own mean — worst seed −0.045
+  (one hard failure in nine), best +0.275. The sweep records' ~0.4
+  per-seed readings are explained, not contradicted: the sweeps'
+  measurement pool trains and serves its cartridges behind the
+  LoRA-ADAPTED base (verified in `cartridge_base_lora_sweep`'s
+  `_MeasurementPoolProvider`), so those gains carried the adaptation's
+  contribution; behind the plain base the cartridge alone delivers
+  ~0.16. This also sharpens the headroom verdict: pythia base 3.66
+  minus the measured 0.16 lands at ~3.50, still ABOVE xl's
+  cartridge-adapted ~3.28 — the collapse is NOT purely
+  headroom-to-a-common-floor, and the training-side deficit
+  (GPT-2-tuned hyperparameters on 4096-dim KV geometry, or NF4
+  gradient quality) is real and is what any recovery rung must fix.
+- **Open, filed rather than implied:** a 7B composition rung remains
+  unjustified — solo gain ~0.16 mean with an ~11%-at-n=9 hard-failure
+  rate is no precondition to compose on; the 7B recovery levers, now
+  ordered by the evidence (a hyperparameter rung — slot count /
+  learning rate scaled to the architecture — and an unquantized-bf16
+  precision control, which the certified NF4 determinism makes cheap
+  to compare); the mechanism of the mid-depth valley; the remaining
+  0.30 content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
