@@ -1,0 +1,39 @@
+POWER AUDIT addendum — outcome-type corrections, 2026-09-08 (~22:35Z)
+Applies the umbrella correction (board 22:06:17Z, opus-inert-declarations-0904): the
+t-formula is the paired-CONTINUOUS instrument only. This file carries the binary and
+zero-failure arithmetic for the rusted verdicts that are not continuous. Discordant
+counts recomputed from runs/sweeps/fac2x2/ scorecards (verdict line, won vs not).
+
+== paired binary: fac2x2 win pairings (each arm vs control, 48 shared seeds) ==
+arm    wins-arm wins-ctrl discordant  smallest rejecting split (exact 2-sided)  min detectable win-delta
+f2c0         21        24 9:12 (d=21)   16:5 at p=0.0266                          11
+f2c6         19        24 8:13 (d=21)   16:5 at p=0.0266                          11
+f4c6         26        24 15:13 (d=28)   20:8 at p=0.0357                          12
+
+Consequence: with min detectable win-deltas of 11-12 against a +4 adoption bar, the
+"every pairing vs control flat / no interaction" reading is NOT TESTED at the bar
+threshold. The knob-chapter closure rests on the f2vh48 bar decision (clear +4 twice
+or no adoption), which is a decision rule, not a null certification.
+
+Falsifiability check (the binary instrument's first question): all three pairings
+carry d >= 21, far above the d=5 unfalsifiability floor found in code-style; every
+fac2x2 test could in principle have rejected. The Hard pace analysis in
+paired-stats.txt L75-82 already used this exact instrument (d=38; smallest rejecting
+split 26:12, min detectable win-delta 14 -- consistent with the 0.44 power figure).
+
+== zero-failure claims: exact upper bounds, 1 - alpha^(1/n) at alpha=0.05 ==
+n=  48: true rate excluded above 0.0605  (any single "0/48 wins both arms" panel)
+n= 120: true rate excluded above 0.0247  (flame-nocover post-certification "0/~120")
+n= 312: true rate excluded above 0.0096  (Hard rung 307/312: bound on the win rate SHORTFALL uses failures, not this row)
+
+sd=0 caution, per the umbrella correction: feeding a zero-variance identity read
+into t_crit*sd/sqrt(n) returns MDE 0 and reads as infinite power. rusted's
+byte-identity claims (evolve1/evolve2 graduate identity, identcert's policy-column
+and spend-table identity) rest on construction and the pinned campaign e2e, not on
+a t; any statistical reading of "k runs identical" is bounded by 1 - alpha^(1/k).
+
+Method note, recorded because the audit holds itself to its own standard: the first
+pass at the smallest-rejecting-split search iterated k DESCENDING and returned the
+trivial d:0 split (reported nowhere; caught before publication). The ascending
+search above is the correct form, and it is exactly the class of arithmetic the
+shared helper should own with a test that watches it fail first.

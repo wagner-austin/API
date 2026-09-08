@@ -8,8 +8,10 @@ related:
 source_paths:
   - "wiki/sources/power-audit-2026-09-08/paired-stats.txt:8"
   - "wiki/sources/power-audit-2026-09-08/paired-stats.txt:75"
+  - "wiki/sources/power-audit-2026-09-08/binary-and-zero-failure.txt:7"
 source_git_blobs:
   "wiki/sources/power-audit-2026-09-08/paired-stats.txt": "bf9bfeb578dafdaa4ef5c1b18b6e817dc1aecde3"
+  "wiki/sources/power-audit-2026-09-08/binary-and-zero-failure.txt": "ad77b1b7e06c434289d5e4f56b322dea77e92dae"
 provenance:
   - "wiki/log.md — the dated verdict entries this page audits ([2026-09-02] through [2026-09-08]). Deliberately NOT a pinned source_path, per campaign-ledger's own precedent: log.md is append-only, so a pin goes stale on every append with no information in the drift."
   - "runs/sweeps/<batch>/ scorecard mirrors (untracked by design; masters /pub/wagnera3/rusted/runs/sweeps) — the raw inputs; their distillation is the pinned paired-stats.txt above."
@@ -72,6 +74,24 @@ entries published population-divisor sds (e3stand96 842.6 vs 851.5 sample;
 impbank36 990.4 vs 1034.4) — a ~2% convention drift that changes no
 verdict.[^5]
 
+## Outcome types — the umbrella's 22:06Z correction, applied
+
+The t-formula is the paired-CONTINUOUS instrument only; the umbrella's
+correction names two more, and rusted uses all three.[^8] Everything in the
+tables above is genuinely continuous (paired survival, paired margin), so no
+classification changes. The Hard pace analysis already used the binary
+instrument (exact binomial on discordants). Two additions land with the
+correction: **fac2x2's win-based "every pairing flat / no interaction" is NOT
+TESTED at the +4 adoption bar** — its discordant counts (d = 21/21/28) give
+smallest rejecting splits of 16:5 / 16:5 / 20:8, i.e. minimum detectable
+win-deltas of 11–12, so bar-scale effects were invisible; the knob chapter's
+closure rests on the f2vh48 bar decision, a decision rule rather than a null
+certification.[^8] And the zero-failure claims get their exact bounds: a
+0/48-wins panel excludes a true win rate above 6.05%, the 0/~120 era above
+2.5% (1−α^(1/n)); byte-identity claims rest on construction plus the pinned
+campaign e2e, never on a t over sd = 0, which would read as infinite
+power.[^8]
+
 ## Cross-boundary table
 
 Every boundary this project's comparisons cross has a measured term or a
@@ -105,3 +125,4 @@ states its own-spread MDE beside its t, or it is an advertisement.
 [^5]: sd comparisons at `paired-stats.txt` L5–6 (the divisor note) against `wiki/log.md` § "[2026-09-06] measurement | the graduate stands at evidence tier" (842.6) and § "[2026-09-06] verdict | the bank fires" (990.4).
 [^6]: trees: `wiki/log.md` § "[2026-08-09]"-era raid8 retraction restated in § "[2026-09-07] correction"; nodes and floors: § "[2026-09-06] verdict | detpair24 reads the floor"; regime declaration: § "[2026-09-06] measurement | the routing weave ships"; era re-pricing: § "[2026-09-07] verdict | the weaves nearly HALVED the floor"; OS scope: [[campaign-ledger]]'s Hard Linux row; build fingerprints: `src/rw_bot/provenance.py` per RESEARCH.md's rusted entry.
 [^7]: `wiki/log.md` § "[2026-09-08] verdict | the spacing panel flattens the screen's +588 to +25" — law nine's ledger at five-for-five against screen positives.
+[^8]: `wiki/sources/power-audit-2026-09-08/binary-and-zero-failure.txt` L7–39: the fac2x2 discordant table with smallest rejecting splits, the falsifiability check (all d ≥ 21, above code-style's d=5 floor), the zero-failure bounds, and the sd=0 caution; umbrella correction: board task 9d34f1bb, note of 2026-09-08T22:06:17Z.
