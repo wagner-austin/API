@@ -423,8 +423,20 @@ jobs:
       # circuit breaker, 2/2 failures). At 8 each, two co-tenant suites sum
       # to exactly the worker count one green solo run used. Hosted runners
       # keep `auto`: they are one job per VM by construction.
+      # handwriting-ai additionally runs CPU-ONLY here, because the pool has
+      # ONE 4GB GTX 1630 and Model-Trainer's suite digests it by design --
+      # two concurrent torch suites on one small card is the failure worker
+      # counts cannot fix. Measured across runs 34285840438 and 34287862046:
+      # with both suites on the GPU, Model-Trainer lost workers (KeyError:
+      # WorkerController gw8) and two statistical training tests, and
+      # handwriting-ai's calibration timed out in both stages -- while each
+      # was green with the card to itself, and handwriting-ai's calibration
+      # was ALREADY passing on hosted CPU-only runners before RAM killed
+      # those jobs. It came to this pool for the 26GB, not the GPU; the
+      # routing comment above says so, and this line makes it true.
       - name: Tests
         run: >
+          ${{ matrix.package == 'services/handwriting-ai' && 'CUDA_VISIBLE_DEVICES=-1' || '' }}
           poetry run pytest
           -n ${{ contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && '8' || 'auto' }}
           --cov-branch --cov=src --cov=scripts --cov-report=term-missing
