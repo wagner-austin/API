@@ -193,7 +193,10 @@ jobs:
     # runner agent, reported as infrastructure rather than as a failed
     # assertion. Sixteen xdist workers each holding torch plus real
     # training does not fit in 16GB; the lavender pool has 26GB.
-    runs-on: ${{ (matrix.package == 'clients/RustedWarfareBot' || matrix.package == 'services/Model-Trainer' || matrix.package == 'services/handwriting-ai') && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
+    # The pool membership list appears twice -- here and in the Tests step's
+    # worker count -- as the SAME fromJSON literal, deliberately adjacent in
+    # meaning: a package joins the pool and halves its workers in one edit.
+    runs-on: ${{ contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -410,7 +413,18 @@ jobs:
       - name: Types
         run: poetry run mypy
 
+      # HALF THE BOX PER JOB ON THE SELF-HOSTED POOL, because two runners
+      # share one 16-core / 26GB VM and `-n auto` claims all sixteen cores
+      # PER JOB. Run 34285840438 measured what 32 torch workers do to that
+      # machine: Model-Trainer -- green solo two hours earlier -- lost an
+      # xdist worker to the OOM killer mid-suite (INTERNALERROR after
+      # "replacing crashed worker gw4"), and handwriting-ai's calibration
+      # candidates starved into their own wall-clock timeouts (stage A
+      # circuit breaker, 2/2 failures). At 8 each, two co-tenant suites sum
+      # to exactly the worker count one green solo run used. Hosted runners
+      # keep `auto`: they are one job per VM by construction.
       - name: Tests
         run: >
-          poetry run pytest -n auto
+          poetry run pytest
+          -n ${{ contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && '8' || 'auto' }}
           --cov-branch --cov=src --cov=scripts --cov-report=term-missing
