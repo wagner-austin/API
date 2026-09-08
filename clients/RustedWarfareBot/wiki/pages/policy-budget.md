@@ -10,7 +10,7 @@ source_paths:
   - "src/rw_bot/policy/campaign.py"
 source_git_blobs:
   "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
-  "src/rw_bot/policy/campaign.py": "d32c85432385e1dc226c4a8722b5543f54bea7c2"
+  "src/rw_bot/policy/campaign.py": "a81a52b2f2fbaef12ac8f3ee06a397ba57d54db5"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

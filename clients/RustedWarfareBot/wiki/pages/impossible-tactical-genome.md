@@ -7,7 +7,7 @@ source_paths:
   - "src/rw_bot/policy/dispatching.py"
   - "scripts/evolve.py"
 source_git_blobs:
-  "src/rw_bot/policy/combat.py": "8afff52d08a953cafe435d3543c337652cab3f47"
+  "src/rw_bot/policy/combat.py": "2c69deb870c8606811cc09cb069e8df0cd43ae46"
   "src/rw_bot/policy/dispatching.py": "bc9178f263566abf5bdb21cfc85b051be0ca094c"
   "scripts/evolve.py": "b33dee0d23201d670b9974e985d954e1d7bc54f6"
 provenance:
