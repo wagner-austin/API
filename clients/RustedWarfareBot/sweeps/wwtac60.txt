@@ -1,0 +1,72 @@
+# The tactical genome's first screen (log 2026-09-08): four one-field
+# arms around the standing base -- groupcap 1 and 4 (the fire-group cap
+# July hand-set to 2 on three seeds), prio 1 (range-first: their
+# artillery dies before its screen) and prio 2 (frailest-first) -- on 12
+# shared fresh seeds with the in-batch control, the impbank36 shape.
+# Sized against the detpair24b floor: 2-se MDE ~382 per pairing at
+# n=12. The wwdec36 inversion (t=-6.1) proved the tactical layer holds
+# effects far past anything the credit vocabulary ever showed; this
+# screen asks whether any of the first four alleles points one the
+# right way. Seeds 8816001-8820577.
+#
+# label | seed | doctrine | samples
+stand|8816001|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8816001|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8816001|doctrines/stand-groupcap4.doctrine|10000
+range|8816001|doctrines/stand-prio-range.doctrine|10000
+frail|8816001|doctrines/stand-prio-frail.doctrine|10000
+stand|8816417|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8816417|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8816417|doctrines/stand-groupcap4.doctrine|10000
+range|8816417|doctrines/stand-prio-range.doctrine|10000
+frail|8816417|doctrines/stand-prio-frail.doctrine|10000
+stand|8816833|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8816833|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8816833|doctrines/stand-groupcap4.doctrine|10000
+range|8816833|doctrines/stand-prio-range.doctrine|10000
+frail|8816833|doctrines/stand-prio-frail.doctrine|10000
+stand|8817249|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8817249|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8817249|doctrines/stand-groupcap4.doctrine|10000
+range|8817249|doctrines/stand-prio-range.doctrine|10000
+frail|8817249|doctrines/stand-prio-frail.doctrine|10000
+stand|8817665|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8817665|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8817665|doctrines/stand-groupcap4.doctrine|10000
+range|8817665|doctrines/stand-prio-range.doctrine|10000
+frail|8817665|doctrines/stand-prio-frail.doctrine|10000
+stand|8818081|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8818081|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8818081|doctrines/stand-groupcap4.doctrine|10000
+range|8818081|doctrines/stand-prio-range.doctrine|10000
+frail|8818081|doctrines/stand-prio-frail.doctrine|10000
+stand|8818497|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8818497|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8818497|doctrines/stand-groupcap4.doctrine|10000
+range|8818497|doctrines/stand-prio-range.doctrine|10000
+frail|8818497|doctrines/stand-prio-frail.doctrine|10000
+stand|8818913|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8818913|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8818913|doctrines/stand-groupcap4.doctrine|10000
+range|8818913|doctrines/stand-prio-range.doctrine|10000
+frail|8818913|doctrines/stand-prio-frail.doctrine|10000
+stand|8819329|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8819329|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8819329|doctrines/stand-groupcap4.doctrine|10000
+range|8819329|doctrines/stand-prio-range.doctrine|10000
+frail|8819329|doctrines/stand-prio-frail.doctrine|10000
+stand|8819745|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8819745|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8819745|doctrines/stand-groupcap4.doctrine|10000
+range|8819745|doctrines/stand-prio-range.doctrine|10000
+frail|8819745|doctrines/stand-prio-frail.doctrine|10000
+stand|8820161|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8820161|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8820161|doctrines/stand-groupcap4.doctrine|10000
+range|8820161|doctrines/stand-prio-range.doctrine|10000
+frail|8820161|doctrines/stand-prio-frail.doctrine|10000
+stand|8820577|doctrines/evolve3-g3m10.doctrine|10000
+gcap1|8820577|doctrines/stand-groupcap1.doctrine|10000
+gcap4|8820577|doctrines/stand-groupcap4.doctrine|10000
+range|8820577|doctrines/stand-prio-range.doctrine|10000
+frail|8820577|doctrines/stand-prio-frail.doctrine|10000
