@@ -1,5 +1,5 @@
 ---
-title: Attaching a corpus to a model — four arms, three answered, and the one nobody tested
+title: Attaching a corpus to a model — four arms, and the one that works from 774M
 tags: [ml, model-trainer, cartridges, retrieval, model-editing, research-program]
 related:
   - "[[model-trainer-composition-ceiling]]"
@@ -9,17 +9,20 @@ related:
 source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 2a14e9edc408d27d6324bb15ef4dcdb6af259a72
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 427c6c63073ea1417ef20b0836c99af7688ed448
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": 6fa2350991c7ed262a342326ba6846b4b6afa519
+  "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
   "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py": 411c47f975fad5b700bcc6948da496f9af9c4c73
 provenance:
-  - "QA arms measured 2026-09-07 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
-  - "record qa-record-bm25.json, plan gpt2-wiki-qa, 24 items over the 12 me-wiki pages carrying visibility: public"
-  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges), 74dd514e (persona adapter, never started)"
+  - "ladder measured 2026-09-08 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
+  - "records qa-fixed-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
+  - "SUPERSEDED: the 2026-09-07 run (qa-record-bm25.json, 24 items) was produced before commits 9ba9dfb6 and eb73abf8 and its verdict is retracted on this page"
+  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), 74dd514e (persona adapter, never started)"
   - "AKEW figures from wiki page wu-2024-akew-editing-in-the-wild in the personal wiki, read page by page"
 fact_checked: "2026-09-08"
 confidence: high
@@ -28,12 +31,16 @@ hubs: [services]
 
 # Attaching a corpus to a model
 
-One question has been asked four ways over five days: **can a model be made
+One question has been asked four ways over six days: **can a model be made
 to answer questions about a private corpus without retrieving at query
 time?** The arms were run as separate board tasks by separate sessions and
 each produced its own page, so the program has never been written down as
 one thing. A reader arriving at any single page cannot tell which of four
-attempts they are looking at, or that three of them are already answered.
+attempts they are looking at, or which of them are answered.
+
+**The answer is yes, from about 774M parameters.** It was recorded as *no*
+for a day, on a 124M measurement from an instrument that examined nine of
+the twelve pages it trained on.
 
 This page is the index. It carries no measurement of its own.
 
@@ -43,8 +50,14 @@ This page is the index. It carries no measurement of its own.
 |---|---|---|
 | Weight injection | rank-one edit into the parameters | **No, on this corpus** — bounded by ingest, not algebra |
 | Steering vectors | add a direction to the residual stream | **No** — composition degrades to nothing |
-| Cartridges | train a KV prefix, serve it ahead of the query | **No, at this scale** — loses to keyword search |
+| Cartridges | train a KV prefix, serve it ahead of the query | **Yes from ~774M** — beats keyword search on accuracy, and on latency at 1.5B |
 | Persona adapter | not started | untested |
+
+The cartridge row said **No** until 2026-09-08. That verdict came from a
+single 124M measurement on an instrument carrying two defects, and both the
+defects and the missing rungs were found by questions the author of this
+page had already dismissed. The retraction is documented below rather than
+edited away, because the way it failed is more transferable than the result.
 
 ## Weight injection: the algebra works, the corpus does not fit it
 
@@ -75,50 +88,103 @@ The arm's own S0 gate concluded that building a local harness would replicate
 known results below the state of the art. What shipped instead was the corpus
 update — four papers into the personal wiki.
 
-## Cartridges: the arm that got a full measurement, and lost to BM25
+## Cartridges: the arm that crosses retrieval between 355M and 774M
 
-The only arm carried to a three-way comparison on real data. Over 24 held-out
-questions about the 12 public me-wiki pages, chance 0.25:
+The only arm carried to a full comparison on real data. Four model sizes, the
+same 32 held-out questions about the 12 public me-wiki pages, one card, one
+corpus digest, chance 0.25:
 
-| arm | accuracy | serve latency |
-|---|---|---|
-| base model alone | 0.5417 | 62.98 ms/item |
-| base + cartridge | 0.6389 (gain +0.097, **spread 0.125**) | 75.26 ms/item |
-| base + BM25 retrieval | **0.8333** (gain +0.292, **p = 0.0156**) | **69.79 ms/item** |
-| base + oracle retrieval | 1.0000 (knows the answer) | 70.90 ms/item |
+| model | base | + cartridge | gain | spread | + BM25 | cart ms | BM25 ms |
+|---|---|---|---|---|---|---|---|
+| gpt2 124M | 0.4375 | 0.6042 | +0.167 | 0.031 ✱ | **0.7500** | 69.7 | **63.8** |
+| gpt2-medium 355M | 0.5625 | 0.7292 | +0.167 | 0.188 | **0.7812** | 128.9 | **120.6** |
+| gpt2-large 774M | 0.5312 | **0.8021** | +0.271 | 0.125 ✱ | 0.7500 | 178.3 | **171.4** |
+| gpt2-xl 1.5B | 0.5625 | **0.8229** | +0.260 | 0.031 ✱ | 0.7812 | **246.9** | 281.5 |
 
-The cartridge loses on BOTH axes to a lexical retriever with no model, no
-embeddings and no weights, whose per-query search costs 1.84 ms/item. Its
-accuracy gain does not separate from its own seed spread; BM25's does.
+✱ the gain exceeds its own seed spread. Oracle retrieval scores 0.9688 at
+gpt2 and 1.0000 at every larger rung.
 
-**The cartridge is not doing nothing**, and that is the interesting part. On
-the same corpus it nearly halves the model's surprise at the correct answer —
-summed NLL 18.46 to 10.68, better on 19 of 24 items, p = 0.0066. It raises
-the likelihood of corpus vocabulary generally without sharpening the choice
-between corpus terms, which is what the question actually asks for. Putting
-the sentence in the window sharpens it.
+**The cartridge overtakes BM25 on accuracy between 355M and 774M**, and at
+1.5B it wins on latency as well.
 
-## What this verdict does NOT cover
+The shape is what makes it readable rather than the endpoint. Cartridge
+accuracy rises monotonically — 0.6042, 0.7292, 0.8021, 0.8229 — while BM25
+stays flat at 0.7500 / 0.7812 / 0.7500 / 0.7812. **BM25's flatness is
+expected and is the control**: it puts the answer's own sentence in the
+window, so the answer is nearly given and the reader's capacity barely
+matters. A rising curve and a flat one, crossing once.
 
-Stated because the result is narrow and reads broader than it is.
+**What the ladder cannot say.** 32 items over 3 seeds on one corpus. Base
+accuracy is not clean across rungs (0.4375, 0.5625, 0.5312, 0.5625), so
+rung-to-rung differences of a few points are not readable. The crossing
+point is an interpolation between two rungs, not a measurement of where it
+happens. And `max_seq_len` is held at 896 with evidence truncated to fit, so
+this tests MODEL SCALE and not context length — which is the axis the
+technique is actually for.
+
+## How the first verdict was wrong, which is the transferable part
+
+Recorded because the failure generalises past cartridges: **an instrument
+can be green, self-consistent, and measuring three-quarters of its corpus.**
+
+The 2026-09-07 run reported base 0.5417, cartridge 0.6389 with its gain
+inside the seed spread, and BM25 0.8333 — and concluded the arm was dead.
+Two defects produced it, both found by asking why a plan permitting 120
+items returned 24, rather than accepting 24 as the corpus's size.
+
+1. **The held-out stride counted across the corpus, not within a page**
+   (fixed in `9ba9dfb6`). Which pages got tested depended on where their
+   windows landed in the concatenated sequence. Three of twelve pages held
+   out nothing at all: trained on, never examined. Every arm was fitted to
+   twelve pages and scored on nine, and nothing surfaced it because a short
+   question set looks exactly like a short corpus.
+2. **A term qualified an item from text the evidence could not cite**
+   (fixed in `eb73abf8`). `build_items` read the raw training text;
+   `evidence_for` reads sentences, which strip code fences, table rows and
+   URLs. Nine terms of ninety-four lived only in stripped constructs. Three
+   reached items no retrieval arm could answer — biasing **toward** the
+   cartridge — and one of them crashed the run outright once page 6 was
+   finally examined, which is how the second defect was found at all.
+
+Item count on the real corpus: 24 → 35 after the first fix → 32 after the
+second removed the unsupportable ones.
+
+The instrument passed `make check` at 100% statements and branches
+throughout. Coverage measures whether a line ran, never whether the thing it
+computed was the thing intended.
+
+## What the cartridge result does NOT cover
+
+Stated because a positive reads broader than a negative did, and this one is
+narrow in three ways that still matter.
 
 1. **It is not the published Cartridges system.** Eyuboglu et al. need Llama
    or Qwen3, a two-stage pipeline with a synthesis server, and wandb for
    artifact loading. What was measured is this repo's own simpler thing:
-   direct context distillation over corpus windows, on a 124M model.
-2. **It was measured outside the regime cartridges are for.** They are a
+   direct context distillation over corpus windows.
+2. **It is still measured outside the regime cartridges are for.** They are a
    CONTEXT COMPRESSION technique — the claimed win is serving a very long
    context cheaply. The window here is 896 tokens with evidence truncated to
-   fit. At that size there is nothing to compress and retrieval is trivially
-   cheap.
-3. **Only lexical retrieval was tested.** A dense retriever costs real
-   milliseconds per query, which is the one regime where the cartridge's
-   latency story could survive.
-4. **One model size.** gpt2, 124M. No ladder was run.
+   fit. At that size there is nothing to compress, so the arm won on a
+   question the technique is not designed around. That makes the win more
+   surprising, not less caveated.
+3. **Only lexical retrieval was beaten.** BM25's per-query search costs
+   1.84 ms/item — nearly free. A dense retriever would cost real
+   milliseconds and would also retrieve better, and
+   [[model-trainer-composition-ceiling]]'s sibling task on retrieval
+   methods (board `a8f799c5`) exists to close the 16-to-25 point gap BM25
+   still leaves against the oracle. Beating BM25 is not beating retrieval.
 
-## The untested lever, and why it is the interesting one
+## The untested lever, which the cartridge result makes MORE interesting
 
 Every arm above tested a METHOD. None tested the CORPUS REPRESENTATION.
+
+This mattered when all three arms had failed; it matters more now that one
+has not. The cartridge succeeds by reading prose windows directly, and it is
+the only arm that never needed the corpus reshaped. Weight injection is
+still blocked on exactly that, and the two facts sit next to each other:
+the method that tolerates prose works, and the method that cannot is the one
+nobody has given a usable input to.
 
 AKEW's own numbers say the format is the bottleneck: the same facts score
 93-99% as clean triples and 2.25-4.78% extracted from prose. This wiki is
