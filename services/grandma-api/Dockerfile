@@ -40,6 +40,14 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# ffmpeg is a runtime dependency: core/audio/converter.py shells out to it for
+# every audio conversion. Found missing 2026-09-08 by CI's real-ffmpeg test
+# (FileNotFoundError: 'ffmpeg'), which was the honest verdict -- the runtime
+# image never carried the binary the converter calls.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 
 WORKDIR /workspace
