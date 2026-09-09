@@ -241,6 +241,14 @@ TREE_DIR = ".tree"
 #: Written into the tree last, so its presence certifies a complete freeze.
 TREE_MARKER = ".complete"
 
+#: Wall clock on one match. The slowest legitimate match on record is a
+#: sample-cap grind near the cluster's own 100-minute slurm wall; three
+#: hours holds that with room for a slow node, and a match still running
+#: then is a hung engine, not a long game. Exists for the same reason the
+#: cluster runner's wall does: a child that never returns defeats every
+#: check above it (the 2026-09-09 five-hour driver wedge).
+MATCH_WALL_SECONDS = 10800.0
+
 #: A frozen tree handed to a run was incomplete.
 _TREE_INCOMPLETE = "RW-SWEEP-006"
 
@@ -500,7 +508,8 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
             config["tree"],
             config["pin_delta"],
             config["fast_forward"],
-        )
+        ),
+        MATCH_WALL_SECONDS,
     )
     card = scorecard(output)
     if not is_complete(card):
@@ -569,6 +578,7 @@ def outstanding(jobs: Sequence[SweepJob], out_dir: Path) -> tuple[SweepJob, ...]
 
 
 __all__ = [
+    "MATCH_WALL_SECONDS",
     "TREE_DIR",
     "TREE_MARKER",
     "TREE_SOURCES",

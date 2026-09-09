@@ -46,7 +46,7 @@ def test_the_cluster_route_plays_the_files_own_lines(tmp_path: Path) -> None:
 
     argvs: list[tuple[str, ...]] = []
 
-    def serve(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def serve(argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
         argvs.append(tuple(argv))
         joined = " ".join(argv)
         if joined.endswith("rev-parse HEAD"):

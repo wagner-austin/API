@@ -76,6 +76,14 @@ ENGINE_STDOUT_SUFFIX = ".agent"
 #: crash interleaved into a merged stream is a crash nobody found.
 ENGINE_STDERR_SUFFIX = ".err"
 
+#: Wall clock on the tools this module runs -- the agent compile, the jar
+#: packaging, the port and process listings. The slowest of them (javac
+#: over the agent sources) finishes in seconds; ten minutes is an order of
+#: magnitude past a loaded box, and a tool still running then is hung, not
+#: slow. The wall exists because a child that never returns defeats every
+#: check above it (the 2026-09-09 five-hour driver wedge).
+TOOL_WALL_SECONDS = 600.0
+
 
 def build_agent(config: LaunchConfig, jar_path: str, classes: str, platform: str) -> bool:
     """Compile and package the agent for a match that is not using a snapshot.
@@ -100,14 +108,18 @@ def build_agent(config: LaunchConfig, jar_path: str, classes: str, platform: str
     _test_hooks.make_dirs(Path(classes))
     sources = agent_sources(_test_hooks.list_names(Path(AGENT_SOURCE_DIR)))
     javac = str(game_dir / tool_path("javac", platform))
-    status, output = _test_hooks.run_capture(compile_command(javac, classes, sources))
+    status, output = _test_hooks.run_capture(
+        compile_command(javac, classes, sources), TOOL_WALL_SECONDS
+    )
     if status != 0:
         for line in output:
             _test_hooks.write_line(line)
         _test_hooks.write_line("[play] javac failed")
         return False
     jar_tool = str(game_dir / tool_path("jar", platform))
-    status, output = _test_hooks.run_capture(package_command(jar_tool, jar_path, classes))
+    status, output = _test_hooks.run_capture(
+        package_command(jar_tool, jar_path, classes), TOOL_WALL_SECONDS
+    )
     if status != 0:
         for line in output:
             _test_hooks.write_line(line)
@@ -132,11 +144,11 @@ def clear_orphaned_engine(port: int, platform: str) -> None:
     Raises:
         OSError: When the listing command cannot be started.
     """
-    _, listing = _test_hooks.run_capture(port_listener_command(platform))
+    _, listing = _test_hooks.run_capture(port_listener_command(platform), TOOL_WALL_SECONDS)
     holder = parse_port_listener(listing, port, platform)
     if holder is None:
         return
-    _, named = _test_hooks.run_capture(process_name_command(holder, platform))
+    _, named = _test_hooks.run_capture(process_name_command(holder, platform), TOOL_WALL_SECONDS)
     name = parse_process_name(named, platform)
     if not holder_is_an_orphaned_engine(name, platform):
         _test_hooks.write_line(
@@ -303,6 +315,7 @@ __all__ = [
     "EXIT_NO_CHANNEL",
     "EXIT_OK",
     "TEARDOWN_SETTLE_SECONDS",
+    "TOOL_WALL_SECONDS",
     "build_agent",
     "clear_orphaned_engine",
     "play",

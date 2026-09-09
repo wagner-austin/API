@@ -16,7 +16,9 @@ from pathlib import Path
 import pytest
 
 from rw_bot.harness import _test_hooks
+from rw_bot.harness._test_hooks import CAPTURE_TIMEOUT_STATUS
 from rw_bot.harness.cluster_round import (
+    COMMAND_WALL_SECONDS,
     CONVERGE_PASSES,
     TRANSPORT_BUDGET,
     ClusterRound,
@@ -35,24 +37,28 @@ class _Cluster:
 
     Attributes:
         argvs: Every command issued, in order.
+        walls: The wall clock each command was issued under, in order.
         filed: Scorecard counts to serve, consumed per poll.
         queued: Queue counts to serve, consumed per poll.
     """
 
     def __init__(self, filed: list[int], queued: list[int]) -> None:
         self.argvs: list[tuple[str, ...]] = []
+        self.walls: list[float] = []
         self.filed = filed
         self.queued = queued
 
-    def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
         """Serve one command.
 
         Args:
             argv: The command issued.
+            timeout_seconds: The wall the runner asked for, recorded.
 
         Returns:
             Exit status and output lines, per the script.
         """
+        self.walls.append(timeout_seconds)
         self.argvs.append(tuple(argv))
         joined = " ".join(argv)
         if joined.endswith("rev-parse HEAD"):
@@ -138,6 +144,10 @@ def test_a_clean_round_issues_the_canonical_chain_in_order(tmp_path: Path) -> No
     assert "--commit abc123" in freeze
     doc = next(line for line in joined if "scripts.campaign_doc" in line)
     assert "--payload payload-probe-r0" in doc
+
+    # Every command ran under the wall -- the 2026-09-09 outage held two
+    # drivers for five hours precisely because nothing bounded a call.
+    assert cluster.walls == [COMMAND_WALL_SECONDS] * len(cluster.argvs)
     assert "--difficulty 1" in doc
 
     # The pull lands where the margin scorer reads.
@@ -173,7 +183,7 @@ def test_a_round_that_never_fills_is_a_loud_gap_not_a_loop(tmp_path: Path) -> No
 
 def test_a_failed_command_raises_with_its_own_words(tmp_path: Path) -> None:
     class _Refusing(_Cluster):
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             self.argvs.append(tuple(argv))
             if "scripts.stage_payload" in " ".join(argv):
                 return 3, ("the freeze refused", "a second line")
@@ -197,13 +207,13 @@ def test_a_dropped_connection_is_ridden_out_and_reported(tmp_path: Path) -> None
             super().__init__(filed=[2], queued=[])
             self.scp_calls = 0
 
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if argv[0] == "scp":
                 self.scp_calls += 1
                 if self.scp_calls == 1:
                     self.argvs.append(tuple(argv))
                     return 255, ("client_loop: send disconnect: Broken pipe",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     reported: list[str] = []
 
@@ -230,11 +240,11 @@ def test_a_route_down_through_the_whole_budget_is_the_finding(tmp_path: Path) ->
     the budget rather than spending hours discovering it."""
 
     class _Down(_Cluster):
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if argv[0] == "ssh":
                 self.argvs.append(tuple(argv))
                 return 255, ("websocket: bad handshake",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     saved = _test_hooks.write_line
 
@@ -257,11 +267,11 @@ def test_a_local_command_exiting_255_is_a_command_failure(tmp_path: Path) -> Non
     happens to exit 255 failed on its own terms and is never retried."""
 
     class _Local255(_Cluster):
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if "scripts.stage_payload" in " ".join(argv):
                 self.argvs.append(tuple(argv))
                 return 255, ("the freeze exploded",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     with pytest.raises(ClusterRoundError) as caught:
         _drive(tmp_path, _Local255(filed=[], queued=[]))
@@ -274,11 +284,11 @@ def test_an_ssh_command_failing_on_its_own_terms_is_not_retried(tmp_path: Path) 
     with that status, not 255 -- a defect surfacing, raised immediately."""
 
     class _RemoteFailure(_Cluster):
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if argv[0] == "ssh":
                 self.argvs.append(tuple(argv))
                 return 2, ("tar: rw-payload.tar: Cannot open",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     cluster = _RemoteFailure(filed=[], queued=[])
     with pytest.raises(ClusterRoundError) as caught:
@@ -300,13 +310,13 @@ def test_an_scp_copy_failure_is_ridden_out_like_a_drop(tmp_path: Path) -> None:
             super().__init__(filed=[2], queued=[])
             self.scp_calls = 0
 
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if argv[0] == "scp":
                 self.scp_calls += 1
                 if self.scp_calls == 1:
                     self.argvs.append(tuple(argv))
                     return 1, ("scp: Connection reset by peer",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     reported: list[str] = []
 
@@ -333,11 +343,11 @@ def test_an_ssh_command_exiting_1_is_never_retried(tmp_path: Path) -> None:
     transport verdict -- while the same status from scp is retryable."""
 
     class _RemoteOne(_Cluster):
-        def run(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
             if argv[0] == "ssh":
                 self.argvs.append(tuple(argv))
                 return 1, ("mkdir: cannot create directory",)
-            return super().run(argv)
+            return super().run(argv, timeout_seconds)
 
     cluster = _RemoteOne(filed=[], queued=[])
     with pytest.raises(ClusterRoundError) as caught:
@@ -345,6 +355,63 @@ def test_an_ssh_command_exiting_1_is_never_retried(tmp_path: Path) -> None:
     assert caught.value.code == "RW-CROUND-001"
     assert "command failed (1)" in caught.value.message
     assert len([argv for argv in cluster.argvs if argv[0] == "ssh"]) == 1
+
+
+def test_a_hung_transport_command_rides_the_drop_budget(tmp_path: Path) -> None:
+    """The 2026-09-09 shape: the VPN died without an RST, so the ssh never
+    returned a status at all. Felled at the wall, it reads as the same
+    route failure a 255 is -- idempotent, retried, reported."""
+
+    class _Wedged(_Cluster):
+        def __init__(self) -> None:
+            super().__init__(filed=[2], queued=[])
+            self.scp_calls = 0
+
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
+            if argv[0] == "scp":
+                self.scp_calls += 1
+                if self.scp_calls == 1:
+                    self.argvs.append(tuple(argv))
+                    return CAPTURE_TIMEOUT_STATUS, ()
+            return super().run(argv, timeout_seconds)
+
+    reported: list[str] = []
+
+    def record_line(text: str) -> None:
+        reported.append(text)
+
+    wedged = _Wedged()
+    saved = _test_hooks.write_line
+    _test_hooks.write_line = record_line
+    try:
+        _, slept = _drive(tmp_path, wedged)
+    finally:
+        _test_hooks.write_line = saved
+    assert wedged.scp_calls == 2
+    assert slept == [5.0]
+    drops = [line for line in reported if "transport dropped" in line]
+    assert len(drops) == 1
+
+
+def test_a_hung_local_command_raises_at_the_wall(tmp_path: Path) -> None:
+    """A local tool that hangs is a defect surfacing, not weather: felled
+    at the wall and raised immediately, never retried."""
+
+    class _WedgedFreeze(_Cluster):
+        def run(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
+            if "scripts.stage_payload" in " ".join(argv):
+                self.argvs.append(tuple(argv))
+                return CAPTURE_TIMEOUT_STATUS, ("froze mid-archive",)
+            return super().run(argv, timeout_seconds)
+
+    cluster = _WedgedFreeze(filed=[], queued=[])
+    with pytest.raises(ClusterRoundError) as caught:
+        _drive(tmp_path, cluster)
+    assert caught.value.code == "RW-CROUND-004"
+    assert f"hung past {COMMAND_WALL_SECONDS:.0f}s" in caught.value.message
+    assert "froze mid-archive" in caught.value.message
+    freezes = [argv for argv in cluster.argvs if "scripts.stage_payload" in " ".join(argv)]
+    assert len(freezes) == 1
 
 
 def test_the_search_entry_point_routes_the_cluster_prefix(tmp_path: Path) -> None:
@@ -355,7 +422,7 @@ def test_the_search_entry_point_routes_the_cluster_prefix(tmp_path: Path) -> Non
 
     seen: list[tuple[str, ...]] = []
 
-    def refuse(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def refuse(argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
         seen.append(tuple(argv))
         return 9, ("stopped by the test before anything real",)
 

@@ -42,6 +42,7 @@ from pathlib import Path
 
 from rw_bot import RwBotError
 from rw_bot.harness import _test_hooks
+from rw_bot.harness._test_hooks import CAPTURE_TIMEOUT_STATUS
 
 #: How many converge-then-drain passes a round may spend before the gap is
 #: an error. Each pass resubmits only what is missing, so the budget bounds
@@ -77,6 +78,16 @@ TRANSPORT_STATUSES: dict[str, tuple[int, ...]] = {
 #: otherwise would spend hours discovering what the error says in seconds.
 TRANSPORT_BUDGET = 5
 
+#: The wall-clock bound on any single child command. The 2026-09-09
+#: sedona-VPN outage wedged two drivers for FIVE HOURS inside remote calls
+#: whose connections died without an RST -- no exit status ever arrived,
+#: so the transport budget above never got to count a drop. Thirty
+#: minutes bounds the slowest legitimate command in the chain (a full
+#: payload stage over the tunnel, measured in single minutes) with an
+#: order of magnitude to spare; anything still running at the wall IS the
+#: outage, and surfacing it is the point.
+COMMAND_WALL_SECONDS = 1800.0
+
 
 class ClusterRoundError(RwBotError):
     """A cluster round could not deliver its scorecards.
@@ -86,7 +97,8 @@ class ClusterRoundError(RwBotError):
             child command that failed, ``RW-CROUND-002`` for a round still
             short of its expected scorecards after the convergence budget,
             ``RW-CROUND-003`` for a transport route that stayed down
-            through the whole retry budget.
+            through the whole retry budget, ``RW-CROUND-004`` for a
+            non-transport command felled at the command wall.
         message: Human-readable description carrying the command or the gap.
     """
 
@@ -150,16 +162,21 @@ class ClusterRound:
         self.poll_seconds = poll_seconds
 
     def _capture(self, argv: Sequence[str]) -> tuple[str, ...]:
-        """Run one child command, raising on failure.
+        """Run one child command under the wall clock, raising on failure.
 
         ``ssh`` and ``scp`` commands whose transport died (a status in
         :data:`TRANSPORT_STATUSES` for that program) are re-run up to
         :data:`TRANSPORT_BUDGET` consecutive times, a poll interval
         apart, each drop reported -- every cluster command this runner
         issues is idempotent by design, so re-carrying one after a
-        dropped connection repeats no work and hides no defect. Any
-        other non-zero status is the command itself failing and raises
-        immediately.
+        dropped connection repeats no work and hides no defect. A
+        transport command FELLED at :data:`COMMAND_WALL_SECONDS` rides
+        the same budget: a connection that dies without an RST never
+        returns a status at all, which is how the 2026-09-09 VPN outage
+        held two drivers for five hours. Any other non-zero status is
+        the command itself failing and raises immediately, and a
+        NON-transport command felled at the wall raises immediately too
+        -- a hung local tool is a defect surfacing, not weather to ride.
 
         Args:
             argv: Argument vector, program first.
@@ -173,16 +190,24 @@ class ClusterRound:
                 the child's own words are the diagnostic, and swallowing
                 them would leave a code with nothing behind it. With
                 ``RW-CROUND-003`` when an ssh/scp route stays down through
-                the whole transport budget.
+                the whole transport budget. With ``RW-CROUND-004`` when a
+                non-transport command hangs past the wall.
         """
         retryable = TRANSPORT_STATUSES.get(argv[0], ())
         drops = 0
         while True:
-            status, lines = _test_hooks.run_capture(argv)
+            status, lines = _test_hooks.run_capture(argv, COMMAND_WALL_SECONDS)
             if status == 0:
                 return lines
             printed = "\n".join(lines)
-            if status not in retryable:
+            hung = status == CAPTURE_TIMEOUT_STATUS
+            if hung and retryable == ():
+                raise ClusterRoundError(
+                    "RW-CROUND-004",
+                    f"command hung past {COMMAND_WALL_SECONDS:.0f}s and was "
+                    f"felled: {' '.join(argv)}\n{printed}",
+                )
+            if not hung and status not in retryable:
                 raise ClusterRoundError(
                     "RW-CROUND-001",
                     f"command failed ({status}): {' '.join(argv)}\n{printed}",
@@ -422,6 +447,7 @@ class ClusterRound:
 
 
 __all__ = [
+    "COMMAND_WALL_SECONDS",
     "CONVERGE_PASSES",
     "TRANSPORT_BUDGET",
     "TRANSPORT_EXIT",

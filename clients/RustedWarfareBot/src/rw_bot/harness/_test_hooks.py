@@ -44,6 +44,7 @@ from rw_bot.harness._hook_defaults import (
     _write_text_lines_impl,
 )
 from rw_bot.harness._hook_protocols import (
+    CAPTURE_TIMEOUT_STATUS,
     CopyEntryProto,
     CountCoresProto,
     FileSizeProto,
@@ -102,6 +103,7 @@ write_text_lines: WriteTextLinesProto = _write_text_lines_impl
 
 
 __all__ = [
+    "CAPTURE_TIMEOUT_STATUS",
     "CopyEntryProto",
     "CountCoresProto",
     "FileSizeProto",

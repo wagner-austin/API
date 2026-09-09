@@ -13,6 +13,7 @@ import pytest
 from rw_bot.harness.clone import PLAY_PORT_BASE, CloneError
 from rw_bot.harness.match import MatchConfig
 from rw_bot.harness.runner import (
+    MATCH_WALL_SECONDS,
     SweepConfig,
     SweepOutcome,
     decode_sweep_config,
@@ -137,6 +138,9 @@ def test_a_finished_match_is_filed_as_its_scorecard() -> None:
             "verdict        survived (sample_limit)",
             "army           0 -> 9",
         )
+        # And it ran under the match wall: an engine that never returns is
+        # a hang to surface (the 2026-09-09 driver wedge), not a wait.
+        assert host.walls == [MATCH_WALL_SECONDS]
 
 
 def test_a_scorecard_states_the_match_it_played() -> None:

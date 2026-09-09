@@ -78,17 +78,34 @@ class ReadArgvProto(Protocol):
         ...
 
 
+#: The status :class:`RunCaptureProto` reports for a child felled at its
+#: wall. Unreachable as a real status by construction: POSIX signal deaths
+#: surface as ``-signum`` (bounded well above -257) and Windows statuses
+#: are non-negative, so no child can claim this value for itself. It
+#: exists because a hung command is a RESULT the caller must rule on --
+#: the 2026-09-09 sedona-VPN outage wedged two cluster drivers for five
+#: hours inside remote calls that died without an RST, and no exit status
+#: ever arrived for the retry budget above them to count.
+CAPTURE_TIMEOUT_STATUS = -257
+
+
 class RunCaptureProto(Protocol):
     """Run a child process to completion and capture everything it printed."""
 
-    def __call__(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
-        """Run one command.
+    def __call__(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
+        """Run one command under a hard wall clock.
 
         Args:
             argv: Argument vector, program first.
+            timeout_seconds: Wall-clock bound on the child. A child still
+                running at the bound is felled -- the whole tree -- and
+                reported as :data:`CAPTURE_TIMEOUT_STATUS` with whatever
+                it printed before dying.
 
         Returns:
-            The child's exit status and its combined output lines, in order.
+            The child's exit status and its combined output lines, in
+            order, or :data:`CAPTURE_TIMEOUT_STATUS` and the partial
+            output when the wall felled it.
 
         Raises:
             OSError: When the program cannot be started.
@@ -466,6 +483,7 @@ class ReadPlatformProto(Protocol):
 
 
 __all__ = [
+    "CAPTURE_TIMEOUT_STATUS",
     "CopyEntryProto",
     "CountCoresProto",
     "FileSizeProto",

@@ -103,6 +103,7 @@ def _workspace(
                 "env_path": env_path,
                 "pinned_packages": {},
                 "deterministic": False,
+                "certified_inputs": False,
                 "budget": {
                     "self_imposed_gpu_hours": 0.0,
                     "max_service_units": 0.0,

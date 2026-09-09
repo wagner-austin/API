@@ -73,6 +73,7 @@ class FakeHost:
         dirs: Directories that exist.
         printed: Every line written to standard output, in order.
         commands: Every command run, in order.
+        walls: The wall passed to each :meth:`run_capture`, in order.
         transcripts: What a command prints, keyed by the game directory it names.
             A command whose directory is absent prints a finished match.
         argv: What :func:`read_argv` returns.
@@ -91,6 +92,7 @@ class FakeHost:
         self.dirs: set[str] = set()
         self.printed: list[str] = []
         self.commands: list[tuple[str, ...]] = []
+        self.walls: list[float] = []
         self.transcripts = transcripts or {}
         self.argv: list[str] = []
         self.platform = platform
@@ -422,7 +424,9 @@ class FakeHost:
         """
         self.felled.append(pid)
 
-    def run_capture(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def run_capture(
+        self, argv: Sequence[str], timeout_seconds: float
+    ) -> tuple[int, tuple[str, ...]]:
         """Run a command without running one.
 
         Two kinds of command reach this hook. A tool the launcher consults --
@@ -434,10 +438,12 @@ class FakeHost:
 
         Args:
             argv: The command.
+            timeout_seconds: The caller's wall; recorded, never waited on.
 
         Returns:
             An exit status and the command's output.
         """
+        self.walls.append(timeout_seconds)
         self.commands.append(tuple(argv))
         program = Path(argv[0]).name
         for known, result in self.command_results.items():

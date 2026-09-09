@@ -27,11 +27,11 @@ from socketserver import BaseServer
 
 from platform_core.config import config_test_hooks
 
-from rw_bot.harness._hook_protocols import SpawnedMatchProto
+from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
 from rw_bot.harness.process_tree import fell_command, spawn_isolation
 
 
-def _run_capture_impl(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+def _run_capture_impl(argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
     """Production implementation of :class:`RunCaptureProto`.
 
     Streams are merged because the caller wants one transcript of the match in
@@ -43,23 +43,33 @@ def _run_capture_impl(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
     format this package defines; the alternative is discarding a match that ran
     for seven minutes because one cosmetic byte was not UTF-8.
 
+    A child still running at the wall is felled -- the whole tree, through
+    the same platform command every other kill here uses, because an ``ssh``
+    with a ``ProxyCommand`` is two processes and orphaning the proxy leaks
+    the hang -- and reported as :data:`CAPTURE_TIMEOUT_STATUS`. The
+    ``TimeoutExpired`` is converted at this edge rather than propagated: the
+    wall firing is the condition the caller ASKED this hook to detect, data
+    on the same footing as an exit status, not a failure to soften.
+
     Args:
         argv: Argument vector, program first.
+        timeout_seconds: Wall-clock bound on the child.
 
     Returns:
-        The child's exit status and its combined output lines, in order.
+        The child's exit status and its combined output lines, in order, or
+        :data:`CAPTURE_TIMEOUT_STATUS` and the partial output when the wall
+        felled it.
 
     Raises:
         OSError: When the program cannot be started.
     """
     isolation = spawn_isolation(_read_platform_impl())
-    finished = subprocess.run(
+    child = subprocess.Popen(
         list(argv),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         encoding="utf-8",
         errors="replace",
-        check=False,
         # Ranking and fellability, decided by platform in
         # :mod:`rw_bot.harness.process_tree` so neither arm needs a branch
         # here. On Windows this carries the priority class the batch needs
@@ -68,7 +78,17 @@ def _run_capture_impl(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
         creationflags=isolation["creationflags"],
         start_new_session=isolation["start_new_session"],
     )
-    return finished.returncode, tuple(finished.stdout.splitlines())
+    try:
+        output, _ = child.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        subprocess.run(
+            fell_command(child.pid, _read_platform_impl()),
+            check=False,
+            capture_output=True,
+        )
+        output, _ = child.communicate()
+        return CAPTURE_TIMEOUT_STATUS, tuple(output.splitlines())
+    return child.returncode, tuple(output.splitlines())
 
 
 def _list_names_impl(path: Path) -> tuple[str, ...]:

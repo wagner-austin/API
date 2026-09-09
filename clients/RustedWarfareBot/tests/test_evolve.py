@@ -274,7 +274,7 @@ def test_main_builds_the_cluster_runner_for_the_cluster_route(tmp_path: Path) ->
 
     seen: list[tuple[str, ...]] = []
 
-    def refuse(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def refuse(argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
         seen.append(tuple(argv))
         return 9, ("stopped by the test before anything real",)
 
@@ -333,7 +333,7 @@ class _ServedCluster:
                 encoding="utf-8",
             )
 
-    def serve(self, argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
+    def serve(self, argv: Sequence[str], timeout_seconds: float) -> tuple[int, tuple[str, ...]]:
         joined = " ".join(argv)
         if joined.endswith("rev-parse HEAD"):
             return 0, ("abc123",)

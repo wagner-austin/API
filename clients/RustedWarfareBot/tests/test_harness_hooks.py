@@ -93,7 +93,7 @@ def test_a_path_that_was_never_created_does_not_exist(tmp_path: Path) -> None:
 
 def test_a_child_process_output_is_captured_in_order() -> None:
     status, lines = _test_hooks.run_capture(
-        [sys.executable, "-c", "print('first'); print('second')"]
+        [sys.executable, "-c", "print('first'); print('second')"], 60.0
     )
     assert status == 0
     assert lines == ("first", "second")
@@ -108,7 +108,8 @@ def test_both_streams_are_captured_because_the_transcript_spans_them() -> None:
             sys.executable,
             "-c",
             "import sys; sys.stderr.write('launcher\\n'); print('verdict survived')",
-        ]
+        ],
+        60.0,
     )
     assert status == 0
     assert set(lines) == {"launcher", "verdict survived"}
@@ -118,13 +119,41 @@ def test_a_failing_child_reports_its_status_rather_than_raising() -> None:
     """The exit status is data: a match that fails is filed as a failure, and
     raising here would take down the whole batch instead.
     """
-    status, _ = _test_hooks.run_capture([sys.executable, "-c", "raise SystemExit(3)"])
+    status, _ = _test_hooks.run_capture([sys.executable, "-c", "raise SystemExit(3)"], 60.0)
     assert status == 3
 
 
 def test_a_program_that_does_not_exist_raises() -> None:
     with pytest.raises(OSError):
-        _test_hooks.run_capture(["no-such-program-anywhere", "--version"])
+        _test_hooks.run_capture(["no-such-program-anywhere", "--version"], 60.0)
+
+
+def test_a_child_still_running_at_the_wall_is_felled_and_reported_as_hung() -> None:
+    """The 2026-09-09 defect, tested against real bytes: a child that will
+    never return is killed at the wall and reported as the sentinel, with
+    what it printed before dying kept -- because during the outage the
+    partial transcript was the only diagnostic there was."""
+    status, lines = _test_hooks.run_capture(
+        [
+            sys.executable,
+            "-u",
+            "-c",
+            "import time; print('about to hang'); time.sleep(600)",
+        ],
+        2.0,
+    )
+    assert status == _test_hooks.CAPTURE_TIMEOUT_STATUS
+    assert "about to hang" in lines
+
+
+def test_the_sentinel_is_unreachable_as_a_real_child_status() -> None:
+    """The ruling in ``_capture`` keys on this value, so a child that could
+    return it would forge a hang verdict."""
+    status, _ = _test_hooks.run_capture(
+        [sys.executable, "-c", f"raise SystemExit({_test_hooks.CAPTURE_TIMEOUT_STATUS})"],
+        60.0,
+    )
+    assert status != _test_hooks.CAPTURE_TIMEOUT_STATUS
 
 
 def test_the_process_arguments_are_read_after_the_program_name() -> None:

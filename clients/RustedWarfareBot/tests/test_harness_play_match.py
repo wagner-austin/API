@@ -13,6 +13,7 @@ from rw_bot.harness.launch import LaunchConfig
 from rw_bot.harness.play_match import (
     EXIT_AGENT_BUILD_FAILED,
     EXIT_NO_CHANNEL,
+    TOOL_WALL_SECONDS,
     build_agent,
     clear_orphaned_engine,
     play,
@@ -108,6 +109,13 @@ class TestBuildingTheAgent:
             build_agent(_config(), "a.jar", "build/x", LINUX)
             assert host.commands[0][0] == ".game-w1/jvm-linux/bin/javac"
             assert host.commands[1][0] == ".game-w1/jvm-linux/bin/jar"
+
+    def test_the_tools_run_under_the_tool_wall(self) -> None:
+        """A compiler that never returns is a hang to surface, not a wait --
+        the 2026-09-09 driver wedge, kept out of this module by the wall."""
+        with _host() as host:
+            build_agent(_config(), "a.jar", "build/x", LINUX)
+            assert host.walls == [TOOL_WALL_SECONDS, TOOL_WALL_SECONDS]
 
 
 class TestClearingAnOrphanedEngine:
