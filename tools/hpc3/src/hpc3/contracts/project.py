@@ -75,6 +75,26 @@ class ProjectConfig(TypedDict):
             setting form separate records and comparing across them
             reintroduces the confound the controls remove -- so the setting
             has to be part of what a run IS, not a flag someone remembers.
+        certified_inputs: Whether this project's runs require every /pub
+            input they declare to be admitted by a certification record
+            beside it. REQUIRED and explicit, for the reason
+            ``deterministic`` is: it says what a run's provenance is worth,
+            not how fast it goes, and a project that has not answered it has
+            not been asked.
+
+            Measured 2026-09-09, before this field existed: all ten declared
+            inputs across code-style, floor and mi sat in directories with NO
+            ``*-digests.txt`` at all. Certification is not rare here, it is
+            absent, so an unconditional check would have refused every
+            registered project's next submission. Hence a per-project answer
+            rather than a global rule -- and hence ``false`` on a project
+            means "its inputs reach the cluster by a route that records
+            nothing", which is a fact about that project rather than a
+            setting someone forgot.
+
+            NOT in :data:`PROJECT_FIELDS`, deliberately, like ``budget`` and
+            ``repo``. A run that could override this could switch off its own
+            provenance check, which is the one override that must not exist.
         budget: This project's own caps and charge account. Per project
             rather than per workspace, which is where it lived until
             2026-08-28.
@@ -135,6 +155,7 @@ class ProjectConfig(TypedDict):
     env_path: str
     pinned_packages: dict[str, str]
     deterministic: bool
+    certified_inputs: bool
     budget: Budget
     repo: str
 
@@ -294,6 +315,7 @@ def decode_project_config(
         env_path=require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
         deterministic=require_bool(value, "deterministic"),
+        certified_inputs=require_bool(value, "certified_inputs"),
         budget=decode_budget(value.get("budget")),
         repo=str(config_dir / require_nonempty_str(value, "repo")),
     )
@@ -320,6 +342,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),
         "deterministic": config["deterministic"],
+        "certified_inputs": config["certified_inputs"],
         "budget": encode_budget(config["budget"]),
         "repo": config["repo"],
     }

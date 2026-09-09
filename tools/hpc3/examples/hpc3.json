@@ -22,6 +22,7 @@
         "transformers": "4.46.3"
       },
       "deterministic": true,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 120.0,
         "max_service_units": 0.0,
@@ -47,6 +48,7 @@
       "env_path": "/opt/env",
       "pinned_packages": {},
       "deterministic": false,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 120.0,
         "max_service_units": 0.0,

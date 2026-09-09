@@ -124,6 +124,7 @@ A full workspace — two projects, one GPU and one CPU:
       "env_path": "/opt/env",
       "pinned_packages": { "torch": "2.6.0+cu124", "transformers": "4.46.3" },
       "deterministic": true,
+      "certified_inputs": false,
       "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
       "repo": "../../.."
     },
@@ -143,6 +144,7 @@ A full workspace — two projects, one GPU and one CPU:
       "env_path": "/opt/env",
       "pinned_packages": {},
       "deterministic": false,
+      "certified_inputs": false,
       "budget": { "self_imposed_gpu_hours": 120.0, "max_service_units": 0.0, "charge_account": "" },
       "repo": "../../../../metabolomics-dashboard"
     }
@@ -167,6 +169,7 @@ carries an image):
   "env_path": "/opt/env",
   "pinned_packages": { "torch": "2.6.0+cu124", "numpy": "2.3.5" },
   "deterministic": false,
+  "certified_inputs": false,
   "budget": { "self_imposed_gpu_hours": 12.0, "max_service_units": 0.0, "charge_account": "" },
   "repo": "../../../../LSTM"
 }

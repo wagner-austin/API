@@ -29,6 +29,7 @@
         "transformers": "4.46.3"
       },
       "deterministic": true,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 12.0,
         "max_service_units": 0.0,

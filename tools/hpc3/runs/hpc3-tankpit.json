@@ -26,6 +26,7 @@
         "tankpit-bot": "0.1.0"
       },
       "deterministic": true,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 0.0,
         "max_service_units": 0.0,

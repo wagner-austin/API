@@ -29,6 +29,7 @@
         "numpy": "2.3.5"
       },
       "deterministic": false,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 36.0,
         "max_service_units": 0.0,

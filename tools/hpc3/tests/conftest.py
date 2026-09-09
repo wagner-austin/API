@@ -369,6 +369,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "env_path": "/opt/env",
         "pinned_packages": {},
         "deterministic": False,
+        "certified_inputs": False,
         "budget": budget_document(),
         "repo": "repos/abl",
     }

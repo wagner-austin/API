@@ -131,13 +131,22 @@ class TestDecodeWorkspace:
 
 class TestDecodeProjectConfig:
     def test_it_reads_every_field(self) -> None:
-        """PROJECT_FIELDS plus the budget, which is decoded and not overridable.
+        """PROJECT_FIELDS plus the three a run may NOT replace.
 
         The gap between the two is the assertion: PROJECT_FIELDS is exactly
         what a RUN may replace, and a cap a run can replace is not a cap.
+
+        ``certified_inputs`` joins ``budget`` and ``repo`` outside that tuple
+        for the same reason one step further: a run able to override its own
+        provenance requirement could switch off the check that says its
+        inputs are what they claim, which is the one override that must not
+        exist. Adding it to PROJECT_FIELDS would make this test pass and the
+        guarantee meaningless.
         """
         config = decode_project_config(project_config())
-        assert sorted(config.keys()) == sorted([*PROJECT_FIELDS, "budget", "repo"])
+        assert sorted(config.keys()) == sorted(
+            [*PROJECT_FIELDS, "budget", "certified_inputs", "repo"]
+        )
         assert "budget" not in PROJECT_FIELDS
         assert "repo" not in PROJECT_FIELDS
 

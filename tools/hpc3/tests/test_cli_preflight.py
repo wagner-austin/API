@@ -9,7 +9,13 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str
 
 from hpc3.cli import preflight as preflight_cli
-from tests.conftest import FakeRun, workspace_document, write_file, write_workspace
+from tests.conftest import (
+    FakeRun,
+    project_config,
+    workspace_document,
+    write_file,
+    write_workspace,
+)
 
 _LINE = (
     "sbatch: Job 1 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -87,6 +93,37 @@ class TestPreflightCli:
             "OK abl.arm-b-42: would start 2026-08-22T03:23:00 on hpc3-gpu-16-02 (4 cpu, free-gpu)"
         )
         assert emitted[1] == "1 spec(s) would be admitted; nothing was queued"
+
+    def test_a_project_requiring_certified_inputs_refuses_before_the_scheduler(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """Preflight answers "would this start", and certification answers
+        "is this the file it claims to be". Both must be asked before a job
+        id exists, and this proves preflight reaches the second."""
+        payload = "/pub/w/payloads/train.json"
+        _write(tmp_path / "doc.json", _run_payload(command=f"t --payload {payload}"))
+        _ok(fake_run)
+        fake_run.add("[ -e ", stdout=f"{payload}\n")
+        fake_run.add(
+            "RECORDS",
+            stdout=f"FILE {payload}\n{'c' * 64}  {payload}\nRECORDS {payload}\n",
+        )
+        args = [
+            "--config",
+            write_workspace(
+                tmp_path / "hpc3.json",
+                workspace_document(projects={"abl": project_config(certified_inputs=True)}),
+            ),
+            "--run",
+            str(tmp_path / "doc.json"),
+        ]
+
+        with pytest.raises(AppError) as caught:
+            preflight_cli.main(args)
+
+        error: AppError[Hpc3ErrorCode] = caught.value
+        assert error.code == Hpc3ErrorCode.RUN_INPUT_UNCERTIFIED
+        assert not [line for line in emitted if line.startswith("OK ")]
 
     def test_it_says_the_estimate_is_not_a_reservation(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]

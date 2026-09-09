@@ -323,6 +323,71 @@ class TestSubmitCli:
         assert emitted[-1].endswith("--job 55519937")
         assert emitted[-1].startswith("watch: hpc3-watch --config ")
 
+    def test_a_project_requiring_certified_inputs_refuses_an_unvouched_one(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        """The wrong-file-present half, wired end to end.
+
+        Existence was never the whole question: a payload copied up by hand
+        is present and vouched for by nothing. This proves the CLI reaches
+        that check when the project declares it, and refuses before a job id
+        exists.
+        """
+        payload = "/pub/w/payloads/train.json"
+        _write_json(
+            tmp_path / "run.json",
+            _run_payload(command=f"python train.py --payload {payload}"),
+        )
+        script_healthy_cluster(fake_run)
+        # Present, so require_inputs_present passes; digested to something no
+        # record beside it names, so certification does not.
+        fake_run.add("[ -e ", stdout=f"{payload}\n")
+        fake_run.add(
+            "RECORDS",
+            stdout=f"FILE {payload}\n{'a' * 64}  {payload}\nRECORDS {payload}\n",
+        )
+
+        args = [
+            "--config",
+            _config(tmp_path, projects={"abl": project_config(certified_inputs=True)}),
+            "--run",
+            str(tmp_path / "run.json"),
+        ]
+        with pytest.raises(AppError) as caught:
+            submit_cli.main(args)
+
+        error: AppError[Hpc3ErrorCode] = caught.value
+        assert error.code == Hpc3ErrorCode.RUN_INPUT_UNCERTIFIED
+        assert not [line for line in emitted if line.startswith("submitted ")]
+
+    def test_a_project_not_requiring_them_does_not_ask(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """`certified_inputs: false` is a declaration, not a silent default.
+
+        Every registered project reads false today because none of their
+        inputs carry a record. The check must therefore be genuinely skipped
+        rather than run and forgiven, or the survey that set them false would
+        have broken six projects.
+        """
+        payload = "/pub/w/payloads/train.json"
+        _write_json(
+            tmp_path / "run.json",
+            _run_payload(command=f"python train.py --payload {payload}"),
+        )
+        script_healthy_cluster(fake_run)
+        fake_run.add("[ -e ", stdout=payload + "\n")
+
+        args = [
+            "--config",
+            _config(tmp_path, projects={"abl": project_config(certified_inputs=False)}),
+            "--run",
+            str(tmp_path / "run.json"),
+        ]
+
+        assert submit_cli.main(args) == 0
+        assert not [call for call in fake_run.calls if "RECORDS" in " ".join(call.argv)]
+
     def test_it_says_so_when_nothing_will_be_tagged_on_completion(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:

@@ -31,6 +31,7 @@ from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
+from hpc3.core.certification import require_inputs_certified
 from hpc3.core.inputs import (
     declared_inputs,
     present_on_cluster,
@@ -104,9 +105,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     # payload -- staged corpora, unstaged payload, and nothing between the two
     # that asked. This is that question, asked before a job id exists.
     for spec in specs:
-        require_inputs_present(
-            spec["command"], present_on_cluster(workspace["host"], declared_inputs(spec["command"]))
-        )
+        inputs = declared_inputs(spec["command"])
+        require_inputs_present(spec["command"], present_on_cluster(workspace["host"], inputs))
+        if require_project_config(workspace, spec["project"])["certified_inputs"]:
+            require_inputs_certified(workspace["host"], inputs)
 
     # Preflight answers "would the scheduler admit this". Until 2026-08-26 it
     # did not also answer "and can we afford it", which was survivable only

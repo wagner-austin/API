@@ -57,6 +57,7 @@ def _project(
         env_path="/opt/env",
         pinned_packages={},
         deterministic=True,
+        certified_inputs=False,
         budget={
             "self_imposed_gpu_hours": 0.0,
             "max_service_units": 0.0,

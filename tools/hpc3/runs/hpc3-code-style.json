@@ -31,6 +31,7 @@
         "bitsandbytes": "0.45.5"
       },
       "deterministic": true,
+      "certified_inputs": true,
       "budget": {
         "self_imposed_gpu_hours": 6.0,
         "max_service_units": 0.0,

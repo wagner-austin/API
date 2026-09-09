@@ -27,6 +27,7 @@
         "xgboost": "3.1.2"
       },
       "deterministic": true,
+      "certified_inputs": false,
       "budget": {
         "self_imposed_gpu_hours": 0.5,
         "max_service_units": 0.0,

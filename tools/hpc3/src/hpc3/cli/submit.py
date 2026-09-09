@@ -33,6 +33,7 @@ from hpc3.contracts.run import resolve_run
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
+from hpc3.core.certification import require_inputs_certified
 from hpc3.core.inputs import (
     declared_inputs,
     present_on_cluster,
@@ -94,9 +95,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     # with a clean preflight and died fourteen seconds later on an absent
     # payload -- staged corpora, unstaged payload, and nothing between the two
     # that asked. This is that question, asked before a job id exists.
-    require_inputs_present(
-        spec["command"], present_on_cluster(workspace["host"], declared_inputs(spec["command"]))
-    )
+    inputs = declared_inputs(spec["command"])
+    require_inputs_present(spec["command"], present_on_cluster(workspace["host"], inputs))
+    # Existence, then provenance, and in that order: an absent file and an
+    # unvouched one are different problems, and telling a reader to certify a
+    # file that is not there would be answering the wrong one.
+    if require_project_config(workspace, spec["project"])["certified_inputs"]:
+        require_inputs_certified(workspace["host"], inputs)
 
     # The cap is the project's, not this invocation's. A per-command budget is
     # a budget that is whatever the last person typed; a per-project one is a
