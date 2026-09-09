@@ -30,8 +30,22 @@ _DOSE_RUNGS = (
     "gpt2-triples-dose-5s-lr001",
 )
 
-#: The rungs that hold the dose fixed and move the base.
+#: The rungs that hold the dose fixed and move the base, halfway down.
 _LADDER_RUNGS = ("gpt2-medium-triples", "gpt2-large-triples", "gpt2-xl-triples")
+
+#: The same ladder at the reference implementation's depth, about a third
+#: down. Includes a gpt2 rung because the half-depth ladder's gpt2 point is
+#: the reference plan itself and this one needs its own.
+_ROME_DEPTH_RUNGS = (
+    "gpt2-triples-rome-depth",
+    "gpt2-medium-triples-rome-depth",
+    "gpt2-large-triples-rome-depth",
+    "gpt2-xl-triples-rome-depth",
+)
+
+#: Layer counts, so a depth assertion is against the architecture rather than
+#: against a number somebody typed twice.
+_LAYERS = {"gpt2": 12, "gpt2-medium": 24, "gpt2-large": 36, "gpt2-xl": 48}
 
 
 class TestTheTable:
@@ -47,7 +61,9 @@ class TestTheTable:
         """A plan in neither family belongs to no comparison, and would be
         reported beside numbers it cannot be differenced against.
         """
-        assert set(TRIPLE_EDIT_PLANS) == set(_DOSE_RUNGS) | set(_LADDER_RUNGS)
+        assert set(TRIPLE_EDIT_PLANS) == (
+            set(_DOSE_RUNGS) | set(_LADDER_RUNGS) | set(_ROME_DEPTH_RUNGS)
+        )
 
     def test_every_plan_carries_the_curation_it_is_judged_on(self) -> None:
         for name, plan in TRIPLE_EDIT_PLANS.items():
@@ -78,6 +94,45 @@ class TestTheTable:
 
         assert max(doses) / min(doses) >= 100.0
 
+    def test_the_two_ladders_differ_from_each_other_only_in_the_depth(self) -> None:
+        """THE PROPERTY THAT LETS A RUNG BE DIFFERENCED AGAINST ITS TWIN.
+
+        Every rung of the ROME-depth ladder shares its dose, corpus, triples,
+        fact token and question set with the half-depth rung on the same base.
+        If anything else moved, the difference between the two ladders would
+        not be the depth.
+        """
+        twins = {
+            "gpt2-triples-rome-depth": "gpt2-triples-dose-10s-lr005",
+            "gpt2-medium-triples-rome-depth": "gpt2-medium-triples",
+            "gpt2-large-triples-rome-depth": "gpt2-large-triples",
+            "gpt2-xl-triples-rome-depth": "gpt2-xl-triples",
+        }
+        for shallow, half in twins.items():
+            here, there = TRIPLE_EDIT_PLANS[shallow], TRIPLE_EDIT_PLANS[half]
+            assert here["qa_plan"] == there["qa_plan"], shallow
+            assert here["value_steps"] == there["value_steps"], shallow
+            assert here["value_learning_rate"] == there["value_learning_rate"], shallow
+            assert here["site"]["fact_token"] == there["site"]["fact_token"], shallow
+            assert here["site"]["module_template"] == there["site"]["module_template"], shallow
+            assert here["site"]["layer"] < there["site"]["layer"], shallow
+
+    def test_the_shallow_ladder_sits_at_the_published_fraction(self) -> None:
+        """ROME edits layer 17 of gpt2-xl's 48. Every other rung is that same
+        fraction of its own depth, rounded — and xl is the published layer
+        itself rather than a rounding of it.
+        """
+        assert TRIPLE_EDIT_PLANS["gpt2-xl-triples-rome-depth"]["site"]["layer"] == 17
+        fraction = 17 / 48
+        for name in _ROME_DEPTH_RUNGS:
+            plan = TRIPLE_EDIT_PLANS[name]
+            layers = _LAYERS[QA_PLANS[plan["qa_plan"]]["model_id"]]
+            # In LAYERS rather than in fraction: a rung can only sit on an
+            # integer layer, so the tolerance that means "rounded correctly"
+            # is half a layer, and expressing it as a fraction would be a
+            # tolerance that tightens as the model gets deeper.
+            assert abs(plan["site"]["layer"] - fraction * layers) <= 0.5, name
+
     def test_the_ladder_rungs_differ_from_each_other_only_in_the_base(self) -> None:
         """THE PROPERTY THAT MAKES A SCALE LADDER A SCALE LADDER.
 
@@ -100,9 +155,10 @@ class TestTheTable:
         base, so a difference between rungs would be a difference in where the
         edit went as much as in how big the model is.
         """
-        depths = {"gpt2-medium-triples": 24, "gpt2-large-triples": 36, "gpt2-xl-triples": 48}
-        for name, layers in depths.items():
-            assert TRIPLE_EDIT_PLANS[name]["site"]["layer"] * 2 == layers, name
+        for name in _LADDER_RUNGS:
+            plan = TRIPLE_EDIT_PLANS[name]
+            layers = _LAYERS[QA_PLANS[plan["qa_plan"]]["model_id"]]
+            assert plan["site"]["layer"] * 2 == layers, name
         # And the reference the ladder extends sits at the same fraction.
         assert TRIPLE_EDIT_PLANS[_REFERENCE]["site"]["layer"] * 2 == 12
 

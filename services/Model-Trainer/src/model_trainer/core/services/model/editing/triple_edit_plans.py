@@ -171,6 +171,64 @@ TRIPLE_EDIT_PLANS: Final[dict[str, TripleEditPlan]] = {
         "value_steps": 10,
         "value_learning_rate": 0.05,
     },
+    # THE SAME LADDER AT THE REFERENCE IMPLEMENTATION'S OWN DEPTH. The rungs
+    # above edit halfway down because that is where the gpt2 plan happened to
+    # sit; ROME targets layer 17 of gpt2-xl's 48, about a third. A negative
+    # result at half depth is a result about half depth, so the fraction is
+    # the one variable this second ladder moves: 17/48 = 0.354, giving 4 of
+    # 12, 8 of 24, 13 of 36 and ROME's own 17 of 48.
+    #
+    # Everything else -- dose, corpus, triples, fact token, question set -- is
+    # identical to the half-depth ladder, so a rung here is differenceable
+    # against its half-depth twin and the difference is the depth.
+    "gpt2-triples-rome-depth": {
+        "qa_plan": "gpt2-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 4,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
+    "gpt2-medium-triples-rome-depth": {
+        "qa_plan": "gpt2-medium-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 8,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
+    "gpt2-large-triples-rome-depth": {
+        "qa_plan": "gpt2-large-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 13,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
+    "gpt2-xl-triples-rome-depth": {
+        "qa_plan": "gpt2-xl-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 17,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
 }
 
 
