@@ -51,6 +51,7 @@ def _plan(effect: float, alpha: float = 0.05, test: McNemarTest = McNemarTest.MI
         retrieved_chunks=5,
         expansion_feedback_chunks=3,
         expansion_terms=5,
+        rerank_candidates=20,
     )
 
 

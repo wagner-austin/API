@@ -15,6 +15,8 @@ from __future__ import annotations
 from platform_core.run_record import Observation
 from typing_extensions import TypedDict
 
+from model_trainer.core.contracts.cloze import ClozeEvalResult
+
 
 class QaMeasurement(TypedDict):
     """One run of every arm, and the two identities that separate it.
@@ -38,6 +40,114 @@ class QaMeasurement(TypedDict):
     observations: tuple[Observation, ...]
     corpus_digest: str
     question_set_digest: str
+
+
+class ArmScores(TypedDict):
+    """Every arm's scored result, gathered so the record can be built once.
+
+    A RECORD RATHER THAN TWELVE PARAMETERS, and the reason is the arms keep
+    arriving. This benchmark went from four arms to eight in one day, and each
+    addition widened the call that assembles the observations until the
+    argument list itself was the thing most likely to be got wrong -- two
+    ``ClozeEvalResult`` values of the same type, adjacent, are transposable
+    without a type error.
+
+    Named fields cannot be transposed silently, and a ninth arm adds a field
+    here rather than a positional argument somewhere.
+
+    Attributes:
+        base: The model alone.
+        oracle: Evidence selected by knowing the answer -- the upper bound.
+        bm25: Lexical retrieval from the question alone.
+        dense: Embedding retrieval from the question alone.
+        fused: Reciprocal-rank fusion of the lexical and dense rankings.
+        expanded: Lexical retrieval after pseudo-relevance feedback.
+        reranked: The lexical shortlist re-ordered by the model itself.
+        long_context: The corpus handed over whole, with no retrieval.
+    """
+
+    base: ClozeEvalResult
+    oracle: ClozeEvalResult
+    bm25: ClozeEvalResult
+    dense: ClozeEvalResult
+    fused: ClozeEvalResult
+    expanded: ClozeEvalResult
+    reranked: ClozeEvalResult
+    long_context: ClozeEvalResult
+
+
+def accuracy_observations(
+    scores: ArmScores,
+    *,
+    items: int,
+    chance: float,
+    long_context_corpus_fraction: float,
+    reranked_seconds: float,
+    expanded_seconds: float,
+    long_context_seconds: float,
+) -> list[Observation]:
+    """Name what every arm scored, and what each number means beside the others.
+
+    GAINS ARE STATED AGAINST THE ARM EACH ONE IS ABOUT, not uniformly against
+    base. Reranking and expansion are improvements to BM25 and are reported
+    against BM25, because "reranked beats base" would credit them with the
+    retrieval they inherited. Long context is reported against base, because
+    it inherits nothing.
+
+    Args:
+        scores: Every arm's result.
+        items: How many questions the set held.
+        chance: Accuracy a model guessing uniformly would reach.
+        long_context_corpus_fraction: Share of the corpus the long-context arm
+            actually carried. Reported beside its accuracy because the two
+            cannot be read apart -- an arm carrying six per cent of the text
+            has not tested long context.
+        reranked_seconds: Scoring time for the reranked arm.
+        expanded_seconds: Scoring time for the expanded arm.
+        long_context_seconds: Scoring time for the long-context arm.
+
+    Returns:
+        The named accuracies, gains and per-arm costs, in a stable order.
+    """
+    base = scores["base"]["accuracy"]
+    bm25 = scores["bm25"]["accuracy"]
+    return [
+        Observation(name="items", value=float(items)),
+        Observation(name="chance_accuracy", value=chance),
+        Observation(name="base_accuracy", value=base),
+        Observation(name="retrieval_accuracy", value=scores["oracle"]["accuracy"]),
+        Observation(name="retrieval_accuracy_gain", value=scores["oracle"]["accuracy"] - base),
+        Observation(name="dense_accuracy", value=scores["dense"]["accuracy"]),
+        Observation(name="fused_accuracy", value=scores["fused"]["accuracy"]),
+        Observation(name="reranked_accuracy", value=scores["reranked"]["accuracy"]),
+        Observation(
+            name="reranked_accuracy_gain_over_bm25",
+            value=scores["reranked"]["accuracy"] - bm25,
+        ),
+        Observation(name="reranked_serve_seconds", value=reranked_seconds),
+        Observation(name="expanded_accuracy", value=scores["expanded"]["accuracy"]),
+        Observation(
+            name="expanded_accuracy_gain_over_bm25",
+            value=scores["expanded"]["accuracy"] - bm25,
+        ),
+        Observation(name="expanded_serve_seconds", value=expanded_seconds),
+        Observation(name="long_context_accuracy", value=scores["long_context"]["accuracy"]),
+        Observation(
+            name="long_context_accuracy_gain",
+            value=scores["long_context"]["accuracy"] - base,
+        ),
+        Observation(name="long_context_corpus_fraction", value=long_context_corpus_fraction),
+        Observation(name="long_context_seconds", value=long_context_seconds),
+        Observation(name="bm25_accuracy", value=bm25),
+        Observation(name="bm25_accuracy_gain", value=bm25 - base),
+        # The gap the oracle arm exists to bound: how much of retrieval's
+        # advantage is the retriever finding the right sentences, and how
+        # much is knowing the answer outright.
+        Observation(
+            name="oracle_over_bm25_accuracy",
+            value=scores["oracle"]["accuracy"] - bm25,
+        ),
+    ]
 
 
 def latency_observations(
@@ -138,6 +248,8 @@ def latency_observations(
 
 
 __all__ = [
+    "ArmScores",
     "QaMeasurement",
+    "accuracy_observations",
     "latency_observations",
 ]

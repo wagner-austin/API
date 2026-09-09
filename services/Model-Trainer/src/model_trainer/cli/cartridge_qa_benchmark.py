@@ -75,16 +75,15 @@ from model_trainer.core.services.model.cartridge_qa_arms import (
     expanded_retrieval_items,
     long_context_items,
     ranked_retrieval_items,
+    reranked_retrieval_items,
     retrieval_items,
 )
-from model_trainer.core.services.model.cartridge_qa_plans import (
-    QA_EXPERIMENT,
-    QaPlan,
-    qa_plan_label,
-)
+from model_trainer.core.services.model.cartridge_qa_plans import QA_EXPERIMENT, QaPlan
 from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set
 from model_trainer.core.services.model.cartridge_qa_report import (
+    ArmScores,
     QaMeasurement,
+    accuracy_observations,
     latency_observations,
 )
 from model_trainer.core.services.model.cartridge_question_set import build_question_set
@@ -93,8 +92,8 @@ from model_trainer.core.services.model.cartridge_retrieval import (
     fuse_by_reciprocal_rank,
     rank_chunks,
 )
-from model_trainer.core.services.model.cloze.identity import question_set_digest
-from model_trainer.core.services.model.cloze.score import score_cloze_items
+from model_trainer.core.services.model.cloze.identity import qa_plan_label, question_set_digest
+from model_trainer.core.services.model.cloze.score import score_cloze_items, scored_and_timed
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.gemm_timing import synchroniser
 
@@ -178,13 +177,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     # this module took its synchroniser and left its warmup behind.
     score_cloze_items(items=items, model=base, encoder=encoder, device=device, max_seq_len=max_seq)
 
-    wait()
-    started = clock()
-    scored_base = score_cloze_items(
-        items=items, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    scored_base, base_seconds = scored_and_timed(
+        items, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
-    wait()
-    base_seconds = clock() - started
 
     # The oracle's SELECTION is timed apart from the scoring it feeds. It
     # searches each item's own answer, which no real retriever can do, so its
@@ -265,13 +260,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         [ranking[: plan["retrieved_chunks"]] for ranking in dense_ranks],
         max_seq_len=max_seq,
     )
-    wait()
-    started = clock()
-    scored_dense = score_cloze_items(
-        items=dense_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    scored_dense, dense_seconds = scored_and_timed(
+        dense_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
-    wait()
-    dense_seconds = clock() - started
 
     # Fusion re-uses the dense ranking rather than recomputing it, so this
     # times the FUSION plus the lexical ranking it still needs. A deployment
@@ -285,13 +276,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     fused_select_seconds = clock() - started
 
     fused_set = ranked_retrieval_items(items, index, encoder, fused_ranks, max_seq_len=max_seq)
-    wait()
-    started = clock()
-    scored_fused = score_cloze_items(
-        items=fused_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    scored_fused, fused_seconds = scored_and_timed(
+        fused_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
-    wait()
-    fused_seconds = clock() - started
     # SEARCHING TWICE, the second time with terms mined from the first pass.
     # Reported beside plain BM25 rather than replacing it: expansion assumes
     # its feedback set is relevant and never checks, so where the first
@@ -306,16 +293,35 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         feedback_chunks=plan["expansion_feedback_chunks"],
         expansion_terms=plan["expansion_terms"],
     )
-    wait()
-    started = clock()
-    scored_expanded = score_cloze_items(
-        items=expanded_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    scored_expanded, expanded_seconds = scored_and_timed(
+        expanded_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
-    wait()
-    expanded_seconds = clock() - started
     _log.info(
         "expanded %.4f against bm25 %.4f",
         scored_expanded["accuracy"],
+        scored_real["accuracy"],
+    )
+
+    # THE HALF OF A REAL PIPELINE THIS AXIS HAS BEEN MISSING. A deployment
+    # over-retrieves cheaply and reranks the shortlist with something that
+    # reads; comparing a cartridge against unranked BM25 compares it against
+    # a system nobody ships. Costed separately because the cost is the trade:
+    # rerank_candidates forward passes per item, where BM25 pays none.
+    reranked_set = reranked_retrieval_items(
+        items,
+        index,
+        encoder,
+        base,
+        device=device,
+        max_seq_len=max_seq,
+        candidates=plan["rerank_candidates"],
+    )
+    scored_reranked, reranked_seconds = scored_and_timed(
+        reranked_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
+    )
+    _log.info(
+        "reranked %.4f against bm25 %.4f",
+        scored_reranked["accuracy"],
         scored_real["accuracy"],
     )
 
@@ -328,13 +334,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     long_set, long_context_fraction = long_context_items(
         items, training_text, encoder, max_seq_len=max_seq
     )
-    wait()
-    started = clock()
-    scored_long_context = score_cloze_items(
-        items=long_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    scored_long_context, long_context_seconds = scored_and_timed(
+        long_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
-    wait()
-    long_context_seconds = clock() - started
     _log.info(
         "long-context %.4f over %.4f of the corpus",
         scored_long_context["accuracy"],
@@ -380,48 +382,33 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         )
 
     retrieval_pair = compare_arms(scored_base, scored_retrieval)
-    observations: list[Observation] = [
-        Observation(name="items", value=float(len(items))),
-        Observation(name="chance_accuracy", value=chance),
-        Observation(name="base_accuracy", value=scored_base["accuracy"]),
-        Observation(name="retrieval_accuracy", value=scored_retrieval["accuracy"]),
-        Observation(
-            name="retrieval_accuracy_gain",
-            value=scored_retrieval["accuracy"] - scored_base["accuracy"],
+    observations = accuracy_observations(
+        ArmScores(
+            base=scored_base,
+            oracle=scored_retrieval,
+            bm25=scored_real,
+            dense=scored_dense,
+            fused=scored_fused,
+            expanded=scored_expanded,
+            reranked=scored_reranked,
+            long_context=scored_long_context,
         ),
-        Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
-        Observation(name="dense_accuracy", value=scored_dense["accuracy"]),
-        Observation(name="fused_accuracy", value=scored_fused["accuracy"]),
-        Observation(name="expanded_accuracy", value=scored_expanded["accuracy"]),
-        Observation(
-            name="expanded_accuracy_gain_over_bm25",
-            value=scored_expanded["accuracy"] - scored_real["accuracy"],
-        ),
-        Observation(name="expanded_serve_seconds", value=expanded_seconds),
-        Observation(name="long_context_accuracy", value=scored_long_context["accuracy"]),
-        Observation(
-            name="long_context_accuracy_gain",
-            value=scored_long_context["accuracy"] - scored_base["accuracy"],
-        ),
-        Observation(name="long_context_corpus_fraction", value=long_context_fraction),
-        Observation(name="long_context_seconds", value=long_context_seconds),
-        Observation(name="bm25_accuracy", value=scored_real["accuracy"]),
-        Observation(
-            name="bm25_accuracy_gain",
-            value=scored_real["accuracy"] - scored_base["accuracy"],
-        ),
+        items=len(items),
+        chance=chance,
+        long_context_corpus_fraction=long_context_fraction,
+        reranked_seconds=reranked_seconds,
+        expanded_seconds=expanded_seconds,
+        long_context_seconds=long_context_seconds,
+    )
+    observations.append(
+        Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"])
+    )
+    observations.append(
         Observation(
             name="base_to_bm25_p_value",
             value=compare_arms(scored_base, scored_real)["p_value"],
-        ),
-        # The gap the oracle arm exists to bound: how much of retrieval's
-        # advantage is the retriever finding the right sentences, and how
-        # much is knowing the answer outright.
-        Observation(
-            name="oracle_over_bm25_accuracy",
-            value=scored_retrieval["accuracy"] - scored_real["accuracy"],
-        ),
-    ]
+        )
+    )
     # Replicated once and reused, so the summary and the per-seed rows
     # describe the same arm rather than two independent reductions of it.
     accuracy_arm = replicate("cartridge-accuracy-gain", accuracy_gains)

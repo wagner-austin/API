@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode
+from tests._retrieval_support import standard_index
 
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem, ClozeItemOutcome
 from model_trainer.core.encoding import ListEncoded
@@ -32,6 +33,7 @@ from model_trainer.core.services.model.cartridge_qa import (
 )
 from model_trainer.core.services.model.cartridge_qa_arms import (
     long_context_items,
+    reranked_retrieval_items,
     retrieval_items,
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
@@ -408,6 +410,98 @@ class TestLongContextItems:
             long_context_items([_item()], "", _CharEncoder(), max_seq_len=40)
 
         assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE
+
+
+class TestRerankedRetrievalItems:
+    """The model choosing among the retriever's shortlist.
+
+    Scored with the tiny probe model, which knows nothing about this corpus.
+    That is the point rather than a limitation: the tests here assert the
+    MECHANISM -- that a shortlist is taken, re-scored and cut -- and not that
+    an untrained model reranks well, which it does not and which no test
+    should pretend.
+    """
+
+    #: Four short sentences. SHORT because the tiny probe rung has 64
+    #: positions, so a chunk plus a question plus the joiner must fit inside
+    #: the budget with room for the answer.
+    _DOCS = ("Ballast trims it. Sonar is filtered. Leaves are pruned. Widths narrow.",)
+
+    def test_it_returns_one_item_per_input_carrying_evidence(self) -> None:
+        """The arm has to produce a scoreable set, whatever it chooses."""
+        model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        index = standard_index(self._DOCS, retrieved_chunks=2)
+        items = [_item(template="what <<BLANK>> it", answer="trims")]
+
+        built = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=48, candidates=4
+        )
+
+        assert len(built) == 1
+        assert EVIDENCE_JOINER in built[0]["template"]
+        assert built[0]["answer"] == "trims"
+
+    def test_it_cuts_the_shortlist_to_the_index_s_own_cutoff(self) -> None:
+        """The arm must hand the scorer what the arms it is compared against do.
+
+        Reranking is about WHICH chunks, never about how many: an arm that
+        also carried more evidence would win on volume and the record could
+        not tell the two apart.
+
+        THE BUDGET HERE IS 60 RATHER THAN 48, and the first version of this
+        test failed for the reason that matters: `with_evidence` truncates
+        AFTER selection, so at 48 the arm correctly chose two chunks and only
+        the first survived the cut. Asserting on the template was conflating
+        what the arm SELECTED with what the window could carry. A budget that
+        fits both separates them, which is the only way this assertion is
+        about reranking at all.
+        """
+        model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        index = standard_index(self._DOCS, retrieved_chunks=2)
+        items = [_item(template="what <<BLANK>> it", answer="trims")]
+
+        built = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=60, candidates=4
+        )
+
+        carried = built[0]["template"].split(EVIDENCE_JOINER)[0]
+        assert sum(carried.count(chunk) for chunk in index["chunks"]) == 2
+
+    def test_it_is_deterministic(self) -> None:
+        """Two runs of one plan must agree, so the sort breaks its own ties."""
+        model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        index = standard_index(self._DOCS, retrieved_chunks=2)
+        items = [_item(template="what <<BLANK>> it", answer="trims")]
+
+        first = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=48, candidates=4
+        )
+        second = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=48, candidates=4
+        )
+
+        assert first[0]["template"] == second[0]["template"]
+
+    def test_a_wider_shortlist_can_change_what_is_carried(self) -> None:
+        """If it could not, `rerank_candidates` would be decoration.
+
+        The arm exists to let the model overrule BM25's ordering. Widening
+        the shortlist gives it more to overrule, and an arm that returned the
+        same evidence either way would be reporting a knob it does not
+        respond to.
+        """
+        model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        index = standard_index(self._DOCS, retrieved_chunks=1)
+        items = [_item(template="what <<BLANK>> it", answer="trims")]
+
+        narrow = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=48, candidates=1
+        )
+        wide = reranked_retrieval_items(
+            items, index, _CharEncoder(), model, device="cpu", max_seq_len=48, candidates=4
+        )
+
+        assert narrow[0]["template"] != wide[0]["template"]
 
 
 class TestTheEncoderUsedHere:

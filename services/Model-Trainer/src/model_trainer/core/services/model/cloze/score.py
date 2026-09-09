@@ -21,7 +21,7 @@ anything.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
@@ -164,8 +164,48 @@ def score_cloze_items(
     )
 
 
+def scored_and_timed(
+    items: Sequence[ClozeItem],
+    model: LMModelProto,
+    encoder: Encoder,
+    *,
+    device: str,
+    max_seq_len: int,
+    wait: Callable[[], None],
+    clock: Callable[[], float],
+) -> tuple[ClozeEvalResult, float]:
+    """Score one arm's items and report what the scoring cost.
+
+    Written out once per arm before this existed. The two waits are the part
+    a copy can silently omit: a CUDA launch is asynchronous, so an unwaited
+    clock read times how long the work took to QUEUE rather than to run, and
+    an arm missing its second wait looks fast.
+
+    Args:
+        items: The arm's item set, carrying whatever evidence it chose.
+        model: The model to score with -- the base, or a cartridge-wrapped
+            base for the seeded arms.
+        encoder: Tokenizer the scorer uses.
+        device: Device the scoring runs on.
+        max_seq_len: The scorer's token budget.
+        wait: Synchroniser for the device, called before and after.
+        clock: Monotonic clock.
+
+    Returns:
+        ``(result, seconds)``, bracketed by synchronisation at both ends.
+    """
+    wait()
+    started = clock()
+    scored = score_cloze_items(
+        items=items, model=model, encoder=encoder, device=device, max_seq_len=max_seq_len
+    )
+    wait()
+    return scored, clock() - started
+
+
 __all__ = [
     "MIN_SCOREABLE_TOKENS",
     "score_cloze_items",
+    "scored_and_timed",
     "sequence_nll",
 ]

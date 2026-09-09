@@ -102,6 +102,11 @@ class QaPlan(TypedDict):
         expansion_feedback_chunks: How many first-pass results the
             query-expansion arm treats as relevant and mines for terms.
         expansion_terms: How many terms that arm adds to the query.
+        rerank_candidates: How many BM25 results the reranking arm hands
+            to the model to re-score. Must exceed ``retrieved_chunks``,
+            or the cutoff does the selecting and the reranker has nothing
+            to choose between. It is also the arm's cost: this many
+            forward passes per item, where BM25 pays none.
 
             Declared for the same reason the BM25 knobs are. Expansion has
             no standard setting -- it trades recall for the risk of
@@ -137,6 +142,7 @@ class QaPlan(TypedDict):
     retrieved_chunks: int
     expansion_feedback_chunks: int
     expansion_terms: int
+    rerank_candidates: int
 
 
 #: Fixed rather than a flag, and distinct from the loss experiment's name.
@@ -292,6 +298,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     # THE SCALE LADDER. Every field except `model_id` is copied from
     # `gpt2-wiki-qa` deliberately: the 2026-09-07 verdict -- that a cartridge
@@ -324,6 +331,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-large-wiki-qa": {
         "model_id": "gpt2-large",
@@ -344,6 +352,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-xl-wiki-qa": {
         "model_id": "gpt2-xl",
@@ -364,6 +373,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     # THE POWERED PLANS, and the reason they exist is arithmetic rather than
     # taste. The me-wiki corpus yields 32 items, and a comparison of two
@@ -403,6 +413,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-large-api-wiki-qa": {
         "model_id": "gpt2-large",
@@ -423,6 +434,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     # THE RUNG ABOVE THE GPT-2 FAMILY, and the reason it did not exist until
     # 2026-09-09 is that nobody wrote it. The ladder stopped at gpt2-xl
@@ -457,6 +469,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     # THE CAPACITY AXIS, WHICH HAD NEVER BEEN VARIED. `num_slots` was 128 in
     # every plan above, six times over, while the programme's stated mechanism
@@ -490,6 +503,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-large-api-wiki-qa-slots-64": {
         "model_id": "gpt2-large",
@@ -510,6 +524,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-large-api-wiki-qa-slots-128": {
         "model_id": "gpt2-large",
@@ -530,6 +545,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
     "gpt2-large-api-wiki-qa-slots-256": {
         "model_id": "gpt2-large",
@@ -550,43 +566,13 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "retrieved_chunks": 5,
         "expansion_feedback_chunks": 3,
         "expansion_terms": 5,
+        "rerank_candidates": 20,
     },
 }
-
-
-def qa_plan_label(name: str, plan: QaPlan, *, digest: str) -> str:
-    """Build the label that identifies one plan's numbers on one corpus.
-
-    Args:
-        name: The plan's name.
-        plan: The plan.
-        digest: Digest of the corpus, from
-            :func:`~cartridge_plans.corpus_digest`.
-
-    Returns:
-        The label, e.g.
-        ``gpt2-wiki-qa-gpt2-w256-s4-c128-m896-e12-lr0.01-d3-n120-seeds7.8.9-1a2b3c4d``.
-    """
-    seeds = ".".join(str(seed) for seed in plan["seeds"])
-    return (
-        f"{name}"
-        f"-{plan['model_id']}"
-        f"-w{plan['window']}"
-        f"-s{plan['held_out_stride']}"
-        f"-c{plan['num_slots']}"
-        f"-m{plan['max_seq_len']}"
-        f"-e{plan['epochs']}"
-        f"-lr{plan['learning_rate']}"
-        f"-d{plan['distractor_count']}"
-        f"-n{plan['max_items']}"
-        f"-seeds{seeds}"
-        f"-{digest[:12]}"
-    )
 
 
 __all__ = [
     "QA_EXPERIMENT",
     "QA_PLANS",
     "QaPlan",
-    "qa_plan_label",
 ]

@@ -201,7 +201,7 @@ class TestLatencyObservations:
 
 class TestServeLatency:
     def test_each_arm_is_timed_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
-        """Thirty reads: seven arms, then two per seed.
+        """Thirty-two reads: eight arms, then two per seed.
 
         The load-bearing assertions are the two totals. The cartridge's three
         seeds are scripted at 1.0, 2.0 and 3.0, so the MEAN is 2.0 and a sum
@@ -236,6 +236,8 @@ class TestServeLatency:
                 269.0,  # fused scoring: 9.0
                 269.0,
                 273.0,  # expanded scoring: 4.0
+                269.0,
+                275.5,  # reranked scoring: 6.5
                 270.0,
                 275.0,  # long-context scoring: 5.0
                 300.0,
@@ -274,6 +276,8 @@ class TestServeLatency:
         assert named["fused_total_serve_seconds"] == 14.0
         # Searching twice costs more than searching once, and says so.
         assert named["expanded_serve_seconds"] == 4.0
+        # Reranking reads every shortlisted chunk, and is costed for it.
+        assert named["reranked_serve_seconds"] == 6.5
         # The arm that does no searching at all still pays for its tokens.
         assert named["long_context_seconds"] == 5.0
         assert named["cartridge_serve_seconds"] == 2.0
@@ -314,6 +318,8 @@ class TestServeLatency:
                 18.0,  # fused scoring
                 18.0,
                 18.5,  # expanded scoring
+                18.0,
+                18.2,  # reranked scoring
                 18.0,
                 19.0,  # long-context scoring
                 20.0,

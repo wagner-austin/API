@@ -22,8 +22,8 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     QA_EXPERIMENT,
     QA_PLANS,
     QaPlan,
-    qa_plan_label,
 )
+from model_trainer.core.services.model.cloze.identity import qa_plan_label
 
 #: The scale ladder: one field moves, and it is the base model.
 _SCALE_LADDER: tuple[str, ...] = (
@@ -82,6 +82,7 @@ def _redrawn(
         retrieved_chunks=plan["retrieved_chunks"],
         expansion_feedback_chunks=plan["expansion_feedback_chunks"],
         expansion_terms=plan["expansion_terms"],
+        rerank_candidates=plan["rerank_candidates"],
     )
 
 

@@ -71,6 +71,7 @@ TINY_PLAN: QaPlan = {
     "retrieved_chunks": 5,
     "expansion_feedback_chunks": 2,
     "expansion_terms": 3,
+    "rerank_candidates": 4,
 }
 
 #: Six documents, each naming its own subject in several sentences.

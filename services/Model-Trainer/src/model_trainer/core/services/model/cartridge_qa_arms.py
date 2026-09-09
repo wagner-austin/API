@@ -24,6 +24,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_
 from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.services.model.cartridge_qa import (
+    EVIDENCE_JOINER,
     evidence_budget_tokens,
     evidence_for,
     with_evidence,
@@ -32,8 +33,11 @@ from model_trainer.core.services.model.cartridge_retrieval import (
     Bm25Index,
     expand_query,
     join_chunks,
+    rank_chunks,
     retrieve,
 )
+from model_trainer.core.services.model.cloze.score import sequence_nll
+from model_trainer.core.types import LMModelProto
 
 
 def retrieval_items(
@@ -271,10 +275,95 @@ def expanded_retrieval_items(
     ]
 
 
+def reranked_retrieval_items(
+    items: Sequence[ClozeItem],
+    index: Bm25Index,
+    encoder: Encoder,
+    model: LMModelProto,
+    *,
+    device: str,
+    max_seq_len: int,
+    candidates: int,
+) -> list[ClozeItem]:
+    """Build the arm that lets the MODEL choose among the retriever's shortlist.
+
+    THE SECOND HALF OF A REAL RETRIEVAL PIPELINE, and the half this axis has
+    been comparing a cartridge against without having. Production systems do
+    not serve BM25's ordering; they over-retrieve cheaply and then rerank the
+    shortlist with something that actually reads. Reporting "the cartridge
+    beats BM25" while the deployed alternative reranks is a comparison against
+    a system nobody ships.
+
+    QUERY LIKELIHOOD, using the base model already loaded, so this adds no
+    dependency and no second scorer whose disagreements with the first would
+    have to be explained. Each candidate chunk is scored by the negative
+    log-likelihood the model assigns to the QUESTION when that chunk precedes
+    it: a chunk that makes the question less surprising is a chunk that
+    explains it. The lowest scores win.
+
+    IT IS THE SAME MODEL BEING MEASURED, and that is worth stating rather than
+    hiding. The reranker is not an independent judge -- a base model that
+    knows nothing about the corpus reranks badly, and one carrying a cartridge
+    is not what runs here. This measures what the ARM can do with the
+    retriever's shortlist, not what an ideal reranker could.
+
+    COST IS THE POINT OF THE ARM, not an implementation detail: it pays
+    ``candidates`` forward passes per item where BM25 pays none, which is
+    exactly the trade a deployment makes. The record times it separately.
+
+    Args:
+        items: The shared question set.
+        index: A BM25 index over the same training documents; its
+            ``retrieved_chunks`` is the cutoff applied AFTER reranking, so
+            this arm hands the scorer the same amount of evidence as the arms
+            it is compared against.
+        encoder: Tokenizer the scorer will use.
+        model: The loaded base model, used to score candidates.
+        device: Device the scoring tensors are placed on.
+        max_seq_len: The scorer's token budget.
+        candidates: How many BM25 results to rerank. Reranking fewer than
+            ``retrieved_chunks`` would leave the cutoff doing the work.
+
+    Returns:
+        One item per input, each carrying what the model chose.
+
+    Raises:
+        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
+            when an item leaves no room for evidence.
+    """
+    built: list[ClozeItem] = []
+    for item in items:
+        query = item["template"].replace(BLANK_MARKER, " ")
+        shortlist = rank_chunks(index, query)[:candidates]
+        # Sorted as (nll, chunk): the tuple orders by score and breaks ties on
+        # corpus position, so the choice is a function of the corpus and the
+        # query alone -- the property every other arm here holds.
+        scored = sorted(
+            (
+                sequence_nll(
+                    model=model,
+                    encoder=encoder,
+                    text=f"{index['chunks'][chunk]}{EVIDENCE_JOINER}{query}",
+                    device=device,
+                    max_seq_len=max_seq_len,
+                    item_id=item["item_id"],
+                ),
+                chunk,
+            )
+            for chunk in shortlist
+        )
+        chosen = [chunk for _nll, chunk in scored[: index["retrieved_chunks"]]]
+        built.append(
+            with_evidence(item, join_chunks(index, chosen), encoder, max_seq_len=max_seq_len)
+        )
+    return built
+
+
 __all__ = [
     "bm25_retrieval_items",
     "expanded_retrieval_items",
     "long_context_items",
     "ranked_retrieval_items",
+    "reranked_retrieval_items",
     "retrieval_items",
 ]
