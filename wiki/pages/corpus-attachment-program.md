@@ -30,14 +30,14 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py": 3315e270ab5f129eb92acc25bc90aa16d610ac0b
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/curated_triples.py": c8294f15c0d14b61604c02418df58f0f9dfbfec7
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_arm.py": 4e6d8ca11243efbf52623609e452e2c1088346b9
-  "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py": 176c9102b85440d7b19337316798567058657c92
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py": f7af025c96945aa117cba11617c24a35fecd0784
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/value_optimisation.py": 2d71c8069f08a946dd47bccf8e03d97825a3e6c7
 provenance:
   - "all arms measured 2026-09-08/09 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
   - "records qa-svc-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
   - "DETERMINISM CERTIFICATE: four independent runs hours apart, across substantial changes to the retrieval path, agree on 12 shared accuracy fields at every rung"
   - "SUPERSEDED: the 2026-09-07 run (qa-record-bm25.json, 24 items) predates commits 9ba9dfb6 and eb73abf8 and its verdict is retracted here; the 2026-09-08 ladder's LATENCY figures predate 62315399 and 00602af9 and are retracted too"
-  - "triple-edit records triple-{gpt2-triples-dose-10s-lr005,gpt2-medium-triples,gpt2-large-triples,gpt2-xl-triples}.json, same 32 items, same corpus digest, dose 10 x 0.05 at half depth, one card"
+  - "triple-edit records triple-{gpt2-triples-dose-10s-lr005,gpt2-medium-triples,gpt2-large-triples,gpt2-xl-triples}.json at half depth and the same four with -rome-depth at ROME's 17/48 fraction; same 32 items, same corpus digest, dose 10 x 0.05 throughout, one card"
   - "the triple-edit arm has NO seed axis: the value search starts from zeros and is deterministic given the plan, so its accuracy differences carry no noise floor and only gpt2-xl's exact zero across thirteen edits is a statement"
   - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), ac5f88cb (scale ladder, done), a8f799c5 (retrieval methods, done), 3fc98ed6 (corpus representation, measured 2026-09-09, held open on the shallower-site caveat), 74dd514e (persona adapter, never started)"
   - "AKEW figures from wiki page wu-2024-akew-editing-in-the-wild in the personal wiki, read page by page"
@@ -130,6 +130,34 @@ thirteen times in a row**: not one of the 32 items moved while thirteen facts
 were written into the parameters. That is AKEW's dissociation between edit
 success and downstream answering, reproduced on this corpus at four scales.
 
+**And it is not the site.** Half depth is not where the reference
+implementation writes — ROME targets layer 17 of gpt2-xl's 48, about a third
+down — so the whole ladder was re-run at that fraction (4/12, 8/24, 13/36, and
+ROME's own 17/48), with dose, corpus, triples, fact token and question set
+identical, so each rung differences against its half-depth twin on depth
+alone.[^depths]
+
+| rung | half depth | at ROME's fraction |
+|---|---|---|
+| gpt2 124M | L6 → 0.3438 (succ 1.00) | L4 → 0.3750 (succ 0.92) |
+| gpt2-medium 355M | L12 → 0.5938 (succ 1.00) | L8 → 0.4688 (succ **0.23**) |
+| gpt2-large 774M | L18 → 0.4688 (succ 1.00) | L13 → 0.5000 (succ 1.00) |
+| gpt2-xl 1.5B | L24 → **0.5625** (succ 1.00) | L17 → **0.5625** (succ 1.00) |
+
+Eight configurations, two depths, four scales, base unchanged within each row.
+**Not one gains more than a single item out of 32.** gpt2-xl is flat at 0.5625
+at BOTH depths — twenty-six edits across the two runs, every one landing, and
+the model answers the same eighteen questions it always did.
+
+The shallower site is also LESS stable, which is the one thing the second
+ladder adds beyond a confirmation. Edit success is 1.00 at half depth
+everywhere; at ROME's fraction it is 0.92, 0.23 and 1.00 — and medium's
+shallower rung is the only configuration measured anywhere in this program
+where the edits leave their own targets MORE surprising than they started
+(21.7 → 23.0). Thirteen sequential rank-one writes at an early layer compound
+into each other's captures, because everything downstream of the site has
+already moved by the time the next edit reads it.
+
 A gpt2-only dose curve had shown accuracy falling monotonically with every
 unit of target likelihood bought, the only harmless dose being the one that
 installed nothing. **The ladder retracts the generality of that**: the damage
@@ -140,10 +168,19 @@ of any benefit.
 and unlike the cartridge arm it has NO seed axis — the value search starts from
 zeros and is deterministic given the plan, so there is nothing to vary and no
 noise floor to build from. Medium's +0.031 and large's −0.062 are one and two
-items and neither is a finding. Only xl's exact zero across all thirteen edits
-is a statement, and it is a statement about one run. The site is also half
-depth at every rung, which the reference implementation does not do — ROME
-targets layer 17 of XL's 48 — so a shallower site is untested.
+items and neither is a finding. What IS a statement is xl's exact zero across
+thirteen edits at each of two depths, and the fact that eight configurations
+produced no gain anywhere.
+
+Still untested: batched editing. Thirteen SEQUENTIAL rank-one writes are not
+MEMIT, which solves for many associations at once and does not let each edit
+read a model the previous ones have already moved — and the 0.23 success rate
+at medium's shallow site is exactly the failure mode batching exists to avoid.
+
+[^depths]: `services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py`
+    § `TRIPLE_EDIT_PLANS` holds both ladders; the ROME-fraction rungs carry the
+    `-rome-depth` suffix and `tests/test_triple_edit_plans.py` asserts each one
+    differs from its half-depth twin in the layer alone. Commit `827f688c`.
 
 [^triples]: `services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py`
     is the gate, `editing/curated_triples.py` the twenty attempts with their
@@ -303,10 +340,11 @@ one more question. The two facts still sit next to each other, but the second
 is now measured rather than inferred — **the method that tolerates prose
 works, and the method that cannot is not rescued by being handed clean input.**
 
-What remains genuinely untested is the shallower site ROME itself uses, and
-whether a corpus REWRITTEN into triple-shaped prose would change what the
-CARTRIDGE arm can do — a different question, since that arm reads windows
-rather than associations, and it is the arm that works.
+The shallower site ROME itself uses was the last caveat, and it was run rather
+than left standing: it does not change the verdict. What remains untested is
+BATCHED editing, and whether a corpus REWRITTEN into triple-shaped prose would
+change what the CARTRIDGE arm can do — a different question, since that arm
+reads windows rather than associations, and it is the arm that works.
 
 ## Reading order for the children
 
