@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
-  "docs/RESEARCH.md": 655f45102f1dabc49dbe35c56c9e3d4fa1889221
+  "docs/RESEARCH.md": 942f70281ca582e9297b1779279479c3d5184a7d
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -50,6 +50,8 @@ provenance:
   - "7B LM twin 55811523 BYTE-IDENTICAL (sha256 6ef4b9c9 truncated, same-node hpc3-gpu-l54-09); 7B invariance twin 55811542 CROSS-NODE (k54-01 vs l54-09) with ALL 198 observations bit-equal -- record shas 254d0126 vs 8c48e82a differ solely in fingerprint/host/logical_cores 32 vs 64, so NF4 training is certified deterministic cross-node in every measured quantity"
   - "headroom measurement 2026-09-07, board task afee6162: cartridge_headroom CLI (commit 77e12c3e), image v44 sha256 9e98d0a7 (truncated), jobs 55812858 + twin 55812861 (~4 min each on A30), records BYTE-IDENTICAL sha256 7668c51d (truncated), same-node hpc3-gpu-k54-01; plain-base held-out loss on the primary corpus 4.57 (gpt2) / 4.27 (medium) / 4.11 (xl) / 3.66 (pythia-6.9b NF4), pythia 0.34-0.90 nats below every GPT-2 base on all 11 corpora; per-corpus character and token rows carried for the tokenizer caveat (pythia ~7% fewer tokens on the same text)"
   - "nine-seed solo reliability 2026-09-07/08, board task b89cd348: cartridge_solo_seeds CLI (commit 4fc8dfbb), image v45 sha256 567cb42d (truncated), solo cartridges trained AND scored behind the PLAIN base at the recorded knobs; 7B pair 55813508 + twin 55813516 BYTE-IDENTICAL sha256 353ab575 (truncated, same-node k54-01); xl control pair 55818092 + twin 55813528 CROSS-NODE (l54-09 / l54-07) with all 14 observations bit-equal, shas differing solely in fingerprint/host/logical_cores 64 vs 32; xl mean +0.827 spread 0.079 over nine seeds, pythia-6.9b/NF4 mean +0.160 spread 0.320 with one negative draw"
+  - "bf16 precision control 2026-09-09, board task c4b9a01b: StoredBf16Precision loader state (commit f4447989), image v46 sha256 bd6ca365 (truncated), jobs 55833896 + twin 55833931 (~9 min each, half NF4's wall clock), records BYTE-IDENTICAL sha256 445e345f (truncated) ACROSS nodes gpu-24-07 / gpu-l54-07 -- the arc's first full cross-node byte identity on a 7B record; bf16 mean +0.102 spread 0.248 two negatives; paired bf16-minus-NF4 -0.058 +/- 0.032 (t -1.80, MDE 0.075 nats): NF4 exonerated"
+  - "MDE rows computed 2026-09-09 from stored per-seed rows (machine-wide MDE standard): 1.5B n8-equals-n4 holds (LM +0.0004 vs MDE 0.019; invariance +0.0001 vs 0.068); objectives' diverse-n4 tie at 1.5B holds (-0.008 vs MDE 0.047); diverse-n8 CORRECTED from tie to a resolved -0.0088 +/- 0.0014 LM advantage (t ~ -6.5), ~1% of the alone gain, no operating decision changes"
 fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
@@ -249,11 +251,15 @@ diverse n8 equals n4 to a tenth under BOTH objectives (LM
 +54.8%/+54.8%, invariance +52.8%/+52.8%; each record's own separation
 flag between the two cells reads 0.0), so the 24-layer n8 collapse is a
 mid-depth valley, not a depth law -- the ladder reads 33.3 → −79.4 →
-+54.8 for LM n8 and 49.6 → 38.1 → 52.8 for invariance n8. The two
-objectives tie on diverse at 1.5B (composed means within both noise
-floors); the invariance objective's remaining margin there is plain
-cartridges (+22.5%/+5.8% against the LM objective's −11.5%/−27.9%) and
-the ladder-wide fact that it collapses nowhere. The n8
++54.8 for LM n8 and 49.6 → 38.1 → 52.8 for invariance n8. On diverse at 1.5B the
+paired per-seed rows resolve what the range floors could not: n4 is a
+genuine tie (−0.008 against an MDE of 0.047) while at n8 invariance
+sits a RESOLVED −0.0088 ± 0.0014 below the LM objective (t ≈ −6.5) —
+about 1% of the alone gain, changing no operating decision, corrected
+from the earlier "tie" wording when the MDE rows were computed. The
+invariance objective's remaining margin there is plain cartridges
+(+22.5%/+5.8% against the LM objective's −11.5%/−27.9%) and the
+ladder-wide fact that it collapses nowhere. The n8
 composed-below-noise-control content gap reads ~0.21 under both
 objectives at 48 layers, so depth's content amplification at 24 layers
 (1.04) does not extrapolate either direction.
@@ -300,10 +306,14 @@ never lucky -- gpt2-xl's nine draws all land in +0.78..+0.86 -- while
 with a spread twice that and one draw negative; the sweeps' ~0.4
 readings carried the adapted base's contribution, and
 pythia-plus-cartridge (~3.50) does not reach xl-plus-cartridge
-(~3.28), so the training-side deficit is real beside headroom. Still
-open, filed rather than implied: the 7B recovery levers (an
-architecture-scaled hyperparameter rung and an unquantized-bf16
-precision control) before any 7B composition rung, the mechanism of
-the mid-depth valley, the remaining 0.30 content gap at medium n8,
-and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
+(~3.28), so the training-side deficit is real beside headroom. The bf16 precision control has
+since run (provenance below) and EXONERATES NF4: quantization removed,
+the same nine seeds land in the same broken regime (mean +0.102, two
+negatives; paired difference −0.058 against an MDE of 0.075), so by
+elimination the 7B training deficit is the hyperparameter/architecture
+mismatch riding on the measured headroom. Still open, filed rather
+than implied: the single remaining 7B recovery lever (slot count /
+learning rate scaled to the architecture) before any 7B composition
+rung, the mechanism of the mid-depth valley, the remaining 0.30
+content gap at medium n8, and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
 and the extension list.
