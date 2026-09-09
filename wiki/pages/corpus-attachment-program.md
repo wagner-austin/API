@@ -1,5 +1,5 @@
 ---
-title: Attaching a corpus to a model — four arms, and the one that works from 774M
+title: Attaching a corpus to a model — four arms, the one that works from 774M, and the one that clean input does not rescue
 tags: [ml, model-trainer, cartridges, retrieval, model-editing, research-program]
 related:
   - "[[model-trainer-composition-ceiling]]"
@@ -8,24 +8,38 @@ related:
   - "[[model-trainer-companioned-training-recipe]]"
 source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_report.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py
   - services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/editing/curated_triples.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_arm.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/editing/value_optimisation.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 1e45bd37cf0cf4f191b62cd43485d892e1901e3c
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 19bb7f1c1e1ee5e71677b6d37d986f7073723b44
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_report.py": e1016b716bea823766336a2b157a1c9587395259
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": 36950df0ed6f7a4af8ae37e3550482f1203aa376
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py": 883e01b8afba699654da81e92e8e37eca608b234
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
   "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py": 411c47f975fad5b700bcc6948da496f9af9c4c73
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py": 3315e270ab5f129eb92acc25bc90aa16d610ac0b
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/curated_triples.py": c8294f15c0d14b61604c02418df58f0f9dfbfec7
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_arm.py": 4e6d8ca11243efbf52623609e452e2c1088346b9
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py": 176c9102b85440d7b19337316798567058657c92
+  "services/Model-Trainer/src/model_trainer/core/services/model/editing/value_optimisation.py": 2d71c8069f08a946dd47bccf8e03d97825a3e6c7
 provenance:
   - "all arms measured 2026-09-08/09 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
   - "records qa-svc-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
   - "DETERMINISM CERTIFICATE: four independent runs hours apart, across substantial changes to the retrieval path, agree on 12 shared accuracy fields at every rung"
   - "SUPERSEDED: the 2026-09-07 run (qa-record-bm25.json, 24 items) predates commits 9ba9dfb6 and eb73abf8 and its verdict is retracted here; the 2026-09-08 ladder's LATENCY figures predate 62315399 and 00602af9 and are retracted too"
-  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), ac5f88cb (scale ladder, done), a8f799c5 (retrieval methods, done), 3fc98ed6 (corpus representation, open), 74dd514e (persona adapter, never started)"
+  - "triple-edit records triple-{gpt2-triples-dose-10s-lr005,gpt2-medium-triples,gpt2-large-triples,gpt2-xl-triples}.json, same 32 items, same corpus digest, dose 10 x 0.05 at half depth, one card"
+  - "the triple-edit arm has NO seed axis: the value search starts from zeros and is deterministic given the plan, so its accuracy differences carry no noise floor and only gpt2-xl's exact zero across thirteen edits is a statement"
+  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), ac5f88cb (scale ladder, done), a8f799c5 (retrieval methods, done), 3fc98ed6 (corpus representation, measured 2026-09-09, held open on the shallower-site caveat), 74dd514e (persona adapter, never started)"
   - "AKEW figures from wiki page wu-2024-akew-editing-in-the-wild in the personal wiki, read page by page"
 fact_checked: "2026-09-09"
 confidence: high
@@ -51,7 +65,7 @@ This page is the index. It carries no measurement of its own.
 
 | arm | mechanism | verdict |
 |---|---|---|
-| Weight injection | rank-one edit into the parameters | **No, on this corpus** — bounded by ingest, not algebra |
+| Weight injection | rank-one edit into the parameters | **No, and now measured rather than argued** — hand-curated triples clear the bar 13 times in 20, every edit lands at every scale, and no rung answers one more question |
 | Steering vectors | add a direction to the residual stream | **No** — composition degrades to nothing |
 | Cartridges | train a KV prefix, serve it ahead of the query | **Yes from ~774M** — beats lexical, dense AND fused retrieval on accuracy; cheaper per request than dense and fused everywhere, and than BM25 at 1.5B |
 | Persona adapter | not started | untested |
@@ -78,6 +92,65 @@ words.
 
 A cited wiki is prose, and prose is the regime these methods score single
 digits in.
+
+### And when the triples are supplied by hand, the method still buys nothing
+
+That was the argument until 2026-09-09. It has now been TESTED rather than
+argued, because "prose does not become a rank-one edit" is a claim about the
+prose that only a curated representation can check.[^triples]
+
+**The cost of a usable representation.** Twenty triples were curated by hand,
+one per distinct answer in the same 32-item question set, each held to a
+seven-clause mechanical gate: the source sentence must be one of the TRAINING
+half's sentences, both ends of the association verbatim in it, object after
+subject, no giveaway in the prompt, and the subject must be a corpus term by
+the same extractor the question set uses to decide what it may ask about.
+
+**13 of 20 clear it; 7 do not.** Six fail on the subject not being an entity
+and two on the answer preceding it, and **zero** fail any clause a curator
+controls — so the rejections are facts about the prose. Every one of the seven
+appears in the training text as the FIRST entity in its sentence, leaving no
+earlier entity to hang an association on. Three of the thirteen that pass are
+grounded only in a filesystem path or a footnote, which is the ghost-term
+problem in a new place.
+
+**What the accepted thirteen do.** Written into the weights at half depth,
+one dose, the same question set.[^triples]
+
+| rung | base | after 1 edit | after 13 | gain | edit success | target NLL |
+|---|---|---|---|---|---|---|
+| gpt2 124M | 0.4375 | 0.4062 | 0.3438 | −0.094 | 1.00 | 23.3 → 15.9 |
+| gpt2-medium 355M | 0.5625 | 0.5312 | 0.5938 | +0.031 | 1.00 | 21.7 → 19.3 |
+| gpt2-large 774M | 0.5312 | 0.5000 | 0.4688 | −0.062 | 1.00 | 22.3 → 18.9 |
+| gpt2-xl 1.5B | 0.5625 | 0.5625 | **0.5625** | +0.000 | 1.00 | 21.4 → 18.9 |
+
+Every edit lands at every scale — success 1.00, target surprise down by 2.4 to
+7.4 — and no rung answers more questions. **gpt2-xl's per-edit curve is 0.5625
+thirteen times in a row**: not one of the 32 items moved while thirteen facts
+were written into the parameters. That is AKEW's dissociation between edit
+success and downstream answering, reproduced on this corpus at four scales.
+
+A gpt2-only dose curve had shown accuracy falling monotonically with every
+unit of target likelihood bought, the only harmless dose being the one that
+installed nothing. **The ladder retracts the generality of that**: the damage
+is a 124M phenomenon and does not survive scale. What survives is the absence
+of any benefit.
+
+**What this arm cannot say.** Its differences are one to three items out of 32,
+and unlike the cartridge arm it has NO seed axis — the value search starts from
+zeros and is deterministic given the plan, so there is nothing to vary and no
+noise floor to build from. Medium's +0.031 and large's −0.062 are one and two
+items and neither is a finding. Only xl's exact zero across all thirteen edits
+is a statement, and it is a statement about one run. The site is also half
+depth at every rung, which the reference implementation does not do — ROME
+targets layer 17 of XL's 48 — so a shallower site is untested.
+
+[^triples]: `services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py`
+    is the gate, `editing/curated_triples.py` the twenty attempts with their
+    source sentences, `editing/triple_edit_arm.py` the arm and
+    `editing/triple_edit_plans.py` the dose curve and the ladder. Commits
+    `f411fd19`, `cf344758`, `98438f67`; board task `3fc98ed6` carries the full
+    trail including the instrument defect found and corrected mid-run.
 
 ## Steering vectors: bounded by published results, not by this stack
 
@@ -208,30 +281,32 @@ narrow in three ways that still matter.
    result is about THIS corpus's proper-noun density, not about dense
    retrieval in general.
 
-## The untested lever, which the cartridge result makes MORE interesting
+## The lever that was untested, and what testing it settled
 
-Every arm above tested a METHOD. None tested the CORPUS REPRESENTATION.
+Every arm above tested a METHOD. None tested the CORPUS REPRESENTATION, and
+until 2026-09-09 this section argued that the omission mattered.
 
-This mattered when all three arms had failed; it matters more now that one
-has not. The cartridge succeeds by reading prose windows directly, and it is
-the only arm that never needed the corpus reshaped. Weight injection is
-still blocked on exactly that, and the two facts sit next to each other:
-the method that tolerates prose works, and the method that cannot is the one
-nobody has given a usable input to.
+The argument was: AKEW's numbers say the format is the bottleneck — the same
+facts score 93-99% as clean triples and 2.25-4.78% extracted from prose, and
+this wiki is 0.24% triple-shaped — so "prose does not become a rank-one edit"
+might be a fact about the prose rather than about the method. The naive test
+was already known to fail, because having a model extract triples from prose
+IS the automatic extraction AKEW measured in the single digits. What was
+needed was high-precision triples behind a verification gate, which converts
+the question from "does the method work" into "what does a usable
+representation cost".
 
-AKEW's own numbers say the format is the bottleneck: the same facts score
-93-99% as clean triples and 2.25-4.78% extracted from prose. This wiki is
-0.24% triple-shaped. So "prose does not become a rank-one edit" may be a fact
-about the prose rather than about the method — and nobody has tried changing
-the prose.
+**That was built and run, and the answer is above.** A usable representation
+costs a 0.35 reject rate on hand-curated triples, and it buys nothing: every
+accepted association lands in the weights at every scale, and no rung answers
+one more question. The two facts still sit next to each other, but the second
+is now measured rather than inferred — **the method that tolerates prose
+works, and the method that cannot is not rescued by being handed clean input.**
 
-**The naive version is already known to fail.** Having a model extract
-triples from prose IS the automatic extraction AKEW measured in the single
-digits. The version worth testing is high-precision triples — curated, or
-generated behind a verification gate that discards anything not exactly
-grounded in its source sentence. That converts the question from "does the
-method work" into "what does a usable representation cost", which is a
-different and better question.
+What remains genuinely untested is the shallower site ROME itself uses, and
+whether a corpus REWRITTEN into triple-shaped prose would change what the
+CARTRIDGE arm can do — a different question, since that arm reads windows
+rather than associations, and it is the arm that works.
 
 ## Reading order for the children
 
