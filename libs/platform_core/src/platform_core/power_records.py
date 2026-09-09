@@ -30,6 +30,7 @@ from platform_core.json_utils import (
 )
 from platform_core.power_distributions import McNemarTest
 from platform_core.power_types import (
+    ClusteredPairedPower,
     McNemarPower,
     NetDifferencePower,
     PairedContinuousPower,
@@ -293,6 +294,67 @@ def decode_net_difference_power(obj: JSONObject) -> NetDifferencePower:
     )
 
 
+def encode_clustered_paired_power(record: ClusteredPairedPower) -> JSONObject:
+    """Encode a :class:`ClusteredPairedPower` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "unit": record["unit"],
+        "clusters": record["clusters"],
+        "total_units": record["total_units"],
+        "largest_cluster": record["largest_cluster"],
+        "average_cluster_size": record["average_cluster_size"],
+        "intracluster_correlation": record["intracluster_correlation"],
+        "design_effect": record["design_effect"],
+        "effective_sample_size": record["effective_sample_size"],
+    }
+
+
+def decode_clustered_paired_power(obj: JSONObject) -> ClusteredPairedPower:
+    """Decode a :class:`ClusteredPairedPower` from a JSON object.
+
+    The unit is checked for emptiness here as well as at construction. A
+    record read back from a file is the form a reader acts on, and a blank
+    unit makes the design effect beside it uninterpretable -- the same 875
+    items grouped three ways give three different answers.
+
+    Args:
+        obj: JSON object as produced by :func:`encode_clustered_paired_power`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On an unknown instrument, or on a blank clustering unit.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    unit = require_str(obj, "unit")
+    if not unit.strip():
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID,
+            "field 'unit' is blank; a design effect without the grouping that "
+            "produced it cannot be checked, because the same units grouped by "
+            "directory and by package give different answers",
+        )
+    return ClusteredPairedPower(
+        instrument=_require_instrument(obj, "instrument", PowerInstrument.CLUSTERED_PAIRED),
+        unit=unit,
+        clusters=require_int(obj, "clusters"),
+        total_units=require_int(obj, "total_units"),
+        largest_cluster=require_int(obj, "largest_cluster"),
+        average_cluster_size=require_float(obj, "average_cluster_size"),
+        intracluster_correlation=require_float(obj, "intracluster_correlation"),
+        design_effect=require_float(obj, "design_effect"),
+        effective_sample_size=require_float(obj, "effective_sample_size"),
+    )
+
+
 def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
     """Encode a :class:`RateFloorPower` to a JSON object.
 
@@ -384,12 +446,14 @@ def decode_zero_failure_power(obj: JSONObject) -> ZeroFailurePower:
 
 
 __all__ = [
+    "decode_clustered_paired_power",
     "decode_mcnemar_power",
     "decode_net_difference_power",
     "decode_paired_continuous_power",
     "decode_rate_floor_power",
     "decode_required_replicates",
     "decode_zero_failure_power",
+    "encode_clustered_paired_power",
     "encode_mcnemar_power",
     "encode_net_difference_power",
     "encode_paired_continuous_power",

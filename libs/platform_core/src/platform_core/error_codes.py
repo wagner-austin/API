@@ -387,6 +387,15 @@ class StatisticalPowerErrorCode(ErrorCodeBase):
     # would let a caller pass 0.95 meaning either one and get no error.
     POWER_RATE_FLOOR_OUT_OF_RANGE = "POWER_RATE_FLOOR_OUT_OF_RANGE"
 
+    # A clustering that cannot support a variance ratio: one cluster, or
+    # every cluster holding a single unit. Its own code rather than reuse
+    # of POWER_SAMPLE_SIZE_INVALID because the sample is fine and the
+    # GROUPING is not, and the two have different remedies -- collect more
+    # units, versus group by a coarser unit. Raised rather than returning
+    # zero: a 0.0 correlation publishes as "no clustering detected", which
+    # is a finding, and this is the absence of one.
+    POWER_CLUSTERS_INSUFFICIENT = "POWER_CLUSTERS_INSUFFICIENT"
+
 
 __all__ = [
     "CalendarErrorCode",

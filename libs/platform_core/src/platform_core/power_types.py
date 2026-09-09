@@ -32,6 +32,7 @@ class PowerInstrument(StrEnum):
     ZERO_FAILURE_PROPORTION = "zero_failure_proportion"
     RATE_FLOOR = "rate_floor"
     NET_DIFFERENCE = "net_difference"
+    CLUSTERED_PAIRED = "clustered_paired"
 
 
 class PowerVerdict(StrEnum):
@@ -302,7 +303,73 @@ class NetDifferencePower(TypedDict):
     net_could_ever_be_significant: bool
 
 
+class ClusteredPairedPower(TypedDict):
+    """How many INDEPENDENT units a paired comparison over clustered data had.
+
+    THE PREREQUISITE THE OTHER FIVE INSTRUMENTS ASSUME AND CANNOT CHECK.
+    Every other record here takes *n* as given and independent. When the
+    units are held-out files from a few packages, or sentences from a few
+    documents, they are not, and no instrument can tell from the counts. The
+    correction is applied by dividing the design effect out of *n* BEFORE the
+    other instruments are asked anything.
+
+    THE SERIES THIS IS MEASURED ON IS THE PAIRED DIFFERENCE, NOT THE
+    OUTCOME, and the distinction is the whole reason this record exists
+    rather than a rho someone assumed. Measured on ``code-style``'s 875
+    committed items: at the containing-directory unit the guards stratum's
+    ICC is +0.028 on the difference and +0.141 on the raw pass indicator --
+    five times larger -- and at the aggregate the two have OPPOSITE SIGNS.
+    Either raw figure is a correct answer to "do these files pass or fail
+    together", which is not the question a paired test asks.
+
+    WHY THE DESIGN EFFECT IS FLOORED AND THE CORRELATION IS NOT. One-way ICC
+    goes negative whenever within-cluster spread exceeds between-cluster
+    spread, and taken literally that yields an effective *n* LARGER than the
+    sample. :attr:`design_effect` is therefore floored at 1.0 while
+    :attr:`intracluster_correlation` is published raw, so a reader can see
+    that a design effect of exactly 1.000 came from a floor rather than from
+    a corpus that happened to land there.
+
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, the third in this module
+    that does not, and for the same reason: "is this design effect large?"
+    has no threshold that is not a judgement about the study.
+
+    Attributes:
+        instrument: Always :attr:`PowerInstrument.CLUSTERED_PAIRED`.
+        unit: What one cluster is, in the study's words. Load-bearing: the
+            same 875 items give *k* = 14, 64 or 336 by category, package or
+            directory, with design effects to match, so a figure quoted
+            without its unit reads as though the grouping were forced.
+        clusters: *k*, the number of non-empty clusters.
+        total_units: *N*. The *n* the other instruments were handed.
+        largest_cluster: Units in the biggest one. Carried because it is how
+            a reader judges whether ``average_cluster_size`` is describing
+            the corpus or hiding it -- code-style's largest package holds
+            165 of 875 against a median of 5.
+        average_cluster_size: Killip's ``m0`` for unequal clusters, which is
+            strictly below the arithmetic mean unless every cluster is the
+            same size.
+        intracluster_correlation: The ICC estimate, UNFLOORED and possibly
+            negative. Negative means no positive clustering was detected at
+            this unit, not that the units are usefully anti-correlated.
+        design_effect: ``max(1, 1 + rho * (m0 - 1))``.
+        effective_sample_size: ``total_units / design_effect``. Never
+            greater than ``total_units``.
+    """
+
+    instrument: str
+    unit: str
+    clusters: int
+    total_units: int
+    largest_cluster: int
+    average_cluster_size: float
+    intracluster_correlation: float
+    design_effect: float
+    effective_sample_size: float
+
+
 __all__ = [
+    "ClusteredPairedPower",
     "McNemarPower",
     "NetDifferencePower",
     "PairedContinuousPower",
