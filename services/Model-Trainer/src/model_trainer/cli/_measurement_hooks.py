@@ -40,6 +40,10 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
     VariedCompanionSweepPlan,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
+from model_trainer.core.services.model.editing.triple_edit_plans import (
+    TRIPLE_EDIT_PLANS,
+    TripleEditPlan,
+)
 from model_trainer.core.services.model.forward_cost import FORWARD_SHAPES, ForwardCostShape
 from model_trainer.core.services.model.gemm_shapes import (
     GemmShape,
@@ -62,6 +66,20 @@ class CartridgePlansProto(Protocol):
 
     def __call__(self) -> Mapping[str, CartridgePlan]:
         """Return every declared plan, in table order."""
+        ...
+
+
+class TripleEditPlansProto(Protocol):
+    """Protocol for the triple-edit plan table.
+
+    Behind a hook for the reason :class:`QaPlansProto` is: the real plan
+    edits a 124-million-parameter base once per accepted triple, each edit
+    preceded by an optimisation, so a suite that could only reach that table
+    would either run it or leave this entry uncovered.
+    """
+
+    def __call__(self) -> Mapping[str, TripleEditPlan]:
+        """Return every declared triple-edit plan, in table order."""
         ...
 
 
@@ -312,6 +330,15 @@ def _default_qa_plans() -> Mapping[str, QaPlan]:
     return QA_PLANS
 
 
+def _default_triple_edit_plans() -> Mapping[str, TripleEditPlan]:
+    """Production triple-edit plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return TRIPLE_EDIT_PLANS
+
+
 def _default_composition_sweep_plans() -> Mapping[str, CompositionSweepPlan]:
     """Production composition-sweep plan table - used as default hook.
 
@@ -403,6 +430,8 @@ content_lora_sweep_plans: BaseLoraSweepPlansProto = _default_content_lora_sweep_
 
 qa_plans: QaPlansProto = _default_qa_plans
 
+triple_edit_plans: TripleEditPlansProto = _default_triple_edit_plans
+
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
 
 trace_rungs: TraceRungsProto = _default_trace_rungs
@@ -431,6 +460,7 @@ __all__ = [
     "QaPlansProto",
     "TraceRungsProto",
     "TrainShapesProto",
+    "TripleEditPlansProto",
     "VariedCompanionSweepPlansProto",
     "base_lora_sweep_plans",
     "benchmark_shapes",
@@ -446,5 +476,6 @@ __all__ = [
     "qa_plans",
     "trace_rungs",
     "train_shapes",
+    "triple_edit_plans",
     "varied_companion_sweep_plans",
 ]

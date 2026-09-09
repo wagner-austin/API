@@ -382,6 +382,7 @@ class TracedModuleProto(Protocol):
         ...
 
 
+@runtime_checkable
 class TracedLMModelProto(LMModelProto, TracedModuleProto, Protocol):
     """A language model whose module graph can also be traced.
 
@@ -392,6 +393,14 @@ class TracedLMModelProto(LMModelProto, TracedModuleProto, Protocol):
     ``to`` is redeclared only to narrow the return type: the inherited one
     returns :class:`LMModelProto`, which would lose the module graph the moment
     a caller moved the model to a device.
+
+    RUNTIME-CHECKABLE for the reason :class:`CacheCapableLMProto` is: the hub
+    loader is typed to return a plain :class:`LMModelProto`, and an arm that
+    needs the module graph has to ESTABLISH that it has one rather than assert
+    it with a cast. What the check can see is that the four graph methods are
+    present; it cannot see their signatures, which is why the narrowing is
+    followed by a real lookup that fails loudly on a model whose graph is
+    shaped differently.
     """
 
     def to(self: TracedLMModelProto, device: str) -> TracedLMModelProto:

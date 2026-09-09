@@ -20,6 +20,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode
 from model_trainer.core.contracts.knowledge_edit import EditSite, resolve_edit_module
 from model_trainer.core.types import (
     EditableParameterProto,
+    LMModelProto,
     TracedLMModelProto,
     TracedModuleProto,
 )
@@ -110,9 +111,45 @@ def require_edit_module(model: TracedLMModelProto, module_name: str) -> TracedMo
     return model.get_submodule(module_name)
 
 
+def require_traceable_model(model: LMModelProto) -> TracedLMModelProto:
+    """Narrow a loaded model to one whose module graph an edit can reach.
+
+    The single place this widening happens, so one error message explains it.
+    ``isinstance`` against a runtime-checkable protocol rather than a cast: a
+    cast would ASSERT the module graph and this establishes it.
+
+    What the check can see is that the graph methods are present. What it
+    cannot see is their signatures -- no runtime protocol check inspects one --
+    so :func:`require_edit_module` is still the check with teeth, and it runs
+    against the model's own inventory a moment later.
+
+    Args:
+        model: The model to narrow, as the hub loader typed it.
+
+    Returns:
+        The same model, typed as traceable.
+
+    Raises:
+        AppError: With ``EDIT_MODULE_NOT_FOUND`` if the model presents no
+            module graph at all. Refused rather than skipped: an arm that
+            silently declined to edit would report the unedited model's
+            accuracy under the edited arm's name.
+    """
+    if isinstance(model, TracedLMModelProto):
+        return model
+    raise AppError(
+        code=ModelTrainerErrorCode.EDIT_MODULE_NOT_FOUND,
+        message=(
+            "this model presents no module graph, so an edit has no module to write "
+            "into; weight editing needs a model whose submodules can be walked"
+        ),
+    )
+
+
 __all__ = [
     "WEIGHT_ATTRIBUTE",
     "require_edit_module",
     "require_editable_weight",
+    "require_traceable_model",
     "weight_parameter_name",
 ]

@@ -19,6 +19,7 @@ from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.core.services.model.cartridge_plans import CARTRIDGE_PLANS
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
+from model_trainer.core.services.model.editing.triple_edit_plans import TRIPLE_EDIT_PLANS
 
 _FRONTMATTER = "---\ntitle: A page\ntags: [x]\n---\n"
 
@@ -111,3 +112,14 @@ class TestQaPlansHook:
         and could name the wrong table.
         """
         assert measurement_hooks.qa_plans() is QA_PLANS
+
+
+class TestTripleEditPlansHook:
+    def test_the_default_is_the_declared_table(self) -> None:
+        """The production side of the corpus-representation arm's table.
+
+        Identity for the reason the two above give: a copy would let the hook
+        and the table drift, and the hook is what decides which plans
+        production can reach.
+        """
+        assert measurement_hooks.triple_edit_plans() is TRIPLE_EDIT_PLANS
