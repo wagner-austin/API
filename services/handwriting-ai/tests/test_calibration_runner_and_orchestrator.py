@@ -98,7 +98,12 @@ def _mk_ds(n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> Preproce
 def test_subprocess_runner_success() -> None:
     ds = _mk_ds(32)
     runner = SubprocessRunner()
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=95.0, timeout_s=20.0, max_failures=2)
+    # 120s bounds a hung child without racing a healthy one: the child boots
+    # a fresh interpreter plus torch, which measured 8-15s under host load,
+    # and a success-path test that times out on a busy machine asserts the
+    # machine, not the runner. The timeout-SUBJECT tests below keep their
+    # deliberately short budgets.
+    budget = BudgetConfig(start_pct_max=99.0, abort_pct=95.0, timeout_s=120.0, max_failures=2)
     cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=8)
     out = runner.run(ds, cand, samples=1, budget=budget)
     assert out["ok"]

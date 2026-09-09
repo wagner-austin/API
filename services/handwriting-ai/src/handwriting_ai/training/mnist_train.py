@@ -222,6 +222,10 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
     apply_threads(ec)
     # Centralize batch progress frequency control (Discord/consumers rely on this cadence)
     _set_batch_cadence(int(cfg["progress_every_batches"]))
+    # Declared before the try so the finally can shut them down on every exit
+    # path, including a failure before they exist.
+    train_loader: DataLoader[tuple[Tensor, Tensor]] | None = None
+    test_loader: DataLoader[tuple[Tensor, Tensor]] | None = None
     try:
         # Log threading and device configuration
         intra = torch.get_num_threads()
@@ -307,6 +311,20 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
         log.info(f"training_complete run_id={run_id} val_acc={val:.4f}")
         return result
     finally:
+        # Shut down the loaders' persistent workers DETERMINISTICALLY, on
+        # every exit path. The calibration measure path has always done this
+        # (measure.py); this path relied on garbage collection instead, and
+        # under pytest that is a leak with a measured bill: tracebacks pin
+        # frames, frames pin loaders, loaders pin their worker processes --
+        # each holding a dataset copy plus the torch runtime -- and across a
+        # suite of real training runs the stranded pt_data_worker processes
+        # accumulated past 26GB RAM + 8GB swap on the CI host (2026-09-09,
+        # runs 34292306485/34301896566; 31 such workers in the process
+        # census) and OOM-killed the hosted 16GB runner at ~98% before that.
+        if train_loader is not None:
+            _test_hooks.shutdown_loader(train_loader)
+        if test_loader is not None:
+            _test_hooks.shutdown_loader(test_loader)
         # Avoid cross-run/test leakage of cadence
         _set_batch_cadence(0)
 

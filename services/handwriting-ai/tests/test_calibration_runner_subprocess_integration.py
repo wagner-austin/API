@@ -28,7 +28,10 @@ def test_subprocess_runner_writes_result_file(tmp_path: Path) -> None:
     base = _FakeMNIST(8)
     ds = PreprocessDataset(base, default_train_config(batch_size=4))
     cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=2)
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=99.0, timeout_s=20.0, max_failures=1)
+    # 120s bounds a hung child without racing a healthy one -- the child
+    # boots a fresh interpreter plus torch, measured at 8-15s under host
+    # load, and this test's subject is the file write, not the wall clock.
+    budget = BudgetConfig(start_pct_max=99.0, abort_pct=99.0, timeout_s=120.0, max_failures=1)
     out = SubprocessRunner().run(ds, cand, samples=1, budget=budget)
     assert out["ok"] and out["res"] is not None and out["res"]["batch_size"] >= 1
 
@@ -48,7 +51,9 @@ def test_subprocess_runner_child_logging_works(
     base = _FakeMNIST(8)
     ds = PreprocessDataset(base, default_train_config(batch_size=4))
     cand = Candidate(intra_threads=1, interop_threads=None, num_workers=0, batch_size=2)
-    budget = BudgetConfig(start_pct_max=99.0, abort_pct=99.0, timeout_s=20.0, max_failures=1)
+    # 120s for the same reason as its sibling above: the subject here is
+    # child logging, and a busy host must not fail it by wall clock.
+    budget = BudgetConfig(start_pct_max=99.0, abort_pct=99.0, timeout_s=120.0, max_failures=1)
 
     with caplog.at_level(logging.INFO, logger="handwriting_ai"):
         out = SubprocessRunner().run(ds, cand, samples=1, budget=budget)

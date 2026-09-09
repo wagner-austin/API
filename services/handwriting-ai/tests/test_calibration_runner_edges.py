@@ -123,10 +123,16 @@ def test_child_entry_emits_logs_and_writes_result(tmp_path: Path) -> None:
         abort_pct=90.0,
         log_q=log_q,
     )
-    records: list[logging.LogRecord] = []
-    while not log_q.empty():
-        records.append(log_q.get())
-    assert any("calibration_child_started" in r.getMessage() for r in records)
+    # Drain with a blocking get rather than empty(): a multiprocessing queue
+    # feeds records through its feeder thread and a pipe, so empty() can read
+    # True while a just-put record is still in flight -- measured as a flake
+    # under host load 2026-09-09. The blocking get waits for the record the
+    # test is about; ten seconds bounds a genuinely absent one.
+    found_started = False
+    while not found_started:
+        record: logging.LogRecord = log_q.get(timeout=10.0)
+        found_started = "calibration_child_started" in record.getMessage()
+    assert found_started
     assert out_path.exists()
 
 
