@@ -109,7 +109,13 @@ class TestStageManifest:
         placed = stage_manifest("hpc3", tmp_path, manifest, record_name="m")
 
         assert placed == [f"{_DEST}/armB.txt", f"{_DEST}/armC.txt"]
-        assert fake_run.commands()[0] == f"mkdir -p '{_DEST}'"
+        # Filtered to the commands sent to the CLUSTER. Since the
+        # reproducibility precondition landed, the first commands issued are
+        # local `git` calls asking whether these files match the repository,
+        # and the property this test is about is that the destination exists
+        # before anything is placed in it.
+        cluster = [call.remote_command for call in fake_run.calls if call.argv[0] != "git"]
+        assert cluster[0] == f"mkdir -p '{_DEST}'"
 
     def test_the_first_bad_file_stops_the_run(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

@@ -22,6 +22,7 @@ import pathlib
 from hpc3.contracts.provenance import format_provenance
 from hpc3.contracts.stage import StagedFile, StageManifest
 from hpc3.core import audit, digest, remote
+from hpc3.core.reproducible import require_sources_reproducible
 
 
 def stage_one(host: str, source_dir: pathlib.Path, destination: str, staged: StagedFile) -> str:
@@ -122,11 +123,17 @@ def stage_manifest(
         Absolute cluster paths of the verified files, in manifest order.
 
     Raises:
-        AppError: On the first file that cannot be verified or transferred.
-            Earlier files remain on the cluster; they are individually
-            correct, and the caller is told which file stopped the run rather
-            than being handed a partial success to interpret.
+        AppError: With ``STAGE_SOURCE_NOT_REPRODUCIBLE`` when a tracked file's
+            bytes differ from the repository's, checked BEFORE anything is
+            transferred so a refusal leaves the cluster untouched. Or on the
+            first file that cannot be verified or transferred: earlier files
+            remain on the cluster; they are individually correct, and the
+            caller is told which file stopped the run rather than being
+            handed a partial success to interpret.
     """
+    # First, and before the directory exists: a digest that only this machine
+    # can reproduce is worse than no staging at all, because it certifies.
+    require_sources_reproducible(source_dir, manifest)
     remote.make_directory(host, manifest["destination"])
     placed = [
         stage_one(host, source_dir, manifest["destination"], staged) for staged in manifest["files"]

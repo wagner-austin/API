@@ -91,6 +91,15 @@ class Hpc3ErrorCode(ErrorCodeBase):
     DIGEST_MISMATCH = "DIGEST_MISMATCH"
     MANIFEST_FILE_MISSING = "MANIFEST_FILE_MISSING"
     STAGED_DIGEST_UNEXPECTED = "STAGED_DIGEST_UNEXPECTED"
+    # A manifest records the digest of the bytes ON DISK. When those differ
+    # from the repository's copy of the same tracked path, the record is
+    # accurate about what was staged and cannot be reproduced by anyone on
+    # another checkout. Measured 2026-09-09 across every staging manifest in
+    # tools/hpc3/runs: three files, all with Windows CRLF digests against LF
+    # blobs. --expect-from cannot see it, because the manifest and the
+    # expected-digest record are both written from the same working tree and
+    # agree with each other by construction.
+    STAGE_SOURCE_NOT_REPRODUCIBLE = "STAGE_SOURCE_NOT_REPRODUCIBLE"
 
     # Budget -- our own share of a shared machine, capped before and during.
     BUDGET_PROJECTION_EXCEEDED = "BUDGET_PROJECTION_EXCEEDED"
