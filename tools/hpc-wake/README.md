@@ -99,6 +99,35 @@ outage mode). Health is read from `runs/cycle.log`: the LAST line must be
 a result, and the last header's AGE must be under a few minutes — a stale
 timestamp IS an outage even when the line under it looks healthy.
 
+## The pump: publisher inventory (board 9406cfd9)
+
+The scheduled task above is THE machine's event pump: each 3-minute tick
+runs every row of `scripts/run_cycle.py`'s `PUBLISHERS` table, in order,
+each publisher isolated (one failing does not stop the next; the tick's
+status is the first nonzero exit and the log's `-- <name>` markers say
+which half went red). Publishers join the table, never become sibling
+scheduled tasks — the random-task count goes down, not up.
+
+| publisher | source | posts to | mention target |
+|---|---|---|---|
+| hpc-wake | hpc3 slurm ledger | `f6b04193` | ledger `submitter` |
+| ci-wake | GitHub Actions + push enrolment | `c5593c56` | enrolment `agent` |
+| lock-wake | fleet-lock journal | `5d86be8d` | journal `agent` |
+
+Every publisher batches per tick (a 103-job Slurm batch or a 126-line
+lock-journal backlog is ONE post) and mentions only whoever acted — the
+noise budget is acceptance 6 of the board task, not a hope.
+
+DELIBERATE EXCLUSIONS, so the next reader knows they are decisions:
+
+- **`make check` is not published machine-wide.** Per-package, unlocked,
+  high-frequency; a session wanting a wake from its own check uses its
+  harness's background-task notification, which already works.
+- **Deploy/rebuild completions have no separate publisher.** The locked
+  compose targets already write the fleet-lock journal at their
+  boundaries, so lock-wake's posts carry cascade start/end; a dedicated
+  publisher would announce the same transitions twice.
+
 ## Stated limitations
 
 - **A job `hpc3-triage` closes first is closed unannounced.** Both writers
