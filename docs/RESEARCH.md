@@ -692,10 +692,56 @@ test and by image smoke.
   moot until the method itself changes (companioned/composition-aware
   training at 7B is the one measured lever left standing at smaller
   scales, and it is a different experiment, not a knob).
+- **The companioned recipe at 7B closes the method question, and the
+  answer is that nothing about KV-prefix cartridges transfers to this
+  architecture (board task `68a96413`; precision-through-plans refactor
+  commit `fd1f242a` — `precision_selector` declared per plan row,
+  resolved through the one `resolve_precision` chokepoint, and the
+  diverse sweep grew an in-record `naive-solo` arm; image v49
+  `0a38233c…`, 49 smokes; jobs 55858713 + twin 55858759, ~2h07m each,
+  records BYTE-IDENTICAL sha256 `c7fcd094…`; the naive arm reproduces
+  the certified `445e345f` solo record BIT-FOR-BIT, all nine seeds —
+  the record reads, and every companioned arm pairs per-seed against
+  its own in-record baseline):** two eliminations in one record. THE
+  SOLO AXIS: companioned-alone minus naive-solo is −0.0016 ± sd 0.1215
+  (t −0.04, MDE 0.093) — composition-aware training moves the 7B solo
+  gain by NOTHING; the ~0.10-regime survives the method change
+  untouched (+0.1002 vs +0.1018; 1/9 negative → CP95 [0.3%, 48.2%]).
+  THE COMPOSITION AXIS, where the recipe earned its name at smaller
+  scales, INVERTS: n4 composed −0.216 (NINE OF NINE negative, CP
+  [66.4%, 100%], in-record retention −216% against the medium record's
+  +44.6% under the same recipe), n8 −0.284 (9/9), and the content
+  effect flips sign — at n4 trained companions cost MORE than noise
+  slots (paired −0.106 vs untrained-composed, t −3.38, MDE 0.072),
+  the exact opposite of the +20-point content rescue the recipe bought
+  at gpt2 scale. The companion-cross arms say why: a foreign 64-slot
+  cartridge ALONE costs 0.75-1.0 nats on the primary held-out at 7B,
+  an order beyond any gpt2-family cross effect — foreign KV-prefix
+  content is actively toxic to this architecture's attention.
+  **STANDING VERDICT, the 7B story complete:** training axes (lr,
+  slots, epochs) eliminated at their maxima; precision exonerated;
+  headroom present; and now the one measured method lever eliminated
+  on both of its axes. KV-prefix cartridges do not transfer to
+  pythia-6.9b — not the tuning, not the training, not the method. A
+  compartmental design at this scale needs a different mechanism
+  (the base-side LoRA lever and retrieval are the measured
+  candidates), not a better cartridge recipe.
+- **Records archive in-repo (2026-09-09, prompted by board 9d34f1bb):**
+  every cartridge RunRecord whose sha256 is quoted here or in the
+  api-codebase wiki — 38 cluster-produced, 8 austinpc-local, plus this
+  arm's pair — is committed under
+  `services/Model-Trainer/results/cartridge/` with `-text` protection,
+  so every byte-identity certificate is verifiable by diffing two
+  files in any checkout. "Produces on `/pub`" above remains where runs
+  WRITE; this directory is where cited records LIVE. Archiving each
+  arm's records is a standing closure step from this arm forward.
 - **Open, filed rather than implied:** the mechanism of the mid-depth
-  valley; the remaining 0.30 content gap at medium n8; whether the
-  companioned recipe's levers survive at 7B (a method change, per the
-  conclusion above — not a training-axis continuation).
+  valley at gpt2 scales; the remaining 0.30 content gap at medium n8;
+  the unswept pool size K=3 (registered as the sweep family's
+  frozen-by-copy knob per the 2026-09-09 registration audit — a
+  gpt2-scale question now, since no 7B rung remains to spend it on);
+  and the 7B compartmental design itself, which after this record is a
+  base-adaptation or retrieval question, not a cartridge one.
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
