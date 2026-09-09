@@ -215,6 +215,16 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # than the refusal would have.
     CARTRIDGE_QA_UNDERPOWERED = "CARTRIDGE_QA_UNDERPOWERED"
 
+    # Two arms whose replicates cannot be subtracted seed by seed, because
+    # their seed tuples differ in membership or in order. Its own code rather
+    # than reuse of CARTRIDGE_MEASUREMENT_UNREPLICATED: that one says an arm
+    # has too FEW replicates, this says two arms have replicates that are not
+    # THE SAME DRAWS, and the remedies share nothing -- one needs more seeds,
+    # the other needs the pair re-run under one seed list. Raised rather than
+    # silently degrading to an unpaired comparison, which would emit a number
+    # of a different kind under the name of a paired one.
+    CARTRIDGE_ARMS_UNPAIRABLE = "CARTRIDGE_ARMS_UNPAIRABLE"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one

@@ -61,6 +61,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
     noise_floor,
+    paired_separation,
     per_seed_observations,
     retention,
     separates,
@@ -107,21 +108,49 @@ def sweep_observations(sweep: Sequence[ReplicatedGain], floor: float) -> tuple[O
     would leave every future reader to re-derive it against a floor they would
     have to re-derive too.
 
+    AND THE PAIRED VERDICT BESIDE IT, because the range one was the only one
+    for four days and it is the weaker of the two. ``separated`` compares two
+    MEANS against ``max - min``, which discards the seed pairing and grows
+    with the seed count; the paired statistic subtracts seed by seed. On the
+    ``gpt2-wiki`` plan all four 4x steps sat inside the range floor at three
+    seeds and a hand-computed paired test overturned every one of them --
+    that table was typed into a wiki page's prose because NOTHING IN THE TREE
+    COMPUTED IT. It does now, at every one of the eleven call sites this
+    function has, which is why the addition is here and not in each caller.
+
+    THE FLOOR IS UNTOUCHED. It is the caller's, it is measured, and the two
+    verdicts answer different questions -- one whether the gap clears this
+    stack's noise, the other whether the per-seed differences support it at
+    :data:`~model_trainer.core.contracts.replicated_measurement.PAIRED_ALPHA`.
+    A reader needs both, and a step where they disagree is the interesting one.
+
     Args:
         sweep: The sweep's arms, in increasing slot order.
         floor: The run's noise floor.
 
     Returns:
-        Two observations per adjacent pair: the signed difference, and 1.0 or
-        0.0 for whether it separated.
+        Five observations per adjacent pair: the signed difference, 1.0 or 0.0
+        for whether it cleared the floor, the sd of the per-seed differences,
+        the minimum detectable effect at that sd, and 1.0 or 0.0 for whether
+        the paired difference exceeds it.
     """
     named: list[Observation] = []
     for smaller, larger in itertools.pairwise(sweep):
         verdict = separates(larger, smaller, floor=floor)
         step = f"{verdict['second']}_to_{verdict['first']}"
+        paired = paired_separation(larger, smaller)
         named.append(Observation(name=f"{step}_difference", value=verdict["difference"]))
         named.append(
             Observation(name=f"{step}_separated", value=1.0 if verdict["separated"] else 0.0)
+        )
+        named.append(Observation(name=f"{step}_paired_sd", value=paired["sample_sd"]))
+        named.append(
+            Observation(name=f"{step}_paired_mde", value=paired["minimum_detectable_effect"])
+        )
+        named.append(
+            Observation(
+                name=f"{step}_paired_significant", value=1.0 if paired["significant"] else 0.0
+            )
         )
     return tuple(named)
 

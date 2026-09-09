@@ -9,6 +9,8 @@ against an arm that did not gain is refused rather than printed.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
@@ -16,12 +18,14 @@ from platform_core.run_record import Observation
 
 from model_trainer.core.contracts.replicated_measurement import (
     MIN_SEEDS,
+    PAIRED_ALPHA,
     ReplicatedGain,
     decode_replicated_gain,
     decode_replicated_gains,
     encode_replicated_gain,
     gain_observations,
     noise_floor,
+    paired_separation,
     per_seed_observations,
     replicate,
     retention,
@@ -144,6 +148,131 @@ class TestSeparates:
         )
 
         assert verdict["separated"] is False
+
+
+class TestPairedSeparation:
+    """The verdict that reads the seed pairing the range statistic throws away."""
+
+    def test_a_consistent_step_clears_the_paired_test_inside_its_own_range_floor(
+        self,
+    ) -> None:
+        """THE DISAGREEMENT THAT MOTIVATES THE WHOLE ADDITION.
+
+        Both arms wander over 0.20 across seeds, so the range floor is 0.20
+        and a gap of 0.05 cannot clear it. But the gap is +0.05 on EVERY
+        draw -- the arms wander together -- so the paired differences have no
+        spread at all and the step is real. On the `gpt2-wiki` plan four 4x
+        steps were in exactly this state, called saturated by the floor and
+        overturned by a paired test nothing in the tree computed.
+        """
+        smaller = _gain("slots-32", (0.10, 0.30, 0.20))
+        larger = _gain("slots-128", (0.15, 0.35, 0.25))
+        floor = noise_floor([smaller, larger])
+
+        assert separates(larger, smaller, floor=floor)["separated"] is False
+
+        paired = paired_separation(larger, smaller)
+
+        assert paired["significant"] is True
+        assert paired["sample_sd"] == pytest.approx(0.0)
+        assert paired["mean_difference"] == pytest.approx(0.05)
+
+    def test_arms_that_cross_do_not_clear_it(self) -> None:
+        """The mirror case: identical means, and per-seed differences that
+        disagree in sign. 4.302653 is the two-sided t at 2 df and alpha 0.05,
+        a table value rather than this module's own output.
+        """
+        base = _gain("base", (0.10, 0.20, 0.30))
+        crossed = _gain("crossed", (0.30, 0.20, 0.10))
+
+        paired = paired_separation(crossed, base)
+
+        assert paired["mean_difference"] == pytest.approx(0.0)
+        assert paired["sample_sd"] == pytest.approx(0.2)
+        assert paired["minimum_detectable_effect"] == pytest.approx(
+            4.302653 * 0.2 / math.sqrt(3), abs=1e-6
+        )
+        assert paired["significant"] is False
+
+    def test_the_mean_difference_is_the_difference_of_the_means(self) -> None:
+        """True by algebra, asserted because a reader comparing this field to
+        `Separation.difference` needs to know they are the same number and
+        that only the SPREAD differs between the two verdicts.
+        """
+        smaller = _gain("slots-32", (0.10, 0.30, 0.20))
+        larger = _gain("slots-128", (0.40, 0.20, 0.60))
+
+        paired = paired_separation(larger, smaller)
+
+        assert paired["mean_difference"] == pytest.approx(larger["mean"] - smaller["mean"])
+
+    def test_the_sd_is_of_the_differences_and_not_of_either_arm(self) -> None:
+        """The field most likely to be misread as an arm's spread.
+
+        The per-seed differences are +0.30, -0.10, +0.40, whose sample sd is
+        ``sqrt(0.07)``. Neither arm's spread is that number and neither is the
+        larger of the two, so a reader who took this field for a range would
+        be reading something no arm produced.
+        """
+        smaller = _gain("slots-32", (0.10, 0.30, 0.20))
+        larger = _gain("slots-128", (0.40, 0.20, 0.60))
+
+        paired = paired_separation(larger, smaller)
+
+        assert paired["sample_sd"] == pytest.approx(math.sqrt(0.07), abs=1e-9)
+        assert smaller["spread"] == pytest.approx(0.2)
+        assert larger["spread"] == pytest.approx(0.4)
+
+    def test_it_carries_what_made_the_pairing_legal(self) -> None:
+        smaller = _gain("slots-32", (0.10, 0.30, 0.20))
+        larger = _gain("slots-128", (0.15, 0.35, 0.25))
+
+        paired = paired_separation(larger, smaller)
+
+        assert paired["first"] == "slots-128"
+        assert paired["second"] == "slots-32"
+        assert paired["seeds"] == (7, 8, 9)
+        assert paired["replicates"] == 3
+        assert paired["alpha"] == PAIRED_ALPHA
+
+    def test_arms_drawn_under_different_seeds_are_refused(self) -> None:
+        """REFUSED RATHER THAN DEGRADED. Subtracting position by position
+        would produce a number shaped exactly like a paired difference and
+        built from unrelated draws.
+        """
+        smaller = replicate("slots-32", [(7, 0.10), (8, 0.30), (9, 0.20)])
+        larger = replicate("slots-128", [(1, 0.15), (2, 0.35), (3, 0.25)])
+
+        with pytest.raises(AppError) as excinfo:
+            paired_separation(larger, smaller)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE
+
+    def test_the_same_seeds_in_a_different_order_are_refused_too(self) -> None:
+        """The subtler half, and the one a membership check would miss: the
+        seeds match as a set and index 0 is seed 7 on one side and seed 9 on
+        the other.
+        """
+        smaller = replicate("slots-32", [(7, 0.10), (8, 0.30), (9, 0.20)])
+        larger = replicate("slots-128", [(9, 0.25), (8, 0.35), (7, 0.15)])
+
+        with pytest.raises(AppError) as excinfo:
+            paired_separation(larger, smaller)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE
+
+    def test_a_narrower_alpha_raises_the_bar(self) -> None:
+        """Alpha is a parameter with a default, not a constant baked into the
+        arithmetic, so a caller reporting at another level gets an MDE for the
+        test they ran rather than for this module's default.
+        """
+        smaller = _gain("slots-32", (0.10, 0.30, 0.20))
+        larger = _gain("slots-128", (0.40, 0.20, 0.60))
+
+        assert (
+            paired_separation(larger, smaller, alpha=0.01)["minimum_detectable_effect"]
+            > paired_separation(larger, smaller, alpha=0.05)["minimum_detectable_effect"]
+        )
 
 
 class TestRetention:

@@ -144,7 +144,50 @@ class TestSweepObservations:
         assert named == (
             {"name": "slots-2_to_slots-8_difference", "value": pytest.approx(0.20)},
             {"name": "slots-2_to_slots-8_separated", "value": 1.0},
+            {"name": "slots-2_to_slots-8_paired_sd", "value": pytest.approx(0.0)},
+            {"name": "slots-2_to_slots-8_paired_mde", "value": pytest.approx(0.0)},
+            {"name": "slots-2_to_slots-8_paired_significant", "value": 1.0},
         )
+
+    def test_the_paired_verdict_can_disagree_with_the_floor(self) -> None:
+        """THE REASON THE PAIRED NUMBERS ARE HERE AT ALL.
+
+        Both arms wander by 0.20 across seeds, so the floor they are judged
+        against is 0.20 and a gap of 0.05 cannot clear it. The gap is +0.05 on
+        every draw, though, so the paired differences have no spread and the
+        step is real. A record carrying only the range verdict says this step
+        saturated; four `gpt2-wiki` steps were called saturated exactly here.
+        """
+        sweep = [
+            replicate("slots-32", [(7, 0.10), (8, 0.30), (9, 0.20)]),
+            replicate("slots-128", [(7, 0.15), (8, 0.35), (9, 0.25)]),
+        ]
+
+        named = bench.sweep_observations(sweep, 0.20)
+
+        assert named[1] == {"name": "slots-32_to_slots-128_separated", "value": 0.0}
+        assert named[4] == {
+            "name": "slots-32_to_slots-128_paired_significant",
+            "value": 1.0,
+        }
+
+    def test_the_paired_sd_is_not_any_arm_spread(self) -> None:
+        """The emitted sd is of the per-seed DIFFERENCES. Here the arms cross,
+        so the means are equal, nothing is significant, and the sd is the
+        number that says why.
+        """
+        sweep = [
+            replicate("slots-32", [(7, 0.10), (8, 0.20), (9, 0.30)]),
+            replicate("slots-128", [(7, 0.30), (8, 0.20), (9, 0.10)]),
+        ]
+
+        named = bench.sweep_observations(sweep, 0.05)
+
+        assert named[2] == {"name": "slots-32_to_slots-128_paired_sd", "value": pytest.approx(0.2)}
+        assert named[4] == {
+            "name": "slots-32_to_slots-128_paired_significant",
+            "value": 0.0,
+        }
 
     def test_a_step_inside_the_noise_records_a_zero(self) -> None:
         """Recorded as a number, not omitted.

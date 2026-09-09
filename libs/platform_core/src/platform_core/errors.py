@@ -212,6 +212,10 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # A corpus that yields nothing to train or nothing to hold out. 400 for
     # the same reason: the window and the split are the caller's choices.
     ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE: 400,
+    # Two arms whose seed tuples differ, so their replicates are not the same
+    # draws and cannot be paired. 409, like the geometry mismatch: neither
+    # arm is wrong on its own, and only the attempt to subtract them is.
+    ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE: 409,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

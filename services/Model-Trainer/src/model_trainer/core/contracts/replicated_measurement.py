@@ -40,7 +40,9 @@ ones.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
+from statistics import fmean, stdev
 
 from platform_core.errors import (
     AppError,
@@ -57,6 +59,7 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.power_distributions import t_critical
 from platform_core.run_record import Observation
 from typing_extensions import TypedDict
 
@@ -204,6 +207,133 @@ def separates(first: ReplicatedGain, second: ReplicatedGain, *, floor: float) ->
         difference=difference,
         floor=floor,
         separated=abs(difference) > floor,
+    )
+
+
+#: Two-sided significance level every paired step verdict is judged at.
+#:
+#: FIXED HERE RATHER THAN DECLARED PER PLAN, and the asymmetry with
+#: :mod:`~model_trainer.core.services.model.cartridge_qa_plans` is deliberate.
+#: A question-set plan declares both an alpha and the smallest effect it is
+#: hunting, because it chooses its own item count. A sweep judges against a
+#: floor it MEASURES from the arms it actually ran, so alpha is its only free
+#: parameter -- and holding it at one value across every sweep is what lets
+#: two runs' step verdicts be read side by side. A per-plan field would be a
+#: second place to keep in sync for a number nobody has ever wanted to vary.
+PAIRED_ALPHA: float = 0.05
+
+
+class PairedSeparation(TypedDict):
+    """Whether a step's per-seed differences are larger than the noise in them.
+
+    THE COMPLEMENT OF :class:`Separation`, NOT A REPLACEMENT FOR IT, and the
+    difference is the whole reason this exists. ``separates`` compares two
+    MEANS against a range statistic: it throws away which seed produced which
+    gain, and its floor is ``max - min``, which grows with the seed count
+    (sigma*d2(n), d2(3)=1.69 against d2(9)=2.97) so a plan cannot be made more
+    conclusive by adding seeds. This one subtracts seed by seed and asks what
+    the resulting differences support at a fixed alpha.
+
+    They can disagree, and when they do the paired answer is the sharper one:
+    every arm of a run trains under the SAME seeds, so seed 7's 32-slot gain
+    and seed 7's 128-slot gain are two measurements of one draw, and a
+    difference that is consistent across draws can clear a paired test while
+    sitting inside a range that any single noisy arm widened.
+
+    Attributes:
+        first: Name of the arm subtracted from.
+        second: Name of the arm subtracted.
+        seeds: The seeds both arms were drawn under, in order. Carried because
+            it is the thing that had to match for any of this to be paired.
+        replicates: How many paired differences there were.
+        mean_difference: Mean of the per-seed differences. Equal to the
+            difference of the means -- carried so the record does not require
+            a reader to know that.
+        sample_sd: Sample standard deviation of the per-seed DIFFERENCES.
+            Not any arm's spread: two arms that both wander together produce a
+            large spread and a small paired sd, which is exactly the case the
+            range statistic reads wrongly.
+        alpha: Two-sided significance level, :data:`PAIRED_ALPHA`.
+        minimum_detectable_effect: Smallest true difference this many
+            replicates at this sd would call significant.
+        significant: Whether ``abs(mean_difference)`` exceeds it. Equivalent to
+            the paired t-test rejecting at ``alpha``, stated in the outcome's
+            own units so it can be read beside the difference.
+    """
+
+    first: str
+    second: str
+    seeds: tuple[int, ...]
+    replicates: int
+    mean_difference: float
+    sample_sd: float
+    alpha: float
+    minimum_detectable_effect: float
+    significant: bool
+
+
+def paired_separation(
+    first: ReplicatedGain, second: ReplicatedGain, *, alpha: float = PAIRED_ALPHA
+) -> PairedSeparation:
+    """Judge two arms on their per-seed differences rather than their means.
+
+    Args:
+        first: The arm subtracted from.
+        second: The arm subtracted.
+        alpha: Two-sided significance level.
+
+    Returns:
+        The paired verdict, carrying the sd and the minimum detectable effect
+        as well as the answer, so a null can be read as "no effect" or "no
+        instrument" rather than leaving the reader to guess.
+
+    Raises:
+        AppError: With ``CARTRIDGE_ARMS_UNPAIRABLE`` when the two arms were not
+            drawn under the same seeds in the same order. REFUSED RATHER THAN
+            DEGRADED: positional subtraction of gains from different draws
+            produces a number that looks exactly like a paired difference and
+            is not one, and an unpaired statistic emitted under a paired name
+            is worse than no statistic. Nothing checked this before, because
+            ``separates`` reads only the two means and never needed it.
+    """
+    if first["seeds"] != second["seeds"]:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE,
+            (
+                f"arms {first['arm']!r} and {second['arm']!r} were drawn under "
+                f"{first['seeds']} and {second['seeds']}; a paired difference needs the "
+                f"same seeds in the same order, because gains at the same index have to "
+                f"be two measurements of one draw"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE),
+        )
+    differences = [
+        left - right for left, right in zip(first["gains"], second["gains"], strict=True)
+    ]
+    replicates = len(differences)
+    mean_difference = fmean(differences)
+    sample_sd = stdev(differences)
+    # The primitive rather than `paired_continuous_power`: that helper builds
+    # a record around a SMALLEST EFFECT OF INTEREST, which is a design
+    # question ("could I have seen the effect I care about"). The question
+    # here is about the effect actually observed, and `power_distributions`
+    # exists so a consumer can reach the arithmetic without the record types.
+    minimum_detectable_effect = (
+        t_critical(replicates - 1, alpha) * sample_sd / math.sqrt(replicates)
+    )
+    return PairedSeparation(
+        first=first["arm"],
+        second=second["arm"],
+        seeds=first["seeds"],
+        replicates=replicates,
+        mean_difference=mean_difference,
+        sample_sd=sample_sd,
+        alpha=alpha,
+        minimum_detectable_effect=minimum_detectable_effect,
+        # Equivalent to |t| > t_crit, written in the outcome's units so it
+        # holds at sd = 0 as well: three identical non-zero differences are a
+        # perfectly consistent effect, and the t form divides by zero there.
+        significant=abs(mean_difference) > minimum_detectable_effect,
     )
 
 
@@ -372,6 +502,8 @@ def decode_replicated_gains(value: JSONValue) -> list[ReplicatedGain]:
 
 __all__ = [
     "MIN_SEEDS",
+    "PAIRED_ALPHA",
+    "PairedSeparation",
     "ReplicatedGain",
     "Separation",
     "decode_replicated_gain",
@@ -379,6 +511,7 @@ __all__ = [
     "encode_replicated_gain",
     "gain_observations",
     "noise_floor",
+    "paired_separation",
     "per_seed_observations",
     "replicate",
     "retention",
