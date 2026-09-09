@@ -28,7 +28,7 @@ source_paths:
   - tools/hpc3/runs/code-style-qlora-v1.json
   - tools/hpc3/runs/code-style-qlora-v2.json
 source_git_blobs:
-  "tools/code-style-eval/runs/gen-v2/comparison.json": e5aacf2c0894e42720d34b3ae864f5ed3200a853
+  "tools/code-style-eval/runs/gen-v2/comparison.json": b9daedc741c8c6506403d70cedc20021ccbd292e
   "tools/code-style-eval/runs/gen-v2/base.outcomes.jsonl": ba1a470e0abb607c5d1dd523b323638952ef64fd
   "tools/code-style-eval/runs/gen-v2/candidate.outcomes.jsonl": 17dbefe2994932bbc2e7cb93991ba6c9445cef89
   "tools/code-style-eval/runs/gen-v2/base.generation.jsonl": 28d3c2096b3ee0b42d3a5fc27b6369cc591372ba
@@ -332,8 +332,18 @@ measured the sandbox.
        `runs/gen-v2/{base,candidate}.outcomes.jsonl` joined on `item_id`:
        aggregate mypy 54, all-three 29; both-finished mypy 30, all-three 24;
        truncated all-three 5. Best-case values from
-       `platform_core.power_distributions.mcnemar_p(0, net, McNemarTest.MID_P)`
-       — 0.25 at net 2, 0.125 at 3, 0.0625 at 4, 0.03125 at 5. Four of this
+       `platform_core.minimum_detectable_effect.net_difference_power`, with
+       `smallest_resolvable_net_difference(0.05, MID_P)` returning 5
+       — 0.25 at net 2, 0.125 at 3, 0.0625 at 4, 0.03125 at 5.
+       THIS FOOTNOTE FIRST DERIVED THOSE AS `mcnemar_p(0, net, MID_P)`,
+       which assumes the best case sits at *d* = net. That assumption is
+       false — the margin needed to reject is not monotone in *d*, it
+       oscillates with parity, and at net 0 the mid-p tie form dips to 0.75
+       at *d*=2 before climbing back. The four values above are unaffected
+       (the exception bites only at net 0), but two of this package's six
+       committed comparisons ARE at net 0, where the hand derivation returns
+       1.0 and the shipped function returns 0.75. Corrected to consume the
+       function rather than restate its arithmetic. Four of this
        page's twelve per-checker rows fail this floor (aggregate mypy,
        both-finished mypy, both-finished all-three, truncated all-three); the
        eight that pass include every result this page argues from. The check is
