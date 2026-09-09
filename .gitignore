@@ -209,6 +209,26 @@ tools/hpc3/runs/*
 # has not been negated.
 !tools/hpc3/runs/cartridge-*.json
 
+# extraction-ablation SCORE RECORDS, for the reason the code-style-eval block
+# below states two days earlier and for a different project. Every accuracy in
+# the four-scale marker ablation -- the 124M/355M/774M/1.5B ladder, the marker
+# null, the -0.5588 pp contrast at 1.5B -- came from
+# `modeltrainer-score-run --device cuda` on one workstation card. No image, no
+# digest (each record's own `fingerprint.image_digest` is the empty string and
+# says so), no run document, and until 2026-09-09 the only copies lived in an
+# AppData Temp scratchpad that exists to be purged. The wiki page built on them
+# was durable; its evidence was one cleanup from gone.
+#
+# 44 records, 176 KB. NOT the 46 per-item outcomes files (21 MB) -- those are
+# on the cluster at /pub/wagnera3/abl/redo-e2be2a3/score-outcomes and pinned by
+# sha256 in extraction-ablation-e2be2a3-outcomes-digests.txt, all 46 verified
+# against the remote copies rather than against the local ones they came from.
+# Same split, and the same reasoning, as the holdout below.
+!tools/hpc3/runs/extraction-ablation-e2be2a3-scores/
+tools/hpc3/runs/extraction-ablation-e2be2a3-scores/*
+!tools/hpc3/runs/extraction-ablation-e2be2a3-scores/*.json
+!tools/hpc3/runs/extraction-ablation-e2be2a3-outcomes-digests.txt
+
 # code-style-eval OUTCOMES are the measurement, not run output. A guard-pass
 # comparison is a per-item boolean from ruff, mypy and scripts.guard over a
 # fixed holdout; the generations can be reproduced from a pinned adapter and a
