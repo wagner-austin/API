@@ -184,11 +184,28 @@ class TestTheShippedPlans:
         assert plan["mcnemar_test"] in tuple(McNemarTest)
 
     @pytest.mark.parametrize("name", sorted(QA_PLANS))
-    def test_every_plan_needs_a_hundred_items_at_its_declared_effect(self, name: str) -> None:
-        """0.05 under mid-p at alpha 0.05 means 100 items, for every plan.
+    def test_every_plan_needs_two_hundred_and_fifty_items_at_its_declared_effect(
+        self, name: str
+    ) -> None:
+        """0.02 under mid-p at alpha 0.05 means 250 items, for every plan.
 
         Pinned so that lowering a plan's declared effect without growing its
         corpus fails here rather than at the end of a GPU run.
+
+        THIS TEST CAUGHT THE CHANGE IT WAS WRITTEN FOR, which is why the
+        number moved rather than the pin being deleted. It read 100 items at
+        0.05 until 2026-09-09, when the SEI was corrected to 0.02 -- the
+        lowest non-noise effect the plan table's own anchor list cites, where
+        0.05 had been roughly the middle of that list and described as its
+        floor. Lowering the effect without growing the corpus is exactly what
+        happened, and this assertion is where it surfaced.
+
+        The consequence is deliberate and is stated in the table's comment:
+        at 250 items EVERY plan in the registry is now refused, including the
+        two api-wiki plans added the same morning to fix the power problem
+        (235 raw and 224 reshaped items against the 250 required). The corpus
+        is what moves next. Raising the SEI back so the existing corpus
+        clears it would make this test pass and mean nothing.
 
         Args:
             name: Plan name in the registry.
@@ -196,5 +213,5 @@ class TestTheShippedPlans:
         plan = QA_PLANS[name]
 
         with pytest.raises(AppError):
-            require_resolvable_question_set(plan, 99)
-        assert require_resolvable_question_set(plan, 100) == pytest.approx(0.05)
+            require_resolvable_question_set(plan, 249)
+        assert require_resolvable_question_set(plan, 250) == pytest.approx(0.02)

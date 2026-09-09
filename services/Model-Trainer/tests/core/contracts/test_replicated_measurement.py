@@ -261,6 +261,52 @@ class TestPairedSeparation:
 
         assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE
 
+    def test_too_few_paired_differences_are_refused(self) -> None:
+        """The guard :func:`replicate` cannot supply, because this function
+        does not go through it.
+
+        ``replicate`` refuses fewer than MIN_SEEDS results, so no gain BUILT
+        BY IT can reach here short. But ``paired_separation`` is public and
+        takes the TypedDicts, so a caller assembling them by hand reaches
+        ``stdev`` directly -- and at one difference that is a bare
+        ``statistics.StatisticsError`` with no code and nothing a caller can
+        act on. Refused with this package's own code instead, at the same
+        floor ``replicate`` enforces, because a sample sd from one draw is a
+        range estimate and the MDE computed from it means nothing.
+        """
+        smaller = ReplicatedGain(arm="slots-32", seeds=(7,), gains=(0.10,), mean=0.10, spread=0.0)
+        larger = ReplicatedGain(arm="slots-128", seeds=(7,), gains=(0.30,), mean=0.30, spread=0.0)
+
+        with pytest.raises(AppError) as excinfo:
+            paired_separation(larger, smaller)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_MEASUREMENT_UNREPLICATED
+        assert str(MIN_SEEDS) in excinfo.value.message
+
+    def test_the_floor_is_the_one_replicate_enforces(self) -> None:
+        """One below MIN_SEEDS refuses and MIN_SEEDS itself does not, so the
+        two entry points cannot drift to different floors.
+        """
+        seeds = tuple(range(7, 7 + MIN_SEEDS))
+        short = tuple(range(7, 7 + MIN_SEEDS - 1))
+
+        with pytest.raises(AppError):
+            paired_separation(
+                ReplicatedGain(
+                    arm="a", seeds=short, gains=(0.3,) * len(short), mean=0.3, spread=0.0
+                ),
+                ReplicatedGain(
+                    arm="b", seeds=short, gains=(0.1,) * len(short), mean=0.1, spread=0.0
+                ),
+            )
+
+        verdict = paired_separation(
+            replicate("a", [(seed, 0.30 + index * 0.01) for index, seed in enumerate(seeds)]),
+            replicate("b", [(seed, 0.10 + index * 0.01) for index, seed in enumerate(seeds)]),
+        )
+
+        assert verdict["replicates"] == MIN_SEEDS
+
     def test_a_narrower_alpha_raises_the_bar(self) -> None:
         """Alpha is a parameter with a default, not a constant baked into the
         arithmetic, so a caller reporting at another level gets an MDE for the

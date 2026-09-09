@@ -83,6 +83,13 @@ class QaPlan(TypedDict):
             items can resolve -- was published, reached a wiki hub, and had to
             be withdrawn. A plan that cannot say what size of effect it is
             hunting cannot be told it failed to find one.
+
+            A DECLARED VALUE MUST SAY WHETHER IT WAS MEASURED OR CHOSEN, and
+            the table's comment does. The second lesson of the same day is
+            that a threshold can be wrong while looking derived: this field's
+            first value was averaged from real anchors and then described as
+            a floor. Erring small is the safe direction -- a too-large value
+            licenses a verdict, a too-small one only refuses a run.
         alpha: Two-sided significance level the rejection region is fixed at.
         mcnemar_test: Which McNemar variant the arms are judged under. Carried
             rather than assumed because the exact and mid-p rejection regions
@@ -130,30 +137,108 @@ QA_EXPERIMENT = "cartridge-question-set"
 #: and schedule so the two measurements describe the same cartridge, and adds
 #: only what a question set needs.
 #:
-#: WHY EVERY PLAN DECLARES 0.05, AND WHY THAT NUMBER IS NOT A PREFERENCE. It
-#: is the size of effect this literature actually reports for interventions of
-#: this kind, so it is the smallest difference worth building an instrument
-#: for:
+#: EVERY PLAN DECLARES 0.02, AND IT IS CHOSEN RATHER THAN DERIVED. Saying so
+#: is the whole point of this paragraph, because the field's previous value
+#: failed for the opposite reason.
+#:
+#: The anchors available to this programme:
 #:
 #:   WRAP, LLM rephrasing of C4 into four styles, 1:1 synthetic mix   +0.020
 #:     (Maini et al., arXiv 2401.16380, 13 zero-shot QA benchmarks)
-#:   this machine's extraction ablation, 7:1 OSCAR dilution removed   +0.061
 #:   this machine's extraction ablation, sentence-permuted copies     +0.029
+#:   this machine's extraction ablation, 7:1 OSCAR dilution removed   +0.061
 #:   this machine's extraction ablation, hub-slug markers             +0.004  (noise)
 #:
-#: A plan hunting something smaller than 0.05 needs a bigger corpus, and a
-#: plan claiming something larger should say so rather than inherit this.
+#: 0.020 IS THE MOST CONSERVATIVE ANCHOR AVAILABLE, NOT A MEASURED FLOOR. It
+#: is the minimum over a heterogeneous list, and a minimum over a mixed list
+#: is a rule, not a derivation: the entry it lands on is WRAP -- published
+#: literature, a different intervention, someone else's corpus -- so one
+#: smaller published effect from any adjacent paper would move this number
+#: without anything about THIS programme changing.
 #:
-#: WHAT IT COSTS, STATED PLAINLY BECAUSE IT IS THE POINT. At alpha 0.05 under
-#: mid-p the fewest disagreements that can ever reject is 5, so resolving 0.05
-#: needs at least 100 items. THE FOUR ME-WIKI PLANS BELOW YIELD ABOUT 32 AND
-#: ARE THEREFORE REFUSED BY
+#: It is chosen conservatively, and the asymmetry is the justification. A
+#: too-LARGE smallest-effect-of-interest licenses a verdict that should not
+#: exist; a too-SMALL one only refuses runs. Those errors are not
+#: symmetric, and the expensive one is already on this programme's record.
+#:
+#: WHAT WOULD REPLACE IT: no decision this programme has taken yet fixes an
+#: SEI the way ``clients/RustedWarfareBot``'s adoption log fixes theirs, where
+#: the threshold is read off the smallest effect the campaign ever ACTED on.
+#: When this programme first acts on an effect, that effect becomes the
+#: anchor and this number should be replaced by it.
+#:
+#: A BETTER-DERIVED CANDIDATE WAS OFFERED AND DECLINED, recorded so nobody
+#: has to rediscover it. **0.0294** -- the minimum over the effects the
+#: SIBLING extraction ablation actually acted on, which is the rusted-shaped
+#: derivation this one lacks. Its case, from
+#: ``~/PROJECTS/wiki/pages/wiki-corpus-extraction-ablation.md``:
+#:
+#:   ACTED ON   augmentation, arm D - arm C, +2.94 points, p = 2e-3 / 2e-5 /
+#:              4e-6, verdict "decisive". An entire follow-up experiment
+#:              exists to decompose that arm, which is what makes it a
+#:              DECISION rather than a reading.
+#:   ACTED ON   dilution, arm B - arm A, -6.14 points, p to 9e-17; every
+#:              later arm carries the 7:1 mixture. abs(-6.14) > 2.94, so the
+#:              minimum over acted-on levers is still augmentation -- the
+#:              check that makes 0.0294 a derivation rather than a lucky pick.
+#:   DECLINED   the hub-slug marker, +0.36 points, p ~ 0.6, abandoned after
+#:              all three specified conditions and a 355M rung at -0.37.
+#:
+#: (The ablation names that lever "augmentation" and the anchor list above
+#: names its mechanism, "sentence-permuted copies". One lever, two names:
+#: ``| D | C + four sentence-permuted copies of each page |``.)
+#:
+#: DECLINED FOR THREE REASONS, none of which is that the derivation is wrong.
+#: It is not wrong. (1) The extraction ablation is a SIBLING programme --
+#: different intervention, different training regime, shared corpus family
+#: and units -- so 0.0294 is borrowed too, one degree closer to home, and the
+#: replacement condition above has no "closer" tier. (2) Between two borrowed
+#: candidates the asymmetry is the only argument not about provenance, and it
+#: favours the smaller. (3) Adopting it would un-refuse precisely the two
+#: plans that are currently short, hours after this field was built because a
+#: permissive threshold licensed a false claim; the derivation defends that
+#: and the shape of it still reads wrong.
+#:
+#: Take 0.0294 when the cartridge arm has no decision of its own AND the
+#: sibling transfer has been argued rather than assumed. Take the native
+#: number the moment one exists.
+#:
+#: THIS FIELD READ 0.05 BETWEEN 376b0f24 AND 2026-09-09T20:24Z, AND THE
+#: DEFECT WAS THE SENTENCE, NOT ONLY THE VALUE. The comment here was headed
+#: "WHY THAT NUMBER IS NOT A PREFERENCE" and asserted a floor its own anchor
+#: list did not support: two of the three non-noise entries (+0.020 and
+#: +0.029) sat BELOW it. It was not a number picked out of the air -- it was
+#: real measurements averaged into a threshold and then described as derived,
+#: which is worse, because it reads as checked. The same move as the
+#: retraction this module exists to prevent, committed inside the fix for it.
+#: 0.020 would repeat it exactly if this comment claimed to have derived it.
+#:
+#: WHAT IT COSTS, STATED PLAINLY BECAUSE IT IS THE POINT. Resolving an effect
+#: ``e`` needs about ``d / e`` items, where ``d`` is the fewest disagreements
+#: that can ever reject -- and ``d`` IS NOT A CONSTANT OF THE ARITHMETIC, it
+#: is a function of the two fields beside this one. At alpha 0.05 it is 5
+#: under mid-p and 6 under exact;
+#: :func:`~model_trainer.core.services.model.cartridge_qa_power.smallest_rejecting_discordant`
+#: computes it rather than quoting it, and should be preferred over the table
+#: below the moment any plan declares something other than mid-p at 0.05:
+#:
+#:   SEI       mid-p (d=5)   exact (d=6)
+#:   0.05          100           120
+#:   0.029         173           207
+#:   0.02          250           300
+#:
+#: WHICH REFUSES EVERY PLAN IN THIS TABLE, INCLUDING THE TWO ADDED THIS
+#: MORNING TO FIX THE POWER PROBLEM. The four me-wiki plans yield about 32
+#: items (floor 0.15625). The api-codebase wiki yields 235 raw and 224
+#: reshaped (floors 0.02128 and 0.02232), against the 250 that 0.02 needs --
+#: short by 15 items and 26 items, which is 6% and 12% more corpus.
+#:
+#: The corpus is what moves. Raising the SEI back to 0.05 would make both
+#: api-wiki plans pass tomorrow and is the one thing this field must never be
+#: used for: a threshold chosen so the corpus you have clears it is not a
+#: threshold. Every plan here stays refused by
 #: :func:`~model_trainer.core.services.model.cartridge_qa_power.require_resolvable_question_set`
-#: BEFORE THEY RUN. That is not a regression; it is the whole change. Those
-#: plans produced the cartridge-beats-retrieval headline that was retracted on
-#: 2026-09-09 for resting on 1.3 to 1.7 items against a 5-item floor, and they
-#: will keep being refused until the corpus they read is large enough for the
-#: question they are asked.
+#: until the text it reads is large enough for the question it is asked.
 QA_PLANS: Final[dict[str, QaPlan]] = {
     "gpt2-wiki-qa": {
         "model_id": "gpt2",
@@ -166,7 +251,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 120,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -196,7 +281,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 120,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -214,7 +299,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 120,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -232,7 +317,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 120,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -269,7 +354,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -287,7 +372,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -319,7 +404,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -350,7 +435,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -368,7 +453,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -386,7 +471,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,
@@ -404,7 +489,7 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "learning_rate": 0.01,
         "distractor_count": 3,
         "max_items": 240,
-        "smallest_effect_of_interest": 0.05,
+        "smallest_effect_of_interest": 0.02,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
         "bm25_k1": 1.5,

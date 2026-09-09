@@ -311,6 +311,17 @@ def paired_separation(
         left - right for left, right in zip(first["gains"], second["gains"], strict=True)
     ]
     replicates = len(differences)
+    if replicates < MIN_SEEDS:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_MEASUREMENT_UNREPLICATED,
+            (
+                f"arms {first['arm']!r} and {second['arm']!r} yield {replicates} paired "
+                f"difference(s), and a paired statistic needs at least {MIN_SEEDS}; below "
+                f"that the sample sd is a range estimate from one draw and the minimum "
+                f"detectable effect computed from it means nothing"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_MEASUREMENT_UNREPLICATED),
+        )
     mean_difference = fmean(differences)
     sample_sd = stdev(differences)
     # The primitive rather than `paired_continuous_power`: that helper builds
