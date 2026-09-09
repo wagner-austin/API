@@ -59,18 +59,25 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from enum import StrEnum
 from statistics import fmean, stdev
-
-from typing_extensions import TypedDict
 
 from platform_core.error_codes import StatisticalPowerErrorCode
 from platform_core.errors import AppError
 from platform_core.power_distributions import (
     McNemarTest,
     mcnemar_p,
+    regularized_incomplete_beta,
     require_alpha,
     t_critical,
+)
+from platform_core.power_types import (
+    McNemarPower,
+    PairedContinuousPower,
+    PowerInstrument,
+    PowerVerdict,
+    RateFloorPower,
+    RequiredReplicates,
+    ZeroFailurePower,
 )
 
 #: Fewest paired differences a continuous power statement may be built from.
@@ -82,134 +89,15 @@ from platform_core.power_distributions import (
 #: consistent rather than inventing a second number.
 MIN_REPLICATES: int = 3
 
-
-class PowerInstrument(StrEnum):
-    """Which power calculation produced a record.
-
-    Published beside every number so a reader can tell which arithmetic was
-    applied without inferring it from the field names.
-    """
-
-    PAIRED_CONTINUOUS = "paired_continuous"
-    MCNEMAR = "mcnemar"
-    ZERO_FAILURE_PROPORTION = "zero_failure_proportion"
-
-
-class PowerVerdict(StrEnum):
-    """Whether a null was actually tested, or merely reported.
-
-    ``TESTED`` means the instrument could have resolved an effect as small as
-    the one anyone would act on. ``NOT_TESTED`` means it could not, and the
-    null therefore says nothing about the world.
-    """
-
-    TESTED = "TESTED"
-    NOT_TESTED = "NOT_TESTED"
-
-
-class PairedContinuousPower(TypedDict):
-    """Power of a paired continuous comparison.
-
-    Attributes:
-        instrument: Always :attr:`PowerInstrument.PAIRED_CONTINUOUS`.
-        replicates: Number of paired differences.
-        degrees_of_freedom: ``replicates - 1``.
-        alpha: Two-sided significance level the MDE is computed at.
-        mean_difference: Mean of the paired differences, in outcome units.
-        sample_sd: Sample standard deviation of the paired differences.
-        t_critical: Two-sided critical t at these df and alpha.
-        minimum_detectable_effect: Smallest true effect this instrument would
-            call significant, in outcome units.
-        smallest_effect_of_interest: The effect worth acting on, supplied by
-            the caller.
-        verdict: :class:`PowerVerdict` for this comparison.
-    """
-
-    instrument: str
-    replicates: int
-    degrees_of_freedom: int
-    alpha: float
-    mean_difference: float
-    sample_sd: float
-    t_critical: float
-    minimum_detectable_effect: float
-    smallest_effect_of_interest: float
-    verdict: str
-
-
-class McNemarPower(TypedDict):
-    """Power of a paired BINARY comparison, conditioned on discordant pairs.
-
-    THIS RECORD CARRIES NO :class:`PowerVerdict`, DELIBERATELY, and that is
-    the one asymmetry in this module worth understanding before using it.
-
-    The other two instruments take the effect anyone would act on and answer
-    "could this have detected it?". McNemar conditions on the discordant
-    pairs alone, so from ``discordant_pairs`` and ``alpha`` the only question
-    answerable is "can any attainable split reject?" -- falsifiability, not
-    practical detectability. Those are different questions, and giving them
-    one vocabulary is how a reader ends up reporting the first as though it
-    were the second.
-
-    Concretely, on real code-style data: at d=6 under mid-p the comparison
-    CAN reject (at a perfect 6:0), while the project's own classification
-    against a +5 pp threshold was NOT TESTED, because the detectable
-    difference sat above the base rate it applied to. A ``verdict: TESTED``
-    here would have been true of the instrument and false about the world --
-    the exact confusion this whole sweep exists to end, one level up.
-
-    So the truth is carried by :attr:`can_ever_reject`, a boolean that cannot
-    be mistaken for a classification. To classify a binary null against a
-    stated threshold, convert the returned split into your outcome's units
-    (the smallest detectable net difference is ``discordant_pairs - 2 *
-    most_balanced_rejecting_minority`` over your total pairs) and compare
-    that to the effect you care about.
-
-    Attributes:
-        instrument: Always :attr:`PowerInstrument.MCNEMAR`.
-        test: Which :class:`McNemarTest` the report uses. Carried because the
-            two variants have different rejection regions, so an MDE computed
-            against the wrong one describes a test nobody ran.
-        discordant_pairs: Number of pairs that disagreed.
-        alpha: Two-sided significance level.
-        smallest_attainable_p: p of the most extreme split. No result from
-            this many discordant pairs can beat it.
-        can_ever_reject: Whether ``smallest_attainable_p <= alpha``.
-        most_balanced_rejecting_minority: Largest minority count whose split
-            still rejects, or -1 when none does. This is the informative
-            bound; a search returning the trivial extreme instead is the bug
-            the tests pin.
-    """
-
-    instrument: str
-    test: str
-    discordant_pairs: int
-    alpha: float
-    smallest_attainable_p: float
-    can_ever_reject: bool
-    most_balanced_rejecting_minority: int
-
-
-class ZeroFailurePower(TypedDict):
-    """Bound on a rate that was observed to be zero.
-
-    Attributes:
-        instrument: Always :attr:`PowerInstrument.ZERO_FAILURE_PROPORTION`.
-        trials: Number of independent trials, all of which succeeded.
-        confidence: One-sided Clopper-Pearson confidence level.
-        upper_bound: Largest true failure rate consistent with observing zero
-            failures at this confidence, ``1 - (1 - c) ** (1/n)``.
-        largest_rate_of_interest: The failure rate worth acting on.
-        verdict: :class:`PowerVerdict`. ``TESTED`` only when the bound is at
-            or below the rate anyone would care about.
-    """
-
-    instrument: str
-    trials: int
-    confidence: float
-    upper_bound: float
-    largest_rate_of_interest: float
-    verdict: str
+#: Largest replicate count :func:`required_replicates` will search to.
+#:
+#: Not a statistical limit but a design one. The minimum detectable effect
+#: falls as ``1/sqrt(n)``, so halving it costs four times the runs; a design
+#: needing more than this many replicates to resolve the effect its own
+#: authors called interesting is not short of replicates, it is measuring the
+#: wrong thing or measuring it too noisily. Returning the ceiling instead of
+#: raising would hand that design a number it could schedule against.
+MAX_SEARCH_REPLICATES: int = 10_000
 
 
 def _require_effect_of_interest(value: float, field: str) -> None:
@@ -276,6 +164,96 @@ def paired_continuous_power(
         minimum_detectable_effect=mde,
         smallest_effect_of_interest=smallest_effect_of_interest,
         verdict=verdict.value,
+    )
+
+
+def required_replicates(
+    differences: Sequence[float],
+    alpha: float,
+    smallest_effect_of_interest: float,
+) -> RequiredReplicates:
+    """Find the fewest paired replicates that would resolve the effect of interest.
+
+    Answers the question a ``NOT_TESTED`` verdict raises and does not settle:
+    how many replicates would have been enough. Searches upward from
+    :data:`MIN_REPLICATES` for the first ``n`` whose minimum detectable effect
+    ``t_crit(n - 1, alpha) * sd / sqrt(n)`` is at or below the effect of
+    interest, holding the spread fixed at the observed sample sd.
+
+    The first hit IS the smallest: ``t_crit`` falls with degrees of freedom and
+    ``sqrt(n)`` rises, so the MDE is strictly decreasing in ``n`` and the
+    search cannot step over a solution.
+
+    The search starts at :data:`MIN_REPLICATES` rather than at the observed
+    count, because the question is what the design needs, not what it happens
+    to have run. A design already adequate therefore reports a required count
+    at or below its observed one, and ``additional_replicates`` of zero.
+
+    Args:
+        differences: Per-replicate paired differences from the pilot run, in
+            outcome units. Supplies the spread the projection rests on.
+        alpha: Two-sided significance level in ``(0, 1)``.
+        smallest_effect_of_interest: The effect worth acting on.
+
+    Returns:
+        A populated :class:`RequiredReplicates`.
+
+    Raises:
+        AppError: ``POWER_TOO_FEW_REPLICATES`` below :data:`MIN_REPLICATES`;
+            ``POWER_ALPHA_OUT_OF_RANGE`` or
+            ``POWER_EFFECT_OF_INTEREST_INVALID`` on bad parameters;
+            ``POWER_REQUIRED_REPLICATES_UNREACHABLE`` when no count at or below
+            :data:`MAX_SEARCH_REPLICATES` suffices.
+    """
+    observed = len(differences)
+    if observed < MIN_REPLICATES:
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_TOO_FEW_REPLICATES,
+            f"a power statement needs at least {MIN_REPLICATES} replicates; got {observed}",
+        )
+    require_alpha(alpha)
+    _require_effect_of_interest(smallest_effect_of_interest, "smallest_effect_of_interest")
+    sample_sd = stdev(differences)
+
+    def resolves(candidate: int) -> bool:
+        """Report whether ``candidate`` replicates resolve the effect of interest.
+
+        Args:
+            candidate: A replicate count at or above :data:`MIN_REPLICATES`.
+
+        Returns:
+            True when the MDE at this count is at or below the effect of interest.
+        """
+        return t_critical(candidate - 1, alpha) * sample_sd / math.sqrt(candidate) <= (
+            smallest_effect_of_interest
+        )
+
+    if not resolves(MAX_SEARCH_REPLICATES):
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_REQUIRED_REPLICATES_UNREACHABLE,
+            f"no replicate count at or below {MAX_SEARCH_REPLICATES} brings the minimum "
+            f"detectable effect down to {smallest_effect_of_interest!r} at a paired sd of "
+            f"{sample_sd!r}; more replicates are the wrong remedy at this spread",
+        )
+    # Bisection, not a scan: the MDE is strictly decreasing in ``n``, so the
+    # predicate is monotone and the boundary is unique. A scan would cost
+    # MAX_SEARCH_REPLICATES evaluations of ``t_critical``, which is itself a
+    # bisection -- measured at four minutes for one unreachable case.
+    low, high = MIN_REPLICATES, MAX_SEARCH_REPLICATES
+    while low < high:
+        midpoint = (low + high) // 2
+        if resolves(midpoint):
+            high = midpoint
+        else:
+            low = midpoint + 1
+    return RequiredReplicates(
+        instrument=PowerInstrument.PAIRED_CONTINUOUS.value,
+        observed_replicates=observed,
+        observed_sample_sd=sample_sd,
+        alpha=alpha,
+        smallest_effect_of_interest=smallest_effect_of_interest,
+        required_replicates=low,
+        additional_replicates=max(0, low - observed),
     )
 
 
@@ -387,14 +365,84 @@ def zero_failure_power(
     )
 
 
+def _require_rate_floor(floor: float) -> None:
+    """Reject a pass-rate floor outside the open unit interval.
+
+    Args:
+        floor: Candidate floor.
+
+    Raises:
+        AppError: ``POWER_RATE_FLOOR_OUT_OF_RANGE`` when not in ``(0, 1)``.
+    """
+    if not 0.0 < floor < 1.0:
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_RATE_FLOOR_OUT_OF_RANGE,
+            f"a pass-rate floor must lie in (0, 1) to be beatable; got {floor!r}",
+        )
+
+
+def rate_floor_power(
+    successes: int,
+    trials: int,
+    floor: float,
+    alpha: float,
+) -> RateFloorPower:
+    """Test an observed pass-rate against the floor its gate requires.
+
+    Args:
+        successes: Trials meeting the claim; ``0 <= successes <= trials``.
+        trials: Trials attempted; must be positive.
+        floor: The rate the claim must beat, in ``(0, 1)``.
+        alpha: One-sided significance level in ``(0, 1)``.
+
+    Returns:
+        A populated :class:`RateFloorPower`.
+
+    Raises:
+        AppError: ``POWER_SAMPLE_SIZE_INVALID`` when ``trials`` is not positive
+            or ``successes`` is outside ``[0, trials]``;
+            ``POWER_RATE_FLOOR_OUT_OF_RANGE`` or ``POWER_ALPHA_OUT_OF_RANGE``
+            on bad parameters.
+    """
+    if trials <= 0:
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID,
+            f"a rate needs at least one trial; got {trials!r}",
+        )
+    if not 0 <= successes <= trials:
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID,
+            f"successes must lie in [0, {trials}]; got {successes!r}",
+        )
+    _require_rate_floor(floor)
+    require_alpha(alpha)
+    # P(X >= k | n, p) = I_p(k, n - k + 1). At k = 0 every outcome qualifies,
+    # which the beta form does not cover, so it is stated rather than computed.
+    p_value = (
+        1.0
+        if successes == 0
+        else regularized_incomplete_beta(floor, successes, trials - successes + 1)
+    )
+    verdict = PowerVerdict.TESTED if p_value <= alpha else PowerVerdict.NOT_TESTED
+    return RateFloorPower(
+        instrument=PowerInstrument.RATE_FLOOR.value,
+        successes=successes,
+        trials=trials,
+        observed_rate=successes / trials,
+        floor=floor,
+        alpha=alpha,
+        p_value=p_value,
+        perfect_record_trials=math.ceil(math.log(alpha) / math.log(floor)),
+        verdict=verdict.value,
+    )
+
+
 __all__ = [
+    "MAX_SEARCH_REPLICATES",
     "MIN_REPLICATES",
-    "McNemarPower",
-    "PairedContinuousPower",
-    "PowerInstrument",
-    "PowerVerdict",
-    "ZeroFailurePower",
     "mcnemar_power",
     "paired_continuous_power",
+    "rate_floor_power",
+    "required_replicates",
     "zero_failure_power",
 ]

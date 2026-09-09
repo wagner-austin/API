@@ -23,22 +23,28 @@ from platform_core.error_codes import StatisticalPowerErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError
 from platform_core.minimum_detectable_effect import (
+    MAX_SEARCH_REPLICATES,
     MIN_REPLICATES,
-    PowerInstrument,
-    PowerVerdict,
     mcnemar_power,
     paired_continuous_power,
+    rate_floor_power,
+    required_replicates,
     zero_failure_power,
 )
-from platform_core.power_distributions import McNemarTest
+from platform_core.power_distributions import McNemarTest, t_critical
 from platform_core.power_records import (
     decode_mcnemar_power,
     decode_paired_continuous_power,
+    decode_rate_floor_power,
+    decode_required_replicates,
     decode_zero_failure_power,
     encode_mcnemar_power,
     encode_paired_continuous_power,
+    encode_rate_floor_power,
+    encode_required_replicates,
     encode_zero_failure_power,
 )
+from platform_core.power_types import PowerInstrument, PowerVerdict
 
 
 class TestPairedContinuousPower:
@@ -226,6 +232,182 @@ class TestZeroFailurePower:
         assert excinfo.value.code is StatisticalPowerErrorCode.POWER_EFFECT_OF_INTEREST_INVALID
 
 
+class TestRequiredReplicates:
+    """The projection instrument, against published Student-t critical values.
+
+    Every expectation below is derived from a t table and closed-form
+    arithmetic, never from this module's own output. The differences
+    ``[-1.0, 0.0, 1.0]`` have a sample sd of exactly 1.0 (mean 0, squared
+    deviations 1 + 0 + 1, divided by 2 df), so ``MDE(n) = t_crit(n - 1) /
+    sqrt(n)`` and the ladder is readable straight off the table:
+
+        n = 3   4.302653 / 1.732051 = 2.484519
+        n = 4   3.182446 / 2.000000 = 1.591223
+        n = 5   2.776445 / 2.236068 = 1.241664
+        n = 6   2.570582 / 2.449490 = 1.049435
+        n = 7   2.446912 / 2.645751 = 0.924849
+    """
+
+    def test_finds_the_first_n_that_clears_the_effect_of_interest(self) -> None:
+        # delta = 1.0 sits between MDE(6) = 1.0494 and MDE(7) = 0.9248,
+        # so 7 is the smallest adequate design and 4 more runs are owed.
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0)
+        assert record["required_replicates"] == 7
+        assert record["observed_replicates"] == 3
+        assert record["additional_replicates"] == 4
+
+    def test_lands_on_the_lower_rung_when_the_effect_is_larger(self) -> None:
+        # delta = 1.6 clears MDE(4) = 1.5912 but not MDE(3) = 2.4845.
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 1.6)
+        assert record["required_replicates"] == 4
+        assert record["additional_replicates"] == 1
+
+    def test_reports_the_floor_when_the_pilot_was_already_adequate(self) -> None:
+        # delta = 3.0 exceeds MDE(3) = 2.4845, so nothing more is owed.
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 3.0)
+        assert record["required_replicates"] == MIN_REPLICATES
+        assert record["additional_replicates"] == 0
+
+    def test_floors_additional_at_zero_when_observed_exceeds_required(self) -> None:
+        # Five differences, same sd of 1.0: squared deviations 1+1+0+1+1 = 4
+        # over 4 df. Required stays 3, so the surplus must not go negative.
+        record = required_replicates([-1.0, -1.0, 0.0, 1.0, 1.0], 0.05, 3.0)
+        assert record["observed_replicates"] == 5
+        assert record["required_replicates"] == MIN_REPLICATES
+        assert record["additional_replicates"] == 0
+
+    def test_a_spreadless_pilot_needs_only_the_floor(self) -> None:
+        # Identical differences have sd 0, so the MDE is 0 at every n and
+        # the smallest legal design already resolves any positive effect.
+        record = required_replicates([5.0, 5.0, 5.0], 0.05, 1e-6)
+        assert record["observed_sample_sd"] == 0.0
+        assert record["required_replicates"] == MIN_REPLICATES
+
+    def test_the_returned_count_is_the_boundary_and_not_merely_sufficient(self) -> None:
+        # The contract is "FEWEST", which a merely-sufficient answer would
+        # also satisfy. Pin both sides: n resolves the effect and n - 1 does
+        # not. At sd 1.0 the MDE is t_crit(n - 1) / sqrt(n).
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0)
+        needed = record["required_replicates"]
+        assert record["observed_sample_sd"] == 1.0
+        assert needed > MIN_REPLICATES
+        assert t_critical(needed - 1, 0.05) / math.sqrt(needed) <= 1.0
+        assert t_critical(needed - 2, 0.05) / math.sqrt(needed - 1) > 1.0
+
+    def test_publishes_the_instrument_it_projects_for(self) -> None:
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0)
+        assert record["instrument"] == PowerInstrument.PAIRED_CONTINUOUS.value
+
+    def test_refuses_a_pilot_below_the_replicate_floor(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            required_replicates([1.0, 2.0], 0.05, 1.0)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_TOO_FEW_REPLICATES
+
+    def test_refuses_an_alpha_outside_the_unit_interval(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            required_replicates([-1.0, 0.0, 1.0], 1.5, 1.0)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_ALPHA_OUT_OF_RANGE
+
+    def test_refuses_a_non_positive_effect_of_interest(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            required_replicates([-1.0, 0.0, 1.0], 0.05, 0.0)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_EFFECT_OF_INTEREST_INVALID
+
+    def test_refuses_to_certify_a_design_replicates_cannot_rescue(self) -> None:
+        # At sd 1.0 the MDE is still about 0.0196 at the search ceiling, so
+        # an effect of interest of 1e-9 is unreachable by replication. The
+        # module raises rather than returning the ceiling, because a caller
+        # would otherwise schedule 10,000 runs that still would not resolve it.
+        with pytest.raises(AppError) as excinfo:
+            required_replicates([-1.0, 0.0, 1.0], 0.05, 1e-9)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_REQUIRED_REPLICATES_UNREACHABLE
+        assert str(MAX_SEARCH_REPLICATES) in excinfo.value.message
+
+
+class TestRateFloorPower:
+    """The pass-rate instrument, on TankpitBot's own `make audit` counts.
+
+    Expectations come from the exact binomial, computed independently as a sum
+    of binomial coefficients (`sum(C(n,i) p^i (1-p)^(n-i) for i in k..n)`) and
+    cross-checked against this module's beta form. They are NOT read back from
+    this module's output.
+    """
+
+    def test_a_flawless_six_of_six_does_not_clear_an_085_floor(self) -> None:
+        # 0.85 ** 6 = 0.37714951... A perfect record this short arises 37.7%
+        # of the time when the true rate is exactly the floor, so the gate's
+        # PASS carries no evidence the claim exceeds it.
+        record = rate_floor_power(6, 6, 0.85, 0.05)
+        assert record["p_value"] == pytest.approx(0.85**6, abs=1e-12)
+        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+        assert record["observed_rate"] == 1.0
+
+    def test_a_large_flawless_record_clears_the_floor(self) -> None:
+        # 18,649 of 18,649 -- the capacity claim. A comb-sum is infeasible here,
+        # which is why the beta form is used.
+        record = rate_floor_power(18_649, 18_649, 0.85, 0.05)
+        assert record["p_value"] < 1e-12
+        assert record["verdict"] == PowerVerdict.TESTED.value
+
+    def test_a_rate_close_to_the_floor_is_not_distinguishable_from_it(self) -> None:
+        # walk: 204/232 = 87.9%, above 0.85 by eye and not separable from it.
+        record = rate_floor_power(204, 232, 0.85, 0.05)
+        assert record["p_value"] == pytest.approx(0.1215724091, abs=1e-9)
+        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+
+    def test_a_rate_far_above_the_floor_is_separable(self) -> None:
+        # homing: 487/522 = 93.3%.
+        record = rate_floor_power(487, 522, 0.85, 0.05)
+        assert record["p_value"] == pytest.approx(4.1e-9, rel=0.05)
+        assert record["verdict"] == PowerVerdict.TESTED.value
+
+    def test_zero_successes_cannot_be_evidence_against_the_floor(self) -> None:
+        # Every outcome is at least as good as the worst one, so the one-sided
+        # p is exactly 1. The beta form does not cover k = 0.
+        record = rate_floor_power(0, 40, 0.85, 0.05)
+        assert record["p_value"] == 1.0
+        assert record["observed_rate"] == 0.0
+        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+
+    def test_publishes_the_shortest_flawless_record_that_could_pass(self) -> None:
+        # 0.85 ** 19 = 0.04559 <= 0.05 < 0.05386 = 0.85 ** 18. Below 19 trials
+        # NO outcome can clear the floor, so the gate cannot be passed on
+        # evidence however clean the record.
+        record = rate_floor_power(6, 6, 0.85, 0.05)
+        assert record["perfect_record_trials"] == 19
+        assert 0.85**19 <= 0.05
+        assert 0.85**18 > 0.05
+
+    def test_publishes_the_instrument_it_used(self) -> None:
+        record = rate_floor_power(6, 6, 0.85, 0.05)
+        assert record["instrument"] == PowerInstrument.RATE_FLOOR.value
+
+    def test_refuses_a_trial_count_that_is_not_positive(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            rate_floor_power(0, 0, 0.85, 0.05)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID
+
+    def test_refuses_more_successes_than_trials(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            rate_floor_power(7, 6, 0.85, 0.05)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID
+
+    def test_refuses_a_negative_success_count(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            rate_floor_power(-1, 6, 0.85, 0.05)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID
+
+    def test_refuses_a_floor_outside_the_unit_interval(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            rate_floor_power(6, 6, 1.0, 0.05)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_RATE_FLOOR_OUT_OF_RANGE
+
+    def test_refuses_an_alpha_outside_the_unit_interval(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            rate_floor_power(6, 6, 0.85, 0.0)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_ALPHA_OUT_OF_RANGE
+
+
 class TestRoundTrips:
     """Encode/decode, and the validation that makes decode meaningful."""
 
@@ -240,6 +422,47 @@ class TestRoundTrips:
     def test_zero_failure_round_trip_is_lossless(self) -> None:
         record = zero_failure_power(40, 0.95, 0.2)
         assert decode_zero_failure_power(encode_zero_failure_power(record)) == record
+
+    def test_required_replicates_survives_a_round_trip(self) -> None:
+        record = required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0)
+        assert decode_required_replicates(encode_required_replicates(record)) == record
+
+    def test_decode_rejects_a_mismatched_instrument_on_required_replicates(self) -> None:
+        payload = encode_required_replicates(required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0))
+        payload["instrument"] = PowerInstrument.MCNEMAR.value
+        with pytest.raises(AppError) as excinfo:
+            decode_required_replicates(payload)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_INSTRUMENT_UNKNOWN
+
+    def test_decode_rejects_a_missing_required_replicates_field(self) -> None:
+        payload = encode_required_replicates(required_replicates([-1.0, 0.0, 1.0], 0.05, 1.0))
+        del payload["required_replicates"]
+        with pytest.raises(JSONTypeError):
+            decode_required_replicates(payload)
+
+    def test_rate_floor_survives_a_round_trip(self) -> None:
+        record = rate_floor_power(204, 232, 0.85, 0.05)
+        assert decode_rate_floor_power(encode_rate_floor_power(record)) == record
+
+    def test_decode_rejects_a_mismatched_instrument_on_rate_floor(self) -> None:
+        payload = encode_rate_floor_power(rate_floor_power(6, 6, 0.85, 0.05))
+        payload["instrument"] = PowerInstrument.MCNEMAR.value
+        with pytest.raises(AppError) as excinfo:
+            decode_rate_floor_power(payload)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_INSTRUMENT_UNKNOWN
+
+    def test_decode_rejects_an_unknown_verdict_on_rate_floor(self) -> None:
+        payload = encode_rate_floor_power(rate_floor_power(6, 6, 0.85, 0.05))
+        payload["verdict"] = "PROBABLY_FINE"
+        with pytest.raises(AppError) as excinfo:
+            decode_rate_floor_power(payload)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_VERDICT_UNKNOWN
+
+    def test_decode_rejects_a_missing_rate_floor_field(self) -> None:
+        payload = encode_rate_floor_power(rate_floor_power(6, 6, 0.85, 0.05))
+        del payload["p_value"]
+        with pytest.raises(JSONTypeError):
+            decode_rate_floor_power(payload)
 
     def test_decode_rejects_an_unknown_verdict(self) -> None:
         payload = encode_paired_continuous_power(

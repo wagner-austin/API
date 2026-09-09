@@ -245,6 +245,14 @@ class FleetErrorCode(ErrorCodeBase):
     # transport or the script is corrupt, and scoring a corrupt transcript
     # would let a mangled line read as a passing check.
     RUNNER_AUDIT_UNPARSABLE = "RUNNER_AUDIT_UNPARSABLE"
+    # Onboarding a repository onto the self-hosted fleet (2026-09-09, the
+    # operator's mandate after the last hand-rolled install). Two codes,
+    # split where the reader's next action splits: an unmintable token is a
+    # gh/auth/permissions question on the LOCAL machine, while an
+    # already-onboarded repo means the roster says this work is done and
+    # re-running it would register duplicate runners.
+    RUNNER_TOKEN_UNAVAILABLE = "RUNNER_TOKEN_UNAVAILABLE"
+    RUNNER_ALREADY_ONBOARDED = "RUNNER_ALREADY_ONBOARDED"
 
 
 class McpClientErrorCode(ErrorCodeBase):

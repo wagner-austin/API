@@ -203,6 +203,18 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     CARTRIDGE_MEASUREMENT_UNREPLICATED = "CARTRIDGE_MEASUREMENT_UNREPLICATED"
     CARTRIDGE_CORPUS_UNUSABLE = "CARTRIDGE_CORPUS_UNUSABLE"
 
+    # The question set a plan realised cannot resolve the difference that plan
+    # declares it is looking for, so the run would produce a number no reading
+    # of the data could support. Its own code rather than reuse of
+    # CARTRIDGE_MEASUREMENT_UNREPLICATED: that one says a measurement has too
+    # few SEEDS to carry a spread, this says the ITEM SET is too small to
+    # resolve an effect however the seeds fall, and the remedies are different
+    # -- more seeds against a bigger corpus. Raised BEFORE the arms run: the
+    # cartridge-versus-retrieval headline was published from 32 items where 6
+    # was the smallest resolvable difference, and the retraction cost more
+    # than the refusal would have.
+    CARTRIDGE_QA_UNDERPOWERED = "CARTRIDGE_QA_UNDERPOWERED"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one
@@ -350,6 +362,20 @@ class StatisticalPowerErrorCode(ErrorCodeBase):
     # name different mistakes: the wrong record type, versus the right
     # record type carrying a rejection region nobody computed against.
     POWER_TEST_UNKNOWN = "POWER_TEST_UNKNOWN"
+
+    # No replicate count within the search ceiling brings the minimum
+    # detectable effect down to the effect of interest. Raised rather
+    # than returning the ceiling: a caller that reads "10,000" as an
+    # answer would schedule an impossible run, whereas the true finding
+    # is that MORE REPLICATES ARE THE WRONG REMEDY -- at that spread the
+    # design needs a tighter measurement, not a longer one.
+    POWER_REQUIRED_REPLICATES_UNREACHABLE = "POWER_REQUIRED_REPLICATES_UNREACHABLE"
+
+    # A pass-rate floor outside (0, 1). Its own code rather than reuse of
+    # POWER_CONFIDENCE_OUT_OF_RANGE: a floor is the rate a claim must
+    # BEAT, a confidence is how sure the bound is, and conflating them
+    # would let a caller pass 0.95 meaning either one and get no error.
+    POWER_RATE_FLOOR_OUT_OF_RANGE = "POWER_RATE_FLOOR_OUT_OF_RANGE"
 
 
 __all__ = [

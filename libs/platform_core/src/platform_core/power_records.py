@@ -28,14 +28,16 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
-from platform_core.minimum_detectable_effect import (
+from platform_core.power_distributions import McNemarTest
+from platform_core.power_types import (
     McNemarPower,
     PairedContinuousPower,
     PowerInstrument,
     PowerVerdict,
+    RateFloorPower,
+    RequiredReplicates,
     ZeroFailurePower,
 )
-from platform_core.power_distributions import McNemarTest
 
 
 def _require_verdict(obj: JSONObject, key: str) -> str:
@@ -156,6 +158,50 @@ def decode_paired_continuous_power(obj: JSONObject) -> PairedContinuousPower:
     )
 
 
+def encode_required_replicates(record: RequiredReplicates) -> JSONObject:
+    """Encode a :class:`RequiredReplicates` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "observed_replicates": record["observed_replicates"],
+        "observed_sample_sd": record["observed_sample_sd"],
+        "alpha": record["alpha"],
+        "smallest_effect_of_interest": record["smallest_effect_of_interest"],
+        "required_replicates": record["required_replicates"],
+        "additional_replicates": record["additional_replicates"],
+    }
+
+
+def decode_required_replicates(obj: JSONObject) -> RequiredReplicates:
+    """Decode a :class:`RequiredReplicates` from a JSON object.
+
+    Args:
+        obj: JSON object as produced by :func:`encode_required_replicates`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On an instrument outside this record's vocabulary.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    return RequiredReplicates(
+        instrument=_require_instrument(obj, "instrument", PowerInstrument.PAIRED_CONTINUOUS),
+        observed_replicates=require_int(obj, "observed_replicates"),
+        observed_sample_sd=require_float(obj, "observed_sample_sd"),
+        alpha=require_float(obj, "alpha"),
+        smallest_effect_of_interest=require_float(obj, "smallest_effect_of_interest"),
+        required_replicates=require_int(obj, "required_replicates"),
+        additional_replicates=require_int(obj, "additional_replicates"),
+    )
+
+
 def encode_mcnemar_power(record: McNemarPower) -> JSONObject:
     """Encode a :class:`McNemarPower` to a JSON object.
 
@@ -197,6 +243,54 @@ def decode_mcnemar_power(obj: JSONObject) -> McNemarPower:
         smallest_attainable_p=require_float(obj, "smallest_attainable_p"),
         can_ever_reject=require_bool(obj, "can_ever_reject"),
         most_balanced_rejecting_minority=require_int(obj, "most_balanced_rejecting_minority"),
+    )
+
+
+def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
+    """Encode a :class:`RateFloorPower` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "successes": record["successes"],
+        "trials": record["trials"],
+        "observed_rate": record["observed_rate"],
+        "floor": record["floor"],
+        "alpha": record["alpha"],
+        "p_value": record["p_value"],
+        "perfect_record_trials": record["perfect_record_trials"],
+        "verdict": record["verdict"],
+    }
+
+
+def decode_rate_floor_power(obj: JSONObject) -> RateFloorPower:
+    """Decode a :class:`RateFloorPower` from a JSON object.
+
+    Args:
+        obj: JSON object as produced by :func:`encode_rate_floor_power`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On unknown verdict or mismatched instrument.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    return RateFloorPower(
+        instrument=_require_instrument(obj, "instrument", PowerInstrument.RATE_FLOOR),
+        successes=require_int(obj, "successes"),
+        trials=require_int(obj, "trials"),
+        observed_rate=require_float(obj, "observed_rate"),
+        floor=require_float(obj, "floor"),
+        alpha=require_float(obj, "alpha"),
+        p_value=require_float(obj, "p_value"),
+        perfect_record_trials=require_int(obj, "perfect_record_trials"),
+        verdict=_require_verdict(obj, "verdict"),
     )
 
 
@@ -245,8 +339,12 @@ def decode_zero_failure_power(obj: JSONObject) -> ZeroFailurePower:
 __all__ = [
     "decode_mcnemar_power",
     "decode_paired_continuous_power",
+    "decode_rate_floor_power",
+    "decode_required_replicates",
     "decode_zero_failure_power",
     "encode_mcnemar_power",
     "encode_paired_continuous_power",
+    "encode_rate_floor_power",
+    "encode_required_replicates",
     "encode_zero_failure_power",
 ]
