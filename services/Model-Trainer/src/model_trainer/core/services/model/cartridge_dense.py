@@ -111,30 +111,59 @@ def rank_by_similarity(
     return tuple(sorted(range(len(scores)), key=rank))
 
 
-def dense_ranking(index: Bm25Index, query: str, embed: EmbedderProto) -> tuple[int, ...]:
-    """Rank an index's chunks against one question by meaning.
+def embed_chunks(index: Bm25Index, embed: EmbedderProto) -> torch.Tensor:
+    """Embed every chunk ONCE, as offline index work.
 
-    Embeds the chunks on every call rather than caching them, which is
-    deliberate for a MEASUREMENT: the caller times indexing and querying
-    separately, and a hidden cache would move indexing cost into whichever
-    query happened to run first. A deployment would cache; this is not one.
+    THE FIRST VERSION EMBEDDED THE CORPUS INSIDE EVERY QUERY, and the
+    measurement that produced is the reason this function exists. Timed that
+    way the dense arm read 17452 ms/item against BM25's 72 -- a 240x gap that
+    is real arithmetic over a design nobody deploys. A deployment embeds its
+    corpus when the corpus changes, exactly as BM25 builds its index once,
+    and pays ONE QUERY EMBEDDING per request.
+
+    The reasoning that produced the mistake was not silly, which is why it is
+    recorded rather than quietly fixed: the goal was to keep indexing cost
+    out of whichever query happened to run first. That goal is right, and
+    the way to get it is to time this call separately -- not to move the work
+    into the request path.
 
     Args:
-        index: The index whose chunks to rank. Its BM25 statistics are
-            unused here -- the chunk list is the shared corpus view, so both
-            arms rank exactly the same units.
-        query: The question. The answer is not an argument.
+        index: The index whose chunks to embed. Its BM25 statistics are
+            unused; the chunk list is the shared corpus view, so both arms
+            rank exactly the same units.
         embed: The embedder.
 
     Returns:
-        Chunk indices, best first. Empty when the index holds no chunks.
+        One L2-normalised row per chunk, shaped (chunks, features). An empty
+        tensor when the index holds no chunks -- embedding an empty batch is
+        a torch error rather than an empty result.
     """
     chunks = index["chunks"]
     if not chunks:
+        return torch.zeros((0, 0), dtype=torch.float32)
+    return embed(list(chunks))
+
+
+def dense_ranking(vectors: torch.Tensor, query: str, embed: EmbedderProto) -> tuple[int, ...]:
+    """Rank pre-embedded chunks against one question by meaning.
+
+    Takes the chunk VECTORS rather than the index, so the only embedding
+    this does is the query's -- which is the whole per-request cost of a
+    dense retriever and the number the record should carry.
+
+    Args:
+        vectors: Chunk embeddings from :func:`embed_chunks`.
+        query: The question. The answer is not an argument, which is the
+            whole difference from the oracle arm.
+        embed: The embedder, called once on the query.
+
+    Returns:
+        Chunk indices, best first. Empty when there are no chunks.
+    """
+    count = int(vectors.shape[0])
+    if count == 0:
         return ()
-    vectors = embed(list(chunks))
-    query_vector = embed([query])[0]
-    return rank_by_similarity(query_vector, vectors, tie_break=range(len(chunks)))
+    return rank_by_similarity(embed([query])[0], vectors, tie_break=range(count))
 
 
 class _BatchProto(Protocol):

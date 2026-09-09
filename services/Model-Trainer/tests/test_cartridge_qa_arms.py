@@ -118,6 +118,11 @@ class TestLatencyObservations:
                 real_seconds=7.0,
                 real_select_seconds=1.0,
                 real_index_seconds=0.25,
+                dense_seconds=6.0,
+                dense_select_seconds=0.5,
+                dense_index_seconds=40.0,
+                fused_seconds=9.0,
+                fused_select_seconds=2.0,
             )
         }
 
@@ -130,7 +135,45 @@ class TestLatencyObservations:
             "bm25_select_seconds": 1.0,
             "bm25_total_serve_seconds": 8.0,
             "bm25_index_seconds": 0.25,
+            "dense_serve_seconds": 6.0,
+            "dense_select_seconds": 0.5,
+            "dense_total_serve_seconds": 6.5,
+            "dense_index_seconds": 40.0,
+            "fused_serve_seconds": 9.0,
+            "fused_select_seconds": 2.0,
+            # 9.0 scoring + 2.0 fusing + 0.5 for the dense ranking it fused.
+            "fused_total_serve_seconds": 11.5,
         }
+
+    def test_a_huge_dense_index_never_reaches_a_per_request_total(self) -> None:
+        """THE DEFECT THIS ARM SHIPPED WITH, pinned as arithmetic.
+
+        Embedding the corpus inside every query recorded 17452 ms/item
+        against BM25's 72. The index cost is offline and belongs out of both
+        totals, symmetric with `bm25_index_seconds` -- so a forty-second
+        corpus embed must leave a half-second query untouched.
+        """
+        named = {
+            observation["name"]: observation["value"]
+            for observation in bench.latency_observations(
+                base_seconds=1.0,
+                retrieval_seconds=1.0,
+                cartridge_seconds=1.0,
+                retrieval_build_seconds=1.0,
+                real_seconds=1.0,
+                real_select_seconds=1.0,
+                real_index_seconds=1.0,
+                dense_seconds=6.0,
+                dense_select_seconds=0.5,
+                dense_index_seconds=40.0,
+                fused_seconds=9.0,
+                fused_select_seconds=2.0,
+            )
+        }
+
+        assert named["dense_total_serve_seconds"] == 6.5
+        assert named["fused_total_serve_seconds"] == 11.5
+        assert named["dense_index_seconds"] == 40.0
 
     def test_the_bm25_total_charges_selection_and_not_indexing(self) -> None:
         """The asymmetry is the whole design, so it is asserted directly."""
@@ -144,6 +187,11 @@ class TestLatencyObservations:
                 real_seconds=7.0,
                 real_select_seconds=1.0,
                 real_index_seconds=100.0,
+                dense_seconds=1.0,
+                dense_select_seconds=1.0,
+                dense_index_seconds=1.0,
+                fused_seconds=1.0,
+                fused_select_seconds=1.0,
             )
         }
 
@@ -176,6 +224,8 @@ class TestServeLatency:
                 212.0,  # bm25 select: 1.0
                 220.0,
                 227.0,  # bm25 scoring: 7.0
+                228.0,
+                268.0,  # dense INDEX: 40.0, offline and out of every total
                 230.0,
                 232.0,  # dense select: 2.0
                 240.0,
@@ -206,8 +256,10 @@ class TestServeLatency:
         assert named["bm25_select_seconds"] == 1.0
         assert named["bm25_serve_seconds"] == 7.0
         assert named["bm25_total_serve_seconds"] == 8.0
+        assert named["dense_index_seconds"] == 40.0
         assert named["dense_select_seconds"] == 2.0
         assert named["dense_serve_seconds"] == 8.0
+        # The forty-second corpus embed is offline and stays out of this.
         assert named["dense_total_serve_seconds"] == 10.0
         assert named["fused_select_seconds"] == 3.0
         assert named["fused_serve_seconds"] == 9.0
@@ -240,6 +292,8 @@ class TestServeLatency:
                 13.0,  # bm25 select
                 13.0,
                 14.0,  # bm25 scoring
+                14.0,
+                14.5,  # dense index
                 14.0,
                 15.0,  # dense select
                 15.0,

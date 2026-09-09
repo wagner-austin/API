@@ -102,6 +102,26 @@ class TestRankBySimilarity:
         assert dense.rank_by_similarity(query, chunks, tie_break=range(2)) == (0, 1)
 
 
+class TestEmbedChunks:
+    def test_it_embeds_the_corpus_once_and_returns_a_row_per_chunk(self) -> None:
+        index = build_index(_DOCUMENTS)
+        embed = _planted(dict.fromkeys(index["chunks"], (1.0, 0.0)))
+
+        vectors = dense.embed_chunks(index, embed)
+
+        assert vectors.shape == (len(index["chunks"]), 2)
+
+    def test_an_empty_index_embeds_nothing_at_all(self) -> None:
+        """Returning early matters: embedding an empty batch is a torch error
+        rather than an empty result.
+        """
+
+        def refuse(texts: Sequence[str], /) -> torch.Tensor:
+            raise AssertionError("the embedder ran on an empty index")
+
+        assert dense.embed_chunks(build_index(()), refuse).shape == (0, 0)
+
+
 class TestDenseRanking:
     def test_it_ranks_the_chunk_whose_meaning_matches(self) -> None:
         index = build_index(_DOCUMENTS)
@@ -114,10 +134,32 @@ class TestDenseRanking:
                 "how is sonar handled": (1.0, 0.0),
             }
         )
+        vectors = dense.embed_chunks(index, embed)
 
-        ranked = dense.dense_ranking(index, "how is sonar handled", embed)
+        ranked = dense.dense_ranking(vectors, "how is sonar handled", embed)
 
         assert ranked[0] == sonar
+
+    def test_it_embeds_the_query_and_only_the_query(self) -> None:
+        """THE DEFECT THIS SIGNATURE EXISTS TO PREVENT, asserted directly.
+
+        The first version took the index and re-embedded every chunk on
+        every call. Timed that way the arm recorded 17452 ms/item against
+        BM25's 72 -- a 240x gap that measured a design nobody deploys. A
+        per-request path may embed exactly one text: the question.
+        """
+        index = build_index(_DOCUMENTS)
+        embed = _planted(dict.fromkeys(index["chunks"], (1.0, 0.0)))
+        vectors = dense.embed_chunks(index, embed)
+        seen: list[int] = []
+
+        def counting(texts: Sequence[str], /) -> torch.Tensor:
+            seen.append(len(texts))
+            return embed(texts)
+
+        dense.dense_ranking(vectors, "how is sonar handled", counting)
+
+        assert seen == [1], "the query path embedded something other than the query"
 
     def test_it_ranks_every_chunk_so_fusion_has_a_full_ordering(self) -> None:
         """Fusion combines POSITIONS, so a truncated ranking would give the
@@ -125,18 +167,15 @@ class TestDenseRanking:
         """
         index = build_index(_DOCUMENTS)
         embed = _planted({index["chunks"][0]: (1.0, 0.0)})
+        vectors = dense.embed_chunks(index, embed)
 
-        assert len(dense.dense_ranking(index, "anything", embed)) == len(index["chunks"])
+        assert len(dense.dense_ranking(vectors, "anything", embed)) == len(index["chunks"])
 
-    def test_an_empty_index_ranks_nothing_without_embedding(self) -> None:
-        """Returning early matters: embedding an empty batch is a torch error
-        rather than an empty result.
-        """
-
+    def test_no_chunks_ranks_nothing_without_embedding(self) -> None:
         def refuse(texts: Sequence[str], /) -> torch.Tensor:
-            raise AssertionError("the embedder ran on an empty index")
+            raise AssertionError("the embedder ran with no chunks to rank")
 
-        assert dense.dense_ranking(build_index(()), "anything", refuse) == ()
+        assert dense.dense_ranking(torch.zeros((0, 0)), "anything", refuse) == ()
 
 
 class TestModelChoice:

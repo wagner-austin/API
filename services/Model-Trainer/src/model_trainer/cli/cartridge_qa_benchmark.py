@@ -64,7 +64,7 @@ from model_trainer.core.services.model.cartridge_corpus import (
     build_windows,
     split_by_stride,
 )
-from model_trainer.core.services.model.cartridge_dense import dense_ranking
+from model_trainer.core.services.model.cartridge_dense import dense_ranking, embed_chunks
 from model_trainer.core.services.model.cartridge_measurement import train_cartridge
 from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
@@ -112,6 +112,11 @@ def latency_observations(
     real_seconds: float,
     real_select_seconds: float,
     real_index_seconds: float,
+    dense_seconds: float,
+    dense_select_seconds: float,
+    dense_index_seconds: float,
+    fused_seconds: float,
+    fused_select_seconds: float,
 ) -> tuple[Observation, ...]:
     """Name what each arm cost to SERVE, per pass over the question set.
 
@@ -152,9 +157,23 @@ def latency_observations(
             in the total: a deployment pays it once when its corpus changes,
             so charging it per query would overstate retrieval exactly as
             charging the oracle's cheating would.
+        dense_seconds: Scoring behind embedding-retrieved evidence.
+        dense_select_seconds: Embedding the QUERY and ranking pre-embedded
+            chunks against it. Charged, for the reason BM25's select is.
+        dense_index_seconds: Embedding the corpus. Offline and excluded from
+            the total, symmetric with ``real_index_seconds`` -- and the
+            asymmetry the first version of this got wrong, by embedding the
+            corpus inside every query and recording 17452 ms/item.
+        fused_seconds: Scoring behind reciprocal-rank-fused evidence.
+        fused_select_seconds: Fusing, plus the lexical ranking fusion needs.
+            The dense ranking is an INPUT to it, so the fused total adds
+            ``dense_select_seconds`` as well -- a hybrid cannot cost less
+            than an arm it is built on.
 
     Returns:
-        The named durations.
+        The named durations. Every arm's per-request total is present as its
+        own name, so a reader compares totals without re-deriving which
+        components belong to which arm.
     """
     return tuple(
         Observation(name=name, value=value)
@@ -167,6 +186,16 @@ def latency_observations(
             ("bm25_select_seconds", real_select_seconds),
             ("bm25_total_serve_seconds", real_seconds + real_select_seconds),
             ("bm25_index_seconds", real_index_seconds),
+            ("dense_serve_seconds", dense_seconds),
+            ("dense_select_seconds", dense_select_seconds),
+            ("dense_total_serve_seconds", dense_seconds + dense_select_seconds),
+            ("dense_index_seconds", dense_index_seconds),
+            ("fused_serve_seconds", fused_seconds),
+            ("fused_select_seconds", fused_select_seconds),
+            (
+                "fused_total_serve_seconds",
+                fused_seconds + fused_select_seconds + dense_select_seconds,
+            ),
         )
     )
 
@@ -289,8 +318,17 @@ def measure_qa_plan(
     # `bm25_retrieval_items` documents.
     queries = [item["template"].replace(BLANK_MARKER, " ") for item in items]
 
+    # OFFLINE, exactly as the BM25 index build is. The first version of this
+    # embedded the whole corpus inside every query and recorded 17452 ms/item
+    # against BM25's 72 -- real arithmetic over a design nobody deploys.
     started = clock()
-    dense_ranks = [dense_ranking(index, query, _test_hooks.embed_texts) for query in queries]
+    dense_vectors = embed_chunks(index, _test_hooks.embed_texts)
+    dense_index_seconds = clock() - started
+
+    started = clock()
+    dense_ranks = [
+        dense_ranking(dense_vectors, query, _test_hooks.embed_texts) for query in queries
+    ]
     dense_select_seconds = clock() - started
 
     dense_set = ranked_retrieval_items(
@@ -378,18 +416,6 @@ def measure_qa_plan(
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
         Observation(name="dense_accuracy", value=scored_dense["accuracy"]),
         Observation(name="fused_accuracy", value=scored_fused["accuracy"]),
-        Observation(name="dense_select_seconds", value=dense_select_seconds),
-        Observation(name="dense_serve_seconds", value=dense_seconds),
-        Observation(name="dense_total_serve_seconds", value=dense_seconds + dense_select_seconds),
-        Observation(name="fused_select_seconds", value=fused_select_seconds),
-        Observation(name="fused_serve_seconds", value=fused_seconds),
-        Observation(
-            name="fused_total_serve_seconds",
-            # The dense ranking is an INPUT to fusion, so a deployment pays
-            # it too. Adding it here rather than leaving the reader to notice
-            # -- the separate components are all recorded above.
-            value=fused_seconds + fused_select_seconds + dense_select_seconds,
-        ),
         Observation(name="bm25_accuracy", value=scored_real["accuracy"]),
         Observation(
             name="bm25_accuracy_gain",
@@ -423,6 +449,11 @@ def measure_qa_plan(
             real_seconds=real_seconds,
             real_select_seconds=real_select_seconds,
             real_index_seconds=real_index_seconds,
+            dense_seconds=dense_seconds,
+            dense_select_seconds=dense_select_seconds,
+            dense_index_seconds=dense_index_seconds,
+            fused_seconds=fused_seconds,
+            fused_select_seconds=fused_select_seconds,
         )
     )
     return tuple(observations), digest
