@@ -10,10 +10,10 @@ source_paths:
   - "README.md"
   - "pyproject.toml"
 source_git_blobs:
-  "src/hpc3/clusters/hpc3.py": "e6fedebb13c20222c9269b158f0ebed7fbf84cc9"
+  "src/hpc3/clusters/hpc3.py": "7bb86a2753a78657365f4bd69c3a0dedd0f1e82c"
   "src/hpc3/core/bootstrap.py": "689051513c67eb0978667f2fe109c83b0baab1d1"
   "src/hpc3/core/env_probe.py": "e83c330acd07bdb53dfdcc8fe1ee8a64de3af529"
-  "README.md": "104d4dac210676c88c42b5122146c11687239fc5"
+  "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
   "pyproject.toml": "48c300ade70f6240e0aadf87dbf988e96fbe3dfe"
 provenance:
   - "module -t avail python on hpc3 login-i15, 2026-09-03: python/2.7.17, 3.8.0, 3.10.2, 3.14.3"

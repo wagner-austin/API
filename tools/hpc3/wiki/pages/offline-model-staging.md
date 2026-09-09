@@ -8,7 +8,7 @@ source_paths:
   - "runs/hpc3-code-style.json"
 source_git_blobs:
   "runs/code-style-run-train.json": "d60c063f583e12b75e85651d00ae6c24e54ebc04"
-  "runs/hpc3-code-style.json": "1704cc0ecd7d68df31eee6b11eb845803a7c7fe4"
+  "runs/hpc3-code-style.json": "6a6adee0f76926efbd62ef677880eefe43ecb5f2"
 provenance:
   - "huggingface_hub file_download.py, function _cache_commit_hash_for_specific_revision -- read from the installed 0.x in services/Model-Trainer/.venv, outside this wiki's workspaceRoot"
   - "job 55744648, code-style.qlora-qwen-v1 on an A30, 2026-09-04: OSError after 9 seconds, 'couldn't find it in the cached files'"

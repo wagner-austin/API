@@ -8,10 +8,10 @@ source_paths:
   - "README.md"
 source_git_blobs:
   "src/hpc3/contracts/layout.py": "cb698fabbd6994fc9b6bc10092e77df3dc7f520e"
-  "README.md": "104d4dac210676c88c42b5122146c11687239fc5"
+  "README.md": "7ac1acb5c894dafe7537926323ae96d7d5b57dbe"
 provenance:
   - "AccountingStoreFlags = (null), measured 2026-08-23"
-fact_checked: 2026-09-04
+fact_checked: 2026-09-09
 confidence: high
 ---
 
@@ -46,10 +46,17 @@ only effect was satisfying the guard. `mi` declared 500 and `turkic-lstm`
 declares 27,344 against payloads that checkpoint on schedules of their own and
 have never seen either number.
 
-`checkpoint_steps` is therefore an **operator assertion the tooling cannot
+The declaration is therefore an **operator assertion the tooling cannot
 verify**, not a setting it applies, and nothing in the rendered script pretends
 otherwise any more. The restart count still reaches the job log, read from
 Slurm's own `SLURM_RESTART_COUNT` rather than re-exported under a name of ours.
+
+The field itself was renamed on 2026-09-09. `checkpoint_steps: int` became
+`resumes_from_checkpoint: bool`, because an integer cadence implies a
+configured interval and this one configured nothing: monorepo-wide it appeared
+in the guard and the type feeding it, and the guard only ever compared it
+`> 0`. A boolean states the claim being made. 389 of the 392 committed
+documents declared `0` and asserted nothing at all.
 
 When a payload does resume from a checkpoint, the export returns **in the same
 change as its reader** — the declaration becomes legal at the moment it becomes

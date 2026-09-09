@@ -8,12 +8,12 @@ source_paths:
   - "src/hpc3/core/inflight.py"
   - "src/hpc3/core/campaign.py"
 source_git_blobs:
-  "src/hpc3/contracts/job.py": "45f6be817460501c520ecca58b4f1dbc7341f4d0"
+  "src/hpc3/contracts/job.py": "1db35d094165fbf272511c84479db13979b93326"
   "src/hpc3/core/inflight.py": "03cf4ad35a0e4c2987b9d5e8ed20e440b3891c55"
   "src/hpc3/core/campaign.py": "16eb99599f73899e856393e48ee7f3fe7addc71e"
 provenance:
   - "scontrol show partition free-gpu (2026-08-28)"
-fact_checked: 2026-09-05
+fact_checked: 2026-09-09
 confidence: high
 ---
 
@@ -36,8 +36,16 @@ requeue instead. Observed 2026-08-28: `turkic-lstm.bases-kk` was preempted at
 resume state is written to `/pub` after every completed epoch precisely
 because node-local scratch dies with the job — including when it dies by
 preemption. A preempted member is resubmitted and continues from its last
-completed epoch. That is what `checkpoint_steps` is for, and it is why a long
-run on a preemptible partition is viable at all.
+completed epoch. That is what `resumes_from_checkpoint` declares, and it is
+why a long run on a preemptible partition is viable at all.
+
+This page stated that sentence on 2026-08-28 and the submission guard had no
+way to consult it. `PREEMPTIBLE_RUN_UNPROTECTED` went on requiring `requeue`
+in every branch until 2026-09-09, because `PartitionFacts` carried a
+`preemptible` boolean and nothing about the mode — so the distinction this
+page opens with lived in prose, here and in two docstrings, and nowhere the
+code could reach. The field is now `preempt_mode`, measured per partition,
+and the flag is demanded only under `REQUEUE`, where Slurm honours it.
 
 ## The campaign is the resume mechanism
 
@@ -79,7 +87,7 @@ verified by `scontrol` the same hour): a wave took 22 of a 96-task array
 `PREEMPTED` — nothing returned to the queue. One `hpc3-campaign` converge
 pass resubmitted exactly the 22 as a sparse array against the same member
 table and left the 49 running and 25 finished members alone. This is also
-the `checkpoint_steps: 0` case the deterministic-replay clause admits: the
-members are pinned-regime replays, so "resume" is replay-from-zero, and the
-campaign is the entire recovery mechanism — no checkpoint file exists to
-protect.
+the `resumes_from_checkpoint: false` case the deterministic-replay clause
+admits: the members are pinned-regime replays, so "resume" is replay-from-zero,
+and the campaign is the entire recovery mechanism — no checkpoint file exists
+to protect.

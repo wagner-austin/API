@@ -7,9 +7,9 @@ source_paths:
   - "src/hpc3/contracts/run.py"
   - "src/hpc3/contracts/experiment.py"
 source_git_blobs:
-  "src/hpc3/contracts/run.py": "857420fb3712cfb66b2ad0ac2d9f984be5de5a15"
+  "src/hpc3/contracts/run.py": "c3d17711f71ea01ba5eeb14eb3293ad89f527cd0"
   "src/hpc3/contracts/experiment.py": "530e8484b421d13119e951fef3ed8ea8b2706abf"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-09
 confidence: high
 ---
 
@@ -40,14 +40,16 @@ Any project default may be restated to override it for this run alone:
 ```json
 {
   "project": "abl", "name": "armC-full", "command": "python -u train.py --arm C",
-  "minutes": 900, "checkpoint_steps": 250
+  "minutes": 900, "resumes_from_checkpoint": true
 }
 ```
 
 Overriding is not a way around validation — the merged result goes through the
 same decoder a fully hand-written spec would, so an override that lengthens a
-preemptible run past an hour must also carry `requeue` and `checkpoint_steps`
-([[preemption-and-campaigns]]).
+run past an hour on a partition that preempts must declare work that survives
+eviction: `resumes_from_checkpoint` or `deterministic`. Under
+`PreemptMode=REQUEUE` it must also carry `requeue`; under `CANCEL` that flag is
+inert and is not demanded ([[preemption-and-campaigns]]).
 
 ## Unrecognised fields are refused, not ignored
 

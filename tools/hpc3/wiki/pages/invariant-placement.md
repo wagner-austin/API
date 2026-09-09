@@ -9,7 +9,7 @@ source_paths:
   - "src/hpc3/cli/_config.py"
 source_git_blobs:
   "src/hpc3/core/preflight.py": "c642109e539eb3a0a7cfb97c6e44ff161fe7cb0a"
-  "src/hpc3/contracts/project.py": "c2ff0d9ae27e41570308a457bd875b6c3acb0251"
+  "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
   "src/hpc3/cli/_config.py": "81b8e8ee8fc1a7f8a747da7fa481fee84b114a71"
 provenance:
   - "PROJECT_UNIMAGED observed raised from contracts/workspace.py at decode, 2026-09-02, while that file was uncommitted work in progress"

@@ -7,9 +7,9 @@ source_paths:
   - "src/hpc3/contracts/sweep.py"
   - "src/hpc3/core/sweep.py"
 source_git_blobs:
-  "src/hpc3/contracts/sweep.py": "0893d3d08329be27f076211775f7f7e7b9faa5cc"
+  "src/hpc3/contracts/sweep.py": "52dcf1549a3531a2b847643ca056f6c2226043fa"
   "src/hpc3/core/sweep.py": "6796f42b6a10dbb1ea223b0ae9f3651ff4f1675e"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-09
 confidence: high
 ---
 
@@ -20,7 +20,7 @@ A sweep is one template run several ways at once:
 ```json
 {
   "project": "abl", "name": "rung-large",
-  "minutes": 900, "checkpoint_steps": 250,
+  "minutes": 900, "resumes_from_checkpoint": true,
   "members": [
     { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0 --out /pub/wagnera3/abl/s0.json",
       "artifact": "/pub/wagnera3/abl/s0.json" },

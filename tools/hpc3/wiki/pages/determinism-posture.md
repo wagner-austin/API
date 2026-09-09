@@ -8,8 +8,8 @@ source_paths:
   - "src/hpc3/contracts/job.py"
   - "src/hpc3/contracts/ledger.py"
 source_git_blobs:
-  "src/hpc3/contracts/project.py": "c2ff0d9ae27e41570308a457bd875b6c3acb0251"
-  "src/hpc3/contracts/job.py": "45f6be817460501c520ecca58b4f1dbc7341f4d0"
+  "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
+  "src/hpc3/contracts/job.py": "1db35d094165fbf272511c84479db13979b93326"
   "src/hpc3/contracts/ledger.py": "d059693188c3d50b7634458f885c385842c2764c"
 provenance:
   - "measured: RTX 3090 Ti, torch 2.6.0+cu124, transformers 4.46.3"
