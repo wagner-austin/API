@@ -21,6 +21,12 @@ source_paths:
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
   - libs/platform_core/src/platform_core/power_distributions.py
   - tools/code-style-eval/tests/test_published_comparisons.py
+  - tools/hpc3/runs/code-style-gen-v1-base.json
+  - tools/hpc3/runs/code-style-gen-v1-candidate.json
+  - tools/hpc3/runs/code-style-gen-v2-base.json
+  - tools/hpc3/runs/code-style-gen-v2-candidate.json
+  - tools/hpc3/runs/code-style-qlora-v1.json
+  - tools/hpc3/runs/code-style-qlora-v2.json
 source_git_blobs:
   "tools/code-style-eval/runs/gen-v2/comparison.json": 59740d9ff18ef856ec3afee9b1e4cdf86995b3eb
   "tools/code-style-eval/runs/gen-v2/base.outcomes.jsonl": ba1a470e0abb607c5d1dd523b323638952ef64fd
@@ -37,6 +43,12 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
   "tools/code-style-eval/tests/test_published_comparisons.py": 9d8789a618d8e870136cb758d5059a70c4ebe678
+  "tools/hpc3/runs/code-style-gen-v1-base.json": c650a9dcb602022d5bc8ab9c35e9b586fa4ce133
+  "tools/hpc3/runs/code-style-gen-v1-candidate.json": 0ba923bf44663318bbcb1ba24cd52321a22949be
+  "tools/hpc3/runs/code-style-gen-v2-base.json": 28ba697b4326009567c8b5bbede772bbc627d83e
+  "tools/hpc3/runs/code-style-gen-v2-candidate.json": 166db0baa7199f561a7a6a58035345c0ef89becb
+  "tools/hpc3/runs/code-style-qlora-v1.json": d0b87665e7742bc7f563389707bd033db5a1bc61
+  "tools/hpc3/runs/code-style-qlora-v2.json": 1f9a7f16b984d546eb21e17fc6754b1ab56d08e1
 provenance:
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
@@ -175,6 +187,27 @@ correction[^12]. Picking the row that keeps a p-value under
 0.05 is exactly the move this table exists to make visible, and it is not made
 here.
 
+**Every figure here is one realization of the decode, and there is no second
+one.** `seed` is 0 in all six of this project's committed run documents, v1
+and v2, both arms; no document carries a seeds list and the axis has never
+been varied.[^13] The two arms *sharing* a seed is deliberate and correct —
+it is what makes the decode paired — but never moving it across runs means
+this project has no noise floor at all. McNemar conditions on the discordant
+pairs, which handles item-level pairing; it says nothing about
+decode-to-decode variance, and re-running at seed 1 would have both arms emit
+different completions and therefore a different 2x2 table.
+
+Unlike the clustering limit above, this one **cannot be bounded here**. A
+range needs at least two seeds and this corpus has one, so the size of the
+effect is unknown rather than estimated — stating an interval would be
+inventing it. What can be said is which results are exposed: termination at
+−204 items of 875 and mid-p 2e-28 would survive essentially any plausible
+decode variance, while the guards gain of +18 on 282 items is now the same
+result flagged for a third independent reason — below its own MDE, over
+non-independent units, and from a single decode. Three reasons to read it as
+directional, and the case for not calling it a result until a seed axis
+exists.
+
 ## What each null could have detected
 
 A McNemar test conditions on the discordant pairs, so its power is a property
@@ -282,6 +315,10 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
+[^13]: `tools/hpc3/runs/code-style-gen-v{1,2}-{base,candidate}.json`,
+       `code-style-qlora-v{1,2}.json` — `"seed": 0` in all six, and no `seeds`
+       key in any code-style run document. Counted 2026-09-09 by grepping the
+       committed documents rather than by reading the pipeline.
 [^12]: Cluster counts computed over the 875 shared item ids in
        `tools/code-style-eval/runs/gen-v2/{base,candidate}.outcomes.jsonl`,
        grouping by the first path segment, the first two, and the containing
