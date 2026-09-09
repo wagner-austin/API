@@ -21,6 +21,7 @@ source_paths:
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
   - libs/platform_core/src/platform_core/power_distributions.py
   - tools/code-style-eval/tests/test_published_comparisons.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/continuations.py
   - tools/hpc3/runs/code-style-gen-v1-base.json
   - tools/hpc3/runs/code-style-gen-v1-candidate.json
   - tools/hpc3/runs/code-style-gen-v2-base.json
@@ -43,6 +44,7 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
   "tools/code-style-eval/tests/test_published_comparisons.py": 9d8789a618d8e870136cb758d5059a70c4ebe678
+  "services/Model-Trainer/src/model_trainer/core/services/model/continuations.py": 963041d82664195e4aa7fd6d69a54f64c1ebcb33
   "tools/hpc3/runs/code-style-gen-v1-base.json": c650a9dcb602022d5bc8ab9c35e9b586fa4ce133
   "tools/hpc3/runs/code-style-gen-v1-candidate.json": 0ba923bf44663318bbcb1ba24cd52321a22949be
   "tools/hpc3/runs/code-style-gen-v2-base.json": 28ba697b4326009567c8b5bbede772bbc627d83e
