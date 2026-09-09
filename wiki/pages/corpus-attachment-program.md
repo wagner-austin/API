@@ -9,22 +9,25 @@ related:
 source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py
   - services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 427c6c63073ea1417ef20b0836c99af7688ed448
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": 6fa2350991c7ed262a342326ba6846b4b6afa519
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 1e45bd37cf0cf4f191b62cd43485d892e1901e3c
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": 36950df0ed6f7a4af8ae37e3550482f1203aa376
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py": 883e01b8afba699654da81e92e8e37eca608b234
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
   "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py": 411c47f975fad5b700bcc6948da496f9af9c4c73
 provenance:
-  - "ladder measured 2026-09-08 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
-  - "records qa-fixed-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
-  - "SUPERSEDED: the 2026-09-07 run (qa-record-bm25.json, 24 items) was produced before commits 9ba9dfb6 and eb73abf8 and its verdict is retracted on this page"
-  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), 74dd514e (persona adapter, never started)"
+  - "all arms measured 2026-09-08/09 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
+  - "records qa-svc-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
+  - "DETERMINISM CERTIFICATE: four independent runs hours apart, across substantial changes to the retrieval path, agree on 12 shared accuracy fields at every rung"
+  - "SUPERSEDED: the 2026-09-07 run (qa-record-bm25.json, 24 items) predates commits 9ba9dfb6 and eb73abf8 and its verdict is retracted here; the 2026-09-08 ladder's LATENCY figures predate 62315399 and 00602af9 and are retracted too"
+  - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), ac5f88cb (scale ladder, done), a8f799c5 (retrieval methods, done), 3fc98ed6 (corpus representation, open), 74dd514e (persona adapter, never started)"
   - "AKEW figures from wiki page wu-2024-akew-editing-in-the-wild in the personal wiki, read page by page"
-fact_checked: "2026-09-08"
+fact_checked: "2026-09-09"
 confidence: high
 hubs: [services]
 ---
@@ -50,7 +53,7 @@ This page is the index. It carries no measurement of its own.
 |---|---|---|
 | Weight injection | rank-one edit into the parameters | **No, on this corpus** — bounded by ingest, not algebra |
 | Steering vectors | add a direction to the residual stream | **No** — composition degrades to nothing |
-| Cartridges | train a KV prefix, serve it ahead of the query | **Yes from ~774M** — beats keyword search on accuracy, and on latency at 1.5B |
+| Cartridges | train a KV prefix, serve it ahead of the query | **Yes from ~774M** — beats lexical, dense AND fused retrieval on accuracy; cheaper per request than dense and fused everywhere, and than BM25 at 1.5B |
 | Persona adapter | not started | untested |
 
 The cartridge row said **No** until 2026-09-08. That verdict came from a
@@ -88,24 +91,44 @@ The arm's own S0 gate concluded that building a local harness would replicate
 known results below the state of the art. What shipped instead was the corpus
 update — four papers into the personal wiki.
 
-## Cartridges: the arm that crosses retrieval between 355M and 774M
+## Cartridges: the arm that crosses every retriever between 355M and 774M
 
 The only arm carried to a full comparison on real data. Four model sizes, the
 same 32 held-out questions about the 12 public me-wiki pages, one card, one
 corpus digest, chance 0.25:
 
-| model | base | + cartridge | gain | spread | + BM25 | cart ms | BM25 ms |
+| model | base | + cartridge | gain | spread | + BM25 | + dense | + fused |
 |---|---|---|---|---|---|---|---|
-| gpt2 124M | 0.4375 | 0.6042 | +0.167 | 0.031 ✱ | **0.7500** | 69.7 | **63.8** |
-| gpt2-medium 355M | 0.5625 | 0.7292 | +0.167 | 0.188 | **0.7812** | 128.9 | **120.6** |
-| gpt2-large 774M | 0.5312 | **0.8021** | +0.271 | 0.125 ✱ | 0.7500 | 178.3 | **171.4** |
-| gpt2-xl 1.5B | 0.5625 | **0.8229** | +0.260 | 0.031 ✱ | 0.7812 | **246.9** | 281.5 |
+| gpt2 124M | 0.4375 | 0.6042 | +0.167 | 0.031 ✱ | **0.7500** | 0.7188 | **0.7812** |
+| gpt2-medium 355M | 0.5625 | 0.7292 | +0.167 | 0.188 | **0.7812** | 0.6875 | 0.7500 |
+| gpt2-large 774M | 0.5312 | **0.8021** | +0.271 | 0.125 ✱ | 0.7500 | 0.7188 | 0.7500 |
+| gpt2-xl 1.5B | 0.5625 | **0.8229** | +0.260 | 0.031 ✱ | 0.7812 | 0.7500 | 0.7812 |
 
 ✱ the gain exceeds its own seed spread. Oracle retrieval scores 0.9688 at
 gpt2 and 1.0000 at every larger rung.
 
-**The cartridge overtakes BM25 on accuracy between 355M and 774M**, and at
-1.5B it wins on latency as well.
+Per-request cost, ms/item, with index builds excluded and reported
+separately (BM25 ~4.6 ms, dense ~340 ms, both one-time):
+
+| model | cartridge | BM25 | dense | fused |
+|---|---|---|---|---|
+| gpt2 124M | 69.8 | **64.3** | 81.9 | 82.7 |
+| gpt2-medium 355M | 127.0 | **122.2** | 142.3 | 137.2 |
+| gpt2-large 774M | 177.4 | **170.5** | 195.3 | 196.8 |
+| gpt2-xl 1.5B | **250.7** | 270.5 | 299.4 | 309.5 |
+
+**The cartridge overtakes every retriever on accuracy between 355M and
+774M.** It is also cheaper per request than dense and fused at every rung,
+and cheaper than BM25 at 1.5B.
+
+**Dense retrieval is the surprise, and it is a negative one.** It loses to
+plain BM25 at every rung, and fusing the two closes none of the gap to the
+oracle. The reason was predicted before it was measured, by
+`packages/wiki-search/src/fusion.ts` in the MCPs repo: a proper-noun query
+needs the lexical hit even where the vector arm ranks it nowhere. This
+corpus is project names — ClearGBM, NavProbe, TankpitBot — which is exactly
+what lexical matching rewards and embeddings blur. The dense arm contributes
+little, so reciprocal-rank fusion has little to fuse.
 
 The shape is what makes it readable rather than the endpoint. Cartridge
 accuracy rises monotonically — 0.6042, 0.7292, 0.8021, 0.8229 — while BM25
@@ -168,12 +191,22 @@ narrow in three ways that still matter.
    fit. At that size there is nothing to compress, so the arm won on a
    question the technique is not designed around. That makes the win more
    surprising, not less caveated.
-3. **Only lexical retrieval was beaten.** BM25's per-query search costs
-   1.84 ms/item — nearly free. A dense retriever would cost real
-   milliseconds and would also retrieve better, and
-   [[model-trainer-composition-ceiling]]'s sibling task on retrieval
-   methods (board `a8f799c5`) exists to close the 16-to-25 point gap BM25
-   still leaves against the oracle. Beating BM25 is not beating retrieval.
+3. ~~**Only lexical retrieval was beaten.**~~ **ANSWERED 2026-09-09, and the
+   answer inverted the caveat.** This page previously argued that beating
+   BM25 is not beating retrieval, because a dense retriever "would cost real
+   milliseconds and would also retrieve better". Half of that was right: a
+   dense query costs ~20 ms/item against BM25's ~1.5. The other half was
+   wrong — dense retrieves WORSE here, at every rung, and the fusion of the
+   two closes none of the oracle gap. The cartridge now leads all three
+   retrievers at 774M and 1.5B. Board `a8f799c5` carries the measurement.
+
+   The caveat is struck rather than deleted because its REASONING was sound
+   and is what made the test worth running; only its prediction failed.
+
+4. **A stronger embedder is untested.** The dense arm ran `thenlper/gte-base`,
+   chosen to match the family `wiki-search` deploys rather than to win. This
+   result is about THIS corpus's proper-noun density, not about dense
+   retrieval in general.
 
 ## The untested lever, which the cartridge result makes MORE interesting
 
