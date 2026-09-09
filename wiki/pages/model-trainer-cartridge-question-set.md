@@ -92,6 +92,16 @@ McNemar exact, and its floor follows immediately: **a net difference of 5
 items cannot reach p ≤ 0.05 under ANY arrangement of the pairs** (2·0.5^5 =
 0.063), while 6 items can (0.031).
 
+**That floor belongs to the EXACT test, and here the distinction is not
+academic.** Under **mid-p** a 5:0 split gives 0.031 and rejects, putting that
+floor at 5 — under which all three of the cartridge's seeds would clear
+rather than one. **The exact floor is the one that applies**, because exact
+is what this instrument computes and reports; a page does not get to pick the
+variant that flatters it after the fact. Recorded because the temptation is
+obvious and because `code-style` legitimately reports mid-p, so the same
+count means different things in the two lanes and a floor quoted without its
+variant will be applied to the wrong one.
+
 The cartridge's gain is 6 / 5 / 5 items across the three seeds. **One seed
 of three sits on the boundary and two sit under it**, which is why no p is
 reported beside it while every retrieval row has one. The honest reading is

@@ -259,6 +259,16 @@ p of 2·(0.5)^*d*. That is ≤ 0.05 only from *d* = 6 upward
 therefore the smallest net difference this question set can EVER declare
 significant, no matter how the pairs fall.**
 
+**Six is the floor for the EXACT test, which is the one this instrument
+reports — check which variant yours reports before reusing the number.** The
+p-values on [[model-trainer-cartridge-question-set]] settle it here: BM25's
++10 items reports 0.0020, which is 2·(0.5)^10 to four figures, and the
+oracle's +17 reports 0.0000153, which is 2·(0.5)^17. Under **mid-p**, the
+variant `code-style` uses, a 5:0 split gives 0.031 and does reject, so that
+floor is 5. The distinction changes nothing here — 1.7 and 1.3 items fail
+both by a wide margin — but a floor quoted without its test is a number
+someone will apply to the wrong instrument.
+
 Against that floor:
 
 | comparison | rung | net difference | items of 32 | vs the 6-item floor |
