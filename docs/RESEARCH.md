@@ -673,20 +673,27 @@ name appeared nowhere here — was mine, and another session bridged it.
   run. Against a coarser 1% bar the two large rows are TESTED and the gemm
   and attention rows are not. The verdicts are not wrong; what they
   exclude is narrower than "bit-identical" reads.
-- **`186` is a RECORD count and `93` is the comparison count, and the
-  documents disagree.** This entry says cross-card `gemm 186/186`; the
-  personal-wiki narrative says the cards "agree on all 93 ordered ones"
-  against "18 of 93 vendor gemm digests". The ledger
-  (`tools/hpc3/runs/ledger.jsonl`, project `mi-cu128`) shows the L40S ran
-  only the `cublas` and `ordered` gemm arms — `owned`, `fp64`, `rank1` and
-  `sdpa` are RTX PRO 6000 only — so 186 cannot be ordered+owned cross-card
-  (owned has no L40S counterpart) and cannot include cublas (18 of 93).
-  The reconcilable reading is 93 shapes across 2 cards = 186 records
-  forming **93 comparisons**. It matters because reporting 186 as the
-  comparison count halves the stated uncertainty, 1.598% against 3.170%;
-  the table above therefore uses the conservative 93. Collapsing this
-  needs a read of `/pub/wagnera3/gemm/cu128-v1/*-ordered.json`, which is
-  cluster-only and was not reachable from this checkout.
+- **`186` and `93` count different UNITS of the same battery, and both are
+  correct — settled by a cluster read 2026-09-09.** This entry says
+  cross-card `gemm 186/186`; the personal-wiki narrative says the cards
+  "agree on all 93 ordered ones". Both files hold **186 observations over
+  93 distinct shapes**, each shape carrying two summaries of one computed
+  matrix, `<shape>|digest48` and `<shape>|sum`; the observation names are
+  identical across the two cards, so the pairing is exact and total. So
+  186/186 is observation-level agreement and 93/93 is shape-level
+  agreement — one battery, two units, no conflict. Read directly from
+  `/pub/wagnera3/gemm/cu128-v1/{rtx6000,l40s}-ordered.json` by
+  @opus-qft-code-0903, who had the cluster connection this audit did not.
+  **The bound above uses 93, and non-independence is the reason, not
+  caution.** `digest48` and `sum` are two views of the SAME matrix: a
+  kernel that changes a result moves both, and one that does not moves
+  neither. They cannot diverge separately, so counting 186 independent
+  trials would inflate the denominator with duplicate evidence and halve
+  a bound the data does not support halving (1.598% against the correct
+  3.170%). **Whenever either number is quoted, name its unit** — "186/186
+  observations across 93 shapes", "93 shapes (186 observations)" —
+  because two accurate totals over one battery, stated without their
+  units, read as a disagreement to everyone who did not run them.
 - **The run-level axis is n=1, and it is a different question.**
   Bit-identity across 2,627 items says nothing about whether a FRESH pair
   of runs reproduces it — that is the axis determinism pins address, and
