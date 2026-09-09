@@ -24,7 +24,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 2f3ad497d7dcea1cb378720573de7243d6f85f01
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
   "services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py": d8d1e89ba5c1920464a501048a028d9b24b97acc
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 32427d62f7e123078e671532a78ea09f3feeeaae
 provenance:
   - "CURRENT: record qa-svc-gpt2.json, measured 2026-09-08 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
   - "gpt2 (12 layers, 12 heads, 1024 positions), 12 me-wiki pages carrying visibility: public, 128 slots, seeds 7/8/9, determinism pinned, corpus digest e2f23c635583"
