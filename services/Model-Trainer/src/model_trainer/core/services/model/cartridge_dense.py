@@ -42,13 +42,27 @@ DENSE_MODEL_ID = "thenlper/gte-base"
 class EmbedderProto(Protocol):
     """Protocol for the text embedder the dense arm ranks with.
 
-    Behind a hook because it loads real weights. A test that reached the
-    real one would need a model cache to run at all, and the arm's LOGIC --
-    pooling, normalisation, ranking, fusion -- is what the tests are for.
+    An embedder is a SERVICE holding a loaded encoder, not a function that
+    loads one -- see :func:`_default_embedder_factory` for why that
+    distinction cost 300 ms of every query before it was drawn.
     """
 
     def __call__(self, texts: Sequence[str], /) -> torch.Tensor:
         """Embed each text, returning one L2-normalised row per input."""
+        ...
+
+
+class EmbedderFactoryProto(Protocol):
+    """Protocol for building an embedder bound to a device.
+
+    Behind a hook because building one loads real weights. A test that
+    reached the real factory would need a model cache to run at all, and the
+    arm's LOGIC -- pooling, normalisation, ranking, fusion -- is what the
+    tests are for.
+    """
+
+    def __call__(self, device: str, /) -> EmbedderProto:
+        """Load the encoder once and return an embedder using it."""
         ...
 
 
@@ -220,6 +234,10 @@ class _EncoderProto(Protocol):
         """Put the model in evaluation mode, returning itself."""
         ...
 
+    def to(self, device: str) -> _EncoderProto:
+        """Move the weights to a device, returning itself."""
+        ...
+
 
 class _EncoderClassProto(Protocol):
     """The ``AutoModel`` class object."""
@@ -229,8 +247,20 @@ class _EncoderClassProto(Protocol):
         ...
 
 
-def _default_embedder(texts: Sequence[str], /) -> torch.Tensor:
-    """Production embedder - used as default hook.
+def _default_embedder_factory(device: str, /) -> EmbedderProto:
+    """Production embedder factory - used as default hook.
+
+    A FACTORY RATHER THAN A BARE FUNCTION, and the reason is the second half
+    of the same defect the corpus-embedding fix addressed. The first version
+    called ``from_pretrained`` on EVERY invocation, so each query paid a full
+    model load: measured, the per-request dense cost stayed at 368 ms/item
+    after the corpus embedding moved offline, against BM25's 66, and the
+    remainder was almost entirely reloading gte. A deployment loads its
+    encoder once when the process starts. So does this now.
+
+    IT ALSO NEVER LEFT THE CPU while every other arm ran on CUDA, which made
+    the comparison a cross-device one nobody declared. The device is now an
+    argument, and the weights and both input tensors go to it.
 
     Imported inside the function for the reason the hub loaders are: parsing
     a command line must not pull transformers into the process. The
@@ -242,29 +272,47 @@ def _default_embedder(texts: Sequence[str], /) -> torch.Tensor:
     call, which makes the ranking a function of nothing.
 
     Args:
-        texts: Texts to embed.
+        device: Where the encoder and its inputs live, matching the arm the
+            embeddings are compared against.
 
     Returns:
-        One L2-normalised row per input.
+        An embedder closed over the loaded encoder, returning one
+        L2-normalised row per input text.
     """
     transformers = __import__("transformers", fromlist=["AutoModel", "AutoTokenizer"])
     tokenizer_cls: _TokenizerClassProto = transformers.AutoTokenizer
     model_cls: _EncoderClassProto = transformers.AutoModel
 
     tokenizer = tokenizer_cls.from_pretrained(DENSE_MODEL_ID)
-    model = model_cls.from_pretrained(DENSE_MODEL_ID).eval()
-    batch = tokenizer(list(texts), padding=True, truncation=True, return_tensors="pt")
-    mask = batch["attention_mask"]
-    with torch.no_grad():
-        hidden = model(input_ids=batch["input_ids"], attention_mask=mask).last_hidden_state
-    return torch.nn.functional.normalize(masked_mean(hidden, mask), p=2.0, dim=1)
+    model = model_cls.from_pretrained(DENSE_MODEL_ID).eval().to(device)
+
+    def embed(texts: Sequence[str], /) -> torch.Tensor:
+        """Embed a batch against the encoder loaded once above.
+
+        Args:
+            texts: Texts to embed.
+
+        Returns:
+            One L2-normalised row per input.
+        """
+        batch = tokenizer(list(texts), padding=True, truncation=True, return_tensors="pt")
+        mask = batch["attention_mask"].to(device)
+        with torch.no_grad():
+            hidden = model(
+                input_ids=batch["input_ids"].to(device), attention_mask=mask
+            ).last_hidden_state
+        return torch.nn.functional.normalize(masked_mean(hidden, mask), p=2.0, dim=1)
+
+    return embed
 
 
 __all__ = [
     "DENSE_MODEL_ID",
+    "EmbedderFactoryProto",
     "EmbedderProto",
-    "_default_embedder",
+    "_default_embedder_factory",
     "dense_ranking",
+    "embed_chunks",
     "masked_mean",
     "rank_by_similarity",
 ]

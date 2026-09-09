@@ -32,6 +32,7 @@ from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
+from model_trainer.core.services.model.cartridge_dense import EmbedderProto
 from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
@@ -164,7 +165,7 @@ def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
     return DOCUMENTS
 
 
-def fake_embedder(texts: Sequence[str], /) -> torch.Tensor:
+def _fake_embed(texts: Sequence[str], /) -> torch.Tensor:
     """Stand in for the gte embedder with a deterministic hashed vector.
 
     FAKED HERE FOR TWO REASONS, and speed is the lesser one. The real
@@ -194,11 +195,28 @@ def fake_embedder(texts: Sequence[str], /) -> torch.Tensor:
     return torch.tensor(rows, dtype=torch.float32)
 
 
+def fake_embedder_factory(device: str, /) -> EmbedderProto:
+    """Stand in for the gte embedder factory.
+
+    Takes the device and ignores it: the fake hashes text rather than
+    running a model, so there is nothing to place. The PARAMETER is kept
+    because the protocol has it, and a fake whose signature drifts from the
+    real one stops testing the call it stands in for.
+
+    Args:
+        device: Where a real encoder would live. Unused here.
+
+    Returns:
+        The hashing embedder.
+    """
+    return _fake_embed
+
+
 def install_fakes() -> None:
     """Point every seam the benchmark uses at a fake."""
     _measurement_hooks.qa_plans = _fake_plans
     _test_hooks.read_corpus_documents = _fake_corpus_reader
-    _test_hooks.embed_texts = fake_embedder
+    _test_hooks.make_embedder = fake_embedder_factory
     hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
     hf_hooks.Hooks.load_hf_model = _fake_model
 
@@ -207,7 +225,7 @@ def restore_fakes() -> None:
     """Put the production hooks back."""
     _measurement_hooks.qa_plans = _measurement_hooks._default_qa_plans
     _test_hooks.read_corpus_documents = _test_hooks._default_read_corpus_documents
-    _test_hooks.embed_texts = _test_hooks._default_embedder
+    _test_hooks.make_embedder = _test_hooks._default_embedder_factory
     hf_hooks.Hooks.reset()
 
 
@@ -227,7 +245,7 @@ __all__ = [
     "DOCUMENTS",
     "TINY_PLAN",
     "Tokenizer",
-    "fake_embedder",
+    "fake_embedder_factory",
     "install_fakes",
     "restore_fakes",
     "values",

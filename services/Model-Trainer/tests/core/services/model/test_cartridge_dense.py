@@ -189,12 +189,25 @@ class TestModelChoice:
         assert dense.DENSE_MODEL_ID.startswith("thenlper/gte")
 
 
+#: The production embedder, built once for this module rather than per test.
+#:
+#: Built at module scope for the same reason the factory exists at all: each
+#: construction loads gte-base off disk, and paying that twice inside a test
+#: file whose subject is not model loading is the very cost the factory was
+#: introduced to remove from the query path.
+_EMBED = dense._default_embedder_factory("cpu")
+
+
 class TestProductionEmbedder:
     """The real weights, loaded once, because the plumbing can be wrong quietly.
 
     Follows the pattern `_default_load_hf_model` uses -- that one loads a
     real `sshleifer/tiny-gpt2` rather than faking transformers away. gte-base
     is in the local cache, so this reads from disk and downloads nothing.
+
+    CPU deliberately: the factory's device argument is exercised here with
+    the one device every machine running this suite has, and the arm's own
+    runs pass "cuda".
     """
 
     def test_it_returns_unit_vectors_of_the_model_s_width(self) -> None:
@@ -204,7 +217,7 @@ class TestProductionEmbedder:
         embedder makes long chunks win on magnitude rather than meaning, and
         nothing raises.
         """
-        vectors = dense._default_embedder(["one short sentence", "another short sentence"])
+        vectors = _EMBED(["one short sentence", "another short sentence"])
 
         assert vectors.shape == (2, 768)
         # A unit vector dotted with itself is exactly 1.0, which asserts the
@@ -220,7 +233,7 @@ class TestProductionEmbedder:
         and the arm would then read as evidence about dense retrieval when
         it is evidence about this function.
         """
-        vectors = dense._default_embedder(
+        vectors = _EMBED(
             [
                 "Sonar returns are filtered before the pilot ever sees them.",
                 "Ballast tanks flood to trim the vessel at depth.",

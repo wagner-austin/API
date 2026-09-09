@@ -36,7 +36,10 @@ from model_trainer.core._hook_protocols_ml import (
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.continuation_sweep import Completion, ContinuationArm
 from model_trainer.core.contracts.model import PreparedLMModel
-from model_trainer.core.services.model.cartridge_dense import EmbedderProto, _default_embedder
+from model_trainer.core.services.model.cartridge_dense import (
+    EmbedderFactoryProto,
+    _default_embedder_factory,
+)
 
 
 class LoadHubModelProto(Protocol):
@@ -524,14 +527,14 @@ monotonic_clock: MonotonicClockProto = _default_monotonic_clock
 #: Behind a hook because it loads real gte weights. A measurement run gets
 #: the production one; a test installs planted vectors so the ranking under
 #: test is a function it can state the right answer for.
-embed_texts: EmbedderProto = _default_embedder
+make_embedder: EmbedderFactoryProto = _default_embedder_factory
 
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 
 __all__ = [
     "ApplyDeterminismProto",
-    "EmbedderProto",
+    "EmbedderFactoryProto",
     "EnvCublasltWorkspaceProto",
     "GenerateContinuationBatchProto",
     "LoadContinuationArmProto",
@@ -545,14 +548,14 @@ __all__ = [
     # rather than defined here. Every other default in this module is local,
     # so mypy hands them on without asking; an imported name needs this line
     # or a test cannot restore the production hook it replaced.
-    "_default_embedder",
+    "_default_embedder_factory",
     "apply_determinism_hook",
-    "embed_texts",
     "env_cublaslt_workspace",
     "generate_continuation_batch",
     "load_continuation_arm",
     "load_hub_model",
     "load_run_model",
+    "make_embedder",
     "monotonic_clock",
     "pin_torch_threads",
     "read_corpus_documents",

@@ -321,14 +321,17 @@ def measure_qa_plan(
     # OFFLINE, exactly as the BM25 index build is. The first version of this
     # embedded the whole corpus inside every query and recorded 17452 ms/item
     # against BM25's 72 -- real arithmetic over a design nobody deploys.
+    # Built ONCE, before any clock starts. A deployment loads its encoder at
+    # startup; the first version reloaded gte on every call and left 300 ms
+    # of model loading inside each query's measured cost.
+    embedder = _test_hooks.make_embedder(device)
+
     started = clock()
-    dense_vectors = embed_chunks(index, _test_hooks.embed_texts)
+    dense_vectors = embed_chunks(index, embedder)
     dense_index_seconds = clock() - started
 
     started = clock()
-    dense_ranks = [
-        dense_ranking(dense_vectors, query, _test_hooks.embed_texts) for query in queries
-    ]
+    dense_ranks = [dense_ranking(dense_vectors, query, embedder) for query in queries]
     dense_select_seconds = clock() - started
 
     dense_set = ranked_retrieval_items(
