@@ -20,7 +20,7 @@ and not on a clean checkout, and an entry point that reaches for its own
 tree is untestable without that state — which is exactly how this job
 shipped red in CI while green locally (board, 2026-09-09 20:39Z: five CI
 runs, five failures, zero passes, invisible because the job usually does
-not run). The task registration lives in the README beside the old one.
+not run). The task registration lives in the README's Scheduling section.
 
 Behaviour is the PowerShell script's, deliberately: source ``runs/env.ps1``
 (still PowerShell syntax so interactive sessions can keep dot-sourcing it —
