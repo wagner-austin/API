@@ -19,15 +19,15 @@ source_paths:
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 9300942991b85dcc3bb354ecca84e4680ce9ee2d
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": 86c614151f8752fb3e16f78fca41f949448bdfab
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": f41deeec935e92643b7263ab6e564cdd2e9347b8
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": f2143579c9fd9bda4e36f04fd2c47f3322b25d15
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": dc7f268e2ff733d554e860627c431f6ea3b6b4bf
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": 75b3370cb8fd7ba5a7d5cac712e2a61c3abe6fdb
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 51621f94781dd5b27149fcc5931c4bb6e7209006
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 6e96538b0370caebbe7e459104283392b9a2941a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dc758263db2d9ac7e08156d40fd79e11d728b12e
-  "docs/RESEARCH.md": 73bbe133af988d075d98a758f212d4328dec779d
+  "docs/RESEARCH.md": 056f9d3f081b36609fc0ff57447a20e56e565fed
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -54,6 +54,7 @@ provenance:
   - "MDE rows computed 2026-09-09 from stored per-seed rows (machine-wide MDE standard): 1.5B n8-equals-n4 holds (LM +0.0004 vs MDE 0.019; invariance +0.0001 vs 0.068); objectives' diverse-n4 tie at 1.5B holds (-0.008 vs MDE 0.047); diverse-n8 CORRECTED from tie to a resolved -0.0088 +/- 0.0014 LM advantage (t ~ -6.5), ~1% of the alone gain, no operating decision changes"
   - "hyperparameter grid 2026-09-09, board task 47d5f8c6 (operator-directed): cartridge_solo_grid CLI (commit 103bdaf7), image v47 sha256 290794b0 (truncated) from fcb39991, jobs 55841983 + twin 55841997 (1h08m each), records BYTE-IDENTICAL sha256 bc18d701 (truncated, same-node k54-05); the lr0.01xc64 anchor cell reproduces the certified 445e345f bf16 record BIT-FOR-BIT seed for seed; lr {0.001,0.003,0.01,0.03} x slots {64,256} at nine seeds: 0.001 all-negative, 0.03 divergent (means to -1.67), 0.003 indistinguishable-to-worse (t -1.04), 256 slots never better than 64 (at lr0.003 significantly worse, t -5.19) -- the recorded knobs sit at the grid's maximum; bounds added post-audit: failure counts carry exact 95% Clopper-Pearson intervals (anchor 2/9 -> [2.8%, 60.0%]; 9/9-negative cells -> [66.4%, 100%]) and paired-vs-anchor MDEs 0.087 / 0.091 / 0.060 nats, an order below the 0.36-nat recovery being hunted"
   - "epochs line 2026-09-09, board task e03cd293: cartridge_solo_grid --cells epochs-line (declared-cells refactor fe692719: SoloGridCell/SoloCellSet carry knobs AND recorded observation tokens as data, cell_set_for refuses undeclared selectors), image v48 sha256 dd04cb08 (truncated), jobs 55848106 + twin 55848109 (~55 min each), records BYTE-IDENTICAL sha256 114acee2 (truncated); the reused anchor cell reproduces BOTH bc18d701 and 445e345f BIT-FOR-BIT seed for seed; e24 halves the mean (+0.046 vs +0.102; paired -0.055, t -2.14, MDE 0.060) and e48 destroys it (mean -0.240, 9/9 negative -> CP [66.4%, 100%]; paired -0.342, t -5.55, MDE 0.142); per-cell CP bounds e12 2/9 -> [2.8%, 60.0%], e24 1/9 -> [0.3%, 48.2%]; every training axis now measured with the recorded knobs at each maximum -- method-level conclusion filed in RESEARCH.md: KV-prefix capacity does not transfer to pythia-6.9b under naive solo training, and a 7B rung for THIS page's recipe is a method change, not a knob"
+  - "THE 7B RUNG OF THIS PAGE'S RECIPE, measured 2026-09-09, board task 68a96413: cartridge_diverse_companion_sweep --plan pythia-6.9b-companions-diverse (precision-through-plans refactor fd1f242a; the sweep grew an in-record naive-solo arm), image v49 sha256 0a38233c (truncated), jobs 55858713 + twin 55858759 (~2h07m each), records BYTE-IDENTICAL sha256 c7fcd094 (truncated); the naive arm reproduces the certified 445e345f solo record BIT-FOR-BIT all nine seeds; VERDICT, two eliminations in one record: companioned-alone minus naive-solo -0.0016 (t -0.04, MDE 0.093; CP95 on 1/9 negative [0.3%, 48.2%]) -- the recipe does not move the 7B solo gain -- and composition INVERTS: n4 composed -0.216 (9/9 negative, CP [66.4%, 100%], retention -216% against the medium record's +44.6%), n8 -0.284 (9/9), content effect at n4 -0.106 vs noise (t -3.38) where gpt2 measured +0.20, companion-cross arms -0.75 to -1.0 nats; this page's recipe is a gpt2-family finding, and the 7B compartmental question is a base-adaptation or retrieval question, per RESEARCH.md's standing verdict"
 fact_checked: "2026-09-09"
 confidence: high
 hubs: [services]
@@ -317,13 +318,26 @@ the tuning hypothesis in its measured ranges: the recorded lr 0.01 ×
 64 slots sits at the grid's maximum — the learning-rate bracket is
 worse in both directions, catastrophically at 0.03, and 256 slots
 never beats 64 — with the anchor cell reproducing the certified bf16
-record bit for bit. After three eliminations (headroom measured, NF4
-exonerated, lr/slots refuted) the standing verdict is that ~0.10-0.16
-nats IS the 7B solo regime for this recipe at 12 epochs. Still open,
-filed rather than implied: the last unmeasured training axis (epochs /
-schedule) — past which the conclusion becomes that KV-prefix capacity
-itself does not transfer to this architecture at this scale, a finding
-about the method rather than the tuning — any 7B composition rung, the
-mechanism of the mid-depth valley, the remaining 0.30 content gap at
-medium n8, and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
-and the extension list.
+record bit for bit. The epochs line has since closed the training axes
+(provenance below): doubling exposure halves the 7B gain and
+quadrupling destroys it (e48 mean −0.240, nine of nine seeds
+negative), so the recorded knobs sit at the maximum of every measured
+training axis. And the 7B rung of THIS PAGE'S RECIPE has since run
+(provenance below), which was the last measured lever standing, and it
+falls on both of its axes: companioned training moves the 7B solo gain
+by nothing (paired −0.0016, t −0.04, MDE 0.093, the naive arm
+reproducing the certified solo record bit for bit inside the same
+record), and composition — the axis this recipe exists for — INVERTS
+at 7B: n4 retention −216% against medium's +44.6% under the identical
+schedule, trained companions costing more than noise where every
+gpt2-family rung measured content buying twenty points back, and each
+foreign cartridge alone costing 0.75-1.0 nats on the primary. So this
+page's recipe is a GPT-2-FAMILY finding, bounded above by
+architecture: on pythia-6.9b, KV-prefix cartridges do not transfer —
+not the tuning, not the training, not the method — and the 7B
+compartmental question belongs to base adaptation or retrieval. Still
+open, filed rather than implied: the mechanism of the mid-depth valley,
+the remaining 0.30 content gap at medium n8, the budget slot policy,
+and the unswept pool size K=3 (the sweep family's registered
+frozen-by-copy knob, a gpt2-scale question). The RESEARCH.md entry
+under `mi` carries all the run summaries and the extension list.
