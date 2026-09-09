@@ -624,7 +624,18 @@ test and by image smoke.
   lr/slots refuted): at 12 epochs, ~0.10-0.16 nats IS the 7B solo
   regime for KV-prefix cartridge training on this corpus, and the
   ~0.36-nat residual to the family's adapted floor is not reachable by
-  any knob measured so far.
+  any knob measured so far. Bounds and MDEs, per the MDE standard
+  (added after the closure audit correctly found them absent from this
+  entry): the failure counts at n=9 carry exact 95% Clopper-Pearson
+  intervals STATED AS BOUNDS — the anchor's 2/9 bounds the failure
+  rate to [2.8%, 60.0%], the 9/9-negative cells to [66.4%, 100%], and
+  even a 0/9 cell (none exists) would only bound it below 33.6% — so
+  no cell's reliability claim at this n is tighter than these
+  intervals allow. Paired-versus-anchor MDEs from the per-seed rows:
+  0.087 nats (lr 0.003 × c64), 0.091 (lr 0.01 × c256), 0.060
+  (lr 0.003 × c256) — the two indistinguishable cells could have hidden
+  effects up to those sizes, an order below the 0.36-nat recovery the
+  rung was hunting.
 - **Open, filed rather than implied:** the last unmeasured training
   axis at 7B (epochs / optimizer schedule) — and, if that also fails,
   the honest conclusion becomes that KV-prefix capacity itself does
