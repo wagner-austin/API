@@ -26,6 +26,7 @@ import zlib
 from collections.abc import Mapping, Sequence
 
 import torch
+from platform_core.power_distributions import McNemarTest
 from platform_core.run_record import Observation
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
@@ -54,15 +55,35 @@ TINY_PLAN: QaPlan = {
     "learning_rate": 0.05,
     "distractor_count": 2,
     "max_items": 6,
+    # DECLARED HONESTLY RATHER THAN SET TO WHATEVER LETS THE FIXTURE THROUGH.
+    # Six items resolve nothing smaller than 5/6, so a fixture claiming to
+    # hunt a real 0.05 effect would be refused by
+    # `require_resolvable_question_set` -- correctly, and the temptation would
+    # then be to exempt tests from the gate. That exemption is exactly how a
+    # gate stops being one. This plan says what six items can actually do:
+    # only a near-total difference. The gate therefore runs in the end-to-end
+    # path rather than being skipped in it.
+    "smallest_effect_of_interest": 0.9,
+    "alpha": 0.05,
+    "mcnemar_test": McNemarTest.MID_P,
 }
 
-#: Four documents, each naming its own subject in several sentences.
+#: Six documents, each naming its own subject in several sentences.
 #:
 #: FOUR RATHER THAN TWO because a distractor may not be a term from the item's
 #: own document: with two documents an item could draw only one distractor,
 #: and the builder correctly refuses. Each subject recurs so that it lands in
 #: both a held-out window and a training one, which is what makes its item
 #: answerable from the corpus rather than a guess.
+#:
+#: AND SIX RATHER THAN FOUR because four items cannot resolve anything at all.
+#: McNemar needs at least five disagreements to reject at alpha 0.05 under
+#: mid-p, so a four-item question set has a floor of 5/4 = 1.25 -- above the
+#: 1.0 that bounds any accuracy difference. This fixture had been exercising
+#: the whole benchmark end to end on a question set incapable of producing a
+#: significant result however the arms fell, which is a small instance of the
+#: defect `cartridge_qa_power` exists to refuse. Six items put the floor at
+#: 5/6, which `TINY_PLAN` declares and can therefore clear honestly.
 #: NO SENTENCE BEGINS WITH ITS SUBJECT, and that is a constraint of the fake
 #: tokenizer rather than of the corpus. It is word-level, so each name is one
 #: token; a name at position zero is the sequence's first token, which no
@@ -76,7 +97,7 @@ DOCUMENTS: tuple[str, ...] = tuple(
         f"The team measured {name} against the usual baseline over many weeks. "
         f"Written notes about {name} explain the design in considerable detail."
     )
-    for name in ("ClearGBM", "TankpitBot", "NavProbe", "CoverGate")
+    for name in ("ClearGBM", "TankpitBot", "NavProbe", "CoverGate", "LedgerVane", "QuartzMill")
 )
 
 

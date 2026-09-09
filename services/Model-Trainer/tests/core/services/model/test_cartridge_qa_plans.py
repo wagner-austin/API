@@ -25,6 +25,22 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     qa_plan_label,
 )
 
+#: The scale ladder: one field moves, and it is the base model.
+_SCALE_LADDER: tuple[str, ...] = (
+    "gpt2-wiki-qa",
+    "gpt2-medium-wiki-qa",
+    "gpt2-large-wiki-qa",
+    "gpt2-xl-wiki-qa",
+)
+
+#: The capacity axis: one field moves, and it is the cartridge's slot count.
+_SLOT_AXIS: tuple[str, ...] = (
+    "gpt2-large-api-wiki-qa-slots-32",
+    "gpt2-large-api-wiki-qa-slots-64",
+    "gpt2-large-api-wiki-qa-slots-128",
+    "gpt2-large-api-wiki-qa-slots-256",
+)
+
 
 def _redrawn(
     plan: QaPlan, *, max_seq_len: int | None = None, distractor_count: int | None = None
@@ -58,6 +74,9 @@ def _redrawn(
             plan["distractor_count"] if distractor_count is None else distractor_count
         ),
         max_items=plan["max_items"],
+        smallest_effect_of_interest=plan["smallest_effect_of_interest"],
+        alpha=plan["alpha"],
+        mcnemar_test=plan["mcnemar_test"],
     )
 
 
@@ -126,10 +145,49 @@ class TestThePlanTable:
         supposed to win on, since it exists to compress a long context. If
         someone later varies the window here, this test fails and the ladder's
         claim has to be restated.
+
+        SCOPED TO THE SCALE LADDER rather than to the whole table, since the
+        table gained a second family on 2026-09-09. The invariant is a
+        property of an AXIS -- hold everything but one field -- and asserting
+        it across two axes at once would only be satisfiable by a table with
+        one axis in it.
         """
-        windows = {QA_PLANS[name]["max_seq_len"] for name in QA_PLANS}
+        windows = {QA_PLANS[name]["max_seq_len"] for name in _SCALE_LADDER}
 
         assert windows == {896}
+
+    def test_the_slot_axis_holds_the_window_fixed_and_so_tests_only_capacity(self) -> None:
+        """The same discipline, for the axis that had never been varied.
+
+        Every cell is held to 768 rather than to its own ``1024 - num_slots``.
+        Sizing each cell to its own prefix would hand the 32-slot cell 992
+        tokens of evidence and the 256-slot cell 768, so the cell with the
+        smallest cartridge would also have the largest retrieval budget and
+        the axis would measure two things moving in opposite directions.
+        """
+        cells = [QA_PLANS[name] for name in _SLOT_AXIS]
+
+        assert {cell["max_seq_len"] for cell in cells} == {768}
+        assert {cell["num_slots"] for cell in cells} == {32, 64, 128, 256}
+
+    def test_the_slot_axis_varies_nothing_but_its_slot_count(self) -> None:
+        """Anything else moving with it would confound the capacity reading."""
+        base = QA_PLANS["gpt2-large-api-wiki-qa-slots-128"]
+
+        for name in _SLOT_AXIS:
+            cell = QA_PLANS[name]
+            expected: QaPlan = {**base, "num_slots": cell["num_slots"]}
+            assert cell == expected, name
+
+    def test_the_ladder_reaches_past_the_crossing_it_reports(self) -> None:
+        """A ladder that stops at its own finding cannot test it.
+
+        The crossing this programme reports is at ~774M, and until
+        2026-09-09 the table stopped at gpt2-xl -- one rung later. The base
+        added is the one the cartridge sweeps already run on an A30, so the
+        GPU profile is proven rather than assumed.
+        """
+        assert QA_PLANS["pythia-6.9b-api-wiki-qa"]["model_id"] == "EleutherAI/pythia-6.9b"
 
     def test_the_experiment_is_not_the_loss_experiment_s(self) -> None:
         """A loss record and a question-set record must never be differenced.

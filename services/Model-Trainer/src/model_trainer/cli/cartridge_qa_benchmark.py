@@ -81,6 +81,7 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     QaPlan,
     qa_plan_label,
 )
+from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set
 from model_trainer.core.services.model.cartridge_qa_report import (
     QaMeasurement,
     latency_observations,
@@ -138,6 +139,19 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     items, training_text = build_question_set(documents, encoded, encoder, plan)
     chance = 1.0 / float(plan["distractor_count"] + 1)
     _log.info("built %d items over %d documents, chance %.4f", len(items), len(documents), chance)
+
+    # BEFORE THE MODEL LOADS, WHICH IS THE POINT. Everything below this line
+    # costs GPU hours, and a question set too small to resolve what the plan
+    # declares will still produce a full arms table at the end of them --
+    # which is how a difference of 1.3 items over 32 reached a wiki hub and
+    # had to be retracted. The refusal is here, against the REALISED item
+    # count, because `max_items` is a cap the corpus is free to fall short of.
+    floor = require_resolvable_question_set(plan, len(items))
+    _log.info(
+        "question set resolves nothing smaller than %.4f; plan declares %.4f",
+        floor,
+        plan["smallest_effect_of_interest"],
+    )
 
     windows = build_windows(encoded, window=plan["window"], device=device)
     train, _held = split_by_stride(windows, held_out_stride=plan["held_out_stride"])
