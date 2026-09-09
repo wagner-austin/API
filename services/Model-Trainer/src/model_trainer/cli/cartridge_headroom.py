@@ -55,6 +55,7 @@ from model_trainer.core.services.finetuning.strategies.cartridge import (
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
 from model_trainer.core.services.model.cartridge_plans import (
+    base_short,
     corpus_digest,
     require_cartridge_plan,
 )
@@ -82,19 +83,6 @@ MEASURED_BASES = ("gpt2", "gpt2-medium", "gpt2-xl", "EleutherAI/pythia-6.9b")
 #: drift: every cartridge record's held-out split used exactly this
 #: row's window and stride.
 GEOMETRY_PLAN_NAME = "gpt2-base-lora"
-
-
-def base_short(model_id: str) -> str:
-    """Collapse a hub id to its observation-name segment.
-
-    Args:
-        model_id: The hub id.
-
-    Returns:
-        The id's last path segment: ``EleutherAI/pythia-6.9b`` names its
-        rows ``pythia-6.9b`` and the gpt2 family is unchanged.
-    """
-    return model_id.rsplit("/", 1)[-1]
 
 
 def headroom_label(
@@ -325,7 +313,6 @@ __all__ = [
     "GEOMETRY_PLAN_NAME",
     "HEADROOM_EXPERIMENT",
     "MEASURED_BASES",
-    "base_short",
     "entrypoint",
     "headroom_label",
     "headroom_run_record",

@@ -17,6 +17,8 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
+from model_trainer.core.services.model.cartridge_plans import base_short
+
 
 class VariedCompanionSweepPlan(TypedDict):
     """One complete, reproducible varied-count companionship measurement.
@@ -46,6 +48,13 @@ class VariedCompanionSweepPlan(TypedDict):
         seeds: Initialisation seeds. Every arm runs once per seed.
         epochs: Passes over each corpus.
         learning_rate: Step size for AdamW.
+        precision_selector: How the base loads, resolved through
+            :func:`model_trainer.cli.cartridge_solo_seeds.resolve_precision`
+            at record time -- ``"policy"`` for the loading policy's
+            declaration (every recorded gpt2-family row), or
+            ``"stored-bf16"`` for the declared unquantized-bf16 load the
+            7B rows measure at. Declared per row like every other field,
+            because precision is part of what the record means.
     """
 
     model_id: str
@@ -58,6 +67,7 @@ class VariedCompanionSweepPlan(TypedDict):
     seeds: tuple[int, ...]
     epochs: int
     learning_rate: float
+    precision_selector: str
 
 
 #: Fixed for the reason the other experiment names are.
@@ -81,6 +91,7 @@ VARIED_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
         "seeds": (7, 8, 9),
         "epochs": 12,
         "learning_rate": 0.01,
+        "precision_selector": "policy",
     },
 }
 
@@ -111,6 +122,7 @@ DIVERSE_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
         "seeds": (7, 8, 9),
         "epochs": 12,
         "learning_rate": 0.01,
+        "precision_selector": "policy",
     },
     # The scale rung: the recorded recipe on a base three times the size.
     # Every field except the base matches ``gpt2-companions-diverse``, so
@@ -130,6 +142,31 @@ DIVERSE_COMPANION_SWEEP_PLANS: Final[dict[str, VariedCompanionSweepPlan]] = {
         "seeds": (7, 8, 9),
         "epochs": 12,
         "learning_rate": 0.01,
+        "precision_selector": "policy",
+    },
+    # The method rung the epochs-line conclusion names (board e03cd293 ->
+    # 68a96413): naive solo training cannot move pythia-6.9b at any
+    # measured knob, and the diverse recipe is the one measured lever left
+    # standing. Schedule fields are byte-equal to ``gpt2-companions-diverse``
+    # -- a retuned schedule would confound method with tuning -- and the two
+    # DELIBERATE differences are declared: the base (with its declared
+    # stored-bf16 load; fp32 7B exceeds the A30), and the seeds, NINE
+    # because this record pairs per-seed against the 7B solo certificates
+    # (445e345f / bc18d701 / 114acee2), which are nine-seed records. The
+    # sweep's in-record naive-solo arm must reproduce 445e345f bit-for-bit
+    # or the record is refused as unreadable.
+    "pythia-6.9b-companions-diverse": {
+        "model_id": "EleutherAI/pythia-6.9b",
+        "window": 256,
+        "held_out_stride": 4,
+        "compartment_counts": (4, 8),
+        "slots": 64,
+        "probability": 0.5,
+        "max_companions": 3,
+        "seeds": (7, 8, 9, 10, 11, 12, 13, 14, 15),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "precision_selector": "stored-bf16",
     },
 }
 
@@ -428,25 +465,34 @@ def base_lora_sweep_label(name: str, plan: BaseLoraSweepPlan, *, digest: str) ->
     )
 
 
-def varied_companion_sweep_label(name: str, plan: VariedCompanionSweepPlan, *, digest: str) -> str:
+def varied_companion_sweep_label(
+    name: str, plan: VariedCompanionSweepPlan, *, digest: str, precision_token: str
+) -> str:
     """Build the label identifying one varied-count sweep on one primary corpus.
 
     Args:
         name: The plan's name.
         plan: The plan.
         digest: Digest of the PRIMARY corpus, from :func:`corpus_digest`.
+        precision_token: ``""`` for the policy precision -- every recorded
+            gpt2-family label is byte-unchanged -- or the resolved
+            stored-bf16 token, so records at two precisions cannot share
+            a label. Resolved by the caller through the one precision
+            chokepoint; the policy layer sits above this module.
 
     Returns:
         The label, e.g.
         ``gpt2-companions-varied-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-1a2b3c4d5e6f``.
         ``K`` carries the pool size; ``c`` and ``p`` keep the meanings the
-        companion-sweep label gave them.
+        companion-sweep label gave them. The model segment is
+        :func:`base_short`'s, which leaves the gpt2 family byte-unchanged
+        and keeps a hub id's slash out of the label.
     """
     counts = ".".join(str(count) for count in plan["compartment_counts"])
     seeds = ".".join(str(seed) for seed in plan["seeds"])
     return (
         f"{name}"
-        f"-{plan['model_id']}"
+        f"-{base_short(plan['model_id'])}{precision_token}"
         f"-w{plan['window']}"
         f"-s{plan['held_out_stride']}"
         f"-e{plan['epochs']}"

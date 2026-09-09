@@ -370,6 +370,19 @@ def require_cartridge_plan(plans: Mapping[str, _PlanT], name: str) -> _PlanT:
     return plan
 
 
+def base_short(model_id: str) -> str:
+    """Collapse a hub id to its observation-name segment.
+
+    Args:
+        model_id: The hub id.
+
+    Returns:
+        The id's last path segment: ``EleutherAI/pythia-6.9b`` names its
+        rows ``pythia-6.9b`` and the gpt2 family is unchanged.
+    """
+    return model_id.rsplit("/", 1)[-1]
+
+
 def corpus_digest(documents: Sequence[str]) -> str:
     """Digest the exact text a measurement will train on.
 
@@ -436,6 +449,7 @@ __all__ = [
     "CartridgePlan",
     "CompanionSweepPlan",
     "CompositionSweepPlan",
+    "base_short",
     "companion_sweep_label",
     "composition_sweep_label",
     "corpus_digest",

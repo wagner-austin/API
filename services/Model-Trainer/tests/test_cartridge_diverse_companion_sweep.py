@@ -42,7 +42,7 @@ from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 
 #: A plan small enough to run in a test and shaped like the real one.
 TINY_DIVERSE_PLAN: VariedCompanionSweepPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",
     "window": 8,
     "held_out_stride": 3,
     "compartment_counts": (2, 3),
@@ -52,6 +52,7 @@ TINY_DIVERSE_PLAN: VariedCompanionSweepPlan = {
     "seeds": (7, 8, 9),
     "epochs": 1,
     "learning_rate": 0.05,
+    "precision_selector": "policy",
 }
 
 _VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
@@ -218,6 +219,7 @@ class TestMeasureGrid:
             other_corpora=[beta, gamma],
             companion_corpora=[delta, echo],
             device="cpu",
+            load_precision=None,
         )
 
         names = [observation["name"] for observation in observations]
@@ -236,6 +238,7 @@ class TestMeasureGrid:
             other_corpora=[beta, gamma],
             companion_corpora=[delta, echo],
             device="cpu",
+            load_precision=None,
         )
 
         named = {observation["name"] for observation in observations}
@@ -243,10 +246,67 @@ class TestMeasureGrid:
         assert "companion-cross-0_mean" in named
         assert "companion-cross-1_mean" in named
         assert "companion-cross-1_spread" in named
+        assert "naive-solo_mean" in named
+        assert "naive-solo_spread" in named
+        assert "naive-solo_seed7_gain" in named
+        assert "naive-solo_seed9_gain" in named
         assert "diverse-K2-p0.5-n2-alone_mean" in named
         assert "diverse-K2-p0.5-n3-composed_spread" in named
         assert "diverse-K2-p0.5-n2-cross-0_mean" in named
         assert "diverse_composed_noise_floor" in named
+
+    def test_the_naive_arm_is_the_solo_formula_bit_for_bit(self, tmp_path: pathlib.Path) -> None:
+        """The record's readability gate: ``naive-solo_seed{s}_gain`` must be
+        exactly what the solo formula produces -- a fresh base, the plan's own
+        knobs, the plain seed -- because on the 7B row these values are
+        compared bit-for-bit against the certified solo record."""
+        from model_trainer.core.services.finetuning.strategies.cartridge import (
+            require_cache_capable,
+        )
+        from model_trainer.core.services.finetuning.strategies.cartridge_model import (
+            CartridgeModel,
+        )
+        from model_trainer.core.services.model.cartridge_corpus import (
+            build_windows,
+            split_by_stride,
+        )
+        from model_trainer.core.services.model.cartridge_measurement import (
+            held_out_gain,
+            train_cartridge,
+        )
+
+        primary, beta, gamma, delta, echo = _staged(
+            tmp_path, ("alpha", "beta", "gamma", "delta", "echo")
+        )
+        observations, _digest = sweep.measure_grid(
+            TINY_DIVERSE_PLAN,
+            corpus=primary,
+            other_corpora=[beta, gamma],
+            companion_corpora=[delta, echo],
+            device="cpu",
+            load_precision=None,
+        )
+        recorded = {observation["name"]: observation["value"] for observation in observations}
+
+        tokenizer = FakeHFTokenizer(vocab_size=_VOCAB)
+        encoded = [tokenizer.encode(document) for document in _documents("a")]
+        train, held_out = split_by_stride(
+            build_windows(encoded, window=TINY_DIVERSE_PLAN["window"], device="cpu"),
+            held_out_stride=TINY_DIVERSE_PLAN["held_out_stride"],
+        )
+        model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
+        base = require_cache_capable(model)
+        for seed in TINY_DIVERSE_PLAN["seeds"]:
+            slots = train_cartridge(
+                base,
+                train,
+                num_slots=TINY_DIVERSE_PLAN["slots"],
+                seed=seed,
+                epochs=TINY_DIVERSE_PLAN["epochs"],
+                learning_rate=TINY_DIVERSE_PLAN["learning_rate"],
+            )
+            gain = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
+            assert recorded[f"naive-solo_seed{seed}_gain"] == gain
 
     def test_a_companion_count_mismatching_the_plan_is_refused(
         self, tmp_path: pathlib.Path
@@ -260,6 +320,7 @@ class TestMeasureGrid:
                 other_corpora=[beta, gamma],
                 companion_corpora=[delta],
                 device="cpu",
+                load_precision=None,
             )
 
     def test_a_repeated_companion_corpus_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -272,6 +333,7 @@ class TestMeasureGrid:
                 other_corpora=[beta, gamma],
                 companion_corpora=[delta, delta],
                 device="cpu",
+                load_precision=None,
             )
 
     def test_a_companion_that_is_also_measured_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -284,6 +346,7 @@ class TestMeasureGrid:
                 other_corpora=[beta, gamma],
                 companion_corpora=[delta, gamma],
                 device="cpu",
+                load_precision=None,
             )
 
     def test_too_few_other_corpora_are_refused_up_front(self, tmp_path: pathlib.Path) -> None:
@@ -296,6 +359,7 @@ class TestMeasureGrid:
                 other_corpora=[beta],
                 companion_corpora=[delta, echo],
                 device="cpu",
+                load_precision=None,
             )
 
 
@@ -316,9 +380,7 @@ class TestRunRecord:
         )
 
         assert record["experiment"] == DIVERSE_COMPANION_SWEEP_EXPERIMENT
-        assert record["label"].startswith(
-            "tiny-tiny-under-test-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-"
-        )
+        assert record["label"].startswith("tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-")
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):
@@ -348,10 +410,13 @@ class TestProductionPlan:
         assert diverse == varied
 
     def test_the_diverse_label_cannot_collide_with_the_varied_one(self) -> None:
+        """The policy selector's empty token keeps the recorded label form
+        byte-unchanged."""
         label = varied_companion_sweep_label(
             "gpt2-companions-diverse",
             DIVERSE_COMPANION_SWEEP_PLANS["gpt2-companions-diverse"],
             digest="0" * 64,
+            precision_token="",
         )
         assert label.startswith(
             "gpt2-companions-diverse-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-"
@@ -365,6 +430,39 @@ class TestProductionPlan:
         medium = DIVERSE_COMPANION_SWEEP_PLANS["gpt2-medium-companions-diverse"]
         assert medium["model_id"] == "gpt2-medium"
         assert {**medium, "model_id": recorded["model_id"]} == recorded
+
+    def test_the_7b_rung_declares_exactly_its_two_differences(self) -> None:
+        """The method rung isolates the base (with its declared stored-bf16
+        load) and the seed count -- nine, because it pairs per-seed against
+        the nine-seed 7B solo certificates. Every schedule field must equal
+        the recorded diverse plan, or method is confounded with tuning."""
+        recorded = DIVERSE_COMPANION_SWEEP_PLANS["gpt2-companions-diverse"]
+        seven_b = DIVERSE_COMPANION_SWEEP_PLANS["pythia-6.9b-companions-diverse"]
+        assert seven_b["model_id"] == "EleutherAI/pythia-6.9b"
+        assert seven_b["precision_selector"] == "stored-bf16"
+        assert seven_b["seeds"] == (7, 8, 9, 10, 11, 12, 13, 14, 15)
+        assert {
+            **seven_b,
+            "model_id": recorded["model_id"],
+            "precision_selector": recorded["precision_selector"],
+            "seeds": recorded["seeds"],
+        } == recorded
+
+    def test_the_7b_label_carries_the_stored_bf16_token(self) -> None:
+        """Two precisions cannot share a label, and the hub id's slash must
+        not reach it: the model segment is base_short's."""
+        from model_trainer.cli.cartridge_solo_seeds import resolve_precision
+
+        plan = DIVERSE_COMPANION_SWEEP_PLANS["pythia-6.9b-companions-diverse"]
+        _load, token = resolve_precision(plan["model_id"], plan["precision_selector"])
+        label = varied_companion_sweep_label(
+            "pythia-6.9b-companions-diverse", plan, digest="0" * 64, precision_token=token
+        )
+        assert label.startswith(
+            "pythia-6.9b-companions-diverse-pythia-6.9b-storedbf16"
+            "-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9.10.11.12.13.14.15-"
+        )
+        assert "/" not in label
 
 
 def _argv(tmp_path: pathlib.Path, *, others: str, companions: str) -> list[str]:

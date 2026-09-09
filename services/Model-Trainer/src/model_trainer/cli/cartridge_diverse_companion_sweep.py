@@ -52,7 +52,9 @@ from model_trainer.cli.cartridge_companion_sweep import (
     cell_observations,
 )
 from model_trainer.cli.cartridge_composition_sweep import matched_other_train
+from model_trainer.cli.cartridge_solo_seeds import resolve_precision
 from model_trainer.cli.known_answer_probe import probe_determinism
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
@@ -226,6 +228,7 @@ def measure_grid(
     other_corpora: Sequence[pathlib.Path],
     companion_corpora: Sequence[pathlib.Path],
     device: str,
+    load_precision: QuantizationConfig | StoredBf16Precision | None,
 ) -> tuple[tuple[Observation, ...], str]:
     """Run every count cell, score every pool member, and name it all.
 
@@ -239,12 +242,19 @@ def measure_grid(
             count must equal the plan's ``max_companions``, and every entry
             must be disjoint from the primary, the partners, and each other.
         device: Device to measure on.
+        load_precision: What the loader is handed, resolved from the plan's
+            ``precision_selector`` by the caller -- a declared value, so a
+            record can always say what precision it measured.
 
     Returns:
         ``(observations, digest)``. Beside the cells' arms, one
         ``companion-cross-{j}`` arm per pool member scores that member
         alone on the primary held-out text -- the companion-leakage
-        instrument.
+        instrument -- and the ``naive-solo`` arm trains one cartridge per
+        seed by the exact solo formula behind the same base load: the
+        in-record naive baseline every companioned arm pairs against, and
+        the readability gate where a certified solo record exists for the
+        plan's base.
 
     Raises:
         ValueError: Propagated from :func:`_require_admissible_corpora`.
@@ -299,7 +309,7 @@ def measure_grid(
             )
         )
 
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], load_precision))
     base.to(device)
     provider = _DiversePoolProvider(base, companion_trains, plan)
 
@@ -307,6 +317,31 @@ def measure_grid(
         Observation(name="slots_per_cartridge", value=float(plan["slots"])),
         Observation(name="max_companions", value=float(plan["max_companions"])),
     ]
+
+    # The in-record naive baseline, and the record's readability gate: one
+    # cartridge per seed trained by the exact solo formula -- plain seed,
+    # the plan's own knobs -- behind the same base load. Where a certified
+    # solo record exists for this base at these knobs, these per-seed gains
+    # must reproduce it bit-for-bit, and every companioned arm's per-seed
+    # subtraction pairs against them inside one record.
+    naive_gains: list[tuple[int, float]] = []
+    for seed in plan["seeds"]:
+        naive_slots = train_cartridge(
+            base,
+            train,
+            num_slots=plan["slots"],
+            seed=seed,
+            epochs=plan["epochs"],
+            learning_rate=plan["learning_rate"],
+        )
+        naive_gains.append(
+            (seed, held_out_gain(CartridgeModel(base=base, slots=naive_slots), held_out))
+        )
+    naive = replicate("naive-solo", naive_gains)
+    _log.info("naive-solo: %+.4f mean over %d seeds", naive["mean"], len(naive_gains))
+    observations.extend(gain_observations(naive))
+    observations.extend(per_seed_observations(naive))
+
     companion_gains: list[list[tuple[int, float]]] = [[] for _ in companion_trains]
     for seed in plan["seeds"]:
         for member, slots in enumerate(provider.pool(seed)):
@@ -372,10 +407,15 @@ def diverse_companion_sweep_run_record(
 
     Raises:
         KeyError: If the plan name is unknown, naming the plans that exist.
-        ValueError: Propagated from :func:`measure_grid`.
+        ValueError: Propagated from :func:`measure_grid`, or from
+            :func:`resolve_precision` for a plan whose selector or
+            (model, precision) pair is undeclared.
         AppError: Propagated from the corpus and measurement layers.
     """
     plan = require_cartridge_plan(_measurement_hooks.diverse_companion_sweep_plans(), plan_name)
+    load_precision, precision_token = resolve_precision(
+        plan["model_id"], plan["precision_selector"]
+    )
     fingerprint: RunFingerprint = capture_run_fingerprint(
         device, probe_determinism(device, remove_split_k=False, math_attention=False)
     )
@@ -385,10 +425,13 @@ def diverse_companion_sweep_run_record(
         other_corpora=other_corpora,
         companion_corpora=companion_corpora,
         device=device,
+        load_precision=load_precision,
     )
     return run_record(
         experiment=DIVERSE_COMPANION_SWEEP_EXPERIMENT,
-        label=varied_companion_sweep_label(plan_name, plan, digest=digest),
+        label=varied_companion_sweep_label(
+            plan_name, plan, digest=digest, precision_token=precision_token
+        ),
         fingerprint=fingerprint,
         observations=observations,
         payload_digest=NO_PAYLOAD,

@@ -41,7 +41,7 @@ from platform_core.run_record import (
 )
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
-from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME, base_short
+from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME
 from model_trainer.cli.cartridge_lora_policy import quantization_for, stored_bf16_for
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
@@ -60,6 +60,7 @@ from model_trainer.core.services.model.cartridge_measurement import (
     train_cartridge,
 )
 from model_trainer.core.services.model.cartridge_plans import (
+    base_short,
     corpus_digest,
     require_cartridge_plan,
 )

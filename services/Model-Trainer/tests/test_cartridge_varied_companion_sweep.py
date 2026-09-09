@@ -47,7 +47,7 @@ from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 #: counts so the walk has an n-axis and the pool cache is hit, a pool of two
 #: so the count draw is live.
 TINY_VARIED_PLAN: VariedCompanionSweepPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",
     "window": 8,
     "held_out_stride": 3,
     "compartment_counts": (2, 3),
@@ -57,12 +57,13 @@ TINY_VARIED_PLAN: VariedCompanionSweepPlan = {
     "seeds": (7, 8, 9),
     "epochs": 1,
     "learning_rate": 0.05,
+    "precision_selector": "policy",
 }
 
 #: The sibling plan the nesting test trains the single companion under:
 #: identical on every field the companion seed formula reads.
 TINY_COMPANION_PLAN: CompanionSweepPlan = {
-    "model_id": "tiny-under-test",
+    "model_id": "gpt2",
     "window": 8,
     "held_out_stride": 3,
     "compartment_counts": (2, 3),
@@ -214,6 +215,7 @@ class TestMeasureGrid:
             other_corpora=[beta, gamma],
             companion_corpus=delta,
             device="cpu",
+            load_precision=None,
         )
 
         names = [observation["name"] for observation in observations]
@@ -228,6 +230,7 @@ class TestMeasureGrid:
             other_corpora=[beta, gamma],
             companion_corpus=delta,
             device="cpu",
+            load_precision=None,
         )
 
         named = {observation["name"] for observation in observations}
@@ -253,6 +256,7 @@ class TestMeasureGrid:
                 other_corpora=[beta],
                 companion_corpus=delta,
                 device="cpu",
+                load_precision=None,
             )
 
     def test_a_companion_corpus_that_is_also_a_partner_is_refused(
@@ -267,6 +271,7 @@ class TestMeasureGrid:
                 other_corpora=[beta, gamma],
                 companion_corpus=gamma,
                 device="cpu",
+                load_precision=None,
             )
 
     def test_a_companion_corpus_that_is_the_primary_is_refused(
@@ -281,6 +286,7 @@ class TestMeasureGrid:
                 other_corpora=[beta, gamma],
                 companion_corpus=primary,
                 device="cpu",
+                load_precision=None,
             )
 
 
@@ -299,9 +305,7 @@ class TestRunRecord:
         )
 
         assert record["experiment"] == VARIED_COMPANION_SWEEP_EXPERIMENT
-        assert record["label"].startswith(
-            "tiny-tiny-under-test-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-"
-        )
+        assert record["label"].startswith("tiny-gpt2-w8-s3-e1-lr0.05-n2.3-c2-p0.5-K2-seeds7.8.9-")
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):
@@ -341,13 +345,24 @@ class TestProductionPlan:
         assert varied["learning_rate"] == recorded["learning_rate"]
 
     def test_the_varied_label_cannot_collide_with_the_recorded_ones(self) -> None:
+        """Byte-pinned, not merely prefix-shaped: the recorded varied record
+        registered under exactly this label form, and the policy selector's
+        empty token is what keeps it unchanged."""
         label = varied_companion_sweep_label(
             "gpt2-companions-varied",
             VARIED_COMPANION_SWEEP_PLANS["gpt2-companions-varied"],
             digest="0" * 64,
+            precision_token="",
         )
         assert label.startswith(
             "gpt2-companions-varied-gpt2-w256-s4-e12-lr0.01-n4.8-c64-p0.5-K3-seeds7.8.9-"
+        )
+
+    def test_the_policy_selector_is_declared_on_every_recorded_row(self) -> None:
+        """The recorded gpt2-family rows measured at the policy precision;
+        the field saying so is data, and this pins it."""
+        assert VARIED_COMPANION_SWEEP_PLANS["gpt2-companions-varied"]["precision_selector"] == (
+            "policy"
         )
 
 

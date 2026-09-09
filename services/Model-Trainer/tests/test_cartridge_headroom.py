@@ -30,6 +30,7 @@ from model_trainer.core.services.finetuning.strategies.cartridge import require_
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
+from model_trainer.core.services.model.cartridge_plans import base_short
 from model_trainer.core.services.model.cartridge_pool_plans import (
     BASE_LORA_SWEEP_PLANS,
     BaseLoraSweepPlan,
@@ -264,8 +265,8 @@ class TestPolicyPin:
             quantization_for(model_id)
 
     def test_base_short_names_the_row_segment(self) -> None:
-        assert headroom.base_short("gpt2-xl") == "gpt2-xl"
-        assert headroom.base_short("EleutherAI/pythia-6.9b") == "pythia-6.9b"
+        assert base_short("gpt2-xl") == "gpt2-xl"
+        assert base_short("EleutherAI/pythia-6.9b") == "pythia-6.9b"
 
     def test_the_production_geometry_row_is_the_recorded_one(self) -> None:
         row = BASE_LORA_SWEEP_PLANS[headroom.GEOMETRY_PLAN_NAME]
@@ -307,7 +308,7 @@ class TestMain:
         assert record["label"].startswith("cartridge-headroom-w8-s3-b4-c2-")
         names = {o["name"] for o in record["observations"]}
         for model_id in headroom.MEASURED_BASES:
-            short = headroom.base_short(model_id)
+            short = base_short(model_id)
             assert f"headroom-{short}-alpha_base_loss_mean" in names
             assert f"headroom-{short}-beta_base_loss_mean" in names
 

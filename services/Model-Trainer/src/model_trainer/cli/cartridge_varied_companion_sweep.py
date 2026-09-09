@@ -54,7 +54,9 @@ from model_trainer.cli.cartridge_companion_sweep import (
     cell_observations,
 )
 from model_trainer.cli.cartridge_composition_sweep import matched_other_train
+from model_trainer.cli.cartridge_solo_seeds import resolve_precision
 from model_trainer.cli.known_answer_probe import probe_determinism
+from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     noise_floor,
@@ -173,6 +175,7 @@ def measure_grid(
     other_corpora: Sequence[pathlib.Path],
     companion_corpus: pathlib.Path,
     device: str,
+    load_precision: QuantizationConfig | StoredBf16Precision | None,
 ) -> tuple[tuple[Observation, ...], str]:
     """Run every count cell and name what it produced.
 
@@ -185,6 +188,9 @@ def measure_grid(
         companion_corpus: The pool's corpus. Must not appear among the
             partners or as the primary.
         device: Device to measure on.
+        load_precision: What the loader is handed, resolved from the plan's
+            ``precision_selector`` by the caller -- a declared value, so a
+            record can always say what precision it measured.
 
     Returns:
         ``(observations, digest)`` -- the named numbers, and the digest of
@@ -249,7 +255,7 @@ def measure_grid(
         required=len(train),
     )
 
-    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], None))
+    base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], load_precision))
     base.to(device)
     provider = _PoolProvider(base, companion_train, plan)
 
@@ -310,10 +316,15 @@ def varied_companion_sweep_run_record(
 
     Raises:
         KeyError: If the plan name is unknown, naming the plans that exist.
-        ValueError: Propagated from :func:`measure_grid`.
+        ValueError: Propagated from :func:`measure_grid`, or from
+            :func:`resolve_precision` for a plan whose selector or
+            (model, precision) pair is undeclared.
         AppError: Propagated from the corpus and measurement layers.
     """
     plan = require_cartridge_plan(_measurement_hooks.varied_companion_sweep_plans(), plan_name)
+    load_precision, precision_token = resolve_precision(
+        plan["model_id"], plan["precision_selector"]
+    )
     fingerprint: RunFingerprint = capture_run_fingerprint(
         device, probe_determinism(device, remove_split_k=False, math_attention=False)
     )
@@ -323,10 +334,13 @@ def varied_companion_sweep_run_record(
         other_corpora=other_corpora,
         companion_corpus=companion_corpus,
         device=device,
+        load_precision=load_precision,
     )
     return run_record(
         experiment=VARIED_COMPANION_SWEEP_EXPERIMENT,
-        label=varied_companion_sweep_label(plan_name, plan, digest=digest),
+        label=varied_companion_sweep_label(
+            plan_name, plan, digest=digest, precision_token=precision_token
+        ),
         fingerprint=fingerprint,
         observations=observations,
         payload_digest=NO_PAYLOAD,
