@@ -78,7 +78,8 @@ Registration, once, from any interactive session:
 ```powershell
 $py = (Get-Command python).Source
 $action = New-ScheduledTaskAction -Execute $py `
-  -Argument '"C:\Users\Test\PROJECTS\API\tools\hpc-wake\scripts\run_cycle.py"'
+  -Argument '-m scripts.run_cycle --package-root C:\Users\Test\PROJECTS\API\tools\hpc-wake' `
+  -WorkingDirectory 'C:\Users\Test\PROJECTS\API\tools\hpc-wake'
 $rep = New-TimeSpan -Minutes 3
 $t1 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval $rep
 $t2 = New-ScheduledTaskTrigger -AtStartup

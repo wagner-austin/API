@@ -100,13 +100,28 @@ class TestLoadEnvAssignments:
             run_cycle.load_env_assignments(path)
 
 
+class TestPackageRootFrom:
+    def test_parses_the_one_flag(self, tmp_path: pathlib.Path) -> None:
+        assert run_cycle.package_root_from(["--package-root", str(tmp_path)]) == tmp_path
+
+    def test_refuses_no_arguments(self) -> None:
+        # A defaulted root would reach for the file's own tree — the
+        # untestable dependence the flag exists to remove.
+        with pytest.raises(ValueError, match="usage:"):
+            run_cycle.package_root_from([])
+
+    def test_refuses_an_unknown_flag(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="usage:"):
+            run_cycle.package_root_from(["--root", str(tmp_path)])
+
+
 class TestMain:
     def test_runs_the_cycle_and_appends_header_stdout_then_stderr(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
     ) -> None:
         root = _staged_root(tmp_path, GOOD_ENV)
 
-        code = run_cycle.main(root)
+        code = run_cycle.main(["--package-root", str(root)])
 
         assert code == 0
         content = (root / "runs" / "cycle.log").read_text(encoding="utf-8")
@@ -120,7 +135,7 @@ class TestMain:
     ) -> None:
         root = _staged_root(tmp_path, GOOD_ENV)
 
-        run_cycle.main(root)
+        run_cycle.main(["--package-root", str(root)])
 
         args, cwd, env = runner.calls[0]
         assert list(args) == [
@@ -147,7 +162,7 @@ class TestMain:
         runner.result = _Completed("", "cluster unreachable\n", 3)
         root = _staged_root(tmp_path, GOOD_ENV)
 
-        assert run_cycle.main(root) == 3
+        assert run_cycle.main(["--package-root", str(root)]) == 3
 
     def test_truncates_an_oversized_log_and_keeps_a_small_one(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -157,60 +172,44 @@ class TestMain:
         log.write_text("old\n" * 300_000, encoding="utf-8")
         assert log.stat().st_size > 1_000_000
 
-        run_cycle.main(root)
+        run_cycle.main(["--package-root", str(root)])
         rotated = log.read_text(encoding="utf-8")
         assert "old" not in rotated and rotated.startswith("== ")
 
-        run_cycle.main(root)
+        run_cycle.main(["--package-root", str(root)])
         kept = log.read_text(encoding="utf-8")
         assert kept.startswith(rotated)
         assert kept.count("== 20") == 2
 
 
-class _RaisingRunner:
-    """A runner that refuses, recording the call — the ``__main__`` probe.
-
-    Raising is what keeps the probe side-effect-free: ``main`` appends to
-    the cycle log only AFTER the process call, so a runner that raises
-    proves the entry block invoked ``main`` against the real package tree
-    without the test writing a fake entry into the operational log.
-    """
-
-    def __init__(self) -> None:
-        self.calls: list[pathlib.Path] = []
-
-    def __call__(
-        self,
-        args: Sequence[str],
-        *,
-        cwd: pathlib.Path,
-        env: Mapping[str, str],
-        capture_output: bool,
-        text: bool,
-    ) -> _Completed:
-        self.calls.append(cwd)
-        raise RuntimeError("main-block probe")
-
-
 class TestMainBlock:
-    def test_running_as_a_module_reaches_the_real_package_tree(self) -> None:
+    def test_running_as_a_module_actually_runs_a_cycle(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+    ) -> None:
         """The half that silently goes missing without an ``if __name__``
-        block — and the scheduler invokes exactly this form."""
+        block — and the scheduler invokes exactly this form. Hermetic
+        against a temporary tree: the root arrives through argv, so this
+        probe never reads the operating machine's untracked ``runs/`` state
+        — the dependence that shipped this job red in CI while green
+        locally (five runs, five failures, board 2026-09-09 20:39Z)."""
         import runpy
         import sys
 
-        probe = _RaisingRunner()
-        _test_hooks.run_process = probe
+        root = _staged_root(tmp_path, GOOD_ENV)
         module_name = "scripts.run_cycle"
+        saved_argv = list(sys.argv)
         saved_module = sys.modules.pop(module_name, None)
+        sys.argv = ["run-cycle", "--package-root", str(root)]
         try:
-            with pytest.raises(RuntimeError, match="main-block probe"):
+            with pytest.raises(SystemExit) as caught:
                 runpy.run_module(module_name, run_name="__main__", alter_sys=False)
         finally:
-            _test_hooks.run_process = subprocess.run
+            sys.argv[:] = saved_argv
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
-        assert probe.calls == [pathlib.Path(__file__).resolve().parent.parent]
+        assert caught.value.code == 0
+        assert runner.calls[0][1] == root
+        assert (root / "runs" / "cycle.log").read_text(encoding="utf-8").startswith("== ")
 
 
 class TestHookDefault:

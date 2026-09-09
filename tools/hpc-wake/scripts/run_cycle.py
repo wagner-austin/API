@@ -12,8 +12,15 @@ die silently as a scheduled task on this box:
   board 11:48Z post: stall at .NET assembly load, ~0.16s CPU across 157s,
   repeatable; a NATIVE binary action does not).
 
-``python.exe <this file>`` is the native-binary action that pattern calls
-for. The task registration lives in the README beside the old one.
+``python.exe -m scripts.run_cycle --package-root <dir>`` is the
+native-binary action that pattern calls for. The root is an ARGUMENT, not
+derived from ``__file__``: the package tree holds untracked state
+(``runs/env.ps1``, ``runs/cycle.log``) that exists on the operating machine
+and not on a clean checkout, and an entry point that reaches for its own
+tree is untestable without that state — which is exactly how this job
+shipped red in CI while green locally (board, 2026-09-09 20:39Z: five CI
+runs, five failures, zero passes, invisible because the job usually does
+not run). The task registration lives in the README beside the old one.
 
 Behaviour is the PowerShell script's, deliberately: source ``runs/env.ps1``
 (still PowerShell syntax so interactive sessions can keep dot-sourcing it —
@@ -30,8 +37,44 @@ import os
 import pathlib
 import re
 import sys
+from collections.abc import Sequence
 
 from scripts import _test_hooks
+
+PACKAGE_ROOT_FLAG = "--package-root"
+
+
+def package_root_from(tokens: Sequence[str]) -> pathlib.Path:
+    """Parse the one flag this entry point takes, with stdlib only.
+
+    STDLIB-ONLY IS A CONSTRAINT, NOT A STYLE CHOICE: the scheduled task
+    runs this file under the SYSTEM python — the poetry venv begins
+    inside the cycle's own subprocess — so a first-party import here
+    resolves against whatever stale copy the system interpreter happens
+    to hold, or nothing. Measured 2026-09-09 20:42Z: an import of
+    ``platform_core.cli_args`` found an ancient site-packages install
+    without the module and every scheduled cycle exited 1 before
+    writing a log header.
+
+    Args:
+        tokens: Command-line arguments excluding the program name.
+
+    Returns:
+        The hpc-wake package directory named by ``--package-root``.
+
+    Raises:
+        ValueError: For anything other than exactly that one flag and
+            its value — a defaulted root would reach for this file's own
+            tree, which is the untestable dependence this flag removes.
+    """
+    if len(tokens) != 2 or tokens[0] != PACKAGE_ROOT_FLAG:
+        raise ValueError(
+            f"usage: python -m scripts.run_cycle {PACKAGE_ROOT_FLAG} <dir>; "
+            f"got {list(tokens)!r} — the root is an argument precisely so "
+            f"no invocation ever reaches for this file's own tree"
+        )
+    return pathlib.Path(tokens[1])
+
 
 _ASSIGNMENT = re.compile(r"^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'\s*$")
 _LOG_LIMIT_BYTES = 1_000_000
@@ -69,21 +112,26 @@ def load_env_assignments(env_file: pathlib.Path) -> dict[str, str]:
     return assignments
 
 
-def main(package_root: pathlib.Path) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run one bridge cycle and append its output to the cycle log.
 
     Args:
-        package_root: The hpc-wake package directory, holding ``runs/`` —
-            passed rather than derived so the whole function is exercisable
-            against a temporary tree.
+        argv: Command-line arguments excluding the program name — required
+            flag ``--package-root``, the hpc-wake package directory holding
+            ``runs/``. An argument rather than a ``__file__`` derivation so
+            the whole function is exercisable against a temporary tree.
+            Defaults to the process arguments.
 
     Returns:
         The cycle's own exit status.
 
     Raises:
-        ValueError: Propagated from :func:`load_env_assignments`.
+        ValueError: Propagated from :func:`package_root_from` or
+            :func:`load_env_assignments`.
         OSError: When the log or the package tree is unwritable/unreadable.
     """
+    tokens = list(argv) if argv is not None else list(sys.argv[1:])
+    package_root = package_root_from(tokens)
     environment = load_env_assignments(package_root / "runs" / "env.ps1")
 
     log = package_root / "runs" / "cycle.log"
@@ -106,4 +154,4 @@ def main(package_root: pathlib.Path) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(pathlib.Path(__file__).resolve().parent.parent))
+    sys.exit(main())
