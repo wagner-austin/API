@@ -249,16 +249,16 @@ past its own estimate of 10.70, reject[^17]:
 
 | table (*d*, net) | minority | mid-p |
 |---|---|---|
-| (34, 12) | 11 | 0.041 |
-| (36, 12) | 12 | 0.047 |
-| (35, 11) | 12 | 0.065 |
-| (37, 11) | 13 | 0.073 |
-| (34, 10) | 12 | 0.090 |
-| (36, 10) | 13 | 0.099 |
-| (35, 9) | 13 | 0.133 |
-| (37, 9) | 14 | 0.143 |
+| (34, 12) | 11 | 0.0410 |
+| (36, 12) | 12 | 0.0470 |
+| (35, 11) | 12 | 0.0652 |
+| (37, 11) | 13 | 0.0730 |
+| (34, 10) | 12 | 0.0895 |
+| (36, 10) | 13 | 0.0989 |
+| (35, 9) | 13 | 0.1325 |
+| (37, 9) | 14 | 0.1433 |
 
-Every rounding that respects the net estimate lands between 0.065 and 0.143.[^17]
+Every rounding that respects the net estimate lands between 0.0652 and 0.1433.[^17]
 **A first draft of this paragraph reported 0.047 alone and called the result
 survived** — it was corrected before this page was committed, but only because
 the neighbourhood was enumerated rather than trusted. That draft had taken the
@@ -269,7 +269,7 @@ down and much harder to see: choosing a unit at least looks like a choice.
 Contrast the directory unit above, where the same enumeration is what licenses
 calling the result survived: all six of its roundings reject. **The
 enumeration is what distinguishes the two cases**, and neither conclusion
-would be trustworthy without it.
+would be trustworthy without it.[^17]
 
 That instability is itself the finding. When the answer depends on how a
 non-integer table is rounded, the *effective-sample-size shortcut* — deflate
@@ -576,7 +576,13 @@ measured the sandbox.
        THE EIGHT ROUNDINGS: each row is
        `mcnemar_p((d − net)/2, d, McNemarTest.MID_P)` over every (d, net) of
        matching parity with d in 34..37 and net in 9..12, the integer
-       neighbourhood of the deflated (35.65, 10.70). The directory unit's
+       neighbourhood of the deflated (35.65, 10.70). Quoted to four decimals
+       rather than three because (35, 9) lands on 0.1325, exactly a
+       half-way case: a first version of the table hand-rounded it to 0.133,
+       which is a rounding decision taken by the author inside a table whose
+       entire subject is rounding decisions taken by the author. Every row is
+       now the function's own output at a precision that hides none. The
+       directory unit's
        claim of robust survival is the same enumeration over the
        neighbourhood of its own deflated table (59.17, 17.75) — d in 58..60,
        net in 16..19 — giving six valid tables at 0.0135, 0.0183, 0.0204,
