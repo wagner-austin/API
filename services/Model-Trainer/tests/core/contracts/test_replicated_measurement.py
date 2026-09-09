@@ -84,6 +84,30 @@ class TestReplicate:
 
         assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_MEASUREMENT_UNREPLICATED
 
+    def test_platform_core_agrees_with_this_floor(self) -> None:
+        """A CONSISTENCY THAT WAS ASSERTED IN PROSE AND CHECKED BY NOTHING.
+
+        ``platform_core.minimum_detectable_effect.MIN_REPLICATES`` is 3, and
+        its comment says why: "replicated_measurement measured that swinging
+        by 70% with the replicate count and raised its own floor from two to
+        three; this module keeps the two consistent rather than inventing a
+        second number."
+
+        Nothing made that true. Neither package referenced the other in
+        either direction -- ``git grep MIN_REPLICATES`` over this service and
+        ``git grep MIN_SEEDS`` over platform_core both returned nothing --
+        so changing one left the other silently behind, and the two floors
+        would then disagree about the same data exactly where a paired
+        statistic and a power record are asked the same question.
+
+        The check lives HERE rather than in platform_core because the
+        dependency only runs one way: a service may import a lib, and
+        ``MIN_SEEDS`` is the original the lib's copy was derived from.
+        """
+        from platform_core.minimum_detectable_effect import MIN_REPLICATES
+
+        assert MIN_SEEDS == MIN_REPLICATES
+
 
 class TestNoiseFloor:
     def test_it_takes_the_largest_spread(self) -> None:
