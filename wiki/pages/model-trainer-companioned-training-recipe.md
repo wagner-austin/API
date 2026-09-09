@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 6e96538b0370caebbe7e459104283392b9a2941a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dc758263db2d9ac7e08156d40fd79e11d728b12e
-  "docs/RESEARCH.md": cabe38eeed20d2c8ccea516d902d59d53f695af7
+  "docs/RESEARCH.md": 73bbe133af988d075d98a758f212d4328dec779d
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -53,7 +53,8 @@ provenance:
   - "bf16 precision control 2026-09-09, board task c4b9a01b: StoredBf16Precision loader state (commit f4447989), image v46 sha256 bd6ca365 (truncated), jobs 55833896 + twin 55833931 (~9 min each, half NF4's wall clock), records BYTE-IDENTICAL sha256 445e345f (truncated) ACROSS nodes gpu-24-07 / gpu-l54-07 -- the arc's first full cross-node byte identity on a 7B record; bf16 mean +0.102 spread 0.248 two negatives; paired bf16-minus-NF4 -0.058 +/- 0.032 (t -1.80, MDE 0.075 nats): NF4 exonerated"
   - "MDE rows computed 2026-09-09 from stored per-seed rows (machine-wide MDE standard): 1.5B n8-equals-n4 holds (LM +0.0004 vs MDE 0.019; invariance +0.0001 vs 0.068); objectives' diverse-n4 tie at 1.5B holds (-0.008 vs MDE 0.047); diverse-n8 CORRECTED from tie to a resolved -0.0088 +/- 0.0014 LM advantage (t ~ -6.5), ~1% of the alone gain, no operating decision changes"
   - "hyperparameter grid 2026-09-09, board task 47d5f8c6 (operator-directed): cartridge_solo_grid CLI (commit 103bdaf7), image v47 sha256 290794b0 (truncated) from fcb39991, jobs 55841983 + twin 55841997 (1h08m each), records BYTE-IDENTICAL sha256 bc18d701 (truncated, same-node k54-05); the lr0.01xc64 anchor cell reproduces the certified 445e345f bf16 record BIT-FOR-BIT seed for seed; lr {0.001,0.003,0.01,0.03} x slots {64,256} at nine seeds: 0.001 all-negative, 0.03 divergent (means to -1.67), 0.003 indistinguishable-to-worse (t -1.04), 256 slots never better than 64 (at lr0.003 significantly worse, t -5.19) -- the recorded knobs sit at the grid's maximum; bounds added post-audit: failure counts carry exact 95% Clopper-Pearson intervals (anchor 2/9 -> [2.8%, 60.0%]; 9/9-negative cells -> [66.4%, 100%]) and paired-vs-anchor MDEs 0.087 / 0.091 / 0.060 nats, an order below the 0.36-nat recovery being hunted"
-fact_checked: "2026-09-07"
+  - "epochs line 2026-09-09, board task e03cd293: cartridge_solo_grid --cells epochs-line (declared-cells refactor fe692719: SoloGridCell/SoloCellSet carry knobs AND recorded observation tokens as data, cell_set_for refuses undeclared selectors), image v48 sha256 dd04cb08 (truncated), jobs 55848106 + twin 55848109 (~55 min each), records BYTE-IDENTICAL sha256 114acee2 (truncated); the reused anchor cell reproduces BOTH bc18d701 and 445e345f BIT-FOR-BIT seed for seed; e24 halves the mean (+0.046 vs +0.102; paired -0.055, t -2.14, MDE 0.060) and e48 destroys it (mean -0.240, 9/9 negative -> CP [66.4%, 100%]; paired -0.342, t -5.55, MDE 0.142); per-cell CP bounds e12 2/9 -> [2.8%, 60.0%], e24 1/9 -> [0.3%, 48.2%]; every training axis now measured with the recorded knobs at each maximum -- method-level conclusion filed in RESEARCH.md: KV-prefix capacity does not transfer to pythia-6.9b under naive solo training, and a 7B rung for THIS page's recipe is a method change, not a knob"
+fact_checked: "2026-09-09"
 confidence: high
 hubs: [services]
 ---
