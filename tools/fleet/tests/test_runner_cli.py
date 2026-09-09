@@ -42,6 +42,7 @@ def _raw_host(name: str) -> dict[str, JSONValue]:
             {
                 "repo": "wagner-austin/API",
                 "runner_name": f"{name}-wsl",
+                "side": "wsl",
                 "service": f"actions.runner.wagner-austin-API.{name}-wsl.service",
                 "workdir": "/home/gharunner/actions-runner-1/_work",
                 "labels": ["lavender-wsl"],
@@ -76,8 +77,8 @@ def _clean_transcript(name: str) -> str:
         The OK lines.
     """
     return (
-        f"CHECK service:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
-        f"CHECK workdir:wagner-austin/API:{name}-wsl OK\n"
+        f"CHECK service:wsl:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
+        f"CHECK workdir:wagner-austin/API:wsl:{name}-wsl OK\n"
     )
 
 
@@ -139,9 +140,9 @@ class TestAudit:
     def test_drift_exits_one(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
         transcript = (
-            "CHECK service:actions.runner.wagner-austin-API.lavender-wsl.service "
+            "CHECK service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service "
             "DRIFT it said: inactive\n"
-            "CHECK workdir:wagner-austin/API:lavender-wsl OK\n"
+            "CHECK workdir:wagner-austin/API:wsl:lavender-wsl OK\n"
         )
         _test_hooks.run = FakeRun([ok(""), ok(transcript)])
         assert runners.main(["--spec", spec_path]) == 1
@@ -300,6 +301,98 @@ class TestSampleAndReport:
             runners.main(["--spec", spec_path, "--host", "lavender", "--sample", str(record)])
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert not record.exists()
+
+
+class TestOnboardMode:
+    """The --onboard mode: flags, roster rewrite, exit codes."""
+
+    def test_onboard_requires_host(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="--onboard requires --host"):
+            runners.main(["--spec", spec_path, "--onboard", "wagner-austin/x"])
+
+    def test_sides_without_onboard_is_refused(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="--sides only means something"):
+            runners.main(["--spec", spec_path, "--sides", "wsl"])
+
+    def test_python_without_onboard_is_refused(self, tmp_path: pathlib.Path) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        with pytest.raises(ValueError, match="--python only means something"):
+            runners.main(["--spec", spec_path, "--python", "3.11.9"])
+
+    def test_onboard_rewrites_the_roster_and_exits_on_the_audit(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        # The post-onboard audit covers the pre-existing install AND the new
+        # wsl one, in roster order.
+        transcript = (
+            _clean_transcript("lavender")
+            + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service OK\n"
+            + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
+        )
+        _test_hooks.run = FakeRun(
+            [
+                ok("TOK123\n"),  # gh mint
+                ok(""),  # send wsl payload
+                ok(""),  # send wsl driver
+                ok("done"),  # run wsl driver
+                ok(""),  # audit send
+                ok(transcript),  # audit run
+            ]
+        )
+        code = runners.main(
+            [
+                "--spec",
+                spec_path,
+                "--host",
+                "lavender",
+                "--onboard",
+                "wagner-austin/x",
+                "--sides",
+                "wsl",
+            ]
+        )
+        assert code == 0
+        rewritten = pathlib.Path(spec_path).read_text(encoding="utf-8")
+        decoded = runners.load_runner_spec(spec_path)
+        assert '"wagner-austin/x"' in rewritten
+        repos = [i["repo"] for i in decoded["hosts"][0]["installs"]]
+        assert repos == ["wagner-austin/API", "wagner-austin/x"]
+
+    def test_onboard_with_a_drifting_audit_exits_one_and_still_records(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The runners exist and the roster records them either way; the
+        exit code carries the audit's verdict, not the provisioning's."""
+        spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
+        transcript = (
+            _clean_transcript("lavender")
+            + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service "
+            "DRIFT it said: inactive\n" + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
+        )
+        _test_hooks.run = FakeRun(
+            [ok("TOK123\n"), ok(""), ok(""), ok("done"), ok(""), ok(transcript)]
+        )
+        code = runners.main(
+            [
+                "--spec",
+                spec_path,
+                "--host",
+                "lavender",
+                "--onboard",
+                "wagner-austin/x",
+                "--sides",
+                "wsl",
+            ]
+        )
+        assert code == 1
+        decoded = runners.load_runner_spec(spec_path)
+        assert [i["repo"] for i in decoded["hosts"][0]["installs"]] == [
+            "wagner-austin/API",
+            "wagner-austin/x",
+        ]
 
 
 class TestEntrypoint:

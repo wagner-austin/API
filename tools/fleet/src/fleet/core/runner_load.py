@@ -142,27 +142,55 @@ def _descendant_count(forest: dict[int, tuple[int, str]], root: int) -> int:
     return count
 
 
-def _install_root(workdir: str) -> str:
-    """The install directory a workdir belongs to.
+def _install_marker(workdir: str, side: str) -> str:
+    """The Runner.Worker path fragment that identifies an install's worker.
 
     Args:
-        workdir: The install's ``_work`` tree, e.g.
-            ``/home/gharunner/actions-runner-api-1/_work``.
+        workdir: The install's ``_work`` tree.
+        side: The install's execution environment.
 
     Returns:
-        The install root, e.g. ``/home/gharunner/actions-runner-api-1`` --
-        the path a ``Runner.Worker``'s args carries.
+        For ``wsl``, the POSIX worker path (``<root>/bin/Runner.Worker``);
+        for ``windows``, the backslashed form a Win32 command line carries
+        (``<root>\\bin\\Runner.Worker``), since the roster records Windows
+        workdirs with forward slashes but process command lines do not.
     """
-    return workdir.rsplit("/", 1)[0]
+    root = workdir.rsplit("/", 1)[0]
+    if side == "windows":
+        return root.replace("/", "\\") + "\\bin\\Runner.Worker"
+    return f"{root}/bin/Runner.Worker"
 
 
-def take_sample(spec: HostRunnerSpec, ps_output: str, *, at: int) -> LoadSample:
-    """Score one ``ps`` forest against the roster.
+#: The PowerShell payload that snapshots the WINDOWS process forest in the
+#: same three-column shape ``ps -eo pid=,ppid=,args=`` gives for the distro,
+#: so one parser scores both. Sent and run by path per the remote layer's
+#: rule; a null CommandLine formats as empty, which the parser accepts as a
+#: process with no args.
+WINDOWS_FOREST_SCRIPT = (
+    "Get-CimInstance Win32_Process | ForEach-Object {\n"
+    "  '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, $_.CommandLine\n"
+    "}\n"
+)
+
+#: File name the Windows forest script lands under in the host's scratch_dir.
+FOREST_SCRIPT_NAME = "fleet-runner-forest.ps1"
+
+
+def take_sample(
+    spec: HostRunnerSpec, wsl_ps_output: str, windows_ps_output: str | None, *, at: int
+) -> LoadSample:
+    """Score the host's process forests against the roster.
+
+    The two forests are scored SEPARATELY -- WSL and Windows are distinct
+    pid namespaces, so merging them could alias a distro pid onto a host
+    process and miscount both.
 
     Args:
         spec: The host's roster entry.
-        ps_output: One ``ps -eo pid=,ppid=,args=`` reading from inside the
-            distro.
+        wsl_ps_output: One ``ps -eo pid=,ppid=,args=`` reading from inside
+            the distro.
+        windows_ps_output: One Win32_Process reading in the same shape, or
+            None when the roster declares no windows-side installs.
         at: The reading's timestamp, whole epoch seconds.
 
     Returns:
@@ -170,12 +198,29 @@ def take_sample(spec: HostRunnerSpec, ps_output: str, *, at: int) -> LoadSample:
 
     Raises:
         AppError: ``RUNNER_AUDIT_UNPARSABLE`` from the forest parser.
+        ValueError: When the roster declares a windows-side install and no
+            Windows forest was provided -- scoring it as zero would be the
+            healthiest possible reading taken while looking away, the exact
+            blind spot the ``side`` field was added to close.
     """
-    forest = parse_process_forest(ps_output)
+    wsl_forest = parse_process_forest(wsl_ps_output)
+    windows_forest = (
+        parse_process_forest(windows_ps_output) if windows_ps_output is not None else None
+    )
     installs: list[InstallLoad] = []
     total = 0
     for install in spec["installs"]:
-        marker = f"{_install_root(install['workdir'])}/bin/Runner.Worker"
+        if install["side"] == "windows":
+            if windows_forest is None:
+                raise ValueError(
+                    f"install {install['repo']}:{install['runner_name']} is windows-side "
+                    "but no Windows process forest was provided; a zero here would be a "
+                    "reading taken while looking away"
+                )
+            forest = windows_forest
+        else:
+            forest = wsl_forest
+        marker = _install_marker(install["workdir"], install["side"])
         workers = [pid for pid, (_, args) in forest.items() if marker in args]
         descendants = sum(_descendant_count(forest, pid) for pid in workers)
         installs.append(
@@ -207,11 +252,18 @@ def sample_host(spec: HostRunnerSpec, *, at: int) -> LoadSample:
             the exact moment it knows nothing -- and
             ``RUNNER_AUDIT_UNPARSABLE`` for a forest it cannot parse.
     """
-    output = remote.run_ssh(
+    wsl_output = remote.run_ssh(
         spec["host"],
         ("wsl", "-d", spec["wsl_distro"], "--", "ps", "-eo", "pid=,ppid=,args="),
     )
-    return take_sample(spec, output, at=at)
+    windows_output: str | None = None
+    if any(install["side"] == "windows" for install in spec["installs"]):
+        windows_output = remote.run_script(
+            spec["host"],
+            f"{spec['scratch_dir']}/{FOREST_SCRIPT_NAME}",
+            WINDOWS_FOREST_SCRIPT,
+        )
+    return take_sample(spec, wsl_output, windows_output, at=at)
 
 
 def encode_load_sample(sample: LoadSample) -> JSONObject:
@@ -380,6 +432,8 @@ def decode_sample_file(raw: str) -> list[LoadSample]:
 
 
 __all__ = [
+    "FOREST_SCRIPT_NAME",
+    "WINDOWS_FOREST_SCRIPT",
     "InstallLoad",
     "LoadReport",
     "LoadSample",

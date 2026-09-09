@@ -158,13 +158,13 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
     for install in spec["installs"]:
         checks.append(
             ExpectedCheck(
-                check_id=f"service:{install['service']}",
+                check_id=f"service:{install['side']}:{install['service']}",
                 reason=f"runs the {install['repo']} runner {install['runner_name']}",
             )
         )
         checks.append(
             ExpectedCheck(
-                check_id=f"workdir:{install['repo']}:{install['runner_name']}",
+                check_id=f"workdir:{install['repo']}:{install['side']}:{install['runner_name']}",
                 reason="the install's _work tree, which its venvs are path-bound to",
             )
         )
@@ -280,10 +280,27 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
         workdir = _scriptable(install["workdir"], label="workdir")
         repo = _scriptable(install["repo"], label="repo")
         runner_name = _scriptable(install["runner_name"], label="runner_name")
-        lines += _emit_wsl_state_check(
-            distro, f"service:{service}", f"systemctl is-active '{service}'", "active"
-        )
-        lines += _emit_wsl_test_check(distro, f"workdir:{repo}:{runner_name}", "-d", workdir)
+        if install["side"] == "wsl":
+            lines += _emit_wsl_state_check(
+                distro, f"service:wsl:{service}", f"systemctl is-active '{service}'", "active"
+            )
+            lines += _emit_wsl_test_check(
+                distro, f"workdir:{repo}:wsl:{runner_name}", "-d", workdir
+            )
+        else:
+            # Windows-side installs are checked NATIVELY: the driver already
+            # runs in the host's PowerShell, so the service and the workdir
+            # are one cmdlet away rather than one wsl hop away.
+            lines += [
+                f"$WinSvc = Get-Service '{service}' -ErrorAction SilentlyContinue",
+                f"Emit 'service:windows:{service}' "
+                "($null -ne $WinSvc -and $WinSvc.Status -eq 'Running') "
+                "('Get-Service said: ' + $(if ($null -eq $WinSvc) { 'absent' } "
+                "else { [string]$WinSvc.Status }))",
+                f"Emit 'workdir:{repo}:windows:{runner_name}' "
+                f"(Test-Path -LiteralPath '{workdir}') "
+                f"('Test-Path {workdir}')",
+            ]
     for asset in spec["assets"]:
         path = _scriptable(asset["path"], label="asset path")
         lines += _emit_wsl_test_check(distro, f"asset:{path}", "-e", path)

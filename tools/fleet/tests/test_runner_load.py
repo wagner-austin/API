@@ -35,6 +35,7 @@ def _host() -> HostRunnerSpec:
             RunnerInstall(
                 repo="wagner-austin/API",
                 runner_name="lavender-wsl",
+                side="wsl",
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-api-1/_work",
                 labels=["lavender-wsl"],
@@ -42,6 +43,7 @@ def _host() -> HostRunnerSpec:
             RunnerInstall(
                 repo="wagner-austin/MCPs",
                 runner_name="lavender-wsl",
+                side="wsl",
                 service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner/_work",
                 labels=["lavender-wsl"],
@@ -94,7 +96,7 @@ class TestTakeSample:
     """Scoring a forest against the roster."""
 
     def test_descendants_are_counted_transitively_per_install(self) -> None:
-        sample = runner_load.take_sample(_host(), _FOREST, at=1757400000)
+        sample = runner_load.take_sample(_host(), _FOREST, None, at=1757400000)
         assert sample == runner_load.LoadSample(
             at=1757400000,
             host="lavender",
@@ -124,14 +126,74 @@ class TestTakeSample:
                 "300 1 postgres",
             ]
         )
-        sample = runner_load.take_sample(_host(), quiet, at=7)
+        sample = runner_load.take_sample(_host(), quiet, None, at=7)
         assert sample["total"] == 0
         assert [install["busy"] for install in sample["installs"]] == [False, False]
 
     def test_unrelated_processes_count_for_nobody(self) -> None:
-        sample = runner_load.take_sample(_host(), _FOREST, at=7)
+        sample = runner_load.take_sample(_host(), _FOREST, None, at=7)
         # postgres and its checkpointer appear in the forest and in no install.
         assert sample["total"] == 5
+
+
+def _mixed_host() -> HostRunnerSpec:
+    """A host with one install per side, mirroring lavender since tree-bot.
+
+    Returns:
+        The spec.
+    """
+    spec = _host()
+    spec["installs"].append(
+        RunnerInstall(
+            repo="wagner-austin/tree-bot",
+            runner_name="lavender",
+            side="windows",
+            service="actions.runner.wagner-austin-tree-bot.lavender",
+            workdir="C:/actions-runner-tree-bot/_work",
+            labels=["lavender"],
+        )
+    )
+    return spec
+
+
+#: A Windows process forest in the same three-column shape, with the
+#: backslashed command lines Win32 actually reports, one runner worker with
+#: one child, and a pid that COLLIDES with the wsl forest's -- the reason
+#: the two forests must never be merged.
+_WINDOWS_FOREST = "\n".join(
+    [
+        "4 0 System",
+        "100 4 C:\\actions-runner-tree-bot\\bin\\Runner.Worker.exe spawnclient",
+        "101 100 python.exe -m pytest",
+        "300 4 svchost.exe",
+    ]
+)
+
+
+class TestDualForests:
+    """Windows-side installs are scored against the Windows forest."""
+
+    def test_each_side_counts_only_its_own_forest(self) -> None:
+        sample = runner_load.take_sample(_mixed_host(), _FOREST, _WINDOWS_FOREST, at=1757400000)
+        by_repo = {install["repo"]: install for install in sample["installs"]}
+        # wsl pid 100 is a Runner.Listener; windows pid 100 is a Worker.
+        # If the forests were merged, the collision would corrupt both.
+        assert by_repo["wagner-austin/tree-bot"]["descendants"] == 1
+        assert by_repo["wagner-austin/tree-bot"]["busy"] is True
+        assert sample["total"] == 6
+
+    def test_a_windows_install_with_no_windows_forest_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="looking away"):
+            runner_load.take_sample(_mixed_host(), _FOREST, None, at=1)
+
+    def test_sample_host_fetches_the_windows_forest_only_when_needed(self) -> None:
+        runner = FakeRun([ok(_FOREST), ok(""), ok(_WINDOWS_FOREST)])
+        _test_hooks.run = runner
+        sample = runner_load.sample_host(_mixed_host(), at=11)
+        assert sample["total"] == 6
+        # Three calls: the wsl ps, then send + run of the forest script.
+        assert len(runner.calls) == 3
+        assert runner.stdin[1] == runner_load.WINDOWS_FOREST_SCRIPT.encode("utf-8")
 
 
 class TestSampleHost:
@@ -166,12 +228,12 @@ class TestRecordRoundTrip:
     """The JSONL record."""
 
     def test_encode_then_decode_is_the_identity(self) -> None:
-        sample = runner_load.take_sample(_host(), _FOREST, at=1757400000)
+        sample = runner_load.take_sample(_host(), _FOREST, None, at=1757400000)
         line = runner_load.render_sample_line(sample)
         assert runner_load.decode_load_sample(load_json_str(line)) == sample
 
     def test_a_total_disagreeing_with_its_installs_is_a_corrupt_record(self) -> None:
-        sample = runner_load.take_sample(_host(), _FOREST, at=1)
+        sample = runner_load.take_sample(_host(), _FOREST, None, at=1)
         broken = dict(runner_load.encode_load_sample(sample))
         broken["total"] = 99
         with pytest.raises(JSONTypeError, match="corrupt record"):
@@ -188,8 +250,8 @@ class TestRecordRoundTrip:
             )
 
     def test_a_file_of_lines_decodes_in_order(self) -> None:
-        first = runner_load.take_sample(_host(), _FOREST, at=1)
-        second = runner_load.take_sample(_host(), _FOREST, at=2)
+        first = runner_load.take_sample(_host(), _FOREST, None, at=1)
+        second = runner_load.take_sample(_host(), _FOREST, None, at=2)
         raw = (
             runner_load.render_sample_line(first)
             + "\n"

@@ -13,6 +13,7 @@
         {
           "repo": "wagner-austin/API",
           "runner_name": "lavender-wsl",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner-api-1/_work",
           "labels": ["lavender-wsl"]
@@ -20,6 +21,7 @@
         {
           "repo": "wagner-austin/API",
           "runner_name": "lavender-wsl-2",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-API.lavender-wsl-2.service",
           "workdir": "/home/gharunner/actions-runner-api-2/_work",
           "labels": ["lavender-wsl"]
@@ -27,6 +29,7 @@
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender-wsl",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
           "workdir": "/home/gharunner/actions-runner/_work",
           "labels": ["lavender-wsl"]
@@ -34,6 +37,7 @@
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender-wsl-2",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service",
           "workdir": "/home/gharunner/actions-runner-2/_work",
           "labels": ["lavender-wsl"]
@@ -41,6 +45,7 @@
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender-wsl-3",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service",
           "workdir": "/home/gharunner/actions-runner-3/_work",
           "labels": ["lavender-wsl"]
@@ -48,9 +53,50 @@
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender-wsl-4",
+          "side": "wsl",
           "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service",
           "workdir": "/home/gharunner/actions-runner-4/_work",
           "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender",
+          "side": "windows",
+          "service": "actions.runner.wagner-austin-MCPs.lavender",
+          "workdir": "C:/actions-runner/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/portable-claude",
+          "runner_name": "lavender-wsl",
+          "side": "wsl",
+          "service": "actions.runner.wagner-austin-portable-claude.lavender-wsl.service",
+          "workdir": "/home/gharunner/actions-runner-portable-claude-1/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/portable-claude",
+          "runner_name": "lavender",
+          "side": "windows",
+          "service": "actions.runner.wagner-austin-portable-claude.lavender",
+          "workdir": "C:/actions-runner-portable-claude/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/tree-bot",
+          "runner_name": "lavender-wsl",
+          "side": "wsl",
+          "service": "actions.runner.wagner-austin-tree-bot.lavender-wsl.service",
+          "workdir": "/home/gharunner/actions-runner-treebot-1/_work",
+          "labels": ["lavender-wsl"]
+        },
+        {
+          "repo": "wagner-austin/tree-bot",
+          "runner_name": "lavender",
+          "side": "windows",
+          "service": "actions.runner.wagner-austin-tree-bot.lavender",
+          "workdir": "C:/actions-runner-tree-bot/_work",
+          "labels": ["lavender"]
         }
       ],
       "assets": [

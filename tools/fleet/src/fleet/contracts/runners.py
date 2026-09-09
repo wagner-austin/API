@@ -25,6 +25,8 @@ no keepalive task.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -42,19 +44,27 @@ class RunnerInstall(TypedDict):
 
     Attributes:
         repo: The repository it is registered to, ``owner/name`` form --
-            registrations are per-repo, which is why one box carries six.
+            registrations are per-repo, which is why one box carries many.
         runner_name: The name shown by the repo's runner registration, e.g.
             ``lavender-wsl-2``. Names are per-repo: two installs on one box
             may share a name across repos without being the same install.
-        service: The systemd unit that runs it, e.g.
-            ``actions.runner.wagner-austin-API.lavender-wsl-2.service``.
-            Recorded exactly because "is the service active" is the audit
-            question, and deriving the unit name from the repo and runner
-            name would encode GitHub's naming scheme in two places.
-        workdir: Absolute path of the install's ``_work`` tree inside the
-            execution environment. This is the path a poetry in-project venv
-            bakes into its shebangs -- the fact behind the 2026-09-08 cache
-            poisoning -- and the audit asserts it exists.
+        side: Which execution environment the install lives in: ``"wsl"``
+            (inside the host's WSL distro, run by systemd) or ``"windows"``
+            (on the host OS, run by a Windows service). Added 2026-09-09,
+            when three Windows-side installs (MCPs, portable-claude,
+            tree-bot) were live on lavender and invisible to the audit and
+            the load sampler because the roster could not describe them.
+        service: The service that runs it. For ``wsl``, the systemd unit
+            (``actions.runner.<owner>-<repo>.<name>.service``); for
+            ``windows``, the Windows service name (same, minus
+            ``.service``). Recorded exactly rather than derived, because
+            "is the service running" is the audit question.
+        workdir: Absolute path of the install's ``_work`` tree inside its
+            execution environment -- a ``/home/...`` path for ``wsl``, a
+            drive-letter path for ``windows``; the decoder enforces the
+            match. This is the path a poetry in-project venv bakes into its
+            shebangs -- the fact behind the 2026-09-08 cache poisoning --
+            and the audit asserts it exists.
         labels: The custom labels the install answers to, e.g.
             ``["lavender-wsl"]``. Labels are the pool: a workflow targets a
             label, never a machine, which is what makes a new box a five
@@ -63,6 +73,7 @@ class RunnerInstall(TypedDict):
 
     repo: str
     runner_name: str
+    side: Literal["wsl", "windows"]
     service: str
     workdir: str
     labels: list[str]
@@ -181,6 +192,7 @@ def encode_runner_install(install: RunnerInstall) -> JSONObject:
     return {
         "repo": install["repo"],
         "runner_name": install["runner_name"],
+        "side": install["side"],
         "service": install["service"],
         "workdir": install["workdir"],
         "labels": list(install["labels"]),
@@ -198,10 +210,14 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, ``repo`` is not ``owner/name``, or ``labels`` is
-            empty. A runner with no custom label is unreachable by every
-            workflow in these repositories, so declaring one would record an
-            install nothing can use.
+            mistyped, ``repo`` is not ``owner/name``, ``labels`` is empty,
+            ``side`` is not ``wsl`` or ``windows``, or ``workdir``'s shape
+            does not match the side -- a Windows path on a wsl install (or
+            the reverse) describes an install that cannot exist, and the
+            audit pointed at it would report drift no command can fix. A
+            runner with no custom label is unreachable by every workflow in
+            these repositories, so declaring one would record an install
+            nothing can use.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"runner install must be a JSON object, got {type(value).__name__}")
@@ -214,11 +230,27 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
             "labels must be non-empty; a runner with no custom label cannot be targeted "
             "by any workflow here and would sit registered but unreachable"
         )
+    raw_side = require_str(value, "side")
+    if raw_side not in ("wsl", "windows"):
+        raise JSONTypeError(f"side must be 'wsl' or 'windows', got {raw_side!r}")
+    side: Literal["wsl", "windows"] = "wsl" if raw_side == "wsl" else "windows"
+    workdir = require_str(value, "workdir")
+    if side == "wsl" and not workdir.startswith("/"):
+        raise JSONTypeError(
+            f"a wsl install's workdir must be an absolute POSIX path, got {workdir!r}"
+        )
+    if side == "windows" and not (
+        len(workdir) > 2 and workdir[0].isalpha() and workdir[1] == ":" and workdir[2] in "/\\"
+    ):
+        raise JSONTypeError(
+            f"a windows install's workdir must be a drive-letter path, got {workdir!r}"
+        )
     return RunnerInstall(
         repo=repo,
         runner_name=require_str(value, "runner_name"),
+        side=side,
         service=require_str(value, "service"),
-        workdir=require_str(value, "workdir"),
+        workdir=workdir,
         labels=labels,
     )
 

@@ -6,6 +6,17 @@ Usage:
     fleet-runners --spec runners.json --host lavender --render C:/provision
     fleet-runners --spec runners.json --host lavender --sample load.jsonl
     fleet-runners --spec runners.json --report load.jsonl --cores 16
+    fleet-runners --spec runners.json --host lavender --onboard owner/repo
+
+``--onboard`` is the operator's 2026-09-09 mandate made runnable: ONE
+command registers a repository's CI onto the self-hosted fleet -- token
+minted via gh, both sides provisioned by render-send-run, the roster
+rewritten in the same act, and the host audited as proof. ``--sides
+wsl,windows`` narrows which environments (default both); ``--python
+3.11.9,3.12.10`` seeds those exact versions into the Windows tool cache
+so setup-python finds instead of installing (the install path needs
+registry rights the runner service does not have). See
+:mod:`fleet.core.runner_onboard` for every refusal it can make.
 
 The ``fleet-nodes`` of GitHub Actions serving: one line per declared check,
 drift printed with the roster's own reason beside it, exit 0 only when every
@@ -40,11 +51,16 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONTypeError, load_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 from platform_core.logging import get_logger, setup_logging
 
-from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, decode_runner_spec
-from fleet.core import _test_hooks, runner_audit, runner_load, runner_render
+from fleet.contracts.runners import (
+    HostRunnerSpec,
+    RunnerSpec,
+    decode_runner_spec,
+    encode_runner_spec,
+)
+from fleet.core import _test_hooks, runner_audit, runner_load, runner_onboard, runner_render
 
 _log = get_logger(__name__)
 
@@ -60,7 +76,23 @@ REPORT_FLAG = "--report"
 
 CORES_FLAG = "--cores"
 
-_FLAGS = (SPEC_FLAG, HOST_FLAG, RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, CORES_FLAG)
+ONBOARD_FLAG = "--onboard"
+
+SIDES_FLAG = "--sides"
+
+PYTHON_FLAG = "--python"
+
+_FLAGS = (
+    SPEC_FLAG,
+    HOST_FLAG,
+    RENDER_FLAG,
+    SAMPLE_FLAG,
+    REPORT_FLAG,
+    CORES_FLAG,
+    ONBOARD_FLAG,
+    SIDES_FLAG,
+    PYTHON_FLAG,
+)
 
 
 def load_runner_spec(path: str) -> RunnerSpec:
@@ -244,8 +276,71 @@ def _report(record_path: str, *, cores: int, host_name: str | None) -> int:
     return 0
 
 
+def _onboard(
+    spec: RunnerSpec,
+    spec_path: str,
+    host: HostRunnerSpec,
+    repo: str,
+    sides: tuple[str, ...],
+    python_versions: tuple[str, ...],
+) -> int:
+    """Onboard a repo onto a host, rewrite the roster, print the audit.
+
+    Args:
+        spec: The whole roster; the host entry inside it is mutated by the
+            onboarder and the whole document is rewritten on success.
+        spec_path: Where the roster lives, for the rewrite.
+        host: The target host's entry within ``spec``.
+        repo: The repository, ``owner/name``.
+        sides: Which environments to provision.
+        python_versions: Exact Python versions to seed into the Windows
+            tool cache, empty for none.
+
+    Returns:
+        0 when the post-onboard audit is clean; 1 when it reports drift --
+        the runners exist and the roster records them either way, and the
+        drift lines say exactly what to repair.
+
+    Raises:
+        AppError: As :func:`fleet.core.runner_onboard.onboard` describes.
+    """
+    plan, findings = runner_onboard.onboard(
+        host, repo, sides=sides, python_versions=python_versions
+    )
+    _test_hooks.write_text(
+        pathlib.Path(spec_path), dump_json_str(encode_runner_spec(spec), indent=2) + "\n"
+    )
+    for install in plan["installs"]:
+        _log.info(
+            "onboarded %s %s runner %s (labels: %s)",
+            repo,
+            install["side"],
+            install["runner_name"],
+            ",".join(install["labels"]),
+        )
+    _log.info("roster rewritten: %s", spec_path)
+    faults = 0
+    for finding in findings:
+        if finding["ok"]:
+            _log.info("%s OK %s", host["name"], finding["check_id"])
+        else:
+            _log.info(
+                "%s DRIFT %s -- %s (%s)",
+                host["name"],
+                finding["check_id"],
+                finding["detail"],
+                finding["reason"],
+            )
+            faults += 1
+    if faults:
+        _log.info("%d fault(s) after onboarding; the drift lines name the repairs", faults)
+        return 1
+    _log.info("onboarding verified: every check green, %s covered from birth", repo)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit, render, sample or report, per the flags.
+    """Audit, render, sample, report or onboard, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
@@ -274,37 +369,91 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError(
             f"{SPEC_FLAG} is required: the roster's path is passed, never searched for"
         )
-    modes = [flag for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG) if flag in parsed]
+    modes = [
+        flag for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG) if flag in parsed
+    ]
     if len(modes) > 1:
         raise ValueError(
             f"{' and '.join(modes)} are different acts; give one, or neither for the audit"
         )
     spec = load_runner_spec(spec_path)
     hosts = select_hosts(spec, parsed.get(HOST_FLAG))
+    onboard_repo = parsed.get(ONBOARD_FLAG)
+    if onboard_repo is not None:
+        _require_host(parsed, ONBOARD_FLAG, "onboarding registers runners on one machine")
+        sides = _split_flag(parsed.get(SIDES_FLAG), default=("wsl", "windows"))
+        python_versions = _split_flag(parsed.get(PYTHON_FLAG), default=())
+        return _onboard(spec, spec_path, hosts[0], onboard_repo, sides, python_versions)
+    for orphan in (SIDES_FLAG, PYTHON_FLAG):
+        if orphan in parsed:
+            raise ValueError(f"{orphan} only means something with {ONBOARD_FLAG}")
     render_dir = parsed.get(RENDER_FLAG)
     if render_dir is not None:
-        if parsed.get(HOST_FLAG) is None:
-            raise ValueError(
-                f"{RENDER_FLAG} requires {HOST_FLAG}: a render is for one machine, and "
-                "rendering every host into one directory would overwrite each with the next"
-            )
+        _require_host(parsed, RENDER_FLAG, "a render is for one machine")
         return _render(hosts[0], render_dir)
     sample_path = parsed.get(SAMPLE_FLAG)
     if sample_path is not None:
         return _sample(hosts, sample_path)
     report_path = parsed.get(REPORT_FLAG)
     if report_path is not None:
-        raw_cores = parsed.get(CORES_FLAG)
-        if raw_cores is None:
-            raise ValueError(
-                f"{REPORT_FLAG} requires {CORES_FLAG}: the distribution is read against "
-                "the host's core count, and guessing one would judge with a number "
-                "nobody chose"
-            )
-        if not raw_cores.isdigit() or int(raw_cores) <= 0:
-            raise ValueError(f"{CORES_FLAG} must be a positive integer, got {raw_cores!r}")
-        return _report(report_path, cores=int(raw_cores), host_name=parsed.get(HOST_FLAG))
+        return _report(report_path, cores=_parse_cores(parsed), host_name=parsed.get(HOST_FLAG))
     return _audit(hosts)
+
+
+def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
+    """Refuse a per-machine mode invoked without a machine.
+
+    Args:
+        parsed: The parsed flags.
+        flag: The mode flag needing a host.
+        why: The clause naming why one machine must be chosen.
+
+    Raises:
+        ValueError: When ``--host`` is absent.
+    """
+    if parsed.get(HOST_FLAG) is None:
+        raise ValueError(f"{flag} requires {HOST_FLAG}: {why}, and defaulting one would be a guess")
+
+
+def _split_flag(raw: str | None, *, default: tuple[str, ...]) -> tuple[str, ...]:
+    """A comma-separated flag value as a tuple.
+
+    Args:
+        raw: The flag's value, or None when absent.
+        default: What absence means.
+
+    Returns:
+        The non-empty entries, or the default.
+    """
+    if raw is None:
+        return default
+    return tuple(entry for entry in raw.split(",") if entry)
+
+
+def _parse_cores(parsed: dict[str, str]) -> int:
+    """The validated ``--cores`` value for a report.
+
+    Args:
+        parsed: The parsed flags.
+
+    Returns:
+        The core count.
+
+    Raises:
+        ValueError: When absent or not a positive integer -- the
+            distribution is read against the host's core count, and
+            guessing one would judge with a number nobody chose.
+    """
+    raw_cores = parsed.get(CORES_FLAG)
+    if raw_cores is None:
+        raise ValueError(
+            f"{REPORT_FLAG} requires {CORES_FLAG}: the distribution is read against "
+            "the host's core count, and guessing one would judge with a number "
+            "nobody chose"
+        )
+    if not raw_cores.isdigit() or int(raw_cores) <= 0:
+        raise ValueError(f"{CORES_FLAG} must be a positive integer, got {raw_cores!r}")
+    return int(raw_cores)
 
 
 def entrypoint() -> None:
@@ -326,9 +475,12 @@ def entrypoint() -> None:
 __all__ = [
     "CORES_FLAG",
     "HOST_FLAG",
+    "ONBOARD_FLAG",
+    "PYTHON_FLAG",
     "RENDER_FLAG",
     "REPORT_FLAG",
     "SAMPLE_FLAG",
+    "SIDES_FLAG",
     "SPEC_FLAG",
     "entrypoint",
     "load_runner_spec",

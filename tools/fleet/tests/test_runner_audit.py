@@ -53,6 +53,7 @@ def _host(
             RunnerInstall(
                 repo="wagner-austin/API",
                 runner_name="lavender-wsl",
+                side="wsl",
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-api-1/_work",
                 labels=["lavender-wsl"],
@@ -106,8 +107,8 @@ class TestExpectedChecks:
             "memory-floor:26gb",
             "gpu:nvidia-smi",
             "timer:ci-clean.timer",
-            "service:actions.runner.wagner-austin-API.lavender-wsl.service",
-            "workdir:wagner-austin/API:lavender-wsl",
+            "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
+            "workdir:wagner-austin/API:wsl:lavender-wsl",
             "asset:/opt/corvis/rw-game/game-lib.jar",
             "sha256:/opt/corvis/rw-game/game-lib.jar",
             "asset:/data",
@@ -124,8 +125,8 @@ class TestExpectedChecks:
         )
         ids = [check["check_id"] for check in runner_audit.expected_checks(spec)]
         assert ids == [
-            "service:actions.runner.wagner-austin-API.lavender-wsl.service",
-            "workdir:wagner-austin/API:lavender-wsl",
+            "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
+            "workdir:wagner-austin/API:wsl:lavender-wsl",
         ]
 
 

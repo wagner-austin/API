@@ -40,6 +40,7 @@ def _install(**overrides: JSONValue) -> dict[str, JSONValue]:
     raw: dict[str, JSONValue] = {
         "repo": "wagner-austin/API",
         "runner_name": "lavender-wsl",
+        "side": "wsl",
         "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
         "workdir": "/home/gharunner/actions-runner-api-1/_work",
         "labels": ["lavender-wsl"],
@@ -114,6 +115,31 @@ class TestRunnerInstall:
     def test_empty_labels_are_refused_because_nothing_could_target_the_runner(self) -> None:
         with pytest.raises(JSONTypeError, match="unreachable"):
             decode_runner_install(_install(labels=[]))
+
+    def test_a_windows_install_round_trips(self) -> None:
+        decoded = decode_runner_install(
+            _install(
+                side="windows",
+                runner_name="lavender",
+                service="actions.runner.wagner-austin-API.lavender",
+                workdir="C:/actions-runner-api/_work",
+                labels=["lavender"],
+            )
+        )
+        assert decoded["side"] == "windows"
+
+    @pytest.mark.parametrize("side", ["linux", "host", ""])
+    def test_an_unknown_side_is_refused(self, side: str) -> None:
+        with pytest.raises(JSONTypeError, match="must be 'wsl' or 'windows'"):
+            decode_runner_install(_install(side=side))
+
+    def test_a_wsl_install_with_a_windows_workdir_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="absolute POSIX path"):
+            decode_runner_install(_install(workdir="C:/actions-runner/_work"))
+
+    def test_a_windows_install_with_a_posix_workdir_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="drive-letter path"):
+            decode_runner_install(_install(side="windows"))
 
 
 class TestFileAsset:
@@ -260,7 +286,13 @@ class TestRunnerSpec:
         assert decode_runner_spec(dict(encode_runner_spec(spec))) == spec
         lavender = spec["hosts"][0]
         assert lavender["name"] == "lavender"
-        assert len(lavender["installs"]) == 6
+        # The full box, both execution environments: eight wsl-side installs
+        # (2 API + 4 MCPs + portable-claude + tree-bot) and three
+        # windows-side ones (MCPs, portable-claude, tree-bot) -- the count
+        # measured from the live services on 2026-09-09.
+        sides = [install["side"] for install in lavender["installs"]]
+        assert sides.count("wsl") == 8
+        assert sides.count("windows") == 3
         pinned = [asset for asset in lavender["assets"] if asset["sha256"] is not None]
         assert len(pinned) == 1
         assert pinned[0]["manual"] is True

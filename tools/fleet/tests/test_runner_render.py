@@ -41,6 +41,7 @@ def _host(
             RunnerInstall(
                 repo="wagner-austin/API",
                 runner_name="lavender-wsl",
+                side="wsl",
                 service="actions.runner.wagner-austin-API.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-1/_work",
                 labels=["lavender-wsl"],
@@ -48,6 +49,7 @@ def _host(
             RunnerInstall(
                 repo="wagner-austin/MCPs",
                 runner_name="lavender-wsl",
+                side="wsl",
                 service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
                 workdir="/home/gharunner/actions-runner-2/_work",
                 labels=["lavender-wsl", "linux-ci"],
@@ -97,6 +99,24 @@ class TestWindowsScript:
         assert "/tn 'wsl-keepalive'" in script
         assert "schtasks /run /tn 'wsl-keepalive'" in script
         assert "sleep infinity" in script
+
+    def test_a_windows_side_install_joins_the_windows_script(self) -> None:
+        spec = _host()
+        windows_install = RunnerInstall(
+            repo="wagner-austin/tree-bot",
+            runner_name="lavender",
+            side="windows",
+            service="actions.runner.wagner-austin-tree-bot.lavender",
+            workdir="C:/actions-runner-tree-bot/_work",
+            labels=["lavender"],
+        )
+        spec["installs"].append(windows_install)
+        script = runner_render.render_provision(spec)["windows_script"]
+        expected_block = "\n".join(runner_render.render_windows_install_lines(windows_install))
+        assert expected_block in script
+        # And it never leaks into the Linux script, whose environment
+        # cannot run it.
+        assert "config.cmd" not in runner_render.render_provision(spec)["linux_script"]
 
     def test_a_host_declaring_neither_says_so_instead_of_vanishing(self) -> None:
         rendered = runner_render.render_provision(
