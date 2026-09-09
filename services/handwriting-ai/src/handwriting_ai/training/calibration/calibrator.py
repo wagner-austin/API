@@ -76,6 +76,18 @@ def calibrate_input_pipeline(
 
     # Compute budgets based on observed environment and thresholds (subprocess-only)
     # Use current snapshot for start gate; use conservative aborts for <1GB tiers
+    #
+    # The timeouts exist to catch HUNG candidates, not to race healthy ones:
+    # a healthy candidate returns when it finishes regardless of the ceiling,
+    # so the ceiling's only job is bounding how long a genuinely wedged
+    # subprocess can stall a stage (max_failures then breaks the circuit).
+    # They were 45s/60s until 2026-09-09, which raced healthy candidates on
+    # a loaded shared CI host: candidate BOOT alone (python + torch import
+    # under WSL with co-tenant suites) measured 8-15s of the 45s before any
+    # training began, and three stage-A timeouts followed across four runs.
+    # 4x keeps hang detection (a wedged candidate still fails, minutes
+    # instead of seconds, in a training path that runs far longer) and stops
+    # charging the budget for the host's disk cache.
     snap = _test_hooks.get_memory_snapshot()
     mem_limit_mb = snap["cgroup_usage"]["limit_bytes"] // (1024 * 1024)
     stage_a_budget: BudgetConfig
@@ -84,26 +96,26 @@ def calibrate_input_pipeline(
         stage_a_budget = {
             "start_pct_max": 80.0,
             "abort_pct": 85.0,
-            "timeout_s": 45.0,
+            "timeout_s": 180.0,
             "max_failures": 2,
         }
         stage_b_budget = {
             "start_pct_max": 83.0,
             "abort_pct": 88.0,
-            "timeout_s": 60.0,
+            "timeout_s": 240.0,
             "max_failures": 2,
         }
     else:
         stage_a_budget = {
             "start_pct_max": 85.0,
             "abort_pct": 90.0,
-            "timeout_s": 45.0,
+            "timeout_s": 180.0,
             "max_failures": 2,
         }
         stage_b_budget = {
             "start_pct_max": 88.0,
             "abort_pct": 92.0,
-            "timeout_s": 60.0,
+            "timeout_s": 240.0,
             "max_failures": 2,
         }
 
