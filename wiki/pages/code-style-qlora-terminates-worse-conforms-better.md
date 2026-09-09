@@ -200,26 +200,39 @@ correction[^12]. Picking the row that keeps a p-value under
 0.05 is exactly the move this table exists to make visible, and it is not made
 here.
 
-**Every figure here is one realization of the decode, and there is no second
-one.** `seed` is 0 in all six of this project's committed run documents, v1
-and v2, both arms; no document carries a seeds list and the axis has never
-been varied.[^13] The two arms *sharing* a seed is deliberate and correct —
-it is what makes the decode paired — but never moving it across runs means
-this project has no noise floor at all. McNemar conditions on the discordant
-pairs, which handles item-level pairing; it says nothing about
-decode-to-decode variance, and re-running at seed 1 would have both arms emit
-different completions and therefore a different 2x2 table.
+**The decode is deterministic, measured across three seeds and three nodes.**
+An earlier version of this section said the opposite -- that every figure was
+one realization and re-running at another seed would emit different
+completions and a different 2x2 table. That was reasoning from the specs,
+where `seed` is 0 in all six committed run documents.[^13] It is wrong, and
+the seed axis run to test it is what showed so.[^15]
 
-Unlike the clustering limit above, this one **cannot be bounded here**. A
-range needs at least two seeds and this corpus has one[^13], so the size of
-the effect is unknown rather than estimated — stating an interval would be
-inventing it. What can be said is which results are exposed: termination at
-−204 items of 875 and mid-p 2e-28 would survive essentially any plausible
-decode variance, while the guards gain of +18 on 282 items is now the same
-result flagged for a third independent reason — below its own MDE, over
-non-independent units, and from a single decode. Three reasons to read it as
-directional, and the case for not calling it a result until a seed axis
-exists.
+Three base runs at seeds 0, 1 and 2 -- same adapter, same holdout, same card
+model, differing in `seed` and nothing else -- produced BYTE-IDENTICAL
+finished-sets: payload digest `sha256:db1795e0...` and 564 of 875 completions
+finished, in all three. They ran on three different nodes (k54-01, l54-07,
+l54-08) on different days over a preemptible partition.[^15]
+
+The mechanism is in the generator, not in the run documents. Continuation
+decoding passes `do_sample=False` -- its own docstring says "Whether to
+sample. Always False here" -- so there is no sampling for a seed to control.
+`torch.manual_seed` IS called, once per batch, and the function says why: a
+batch's result stays independent of how many batches preceded it, so a run
+resumed after preemption reproduces what it redoes rather than replacing it
+plausibly. The seed is a determinism GUARANTEE, not a variance axis.[^15]
+
+So there is no decode variance to bound, and the old caveat overstated the
+uncertainty rather than understating it. **What this does not rescue is the
+clustering limit above**, which is about correlation BETWEEN ITEMS and is
+untouched by any amount of run-to-run determinism. The guards gain of +18 on
+282 items therefore stands flagged for two reasons, not three: below its own
+MDE, and over non-independent units.
+
+And this instrument still has **no declared smallest effect of interest**, so
+nothing here says whether an effect it can resolve is one anyone would act
+on. A noise floor was going to anchor that number without anyone choosing it;
+the floor is exactly zero, `SEI >= 0` constrains nothing, and inventing one
+instead is the move this page has refused twice already.
 
 ## What each null could have detected
 
@@ -328,6 +341,21 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
+[^15]: Jobs 55877275 (`gen-v2-base-s1`, 7998s, hpc3-gpu-l54-07) and 55877509
+       (`gen-v2-base-s2`, 7879s, hpc3-gpu-l54-08), against the existing
+       55809956 (`gen-v2-base`, 6297s, hpc3-gpu-k54-01). Records at
+       `/pub/wagnera3/code-style/results/gen-v2-base{,-s1,-s2}.json`; the
+       `payload_digest` is a digest over which items finished, so it moves if
+       the decode moves. Specs staged and certified via
+       `tools/hpc3/runs/code-style-specs-v2-seeds-stage.json`, each differing
+       from its own arm's seed-0 spec in exactly `seed` and `label`, verified
+       before staging. Mechanism read from
+       `services/Model-Trainer/src/model_trainer/core/services/model/continuations.py`
+       at HEAD -- `do_sample=False` and the per-batch `torch.manual_seed`
+       rationale in the same function's docstring. The acceptance for this
+       reading was posted to board task bc307caa at 19:34Z, BEFORE the jobs
+       finished: three distinct digests would have meant the seed varied the
+       decode, any two identical meant stop and compute no floor.
 [^14]: Discordant counts recomputed per checker over
        `runs/gen-v2/{base,candidate}.outcomes.jsonl` joined on `item_id`:
        aggregate mypy 54, all-three 29; both-finished mypy 30, all-three 24;
