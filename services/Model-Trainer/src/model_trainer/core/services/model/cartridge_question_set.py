@@ -24,9 +24,9 @@ from collections import Counter
 from collections.abc import Sequence
 
 from model_trainer.core.contracts.cloze import ClozeItem
+from model_trainer.core.contracts.qa_plan import QaPlan
 from model_trainer.core.encoding import Encoder
 from model_trainer.core.services.model.cartridge_corpus import window_documents
-from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
 from model_trainer.core.services.model.corpus_cloze import build_items
 
 

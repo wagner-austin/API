@@ -63,7 +63,7 @@ from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_
 from platform_core.minimum_detectable_effect import mcnemar_power
 from platform_core.power_distributions import McNemarTest
 
-from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
+from model_trainer.core.contracts.qa_plan import QaPlan
 
 #: How far the search for a rejecting discordant count runs before giving up.
 #: The smallest rejecting count is 5 to 8 across the variants and alphas this

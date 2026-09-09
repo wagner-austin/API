@@ -28,7 +28,7 @@ import pytest
 
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_qa_benchmark as bench
-from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
+from model_trainer.core.contracts.qa_plan import QaPlan
 from tests._qa_benchmark_support import (
     DOCUMENTS,
     TINY_PLAN,

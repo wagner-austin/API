@@ -20,6 +20,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Protocol
 
+from model_trainer.core.contracts.qa_plan import QaPlan
+
 # Safe at module scope for the same reason `probe_shapes` is: a table of
 # TypedDicts, a digest and a label formatter, importing no torch. The arms it
 # describes live in `cartridge_measurement`, which does.
@@ -39,7 +41,7 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
     BaseLoraSweepPlan,
     VariedCompanionSweepPlan,
 )
-from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
+from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
 from model_trainer.core.services.model.editing.triple_edit_plans import (
     TRIPLE_EDIT_PLANS,
     TripleEditPlan,

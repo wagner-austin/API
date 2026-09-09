@@ -46,6 +46,7 @@ from platform_core.run_record import (
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.cloze import BLANK_MARKER
+from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.contracts.replicated_measurement import (
     gain_observations,
     per_seed_observations,
@@ -78,7 +79,6 @@ from model_trainer.core.services.model.cartridge_qa_arms import (
     reranked_retrieval_items,
     retrieval_items,
 )
-from model_trainer.core.services.model.cartridge_qa_plans import QA_EXPERIMENT, QaPlan
 from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set
 from model_trainer.core.services.model.cartridge_qa_report import (
     ArmScores,

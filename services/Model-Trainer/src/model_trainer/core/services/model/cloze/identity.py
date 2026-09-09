@@ -46,7 +46,7 @@ from collections.abc import Sequence
 from platform_core.json_utils import JSONValue, dump_json_str
 
 from model_trainer.core.contracts.cloze import ClozeItem, encode_cloze_item
-from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
+from model_trainer.core.contracts.qa_plan import QaPlan
 
 QUESTION_SET_DIGEST_PREFIX = "sha256:"
 """What a digest from this module starts with, so a reader knows the algorithm."""

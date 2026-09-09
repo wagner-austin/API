@@ -32,7 +32,7 @@ from platform_ml.determinism import (
 )
 
 from model_trainer.cli import cartridge_qa_benchmark as bench
-from model_trainer.core.services.model.cartridge_qa_plans import QA_EXPERIMENT
+from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT
 from tests._qa_benchmark_support import (
     DOCUMENTS as _DOCUMENTS,
 )

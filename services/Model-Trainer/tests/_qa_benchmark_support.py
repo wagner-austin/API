@@ -31,10 +31,10 @@ from platform_core.run_record import Observation
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
+from model_trainer.core.contracts.qa_plan import QaPlan
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_dense import EmbedderProto
-from model_trainer.core.services.model.cartridge_qa_plans import QaPlan
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import LMModelProto

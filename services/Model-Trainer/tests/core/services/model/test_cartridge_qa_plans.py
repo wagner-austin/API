@@ -12,17 +12,15 @@ from __future__ import annotations
 
 import pytest
 
+from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.contracts.replicated_measurement import MIN_SEEDS
 from model_trainer.core.services.model.cartridge_plans import (
     CARTRIDGE_EXPERIMENT,
     corpus_digest,
     require_cartridge_plan,
 )
-from model_trainer.core.services.model.cartridge_qa_plans import (
-    QA_EXPERIMENT,
-    QA_PLANS,
-    QaPlan,
-)
+from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
+from model_trainer.core.services.model.cartridge_qa_power import resolvable_floor
 from model_trainer.core.services.model.cloze.identity import qa_plan_label
 
 #: The scale ladder: one field moves, and it is the base model.
@@ -204,6 +202,54 @@ class TestThePlanTable:
         """
         assert QA_EXPERIMENT == "cartridge-question-set"
         assert QA_EXPERIMENT != CARTRIDGE_EXPERIMENT
+
+
+class TestTheFullWikiPlan:
+    """The plan whose cap does not bind, and why that is the point.
+
+    Every other plan in the table declares a `max_items` at or below what its
+    corpus yields, so the CAP is the instrument's limit and the corpus is
+    hidden behind it. This one is the reverse, and the tests assert that
+    property rather than the number.
+    """
+
+    def test_its_cap_exceeds_what_its_corpus_can_yield(self) -> None:
+        """Measured 2026-09-09: ~/PROJECTS/wiki offers 3,735 items at gpt2.
+
+        A cap at or under that would make this plan's item count a fact about
+        this file rather than about the corpus, which is exactly how a
+        240-item cap came to be read as an unavailable instrument.
+        """
+        assert QA_PLANS["gpt2-full-wiki-qa"]["max_items"] > 3735
+
+    def test_it_resolves_the_effect_every_plan_declares(self) -> None:
+        """The corpus clears the declared effect with real margin.
+
+        At 3,735 items the floor is 0.00134 against a declared 0.02. Asserted
+        through the gate rather than by arithmetic written here, so the two
+        cannot drift.
+        """
+        plan = QA_PLANS["gpt2-full-wiki-qa"]
+
+        assert (
+            resolvable_floor(3735, plan["alpha"], plan["mcnemar_test"])
+            < (plan["smallest_effect_of_interest"])
+        )
+
+    def test_it_re_runs_the_retracted_comparison_rather_than_a_new_one(self) -> None:
+        """gpt2 is where the cartridge was reported to lose to every retriever.
+
+        A larger rung on an untrusted instrument answers a question nobody
+        asked; the same rung on a fifteen-times finer one answers the question
+        that was withdrawn.
+        """
+        plan = QA_PLANS["gpt2-full-wiki-qa"]
+        retracted = QA_PLANS["gpt2-wiki-qa"]
+
+        assert plan["model_id"] == retracted["model_id"] == "gpt2"
+        assert plan["num_slots"] == retracted["num_slots"]
+        assert plan["max_seq_len"] == retracted["max_seq_len"]
+        assert plan["distractor_count"] == retracted["distractor_count"]
 
 
 class TestQaPlanLabel:

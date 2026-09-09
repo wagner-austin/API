@@ -13,7 +13,8 @@ from platform_core.error_codes import ModelTrainerErrorCode
 from platform_core.errors import AppError
 from platform_core.power_distributions import McNemarTest
 
-from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS, QaPlan
+from model_trainer.core.contracts.qa_plan import QaPlan
+from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
 from model_trainer.core.services.model.cartridge_qa_power import (
     require_resolvable_question_set,
     resolvable_floor,
