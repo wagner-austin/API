@@ -106,7 +106,18 @@ services:
     # with margin — interrupting the wait is safe, the manager owns
     # the drain.
     stop_grace_period: 10m
-    restart: "no"
+    # The MANAGER restarts; bots never do. An idle manager costs
+    # nothing and touches no game server — bots spawn only on a
+    # viewer's /demo/spawn press and each is a bounded session — so
+    # the no-relaunch rationale on the `bot` service below does not
+    # apply here. Was `restart: "no"` until 2026-09-09, which left
+    # the public demo dead for ~1h after Windows Update force-
+    # rebooted the host (10:31Z): Docker came back, the fleet did
+    # not, and austinwagner.org/tankpit answered with an empty
+    # fleet until an operator ran `make up`. `unless-stopped`
+    # preserves the drain semantics: `make down`'s compose stop
+    # still parks it until the next `make up`.
+    restart: unless-stopped
 
 
   bot:
