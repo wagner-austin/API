@@ -1,0 +1,34 @@
+{
+  "project": "mi",
+  "name": "cartridge-solo-grid-7b-bf16-a30-v47",
+  "image": {
+    "path": "/pub/wagnera3/images/v47/abl.sif",
+    "sha256": "290794b0d13810fe2188a56ffcc5feb1ec152c081c02a4bb9144822d07a4fa9c",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 600,
+  "mem_gb": 64,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_solo_grid --model-id EleutherAI/pythia-6.9b --precision stored-bf16 --corpus /pub/wagnera3/mi/cartridge/corpus-me --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-solo-grid-7b-bf16-a30-v47.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-solo-grid-7b-bf16-a30-v47.json",
+  "experiment": {
+    "measurement": "cartridge-solo-grid",
+    "base_model": "EleutherAI/pythia-6.9b",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "seeds": "7.8.9.10.11.12.13.14.15",
+    "geometry": "w256-s4-c64-e12-lr0.01-from-the-recorded-gpt2-base-lora-row",
+    "image_commit": "fcb39991ff314cb6b75634d995eef57eb75d06a1",
+    "baseline_record": "445e345f-bf16-nine-seed-the-anchor-cell-must-reproduce-it",
+    "why": "the-hyperparameter-rung-operator-directed-can-architecture-scaled-knobs-reach-the-measured-headroom-reliably",
+    "gpu_pinned_because": "bf16-7b-weights-13.8GB-plus-training-need-24GB-and-the-nf4-pair-ran-on-a30",
+    "model_snapshot": "c0e3eee36dc47af0c49f361c74cfe459c09f7f23",
+    "precision": "stored-bf16-unquantized-declared-by-policy-nf4-removed",
+    "grid": "lr0.001.0.003.0.01.0.03-x-c64.256-anchor-lr0.01c64"
+  },
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  }
+}
