@@ -21,13 +21,14 @@ nobody acts on.
 from __future__ import annotations
 
 import datetime
+from typing import Final
 
 from typing_extensions import TypedDict
 
 from lock_wake.journal import LockEvent
 
 #: Kinds that make a hold worth a line in the post.
-BOUNDARY_KINDS = ("acquired", "released", "failed", "timeout")
+BOUNDARY_KINDS: Final = ("acquired", "released", "failed", "timeout")
 
 
 class Announcement(TypedDict):

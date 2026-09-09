@@ -27,7 +27,7 @@ always carry the key, empty when the invoking shell exported no label.
 from __future__ import annotations
 
 import pathlib
-from typing import Literal
+from typing import Final, Literal
 
 from platform_core.json_utils import (
     JSONTypeError,
@@ -43,7 +43,7 @@ from lock_wake import _test_hooks
 #: Every transition kind the lock wrapper writes, in lifecycle order.
 #: Pinned as data so a new kind in the journal is a loud decode refusal
 #: here rather than a silently mis-summarised cascade.
-EVENT_KINDS = ("requested", "waiting", "acquired", "step", "released", "failed", "timeout")
+EVENT_KINDS: Final = ("requested", "waiting", "acquired", "step", "released", "failed", "timeout")
 
 
 class LockEvent(TypedDict):
