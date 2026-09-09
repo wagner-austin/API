@@ -809,15 +809,30 @@ entry point that builds a `RunRecord` and is named nowhere here.
   cell's own `1024 - num_slots`, or the smallest cartridge would also carry
   the largest evidence budget.
 
-- **Known gaps, filed rather than implied.** There is still **no
-  long-context arm** — the corpus in the context window is the real
-  competitor to a cartridge, and every verdict this command has produced is
-  silent about it. BM25's `K1`, `B` and `RETRIEVED_CHUNKS` are still module
-  constants rather than declared, swept plan fields, so the retrieval arms
-  are three fixed points with no parameter sweep, no reranker and no query
-  expansion. And **no run document is committed yet, deliberately**: no
-  registered image carries the post-`cdb84e12` code, so a committed run
-  naming one would assert something untrue — the same position
+- **The two gaps filed at registration are closed** (`baca6369`,
+  `643757bd`). BM25's `K1`, `B` and `RETRIEVED_CHUNKS` were module constants,
+  so "the cartridge beats BM25" named one arbitrary point in a parameter
+  space; they are now `bm25_k1`, `bm25_b` and `retrieved_chunks` on the plan,
+  carried on the index so a record reports the retriever that actually ran.
+  And a **long-context arm** exists: `long_context_items` hands the model the
+  corpus whole and lets the window truncate it.
+
+  **Read its coverage before its accuracy.** The arm reports
+  `long_context_corpus_fraction`, and it has to. `with_evidence` keeps the
+  OPENING of the evidence and drops the rest — its docstring claimed the
+  opposite until 2026-09-09 — so where the corpus overflows the window this
+  arm is not "the corpus in context" but "the first few per cent of it,
+  chosen by document order". At the current rungs the me-wiki corpus is
+  15,602 tokens against a 896-token budget, so the arm carries about 6% and a
+  cartridge beating it has beaten almost nothing. It becomes the honest
+  long-context baseline only as that fraction approaches 1, which is an
+  argument for the bigger bases and the bigger corpora rather than for the
+  arm's absence.
+
+- **Still open.** No reranker and no query-expansion arm, so the search side
+  is parameterised but not yet widened. And **no run document is committed,
+  deliberately**: no registered image carries the post-`cdb84e12` code, so a
+  committed run naming one would assert something untrue — the same position
   `cartridge_composition_sweep` held until image v32.
 
 ### `mi-cu128` — the Blackwell determinism baseline
