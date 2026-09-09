@@ -41,6 +41,8 @@ provenance:
   - "the triple-edit arm has NO seed axis: the value search starts from zeros and is deterministic given the plan, so its accuracy differences carry no noise floor and only gpt2-xl's exact zero across thirteen edits is a statement"
   - "board tasks d3639e09 (weight injection), d3742672 (steering vectors), 1fc5afed (cartridges -- its closure result is WRONG, see the 23:08Z note on that task), ac5f88cb (scale ladder, done), a8f799c5 (retrieval methods, done), 3fc98ed6 (corpus representation, measured 2026-09-09, held open on the shallower-site caveat), 74dd514e (persona adapter, never started)"
   - "AKEW figures from wiki page wu-2024-akew-editing-in-the-wild in the personal wiki, read page by page"
+  - "RETRACTED 2026-09-09, same day it was published: the claim that the cartridge beats lexical, dense and fused retrieval. The accuracy numbers in the table are unchanged and were not the error -- reading a 1.7-item and a 1.3-item margin out of 32 as a lead was. McNemar exact on 32 paired items cannot declare a net difference below 6 items significant under any arrangement of the discordant pairs, since the most favourable configuration for a net of d gives p = 2*(0.5)^d. The cartridge-vs-base rows (+8.7, +8.3 items) clear that floor and survive; the cartridge-vs-retrieval rows never did. The floor was never computed before publication, which is the defect, not the size of the number."
+  - "RETRACTED 2026-09-09 in the same pass, and not part of the headline, which is why it needed a second reading: 'dense retrieval loses to plain BM25 at every rung'. The margins are 1, 3, 1 and 1 items of 32, all under the same floor. Dense was not shown to retrieve worse -- it was shown to be unresolvable from BM25 on this question set. The four rungs agreeing is not four pieces of evidence; it is one 32-item set scored four times. What still clears the floor in that comparison is the ORACLE GAP: fused retrieval trails the oracle by 6 to 8 items at every rung."
 fact_checked: "2026-09-09"
 confidence: high
 hubs: [services]
@@ -55,9 +57,19 @@ each produced its own page, so the program has never been written down as
 one thing. A reader arriving at any single page cannot tell which of four
 attempts they are looking at, or which of them are answered.
 
-**The answer is yes, from about 774M parameters.** It was recorded as *no*
-for a day, on a 124M measurement from an instrument that examined nine of
-the twelve pages it trained on.
+**The answer is yes from about 774M parameters — against the un-augmented
+base, and only against that.** It was recorded as *no* for a day, on a 124M
+measurement from an instrument that examined nine of the twelve pages it
+trained on.
+
+**Read the scope of that sentence carefully, because it was written wider on
+2026-09-09 and had to be narrowed the same day.** A cartridge answers 8.7
+more of 32 questions at 774M than the same model with nothing attached, and
+that margin clears the smallest difference this question set can resolve.
+Whether it beats RETRIEVING the same corpus at query time is a separate
+question and is **not answered here**: the cartridge−BM25 margin is 1.7
+items, and 32 paired items cannot resolve fewer than 6. The arithmetic is
+under *The retrieval comparison, and why it is not a result*, below.
 
 This page is the index. It carries no measurement of its own.
 
@@ -67,7 +79,7 @@ This page is the index. It carries no measurement of its own.
 |---|---|---|
 | Weight injection | rank-one edit into the parameters | **No, and now measured rather than argued** — hand-curated triples clear the bar 13 times in 20, every edit lands at every scale, and no rung answers one more question |
 | Steering vectors | add a direction to the residual stream | **No** — composition degrades to nothing |
-| Cartridges | train a KV prefix, serve it ahead of the query | **Yes from ~774M** — beats lexical, dense AND fused retrieval on accuracy; cheaper per request than dense and fused everywhere, and than BM25 at 1.5B |
+| Cartridges | train a KV prefix, serve it ahead of the query | **Yes against the un-augmented base from ~774M** — +8.7 and +8.3 items of 32, clearing the instrument's floor. **NOT established against retrieval**: the cartridge−BM25 margin is 1.7 and 1.3 items, below anything 32 items can resolve (retracted 2026-09-09, see below). Cheaper per request than dense and fused everywhere, and than BM25 at 1.5B |
 | Persona adapter | not started | untested |
 
 The cartridge row said **No** until 2026-09-08. That verdict came from a
@@ -201,7 +213,7 @@ The arm's own S0 gate concluded that building a local harness would replicate
 known results below the state of the art. What shipped instead was the corpus
 update — four papers into the personal wiki.
 
-## Cartridges: the arm that crosses every retriever between 355M and 774M
+## Cartridges: the arm that beats its own base from 774M
 
 The only arm carried to a full comparison on real data. Four model sizes, the
 same 32 held-out questions about the 12 public me-wiki pages, one card, one
@@ -227,25 +239,85 @@ separately (BM25 ~4.6 ms, dense ~340 ms, both one-time):
 | gpt2-large 774M | 177.4 | **170.5** | 195.3 | 196.8 |
 | gpt2-xl 1.5B | **250.7** | 270.5 | 299.4 | 309.5 |
 
-**The cartridge overtakes every retriever on accuracy between 355M and
-774M.** It is also cheaper per request than dense and fused at every rung,
+~~**The cartridge overtakes every retriever on accuracy between 355M and
+774M.**~~ **RETRACTED 2026-09-09. That sentence read a difference this
+instrument cannot resolve.** What it is cheaper than survives — the latency
+table is a per-request measurement, not a 32-item comparison — so the
+cartridge is still cheaper per request than dense and fused at every rung,
 and cheaper than BM25 at 1.5B.
 
-**Dense retrieval is the surprise, and it is a negative one.** It loses to
-plain BM25 at every rung, and fusing the two closes none of the gap to the
-oracle. The reason was predicted before it was measured, by
-`packages/wiki-search/src/fusion.ts` in the MCPs repo: a proper-noun query
-needs the lexical hit even where the vector arm ranks it nowhere. This
-corpus is project names — ClearGBM, NavProbe, TankpitBot — which is exactly
-what lexical matching rewards and embeddings blur. The dense arm contributes
-little, so reciprocal-rank fusion has little to fuse.
+### The retrieval comparison, and why it is not a result
 
-The shape is what makes it readable rather than the endpoint. Cartridge
-accuracy rises monotonically — 0.6042, 0.7292, 0.8021, 0.8229 — while BM25
-stays flat at 0.7500 / 0.7812 / 0.7500 / 0.7812. **BM25's flatness is
-expected and is the control**: it puts the answer's own sentence in the
-window, so the answer is nearly given and the reader's capacity barely
-matters. A rising curve and a flat one, crossing once.
+**The arithmetic, because the retraction is a number and not a doubt.**
+These arms are scored on the SAME 32 items, so the comparison is paired and
+McNemar's exact test is the one that applies. It reads only the discordant
+pairs — items one arm got right and the other wrong — and its most
+favourable possible configuration for a net difference of *d* items is
+*d* discordant pairs all falling one way, giving a two-sided
+p of 2·(0.5)^*d*. That is ≤ 0.05 only from *d* = 6 upward
+(*d* = 6 → p = 0.031; *d* = 5 → p = 0.063). **Six items of 32 is
+therefore the smallest net difference this question set can EVER declare
+significant, no matter how the pairs fall.**
+
+Against that floor:
+
+| comparison | rung | net difference | items of 32 | vs the 6-item floor |
+|---|---|---|---|---|
+| cartridge − base | 774M | +0.271 | +8.7 | clears it |
+| cartridge − base | 1.5B | +0.260 | +8.3 | clears it |
+| cartridge − BM25 | 774M | +0.052 | +1.7 | **below it** |
+| cartridge − BM25 | 1.5B | +0.042 | +1.3 | **below it** |
+
+So the two headline rows of the accuracy table were never a result. A margin
+of one or two items cannot reach significance at this n under any
+arrangement of the underlying pairs, which means the correct report is *not
+measured*, not *smaller than we hoped*.
+
+**Clearing the floor is necessary, not sufficient.** The cartridge−base rows
+pass the test of "could this n ever show it"; whether they DO is a question
+about the actual discordant split, which needs the per-item paired data and
+is not settled by the accuracy means alone. The floor rules things out. It
+does not rule them in.
+
+~~**Dense retrieval is the surprise, and it is a negative one. It loses to
+plain BM25 at every rung.**~~ **RETRACTED 2026-09-09 BY THE SAME FLOOR, and
+this one was not in the headline, which is why it took a second pass to
+catch.** Dense trails BM25 by 1, 3, 1 and 1 items across the four rungs —
+every one of them under 6. **Dense retrieval was not shown to lose here.**
+It was shown to be indistinguishable from BM25 on an instrument that cannot
+tell them apart, four times, which is a different sentence and a much
+duller one.
+
+That the four rungs all lean the same way is not four pieces of evidence: it
+is the same 32 items scored four times, so the agreement across rungs is
+mostly the agreement of one question set with itself.
+
+**What does survive is the oracle gap.** Fusing the two closes none of it —
+fused reads 0.7812 / 0.7500 / 0.7500 / 0.7812 against an oracle at 0.9688
+and then 1.0000, a shortfall of 6 to 8 items at every rung, which clears the
+floor at every rung. Something is being missed by both retrievers, and the
+prediction made before the measurement — by
+`packages/wiki-search/src/fusion.ts` in the MCPs repo, that a proper-noun
+query needs the lexical hit even where the vector arm ranks it nowhere —
+remains the plausible reading. **Plausible, not measured.** This corpus is
+project names, ClearGBM, NavProbe, TankpitBot, which is exactly what lexical
+matching rewards and embeddings blur; but the number that would show the
+dense arm contributing little is precisely the number the floor rejects.
+
+The shape is what makes the cartridge column readable rather than the
+endpoint. Cartridge accuracy rises monotonically — 0.6042, 0.7292, 0.8021,
+0.8229 — while BM25 stays flat at 0.7500 / 0.7812 / 0.7500 / 0.7812.
+**BM25's flatness is expected and is the control**: it puts the answer's own
+sentence in the window, so the answer is nearly given and the reader's
+capacity barely matters.
+
+**And the floor picks out the same rung the eye did, which is worth noting
+because it did not have to.** The cartridge−base gain is +5.3 items at 124M
+and +5.3 at 355M — under the floor — and +8.7 and +8.3 at 774M and 1.5B,
+over it. The "yes from ~774M" boundary in this page's headline was first
+drawn by looking at the curve against its seed spread; recomputing it as
+"the first rung whose gain a 32-item paired test could ever resolve" puts it
+in the same place.
 
 **What the ladder cannot say.** 32 items over 3 seeds on one corpus. Base
 accuracy is not clean across rungs (0.4375, 0.5625, 0.5312, 0.5625), so
@@ -301,17 +373,37 @@ narrow in three ways that still matter.
    fit. At that size there is nothing to compress, so the arm won on a
    question the technique is not designed around. That makes the win more
    surprising, not less caveated.
-3. ~~**Only lexical retrieval was beaten.**~~ **ANSWERED 2026-09-09, and the
-   answer inverted the caveat.** This page previously argued that beating
-   BM25 is not beating retrieval, because a dense retriever "would cost real
-   milliseconds and would also retrieve better". Half of that was right: a
-   dense query costs ~20 ms/item against BM25's ~1.5. The other half was
-   wrong — dense retrieves WORSE here, at every rung, and the fusion of the
-   two closes none of the oracle gap. The cartridge now leads all three
-   retrievers at 774M and 1.5B. Board `a8f799c5` carries the measurement.
+3. **No retrieval arm has been beaten, and this item has now been wrong
+   twice in opposite directions.** The history is kept because the second
+   error is the instructive one.
 
-   The caveat is struck rather than deleted because its REASONING was sound
-   and is what made the test worth running; only its prediction failed.
+   * It first read *"only lexical retrieval was beaten"* — arguing that
+     beating BM25 is not beating retrieval, because a dense retriever
+     "would cost real milliseconds and would also retrieve better".
+   * On 2026-09-09 it was rewritten to *"the cartridge now leads all three
+     retrievers at 774M and 1.5B"*, on the strength of the accuracy table
+     above. Board `a8f799c5` carries that measurement.
+   * **That rewrite is retracted the same day.** The lead it claimed was
+     1.7 and 1.3 items out of 32, and the smallest net difference this
+     question set can ever resolve is 6. There was no lead to report.
+
+   Of the original reasoning, the COST half survives and the RANKING half
+   does not. A dense query does cost ~20 ms/item against BM25's ~1.5 —
+   that is a per-request timing, not a 32-item comparison, and no floor
+   applies to it. But "dense retrieves worse here" fails the same test the
+   headline failed: the margins are 1, 3, 1 and 1 items. It was written
+   into this page as a finding on 2026-09-09 and is struck above. The one
+   ranking claim that clears the floor is the oracle gap, 6 to 8 items at
+   every rung, which says both retrievers miss something and does not say
+   which of them misses more.
+
+   **What the sequence should be read for.** The first version was a caveat
+   the author distrusted and tested. The second was the caveat's removal on
+   the first evidence that pointed the desired way, WITHOUT asking whether
+   the instrument could see a difference that size — and it went into a page
+   marked `confidence: high` on the same day it was measured. The failure is
+   not that the number was small. It is that no floor was computed before
+   the caveat was struck.
 
 4. **A stronger embedder is untested.** The dense arm ran `thenlper/gte-base`,
    chosen to match the family `wiki-search` deploys rather than to win. This

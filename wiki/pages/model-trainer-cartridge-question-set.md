@@ -1,5 +1,5 @@
 ---
-title: The cartridge does pick the fact out of a line-up, and the instrument that said otherwise skipped a quarter of the corpus
+title: The cartridge's line-up gain at 124M lands on the instrument's own floor, and the run that first denied it skipped a quarter of the corpus
 tags: [ml, model-trainer, cartridges, measurement, evaluation, retraction]
 related:
   - "[[corpus-attachment-program]]"
@@ -29,19 +29,32 @@ provenance:
   - "32 items generated mechanically from held-out windows, one per document; no item hand-written"
   - "RETRACTED: the 2026-09-04 run (qa-record.json, 24 items) and every number this page carried until 2026-09-09; see the retraction section for what was wrong and which way it moved"
   - "board task 1fc5afed-89a7-400e-b79e-378f322711c7 carries the original trail; ac5f88cb and a8f799c5 carry the corrected ladder"
+  - "SCOPE CORRECTION 2026-09-09, later the same day: the accuracy gain was reported against its own SEED SPREAD, which measures wobble between initialisations and not whether 32 paired items can resolve two arms. The arms answer the same 32 items, so McNemar exact applies -- confirmed by this page's own p-values, where BM25's +10 items reports 0.0020 = 2*(0.5)^10 and the oracle's +17 items reports 0.0000153 = 2*(0.5)^17. Its floor is 6 items: 2*(0.5)^5 = 0.063 cannot reject under any arrangement of the pairs. The cartridge gain is 6/5/5 items across seeds -- one on the boundary, two under it -- and 'loses to every retriever at this scale' (cartridge-BM25 = 4.7 items) is struck for the same reason. The answer-NLL gain is continuous and not governed by this floor."
 fact_checked: "2026-09-09"
-confidence: high
+confidence: medium
 hubs: [services]
 ---
 
-# The cartridge does pick the fact out of a line-up, and the instrument that said otherwise skipped a quarter of the corpus
+# The cartridge's line-up gain at 124M lands on the instrument's own floor
 
 Every earlier cartridge number in this repository was a held-out **loss**, and
 `core/contracts/cloze.py` already said why that is not enough: "a model can
 memorise text word-by-word and still fail every question about it." The
 question-set arm asks the other question. It first answered that a cartridge
-halves the surprise on a fact and cannot choose between corpus terms; that
-answer was wrong, and the way it was wrong is the more useful finding.
+halves the surprise on a fact and cannot choose between corpus terms; the
+instrument behind that answer was defective, and the way it was defective is
+the more useful finding.
+
+**Two corrections have now been applied to this page and they point opposite
+ways, so read the order.** The first (2026-09-08) fixed the instrument and
+moved the accuracy gain up, from +0.0972 to +0.1667. The second
+(2026-09-09, below) fixed how that gain was JUDGED, and moved the conclusion
+back down: +0.1667 of 32 items is 6 / 5 / 5 items across the three seeds,
+against a paired-test floor of 6, so **at 124M the accuracy result is at the
+edge of what this question set can resolve and is not a finding on its own**.
+What is NOT at the edge is the answer-token surprise: +7.8051 NLL against a
+seed spread of 1.1491 is a continuous measurement, not a count of discordant
+items, and the McNemar floor does not govern it.
 
 Every number below is an observation of record `qa-svc-gpt2.json`, emitted by
 `measure_qa_plan` under the names it gives them.[^rec]
@@ -63,10 +76,34 @@ same direction as the surprise gain rather than against it. Both instruments
 now say the same thing: reading the corpus made the model both less surprised
 by the answer and better at choosing it.
 
-It still **loses to every retriever at this scale**, including the weakest.
-That is not a defeat of the mechanism; it is where 124M parameters sits on the
-ladder. The cartridge crosses lexical, dense and fused retrieval between 355M
-and 774M, and that ladder is on [[corpus-attachment-program]].
+**The seed spread is the wrong yardstick for that claim, and this page said
+so on 2026-09-09 after saying the opposite.** Seed spread measures how much
+the arm wobbles between initialisations. It says nothing about whether 32
+paired items can resolve the difference between two arms — and that is the
+question, because every arm here answers the SAME 32 items, which makes the
+comparison paired and McNemar's exact test the one that applies.
+
+**Read the p-values already in the table above and the instrument names
+itself.** BM25's +0.3125 is 10 items of 32 and reports p = 0.0020; the
+oracle's +0.5313 is 17 items and reports p = 0.0000153. Both are exactly
+2·(0.5)^*k* for *k* = 10 and *k* = 17 — the two-sided exact probability of
+*k* discordant pairs all falling one way. So the test behind this column is
+McNemar exact, and its floor follows immediately: **a net difference of 5
+items cannot reach p ≤ 0.05 under ANY arrangement of the pairs** (2·0.5^5 =
+0.063), while 6 items can (0.031).
+
+The cartridge's gain is 6 / 5 / 5 items across the three seeds. **One seed
+of three sits on the boundary and two sit under it**, which is why no p is
+reported beside it while every retrieval row has one. The honest reading is
+that this instrument is at the edge of being able to see this effect at
+124M, not that it has seen it.
+
+~~It still **loses to every retriever at this scale**, including the
+weakest.~~ **STRUCK by the same arithmetic on 2026-09-09.** Cartridge−BM25
+here is −0.1458, which is 4.7 items — under the floor. The cartridge was not
+shown to lose to BM25 at 124M; the two are unresolvable on this question set.
+Where the ladder sits at larger scales is on [[corpus-attachment-program]],
+whose own retrieval headline was retracted the same day for the same reason.
 
 ## What was retracted, and which way it moved
 
@@ -107,6 +144,22 @@ The retraction is recorded rather than the numbers deleted, because the
 reasoning that produced the old verdict was sound: a gain inside its seed
 spread genuinely is not a finding, and refusing to report it was right on the
 evidence then available. Only the evidence was defective.
+
+**And the old verdict was closer to right than this section credited it,
+which is the third correction and the least comfortable one.** Fixing the
+instrument moved the gain from 2.3 items of 24 to 5.3 of 32 — larger, and
+still under the 6-item floor a 32-item paired test imposes. So "not a
+finding" survived the very correction that was supposed to overturn it. The
+sentence above says the old verdict fell to better evidence; what actually
+happened is that better evidence moved the number toward the threshold
+without carrying it across, and this page declared victory at the moment the
+number moved rather than at the moment it cleared anything.
+
+That is the transferable part, and it is not about cartridges. **A
+correction that moves a number in the direction you wanted is the single
+easiest place to stop checking.** The seed-spread comparison was available,
+flattering, and already in the record; the floor had to be computed, was
+not, and would have taken one line.
 
 ## The two runs were indistinguishable, and that is now fixed
 
