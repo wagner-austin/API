@@ -148,6 +148,49 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "distractor_count": 3,
         "max_items": 120,
     },
+    # THE POWERED PLANS, and the reason they exist is arithmetic rather than
+    # taste. The me-wiki corpus yields 32 items, and a comparison of two
+    # arm-gaps across two corpora at that n has a minimum detectable effect of
+    # 0.216 to 0.343 depending on how much the arms trade items -- larger than
+    # any difference this program has ever measured. Computed with
+    # `platform_core.minimum_detectable_effect` before these were added, not
+    # after a disappointing result.
+    #
+    # Everything except `max_items` is copied from `gpt2-wiki-qa` so a rung
+    # here differs from its me-wiki twin in the corpus and the item count
+    # alone. `max_items` is 240 because the api-codebase wiki offers 235 and
+    # 224 items in its raw and reshaped forms: a cap of 120 would have been
+    # the binding constraint rather than the corpus, and would have thrown
+    # away half the power the bigger corpus was chosen for.
+    #
+    # THE TWO SIDES ARE NOT EQUAL n (235 against 224) and that is correct.
+    # They are different question sets over different text; equalising them
+    # would mean discarding real items to make two incomparable numbers look
+    # comparable, which is the confusion this whole design is built to avoid.
+    "api-wiki-qa": {
+        "model_id": "gpt2",
+        "window": 256,
+        "held_out_stride": 4,
+        "num_slots": 128,
+        "max_seq_len": 896,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "distractor_count": 3,
+        "max_items": 240,
+    },
+    "gpt2-large-api-wiki-qa": {
+        "model_id": "gpt2-large",
+        "window": 256,
+        "held_out_stride": 4,
+        "num_slots": 128,
+        "max_seq_len": 896,
+        "seeds": (7, 8, 9),
+        "epochs": 12,
+        "learning_rate": 0.01,
+        "distractor_count": 3,
+        "max_items": 240,
+    },
 }
 
 
