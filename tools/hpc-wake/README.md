@@ -56,6 +56,48 @@ session id, so every run presents the same (label, session) pair and the
 board's one-session-one-label rule reads as a service contract. Restarts do
 not mint identities.
 
+## Scheduling
+
+The entry point is `scripts/run_cycle.py` — plain Python, registered as
+Windows scheduled task `corvis\hpc-wake` with a **native-binary action and
+an S4U principal**. Both halves of that are measured constraints from
+2026-09-09, not preferences:
+
+- Registered `LogonType=Interactive` (the original form), the scheduler
+  MISSES every trigger while no desktop session exists: 37 consecutive
+  missed runs after a Windows-Update reboot, `State: Ready`,
+  `Start-ScheduledTask` returning without running anything. Every wake on
+  the machine went silent for two hours.
+- Registered S4U with `powershell.exe` as the action, PowerShell itself
+  deadlocks before reaching any script (measured on this box by the
+  Docker-autostart work: stall at .NET assembly load, repeatable). A
+  native binary does not.
+
+Registration, once, from any interactive session:
+
+```powershell
+$py = (Get-Command python).Source
+$action = New-ScheduledTaskAction -Execute $py `
+  -Argument '"C:\Users\Test\PROJECTS\API\tools\hpc-wake\scripts\run_cycle.py"'
+$rep = New-TimeSpan -Minutes 3
+$t1 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval $rep
+$t2 = New-ScheduledTaskTrigger -AtStartup
+$t2.Repetition = $t1.Repetition
+$principal = New-ScheduledTaskPrincipal -UserId 'Test' -LogonType S4U -RunLevel Limited
+$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew `
+  -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+  -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+Register-ScheduledTask -TaskPath '\corvis\' -TaskName 'hpc-wake' `
+  -Action $action -Trigger $t1, $t2 -Principal $principal -Settings $settings -Force
+```
+
+The `AtStartup` trigger re-arms the cycle after a reboot with no logon;
+`IgnoreNew` keeps a slow cycle from stacking; the 30-minute limit kills a
+hung one so the next trigger is not silently skipped (the 2026-09-08
+outage mode). Health is read from `runs/cycle.log`: the LAST line must be
+a result, and the last header's AGE must be under a few minutes — a stale
+timestamp IS an outage even when the line under it looks healthy.
+
 ## Stated limitations
 
 - **A job `hpc3-triage` closes first is closed unannounced.** Both writers

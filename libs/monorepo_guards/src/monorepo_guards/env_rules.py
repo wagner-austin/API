@@ -20,6 +20,14 @@ class EnvRule:
     # `toml_utils.py` joined it on 2026-09-04 when the tomllib narrowing moved
     # out of `config/_test_hooks.py` into a public module. The number of files
     # importing tomllib did not change; only which one does.
+    #
+    # `run_cycle.py` joined it on 2026-09-09: it is the hpc-wake bridge's
+    # scheduled entry point, and a Windows scheduled task carries no shell
+    # profile, so this one file's PURPOSE is to assemble the child process's
+    # environment (inherited parent env plus the untracked credentials file)
+    # before handing over. Reading credentials stays in
+    # `board_watch.config.load_credentials`; this file only builds the
+    # context that loader runs in.
     _ALLOW_SUFFIXES: ClassVar[set[str]] = {
         "src/platform_core/toml_utils.py",
         "src/platform_core/config/_utils.py",
@@ -29,6 +37,7 @@ class EnvRule:
         "src/monorepo_guards/config_loader.py",
         "tests/test_config_loader.py",
         "tests/test_env_rules.py",
+        "tools/hpc-wake/scripts/run_cycle.py",
     }
 
     def _is_allowed(self, path: Path) -> bool:
