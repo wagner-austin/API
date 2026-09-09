@@ -165,10 +165,14 @@ comparison of continuous data, not on McNemar; it is cited for the magnitude of
 the hazard, not as a transferable rate.
 
 So this is now quantified as a *range* rather than dismissed or corrected. The
-honest reading is that the termination result at mid-p 2e-28 survives every
-row of that table, and the guards gain at mid-p 0.020 does not survive the
-coarser ones. Picking the row that keeps a p-value under 0.05 is exactly the
-move this table exists to make visible, and it is not made here.
+honest reading is that the termination result at mid-p 2e-28[^3] survives every
+row of that table, and the guards gain at mid-p 0.020 on 282 items[^9] does not
+survive the coarser ones. That subset carries its own cluster structure rather
+than the aggregate's — *k* = 14 / 53 / 186 over the same three units, effective
+*n* falling to 42 at the coarsest, again before the unequal-cluster
+correction[^12]. Picking the row that keeps a p-value under
+0.05 is exactly the move this table exists to make visible, and it is not made
+here.
 
 ## What each null could have detected
 
@@ -281,6 +285,9 @@ measured the sandbox.
        `tools/code-style-eval/runs/gen-v2/{base,candidate}.outcomes.jsonl`,
        grouping by the first path segment, the first two, and the containing
        directory: k = 14 / 64 / 336, largest package 165 files, median 5.
+       The same counting over the 282-item both-finished subset of [^9], which
+       has its own structure rather than the aggregate's: k = 14 / 53 / 186,
+       m = 20.1 / 5.3 / 1.5, effective n 42 to 275 at rho=0.30.
        The design effect is Killip, Mahfoud & Pearce 2004 (Ann Fam Med, doi
        10.1370/afm.141), archived at `tech-wiki/sources/`
        `killip-2004-intracluster-correlation.txt` sha256
