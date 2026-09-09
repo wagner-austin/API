@@ -31,6 +31,7 @@ from platform_core.json_utils import (
 from platform_core.power_distributions import McNemarTest
 from platform_core.power_types import (
     McNemarPower,
+    NetDifferencePower,
     PairedContinuousPower,
     PowerInstrument,
     PowerVerdict,
@@ -246,6 +247,52 @@ def decode_mcnemar_power(obj: JSONObject) -> McNemarPower:
     )
 
 
+def encode_net_difference_power(record: NetDifferencePower) -> JSONObject:
+    """Encode a :class:`NetDifferencePower` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "test": record["test"],
+        "net_difference": record["net_difference"],
+        "total_pairs": record["total_pairs"],
+        "alpha": record["alpha"],
+        "best_case_p": record["best_case_p"],
+        "smallest_resolvable_net_difference": record["smallest_resolvable_net_difference"],
+        "net_could_ever_be_significant": record["net_could_ever_be_significant"],
+    }
+
+
+def decode_net_difference_power(obj: JSONObject) -> NetDifferencePower:
+    """Decode a :class:`NetDifferencePower` from a JSON object.
+
+    Args:
+        obj: JSON object as produced by :func:`encode_net_difference_power`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On unknown test or instrument.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    return NetDifferencePower(
+        instrument=_require_instrument(obj, "instrument", PowerInstrument.NET_DIFFERENCE),
+        test=_require_mcnemar_test(obj, "test"),
+        net_difference=require_int(obj, "net_difference"),
+        total_pairs=require_int(obj, "total_pairs"),
+        alpha=require_float(obj, "alpha"),
+        best_case_p=require_float(obj, "best_case_p"),
+        smallest_resolvable_net_difference=require_int(obj, "smallest_resolvable_net_difference"),
+        net_could_ever_be_significant=require_bool(obj, "net_could_ever_be_significant"),
+    )
+
+
 def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
     """Encode a :class:`RateFloorPower` to a JSON object.
 
@@ -338,11 +385,13 @@ def decode_zero_failure_power(obj: JSONObject) -> ZeroFailurePower:
 
 __all__ = [
     "decode_mcnemar_power",
+    "decode_net_difference_power",
     "decode_paired_continuous_power",
     "decode_rate_floor_power",
     "decode_required_replicates",
     "decode_zero_failure_power",
     "encode_mcnemar_power",
+    "encode_net_difference_power",
     "encode_paired_continuous_power",
     "encode_rate_floor_power",
     "encode_required_replicates",

@@ -31,6 +31,7 @@ class PowerInstrument(StrEnum):
     MCNEMAR = "mcnemar"
     ZERO_FAILURE_PROPORTION = "zero_failure_proportion"
     RATE_FLOOR = "rate_floor"
+    NET_DIFFERENCE = "net_difference"
 
 
 class PowerVerdict(StrEnum):
@@ -232,8 +233,78 @@ class RateFloorPower(TypedDict):
     verdict: str
 
 
+class NetDifferencePower(TypedDict):
+    """Whether an OBSERVED net difference could have been significant at all.
+
+    THE SIBLING OF :class:`McNemarPower`, ASKING THE OTHER HALF OF THE
+    QUESTION, and the two are not substitutes. That one takes the discordant
+    total and asks "could any split of *d* reject?". This one takes the net
+    difference and asks "could any *d* consistent with this net reject?".
+
+    A comparison passes the first and fails the second whenever *d* is large
+    and the split is near even. Worked case, from ``code-style``'s published
+    tables on 2026-09-09: the mypy stratum has *d* = 54, so
+    ``can_ever_reject`` is TRUE and correct -- and its net of 4 cannot be
+    significant at ANY *d*, so the p-value beside it carries no information
+    about the world. Four of that page's twelve rows were in that state, each
+    reported as a null with a p, each having passed the first check.
+
+    The two questions were separated only after the corpus-attachment
+    programme published "the cartridge beats lexical, dense and fused
+    retrieval" from margins of 1.7 and 1.3 items out of 32, and retracted it
+    the same day. Nothing in the code could have caught it: the instrument
+    reported the correct p for the split it was given, and no one asked
+    whether a margin that size was reachable.
+
+    WHY THE FLOOR IS AT ``net_difference`` ITSELF. The feasible discordant
+    totals for a net of *k* are *k*, *k*+2, *k*+4, ..., and *k* is the one
+    where every discordant pair falls one way -- the most extreme split
+    available. Larger totals only move the split toward even. That the
+    minimum over feasible arrangements really does sit at *k* is pinned
+    exhaustively by test rather than asserted here.
+
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, for the reason
+    :class:`McNemarPower` does not. ``net_could_ever_be_significant`` is
+    falsifiability, not detectability: False is a hard statement that the
+    reported p means nothing, while True says only that some arrangement
+    could have rejected -- not that this one did, and not that the effect
+    would matter. A ``TESTED`` here would be true of the instrument and false
+    about the world.
+
+    Attributes:
+        instrument: Always :attr:`PowerInstrument.NET_DIFFERENCE`.
+        test: Which :class:`~platform_core.power_distributions.McNemarTest`
+            the report uses. Load-bearing rather than decorative: the exact
+            floor at alpha 0.05 is 6 and the mid-p floor is 5, so a number
+            quoted without its variant will be applied to a test nobody ran.
+        net_difference: ``abs(b - c)``, in ITEMS. Items rather than a rate
+            deliberately -- ``+0.052`` looks like a number and ``+1.7 items
+            of 32`` looks like what it is.
+        total_pairs: Items both arms answered. Carried so the record reads
+            "4 of 875" rather than "4"; it does not enter the arithmetic,
+            because McNemar conditions on the discordant pairs alone.
+        alpha: Two-sided significance level.
+        best_case_p: p of the most favourable arrangement, the
+            ``net_difference : 0`` split. No arrangement of this net beats it.
+        smallest_resolvable_net_difference: Smallest net difference that could
+            ever be significant at this alpha under this test. The number to
+            quote beside a table.
+        net_could_ever_be_significant: Whether ``best_case_p <= alpha``.
+    """
+
+    instrument: str
+    test: str
+    net_difference: int
+    total_pairs: int
+    alpha: float
+    best_case_p: float
+    smallest_resolvable_net_difference: int
+    net_could_ever_be_significant: bool
+
+
 __all__ = [
     "McNemarPower",
+    "NetDifferencePower",
     "PairedContinuousPower",
     "PowerInstrument",
     "PowerVerdict",

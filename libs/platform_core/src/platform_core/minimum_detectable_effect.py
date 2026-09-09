@@ -72,6 +72,7 @@ from platform_core.power_distributions import (
 )
 from platform_core.power_types import (
     McNemarPower,
+    NetDifferencePower,
     PairedContinuousPower,
     PowerInstrument,
     PowerVerdict,
@@ -98,6 +99,16 @@ MIN_REPLICATES: int = 3
 #: wrong thing or measuring it too noisily. Returning the ceiling instead of
 #: raising would hand that design a number it could schedule against.
 MAX_SEARCH_REPLICATES: int = 10_000
+
+#: Largest net difference :func:`net_difference_power` will search to.
+#:
+#: A refusal boundary in the sense :data:`~platform_core.power_distributions.
+#: _T_SEARCH_CEILING` is, not a guess at any answer. The best attainable p
+#: halves with every additional item of net difference, so this is reached
+#: only by an alpha below about 1e-308 -- a level no experiment on this
+#: machine reports at, and one this helper declines to certify rather than
+#: returning the ceiling as though it were the floor.
+MAX_SEARCH_NET_DIFFERENCE: int = 1024
 
 
 def _require_effect_of_interest(value: float, field: str) -> None:
@@ -310,6 +321,144 @@ def mcnemar_power(
     )
 
 
+def _best_case_p_for_net(net_difference: int, total_pairs: int, test: McNemarTest) -> float:
+    """Find the smallest p any arrangement with this net difference attains.
+
+    THE ARRANGEMENTS A NET OF *k* ALLOWS are the discordant totals *k*, *k*+2,
+    *k*+4, ..., each with the split ``((d+k)/2, (d-k)/2)``. The minimum over
+    them sits at ``d = k`` -- every discordant pair one way -- and that is
+    PROVED rather than assumed, because assuming a direction on this surface
+    is a known trap: the margin needed to reject is NOT monotone in *d*, it
+    oscillates with parity, and a sibling gate was built on the wrong end of
+    it on 2026-09-09.
+
+    For the exact test, write ``S_m`` for ``sum(C(d, j) for j <= m)`` with
+    ``m = (d - k) / 2``. Pascal twice gives
+    ``sum(C(d+2, j) for j <= m+1) == 4 * S_m + C(d, m+1) - C(d, m)``, so
+    stepping *d* by two changes the p-value by a term proportional to
+    ``C(d, m+1) - C(d, m)``, which is non-negative exactly when
+    ``2m + 1 <= d``. Substituting ``2m = d - k`` makes that condition
+    ``k >= 1``. So for any non-zero net the p-value only rises as the
+    discordant total grows, and ``d = k`` is the floor.
+
+    ``k == 0`` IS THE ONE EXCEPTION AND IT IS REAL. The condition above fails
+    there, and mid-p's tie form makes a tied comparison DIP: ``d = 0`` is 1.0
+    by definition -- no discordant pairs is no evidence -- while ``d = 2``
+    gives 0.75 and larger totals climb back toward 1. So a tie is handled by
+    naming both candidates rather than by pretending the lemma covers it.
+    Under the exact test every k=0 arrangement is 1.0 anyway, capped.
+
+    Args:
+        net_difference: ``abs(b - c)`` in items, non-negative.
+        total_pairs: Items both arms answered. Bounds which discordant totals
+            are attainable at all.
+        test: Which McNemar variant the report uses.
+
+    Returns:
+        The smallest attainable p.
+    """
+    if net_difference == 0:
+        # ``d = 2`` needs two pairs to exist before it is an arrangement.
+        if total_pairs < 2:
+            return 1.0
+        return min(1.0, mcnemar_p(1, 2, test))
+    return mcnemar_p(0, net_difference, test)
+
+
+def smallest_resolvable_net_difference(alpha: float, test: McNemarTest) -> int:
+    """Find the smallest net difference that could ever be significant.
+
+    The number to quote beside a table of paired comparisons. At alpha 0.05
+    it is 6 under :attr:`~platform_core.power_distributions.McNemarTest.EXACT`
+    and 5 under ``MID_P`` -- which is why the test is a parameter and never a
+    default.
+
+    Ascending rather than closed-form, deliberately. The p at the extreme
+    split is a simple power of two under both variants and could be inverted
+    with a logarithm, but that would be a SECOND expression of the same
+    arithmetic, going stale the moment either variant's definition moved.
+    Asking :func:`~platform_core.power_distributions.mcnemar_p` keeps one
+    source of truth, and the loop runs at most 31 times for any alpha above
+    1e-9.
+
+    Args:
+        alpha: Two-sided significance level in ``(0, 1)``.
+        test: Which McNemar variant the report uses.
+
+    Returns:
+        The smallest net difference whose best-case arrangement reaches
+        ``alpha``.
+
+    Raises:
+        AppError: ``POWER_ALPHA_OUT_OF_RANGE`` when alpha is outside ``(0, 1)``
+            or so small that no net difference at or below
+            :data:`MAX_SEARCH_NET_DIFFERENCE` reaches it.
+    """
+    require_alpha(alpha)
+    for candidate in range(MAX_SEARCH_NET_DIFFERENCE + 1):
+        # ``total_pairs`` unbounded here: this asks what the TEST can resolve,
+        # not what one table's item count allows, so every arrangement counts.
+        if _best_case_p_for_net(candidate, MAX_SEARCH_NET_DIFFERENCE, test) <= alpha:
+            return candidate
+    raise AppError(
+        StatisticalPowerErrorCode.POWER_ALPHA_OUT_OF_RANGE,
+        f"alpha {alpha!r} under the {test.value} test needs a net difference beyond "
+        f"{MAX_SEARCH_NET_DIFFERENCE} items; this helper will not certify it",
+    )
+
+
+def net_difference_power(
+    net_difference: int,
+    total_pairs: int,
+    alpha: float,
+    test: McNemarTest,
+) -> NetDifferencePower:
+    """Ask whether an OBSERVED net difference could have been significant.
+
+    The complement of :func:`mcnemar_power`, and neither replaces the other.
+    That one is given the discordant total and asks which splits reject; this
+    one is given the net difference and asks whether ANY discordant total
+    consistent with it rejects. A comparison passes that check and fails this
+    one whenever the discordant total is large and the split near even --
+    ``code-style``'s mypy stratum, at d=54 and a net of 4, is exactly that.
+
+    Args:
+        net_difference: ``abs(b - c)`` in items; non-negative.
+        total_pairs: Items both arms answered; must be at least
+            ``net_difference``, since the net cannot exceed the pairs it is
+            drawn from.
+        alpha: Two-sided significance level in ``(0, 1)``.
+        test: Which McNemar variant the report uses. Required, not defaulted,
+            for the reason :func:`mcnemar_power` requires it.
+
+    Returns:
+        A populated :class:`NetDifferencePower`.
+
+    Raises:
+        AppError: ``POWER_SAMPLE_SIZE_INVALID`` when either count is negative
+            or the net exceeds the pairs; ``POWER_ALPHA_OUT_OF_RANGE`` when
+            alpha is out of range or unreachable.
+    """
+    if net_difference < 0 or total_pairs < 0 or net_difference > total_pairs:
+        raise AppError(
+            StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID,
+            f"need 0 <= net_difference <= total_pairs; got net_difference="
+            f"{net_difference!r}, total_pairs={total_pairs!r}",
+        )
+    require_alpha(alpha)
+    best_case_p = _best_case_p_for_net(net_difference, total_pairs, test)
+    return NetDifferencePower(
+        instrument=PowerInstrument.NET_DIFFERENCE.value,
+        test=test.value,
+        net_difference=net_difference,
+        total_pairs=total_pairs,
+        alpha=alpha,
+        best_case_p=best_case_p,
+        smallest_resolvable_net_difference=smallest_resolvable_net_difference(alpha, test),
+        net_could_ever_be_significant=best_case_p <= alpha,
+    )
+
+
 def zero_failure_power(
     trials: int,
     confidence: float,
@@ -438,11 +587,14 @@ def rate_floor_power(
 
 
 __all__ = [
+    "MAX_SEARCH_NET_DIFFERENCE",
     "MAX_SEARCH_REPLICATES",
     "MIN_REPLICATES",
     "mcnemar_power",
+    "net_difference_power",
     "paired_continuous_power",
     "rate_floor_power",
     "required_replicates",
+    "smallest_resolvable_net_difference",
     "zero_failure_power",
 ]
