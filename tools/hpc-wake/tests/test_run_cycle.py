@@ -57,6 +57,7 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
         [
             _Completed("hpc-out\n", "hpc-err\n", 0),
             _Completed("ci-out\n", "ci-err\n", 0),
+            _Completed("lock-out\n", "lock-err\n", 0),
         ]
     )
     _test_hooks.run_process = fake
@@ -134,12 +135,14 @@ class TestMain:
 
         assert code == 0
         content = (root / "runs" / "cycle.log").read_text(encoding="utf-8")
-        header, mark1, out1, err1, mark2, out2, err2 = content.splitlines()
+        header, mark1, out1, err1, mark2, out2, err2, mark3, out3, err3 = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
         assert mark1 == "-- hpc-wake"
         assert (out1, err1) == ("hpc-out", "hpc-err")
         assert mark2 == "-- ci-wake"
         assert (out2, err2) == ("ci-out", "ci-err")
+        assert mark3 == "-- lock-wake"
+        assert (out3, err3) == ("lock-out", "lock-err")
 
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -166,6 +169,16 @@ class TestMain:
             "runs\\pushes.jsonl",
         ]
         assert ci_cwd == (root / "..\\ci-wake").resolve()
+        lock_args, lock_cwd, lock_env = runner.calls[2]
+        assert list(lock_args) == [
+            "poetry",
+            "run",
+            "lock-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
+        ]
+        assert lock_cwd == (root / "..\\lock-wake").resolve()
+        assert lock_env == env
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
         assert ci_env == env
@@ -184,7 +197,7 @@ class TestMain:
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
-        assert len(runner.calls) == 2
+        assert len(runner.calls) == 3
 
     def test_a_failing_second_publisher_reddens_the_tick(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
@@ -223,17 +236,23 @@ class TestMain:
 
 
 class TestPublishers:
-    def test_the_inventory_is_the_two_bridges_in_publication_order(self) -> None:
+    def test_the_inventory_is_the_three_bridges_in_publication_order(self) -> None:
         """Pinned as data: a publisher added or removed shows up HERE, and
         board task 9406cfd9's rule -- publishers join this table, never
         become sibling scheduled tasks -- has a diff to point at."""
-        assert [p["name"] for p in run_cycle.PUBLISHERS] == ["hpc-wake", "ci-wake"]
+        assert [p["name"] for p in run_cycle.PUBLISHERS] == ["hpc-wake", "ci-wake", "lock-wake"]
         assert run_cycle.PUBLISHERS[0]["cwd"] == "."
         assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
         assert run_cycle.PUBLISHERS[1]["args"][2:] == (
             "ci-wake",
             "--enrolment",
             "runs\\pushes.jsonl",
+        )
+        assert run_cycle.PUBLISHERS[2]["cwd"] == "..\\lock-wake"
+        assert run_cycle.PUBLISHERS[2]["args"][2:] == (
+            "lock-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
         )
 
 

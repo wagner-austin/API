@@ -85,6 +85,21 @@ PUBLISHERS: Final[tuple[Publisher, ...]] = (
         "args": ("poetry", "run", "ci-wake", "--enrolment", "runs\\pushes.jsonl"),
         "cwd": "..\\ci-wake",
     },
+    # lock-wake (board 9406cfd9 publisher b): fleet-lock journal -> board.
+    # One post per tick at most, boundaries only, progress folded as
+    # counts; the journal's 'agent' field (MCPs 66b85d32) supplies the
+    # mention target. Standing task id: LOCK_WAKE_TASK_ID in runs/env.ps1.
+    {
+        "name": "lock-wake",
+        "args": (
+            "poetry",
+            "run",
+            "lock-wake",
+            "--journal",
+            "C:\\Users\\Test\\PROJECTS\\MCPs\\.fleet-events.jsonl",
+        ),
+        "cwd": "..\\lock-wake",
+    },
 )
 
 
