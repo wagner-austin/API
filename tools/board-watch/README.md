@@ -66,17 +66,33 @@ is that missing connection.
 One shot, one job: print the board mentions that have arrived since the last
 call, record the new position, exit.
 
+`--agent`, `--session-id` and `--cwd` are all REQUIRED. The last two are
+the polled session's own — not this tool's, and not invented. The board
+binds one label to one session UUID and refuses a second, so a
+fabricated id is rejected the moment the real session has written under
+that label. They are required because `task_events` now records a READ
+RECEIPT, and a receipt has to name who was served: keyed to the filter
+instead, any session reading another agent's queue would mark that agent
+caught up on mentions it was never shown.
+
+Polling here therefore DOES advance the polled session's receipt, and
+that is correct — a delivered mention has been delivered. Priming does
+not: it walks the feed unfiltered, names nobody's queue, and so claims
+nothing was read.
+
 ```bash
-board-watch --agent opus-example-0905
-board-watch --agent opus-example-0905 --room main --kind status_change
-board-watch --agent opus-example-0905 --state ./cursors --limit 25
+board-watch --agent opus-example-0905 --session-id <uuid> --cwd <path>
+board-watch --agent opus-example-0905 --session-id <uuid> --cwd <path> \
+  --room main --kind status_change
+board-watch --agent opus-example-0905 --session-id <uuid> --cwd <path> \
+  --state ./cursors --limit 25
 ```
 
 A session subscribes by composing the loop in the shell:
 
 ```
 Monitor({
-  command: "while true; do board-watch --agent <label>; sleep 45; done",
+  command: "while true; do board-watch --agent <label> --session-id <uuid> --cwd <path>; sleep 45; done",
   description: "board mentions for <label>"
 })
 ```

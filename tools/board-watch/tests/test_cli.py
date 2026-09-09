@@ -29,8 +29,14 @@ from tests.conftest import (
 )
 
 AGENT = "opus-nclex-licensure-0904"
+#: The polled session's real UUID. Required since the board grew read
+#: receipts: a receipt names who was served, and one label is bound to
+#: one session, so this tool cannot invent the value.
+SESSION_ID = "55555555-5555-4555-8555-555555555555"
+CWD = "C:/Users/Test/PROJECTS/MCPs"
 DIRECTORY = pathlib.Path("/cursors")
-ARGV = ("--agent", AGENT, "--state", str(DIRECTORY))
+IDENTITY_ARGV = ("--agent", AGENT, "--session-id", SESSION_ID, "--cwd", CWD)
+ARGV = (*IDENTITY_ARGV, "--state", str(DIRECTORY))
 
 
 def test_the_first_call_primes_and_announces_without_replaying(
@@ -162,7 +168,7 @@ def test_the_default_state_directory_is_used_when_none_is_given(
     """A caller composing a shell loop should not have to name a path."""
     set_environment()
     _test_hooks.http_post = FakeHttpPost([ok(tool_text(page_text([], None)))])
-    assert main(["--agent", AGENT]) == 0
+    assert main([*IDENTITY_ARGV]) == 0
     from board_watch.state import DEFAULT_STATE_DIRECTORY
 
     assert state_path(AGENT, DEFAULT_STATE_DIRECTORY) in files.contents
