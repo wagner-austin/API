@@ -59,8 +59,8 @@ from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
-    per_seed_observations,
     noise_floor,
+    per_seed_observations,
     retention,
 )
 from model_trainer.core.run_fingerprint import (
