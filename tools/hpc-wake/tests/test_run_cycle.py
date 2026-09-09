@@ -25,10 +25,10 @@ class _Completed:
 
 
 class _RecordingRunner:
-    """A process runner that records its call and returns scripted output."""
+    """A process runner that records calls and returns scripted results in order."""
 
-    def __init__(self, result: _Completed) -> None:
-        self.result = result
+    def __init__(self, results: Sequence[_Completed]) -> None:
+        self.results = list(results)
         self.calls: list[tuple[Sequence[str], pathlib.Path, dict[str, str]]] = []
 
     def __call__(
@@ -43,13 +43,22 @@ class _RecordingRunner:
         assert capture_output is True
         assert text is True
         self.calls.append((args, cwd, dict(env)))
-        return self.result
+        return self.results[len(self.calls) - 1]
 
 
 @pytest.fixture(name="runner")
 def _runner() -> Generator[_RecordingRunner, None, None]:
-    """Install a recording runner, and put the real one back afterwards."""
-    fake = _RecordingRunner(_Completed("out-line\n", "err-line\n", 0))
+    """Install a recording runner, and put the real one back afterwards.
+
+    Scripted with one result per publisher, distinguishable by content so
+    ordering assertions mean something.
+    """
+    fake = _RecordingRunner(
+        [
+            _Completed("hpc-out\n", "hpc-err\n", 0),
+            _Completed("ci-out\n", "ci-err\n", 0),
+        ]
+    )
     _test_hooks.run_process = fake
     yield fake
     _test_hooks.run_process = subprocess.run
@@ -116,7 +125,7 @@ class TestPackageRootFrom:
 
 
 class TestMain:
-    def test_runs_the_cycle_and_appends_header_stdout_then_stderr(
+    def test_runs_every_publisher_and_appends_marked_sections_in_order(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
     ) -> None:
         root = _staged_root(tmp_path, GOOD_ENV)
@@ -125,12 +134,14 @@ class TestMain:
 
         assert code == 0
         content = (root / "runs" / "cycle.log").read_text(encoding="utf-8")
-        header, out, err = content.splitlines()
+        header, mark1, out1, err1, mark2, out2, err2 = content.splitlines()
         assert header.startswith("== 20") and header.endswith("Z")
-        assert out == "out-line"
-        assert err == "err-line"
+        assert mark1 == "-- hpc-wake"
+        assert (out1, err1) == ("hpc-out", "hpc-err")
+        assert mark2 == "-- ci-wake"
+        assert (out2, err2) == ("ci-out", "ci-err")
 
-    def test_hands_the_runner_the_command_the_tree_and_a_merged_env(
+    def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
     ) -> None:
         root = _staged_root(tmp_path, GOOD_ENV)
@@ -145,9 +156,19 @@ class TestMain:
             "--config",
             "..\\hpc3\\runs\\hpc3.json",
         ]
-        assert cwd == root
+        assert cwd == root.resolve()
+        ci_args, ci_cwd, ci_env = runner.calls[1]
+        assert list(ci_args) == [
+            "poetry",
+            "run",
+            "ci-wake",
+            "--enrolment",
+            "runs\\pushes.jsonl",
+        ]
+        assert ci_cwd == (root / "..\\ci-wake").resolve()
         assert env["TASKBOARD_MCP_API_KEY"] == "key-value"
         assert env["HPC_WAKE_TASK_ID"] == "task-value"
+        assert ci_env == env
         # The parent environment rides along — a scheduled task still needs
         # PATH and friends to find poetry at all. pytest's own marker is the
         # witness: the framework sets PYTEST_CURRENT_TEST in THIS process's
@@ -156,10 +177,28 @@ class TestMain:
         assert env["PYTEST_CURRENT_TEST"].endswith("(call)")
         assert len(env) > 3
 
-    def test_propagates_the_cycles_own_failure(
+    def test_a_failing_first_publisher_does_not_stop_the_second(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
     ) -> None:
-        runner.result = _Completed("", "cluster unreachable\n", 3)
+        runner.results[0] = _Completed("", "cluster unreachable\n", 3)
+        root = _staged_root(tmp_path, GOOD_ENV)
+
+        assert run_cycle.main(["--package-root", str(root)]) == 3
+        assert len(runner.calls) == 2
+
+    def test_a_failing_second_publisher_reddens_the_tick(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+    ) -> None:
+        runner.results[1] = _Completed("", "actions api refused\n", 7)
+        root = _staged_root(tmp_path, GOOD_ENV)
+
+        assert run_cycle.main(["--package-root", str(root)]) == 7
+
+    def test_the_first_failure_names_the_tick_when_both_fail(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner
+    ) -> None:
+        runner.results[0] = _Completed("", "a\n", 3)
+        runner.results[1] = _Completed("", "b\n", 7)
         root = _staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(["--package-root", str(root)]) == 3
@@ -167,6 +206,7 @@ class TestMain:
     def test_truncates_an_oversized_log_and_keeps_a_small_one(
         self, tmp_path: pathlib.Path, runner: _RecordingRunner
     ) -> None:
+        runner.results.extend(runner.results)
         root = _staged_root(tmp_path, GOOD_ENV)
         log = root / "runs" / "cycle.log"
         log.write_text("old\n" * 300_000, encoding="utf-8")
@@ -180,6 +220,21 @@ class TestMain:
         kept = log.read_text(encoding="utf-8")
         assert kept.startswith(rotated)
         assert kept.count("== 20") == 2
+
+
+class TestPublishers:
+    def test_the_inventory_is_the_two_bridges_in_publication_order(self) -> None:
+        """Pinned as data: a publisher added or removed shows up HERE, and
+        board task 9406cfd9's rule -- publishers join this table, never
+        become sibling scheduled tasks -- has a diff to point at."""
+        assert [p["name"] for p in run_cycle.PUBLISHERS] == ["hpc-wake", "ci-wake"]
+        assert run_cycle.PUBLISHERS[0]["cwd"] == "."
+        assert run_cycle.PUBLISHERS[1]["cwd"] == "..\\ci-wake"
+        assert run_cycle.PUBLISHERS[1]["args"][2:] == (
+            "ci-wake",
+            "--enrolment",
+            "runs\\pushes.jsonl",
+        )
 
 
 class TestMainBlock:
@@ -208,7 +263,8 @@ class TestMainBlock:
             if saved_module is not None:
                 sys.modules[module_name] = saved_module
         assert caught.value.code == 0
-        assert runner.calls[0][1] == root
+        assert runner.calls[0][1] == root.resolve()
+        assert len(runner.calls) == len(run_cycle.PUBLISHERS)
         assert (root / "runs" / "cycle.log").read_text(encoding="utf-8").startswith("== ")
 
 

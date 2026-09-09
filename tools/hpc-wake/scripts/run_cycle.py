@@ -38,10 +38,54 @@ import pathlib
 import re
 import sys
 from collections.abc import Sequence
+from typing import Final
+
+from typing_extensions import TypedDict
 
 from scripts import _test_hooks
 
 PACKAGE_ROOT_FLAG = "--package-root"
+
+
+class Publisher(TypedDict):
+    """One publisher the pump runs each tick.
+
+    Attributes:
+        name: The marker written to the cycle log before this publisher's
+            output, so a red tick names its red half.
+        args: The command, run to completion with captured output.
+        cwd: Working directory RELATIVE to the pump's package root —
+            ``poetry run`` resolves its project from the cwd, which is how
+            one pump drives entry points from several poetry projects.
+    """
+
+    name: str
+    args: tuple[str, ...]
+    cwd: str
+
+
+#: The pump's publishers, run IN ORDER each tick — the one scheduled task
+#: the board's event system rides (board task 9406cfd9: publishers are
+#: added HERE, never as sibling scheduled tasks). Order is publication
+#: order only; each runs regardless of the previous one's exit status,
+#: and the tick's own status is the first nonzero exit so the scheduler's
+#: history stays the health record while the log names the failing half.
+PUBLISHERS: Final[tuple[Publisher, ...]] = (
+    {
+        "name": "hpc-wake",
+        "args": ("poetry", "run", "hpc-wake", "--config", "..\\hpc3\\runs\\hpc3.json"),
+        "cwd": ".",
+    },
+    # ci-wake (board 21:02Z, bridge-ci-wake-0909): GitHub Actions -> board,
+    # with the pre-push enrolment ledger supplying the @mention target the
+    # Actions API cannot know. Its standing task id rides runs/env.ps1 as
+    # CI_WAKE_TASK_ID beside the pump's other credentials.
+    {
+        "name": "ci-wake",
+        "args": ("poetry", "run", "ci-wake", "--enrolment", "runs\\pushes.jsonl"),
+        "cwd": "..\\ci-wake",
+    },
+)
 
 
 def package_root_from(tokens: Sequence[str]) -> pathlib.Path:
@@ -123,12 +167,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             Defaults to the process arguments.
 
     Returns:
-        The cycle's own exit status.
+        The tick's status: 0 when every publisher exited 0, otherwise the
+        FIRST nonzero exit — every publisher runs regardless, and the log's
+        per-publisher markers name which one went red.
 
     Raises:
         ValueError: Propagated from :func:`package_root_from` or
             :func:`load_env_assignments`.
-        OSError: When the log or the package tree is unwritable/unreadable.
+        OSError: When the log or the package tree is unwritable/unreadable,
+            or a publisher's command cannot be spawned — a spawn failure is
+            a broken pump, not a publisher outcome, and the header already
+            written puts the evidence in the log before the scheduler
+            records the crash.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     package_root = package_root_from(tokens)
@@ -139,18 +189,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         log.unlink()
 
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    completed = _test_hooks.run_process(
-        ["poetry", "run", "hpc-wake", "--config", "..\\hpc3\\runs\\hpc3.json"],
-        cwd=package_root,
-        env={**os.environ, **environment},
-        capture_output=True,
-        text=True,
-    )
+    worst = 0
     with log.open("a", encoding="utf-8") as handle:
         handle.write(f"== {stamp}\n")
-        handle.write(completed.stdout)
-        handle.write(completed.stderr)
-    return completed.returncode
+        for publisher in PUBLISHERS:
+            handle.write(f"-- {publisher['name']}\n")
+            completed = _test_hooks.run_process(
+                list(publisher["args"]),
+                cwd=(package_root / publisher["cwd"]).resolve(),
+                env={**os.environ, **environment},
+                capture_output=True,
+                text=True,
+            )
+            handle.write(completed.stdout)
+            handle.write(completed.stderr)
+            if completed.returncode != 0 and worst == 0:
+                worst = completed.returncode
+    return worst
 
 
 if __name__ == "__main__":
