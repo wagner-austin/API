@@ -219,8 +219,26 @@ class RateFloorPower(TypedDict):
             the floor, ``ceil(log(alpha) / log(floor))``. Below this, no
             outcome whatsoever can pass, so the gate cannot be failed OR
             passed on evidence.
-        verdict: :class:`PowerVerdict`. ``TESTED`` only when ``p_value`` is at
-            or below ``alpha``.
+        rate_exceeds_floor: Whether ``p_value <= alpha`` -- the observed rate
+            is separable FROM the floor. A statement about this RESULT.
+        design_can_clear_floor: Whether ``trials >= perfect_record_trials`` --
+            some attainable outcome could have cleared the floor. A statement
+            about this DESIGN, and the question :class:`PowerVerdict` asks.
+
+    WHY THIS RECORD CARRIES NO ``verdict``, and it shipped with one for four
+    hours on 2026-09-09 before the mistake was caught. ``PowerVerdict.TESTED``
+    is defined as "the instrument could have resolved an effect as small as
+    the one anyone would act on" -- a claim about RESOLUTION. This instrument
+    set it from ``p_value <= alpha``, which is SIGNIFICANCE, and on this
+    question the two are anti-correlated: 120 successes in 200 trials is a
+    decisively measured failure against an 0.85 floor and read ``NOT_TESTED``,
+    while 20 of 20 -- one trial past the minimum, able to resolve only a
+    perfect record -- read ``TESTED``.
+
+    Two booleans named after their own questions replace it, which is the
+    precedent this module already set with ``can_ever_reject`` and
+    ``net_could_ever_be_significant``. A word that reassures a reader about a
+    question it never asked is the defect this whole module exists to prevent.
     """
 
     instrument: str
@@ -231,7 +249,8 @@ class RateFloorPower(TypedDict):
     alpha: float
     p_value: float
     perfect_record_trials: int
-    verdict: str
+    rate_exceeds_floor: bool
+    design_can_clear_floor: bool
 
 
 class NetDifferencePower(TypedDict):
@@ -330,13 +349,20 @@ class ClusteredPairedPower(TypedDict):
     that a design effect of exactly 1.000 came from a floor rather than from
     a corpus that happened to land there.
 
-    THIS RECORD CARRIES NO :class:`PowerVerdict`, and for the same reason
-    three of the six records before it do not: "is this design effect large?"
-    has no threshold that is not a judgement about the study. The verdict is
-    set in exactly three places in
-    :mod:`platform_core.minimum_detectable_effect`, all of them instruments
-    handed a threshold to compare against -- counted by reading the
-    assignments rather than the docstrings, because
+    THIS RECORD CARRIES NO :class:`PowerVerdict`: "is this design effect
+    large?" has no threshold that is not a judgement about the study.
+
+    THE CRITERION, NOT A TALLY, AND THAT IS DELIBERATE. A record here carries
+    a verdict exactly when its instrument is HANDED THE EFFECT WORTH ACTING
+    ON and can compare something to it; the rest report a predicate named
+    after the question they answer. A count of which records fall each way
+    would be a fact about a sibling module's current source, stated here,
+    with nothing comparing the two -- it goes stale the next time someone
+    adds or removes a verdict, and this module would not notice. Read the
+    field lists below if you need the tally.
+
+    Counting them by reading DOCSTRINGS rather than assignments has already
+    produced one wrong answer:
     :func:`~platform_core.minimum_detectable_effect.required_replicates`
     describes itself as answering "the question a ``NOT_TESTED`` verdict
     raises" and sets none.

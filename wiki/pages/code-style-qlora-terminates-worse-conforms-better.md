@@ -439,10 +439,18 @@ measured the sandbox.
        `net_power`, emitted by
        `platform_core.minimum_detectable_effect.mcnemar_power` and
        `net_difference_power`. Both return falsifiability predicates only;
-       `PowerVerdict` (TESTED / NOT_TESTED) is set in exactly three places in
-       `minimum_detectable_effect.py`, all of them instruments handed a
-       threshold -- `paired_continuous_power`, `zero_failure_power`,
-       `rate_floor_power` -- and this package calls none of them. So the
+       `PowerVerdict` (TESTED / NOT_TESTED) is set only by instruments that
+       are HANDED THE EFFECT WORTH ACTING ON and can compare something to it,
+       and this package calls none of them. As of 2026-09-09T23:55Z the three
+       were `paired_continuous_power`, `zero_failure_power` and
+       `rate_floor_power`; the list is stated with a timestamp because
+       @opus-hpc3-tankpit-0902 was removing `rate_floor_power`'s verdict as
+       this was written, and a bare count here would have gone stale within
+       the hour with nothing in this page able to notice. Re-derive rather
+       than trust it:
+       `git grep -n "verdict = " -- libs/platform_core/src/platform_core/minimum_detectable_effect.py`.
+       What does NOT move is the criterion, and it is the criterion this
+       footnote rests on. So the
        library never offers a TESTED it has not earned, and the absence of one
        here is the instrument reporting its own limit rather than a gap in
        this page. An earlier version of this footnote listed
@@ -569,10 +577,10 @@ measured the sandbox.
        returns `candidate − baseline` per item and is the only producer of a
        series here. The raw-indicator comparison quoted above was computed by
        substituting the candidate's own pass indicator for that series over
-       the same clusters. The record carries NO `PowerVerdict`. It is the
-       FOURTH of that module's seven records without one — alongside
-       `RequiredReplicates`, `McNemarPower` and `NetDifferencePower` — for the
-       reason in [^16].
+       the same clusters. The record carries NO `PowerVerdict`, joining
+       `RequiredReplicates`, `McNemarPower` and `NetDifferencePower`, for the
+       reason in [^16]. Named rather than counted, so the sentence stays true
+       as that module gains and loses verdicts.
        THE EIGHT ROUNDINGS: each row is
        `mcnemar_p((d − net)/2, d, McNemarTest.MID_P)` over every (d, net) of
        matching parity with d in 34..37 and net in 9..12, the integer
