@@ -223,18 +223,21 @@ batch's result stays independent of how many batches preceded it, so a run
 resumed after preemption reproduces what it redoes rather than replacing it
 plausibly. The seed is a determinism GUARANTEE, not a variance axis.[^15]
 
-So there is no decode variance to bound, and the old caveat overstated the
-uncertainty rather than understating it. **What this does not rescue is the
-clustering limit above**, which is about correlation BETWEEN ITEMS and is
-untouched by any amount of run-to-run determinism. The guards gain of +18 on
-282 items therefore stands flagged for two reasons, not three: below its own
-MDE, and over non-independent units.
+So there is no decode variance to bound[^15], and the old caveat overstated
+the uncertainty rather than understating it. **What this does not rescue is
+the clustering limit above**, which is about correlation BETWEEN ITEMS and is
+untouched by any amount of run-to-run determinism[^12]. The guards gain of +18
+on 282 items therefore stands flagged for two reasons, not three: below its
+own MDE[^14], and over non-independent units[^12].
 
 And this instrument still has **no declared smallest effect of interest**, so
-nothing here says whether an effect it can resolve is one anyone would act
-on. A noise floor was going to anchor that number without anyone choosing it;
-the floor is exactly zero, `SEI >= 0` constrains nothing, and inventing one
-instead is the move this page has refused twice already.
+nothing here says whether an effect it can resolve is one anyone would act on.
+Every power record this package emits is a falsifiability predicate --
+`can_ever_reject`, `net_could_ever_be_significant` -- and neither instrument
+takes a threshold, so neither can return a `PowerVerdict`.[^16] A noise floor
+was going to anchor that number without anyone choosing it; the floor is
+exactly zero[^15], `SEI >= 0` constrains nothing, and inventing one instead is
+the move this page has refused twice already.
 
 ## What each null could have detected
 
@@ -343,6 +346,16 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
+[^16]: `tools/code-style-eval/runs/gen-v2/comparison.json` fields `power` and
+       `net_power`, emitted by
+       `platform_core.minimum_detectable_effect.mcnemar_power` and
+       `net_difference_power`. Both return falsifiability predicates only;
+       `PowerVerdict` (TESTED / NOT_TESTED) is set solely by the instruments
+       that are handed a threshold -- `paired_continuous_power`,
+       `required_replicates`, `zero_failure_power`, `rate_floor_power` -- and
+       this package calls neither of those. So the library never offers a
+       TESTED it has not earned, and the absence of one here is the
+       instrument reporting its own limit rather than a gap in this page.
 [^15]: Jobs 55877275 (`gen-v2-base-s1`, 7998s, hpc3-gpu-l54-07) and 55877509
        (`gen-v2-base-s2`, 7879s, hpc3-gpu-l54-08), against the existing
        55809956 (`gen-v2-base`, 6297s, hpc3-gpu-k54-01). Records at
