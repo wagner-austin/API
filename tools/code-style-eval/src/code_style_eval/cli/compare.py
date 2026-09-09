@@ -21,7 +21,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
-from platform_core.minimum_detectable_effect import mcnemar_power
+from platform_core.minimum_detectable_effect import mcnemar_power, net_difference_power
 from platform_core.power_distributions import McNemarTest, mcnemar_p
 from platform_core.run_record import encode_run_record, run_record_sidecar
 
@@ -157,6 +157,14 @@ def build_report(
         # describe a test nobody ran, which is what mcnemar_power's required
         # `test` argument exists to prevent.
         power=mcnemar_power(discordant, ALPHA, McNemarTest.MID_P),
+        # The SECOND floor, and the one this package needed. `power` above
+        # asks whether this discordant count could ever reject; this asks
+        # whether the net actually observed could ever be significant. Four
+        # published rows of this instrument passed the first and failed the
+        # second -- a net of 4 tops out at mid-p 0.0625 however large d is.
+        net_power=net_difference_power(
+            abs(net_improvement(counts)), len(shared), ALPHA, McNemarTest.MID_P
+        ),
     )
 
 
@@ -187,6 +195,9 @@ def render(report: ComparisonReport) -> list[str]:
         # without it.
         f"smallest p attainable     {report['power']['smallest_attainable_p']:.6f}",
         f"could ever reject         {'yes' if report['power']['can_ever_reject'] else 'NO'}",
+        f"net could ever matter     "
+        f"{'yes' if report['net_power']['net_could_ever_be_significant'] else 'NO'}"
+        f"  (best case {report['net_power']['best_case_p']:.5f})",
     ]
 
 

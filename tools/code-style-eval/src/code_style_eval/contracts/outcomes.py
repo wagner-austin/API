@@ -21,8 +21,13 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
-from platform_core.power_records import decode_mcnemar_power, encode_mcnemar_power
-from platform_core.power_types import McNemarPower
+from platform_core.power_records import (
+    decode_mcnemar_power,
+    decode_net_difference_power,
+    encode_mcnemar_power,
+    encode_net_difference_power,
+)
+from platform_core.power_types import McNemarPower, NetDifferencePower
 from typing_extensions import TypedDict
 
 #: The three checkers a generated file is scored under, and the ONE place the
@@ -154,6 +159,15 @@ class ComparisonReport(TypedDict):
         net_improvement: Items fixed minus items broken.
         mid_p: Two-sided McNemar mid-p value.
         exact_p: Two-sided exact conditional McNemar p-value.
+        net_power: Whether the OBSERVED NET could ever have been significant,
+            from
+            :func:`platform_core.minimum_detectable_effect.net_difference_power`.
+            A SECOND and independent floor: ``power`` asks whether this
+            discordant count could ever reject, this asks whether this net
+            could. A comparison passes the first and fails the second whenever
+            the discordant count is large and the split near even, and four of
+            this package's own published rows were in exactly that state while
+            the first floor called them fine.
         power: What this comparison could ever have resolved, from
             :func:`platform_core.minimum_detectable_effect.mcnemar_power`.
             Carried BESIDE the p-values so a reader never has to ask whether
@@ -176,6 +190,7 @@ class ComparisonReport(TypedDict):
     exact_p: float
     payload_digest: str
     power: McNemarPower
+    net_power: NetDifferencePower
 
 
 def encode_comparison_report(report: ComparisonReport) -> JSONObject:
@@ -199,6 +214,7 @@ def encode_comparison_report(report: ComparisonReport) -> JSONObject:
         "exact_p": report["exact_p"],
         "payload_digest": report["payload_digest"],
         "power": encode_mcnemar_power(report["power"]),
+        "net_power": encode_net_difference_power(report["net_power"]),
     }
 
 
@@ -250,6 +266,7 @@ def decode_comparison_report(obj: JSONObject) -> ComparisonReport:
         exact_p=require_float(obj, "exact_p"),
         payload_digest=payload_digest,
         power=decode_mcnemar_power(require_dict(obj, "power")),
+        net_power=decode_net_difference_power(require_dict(obj, "net_power")),
     )
 
 

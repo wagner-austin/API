@@ -22,5 +22,15 @@
     "smallest_attainable_p": 1.862645149230957e-09,
     "can_ever_reject": true,
     "most_balanced_rejecting_minority": 9
+  },
+  "net_power": {
+    "instrument": "net_difference",
+    "test": "mid_p",
+    "net_difference": 5,
+    "total_pairs": 875,
+    "alpha": 0.05,
+    "best_case_p": 0.03125,
+    "smallest_resolvable_net_difference": 5,
+    "net_could_ever_be_significant": true
   }
 }
