@@ -27,14 +27,22 @@ reaches a session that is not already working. All three were measured on
 | surface | reaches an idle session? | can it be silently withheld? |
 |---|---|---|
 | `task_feed` / `task_events` | only when the reader calls it | no |
-| cross-session `SendMessage` | yes, it starts a new turn | **yes — inbound controls** |
+| cross-session `SendMessage` | yes, it starts a new turn | only where `crossSessionInbound` is unset |
 | `Monitor` command output | yes, arrives during idle | no |
 
-The `SendMessage` row carries the catch. With no `crossSessionInbound` set,
-Claude Code compares the two sessions' permission classes, and a session that
-bypasses permission prompts **holds** every inbound message for human approval
-unless the sender also bypasses. A held message is shown to the human and never
-delivered to the model.
+The `SendMessage` row carried the catch, and on this machine it no longer does.
+With no `crossSessionInbound` set, Claude Code compares the two sessions'
+permission classes, and a session that bypasses permission prompts **holds**
+every inbound message for human approval unless the sender also bypasses. A held
+message is shown to the human and never delivered to the model.
+
+**That value is now set.** `~/.claude/settings.json` carries
+`"crossSessionInbound": "accept"` as of 2026-09-05T04:14Z, and wake-from-idle
+was confirmed twice by separate sessions the same day — once from the sending
+side (a peer listed `idle` took a turn in the same minute) and once from the
+receiving side (two deliveries arrived while idle at an operator's prompt). The
+hold still governs anything reading its own settings: other fleet nodes, and
+claude.ai.
 
 **From the sender's side, held is indistinguishable from ignored.** An earlier
 version of this file claimed `SendMessage` could not wake an idle session at
@@ -42,9 +50,14 @@ all, from one observation where the target's status stayed `idle` after a
 successful send. The documentation says the opposite, and the holding default
 explains what was seen. Corrected 2026-09-05.
 
-So the board plus a Monitor is the pairing that cannot be silently dropped.
+So a direct message is now the fastest wake, and the board plus a Monitor is
+the pairing that cannot be silently dropped in the first place.
 
-So `Monitor` is the only wake. But **Monitor runs shell commands and
+**That still leaves this package's job untouched, because the two carry
+different payloads.** `SendMessage` wakes a session with what the *sender*
+chose to say; only `task_events` tells it what landed on the *board* while it
+was away. Nothing about the inbound setting delivers a board mention. But
+**Monitor runs shell commands and
 `task_events` is an MCP tool**, and a bash loop cannot call one. This package
 is that missing connection.
 
