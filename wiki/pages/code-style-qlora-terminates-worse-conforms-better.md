@@ -198,8 +198,8 @@ decode-to-decode variance, and re-running at seed 1 would have both arms emit
 different completions and therefore a different 2x2 table.
 
 Unlike the clustering limit above, this one **cannot be bounded here**. A
-range needs at least two seeds and this corpus has one, so the size of the
-effect is unknown rather than estimated — stating an interval would be
+range needs at least two seeds and this corpus has one[^13], so the size of
+the effect is unknown rather than estimated — stating an interval would be
 inventing it. What can be said is which results are exposed: termination at
 −204 items of 875 and mid-p 2e-28 would survive essentially any plausible
 decode variance, while the guards gain of +18 on 282 items is now the same
@@ -315,10 +315,16 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
-[^13]: `tools/hpc3/runs/code-style-gen-v{1,2}-{base,candidate}.json`,
-       `code-style-qlora-v{1,2}.json` — `"seed": 0` in all six, and no `seeds`
-       key in any code-style run document. Counted 2026-09-09 by grepping the
-       committed documents rather than by reading the pipeline.
+[^13]: `tools/hpc3/runs/code-style-gen-v1-base.json` key `seed`,
+       and the same key in `code-style-gen-v1-candidate.json`,
+       `code-style-gen-v2-base.json`, `code-style-gen-v2-candidate.json`,
+       `code-style-qlora-v1.json` and `code-style-qlora-v2.json` — the value
+       is `0` in all six. `tools/hpc3/runs/code-style-run-gen-v2-base.json`
+       section `experiment` records the same value as `"seed": "0"` beside
+       the card and decoding settings. No `seeds` key occurs in any
+       `code-style-*.json` run document. Counted 2026-09-09 over the
+       committed documents at commit `93d0bf6f`, by reading the documents
+       rather than the pipeline that consumes them.
 [^12]: Cluster counts computed over the 875 shared item ids in
        `tools/code-style-eval/runs/gen-v2/{base,candidate}.outcomes.jsonl`,
        grouping by the first path segment, the first two, and the containing
