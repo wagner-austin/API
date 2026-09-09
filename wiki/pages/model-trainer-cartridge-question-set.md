@@ -7,6 +7,7 @@ related:
   - "[[monorepo-discipline]]"
 source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa.py
+  - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_arms.py
   - services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cloze/identity.py
@@ -15,11 +16,12 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa.py": e796de50f6608dbb807eb531d4a43ecf9d9fd6b0
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa.py": 3c262a7efce1dc2b3b9d25ef4787f03d420421a2
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_arms.py": e26a5e99699ac3f7b389df81b02fc04b44ef1637
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_question_set.py": 17f3a1278744c898b05c3511b8b89a51aa498fd6
   "services/Model-Trainer/src/model_trainer/core/services/model/cloze/identity.py": b128cc4752df995e95da34bf92d61e2c1bbc6b4c
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 19bb7f1c1e1ee5e71677b6d37d986f7073723b44
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 2f3ad497d7dcea1cb378720573de7243d6f85f01
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
   "services/Model-Trainer/src/model_trainer/core/services/model/control_arms.py": d8d1e89ba5c1920464a501048a028d9b24b97acc
   "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
@@ -69,6 +71,20 @@ Every number below is an observation of record `qa-svc-gpt2.json`, emitted by
 | RRF-fused | 0.7813 | — |
 | retrieval (oracle) | 0.9688 | gain +0.5313, p = 0.0000153 |
 | answer-token NLL | — | gain **+7.8051**, spread 1.1491 |
+
+**THIS TABLE IS NO LONGER THE FULL SET OF ARMS, as of 2026-09-09 (`643757bd`).**
+A long-context arm now runs beside these — the corpus handed to the model
+whole, with no retrieval at all — and it is absent here because it did not
+exist when these numbers were taken. Every comparison above is therefore
+cartridge-versus-*searching*, and says nothing about cartridge-versus-*reading*,
+which is the competitor a reader is most likely to assume was tested.
+
+It is not a matter of re-running to fill the row. At this rung the corpus is
+15,602 tokens against an 896-token budget, so the arm would carry about 6% of
+the text and beating it would mean almost nothing; the new arm reports
+`long_context_corpus_fraction` precisely so that number cannot be read without
+its coverage. The row becomes meaningful at a corpus and window where that
+fraction approaches 1.
 
 The cartridge's accuracy gain is **five times its own seed spread** (0.1667
 against 0.0313, per-seed gains 0.1875 / 0.1563 / 0.1563), and it moves in the
