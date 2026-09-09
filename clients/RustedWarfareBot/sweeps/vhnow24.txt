@@ -1,0 +1,33 @@
+# The Very Hard re-measure (log 2026-09-09): the standing champion's
+# CURRENT VH number, which the record does not hold -- the last VH reads
+# (12-13/24) predate evolve3-g3m10 and every harness fix since, and the
+# base was bred for Impossible survival, never certified at VH. The
+# mandate demands every rung below Impossible measured; this is the gap
+# rung. 24 fresh seeds, difficulty 2. Win rate is the figure.
+# Seeds 8846001-8848393.
+#
+# label | seed | doctrine | samples
+champ|8846001|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846105|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846209|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846313|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846417|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846521|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846625|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846729|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846833|doctrines/evolve3-g3m10.doctrine|10000
+champ|8846937|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847041|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847145|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847249|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847353|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847457|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847561|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847665|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847769|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847873|doctrines/evolve3-g3m10.doctrine|10000
+champ|8847977|doctrines/evolve3-g3m10.doctrine|10000
+champ|8848081|doctrines/evolve3-g3m10.doctrine|10000
+champ|8848185|doctrines/evolve3-g3m10.doctrine|10000
+champ|8848289|doctrines/evolve3-g3m10.doctrine|10000
+champ|8848393|doctrines/evolve3-g3m10.doctrine|10000
