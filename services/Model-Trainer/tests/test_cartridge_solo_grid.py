@@ -1,12 +1,13 @@
-"""The solo-grid CLI, exercised on a real tiny model over a fake corpus.
+"""The declared-cells solo CLI, exercised on a real tiny model.
 
-Same split as the solo-seeds suite it extends: real tiny GPT-2, real
-cartridge training and scoring, real window arithmetic; faked hub
-loaders, corpus reader and plan table. What the assertions concentrate
-on: the grid is complete with one gain row per (cell, seed), each cell's
-summary derives from exactly its own rows, the anchor cell's knobs are
-byte-equal to the recorded plan row's (the in-grid reproduction
-contract), and the base loads ONCE for the whole grid.
+Same split as the solo-seeds suite: real tiny GPT-2, real cartridge
+training and scoring, real window arithmetic; faked hub loaders, corpus
+reader and plan table. The assertions concentrate on what the declared
+surface must guarantee: one gain row per (cell, seed) with the cell's
+summary derived from exactly its own rows, tokens colliding loudly
+instead of merging, the recorded grid set's tokens and label segment
+byte-stable, the anchor configuration shared verbatim by both sets and
+equal to the recorded plan row, and the base loading ONCE per walk.
 """
 
 from __future__ import annotations
@@ -46,11 +47,14 @@ from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 
 _VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
 
-_DOCUMENT_CHARS = 96
+#: Small corpora keep the production cell sets runnable in a test: two
+#: 16-character documents give four 8-token windows, so a 48-epoch cell
+#: is 96 tiny steps rather than thousands.
+_DOCUMENT_CHARS = 32
 
 #: Tiny knobs behind the same plan-hook seam the production path reads;
-#: only window/stride/epochs are consumed by the grid (lr and slots are
-#: the grid's own axes).
+#: only window and stride are consumed by the cell walk (epochs, lr and
+#: slots are the cells' own).
 TINY_GEOMETRY_PLAN: BaseLoraSweepPlan = {
     "model_id": "gpt2",
     "window": 8,
@@ -70,6 +74,13 @@ TINY_GEOMETRY_PLAN: BaseLoraSweepPlan = {
     "learning_rate": 0.05,
 }
 
+#: Two tiny declared cells for the unit paths that do not need the
+#: production sets.
+TINY_CELLS: tuple[grid.SoloGridCell, ...] = (
+    {"token": "a", "learning_rate": 0.05, "num_slots": 2, "epochs": 1},
+    {"token": "b", "learning_rate": 0.02, "num_slots": 3, "epochs": 2},
+)
+
 _LOADS: list[str] = []
 
 
@@ -88,7 +99,7 @@ def _fake_model(
 ) -> LMModelProto:
     """Stand in for the hub loader, recording every load."""
     _LOADS.append(model_id_or_path)
-    # tiny-len512: the production slot axis reaches 256 slots, and a
+    # tiny-len512: the production capacity axis reaches 256 slots, and a
     # 64-position table cannot host 256 slots plus a window.
     model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny-len512"])
     return model
@@ -126,7 +137,9 @@ def _staged(tmp_path: pathlib.Path, name: str) -> pathlib.Path:
 
 
 class TestMeasureSoloGrid:
-    def test_the_grid_is_complete_and_the_base_loads_once(self, tmp_path: pathlib.Path) -> None:
+    def test_every_cell_seed_pair_has_a_row_and_the_base_loads_once(
+        self, tmp_path: pathlib.Path
+    ) -> None:
         alpha = _staged(tmp_path, "alpha")
 
         observations, _digest = grid.measure_solo_grid(
@@ -134,22 +147,20 @@ class TestMeasureSoloGrid:
             model_id="gpt2",
             load_precision=None,
             seeds=(7, 8),
-            learning_rates=(0.05, 0.02),
-            slot_counts=(2, 3),
+            cells=TINY_CELLS,
             device="cpu",
         )
 
         names = [o["name"] for o in observations]
         assert len(names) == len(set(names))
-        for lr in (0.05, 0.02):
-            for slots in (2, 3):
-                token = grid.cell_token(learning_rate=lr, num_slots=slots)
-                for seed in (7, 8):
-                    assert f"grid-gpt2-{token}-seed{seed}_gain" in names
-                assert f"grid-gpt2-{token}_gain_mean" in names
-                assert f"grid-gpt2-{token}_gain_spread" in names
-        # 3 corpus rows + 4 cells * (2 seeds + mean + spread)
-        assert len(names) == 3 + 4 * 4
+        for cell in TINY_CELLS:
+            token = cell["token"]
+            for seed in (7, 8):
+                assert f"grid-gpt2-{token}-seed{seed}_gain" in names
+            assert f"grid-gpt2-{token}_gain_mean" in names
+            assert f"grid-gpt2-{token}_gain_spread" in names
+        # 3 corpus rows + 2 cells * (2 seeds + mean + spread)
+        assert len(names) == 3 + 2 * 4
         assert _LOADS == ["gpt2"]
 
     def test_a_cells_summary_derives_from_exactly_its_own_rows(
@@ -162,27 +173,19 @@ class TestMeasureSoloGrid:
             model_id="gpt2",
             load_precision=None,
             seeds=(7, 8),
-            learning_rates=(0.05,),
-            slot_counts=(2,),
+            cells=TINY_CELLS[:1],
             device="cpu",
         )
         recorded = {o["name"]: o["value"] for o in observations}
-        token = grid.cell_token(learning_rate=0.05, num_slots=2)
-        gains = [
-            recorded[f"grid-gpt2-{token}-seed7_gain"],
-            recorded[f"grid-gpt2-{token}-seed8_gain"],
-        ]
-        assert recorded[f"grid-gpt2-{token}_gain_mean"] == sum(gains) / 2
-        assert recorded[f"grid-gpt2-{token}_gain_spread"] == max(gains) - min(gains)
+        gains = [recorded["grid-gpt2-a-seed7_gain"], recorded["grid-gpt2-a-seed8_gain"]]
+        assert recorded["grid-gpt2-a_gain_mean"] == sum(gains) / 2
+        assert recorded["grid-gpt2-a_gain_spread"] == max(gains) - min(gains)
 
-    def test_the_anchor_cell_equals_an_independent_solo_recomputation(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """The in-grid reproduction contract, in miniature.
-
-        A cell run inside the grid must equal the same training run
-        standalone -- same seed, same knobs, same split -- or the anchor
-        cell could not stand in for the recorded solo run.
+    def test_a_cell_equals_an_independent_solo_recomputation(self, tmp_path: pathlib.Path) -> None:
+        """The reproduction contract in miniature: a cell run inside the
+        walk equals the same training run standalone -- same seed, same
+        knobs, same split -- which is what lets the anchor cell stand in
+        for the certified solo record.
         """
         alpha = _staged(tmp_path, "alpha")
 
@@ -191,8 +194,7 @@ class TestMeasureSoloGrid:
             model_id="gpt2",
             load_precision=None,
             seeds=(7,),
-            learning_rates=(0.05,),
-            slot_counts=(2,),
+            cells=TINY_CELLS[1:],
             device="cpu",
         )
         recorded = {o["name"]: o["value"] for o in observations}
@@ -203,13 +205,12 @@ class TestMeasureSoloGrid:
             build_windows(encoded, window=8, device="cpu"), held_out_stride=3
         )
         base = require_cache_capable(_fake_model("gpt2", None))
-        slots = train_cartridge(base, train, num_slots=2, seed=7, epochs=1, learning_rate=0.05)
+        slots = train_cartridge(base, train, num_slots=3, seed=7, epochs=2, learning_rate=0.02)
         expected = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
 
-        token = grid.cell_token(learning_rate=0.05, num_slots=2)
-        assert recorded[f"grid-gpt2-{token}-seed7_gain"] == expected
+        assert recorded["grid-gpt2-b-seed7_gain"] == expected
 
-    def test_empty_axes_and_seeds_are_refused(self, tmp_path: pathlib.Path) -> None:
+    def test_empty_inputs_and_colliding_tokens_are_refused(self, tmp_path: pathlib.Path) -> None:
         alpha = _staged(tmp_path, "alpha")
         with pytest.raises(ValueError, match="no seeds named"):
             grid.measure_solo_grid(
@@ -217,71 +218,103 @@ class TestMeasureSoloGrid:
                 model_id="gpt2",
                 load_precision=None,
                 seeds=(),
-                learning_rates=(0.05,),
-                slot_counts=(2,),
+                cells=TINY_CELLS,
                 device="cpu",
             )
-        with pytest.raises(ValueError, match="no learning rates named"):
+        with pytest.raises(ValueError, match="no cells named"):
             grid.measure_solo_grid(
                 alpha,
                 model_id="gpt2",
                 load_precision=None,
                 seeds=(7,),
-                learning_rates=(),
-                slot_counts=(2,),
+                cells=(),
                 device="cpu",
             )
-        with pytest.raises(ValueError, match="no slot counts named"):
+        collided: grid.SoloGridCell = {
+            "token": "a",
+            "learning_rate": 0.02,
+            "num_slots": 3,
+            "epochs": 2,
+        }
+        colliding = (TINY_CELLS[0], collided)
+        with pytest.raises(ValueError, match="duplicate cell token"):
             grid.measure_solo_grid(
                 alpha,
                 model_id="gpt2",
                 load_precision=None,
                 seeds=(7,),
-                learning_rates=(0.05,),
-                slot_counts=(),
+                cells=colliding,
                 device="cpu",
             )
 
 
-class TestGridConstants:
-    def test_the_axes_bracket_the_recorded_knobs(self) -> None:
-        assert grid.GRID_LEARNING_RATES == (0.001, 0.003, 0.01, 0.03)
-        assert grid.GRID_SLOT_COUNTS == (64, 256)
-        assert grid.ANCHOR_LEARNING_RATE in grid.GRID_LEARNING_RATES
-        assert grid.ANCHOR_SLOTS in grid.GRID_SLOT_COUNTS
+class TestDeclaredSets:
+    def test_the_grid_set_preserves_the_certified_record_forms(self) -> None:
+        """Tokens and label segment byte-equal to the bc18d701 record's."""
+        assert grid.GRID_CELL_SET["name"] == "grid"
+        assert grid.GRID_CELL_SET["label_segment"] == "l4-c2"
+        assert tuple(cell["token"] for cell in grid.GRID_CELL_SET["cells"]) == (
+            "lr0.001-c64",
+            "lr0.001-c256",
+            "lr0.003-c64",
+            "lr0.003-c256",
+            "lr0.01-c64",
+            "lr0.01-c256",
+            "lr0.03-c64",
+            "lr0.03-c256",
+        )
+        assert all(cell["epochs"] == 12 for cell in grid.GRID_CELL_SET["cells"])
 
-    def test_the_anchor_is_the_recorded_plan_rows_knobs(self) -> None:
-        """The in-grid anchor must be byte-equal to the recorded solo knobs.
+    def test_the_epochs_line_varies_exposure_alone(self) -> None:
+        cells = grid.EPOCHS_LINE_CELL_SET["cells"]
+        assert grid.EPOCHS_LINE_CELL_SET["name"] == "epochs-line"
+        assert grid.EPOCHS_LINE_CELL_SET["label_segment"] == "e12.24.48"
+        assert tuple(cell["epochs"] for cell in cells) == (12, 24, 48)
+        assert all(cell["learning_rate"] == grid.ANCHOR_LEARNING_RATE for cell in cells)
+        assert all(cell["num_slots"] == grid.ANCHOR_SLOTS for cell in cells)
 
-        Asserted against the PRODUCTION row, not the test fake: this is
-        the contract that lets the anchor cell reproduce the recorded
-        nine-seed solo record.
+    def test_the_anchor_configuration_is_shared_verbatim_and_is_the_recorded_row(
+        self,
+    ) -> None:
+        """Both sets carry the identical anchor cell, and its knobs are
+        the recorded plan row's -- the contract that lets one cell pair
+        by name across records and reproduce the certified solo runs.
         """
+        grid_anchor = grid.GRID_CELL_SET["cells"][4]
+        line_anchor = grid.EPOCHS_LINE_CELL_SET["cells"][0]
+        assert grid_anchor == line_anchor
+        assert grid_anchor["token"] == grid.ANCHOR_TOKEN
         row = BASE_LORA_SWEEP_PLANS[GEOMETRY_PLAN_NAME]
         assert row["learning_rate"] == grid.ANCHOR_LEARNING_RATE
         assert row["slots"] == grid.ANCHOR_SLOTS
+        assert row["epochs"] == grid.ANCHOR_EPOCHS
+        assert grid_anchor["learning_rate"] == grid.ANCHOR_LEARNING_RATE
+        assert grid_anchor["num_slots"] == grid.ANCHOR_SLOTS
+        assert grid_anchor["epochs"] == grid.ANCHOR_EPOCHS
 
-    def test_the_cell_token_is_stable(self) -> None:
-        assert grid.cell_token(learning_rate=0.003, num_slots=256) == "lr0.003-c256"
+    def test_the_selector_resolves_both_sets_and_refuses_others(self) -> None:
+        assert grid.cell_set_for("grid") == grid.GRID_CELL_SET
+        assert grid.cell_set_for("epochs-line") == grid.EPOCHS_LINE_CELL_SET
+        with pytest.raises(ValueError, match="unknown cell set"):
+            grid.cell_set_for("warmup-line")
 
-    def test_the_label_names_both_axes(self) -> None:
+    def test_the_label_carries_the_sets_declared_segment(self) -> None:
         label = grid.solo_grid_label(
             model_id="EleutherAI/pythia-6.9b",
             seeds=SOLO_SEEDS,
-            learning_rates=grid.GRID_LEARNING_RATES,
-            slot_counts=grid.GRID_SLOT_COUNTS,
+            label_segment=grid.EPOCHS_LINE_CELL_SET["label_segment"],
             precision_token="-storedbf16",
             digest="0" * 12,
         )
-        assert label == "cartridge-solo-grid-pythia-6.9b-storedbf16-l4-c2-n9-000000000000"
+        assert label == "cartridge-solo-grid-pythia-6.9b-storedbf16-e12.24.48-n9-000000000000"
 
 
 class TestMain:
-    def test_main_walks_the_production_grid_and_writes_the_record(
+    def test_main_walks_the_selected_set_and_writes_the_record(
         self, tmp_path: pathlib.Path
     ) -> None:
         alpha = _staged(tmp_path, "alpha")
-        out = tmp_path / "record" / "grid.json"
+        out = tmp_path / "record" / "line.json"
 
         code = grid.main(
             [
@@ -289,6 +322,8 @@ class TestMain:
                 "gpt2",
                 "--precision",
                 "policy",
+                "--cells",
+                "epochs-line",
                 "--corpus",
                 str(alpha),
                 "--device",
@@ -301,19 +336,17 @@ class TestMain:
         assert code == 0
         record = decode_run_record(load_json_str(out.read_text(encoding="utf-8")))
         assert record["experiment"] == grid.SOLO_GRID_EXPERIMENT
-        assert record["label"].startswith("cartridge-solo-grid-gpt2-l4-c2-n9-")
+        assert record["label"].startswith("cartridge-solo-grid-gpt2-e12.24.48-n9-")
         names = {o["name"] for o in record["observations"]}
-        for lr in grid.GRID_LEARNING_RATES:
-            for slots in grid.GRID_SLOT_COUNTS:
-                token = grid.cell_token(learning_rate=lr, num_slots=slots)
-                assert f"grid-gpt2-{token}_gain_mean" in names
+        for cell in grid.EPOCHS_LINE_CELL_SET["cells"]:
+            assert f"grid-gpt2-{cell['token']}_gain_mean" in names
         assert _LOADS == ["gpt2"]
 
     def test_entrypoint_reads_process_argv_and_exits_with_mains_code(
         self, tmp_path: pathlib.Path
     ) -> None:
         alpha = _staged(tmp_path, "alpha")
-        out = tmp_path / "grid.json"
+        out = tmp_path / "line.json"
         saved = sys.argv
         sys.argv = [
             "prog",
@@ -321,6 +354,8 @@ class TestMain:
             "gpt2",
             "--precision",
             "policy",
+            "--cells",
+            "epochs-line",
             "--corpus",
             str(alpha),
             "--device",
@@ -339,7 +374,7 @@ class TestMain:
 
     def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
         alpha = _staged(tmp_path, "alpha")
-        out = tmp_path / "module" / "grid.json"
+        out = tmp_path / "module" / "line.json"
         module_name = "model_trainer.cli.cartridge_solo_grid"
         saved_argv = sys.argv
         saved_module = sys.modules.pop(module_name, None)
@@ -349,6 +384,8 @@ class TestMain:
             "gpt2",
             "--precision",
             "policy",
+            "--cells",
+            "epochs-line",
             "--corpus",
             str(alpha),
             "--device",
