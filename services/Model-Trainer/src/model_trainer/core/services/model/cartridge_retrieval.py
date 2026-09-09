@@ -197,22 +197,113 @@ def score_chunk(index: Bm25Index, query_terms: Sequence[str], chunk: int) -> flo
     """
     frequencies = index["term_frequencies"][chunk]
     length = index["chunk_lengths"][chunk]
-    total_chunks = len(index["chunks"])
     score = 0.0
     for term in query_terms:
         occurrences = frequencies.get(term, 0)
         if occurrences == 0:
             continue
-        containing = index["document_frequency"][term]
-        # Lucene's non-negative IDF. The textbook form goes negative for a
-        # term in more than half the corpus, which would make a chunk score
-        # WORSE for containing a common query word than for omitting it.
-        idf = math.log(1.0 + (total_chunks - containing + 0.5) / (containing + 0.5))
+        idf = inverse_document_frequency(index, term)
         normalised = length / index["average_length"]
         k1 = index["k1"]
         b = index["b"]
         score += idf * (occurrences * (k1 + 1.0)) / (occurrences + k1 * (1.0 - b + b * normalised))
     return score
+
+
+def inverse_document_frequency(index: Bm25Index, term: str) -> float:
+    """Weigh how much a term's presence distinguishes one chunk from another.
+
+    Lucene's non-negative form. The textbook IDF goes negative for a term in
+    more than half the corpus, which would make a chunk score WORSE for
+    containing a common query word than for omitting it, so a query of common
+    words would rank the least relevant chunks first.
+
+    A FUNCTION RATHER THAN A LINE INSIDE :func:`score_chunk`, because query
+    expansion needs the same weight to decide which terms are worth adding.
+    Two copies of this expression would be two things to keep in step, and
+    the one place they must agree is precisely where expansion picks a term
+    and scoring then rewards it.
+
+    Args:
+        index: The index the term is weighed against.
+        term: The term to weigh. Must occur in the index's document
+            frequencies; a term the corpus has never seen has no weight here
+            rather than a default one.
+
+    Returns:
+        The inverse document frequency, always non-negative.
+    """
+    containing = index["document_frequency"][term]
+    return math.log(1.0 + (len(index["chunks"]) - containing + 0.5) / (containing + 0.5))
+
+
+def expand_query(
+    index: Bm25Index, query: str, *, feedback_chunks: int, expansion_terms: int
+) -> str:
+    """Widen a query with terms drawn from its own best first results.
+
+    PSEUDO-RELEVANCE FEEDBACK, and the "pseudo" is the whole assumption: the
+    top chunks of the first search are TREATED as relevant without anyone
+    checking, their distinctive terms are added to the query, and the search
+    is run again. Where the first results were good this recovers documents
+    that say the same thing in different words -- the vocabulary mismatch a
+    lexical retriever otherwise cannot cross. Where the first results were
+    bad it amplifies the error, which is why the arm using this is reported
+    beside plain BM25 rather than replacing it.
+
+    TERMS ARE RANKED BY THE SAME IDF THAT WILL SCORE THEM, via
+    :func:`inverse_document_frequency`, weighted by how often they occur in
+    the feedback set. Ranking by raw count would promote whatever is common
+    in the corpus; ranking by IDF alone would promote whatever is rarest,
+    which in a wiki is a typo. The product is the term that is both
+    characteristic of these chunks and discriminating in general.
+
+    Args:
+        index: The index to search and to weigh terms against.
+        query: The original question, as the asker wrote it.
+        feedback_chunks: How many top results to mine for terms. The
+            "pseudo-relevant" set.
+        expansion_terms: How many terms to add.
+
+    Returns:
+        The original query with the chosen terms appended. Returned whole
+        rather than as a term list, so the caller passes it to the same
+        :func:`retrieve` a plain arm uses and the two arms differ in nothing
+        but this string.
+    """
+    original = set(terms(query))
+    ranked = rank_chunks(index, query)[:feedback_chunks]
+    weighted: dict[str, float] = {}
+    for chunk in ranked:
+        for term, occurrences in index["term_frequencies"][chunk].items():
+            if term in original:
+                continue
+            weighted[term] = weighted.get(term, 0.0) + occurrences * inverse_document_frequency(
+                index, term
+            )
+    # Ties break on the term itself, so an expansion is a function of the
+    # corpus and the query and nothing else -- the same property `retrieve`
+    # holds, and for the same reason: two runs of one plan must agree.
+    chosen = sorted(weighted.items(), key=_by_weight_then_term)[:expansion_terms]
+    return " ".join([query, *(term for term, _weight in chosen)])
+
+
+def _by_weight_then_term(scored: tuple[str, float]) -> tuple[float, str]:
+    """Order expansion candidates, heaviest first and ties by term.
+
+    A NAMED FUNCTION RATHER THAN A LAMBDA because this package forbids ``Any``
+    expressions: a lambda's parameter is inferred as ``Any`` at a ``sorted``
+    key position, and the subscripts inside it then are too.
+
+    Args:
+        scored: A ``(term, weight)`` pair.
+
+    Returns:
+        The sort key: negated weight first so heavier sorts earlier, then the
+        term itself so the order is total.
+    """
+    term, weight = scored
+    return (-weight, term)
 
 
 def retrieve(index: Bm25Index, query: str) -> str:
@@ -361,7 +452,9 @@ __all__ = [
     "RRF_K",
     "Bm25Index",
     "build_index",
+    "expand_query",
     "fuse_by_reciprocal_rank",
+    "inverse_document_frequency",
     "join_chunks",
     "rank_chunks",
     "retrieve",

@@ -69,6 +69,8 @@ TINY_PLAN: QaPlan = {
     "bm25_k1": 1.5,
     "bm25_b": 0.75,
     "retrieved_chunks": 5,
+    "expansion_feedback_chunks": 2,
+    "expansion_terms": 3,
 }
 
 #: Six documents, each naming its own subject in several sentences.

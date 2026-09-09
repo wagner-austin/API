@@ -163,6 +163,106 @@ class TestTheScoringParametersAreActuallyParameters:
         assert index["retrieved_chunks"] == 3
 
 
+class TestExpandQuery:
+    """Searching twice, and the two ways that can go."""
+
+    #: A corpus where the question's words and the answer's words differ,
+    #: which is the failure ranking alone cannot fix.
+    _VOCAB = (
+        "The vessel submerges using ballast. "
+        "Ballast tanks flood to trim the craft at depth. "
+        "Depth control depends on trim and on flooding rate.",
+    )
+
+    def test_it_adds_terms_the_question_did_not_contain(self) -> None:
+        """The whole mechanism: reach words the asker did not use.
+
+        WHAT IT DOES NOT ADD IS THE INTERESTING HALF, and this test was
+        written asserting the wrong thing first. "ballast" is the obvious
+        expansion of a question about submerging, and it is NOT chosen: it
+        occurs in two of the three chunks, so its inverse document frequency
+        is lower than that of terms occurring once. The arm adds what
+        DISCRIMINATES between chunks, not what a reader would free-associate,
+        and asserting the latter would have pinned an intuition rather than
+        the algorithm.
+        """
+        question = "How does the vessel submerge?"
+        index = standard_index(self._VOCAB)
+
+        expanded = retrieval.expand_query(index, question, feedback_chunks=2, expansion_terms=3)
+
+        assert expanded.startswith(question)
+        added = set(retrieval.terms(expanded)) - set(retrieval.terms(question))
+        assert len(added) == 3
+        # Every added term came from the corpus rather than from nowhere.
+        assert added <= set(retrieval.terms(self._VOCAB[0]))
+        # And the rarer terms outrank the twice-occurring one.
+        assert retrieval.inverse_document_frequency(
+            index, next(iter(added))
+        ) >= retrieval.inverse_document_frequency(index, "ballast")
+
+    def test_it_never_re_adds_a_term_the_query_already_has(self) -> None:
+        """Repeating a query term would reweight the original, not expand it."""
+        index = standard_index(self._VOCAB)
+        query = "ballast trim depth"
+
+        expanded = retrieval.expand_query(index, query, feedback_chunks=3, expansion_terms=4)
+
+        original = retrieval.terms(query)
+        added = [term for term in retrieval.terms(expanded) if term not in original]
+        assert len(set(added)) == len(added)
+        assert not set(added) & set(original)
+
+    def test_asking_for_no_terms_returns_the_query_unchanged(self) -> None:
+        """The identity case has to be the identity, not a near miss."""
+        index = standard_index(self._VOCAB)
+
+        assert (
+            retrieval.expand_query(index, "ballast", feedback_chunks=2, expansion_terms=0)
+            == "ballast"
+        )
+
+    def test_the_expansion_is_a_function_of_the_corpus_and_the_query_alone(self) -> None:
+        """Two runs of one plan must agree, so ties break on the term."""
+        index = standard_index(self._VOCAB)
+
+        first = retrieval.expand_query(index, "trim", feedback_chunks=3, expansion_terms=6)
+        second = retrieval.expand_query(index, "trim", feedback_chunks=3, expansion_terms=6)
+
+        assert first == second
+
+    def test_a_wider_feedback_set_can_change_what_is_added(self) -> None:
+        """Which chunks are assumed relevant is the arm's central assumption.
+
+        If this were inert the parameter would be decoration, and the arm
+        would be reporting a setting it does not actually respond to.
+        """
+        index = standard_index(self._VOCAB)
+
+        narrow = retrieval.expand_query(index, "submerges", feedback_chunks=1, expansion_terms=2)
+        wide = retrieval.expand_query(index, "submerges", feedback_chunks=3, expansion_terms=2)
+
+        assert narrow != wide
+
+
+class TestInverseDocumentFrequency:
+    """The weight expansion and scoring must agree on."""
+
+    def test_a_term_in_every_chunk_still_weighs_above_zero(self) -> None:
+        """Lucene's non-negative form, asserted where it is now shared."""
+        index = standard_index(("shared alpha.", "shared beta.", "shared gamma."))
+
+        assert retrieval.inverse_document_frequency(index, "shared") > 0.0
+
+    def test_a_rarer_term_weighs_more(self) -> None:
+        index = standard_index(("shared alpha.", "shared beta.", "shared gamma."))
+
+        rare = retrieval.inverse_document_frequency(index, "alpha")
+        common = retrieval.inverse_document_frequency(index, "shared")
+
+        assert rare > common
+
+
 class TestRetrieve:
     def test_it_finds_the_chunk_the_question_is_about(self) -> None:
         found = retrieval.retrieve(

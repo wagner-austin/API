@@ -30,6 +30,7 @@ from model_trainer.core.services.model.cartridge_qa import (
 )
 from model_trainer.core.services.model.cartridge_retrieval import (
     Bm25Index,
+    expand_query,
     join_chunks,
     retrieve,
 )
@@ -208,8 +209,71 @@ def ranked_retrieval_items(
     ]
 
 
+def expanded_retrieval_items(
+    items: Sequence[ClozeItem],
+    index: Bm25Index,
+    encoder: Encoder,
+    *,
+    max_seq_len: int,
+    feedback_chunks: int,
+    expansion_terms: int,
+) -> list[ClozeItem]:
+    """Build the arm that searches twice, the second time with better words.
+
+    THE ONE FAILURE A LEXICAL RETRIEVER CANNOT FIX BY RANKING BETTER is a
+    question that shares no vocabulary with the sentence answering it. BM25
+    matches terms; where the asker and the corpus chose different words for
+    the same thing, no amount of saturation tuning reaches the right chunk.
+    Query expansion is the standard lexical answer: take the first search's
+    top results as though they were relevant, mine their distinctive terms,
+    and search again.
+
+    IT CAN MAKE THINGS WORSE AND IS REPORTED BESIDE PLAIN BM25 FOR THAT
+    REASON. The feedback set is assumed relevant, never checked -- so where
+    the first search was wrong, expansion adds the vocabulary of the wrong
+    chunks and the second search is more confidently wrong. That is a real
+    property of the method rather than a defect here, and the two arms
+    sharing one index and one question set is what makes the difference
+    readable.
+
+    Args:
+        items: The shared question set.
+        index: A BM25 index over the same training documents the other arms
+            draw their evidence from.
+        encoder: Tokenizer the scorer will use.
+        max_seq_len: The scorer's token budget.
+        feedback_chunks: How many first-pass results to mine for terms.
+        expansion_terms: How many terms to add to the query.
+
+    Returns:
+        One item per input, each carrying what the twice-searched query found.
+
+    Raises:
+        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
+            when an item leaves no room for evidence.
+    """
+    return [
+        with_evidence(
+            item,
+            retrieve(
+                index,
+                expand_query(
+                    index,
+                    item["template"].replace(BLANK_MARKER, " "),
+                    feedback_chunks=feedback_chunks,
+                    expansion_terms=expansion_terms,
+                ),
+            ),
+            encoder,
+            max_seq_len=max_seq_len,
+        )
+        for item in items
+    ]
+
+
 __all__ = [
     "bm25_retrieval_items",
+    "expanded_retrieval_items",
     "long_context_items",
     "ranked_retrieval_items",
     "retrieval_items",

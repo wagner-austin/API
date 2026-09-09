@@ -99,6 +99,14 @@ class QaPlan(TypedDict):
         bm25_b: BM25 length normalisation for the retrieval arms.
         retrieved_chunks: How many chunks the retrieval arms return per
             question, and the cutoff the dense and fused arms take too.
+        expansion_feedback_chunks: How many first-pass results the
+            query-expansion arm treats as relevant and mines for terms.
+        expansion_terms: How many terms that arm adds to the query.
+
+            Declared for the same reason the BM25 knobs are. Expansion has
+            no standard setting -- it trades recall for the risk of
+            amplifying a bad first search -- so an arm reported without
+            them says nothing a reader can reproduce.
 
             THESE THREE WERE MODULE CONSTANTS in ``cartridge_retrieval`` --
             1.5, 0.75 and 5 -- which is how "the cartridge beats BM25" came
@@ -127,6 +135,8 @@ class QaPlan(TypedDict):
     bm25_k1: float
     bm25_b: float
     retrieved_chunks: int
+    expansion_feedback_chunks: int
+    expansion_terms: int
 
 
 #: Fixed rather than a flag, and distinct from the loss experiment's name.
@@ -280,6 +290,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     # THE SCALE LADDER. Every field except `model_id` is copied from
     # `gpt2-wiki-qa` deliberately: the 2026-09-07 verdict -- that a cartridge
@@ -310,6 +322,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-large-wiki-qa": {
         "model_id": "gpt2-large",
@@ -328,6 +342,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-xl-wiki-qa": {
         "model_id": "gpt2-xl",
@@ -346,6 +362,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     # THE POWERED PLANS, and the reason they exist is arithmetic rather than
     # taste. The me-wiki corpus yields 32 items, and a comparison of two
@@ -383,6 +401,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-large-api-wiki-qa": {
         "model_id": "gpt2-large",
@@ -401,6 +421,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     # THE RUNG ABOVE THE GPT-2 FAMILY, and the reason it did not exist until
     # 2026-09-09 is that nobody wrote it. The ladder stopped at gpt2-xl
@@ -433,6 +455,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     # THE CAPACITY AXIS, WHICH HAD NEVER BEEN VARIED. `num_slots` was 128 in
     # every plan above, six times over, while the programme's stated mechanism
@@ -464,6 +488,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-large-api-wiki-qa-slots-64": {
         "model_id": "gpt2-large",
@@ -482,6 +508,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-large-api-wiki-qa-slots-128": {
         "model_id": "gpt2-large",
@@ -500,6 +528,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
     "gpt2-large-api-wiki-qa-slots-256": {
         "model_id": "gpt2-large",
@@ -518,6 +548,8 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "bm25_k1": 1.5,
         "bm25_b": 0.75,
         "retrieved_chunks": 5,
+        "expansion_feedback_chunks": 3,
+        "expansion_terms": 5,
     },
 }
 

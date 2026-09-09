@@ -80,6 +80,8 @@ def _redrawn(
         bm25_k1=plan["bm25_k1"],
         bm25_b=plan["bm25_b"],
         retrieved_chunks=plan["retrieved_chunks"],
+        expansion_feedback_chunks=plan["expansion_feedback_chunks"],
+        expansion_terms=plan["expansion_terms"],
     )
 
 

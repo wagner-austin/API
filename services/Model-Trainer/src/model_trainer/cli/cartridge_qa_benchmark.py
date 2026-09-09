@@ -72,6 +72,7 @@ from model_trainer.core.services.model.cartridge_plans import (
 from model_trainer.core.services.model.cartridge_qa import answer_nll_pairs, compare_arms
 from model_trainer.core.services.model.cartridge_qa_arms import (
     bm25_retrieval_items,
+    expanded_retrieval_items,
     long_context_items,
     ranked_retrieval_items,
     retrieval_items,
@@ -291,6 +292,33 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     )
     wait()
     fused_seconds = clock() - started
+    # SEARCHING TWICE, the second time with terms mined from the first pass.
+    # Reported beside plain BM25 rather than replacing it: expansion assumes
+    # its feedback set is relevant and never checks, so where the first
+    # search was wrong it adds the wrong vocabulary and the second search is
+    # more confidently wrong. The two arms share one index and one question
+    # set, which is what makes the difference readable.
+    expanded_set = expanded_retrieval_items(
+        items,
+        index,
+        encoder,
+        max_seq_len=max_seq,
+        feedback_chunks=plan["expansion_feedback_chunks"],
+        expansion_terms=plan["expansion_terms"],
+    )
+    wait()
+    started = clock()
+    scored_expanded = score_cloze_items(
+        items=expanded_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    )
+    wait()
+    expanded_seconds = clock() - started
+    _log.info(
+        "expanded %.4f against bm25 %.4f",
+        scored_expanded["accuracy"],
+        scored_real["accuracy"],
+    )
+
     # THE ARM THAT SKIPS RETRIEVAL ENTIRELY, and the one a reader assumes
     # has already been run. Everything above searches; this simply hands the
     # model the corpus and lets the window truncate it. Its coverage is
@@ -364,6 +392,12 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
         Observation(name="dense_accuracy", value=scored_dense["accuracy"]),
         Observation(name="fused_accuracy", value=scored_fused["accuracy"]),
+        Observation(name="expanded_accuracy", value=scored_expanded["accuracy"]),
+        Observation(
+            name="expanded_accuracy_gain_over_bm25",
+            value=scored_expanded["accuracy"] - scored_real["accuracy"],
+        ),
+        Observation(name="expanded_serve_seconds", value=expanded_seconds),
         Observation(name="long_context_accuracy", value=scored_long_context["accuracy"]),
         Observation(
             name="long_context_accuracy_gain",
