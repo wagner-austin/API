@@ -57,6 +57,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
     noise_floor,
+    per_seed_observations,
     replicate,
 )
 from model_trainer.core.run_fingerprint import (
@@ -316,6 +317,7 @@ def measure_grid(
         arm = replicate(f"companion-cross-{member}", gains)
         _log.info("companion-cross-%d: %+.4f on the primary held-out", member, arm["mean"])
         observations.extend(gain_observations(arm))
+        observations.extend(per_seed_observations(arm))
 
     composed_arms: list[ReplicatedGain] = []
     for count in plan["compartment_counts"]:

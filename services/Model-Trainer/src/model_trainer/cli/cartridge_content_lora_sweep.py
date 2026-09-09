@@ -299,12 +299,6 @@ def measure_grid(
         observations.extend(
             cell_observations(plain_name, alone, composed, untrained_composed, cross)
         )
-        # The seed pairing is the evidence (the noise-floor finding on task
-        # 1fc5afed): means and spreads cannot answer a paired question after
-        # the fact, so every arm's per-seed gains join the record. Additive
-        # rows only; every recorded cell name is untouched.
-        for measurement in (alone, composed, untrained_composed, *cross):
-            observations.extend(per_seed_observations(measurement))
 
         diverse_name = f"lora-diverse-n{count}"
         alone, composed, untrained_composed, cross = measure_varied_companioned_scaling(
@@ -327,12 +321,6 @@ def measure_grid(
         observations.extend(
             cell_observations(diverse_name, alone, composed, untrained_composed, cross)
         )
-        # The seed pairing is the evidence (the noise-floor finding on task
-        # 1fc5afed): means and spreads cannot answer a paired question after
-        # the fact, so every arm's per-seed gains join the record. Additive
-        # rows only; every recorded cell name is untouched.
-        for measurement in (alone, composed, untrained_composed, *cross):
-            observations.extend(per_seed_observations(measurement))
 
     plain_floor = noise_floor(plain_arms)
     observations.append(Observation(name="lora-plain_composed_noise_floor", value=plain_floor))

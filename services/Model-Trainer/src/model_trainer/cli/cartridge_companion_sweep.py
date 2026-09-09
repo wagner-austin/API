@@ -51,6 +51,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
     noise_floor,
+    per_seed_observations,
     retention,
 )
 from model_trainer.core.run_fingerprint import (
@@ -207,6 +208,25 @@ def cell_observations(
     'alone did not improve on base', checkable from the alone mean's sign
     in the same record.
 
+    THE PER-SEED GAINS ARE EMITTED HERE, not by the callers. They were added
+    on task 1fc5afed because means and spreads cannot answer a paired
+    question after the fact, and that fix went into two of this function's
+    six callers as a loop beside the call. The other four kept emitting mean
+    and spread alone, which is a difference nothing declared and nothing
+    checked.
+
+    It cost a real answer. Task 91e12be1 tried to settle whether the diverse
+    n8 arm separates from the same-content pool at 0.097017 against a 0.069734
+    floor -- 1.3912x, inside the band where a range and a paired t-test
+    disagree -- and could not, because ``cartridge_diverse_companion_sweep``
+    and ``cartridge_companion_sweep`` are two of the four. The values existed
+    in memory at write time and were dropped; the cluster artifacts and the
+    job logs were both checked and neither carries them.
+
+    A shared assembly function is the place a rule like this survives a new
+    caller, which is why it moved in here rather than being copied a third
+    and fourth time.
+
     Args:
         arm: The cell's name, e.g. ``"noise-p0.5-n4"``.
         alone: The solo-cost arm.
@@ -215,12 +235,14 @@ def cell_observations(
         cross: One cross-gain arm per other corpus.
 
     Returns:
-        Gain observations for every arm, the retention ratio where it is
-        readable, and the composed-versus-untrained interference verdict.
+        Gain observations for every arm, each arm's per-seed gains, the
+        retention ratio where it is readable, and the composed-versus-untrained
+        interference verdict.
     """
     named: list[Observation] = []
     for measured in [alone, composed, untrained_composed, *cross]:
         named.extend(gain_observations(measured))
+        named.extend(per_seed_observations(measured))
     if alone["mean"] > 0.0:
         named.append(Observation(name=f"{arm}_retention", value=retention(alone, composed)))
     named.extend(

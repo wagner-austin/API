@@ -47,9 +47,10 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
-from model_trainer.core.contracts.cloze import ClozeItem
+from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem
 from model_trainer.core.contracts.replicated_measurement import (
     gain_observations,
+    per_seed_observations,
     replicate,
 )
 from model_trainer.core.encoding import Encoder
@@ -71,10 +72,12 @@ from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     require_cartridge_plan,
 )
+from model_trainer.core.services.model.cartridge_dense import dense_ranking
 from model_trainer.core.services.model.cartridge_qa import (
     answer_nll_pairs,
     bm25_retrieval_items,
     compare_arms,
+    ranked_retrieval_items,
     retrieval_items,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import (
@@ -82,7 +85,13 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     QaPlan,
     qa_plan_label,
 )
-from model_trainer.core.services.model.cartridge_retrieval import build_index
+from model_trainer.core.services.model.cartridge_question_set import build_question_set
+from model_trainer.core.services.model.cartridge_retrieval import (
+    RETRIEVED_CHUNKS,
+    build_index,
+    fuse_by_reciprocal_rank,
+    rank_chunks,
+)
 from model_trainer.core.services.model.cloze.score import score_cloze_items
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.corpus_cloze import build_items
@@ -96,85 +105,6 @@ DEVICE_FLAG = "--device"
 OUT_FLAG = "--out"
 
 _FLAGS = (PLAN_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
-
-
-def build_question_set(
-    documents: Sequence[str],
-    encoded: Sequence[Sequence[int]],
-    encoder: Encoder,
-    plan: QaPlan,
-) -> tuple[list[ClozeItem], str]:
-    """Split a corpus and build items from the half the cartridge will not read.
-
-    The split is by window, not by document, and that is what makes the set
-    answerable. Pages here are about different projects, so a document-level
-    split would leave held-out terms that appear nowhere in the training text
-    and every item would be unanswerable from the corpus. Splitting within
-    each page keeps a term learnable from the windows the cartridge trains on
-    while testing it in a sentence those windows do not contain.
-
-    The window text is recovered by DECODING the ids rather than by slicing
-    the document string, because the split is defined on tokens and a
-    character offset cannot name a token boundary.
-
-    Args:
-        documents: Document bodies, in the order they were encoded.
-        encoded: Token ids for each document.
-        encoder: Tokenizer, used to read each window's text back.
-        plan: The measurement being run.
-
-    Returns:
-        ``(items, training_text)``. A plain pair rather than a named record:
-        the two have different types, so nothing can transpose them, and a
-        class holding them would carry no behaviour of its own.
-
-    Raises:
-        AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` when the corpus cannot
-            supply windows, a split, or items.
-    """
-    owners = window_documents(encoded, window=plan["window"])
-    stride = plan["held_out_stride"]
-    windows_per_document = Counter(owners)
-    held_by_document: dict[int, list[str]] = {}
-    training: list[str] = []
-    seen_per_document: dict[int, int] = {}
-    for owner in owners:
-        start = seen_per_document.get(owner, 0)
-        seen_per_document[owner] = start + 1
-        window = plan["window"]
-        text = encoder.decode(list(encoded[owner])[start * window : (start + 1) * window])
-        # THE STRIDE COUNTS WITHIN A DOCUMENT, NOT ACROSS THE CORPUS, and the
-        # first version of this counted across. That made which pages get
-        # tested a function of where their windows happened to land in the
-        # global sequence: measured on the twelve public me-wiki pages,
-        # THREE OF TWELVE held out nothing at all. Those pages were trained
-        # on and never examined, so the cartridge was fitted to twelve pages
-        # and scored on nine -- silently, because a short question set looks
-        # exactly like a short corpus.
-        #
-        # A SINGLE-WINDOW DOCUMENT IS TRAINED ON AND NOT TESTED. It cannot be
-        # both: holding out its only window would leave its terms absent from
-        # the training text, and `build_items` would then correctly refuse
-        # every item drawn from it as unanswerable. Training is the useful
-        # half -- its terms stay learnable and can serve as other pages'
-        # distractors -- so that is the side it goes to.
-        if windows_per_document[owner] > 1 and start % stride == 0:
-            held_by_document.setdefault(owner, []).append(text)
-        else:
-            training.append(text)
-    held_documents = [
-        " ".join(held_by_document.get(document, [])) for document in range(len(documents))
-    ]
-    training_text = " ".join(training)
-    return (
-        build_items(
-            held_documents,
-            training_text,
-            distractor_count=plan["distractor_count"],
-            max_items=plan["max_items"],
-        ),
-        training_text,
-    )
 
 
 def latency_observations(
@@ -356,6 +286,52 @@ def measure_qa_plan(
     wait()
     real_seconds = clock() - started
     _log.info("bm25 retrieval %.4f over %d chunks", scored_real["accuracy"], len(index["chunks"]))
+
+    # THE DENSE ARM, and the FUSION of it with BM25. All three rank the same
+    # chunks, so they differ only in HOW they choose -- which is the
+    # comparison worth making. Queries strip the blank marker for the reason
+    # `bm25_retrieval_items` documents.
+    queries = [item["template"].replace(BLANK_MARKER, " ") for item in items]
+
+    started = clock()
+    dense_ranks = [dense_ranking(index, query, _test_hooks.embed_texts) for query in queries]
+    dense_select_seconds = clock() - started
+
+    dense_set = ranked_retrieval_items(
+        items,
+        index,
+        encoder,
+        [ranking[:RETRIEVED_CHUNKS] for ranking in dense_ranks],
+        max_seq_len=max_seq,
+    )
+    wait()
+    started = clock()
+    scored_dense = score_cloze_items(
+        items=dense_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    )
+    wait()
+    dense_seconds = clock() - started
+
+    # Fusion re-uses the dense ranking rather than recomputing it, so this
+    # times the FUSION plus the lexical ranking it still needs. A deployment
+    # pays the dense arm on top; the record carries the numbers separately
+    # so a reader can add whichever total they mean.
+    started = clock()
+    fused_ranks = [
+        fuse_by_reciprocal_rank(ranking, rank_chunks(index, query), limit=RETRIEVED_CHUNKS)
+        for ranking, query in zip(dense_ranks, queries, strict=True)
+    ]
+    fused_select_seconds = clock() - started
+
+    fused_set = ranked_retrieval_items(items, index, encoder, fused_ranks, max_seq_len=max_seq)
+    wait()
+    started = clock()
+    scored_fused = score_cloze_items(
+        items=fused_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    )
+    wait()
+    fused_seconds = clock() - started
+    _log.info("dense %.4f, fused %.4f", scored_dense["accuracy"], scored_fused["accuracy"])
     _log.info("base %.4f, retrieval %.4f", scored_base["accuracy"], scored_retrieval["accuracy"])
 
     accuracy_gains: list[tuple[int, float]] = []
@@ -404,6 +380,20 @@ def measure_qa_plan(
             value=scored_retrieval["accuracy"] - scored_base["accuracy"],
         ),
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
+        Observation(name="dense_accuracy", value=scored_dense["accuracy"]),
+        Observation(name="fused_accuracy", value=scored_fused["accuracy"]),
+        Observation(name="dense_select_seconds", value=dense_select_seconds),
+        Observation(name="dense_serve_seconds", value=dense_seconds),
+        Observation(name="dense_total_serve_seconds", value=dense_seconds + dense_select_seconds),
+        Observation(name="fused_select_seconds", value=fused_select_seconds),
+        Observation(name="fused_serve_seconds", value=fused_seconds),
+        Observation(
+            name="fused_total_serve_seconds",
+            # The dense ranking is an INPUT to fusion, so a deployment pays
+            # it too. Adding it here rather than leaving the reader to notice
+            # -- the separate components are all recorded above.
+            value=fused_seconds + fused_select_seconds + dense_select_seconds,
+        ),
         Observation(name="bm25_accuracy", value=scored_real["accuracy"]),
         Observation(
             name="bm25_accuracy_gain",
@@ -421,8 +411,13 @@ def measure_qa_plan(
             value=scored_retrieval["accuracy"] - scored_real["accuracy"],
         ),
     ]
-    observations.extend(gain_observations(replicate("cartridge-accuracy-gain", accuracy_gains)))
-    observations.extend(gain_observations(replicate("cartridge-answer-nll-gain", nll_gains)))
+    # Replicated once and reused, so the summary and the per-seed rows
+    # describe the same arm rather than two independent reductions of it.
+    accuracy_arm = replicate("cartridge-accuracy-gain", accuracy_gains)
+    nll_arm = replicate("cartridge-answer-nll-gain", nll_gains)
+    for arm in (accuracy_arm, nll_arm):
+        observations.extend(gain_observations(arm))
+        observations.extend(per_seed_observations(arm))
     observations.extend(
         latency_observations(
             base_seconds=base_seconds,

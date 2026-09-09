@@ -59,6 +59,7 @@ from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
     gain_observations,
+    per_seed_observations,
     noise_floor,
     retention,
 )
@@ -260,8 +261,15 @@ def measure_sweep(
                 untrained_composed["mean"],
             )
             composed_arms.append(composed)
+            # Per-seed gains beside the summary, for the reason
+            # cell_observations states: a mean and a range cannot be asked a
+            # paired question afterwards. This sweep assembles its own cell
+            # rather than calling that helper, so the rule has to be repeated
+            # here -- and an architecture test now checks that every emitter
+            # of gain_observations also emits these.
             for measured in [alone, composed, untrained_composed, *cross]:
                 observations.extend(gain_observations(measured))
+                observations.extend(per_seed_observations(measured))
             observations.append(Observation(name=f"{arm}_slots_per_cartridge", value=float(slots)))
             observations.append(
                 Observation(name=f"{arm}_retention", value=retention(alone, composed))
