@@ -201,7 +201,7 @@ class TestLatencyObservations:
 
 class TestServeLatency:
     def test_each_arm_is_timed_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
-        """Twenty-six reads: five arms, then two per seed.
+        """Twenty-eight reads: six arms, then two per seed.
 
         The load-bearing assertions are the two totals. The cartridge's three
         seeds are scripted at 1.0, 2.0 and 3.0, so the MEAN is 2.0 and a sum
@@ -234,6 +234,8 @@ class TestServeLatency:
                 253.0,  # fused select: 3.0
                 260.0,
                 269.0,  # fused scoring: 9.0
+                270.0,
+                275.0,  # long-context scoring: 5.0
                 300.0,
                 301.0,  # seed 7: 1.0
                 400.0,
@@ -268,6 +270,8 @@ class TestServeLatency:
         # Fusion CONSUMES the dense ranking, so a deployment pays it too:
         # 9.0 scoring + 3.0 fusing + 2.0 for the dense ranking it fused.
         assert named["fused_total_serve_seconds"] == 14.0
+        # The arm that does no searching at all still pays for its tokens.
+        assert named["long_context_seconds"] == 5.0
         assert named["cartridge_serve_seconds"] == 2.0
 
     def test_the_oracle_build_is_not_folded_into_the_retrieval_arm(
@@ -304,6 +308,8 @@ class TestServeLatency:
                 17.0,  # fused select
                 17.0,
                 18.0,  # fused scoring
+                18.0,
+                19.0,  # long-context scoring
                 20.0,
                 21.0,
                 30.0,

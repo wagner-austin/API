@@ -1,30 +1,23 @@
-"""Three arms on one question set: no corpus, corpus as a prefix, corpus in context.
+"""Fitting evidence into what an item leaves, and scoring the answer once it is.
 
-THE QUESTION THE LOSS ARMS DO NOT ANSWER. Every cartridge number measured
-before this module was a held-out loss, and
+WHAT LIVES HERE AND WHAT DOES NOT, since 2026-09-09. This module holds the
+machinery every arm SHARES: how much window an item leaves for evidence, how
+evidence is attached to it, and how a candidate answer is scored once it is
+there. The CHOICE of evidence -- oracle, lexical, dense, fused, or the whole
+corpus -- is the only thing that distinguishes one arm from another, and it
+moved to :mod:`cartridge_qa_arms` when adding the long-context arm pushed this
+module through the 600-line ceiling.
+
+THE QUESTION THE LOSS ARMS DO NOT ANSWER, which is why any of this exists.
+Every cartridge number measured before it was a held-out loss, and
 :mod:`model_trainer.core.contracts.cloze` already says why that is not enough:
 "a model can memorise text word-by-word and still fail every question about
 it." A prefix that lowers perplexity on wiki prose has shown it learned the
-corpus's TEXT. This asks whether the model can USE the corpus, on sentences the
-cartridge never read.
+corpus's TEXT. The arms ask whether the model can USE the corpus, on sentences
+the cartridge never read.
 
-THE THREE ARMS, scored on identical items so every comparison is paired:
-
-    base        the model alone. Chance is 1/(distractors+1); a base model
-                that has never seen this corpus should sit near it.
-    cartridge   the same model with the trained prefix in front. The corpus
-                compressed into a fixed number of slots.
-    retrieval   the same model with the evidence in its context window. The
-                corpus as raw tokens, paying per token, every time.
-
-THE RETRIEVAL ARM IS DELIBERATELY THE STRONGEST ONE AVAILABLE. It is handed
-the training sentences that actually contain the answer term -- oracle
-retrieval, with no retriever to blame and no ranking to lose. That makes it an
-UPPER BOUND on what any real retrieval pipeline could achieve, which is the
-only version worth comparing a cartridge against: beating a weak retriever
-would say nothing.
-
-AND IT IS BOUNDED BY THE CONTEXT WINDOW, WHICH IS THE WHOLE TRADE. Evidence is
+THE BUDGET IS THE WHOLE TRADE, and it is the reason this half is shared.
+Evidence is
 truncated to whatever is left after the item itself, because
 :func:`sequence_nll` truncates the TAIL of a rendering -- so an unbudgeted
 prompt would cut off the answer and score a question the model was never
@@ -58,11 +51,6 @@ from model_trainer.core.contracts.paired_comparison import (
     summarise_pairs,
 )
 from model_trainer.core.encoding import Encoder
-from model_trainer.core.services.model.cartridge_retrieval import (
-    Bm25Index,
-    join_chunks,
-    retrieve,
-)
 from model_trainer.core.services.model.corpus_cloze import sentences
 from model_trainer.core.types import LogitsOutProto, ScoreableLMProto
 
@@ -151,10 +139,22 @@ def with_evidence(
 ) -> ClozeItem:
     """Prepend as much evidence as the item can carry.
 
-    The evidence is truncated from its END rather than its start, so the
-    sentences nearest the question survive; the encoder's own ids are cut and
-    decoded back, because truncating characters would risk splitting a token
-    and changing what the earlier text says.
+    THE EVIDENCE IS CUT FROM ITS TAIL, SO ITS OPENING SURVIVES. Evidence is
+    prepended, so the surviving text is the part FURTHEST from the question --
+    ``ids[:budget]``, not ``ids[-budget:]``. This docstring previously said
+    the opposite, that "the sentences nearest the question survive", which is
+    what the code would do if the slice ran the other way. It does not.
+
+    For the retrieval arms the distinction is nearly inert: they pass five
+    short chunks, which fit whole. It decides everything for an arm whose
+    evidence is a WHOLE CORPUS, where the budget selects a few per cent of the
+    text -- see :func:`~model_trainer.core.services.model.cartridge_qa_arms.long_context_items`,
+    which reports how much of its
+    corpus survived rather than leaving a reader to assume all of it did.
+
+    The encoder's own ids are cut and decoded back, because truncating
+    characters would risk splitting a token and changing what the earlier text
+    says.
 
     Args:
         item: The item to augment.
@@ -208,115 +208,6 @@ def with_evidence(
         answer=item["answer"],
         distractors=list(item["distractors"]),
     )
-
-
-def retrieval_items(
-    items: Sequence[ClozeItem],
-    documents: Sequence[str],
-    encoder: Encoder,
-    *,
-    max_seq_len: int,
-) -> list[ClozeItem]:
-    """Build the retrieval arm's item set.
-
-    Args:
-        items: The shared question set.
-        documents: Training documents the evidence is drawn from.
-        encoder: Tokenizer the scorer will use.
-        max_seq_len: The scorer's token budget.
-
-    Returns:
-        One item per input, each carrying whatever evidence fits.
-    """
-    return [
-        with_evidence(
-            item, evidence_for(item["answer"], documents), encoder, max_seq_len=max_seq_len
-        )
-        for item in items
-    ]
-
-
-def bm25_retrieval_items(
-    items: Sequence[ClozeItem],
-    index: Bm25Index,
-    encoder: Encoder,
-    *,
-    max_seq_len: int,
-) -> list[ClozeItem]:
-    """Build the REAL retrieval arm's item set, from the questions alone.
-
-    The counterpart to :func:`retrieval_items`. That one searches each item's
-    own answer and bounds what retrieval could ever do; this one searches the
-    question, gets some of them wrong, and is therefore the arm a cartridge
-    can lose to informatively.
-
-    THE BLANK MARKER IS REMOVED BEFORE QUERYING, and not because it currently
-    matters. ``<<BLANK>>`` yields the term ``blank``, which scores nothing
-    while no corpus sentence happens to contain that word -- and silently
-    starts retrieving on it the day one does. The marker is a rendering
-    artifact of how the item is posed, not part of what was asked.
-
-    Args:
-        items: The shared question set.
-        index: A BM25 index over the same training documents the oracle arm
-            draws its evidence from.
-        encoder: Tokenizer the scorer will use.
-        max_seq_len: The scorer's token budget.
-
-    Returns:
-        One item per input, each carrying what the retriever chose for it.
-
-    Raises:
-        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
-            when an item leaves no room for evidence. Not caught: a window
-            too small for the plan is a misconfiguration, and the real arm
-            refuses for the same reason the oracle arm does.
-    """
-    return [
-        with_evidence(
-            item,
-            retrieve(index, item["template"].replace(BLANK_MARKER, " ")),
-            encoder,
-            max_seq_len=max_seq_len,
-        )
-        for item in items
-    ]
-
-
-def ranked_retrieval_items(
-    items: Sequence[ClozeItem],
-    index: Bm25Index,
-    encoder: Encoder,
-    rankings: Sequence[Sequence[int]],
-    *,
-    max_seq_len: int,
-) -> list[ClozeItem]:
-    """Build an arm's item set from a pre-computed ranking per item.
-
-    Takes the RANKING rather than computing it, so the caller can time the
-    retrieval separately from the item assembly and can feed the same shape
-    from a dense arm, a fused arm, or anything else that orders chunks. The
-    BM25 arm has its own entry point because it also owns its ranking.
-
-    Args:
-        items: The shared question set.
-        index: The index the rankings refer to.
-        encoder: Tokenizer the scorer will use.
-        rankings: Per item, chunk indices best first, already truncated to
-            however many the arm retrieves.
-        max_seq_len: The scorer's token budget.
-
-    Returns:
-        One item per input, carrying that item's chosen chunks.
-
-    Raises:
-        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
-            when an item leaves no room for evidence.
-    """
-    return [
-        with_evidence(item, join_chunks(index, chosen), encoder, max_seq_len=max_seq_len)
-        for item, chosen in zip(items, rankings, strict=True)
-    ]
 
 
 def answer_span(
@@ -562,12 +453,9 @@ __all__ = [
     "answer_nll",
     "answer_nll_pairs",
     "answer_span",
-    "bm25_retrieval_items",
     "compare_arms",
     "evidence_budget_tokens",
     "evidence_for",
     "longest_rendering_tokens",
-    "ranked_retrieval_items",
-    "retrieval_items",
     "with_evidence",
 ]

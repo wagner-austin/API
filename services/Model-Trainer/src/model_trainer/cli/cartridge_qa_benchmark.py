@@ -69,10 +69,10 @@ from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     require_cartridge_plan,
 )
-from model_trainer.core.services.model.cartridge_qa import (
-    answer_nll_pairs,
+from model_trainer.core.services.model.cartridge_qa import answer_nll_pairs, compare_arms
+from model_trainer.core.services.model.cartridge_qa_arms import (
     bm25_retrieval_items,
-    compare_arms,
+    long_context_items,
     ranked_retrieval_items,
     retrieval_items,
 )
@@ -291,6 +291,28 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     )
     wait()
     fused_seconds = clock() - started
+    # THE ARM THAT SKIPS RETRIEVAL ENTIRELY, and the one a reader assumes
+    # has already been run. Everything above searches; this simply hands the
+    # model the corpus and lets the window truncate it. Its coverage is
+    # recorded beside its accuracy because the two cannot be read apart: an
+    # arm carrying 6% of the corpus has not tested long context, and a
+    # cartridge beating it has not beaten reading.
+    long_set, long_context_fraction = long_context_items(
+        items, training_text, encoder, max_seq_len=max_seq
+    )
+    wait()
+    started = clock()
+    scored_long_context = score_cloze_items(
+        items=long_set, model=base, encoder=encoder, device=device, max_seq_len=max_seq
+    )
+    wait()
+    long_context_seconds = clock() - started
+    _log.info(
+        "long-context %.4f over %.4f of the corpus",
+        scored_long_context["accuracy"],
+        long_context_fraction,
+    )
+
     _log.info("dense %.4f, fused %.4f", scored_dense["accuracy"], scored_fused["accuracy"])
     _log.info("base %.4f, retrieval %.4f", scored_base["accuracy"], scored_retrieval["accuracy"])
 
@@ -342,6 +364,13 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"]),
         Observation(name="dense_accuracy", value=scored_dense["accuracy"]),
         Observation(name="fused_accuracy", value=scored_fused["accuracy"]),
+        Observation(name="long_context_accuracy", value=scored_long_context["accuracy"]),
+        Observation(
+            name="long_context_accuracy_gain",
+            value=scored_long_context["accuracy"] - scored_base["accuracy"],
+        ),
+        Observation(name="long_context_corpus_fraction", value=long_context_fraction),
+        Observation(name="long_context_seconds", value=long_context_seconds),
         Observation(name="bm25_accuracy", value=scored_real["accuracy"]),
         Observation(
             name="bm25_accuracy_gain",

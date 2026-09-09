@@ -28,8 +28,11 @@ from model_trainer.core.services.model.cartridge_qa import (
     evidence_budget_tokens,
     evidence_for,
     longest_rendering_tokens,
-    retrieval_items,
     with_evidence,
+)
+from model_trainer.core.services.model.cartridge_qa_arms import (
+    long_context_items,
+    retrieval_items,
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
@@ -338,6 +341,73 @@ class TestCompareArms:
 
         with pytest.raises(KeyError):
             compare_arms(baseline, treatment)
+
+
+class TestLongContextItems:
+    """The arm that skips retrieval, and the coverage it must report.
+
+    Budget arithmetic is checkable by hand here: the default item renders to
+    six characters under `_CharEncoder` and `EVIDENCE_MARGIN_TOKENS` is 8, so
+    an item's evidence budget is ``max_seq_len - 14``.
+    """
+
+    def test_a_corpus_that_fits_is_carried_whole_and_reports_full_coverage(self) -> None:
+        """At coverage 1.0 this is the honest long-context baseline."""
+        corpus = "abcdefghij"
+
+        built, fraction = long_context_items([_item()], corpus, _CharEncoder(), max_seq_len=40)
+
+        assert fraction == 1.0
+        assert built[0]["template"] == f"{corpus}{EVIDENCE_JOINER}a <<BLANK>> b"
+
+    def test_a_corpus_that_overflows_reports_the_share_it_actually_carried(self) -> None:
+        """The number that stops this being read as a long-context result.
+
+        A budget of 16 over a 40-token corpus is 0.4, and an arm at 0.4 has
+        not been given the corpus -- it has been given two fifths of it.
+        """
+        corpus = "0123456789" * 4
+
+        built, fraction = long_context_items([_item()], corpus, _CharEncoder(), max_seq_len=30)
+
+        assert fraction == pytest.approx(16 / 40)
+        assert built[0]["template"].startswith(corpus[:16])
+
+    def test_the_corpus_opening_survives_truncation_not_its_tail(self) -> None:
+        """Pins the direction, which decides what this arm can ever answer.
+
+        `with_evidence` keeps ``ids[:budget]``, so the surviving text is the
+        part FURTHEST from the question. Its docstring claimed the opposite
+        until 2026-09-09. For five retrieved chunks that is nearly inert; for
+        a whole corpus it decides which items are answerable at all.
+        """
+        corpus = "AAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBB"
+
+        built, _fraction = long_context_items([_item()], corpus, _CharEncoder(), max_seq_len=30)
+
+        carried = built[0]["template"].split(EVIDENCE_JOINER)[0]
+        assert carried == "A" * 16
+        assert "B" not in carried
+
+    def test_coverage_is_averaged_over_items_that_can_carry_different_amounts(self) -> None:
+        """A longer item has less room, so one number per arm must be a mean."""
+        corpus = "0123456789" * 4
+
+        _built, fraction = long_context_items(
+            [_item(), _item(template="a much longer <<BLANK>> question b")],
+            corpus,
+            _CharEncoder(),
+            max_seq_len=40,
+        )
+
+        assert 0.0 < fraction < 1.0
+
+    def test_an_empty_corpus_is_refused_rather_than_divided_by(self) -> None:
+        """Zero corpus tokens has no coverage fraction to report."""
+        with pytest.raises(AppError) as excinfo:
+            long_context_items([_item()], "", _CharEncoder(), max_seq_len=40)
+
+        assert excinfo.value.code is ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE
 
 
 class TestTheEncoderUsedHere:
