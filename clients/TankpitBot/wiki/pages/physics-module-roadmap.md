@@ -262,11 +262,20 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   toward zero, so the floor loses no detection power.
 
   **The gate tests the RATE and puts no floor on `n`** — power audit,
-  board `1e4ab572`, 2026-09-09. `passes_claim` at `validate/audit.py:151`
+  board `1e4ab572`, 2026-09-09. `src/tankpit_bot/validate/audit.py:156` `_passed`
   reads `samples > 0 and exact / samples >= EXACTNESS_FLOOR`, with
-  `EXACTNESS_FLOOR = 0.85` at `validate/audit.py:129`, so a claim clears it
-  on one sample. Against the floor itself, as a one-sided exact binomial on
-  the `make audit` numbers below:[^power]
+  `src/tankpit_bot/validate/audit.py:144` `EXACTNESS_FLOOR` = 0.85, so a claim clears it
+  on one sample. Against the floor itself, as a one-sided exact binomial:[^power]
+
+  **`make audit` now prints these itself.** The table below was hand-computed
+  during the audit; as of 2026-09-09 the run emits a `p vs floor` and a power
+  column beside every row, from
+  `src/tankpit_bot/validate/audit.py:212` `_power_columns` calling
+  `rate_floor_power` in `platform_core.minimum_detectable_effect`. A claim with
+  no samples prints `NO SAMPLES` rather than a number, because there is no rate
+  to test. The figures here are therefore reproducible output rather than
+  transcription, which is the point — a published statistic should cite a
+  computation, not a literal someone typed once.[^power]
 
   | claim | exact/n | rate | p vs 0.85 | |
   |---|---|---|---|---|
@@ -283,14 +292,16 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   **A perfect record needs `n ≥ 19` to clear 0.85 at α = 0.05** —
   `0.85 ** 19 = 0.0456` against `0.85 ** 18 = 0.0536`. At n = 6 a flawless
   6/6 occurs 37.7% of the time even when the true rate is exactly the
-  floor, so `dual-hit` and `missile` pass `passes_claim`
-  (`validate/audit.py:151`) at 100% and carry no evidence they exceed it.
+  floor, so `dual-hit` and `missile` pass
+  `src/tankpit_bot/validate/audit.py:156` `_passed` at 100% and carry no
+  evidence they exceed it.
   `walk` is the opposite shape: it has the samples (n = 232) and sits close
   enough to the floor that 87.9% is not distinguishable from 0.85.[^power]
 
   This does not overturn the verdicts. The sentence above is right that
-  real drift collapses the share toward zero, and `collect_evidence`
-  (`validate/audit.py`) remains a good detector of that; what the bound
+  real drift collapses the share toward zero, and
+  `src/tankpit_bot/validate/audit.py:99` `collect_evidence` remains a good
+  detector of that; what the bound
   constrains is only what a PASS means for the three rows where the sample
   is small or the margin is thin.[^power] Mine
   detonations (0x45) and deposits (0x64) are modeled — detonations
@@ -833,6 +844,46 @@ pays real 90s, the fuel book absorbs them as enemy-hit feasibility
 entries — and both books still judge ZERO divergences, with zero
 ``physics_divergence`` events in the captured stream.[^2]
 
+**What the divergence soaks bound, and what carries their weight** —
+power audit, board `1e4ab572`, 2026-09-09. Both soaks are zero-failure
+claims, so the instrument is the exact Clopper-Pearson bound
+`1 - 0.05^(1/n)` and there is no spread to divide by.[^power] But the
+replicate count is NOT the round count.
+`tests/sim/test_soak.py:100` `test_fighting_soak_is_divergence_free` runs
+`for _ in range(24)` inside
+ONE scripted scenario, under a fixed `tests/sim/test_soak.py:119` `SeamClock`, fixed enemy fuel and a deterministic opponent policy — so
+re-running reproduces it exactly, and the 24 rounds are sequential states
+along a single trajectory rather than 24 draws from the space of
+production situations. The same holds for
+`tests/sim/test_soak.py:66` `test_seam_soak_is_divergence_free` at 30
+rounds.
+
+| reading | n | 95% upper bound on the divergence rate |
+|---|---|---|
+| per-ROUND, inside the one fighting trajectory | 24 | 11.7% |
+| per-ROUND, inside the one seam trajectory | 30 | 9.5% |
+| per-SCENARIO — what a production claim needs | **1** | **95.0%** |
+
+**Against any threshold worth stating — 1% of rounds, say — every one of
+those is NOT TESTED**, and the per-scenario row is the honest one: these
+soaks exercise one scripted fight and one scripted session. Rounds within a
+trajectory are not independent replicates, though they are not identity
+re-runs either — each round reaches a different state, which is why the
+number is worth more than 1 and much less than 24, and why
+`tests/sim/test_soak.py:130` `range` is the wrong place to read the
+replicate count from.[^power]
+
+**The soaks are not rate estimators, and that is fine.** Their real job is
+regression detection, and the thing that makes them credible is not n but
+`tests/sim/test_soak.py:153` `test_detector_fires_on_corrupted_fuel_sync` —
+the negative control that proves the detector CAN fire. A soak without one
+cannot fail and therefore measures nothing; this file says so in its own
+docstring at `tests/sim/test_soak.py:12`. Read that way the evidence is
+sound and the wording is what overreaches: "both books still judge ZERO
+divergences" is a statement about one scenario, not about the world model
+in play. Widening the scenario set — different opponents, container fields
+and rank tiers — buys more than more rounds of the same fight.[^power]
+
 Still out of the world model: the radar-zero emergency grant and
 real enemy minds (the scripted opponent is a harness, not a model).
 Ferries and movable blocks both landed 2026-07-22 — see their
@@ -1370,4 +1421,4 @@ follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).[^2]
 [^2]: receipts for every design and as-built claim above, three-fold: (1) CODE — the blob-pinned trees in frontmatter (`src/tankpit_bot/physics`, `src/tankpit_bot/sim`, `src/tankpit_bot/validate`) plus `protocol/encoders/`, `ledger/fuel_book.py`/`ammo_book.py`, `scripts/physics_claims.py`, and the named `tests/sim/*` files — every symbol, constant, and law named above is greppable on disk, and design paragraphs describe the plan those trees implement (deviations recorded inline); (2) INSTRUMENTS — `make check` (gate/coverage), `make audit` (per-claim sample counts), `make roundtrip` (72,916-message corpus), `make shadow` (law table), `make sim-run` re-derive every number quoted above on demand; (3) HISTORY — the dated 2026-07-20/21/22 commits in git history and their wiki-log entries, plus soak artifacts under `runs/`.
 [^3]: `src/tankpit_bot/sim/server.py` and `src/tankpit_bot/sim/wire_statements.py` both exist as of 2026-07-31, matching the split this phase describes. The "no law changed" claim is a statement of intent for the split, not a measurement — the shadow verdicts it refers to are the ones recorded earlier on this page.
 
-[^power]: Power audit of this page's zero-failure and rate claims, board task `1e4ab572`, 2026-09-09. The gate under test is `passes_claim` at `validate/audit.py:151` with `EXACTNESS_FLOOR = 0.85` at `validate/audit.py:129`; its only size condition is `samples > 0`. The p-values are one-sided exact binomial, `P(X >= exact | n, 0.85)`, computed against the nine per-claim sample counts `make audit` reports and quoted in the Phase 4 step-(a) block on this page. `n >= 19` is the smallest perfect record that clears 0.85 at alpha 0.05, from the same distribution: `0.85 ** 19 = 0.0456 < 0.05` while `0.85 ** 18 = 0.0536`. The zero-failure bounds elsewhere in this audit use the exact one-sided Clopper-Pearson form `1 - alpha ** (1 / n)`, implemented as `zero_failure_power` in `platform_core.minimum_detectable_effect`; no second implementation was written for this page.
+[^power]: Power audit of this page's zero-failure and rate claims, board task `1e4ab572`, 2026-09-09. The gate under test is `src/tankpit_bot/validate/audit.py:156` `_passed`, with the floor `src/tankpit_bot/validate/audit.py:144` `EXACTNESS_FLOOR` = 0.85; its only size condition is `samples > 0`. The p-values are one-sided exact binomial, `P(X >= exact | n, 0.85)`, computed against the nine per-claim sample counts `make audit` reports and quoted in the Phase 4 step-(a) block on this page. `n >= 19` is the smallest perfect record that clears 0.85 at alpha 0.05, from the same distribution: `0.85 ** 19 = 0.0456 < 0.05` while `0.85 ** 18 = 0.0536`. The zero-failure bounds elsewhere in this audit use the exact one-sided Clopper-Pearson form `1 - alpha ** (1 / n)`, implemented as `zero_failure_power` in `platform_core.minimum_detectable_effect`; no second implementation was written for this page.

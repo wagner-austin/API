@@ -190,6 +190,130 @@ Manifests: `BENCHMARK_MANIFEST_2026-08-25_binning_*_quality.json`
 (weather_tmax, voc_match_quality, rw_value, metab_confidence,
 financial_distress, us_binary).
 
+## Power: the standing is nine verdicts and the instrument settles only four
+
+Added by the power audit, board `1e4ab572`, 2026-09-09. Every claim in the
+section above — "leads", "statistically ties", "near-tie" — is a comparison of
+two arms over the SAME five seeds, which makes it a paired comparison whose
+dispersion is the sd of the per-seed differences, not the seed-to-seed spread
+of either arm. The manifests carry per-seed `r_squared` and `auc_roc`, so the
+paired instrument runs on data already on disk.
+
+**Stated threshold of practical interest: 0.01**, one point of R² or of AUC.
+That is the size this program has acted on elsewhere (the `scale_pos_weight`
+landing shipped on a claimed 0.013 AUC), so it is the bar these verdicts are
+graded against rather than a number invented here.
+
+| corpus | arm − lightgbm | n | effect | MDE | verdict | n needed | runs owed |
+|---|---|---|---|---|---|---|---|
+| weather_tmax | cleargbm | 5 | −0.00084 | 0.00069 | **TESTED** | 3 | 0 |
+| weather_tmax | @leaf_wise | 5 | +0.00072 | 0.00133 | **TESTED** | 3 | 0 |
+| metab_confidence | cleargbm | 5 | −0.00037 | 0.00351 | **TESTED** | 3 | 0 |
+| metab_confidence | @leaf_wise | 5 | −0.00140 | 0.00446 | **TESTED** | 3 | 0 |
+| rw_value | cleargbm | 5 | +0.00578 | 0.00895 | **TESTED** | 5 | 0 |
+| rw_value | @leaf_wise | 5 | −0.00549 | 0.03547 | NOT TESTED | 34 | 29 |
+| voc_match_quality | cleargbm | 5 | +0.00752 | 0.02036 | NOT TESTED | 13 | 8 |
+| voc_match_quality | @leaf_wise | 5 | +0.00882 | 0.01692 | NOT TESTED | 10 | 5 |
+| financial_distress | cleargbm | 5 | +0.00041 | 0.01331 | NOT TESTED | 7 | 2 |
+| financial_distress | @leaf_wise | 5 | +0.00085 | 0.01088 | NOT TESTED | 6 | 1 |
+| us_binary | cleargbm | 3 | −0.00491 | 0.01285 | NOT TESTED | 4 | 1 |
+| us_binary | @leaf_wise | 3 | −0.00001 | 0.02009 | NOT TESTED | 6 | 3 |
+
+### Three of the standing's claims do not survive, each differently
+
+**"ClearGBM leads rw_value" — refuted at the stated threshold, and the
+instrument was adequate to say so.** MDE 0.00895 is inside 0.01, so this is a
+TESTED comparison, and the +0.00578 point estimate does not clear its own
+floor. The right statement is a POWERED NULL: at one point of R², ClearGBM and
+LightGBM do not differ on this corpus. That is a stronger and more useful
+result than the lead it replaces, and it costs no re-runs.
+
+**"ClearGBM leads voc_match_quality" — unresolved, not refuted.** The
+point estimate is the largest ClearGBM advantage on the board (+0.0075 /
++0.0088) but the MDE is 0.020, so the design cannot see an effect twice the
+size of the one it is claiming. Eight more seeds on the depth-wise arm settle
+it. This is the one claim on the board most likely to survive measurement.
+
+**"ClearGBM leads weather_tmax" — the two ClearGBM arms straddle LightGBM.**
+The depth-wise arm TRAILS by −0.00084 against an MDE of 0.00069: a real,
+detected deficit. The leaf-wise arm is +0.00072 against an MDE of 0.00133 and
+is indistinguishable. Both comparisons are adequately powered (MDE ≪ 0.01), so
+this corpus is settled and the answer is "no lead in either direction that
+anyone would act on" — with a small, real depth-wise deficit that is 12× below
+the threshold of interest.
+
+### The four-decimal tie is the clearest illustration on the board
+
+The standing celebrates `cleargbm@leaf_wise` on the us binary head-to-head
+"now exactly tying LightGBM at four decimals" (0.688120 vs 0.688134). The
+paired difference is −0.00001 and the MDE at three seeds is **0.02009**. The
+instrument cannot resolve anything smaller than two AUC points; the tie being
+reported is two thousand times finer than that. A four-decimal agreement here
+is a coincidence of rounding, not a measurement, and three more seeds would
+say something real.
+
+### What IS settled, and worth keeping
+
+`metab_confidence` is a genuine powered null on both arms — MDEs of 0.0035 and
+0.0045 against a 0.01 threshold, effects far below. "Still the weak-signal
+statistical tie" is correct AND now demonstrably so, which is what separates it
+from the other ties in the same sentence. `weather_tmax` is settled in the same
+way. Those two corpora need no further runs.
+
+### The remedy is 42 seed-runs, and 13 of them cover three corpora
+
+Taking the larger requirement per corpus: financial_distress +2, us_binary +3,
+voc_match_quality +8, rw_value +29 (driven entirely by the leaf-wise arm's
+0.0355 spread). Everything except rw_value's leaf-wise arm is reachable for
+**13 additional seed-runs total** — the same `scripts.benchmark` invocation
+with seeds extended past 46. The counts come from `required_replicates` in
+`platform_core.minimum_detectable_effect`, which searches for the fewest
+replicates whose MDE clears the stated threshold at the observed spread; they
+are planning estimates from one sample, so a rerun with a wider spread will
+need more.
+
+### The root cause is a timing constant that crossed into quality work
+
+The seed count was never chosen for these comparisons. `DEFAULT_SEEDS =
+(42, 43, 44)` sits at `benchmarking/factory.py:20` in `covenant_ml`, and the
+comment directly above it says what it is for: *"Defaults reproducing the
+workload the ClearGBM PERFORMANCE work is tuned against"*. Its two siblings
+are `DEFAULT_REPEATS = 5` and `DEFAULT_WARMUPS = 2` — wall-clock knobs, where
+three seeds is a reasonable way to stabilise a timing median.
+
+**That constant then travelled into the QUALITY comparisons, where the seed
+count is not a stability parameter but the thing that decides what can be
+concluded.** Three is also the bare floor `platform_core` accepts for a power
+statement at all (`MIN_REPLICATES`), so a quality arm inheriting it starts at
+the minimum the instrument will even certify.
+
+**And the interesting part is that the escape hatch exists and was used.**
+This is not a value copied into each plan and stranded there: three entry
+points import it as a CLI *default* (`benchmark_cleargbm_vs_lightgbm.py` and
+the two `experiment_growth_policy_*` scripts), and `--seeds` overrides it. The
+p6 and binning runs DID override it — every corpus here ran 42–46 — and the
+result is still four NOT TESTED verdicts out of six, because **the override
+takes a seed count, not an effect size.** Exercising the knob replaced one
+undecided number with another.
+
+`us_binary` is the case that took the bare default: three seeds, paired MDE
+0.02009, and the standing celebrates it tying LightGBM "at four decimals".
+Nothing chose either number. A constant picked to make a benchmark's clock
+steady set the resolution of one quality verdict, and a hand-picked 5 set the
+rest. **The fix is not a bigger number in that tuple — it is that a quality
+plan should state the effect it intends to resolve and derive its own replicate
+count**, which `required_replicates` in
+`platform_core.minimum_detectable_effect` now computes.
+
+### One claim on this page cannot be tested at all
+
+"Statistically ties rw_matches (0.7295 vs 0.7299)" rests on a 5-fold CV whose
+PER-FOLD values are not published in any binning-era manifest — only the means
+and across-fold sds. The paired instrument refuses a summary statistic by
+design, so this verdict is unfalsifiable from disk. It is the same gap the
+`scale_pos_weight` page carries for its LightGBM arm, and the same one-column
+fix: publish the five per-fold numbers.
+
 ## Gates at landing
 
 - cleargbm_rs: full gate green — clippy, 1,540+ tests, 100.00% segment

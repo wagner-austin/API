@@ -146,6 +146,17 @@ reading "3/3" as a settled rate. Ten trials would put the bound near 26%
 and thirty near 9.5%; the probe is one `make larder-probe` invocation, so
 the cost of tightening it is minutes.[^power]
 
+**The n is a default argument, not a stopping rule.**
+`src/tankpit_bot/action_lab/larder_probe.py:499` `run_larder_probe` declares
+`src/tankpit_bot/action_lab/larder_probe.py:505` `max_attempts` with a default
+of 3, and the trial loop at
+`src/tankpit_bot/action_lab/larder_probe.py:419` `max_attempts` reads
+`while len(attempts) < max_attempts`, so the run halted at three because three
+is the parameter's default — nothing converged, and no evidence was weighed
+in choosing it. The artifact records this directly: `max_attempts: 3` beside
+`own_tile_successes: 3`. Raising it to 30 is one argument, and it is the
+whole remedy.[^power]
+
 Contrast [[mine-mechanics]], whose ring-2 displacement law began at the same
 3/3 and was later confirmed by an archive sweep at 534/534 (bound 0.56%)
 with a friendly-mine control arm. That is what a settled gate looks like,
@@ -186,4 +197,4 @@ gets harvested instead of rediscovered.[^2]
 [^5]: Probe artifacts on disk: `runs/probe/larder-20260727-224933.json` (water-sitting candidates, 0 trials), `-225643.json` (own-tile 0/2 + adjacent control 1, all-capped inventory, code-7 receipts in the paired `.log`), `-230858.json` (own-tile 3/3, no errors) with matching `.capture_session.json` wire evidence; historical own-tile sample capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6) superseded by the deliberate trials; long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture); code-7 string table [[decode-coverage]] §Supervisor error codes.
 [^7]: [synthesis] — the larder plan is a cascade priority inside COLLECT, so it edits the `collect_*` modules only. The HUNT family (`src/tankpit_bot/bot/ai/hunt_mode.py`, `hunt_acquire.py`, `hunt_lock.py`, `hunt_relay.py`) carries lock, chase, and break-threshold logic and is not in this change's scope. Verified 2026-07-31 that all four modules exist and own that behaviour; this footnote records scope, not a measured no-op.
 
-[^power]: Power audit of this page's probe gate, board task `1e4ab572`, 2026-09-09. The trials are the three own-tile pickups in `runs/probe/larder-20260727-230858.json`, produced by `LarderProbe` in `src/tankpit_bot/action_lab/larder_probe.py`; the two control runs are cited in [^5]. The bound is the exact one-sided Clopper-Pearson form for zero observed failures, `1 - alpha ** (1 / n)`, giving 63.16% at n=3, 25.9% at n=10 and 9.5% at n=30 for alpha 0.05. It is computed by `zero_failure_power` in `platform_core.minimum_detectable_effect`, not by a second implementation written for this page. The contrasting 534/534 figure and its friendly-mine control arm are recorded on [[mine-mechanics]] under the teleport-displacement section.
+[^power]: Power audit of this page's probe gate, board task `1e4ab572`, 2026-09-09. The trials are the three own-tile pickups in `runs/probe/larder-20260727-230858.json`, produced by `src/tankpit_bot/action_lab/larder_probe.py:183` `LarderProbe`; the two control runs are cited in [^5]. The bound is the exact one-sided Clopper-Pearson form for zero observed failures, `1 - alpha ** (1 / n)`, giving 63.16% at n=3, 25.9% at n=10 and 9.5% at n=30 for alpha 0.05. It is computed by `zero_failure_power` in `platform_core.minimum_detectable_effect`, not by a second implementation written for this page. The contrasting 534/534 figure and its friendly-mine control arm are recorded on [[mine-mechanics]] under the teleport-displacement section.

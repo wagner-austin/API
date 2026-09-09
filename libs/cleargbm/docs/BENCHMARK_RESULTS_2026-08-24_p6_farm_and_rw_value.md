@@ -355,15 +355,23 @@ elsewhere — the paired instrument gives:
 
 | corpus | cleargbm − lightgbm | MDE | verdict |
 |---|---|---|---|
-| weather_tmax | −0.00279 | 0.00158 | powered; effect below threshold |
-| metab_confidence | −0.00160 | 0.00193 | powered; effect below threshold |
+| weather_tmax | −0.00279 | 0.00158 | **DETECTED**, 5/5 seeds negative, \|t\| = 4.90 — below threshold |
+| metab_confidence | −0.00160 | 0.00193 | powered NULL, \|t\| = 2.30 |
 | voc_match_quality | −0.00761 | 0.01273 | INCONCLUSIVE |
 | rw_value | +0.00880 | 0.03081 | INCONCLUSIVE |
 
-So weather_tmax and metab_confidence are **genuine nulls, adequately
-powered** — a stronger and more useful statement than "no arm separates from
-the pack", reached from data already on disk with no re-runs. The other two
-are unresolved and should say so.
+The two are **not the same result, and calling both a "null" would be
+wrong.** metab_confidence is a genuine powered null: the paired t is 2.30
+against a critical 2.776, and the MDE of 0.00193 is well inside the 0.01
+threshold, so the instrument could have seen a difference of practical size
+and did not. **weather_tmax is the opposite — a REAL, detected deficit.**
+ClearGBM trails LightGBM on all five seeds, the paired t is 4.90, and the
+effect exceeds its own MDE by 1.8×. What bounds it is the threshold, not the
+noise: −0.0028 R² is a statistically solid difference that is too small to
+act on. That is an equivalence result, and it is a stronger statement than
+this page's "ClearGBM does not lead it" — the deficit is confirmed, and
+confirmed to be negligible. The other two corpora are unresolved and should
+say so.
 
 This section states the threshold the B3 entry above already asks for when it
 says differences "are noise until an arm moves R² materially" — that sentence

@@ -57,6 +57,48 @@ sampled max_features in the optimize builders belongs to RandomForest —
 so no trial was mispriced by the old drop; adding it to the ClearGBM
 search space is now possible and previously would have been meaningless.)
 
+### Power: the wash is not a measurement, and the page's own prose proves it
+
+Added by the power audit, board `1e4ab572`, 2026-09-09. "A statistical wash on
+the mean" is a null, and a null needs the effect its instrument could have
+resolved. The per-fold values are not published here, so the paired sd cannot
+be computed exactly — **but this page states two of the five fold movements,
+and those alone settle it.**
+
+Fold 2 moved +0.012 and fold 3 moved −0.012 against a mean difference of
++0.0001. The three unpublished folds can only ADD to the sum of squared
+deviations, so dropping them gives a strict lower bound:
+
+| quantity | bound |
+|---|---|
+| mean paired difference | +0.0001 (0.7493 − 0.7492) |
+| paired sd | **≥ 0.008486** |
+| MDE at n = 5, `t_crit(4)·sd/√n` | **≥ 0.010536** |
+| stated threshold of practical interest | 0.01 |
+| replicates required | **≥ 6**, and only more as the true sd rises |
+
+**The floor already exceeds the threshold, so `max_features=0.8` on
+rw_matches is NOT TESTED — provably, in the best case the withheld data could
+possibly describe.** The observed +0.0001 is at most 0.0095× its own detection
+floor; the instrument is roughly 105 times too coarse to see it. No arrangement
+of the three unpublished folds can rescue the verdict, because every
+arrangement makes the sd larger.
+
+**What this does NOT undermine.** Implementing the knob was correct regardless:
+it was crossing the Rust boundary and being dropped, and a config value that
+does not reach training is a defect at any effect size. The knob-sensitivity
+test — train twice, assert the model changed — is also unaffected, because it
+asserts a DIFFERENCE rather than a magnitude, which is exactly why it catches
+this bug class where coverage and type checks do not. What is unsupported is
+the quality verdict layered on top: "neutral at 0.8" describes a five-fold
+design that could not have detected one AUC point, not the knob.
+
+**The honest reading is the one the page already reaches by another route.**
+It says the value of `max_features` "is as a tunable dial, not as a default",
+and that the optimizer never sampled it. Both remain true and neither depends
+on the wash. The claim to drop is that 0.8 was measured to be neutral; the
+claim to keep is that nothing has yet measured it either way.
+
 ## The bug class, closed out
 
 Four members found on 2026-08-21/22, all now dispositioned:

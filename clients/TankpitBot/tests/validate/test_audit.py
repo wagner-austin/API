@@ -128,6 +128,47 @@ def test_green_tree_passes_and_stamps(tmp_path: Path, capsys: pytest.CaptureFixt
     assert expected in page_text
 
 
+def test_a_passing_claim_reports_whether_its_pass_means_anything(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A PASS on a short record is printed beside NOT_TESTED, not alone.
+
+    The gate asks whether the exact share REACHED 0.85. The power column asks
+    whether it is separable FROM 0.85, and on the small green fixture it is
+    not. Both statements have to be visible or a reader takes the first for
+    the second -- which is the defect the column was added for.
+    """
+    runs_root, wiki_dir = _green_tree(tmp_path)
+    rc = run_audit(runs_root, wiki_dir, stamp=False)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "FAIL" not in out
+    assert "NOT_TESTED" in out
+    assert "p vs floor" in out
+    # The floor's own arithmetic, stated so the footer cannot drift from it:
+    # 0.85 ** 19 is the first flawless record that clears alpha 0.05.
+    assert "needs 19 samples to clear it" in out
+
+
+def test_a_claim_with_no_samples_states_the_absence_instead_of_a_number(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Zero samples prints NO SAMPLES, never a p-value.
+
+    There is no rate to test, so a number in that column would imply a
+    measurement nobody took.
+    """
+    runs_root = tmp_path / "runs"
+    wiki_dir = tmp_path / "wiki" / "pages"
+    wiki_dir.mkdir(parents=True)
+    (wiki_dir / "game-economy.md").write_text(_ECONOMY_PAGE, encoding="utf-8")
+    rc = run_audit(runs_root, wiki_dir, stamp=False)
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "NO SAMPLES" in out
+    assert "n/a" in out
+
+
 def test_empty_archive_fails_without_stamping(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

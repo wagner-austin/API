@@ -32,6 +32,7 @@ from pathlib import Path
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.logging import get_logger
+from platform_core.minimum_detectable_effect import rate_floor_power
 
 from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.archive import (
@@ -126,6 +127,20 @@ def collect_evidence(runs_root: Path) -> list[ClaimEvidenceDict]:
     return evidence
 
 
+AUDIT_ALPHA = 0.05
+"""One-sided significance level the power column is reported at.
+
+A PASS says the exact share REACHED the floor. It does not say the share is
+distinguishable FROM the floor, and at small ``samples`` those are very
+different statements: a flawless 6-of-6 clears an 0.85 floor 37.7% of the time
+when the true rate IS exactly 0.85. The power column answers the second
+question beside the first so a reader cannot mistake one for the other, and it
+is computed by ``platform_core.minimum_detectable_effect.rate_floor_power``
+rather than transcribed -- a published statistic should cite a computation, not
+a literal someone typed once.
+"""
+
+
 EXACTNESS_FLOOR = 0.85
 """Minimum exact/samples share for a claim to pass.
 
@@ -194,6 +209,26 @@ def _stamp_pages(
     return stamped
 
 
+def _power_columns(record: ClaimEvidenceDict) -> tuple[str, str]:
+    """Render the p-value and power verdict for one evidence row.
+
+    A claim with zero samples has no rate, so there is nothing for the binomial
+    to test and ``rate_floor_power`` refuses it. That is not a case to soften:
+    the row already FAILS on the same condition, and printing an absence says
+    what happened where a number would imply a measurement nobody took.
+
+    Args:
+        record: Evidence for one claim.
+
+    Returns:
+        The formatted p-value column and the power verdict column.
+    """
+    if record["samples"] == 0:
+        return "n/a", "NO SAMPLES"
+    power = rate_floor_power(record["exact"], record["samples"], EXACTNESS_FLOOR, AUDIT_ALPHA)
+    return f"{power['p_value']:.4f}", power["verdict"]
+
+
 def run_audit(runs_root: Path, wiki_pages_dir: Path, *, stamp: bool) -> int:
     """Run the full audit, print the evidence table, optionally stamp.
 
@@ -207,13 +242,23 @@ def run_audit(runs_root: Path, wiki_pages_dir: Path, *, stamp: bool) -> int:
     """
     evidence = collect_evidence(runs_root)
     width = max(len(record["claim_id"]) for record in evidence)
-    sys.stdout.write(f"{'claim':<{width}}  samples  exact  mismatch  status\n")
+    sys.stdout.write(
+        f"{'claim':<{width}}  samples  exact  mismatch  status  {'p vs floor':>10}  power\n"
+    )
     for record in evidence:
         status = "PASS" if _passed(record) else "FAIL"
+        p_column, verdict_column = _power_columns(record)
         sys.stdout.write(
             f"{record['claim_id']:<{width}}  {record['samples']:>7}  {record['exact']:>5}"
-            f"  {record['mismatches']:>8}  {status}  ({record['detail']})\n"
+            f"  {record['mismatches']:>8}  {status}  {p_column:>10}"
+            f"  {verdict_column}  ({record['detail']})\n"
         )
+    shortest = rate_floor_power(1, 1, EXACTNESS_FLOOR, AUDIT_ALPHA)["perfect_record_trials"]
+    sys.stdout.write(
+        f"\npower: one-sided exact binomial P(X >= exact | samples, {EXACTNESS_FLOOR}) "
+        f"at alpha {AUDIT_ALPHA}. NOT_TESTED means the record is consistent with a true "
+        f"rate AT the floor; a flawless record needs {shortest} samples to clear it.\n"
+    )
     if stamp:
         for page_name in _stamp_pages(wiki_pages_dir, evidence):
             sys.stdout.write(f"stamped fact_checked: {page_name}\n")

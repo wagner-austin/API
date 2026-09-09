@@ -73,9 +73,17 @@ paired instrument, from the per-fold values published above:
 |---|---|
 | mean paired difference | +0.01276 (the "1.3 AUC points") |
 | paired sd of the differences | 0.02908 |
-| across-fold sd, as tabled | 0.0754 / 0.0783 — **2.7× larger** |
+| across-fold sd, same estimator | 0.0844 / 0.0875 — **3.0× larger** |
 | MDE, `t_crit(4)·sd/√n` | **0.03611** |
 | paired t | 0.981 on 4 df (`t_crit` 2.776) |
+
+The across-fold row is recomputed here at the same `ddof=1` as the paired sd,
+because the ± figures the table above publishes (0.0754 / 0.0783) are
+POPULATION standard deviations — `ddof=0` over five folds, which understates
+the spread by about 12%. Comparing the published figure against a sample sd
+would mix estimators and report 2.7×; computed consistently, either way, the
+ratio is 3.0×. Nothing downstream changes: the MDE and the paired t use only
+the paired sd, where `ddof=1` is the correct and only choice for a t-test.
 
 **The observed effect is 0.35× its own detection floor: NOT TESTED.** Fold 4
 moves −0.0229 against fold 2's +0.0545, and at n=5 that spread swamps the
