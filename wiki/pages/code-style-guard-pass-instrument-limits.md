@@ -11,12 +11,16 @@ source_paths:
   - tools/code-style-eval/src/code_style_eval/cli/evaluate.py
   - tools/code-style-eval/pyproject.toml
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
+  - libs/platform_core/src/platform_core/power_distributions.py
+  - libs/platform_core/src/platform_core/minimum_detectable_effect.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
   "tools/code-style-eval/src/code_style_eval/core/provenance.py": 96d1c2e03e64c90ed6c720d287c846049f67bdf2
   "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 7ee61da22b34a03c91377041ec92772af0679237
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
-  "tools/code-style-eval/src/code_style_eval/core/scoring.py": be9442c3047ea93eb16c955704a8e51a86c19907
+  "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
+  "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
+  "libs/platform_core/src/platform_core/minimum_detectable_effect.py": 8d65b793f05aa5d3bda1c0ed68b14f0d46e28dbe
 provenance:
   - "runs/sweep-v1/comparison.json + .runrecord.json (label sweep-v4-cap1536-reppen1.1-corpusdeps, 19 distributions recorded)"
   - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded)"
@@ -139,7 +143,7 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
 
-[^8]: `tools/code-style-eval/src/code_style_eval/core/scoring.py`
+[^8]: `libs/platform_core/src/platform_core/power_distributions.py`
       `mid_p_mcnemar_p` and `exact_mcnemar_p` [synthesis] — the floor is the
       p-value each function returns at the most extreme attainable split for
       the stratum's discordant count (*d*:0), and the MDE is the smallest true
@@ -147,3 +151,15 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
       Both are arithmetic on *d* alone, which is why they are fixed before any
       data is collected. The discordant counts are the table's own, from
       `runs/sweep-v1/comparison.json`.
+      These two functions lived in
+      `tools/code-style-eval/src/code_style_eval/core/scoring.py` when this
+      table was computed and moved to `platform_core` on 2026-09-09 (commit
+      `63770146`), which changed no value here: the two implementations were
+      compared over every split of every *d* up to 60, both arm orientations,
+      and agreed at exact float equality on both tests.
+      `libs/platform_core/src/platform_core/minimum_detectable_effect.py`
+      `mcnemar_power` now returns each floor as `smallest_attainable_p`
+      beside a `can_ever_reject` boolean, and reproduces this table's four
+      published floors exactly — 0.015625 and 0.03125 at *d*=6, 0.03125 and
+      0.0625 at *d*=5, the last of them `can_ever_reject` **false**, which is
+      the unfalsifiability this page reports in prose.

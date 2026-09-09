@@ -19,6 +19,8 @@ source_paths:
   - tools/code-style-eval/pyproject.toml
   - tools/hpc3/runs/code-corpus-v2-digests.txt
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
+  - libs/platform_core/src/platform_core/power_distributions.py
+  - tools/code-style-eval/tests/test_published_comparisons.py
 source_git_blobs:
   "tools/code-style-eval/runs/gen-v2/comparison.json": adcdf3a42c78828456790b7b9f6f5a8e17f354ba
   "tools/code-style-eval/runs/gen-v2/base.outcomes.jsonl": ba1a470e0abb607c5d1dd523b323638952ef64fd
@@ -32,7 +34,9 @@ source_git_blobs:
   "tools/code-style-eval/README.md": 0d5b561e739e680393d9aa3906e7df0143c6a92e
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
-  "tools/code-style-eval/src/code_style_eval/core/scoring.py": be9442c3047ea93eb16c955704a8e51a86c19907
+  "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
+  "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
+  "tools/code-style-eval/tests/test_published_comparisons.py": e58058d5186ed305201eb98d8af06fbfb5023cb1
 provenance:
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
@@ -242,12 +246,24 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
-[^11]: `tools/code-style-eval/src/code_style_eval/core/scoring.py`
-       `mid_p_mcnemar_p` — "THE EXACT CONDITIONAL TEST IS THE WRONG DEFAULT
-       HERE ... guaranteeing the nominal level makes it overly conservative,
-       so it fails to detect real differences." The tie form is separate and
-       easy to get wrong: when the two discordant cells are equal the observed
-       outcome sits at the centre of the distribution, so doubling a tail
-       double-counts it and mid-p is `1 - 0.5*point` rather than a doubled
-       tail. A hand-rolled helper that misses that case disagrees with the
-       shipped CLI on exactly the ties.
+[^11]: The choice of variant and the arithmetic behind it now sit in two
+       places, because the statistic moved out of this package on 2026-09-09
+       (commit `63770146`) and citing the old home would be citing a symbol
+       that no longer exists.
+       WHY MID-P: `tools/code-style-eval/src/code_style_eval/core/scoring.py`
+       module docstring — "Fagerland, Lydersen and Laake measured type I error
+       and power over 9,595 scenarios and found the exact conditional test
+       overly conservative in all of them, while the mid-p test never violated
+       the nominal level and was almost as powerful as the asymptotic test."
+       THE ARITHMETIC:
+       `libs/platform_core/src/platform_core/power_distributions.py`
+       `mid_p_mcnemar_p`, which owns both variants for the monorepo and
+       documents the trap in its own words — "THE TIE NEEDS ITS OWN FORM: when
+       the two discordant cells are equal the observation sits at the centre of
+       the distribution, so doubling a tail double-counts it. A hand-rolled
+       version that doubled anyway returned 1.0 at a 3:3 split instead of
+       0.84375, agreed with this one on every unequal split, and was trusted
+       for exactly that reason." That the move changed no number on this page
+       is held by `tools/code-style-eval/tests/test_published_comparisons.py`,
+       which rebuilds all six committed comparisons from their own outcome
+       files rather than from a fixture.
