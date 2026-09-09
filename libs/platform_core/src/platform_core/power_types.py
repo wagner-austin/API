@@ -330,9 +330,16 @@ class ClusteredPairedPower(TypedDict):
     that a design effect of exactly 1.000 came from a floor rather than from
     a corpus that happened to land there.
 
-    THIS RECORD CARRIES NO :class:`PowerVerdict`, the third in this module
-    that does not, and for the same reason: "is this design effect large?"
-    has no threshold that is not a judgement about the study.
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, and for the same reason
+    three of the six records before it do not: "is this design effect large?"
+    has no threshold that is not a judgement about the study. The verdict is
+    set in exactly three places in
+    :mod:`platform_core.minimum_detectable_effect`, all of them instruments
+    handed a threshold to compare against -- counted by reading the
+    assignments rather than the docstrings, because
+    :func:`~platform_core.minimum_detectable_effect.required_replicates`
+    describes itself as answering "the question a ``NOT_TESTED`` verdict
+    raises" and sets none.
 
     Attributes:
         instrument: Always :attr:`PowerInstrument.CLUSTERED_PAIRED`.

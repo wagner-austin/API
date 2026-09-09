@@ -28,6 +28,10 @@ source_paths:
   - tools/hpc3/runs/code-style-gen-v2-candidate.json
   - tools/hpc3/runs/code-style-qlora-v1.json
   - tools/hpc3/runs/code-style-qlora-v2.json
+  - libs/platform_core/src/platform_core/clustering.py
+  - tools/code-style-eval/src/code_style_eval/core/clustering.py
+  - tools/code-style-eval/src/code_style_eval/cli/clustering.py
+  - tools/code-style-eval/src/code_style_eval/contracts/generation.py
 source_git_blobs:
   "tools/code-style-eval/runs/gen-v2/comparison.json": b9daedc741c8c6506403d70cedc20021ccbd292e
   "tools/code-style-eval/runs/gen-v2/base.outcomes.jsonl": ba1a470e0abb607c5d1dd523b323638952ef64fd
@@ -39,7 +43,7 @@ source_git_blobs:
   "libs/platform_core/src/platform_core/continuation_task.py": eaab054bfd2b59a0227261e6455a2067630af31b
   "services/Model-Trainer/src/model_trainer/cli/_test_hooks.py": bb812bd0b9d9b2945d556dba0f81ebc82af5d3ad
   "tools/code-style-eval/README.md": 0d5b561e739e680393d9aa3906e7df0143c6a92e
-  "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
+  "tools/code-style-eval/pyproject.toml": 110037c5f0646c8fb6f44ae30ea2112767bffb30
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
@@ -51,6 +55,10 @@ source_git_blobs:
   "tools/hpc3/runs/code-style-gen-v2-candidate.json": 166db0baa7199f561a7a6a58035345c0ef89becb
   "tools/hpc3/runs/code-style-qlora-v1.json": d0b87665e7742bc7f563389707bd033db5a1bc61
   "tools/hpc3/runs/code-style-qlora-v2.json": 1f9a7f16b984d546eb21e17fc6754b1ab56d08e1
+  "libs/platform_core/src/platform_core/clustering.py": 7611039dbbc21a817e4c10027e282a4e21e9fdbe
+  "tools/code-style-eval/src/code_style_eval/core/clustering.py": 831f60a8e23af61ea78482287b4dadc6b6a972e3
+  "tools/code-style-eval/src/code_style_eval/cli/clustering.py": 0e5c0f9a2ed85a28523bb6660743af36b0221e11
+  "tools/code-style-eval/src/code_style_eval/contracts/generation.py": c1e757eba479597c84fb1e98e64fe2b0b7156e54
 provenance:
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
@@ -162,45 +170,116 @@ count here is over held-out files from two repositories, and McNemar assumes
 the pairs are independent of each other. These are not: files in one package
 share an author, a layout and often a near-identical shape, and the emitter
 deduplicates only byte-identical ones.[^8] Correlation between items inflates
-significance, and nothing here corrects for it. Termination at mid-p 2e-28
-would survive a great deal of it; the guards gain at mid-p 0.020 on 282 items
-is the result most exposed, and it is already the one flagged above as sitting
-below its own MDE. Treat that number as directional.
+significance, and **no p-value on this page is corrected for it** — the
+correction is reported separately, below, rather than folded into the figures,
+because it requires choosing a clustering unit and this corpus does not settle
+which one. Termination at mid-p 2e-28 would survive a great deal of it; the
+guards gain at mid-p 0.020 on 282 items is the result most exposed, and it is
+already the one flagged above as sitting below its own MDE. Treat that number
+as directional.
 
-**How big the unknown is, measured.** The correction still needs a rho nobody
-has, but the *cluster structure* is a fact about the corpus and can be
-counted. Over the 875 scored items[^12]:
+**How big the correction is — measured, not assumed.** An earlier version of
+this section said the correction "still needs a rho nobody has" and printed a
+table at ρ = 0.05 and ρ = 0.30 as hypotheticals. That was wrong about what was
+knowable: ρ is estimable from the two outcomes files this page already pins,
+and the estimate is now computed by a shipped instrument rather than
+guessed[^17]. Over the 875 scored items[^12]:
 
-| clustering unit | clusters *k* | mean per cluster *m* | effective *n* at ρ=0.05 | at ρ=0.30 |
-|---|---|---|---|---|
-| top-level category | 14 | 62.5 | 215 | 45 |
-| package | 64 | 13.7 | 536 | 182 |
-| containing directory | 336 | 2.6 | 810 | 591 |
+| clustering unit | clusters *k* | *m₀* | largest | ρ of *d* | DE | effective *n* |
+|---|---|---|---|---|---|---|
+| top-level category | 14 | 51.32 | 265 | −0.0098 | 1.000 | 875.0 |
+| package | 64 | 13.02 | 165 | +0.0619 | 1.744 | 501.7 |
+| containing directory | 336 | 2.59 | 26 | +0.0585 | 1.093 | 800.3 |
 
-Effective *n* is `mk / DE` with `DE = 1 + ρ(m−1)`, Killip's design effect[^12].
-**No row is this page's answer**, and that is the point: *k* ranges from 14 to
-336 purely on what one chooses to call a cluster, and nobody has chosen. Lazic
-reports that an ICC of 0.30 turns a nominal 5% false-positive rate into 37%,
-and ranks non-independence as more serious than the normality and
-equal-variance assumptions that get checked routinely[^12].
+And over the 282-item both-finished subset[^9], on the guards outcome — the
+row this page flags as most exposed:
 
-Two limits on that table, both in the direction of it being *too kind*. Killip
-states `DE = 1 + ρ(m−1)` for the special case of equal cluster sizes, and these
-are severely unequal — the largest package holds 165 of the 875 files against a
-median of 5 — so a mean *m* understates the design effect and every effective
-*n* above is an upper bound[^12]. And Lazic's 37% is measured on a two-group
-comparison of continuous data, not on McNemar; it is cited for the magnitude of
-the hazard, not as a transferable rate.
+| clustering unit | clusters *k* | *m₀* | largest | ρ of *d* | DE | effective *n* |
+|---|---|---|---|---|---|---|
+| top-level category | 14 | 16.45 | 81 | +0.0442 | 1.683 | 167.6 |
+| package | 53 | 5.14 | 45 | −0.0364 | 1.000 | 282.0 |
+| containing directory | 186 | 1.51 | 7 | +0.0279 | 1.014 | 278.0 |
 
-So this is now quantified as a *range* rather than dismissed or corrected. The
-honest reading is that the termination result at mid-p 2e-28[^3] survives every
-row of that table, and the guards gain at mid-p 0.020 on 282 items[^9] does not
-survive the coarser ones. That subset carries its own cluster structure rather
-than the aggregate's — *k* = 14 / 53 / 186 over the same three units, effective
-*n* falling to 42 at the coarsest, again before the unequal-cluster
-correction[^12]. Picking the row that keeps a p-value under
-0.05 is exactly the move this table exists to make visible, and it is not made
-here.
+`DE = 1 + ρ(m₀−1)`, Killip's design effect[^12], with *m₀* the unequal-cluster
+average rather than a plain mean — these clusters are severely unequal, and a
+plain mean would have overstated every design effect here[^17]. **A DE of
+exactly 1.000 beside a negative ρ is a floor, not a corpus that landed there**:
+one-way ICC goes negative when within-cluster spread exceeds between-cluster
+spread, and taken literally that yields an effective *n* larger than the
+sample. Clustering cannot manufacture information, so the instrument floors DE
+at 1 and publishes ρ unfloored beside it[^17].
+
+**ρ is measured on the paired difference, and that is not a detail.** The
+correlated quantity for a paired test is `d = candidate − baseline` per item,
+in {−1, 0, +1} — not either arm's raw pass indicator. Measured both ways on the
+same clusters, they disagree by up to five times and, at the aggregate, in
+sign: guards at the directory unit is +0.028 on *d* against +0.141 on the raw
+indicator, and the aggregate is +0.059 against −0.031[^17]. Either raw figure
+correctly answers "do these files pass or fail together", which is not the
+question McNemar asks. A correction built from the nearer-to-hand series would
+have deflated one row five times too much and corrected another backwards.
+
+**No row is still this page's answer**, and *that* part stands: *k* ranges from
+14 to 336 purely on what one calls a cluster, and nobody has established which
+level the correlation lives at. Lazic reports that an ICC of 0.30 turns a
+nominal 5% false-positive rate into 37%, and ranks non-independence as more
+serious than the normality and equal-variance assumptions that get checked
+routinely[^12] — measured here, **no unit reaches ρ = 0.07**, so that figure
+describes a hazard this corpus does not have. It is cited for why the question
+was worth asking, not as a rate that transfers, and Lazic's is a two-group
+comparison of continuous data rather than a McNemar table in any case.
+
+**What survives.** Termination at mid-p 2e-28[^3] survives every row. The
+guards gain at mid-p 0.020 on 282 items[^9] survives the package unit (ρ
+negative, so no correction at all) and the containing-directory unit, where it
+survives *robustly*: DE 1.014 deflates the table to (59.17, 17.75), and all six
+parity-valid roundings of that reject, from 0.014 to 0.040[^17]. **It does not
+survive the top-level-category unit**, and the
+measurement changes only the *reason*, not the verdict: the earlier version of
+this section reached the same conclusion from ρ = 0.30, which this corpus does
+not have, and ρ = 0.044 gets there on its own because *m₀* at that unit is
+16.45.
+
+The way it fails is worth stating precisely, because a first pass at it came
+out the other way. Deflating that stratum's discordant table (21, 39) by
+DE = 1.683 gives *d* = 35.65 with a net of 10.70 — **not an integer table**,
+and a McNemar table needs *d* and the net to share a parity. Of the eight
+parity-valid roundings around it, only the two that round the net UP to 12,
+past its own estimate of 10.70, reject[^17]:
+
+| table (*d*, net) | minority | mid-p |
+|---|---|---|
+| (34, 12) | 11 | 0.041 |
+| (36, 12) | 12 | 0.047 |
+| (35, 11) | 12 | 0.065 |
+| (37, 11) | 13 | 0.073 |
+| (34, 10) | 12 | 0.090 |
+| (36, 10) | 13 | 0.099 |
+| (35, 9) | 13 | 0.133 |
+| (37, 9) | 14 | 0.143 |
+
+Every rounding that respects the net estimate lands between 0.065 and 0.143.[^17]
+**A first draft of this paragraph reported 0.047 alone and called the result
+survived** — it was corrected before this page was committed, but only because
+the neighbourhood was enumerated rather than trusted. That draft had taken the
+rounding a language default happened to produce, which is the same move as
+picking the clustering unit that keeps a p-value under 0.05, one level further
+down and much harder to see: choosing a unit at least looks like a choice.
+
+Contrast the directory unit above, where the same enumeration is what licenses
+calling the result survived: all six of its roundings reject. **The
+enumeration is what distinguishes the two cases**, and neither conclusion
+would be trustworthy without it.
+
+That instability is itself the finding. When the answer depends on how a
+non-integer table is rounded, the *effective-sample-size shortcut* — deflate
+by DE, re-run the exact test — is being pushed past where it means anything.
+It is an approximation: a properly clustered McNemar is a different statistic
+rather than a rescaling of this one, which is why the shipped CLI reports the
+design effect and deliberately does not rewrite the p-value beside it[^17].
+The correct reading is not "0.047" and not "0.099" but that **at the coarsest
+defensible clustering unit this instrument cannot resolve the guards gain**,
+which is the same place the MDE analysis above already put it.
 
 **The decode is deterministic, measured across three seeds and three nodes.**
 An earlier version of this section said the opposite -- that every figure was
@@ -360,12 +439,19 @@ measured the sandbox.
        `net_power`, emitted by
        `platform_core.minimum_detectable_effect.mcnemar_power` and
        `net_difference_power`. Both return falsifiability predicates only;
-       `PowerVerdict` (TESTED / NOT_TESTED) is set solely by the instruments
-       that are handed a threshold -- `paired_continuous_power`,
-       `required_replicates`, `zero_failure_power`, `rate_floor_power` -- and
-       this package calls neither of those. So the library never offers a
-       TESTED it has not earned, and the absence of one here is the
-       instrument reporting its own limit rather than a gap in this page.
+       `PowerVerdict` (TESTED / NOT_TESTED) is set in exactly three places in
+       `minimum_detectable_effect.py`, all of them instruments handed a
+       threshold -- `paired_continuous_power`, `zero_failure_power`,
+       `rate_floor_power` -- and this package calls none of them. So the
+       library never offers a TESTED it has not earned, and the absence of one
+       here is the instrument reporting its own limit rather than a gap in
+       this page. An earlier version of this footnote listed
+       `required_replicates` as a fourth setter. It sets none, and its record
+       has no `verdict` field. The list is now counted by reading every
+       assignment in the module at HEAD rather than by reading docstrings,
+       which is how the wrong one got in: that function's docstring says it
+       "answers the question a `NOT_TESTED` verdict raises", and mentioning a
+       verdict is not setting one.
 [^15]: SIX runs, both arms, seeds 0/1/2. New jobs 55877275
        (`gen-v2-base-s1`, 7998s, l54-07), 55877509 (`gen-v2-base-s2`, 7879s,
        l54-08), 55877370 (`gen-v2-candidate-s1`, 9227s) and 55877841
@@ -427,8 +513,9 @@ measured the sandbox.
        grouping by the first path segment, the first two, and the containing
        directory: k = 14 / 64 / 336, largest package 165 files, median 5.
        The same counting over the 282-item both-finished subset of [^9], which
-       has its own structure rather than the aggregate's: k = 14 / 53 / 186,
-       m = 20.1 / 5.3 / 1.5, effective n 42 to 275 at rho=0.30.
+       has its own structure rather than the aggregate's: k = 14 / 53 / 186.
+       Both tables' m0, rho and DE columns come from [^17], not from here;
+       what this note carries is the corpus structure and the two papers.
        The design effect is Killip, Mahfoud & Pearce 2004 (Ann Fam Med, doi
        10.1370/afm.141), archived at `tech-wiki/sources/`
        `killip-2004-intracluster-correlation.txt` sha256
@@ -449,7 +536,65 @@ measured the sandbox.
        independence "can be more serious than violating the normality or equal
        variances assumption". Both read from the archived text, not from a
        summary. Neither paper is about this corpus and neither supplies a ρ
-       for it; nothing here estimates one.
+       for it — [^17] estimates one from the corpus itself.
+[^17]: ρ, m₀, DE and the effective *n* in both tables are emitted by
+       `code-style-eval-clustering`, run against the two blob-pinned outcomes
+       files and, for the stratum table, the two generation manifests. Two
+       commands, from `tools/code-style-eval`, each producing one table above
+       transposed into markdown. THE AGGREGATE:
+       `poetry run python -m code_style_eval.cli.clustering --baseline
+       runs/gen-v2/base.outcomes.jsonl --candidate
+       runs/gen-v2/candidate.outcomes.jsonl --checker all`. THE STRATUM: the
+       same with `--checker guards --baseline-generation
+       runs/gen-v2/base.generation.jsonl --candidate-generation
+       runs/gen-v2/candidate.generation.jsonl`. Both manifests or
+       neither: the CLI refuses one alone, because restricting by a single
+       arm's truncations yields a stratum that is not the both-finished one
+       and cannot be told apart from it afterwards.
+       THE ARITHMETIC is
+       `libs/platform_core/src/platform_core/clustering.py` —
+       `intracluster_correlation` (one-way random-effects ICC),
+       `average_cluster_size` (Killip's m₀ for unequal clusters, which is
+       strictly below the arithmetic mean whenever sizes vary) and
+       `clustered_paired_power`. Its tests check the ICC against the ANOVA
+       definition rewritten independently in the test file rather than against
+       the implementation's own output.
+       THE FLOOR: `design_effect` is `max(1, 1 + ρ(m₀−1))` and
+       `effective_sample_size` can never exceed `total_units`, while
+       `intracluster_correlation` is published unfloored. The first draft of
+       this arithmetic, run as a throwaway script, printed an effective *n* of
+       1718.6 for 875 items; the module's docstring records that as the
+       motivating defect and a test pins it.
+       THE SERIES: `code_style_eval.core.clustering.paired_differences`
+       returns `candidate − baseline` per item and is the only producer of a
+       series here. The raw-indicator comparison quoted above was computed by
+       substituting the candidate's own pass indicator for that series over
+       the same clusters. The record carries NO `PowerVerdict`. It is the
+       FOURTH of that module's seven records without one — alongside
+       `RequiredReplicates`, `McNemarPower` and `NetDifferencePower` — for the
+       reason in [^16].
+       THE EIGHT ROUNDINGS: each row is
+       `mcnemar_p((d − net)/2, d, McNemarTest.MID_P)` over every (d, net) of
+       matching parity with d in 34..37 and net in 9..12, the integer
+       neighbourhood of the deflated (35.65, 10.70). The directory unit's
+       claim of robust survival is the same enumeration over the
+       neighbourhood of its own deflated table (59.17, 17.75) — d in 58..60,
+       net in 16..19 — giving six valid tables at 0.0135, 0.0183, 0.0204,
+       0.0273, 0.0363 and 0.0396, all below α. Computed at commit
+       `7c05c2ca` against `platform_core.power_distributions`, the same
+       function every other p on this page comes from. The CLI does not emit
+       any of them: this is the effective-sample-size shortcut, stated as an
+       approximation in the CLI's own module docstring, done deliberately here
+       rather than published by the instrument. The (36, 12) row is the one a
+       first draft of this section reported alone; Python's `round(12.5)`
+       returns 12 rather than 13, and that is the whole reason it was the row
+       that surfaced.
+       THE STRATUM MANIFEST now has a decoder,
+       `code_style_eval.contracts.generation`, which refuses a row with a
+       missing `finished` field or an empty `item_id`. Until 2026-09-09 it was
+       read with an inline `json.loads`, so a stratum four published tables
+       rest on had no validation between the file and the figure: an absent
+       `finished` would have read as falsy and moved the item out silently.
 [^11]: The choice of variant and the arithmetic behind it now sit in two
        places, because the statistic moved out of this package on 2026-09-09
        (commit `63770146`) and citing the old home would be citing a symbol

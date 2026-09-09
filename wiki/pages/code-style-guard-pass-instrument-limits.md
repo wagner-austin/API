@@ -13,14 +13,16 @@ source_paths:
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
   - libs/platform_core/src/platform_core/power_distributions.py
   - libs/platform_core/src/platform_core/minimum_detectable_effect.py
+  - libs/platform_core/src/platform_core/clustering.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
   "tools/code-style-eval/src/code_style_eval/core/provenance.py": 2ae8f760d7e83ea5e8a37c8d81939219dbe6e202
   "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 7ee61da22b34a03c91377041ec92772af0679237
-  "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
+  "tools/code-style-eval/pyproject.toml": 110037c5f0646c8fb6f44ae30ea2112767bffb30
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
   "libs/platform_core/src/platform_core/minimum_detectable_effect.py": a8c6a8b624d5826cf3c31a2452646236e9b572e8
+  "libs/platform_core/src/platform_core/clustering.py": 7611039dbbc21a817e4c10027e282a4e21e9fdbe
 provenance:
   - "EVERY RUN BELOW IS NAMED BY ITS payload_digest, not only by its directory. Two runs of this package can agree on every published figure -- sweep-v1 and gen-v1 both scored 226 items -- so a run name is not an identity and a figure quoted off this page was, until 2026-09-09, traceable only by resemblance. It was traced to the wrong run once. The digest is name-paired sha256 over the two *.outcomes.jsonl the comparison was computed from, carried inside comparison.json since 63770146."
   - "runs/sweep-v1/comparison.json + .runrecord.json (label sweep-v4-cap1536-reppen1.1-corpusdeps, 19 distributions recorded) -- payload_digest 1fd266b0f0dc050c54eaeef33523a59b45a7337fb2f586ff28fc3767853fb5e6"
@@ -110,6 +112,21 @@ Exact McNemar, alpha 0.05, computed rather than asserted, against the discordant
 
 The corpus holds 392 items. **No amount of retuning the run reaches significance; only more items do.** A guard-pass sweep reported on this corpus without its discordant count beside it is not evidence, and the count is the number to read first[^3].
 
+**And those columns assume the items are independent draws, which held-out
+files from a shared monorepo are not.** Every *n* in that table is a count of
+files, not a count of independent units, so the powers are upper bounds. The
+gap has since been measured rather than left as a caveat: on the 875-item
+gen-v2 corpus the intracluster correlation of the paired difference runs
+−0.010 to +0.062 depending on whether a cluster is a top-level category, a
+package or a directory, for design effects up to 1.744 — under which those 875
+files carry the information of 502. The measured table, the instrument
+that produces it, and why the correlation must be measured on the paired
+difference rather than on either arm's pass rate are all on
+[[code-style-qlora-terminates-worse-conforms-better]]; it is not restated
+here. The practical consequence for this page's recommendation is narrow and
+worth stating: **more items help, and more items drawn from packages already
+in the corpus help less than their count suggests.**[^15]
+
 ## What the sweep did establish
 
 **Perplexity, and only perplexity.** Teacher-forced on the held-out reference: 2.833 to 1.963, **392/392 items improved, 0 worsened**[^11]. Leakage was checked by path *and* by content -- the latter matters because `scripts/guard.py` is byte-identical across 41 packages.
@@ -141,6 +158,19 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
 [^9]: `runs/sweep-v3-nodeps/comparison.json.runrecord.json` (label `sweep-v3-cap1536-reppen1.1`, 3 distributions recorded) against `runs/sweep-v1/comparison.json.runrecord.json` (label `sweep-v4-cap1536-reppen1.1-corpusdeps`, 19). The same generated files, scored before and after the group; mypy failure buckets counted per arm from the two `*.outcomes.jsonl` pairs.
 [^10]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `CORPUS_DISTRIBUTIONS`, `FINGERPRINT_DISTRIBUTIONS` and `scoring_fingerprint`.
 [^11]: `runs/sweep-v1-cap384/perplexity.json` -- `items_improved` 392, `items_worsened` 0, per-item NLL for both arms.
+[^15]: `libs/platform_core/src/platform_core/clustering.py` --
+       `intracluster_correlation`, `average_cluster_size` (Killip's m0 for
+       unequal clusters) and `clustered_paired_power`, whose module docstring
+       carries the measured difference-versus-raw-indicator table and the
+       reason the design effect is floored at 1. The figures quoted here are
+       that instrument's output over
+       `tools/code-style-eval/runs/gen-v2/{base,candidate}.outcomes.jsonl`,
+       via `code-style-eval-clustering`; the full tables and their reading are
+       on [[code-style-qlora-terminates-worse-conforms-better]] and are not
+       duplicated here. NOTE THE CORPUS IS NOT THIS PAGE'S: gen-v2 scored 875
+       items and the sweep this page reports scored 226, so the design effects
+       transfer as an order of magnitude for a monorepo-drawn corpus rather
+       than as this sweep's own correction, which nobody has computed.
 [^12]: `tools/code-style-eval/Makefile:9` and `tools/code-style-eval/Makefile:30` -- the `lint` and `test` targets, each running `poetry sync --with dev`.
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
