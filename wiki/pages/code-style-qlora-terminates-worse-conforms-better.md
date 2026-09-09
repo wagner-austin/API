@@ -234,10 +234,20 @@ And this instrument still has **no declared smallest effect of interest**, so
 nothing here says whether an effect it can resolve is one anyone would act on.
 Every power record this package emits is a falsifiability predicate --
 `can_ever_reject`, `net_could_ever_be_significant` -- and neither instrument
-takes a threshold, so neither can return a `PowerVerdict`.[^16] A noise floor
-was going to anchor that number without anyone choosing it; the floor is
-exactly zero[^15], `SEI >= 0` constrains nothing, and inventing one instead is
-the move this page has refused twice already.
+takes a threshold, so neither can return a `PowerVerdict`.[^16]
+
+**There is no SEI *yet*, and the rule that would create one is stateable.** A
+noise floor was going to anchor the number without anyone choosing it; the
+floor is exactly zero[^15], so `SEI >= 0` constrains nothing. Nor can one be
+read off a decision this project took, the way a campaign that ADOPTS an arm
+can cite the smallest gain it ever adopted on: code-style has promoted
+nothing and put no adapter into use. What remains is legitimate and is not
+derivation — a **pre-registered** rule, of the form "an adapter is worth
+using if it improves guard-pass on the finishable stratum by at least X",
+stated and dated BEFORE a result exists. That still chooses X. What it cannot
+do is choose X to suit a number already seen, which is the failure mode this
+page has refused twice. Until such a rule is written down, every verdict here
+is falsifiability and none is actionability.
 
 ## What each null could have detected
 
