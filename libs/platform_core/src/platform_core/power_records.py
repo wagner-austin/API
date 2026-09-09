@@ -173,7 +173,6 @@ def encode_mcnemar_power(record: McNemarPower) -> JSONObject:
         "smallest_attainable_p": record["smallest_attainable_p"],
         "can_ever_reject": record["can_ever_reject"],
         "most_balanced_rejecting_minority": record["most_balanced_rejecting_minority"],
-        "verdict": record["verdict"],
     }
 
 
@@ -198,7 +197,6 @@ def decode_mcnemar_power(obj: JSONObject) -> McNemarPower:
         smallest_attainable_p=require_float(obj, "smallest_attainable_p"),
         can_ever_reject=require_bool(obj, "can_ever_reject"),
         most_balanced_rejecting_minority=require_int(obj, "most_balanced_rejecting_minority"),
-        verdict=_require_verdict(obj, "verdict"),
     )
 
 

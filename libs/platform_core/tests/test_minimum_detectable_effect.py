@@ -114,7 +114,27 @@ class TestMcNemarPower:
         assert record["smallest_attainable_p"] == pytest.approx(0.0625)
         assert record["can_ever_reject"] is False
         assert record["most_balanced_rejecting_minority"] == -1
-        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+
+    def test_carries_no_power_verdict_because_it_answers_a_different_question(
+        self,
+    ) -> None:
+        # THE ASYMMETRY, PINNED. The other two instruments take the effect
+        # worth acting on and answer "could this detect it?". McNemar, from
+        # discordant pairs and alpha alone, can only answer "can any split
+        # reject?" -- falsifiability, not practical detectability.
+        #
+        # Real disagreement, from code-style: at d=6 mid-p CAN reject (at a
+        # perfect 6:0), while that project's classification against its +5 pp
+        # threshold was NOT TESTED. A PowerVerdict here would have been true
+        # of the instrument and false about the world.
+        #
+        # can_ever_reject carries the truth as a boolean that cannot be
+        # mistaken for a classification. If a verdict field ever returns,
+        # this fails.
+        record = mcnemar_power(6, 0.05, McNemarTest.MID_P)
+        assert record["can_ever_reject"] is True
+        assert "verdict" not in record
+        assert PowerVerdict.TESTED.value not in record.values()
 
     def test_six_discordant_pairs_reject_only_at_the_extreme(self) -> None:
         record = mcnemar_power(6, 0.05, McNemarTest.EXACT)

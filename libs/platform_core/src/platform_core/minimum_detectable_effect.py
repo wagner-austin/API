@@ -140,6 +140,31 @@ class PairedContinuousPower(TypedDict):
 class McNemarPower(TypedDict):
     """Power of a paired BINARY comparison, conditioned on discordant pairs.
 
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, DELIBERATELY, and that is
+    the one asymmetry in this module worth understanding before using it.
+
+    The other two instruments take the effect anyone would act on and answer
+    "could this have detected it?". McNemar conditions on the discordant
+    pairs alone, so from ``discordant_pairs`` and ``alpha`` the only question
+    answerable is "can any attainable split reject?" -- falsifiability, not
+    practical detectability. Those are different questions, and giving them
+    one vocabulary is how a reader ends up reporting the first as though it
+    were the second.
+
+    Concretely, on real code-style data: at d=6 under mid-p the comparison
+    CAN reject (at a perfect 6:0), while the project's own classification
+    against a +5 pp threshold was NOT TESTED, because the detectable
+    difference sat above the base rate it applied to. A ``verdict: TESTED``
+    here would have been true of the instrument and false about the world --
+    the exact confusion this whole sweep exists to end, one level up.
+
+    So the truth is carried by :attr:`can_ever_reject`, a boolean that cannot
+    be mistaken for a classification. To classify a binary null against a
+    stated threshold, convert the returned split into your outcome's units
+    (the smallest detectable net difference is ``discordant_pairs - 2 *
+    most_balanced_rejecting_minority`` over your total pairs) and compare
+    that to the effect you care about.
+
     Attributes:
         instrument: Always :attr:`PowerInstrument.MCNEMAR`.
         test: Which :class:`McNemarTest` the report uses. Carried because the
@@ -154,8 +179,6 @@ class McNemarPower(TypedDict):
             still rejects, or -1 when none does. This is the informative
             bound; a search returning the trivial extreme instead is the bug
             the tests pin.
-        verdict: :class:`PowerVerdict`. ``NOT_TESTED`` whenever the comparison
-            cannot reject at any attainable split.
     """
 
     instrument: str
@@ -165,7 +188,6 @@ class McNemarPower(TypedDict):
     smallest_attainable_p: float
     can_ever_reject: bool
     most_balanced_rejecting_minority: int
-    verdict: str
 
 
 class ZeroFailurePower(TypedDict):
@@ -299,7 +321,6 @@ def mcnemar_power(
     for minority in range(discordant_pairs // 2 + 1):
         if mcnemar_p(minority, discordant_pairs, test) <= alpha:
             most_balanced = minority
-    verdict = PowerVerdict.TESTED if can_ever_reject else PowerVerdict.NOT_TESTED
     return McNemarPower(
         instrument=PowerInstrument.MCNEMAR.value,
         test=test.value,
@@ -308,7 +329,6 @@ def mcnemar_power(
         smallest_attainable_p=smallest_attainable_p,
         can_ever_reject=can_ever_reject,
         most_balanced_rejecting_minority=most_balanced,
-        verdict=verdict.value,
     )
 
 
