@@ -1,0 +1,9 @@
+# -text rather than `text eol=lf`: no conversion in either direction, so a
+# checkout can never rewrite bytes whose sha256 is quoted as a certificate.
+# These are the mi project's cluster-produced cartridge RunRecords, archived
+# 2026-09-09 from /pub/wagnera3/mi/cartridge/results/ so that every record
+# sha256 cited in docs/RESEARCH.md and the api-codebase wiki resolves to a
+# file in this repository rather than to one filesystem's longevity. Twin
+# files are committed BESIDE their primaries deliberately: a byte-identity
+# certificate is verifiable here by comparing the two files directly.
+cartridge/*.json -text
