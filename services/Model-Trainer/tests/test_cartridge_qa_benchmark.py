@@ -23,7 +23,7 @@ from collections.abc import Generator
 
 import pytest
 from platform_core.json_utils import load_json_str
-from platform_core.run_record import decode_run_record
+from platform_core.run_record import NO_PAYLOAD, decode_run_record
 from platform_ml.determinism import (
     ATTENTION_MATH_ONLY,
     ATTENTION_SETTING,
@@ -91,7 +91,9 @@ class TestBuildQuestionSet:
 
 class TestMeasureQaPlan:
     def test_every_observation_is_named_once(self, tmp_path: pathlib.Path) -> None:
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         names = [observation["name"] for observation in observations]
         assert len(names) == len(set(names))
@@ -102,7 +104,9 @@ class TestMeasureQaPlan:
         On gpt2 the accuracy arm did not move while the answer-likelihood arm
         halved; a record carrying only one would report half the finding.
         """
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         named = _values(observations)
         assert "base_accuracy" in named
@@ -114,14 +118,18 @@ class TestMeasureQaPlan:
         assert "cartridge-answer-nll-gain_spread" in named
 
     def test_chance_follows_the_distractor_count(self, tmp_path: pathlib.Path) -> None:
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         named = _values(observations)
         assert named["chance_accuracy"] == pytest.approx(1.0 / (TINY_PLAN["distractor_count"] + 1))
 
     def test_every_gain_carries_a_spread_beside_its_mean(self, tmp_path: pathlib.Path) -> None:
         """A mean without its spread is what let a 0.02 difference read as a finding."""
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         named = _values(observations)
         for arm in ("cartridge-accuracy-gain", "cartridge-answer-nll-gain"):
@@ -132,7 +140,9 @@ class TestMeasureQaPlan:
     def test_the_retrieval_gain_is_the_difference_it_claims_to_be(
         self, tmp_path: pathlib.Path
     ) -> None:
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         named = _values(observations)
         assert named["retrieval_accuracy_gain"] == pytest.approx(
@@ -141,7 +151,9 @@ class TestMeasureQaPlan:
 
     def test_the_item_count_is_reported(self, tmp_path: pathlib.Path) -> None:
         """A gain over six items and one over six hundred read very differently."""
-        observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+            "observations"
+        ]
 
         named = _values(observations)
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
@@ -158,6 +170,30 @@ class TestRunRecord:
         assert record["label"].startswith(
             "tiny-tiny-under-test-w8-s2-c8-m48-e1-lr0.05-d2-n6-seeds7.8.9-"
         )
+
+    def test_the_payload_digest_is_the_question_set_this_run_asked(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """THE FIELD THAT SEPARATES TWO RUNS OF ONE PLAN.
+
+        `qa-record.json` and `qa-svc-gpt2.json` share an experiment, a label
+        and a fingerprint while measuring 24 and 32 questions, because this
+        field held :data:`~platform_core.run_record.NO_PAYLOAD` in both. It is
+        asserted against the digest of the items the same plan builds rather
+        than against a constant, so a change in how items are derived moves
+        both sides and this test keeps checking the wiring rather than a
+        frozen hash.
+        """
+        measured = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        record = bench.qa_run_record(
+            "tiny", corpus=tmp_path, device="cpu", remove_split_k=False, math_attention=False
+        )
+
+        assert record["payload_digest"] == measured["question_set_digest"]
+        assert record["payload_digest"] != NO_PAYLOAD
+        # The corpus digest is in the LABEL, so the payload must not repeat
+        # it: two digests that always agree are one digest.
+        assert measured["corpus_digest"] not in record["payload_digest"]
 
     def test_an_unknown_plan_names_the_known_ones(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(KeyError, match="tiny"):

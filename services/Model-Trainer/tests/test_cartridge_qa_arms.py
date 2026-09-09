@@ -244,7 +244,9 @@ class TestServeLatency:
         )
         cli_hooks.monotonic_clock = lambda: next(ticks)
         try:
-            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+            observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+                "observations"
+            ]
         finally:
             cli_hooks.monotonic_clock = cli_hooks._default_monotonic_clock
 
@@ -312,7 +314,9 @@ class TestServeLatency:
         )
         cli_hooks.monotonic_clock = lambda: next(ticks)
         try:
-            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+            observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
+                "observations"
+            ]
         finally:
             cli_hooks.monotonic_clock = cli_hooks._default_monotonic_clock
 

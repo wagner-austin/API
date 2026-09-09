@@ -37,7 +37,6 @@ from platform_core.comparability import RunFingerprint
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger, setup_logging
 from platform_core.run_record import (
-    NO_PAYLOAD,
     Observation,
     RunRecord,
     encode_run_record,
@@ -82,6 +81,10 @@ from model_trainer.core.services.model.cartridge_qa_plans import (
     QaPlan,
     qa_plan_label,
 )
+from model_trainer.core.services.model.cartridge_qa_report import (
+    QaMeasurement,
+    latency_observations,
+)
 from model_trainer.core.services.model.cartridge_question_set import build_question_set
 from model_trainer.core.services.model.cartridge_retrieval import (
     RETRIEVED_CHUNKS,
@@ -89,6 +92,7 @@ from model_trainer.core.services.model.cartridge_retrieval import (
     fuse_by_reciprocal_rank,
     rank_chunks,
 )
+from model_trainer.core.services.model.cloze.identity import question_set_digest
 from model_trainer.core.services.model.cloze.score import score_cloze_items
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
 from model_trainer.core.services.model.gemm_timing import synchroniser
@@ -103,106 +107,7 @@ OUT_FLAG = "--out"
 _FLAGS = (PLAN_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
 
 
-def latency_observations(
-    *,
-    base_seconds: float,
-    retrieval_seconds: float,
-    cartridge_seconds: float,
-    retrieval_build_seconds: float,
-    real_seconds: float,
-    real_select_seconds: float,
-    real_index_seconds: float,
-    dense_seconds: float,
-    dense_select_seconds: float,
-    dense_index_seconds: float,
-    fused_seconds: float,
-    fused_select_seconds: float,
-) -> tuple[Observation, ...]:
-    """Name what each arm cost to SERVE, per pass over the question set.
-
-    WHAT IS BEING COMPARED, precisely, because the arms are not symmetric.
-    All three run the same scorer over the same items; they differ only in
-    what precedes the question -- nothing, retrieved evidence, or a trained
-    prefix. So the difference between them is prefill, which is the thing a
-    serving comparison is actually about: the retrieval arm re-encodes its
-    evidence on every query, and the cartridge arm does not.
-
-    THE ORACLE'S SELECTION IS MEASURED AND THEN EXCLUDED FROM THE COMPARISON,
-    rather than quietly left out. ``retrieval_build_seconds`` is the time to
-    pick each item's evidence by searching for its own ANSWER -- something no
-    real retriever can do, so charging it to retrieval would invent a cost,
-    and dropping it silently would hide that a step happened at all. It is
-    recorded so a reader can see both the number and the argument.
-
-    WHICH DIRECTION THIS BOUND CUTS. The oracle arm pays no embedding, no
-    index search and no ranking, so it is the CHEAPEST any retrieval could
-    be. A cartridge that beats it beats a real pipeline by more; a cartridge
-    that loses to it has proven nothing about real pipelines. Only the first
-    direction is conclusive, and the write-up has to say so.
-
-    Args:
-        base_seconds: Scoring the question set with no context added.
-        retrieval_seconds: Scoring it with evidence in the prompt.
-        cartridge_seconds: Scoring it behind a trained prefix, MEAN over the
-            plan's seeds so it is one pass like the other two rather than a
-            sum over however many seeds the plan happens to declare.
-        retrieval_build_seconds: Assembling the oracle's evidence. Reported,
-            not charged.
-        real_seconds: Scoring behind BM25-retrieved evidence.
-        real_select_seconds: Querying the index. CHARGED, unlike the oracle's
-            selection, because searching from the question is work every
-            deployment does per request. ``bm25_total_serve_seconds`` is the
-            sum, and it is the number to compare against the cartridge.
-        real_index_seconds: Building the index. Reported separately and NOT
-            in the total: a deployment pays it once when its corpus changes,
-            so charging it per query would overstate retrieval exactly as
-            charging the oracle's cheating would.
-        dense_seconds: Scoring behind embedding-retrieved evidence.
-        dense_select_seconds: Embedding the QUERY and ranking pre-embedded
-            chunks against it. Charged, for the reason BM25's select is.
-        dense_index_seconds: Embedding the corpus. Offline and excluded from
-            the total, symmetric with ``real_index_seconds`` -- and the
-            asymmetry the first version of this got wrong, by embedding the
-            corpus inside every query and recording 17452 ms/item.
-        fused_seconds: Scoring behind reciprocal-rank-fused evidence.
-        fused_select_seconds: Fusing, plus the lexical ranking fusion needs.
-            The dense ranking is an INPUT to it, so the fused total adds
-            ``dense_select_seconds`` as well -- a hybrid cannot cost less
-            than an arm it is built on.
-
-    Returns:
-        The named durations. Every arm's per-request total is present as its
-        own name, so a reader compares totals without re-deriving which
-        components belong to which arm.
-    """
-    return tuple(
-        Observation(name=name, value=value)
-        for name, value in (
-            ("base_serve_seconds", base_seconds),
-            ("retrieval_serve_seconds", retrieval_seconds),
-            ("cartridge_serve_seconds", cartridge_seconds),
-            ("retrieval_oracle_build_seconds", retrieval_build_seconds),
-            ("bm25_serve_seconds", real_seconds),
-            ("bm25_select_seconds", real_select_seconds),
-            ("bm25_total_serve_seconds", real_seconds + real_select_seconds),
-            ("bm25_index_seconds", real_index_seconds),
-            ("dense_serve_seconds", dense_seconds),
-            ("dense_select_seconds", dense_select_seconds),
-            ("dense_total_serve_seconds", dense_seconds + dense_select_seconds),
-            ("dense_index_seconds", dense_index_seconds),
-            ("fused_serve_seconds", fused_seconds),
-            ("fused_select_seconds", fused_select_seconds),
-            (
-                "fused_total_serve_seconds",
-                fused_seconds + fused_select_seconds + dense_select_seconds,
-            ),
-        )
-    )
-
-
-def measure_qa_plan(
-    plan: QaPlan, *, corpus: pathlib.Path, device: str
-) -> tuple[tuple[Observation, ...], str]:
+def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMeasurement:
     """Run every arm of one question-set plan and name what they produced.
 
     THE BASE AND RETRIEVAL ARMS ARE SCORED ONCE, not once per seed. Neither
@@ -216,7 +121,7 @@ def measure_qa_plan(
         device: Device to measure on.
 
     Returns:
-        ``(observations, digest)``.
+        The numbers and both identities of the run that produced them.
 
     Raises:
         AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` when the corpus yields no
@@ -459,7 +364,11 @@ def measure_qa_plan(
             fused_select_seconds=fused_select_seconds,
         )
     )
-    return tuple(observations), digest
+    return QaMeasurement(
+        observations=tuple(observations),
+        corpus_digest=digest,
+        question_set_digest=question_set_digest(items),
+    )
 
 
 def qa_run_record(
@@ -496,13 +405,15 @@ def qa_run_record(
         device,
         probe_determinism(device, remove_split_k=remove_split_k, math_attention=math_attention),
     )
-    observations, digest = measure_qa_plan(plan, corpus=corpus, device=device)
+    measured = measure_qa_plan(plan, corpus=corpus, device=device)
     return run_record(
         experiment=QA_EXPERIMENT,
-        label=qa_plan_label(plan_name, plan, digest=digest),
+        label=qa_plan_label(plan_name, plan, digest=measured["corpus_digest"]),
         fingerprint=fingerprint,
-        observations=observations,
-        payload_digest=NO_PAYLOAD,
+        observations=measured["observations"],
+        # THE QUESTION SET, not the corpus, and the two are not the same
+        # identity. `cloze.identity` carries the two records that proved it.
+        payload_digest=measured["question_set_digest"],
     )
 
 
@@ -566,6 +477,7 @@ def entrypoint() -> None:
 
 __all__ = [
     "HFTokenizerEncoder",
+    "QaMeasurement",
     "build_question_set",
     "entrypoint",
     "latency_observations",
