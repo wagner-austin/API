@@ -743,6 +743,83 @@ test and by image smoke.
   and the 7B compartmental design itself, which after this record is a
   base-adaptation or retrieval question, not a cartridge one.
 
+#### `cartridge_qa_benchmark` — can the model USE what the cartridge carries, and does it beat retrieval
+
+Registered 2026-09-09 (board task `e3c833f7`), and the registration is the
+first thing worth recording: this command produced the cartridge programme's
+most-cited result while appearing in **0 of 571 committed run documents, 0
+lines of this file, and 0 tracked artifacts**. Its records were written to a
+temporary directory that is purged. It ran on the operator's local 3090 Ti,
+where nothing requires an image digest or a staged corpus, and the reason it
+was never registered is that nothing checked. The `research-registration`
+guard rule (`9b011256`, corrected in `bd4dfb97`) now fails `make lint` on any
+entry point that builds a `RunRecord` and is named nowhere here.
+
+- **Command:** `python -m model_trainer.cli.cartridge_qa_benchmark --plan
+  <name> --corpus <dir> --device cuda --controls <arm> --out <file>`
+- **What it measures, and why it is not the loss benchmark.**
+  `cartridge_benchmark` reports held-out loss; a model can memorise text
+  word-by-word and still fail every question about it. This scores a
+  multiple-choice question set built from held-out windows, over six arms:
+  base alone, cartridge, BM25 retrieval, dense retrieval, reciprocal-rank
+  fusion, and an oracle. `QA_EXPERIMENT` differs from `CARTRIDGE_EXPERIMENT`
+  so the comparability layer refuses to difference the two.
+
+- **THE HEADLINE WAS RETRACTED THE DAY THIS SECTION WAS WRITTEN**
+  (`a98769b5`, `dc5f2408`). "The cartridge arm beats lexical, dense and fused
+  retrieval from ~774M" rested on differences of 0.0521 and 0.0417 accuracy
+  over **32 items** — 1.7 and 1.3 items. Under McNemar at alpha 0.05 with
+  mid-p, the fewest disagreements that can ever reject is 5, so the claim sat
+  roughly four times below the floor of the instrument that produced it. No
+  split of that question set could have supported it.
+
+  **What survives:** cartridge versus BASE moved 8.7 and 8.3 items at those
+  rungs, above the floor and above its own seed spread. *"Cartridges improve
+  the model over the un-augmented base from 774M"* stands. *"Cartridges beat
+  retrieval"* does not, and is withdrawn rather than softened.
+
+- **The refusal that now prevents the repeat.** A plan declares
+  `smallest_effect_of_interest`, `alpha` and `mcnemar_test`, and
+  `cartridge_qa_power.require_resolvable_question_set` refuses the run —
+  before the model loads — when the REALISED question set cannot resolve what
+  the plan declares. Against the realised count, never `max_items`: the
+  32-item set came from a plan whose cap said 120. Every plan declares 0.05,
+  which is the effect size this literature reports (WRAP +0.020, arXiv
+  2401.16380; this machine's extraction ablation +0.061 for a removed 7:1
+  dilution, +0.029 for permuted copies, +0.004 for hub-slug markers, which
+  was noise). That needs 100 items, so **the four me-wiki plans are refused
+  before they run** — deliberately, since they are the plans that produced
+  the retracted claim.
+
+  It is a FALSIFIABILITY gate, not a power one: passing means some attainable
+  outcome supports the declared effect, never that the outcome is likely.
+  Classifying an observed result against the discordant count that actually
+  occurred is a separate statement.
+
+- **Two axes added at registration, both previously absent.**
+  `pythia-6.9b-api-wiki-qa` — the ladder had stopped at gpt2-xl, one rung
+  past its own ~774M crossing, while the cartridge sweeps have run this base
+  on an A30 since image v36; every field but `model_id` is the ladder's,
+  `max_seq_len` included, so scale is not confounded with the retriever's
+  budget. And `gpt2-large-api-wiki-qa-slots-{32,64,128,256}` — `num_slots`
+  was 128 in every plan while the programme's stated mechanism for why a
+  cartridge should lose to a retriever is that its slot budget is fixed and
+  an index is not. That is a claim about a curve, and it had been measured at
+  one point. All four cells hold `max_seq_len` at 768 rather than each
+  cell's own `1024 - num_slots`, or the smallest cartridge would also carry
+  the largest evidence budget.
+
+- **Known gaps, filed rather than implied.** There is still **no
+  long-context arm** — the corpus in the context window is the real
+  competitor to a cartridge, and every verdict this command has produced is
+  silent about it. BM25's `K1`, `B` and `RETRIEVED_CHUNKS` are still module
+  constants rather than declared, swept plan fields, so the retrieval arms
+  are three fixed points with no parameter sweep, no reranker and no query
+  expansion. And **no run document is committed yet, deliberately**: no
+  registered image carries the post-`cdb84e12` code, so a committed run
+  naming one would assert something untrue — the same position
+  `cartridge_composition_sweep` held until image v32.
+
 ### `mi-cu128` — the Blackwell determinism baseline
 
 Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
