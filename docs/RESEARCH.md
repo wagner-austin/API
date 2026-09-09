@@ -829,6 +829,30 @@ entry point that builds a `RunRecord` and is named nowhere here.
   argument for the bigger bases and the bigger corpora rather than for the
   arm's absence.
 
+- **`window` and `epochs` are deliberately NOT swept here, and the reason is
+  a result rather than a backlog.** The registration task asked that they
+  stop being constants copied between plans. The epochs line above already
+  closed that knob on the LOSS axis — 12 sits at the maximum of every
+  training axis measured, doubling to 24 halves the mean gain and
+  quadrupling to 48 is catastrophic at nine of nine seeds negative — so a
+  sweep here would re-run a question whose dose-response is known to be
+  monotone down from the recorded value.
+
+  **What is genuinely open is whether that transfers**, and it does not
+  follow. The epochs line is measured in NATS on held-out loss; this command
+  measures ACCURACY on a question set, and the two are kept in separate
+  experiments precisely because a model can memorise text word-by-word and
+  still fail every question about it. A knob that maximises loss-gain need
+  not maximise answerability.
+
+  It is not swept **yet** because it cannot be resolved yet: an epochs axis
+  over the me-wiki plans would produce cells the power gate refuses outright,
+  and over the api-codebase plans it would produce cells too close to their
+  floor to separate. Building plans that cannot run is how this axis got into
+  trouble the first time. The sweep belongs after the corpus is large enough
+  to carry it, and is filed here rather than left as an unexplained
+  difference between two plan tables.
+
 - **Still open.** No reranker and no query-expansion arm, so the search side
   is parameterised but not yet widened. And **no run document is committed,
   deliberately**: no registered image carries the post-`cdb84e12` code, so a
