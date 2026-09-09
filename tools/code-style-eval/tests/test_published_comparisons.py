@@ -34,15 +34,30 @@ from code_style_eval.contracts.outcomes import ComparisonReport, decode_comparis
 
 _RUNS = pathlib.Path(__file__).resolve().parent.parent / "runs"
 
-#: The mid-p values two wiki pages print, pinned as literals beside the run
-#: that produced each. The reproduction test below would still pass if a
-#: committed artifact and the code changed together; these would not.
+#: Every committed comparison, with its denominator and mid-p pinned as
+#: literals. The reproduction test below would still pass if a committed
+#: artifact and the code changed together; these would not.
 #:
-#: ``sweep-v1`` is the "all scored" row of the instrument-limits page (3 v 3,
-#: the TIE form, which a version that doubles the tail returns 1.0 for), and
-#: ``sweep-v1-cap384`` and ``sweep-v2-greedy`` are its two 3 v 2 rows.
-#: ``gen-v1`` is the 4 v 3 table published as 0.7265625.
-_PUBLISHED_MID_P: tuple[tuple[str, int, float], ...] = (
+#: FOUR OF THE SIX ARE PUBLISHED FIGURES, and the other two are pinned
+#: anyway -- they are the same instrument's output and catch drift equally,
+#: but the distinction is recorded so nobody reads this as six citations:
+#:
+#:   sweep-v1        the "all scored" row of the instrument-limits page --
+#:                   3 v 3, the TIE form, which a version that doubles the
+#:                   tail returns 1.0 for instead of 0.84375
+#:   sweep-v3-nodeps the same generations scored before the corpus group
+#:                   existed; the page reports this headline as byte-identical
+#:   gen-v1          the 4 v 3 table published as 0.7265625, which
+#:                   platform_core pinned its own tests to
+#:   gen-v2          the 875-item aggregate of the results page
+#:   sweep-v1-cap384 cited by the pages for its perplexity.json only
+#:   sweep-v2-greedy not cited by either page
+#:
+#: The page's other two strata rows (n=90 and n=49) are SUBSETS of sweep-v1
+#: rather than run directories, and are not reachable from here. They also
+#: report 0.688, which is what makes them easy to mistake for the two runs
+#: above; they are not the same measurement.
+_COMMITTED_MID_P: tuple[tuple[str, int, float], ...] = (
     ("gen-v1", 226, 0.7265625),
     ("gen-v2", 875, 0.361594608053565),
     ("sweep-v1", 226, 0.84375),
@@ -101,9 +116,9 @@ class TestEveryCommittedComparisonReproduces:
         """
         found = tuple(directory.name for directory in _committed_runs())
 
-        assert found == tuple(name for name, _, _ in _PUBLISHED_MID_P)
+        assert found == tuple(name for name, _, _ in _COMMITTED_MID_P)
 
-    @pytest.mark.parametrize("run_name", [name for name, _, _ in _PUBLISHED_MID_P])
+    @pytest.mark.parametrize("run_name", [name for name, _, _ in _COMMITTED_MID_P])
     def test_rebuilding_from_the_outcomes_gives_the_committed_report(self, run_name: str) -> None:
         """Every field, not only the p-values.
 
@@ -122,16 +137,19 @@ class TestEveryCommittedComparisonReproduces:
 
         assert rebuilt == committed
 
-    @pytest.mark.parametrize(("run_name", "shared_items", "mid_p"), _PUBLISHED_MID_P)
-    def test_the_published_mid_p_is_the_literal_a_wiki_page_prints(
+    @pytest.mark.parametrize(("run_name", "shared_items", "mid_p"), _COMMITTED_MID_P)
+    def test_the_mid_p_is_the_pinned_literal(
         self, run_name: str, shared_items: int, mid_p: float
     ) -> None:
         """Exact float equality, because the pages print exact digits.
 
+        Rebuilding alone cannot catch an artifact and the code changing
+        together; a literal written down here can.
+
         Args:
             run_name: The run directory.
-            shared_items: The denominator the page reports.
-            mid_p: The mid-p value the page reports.
+            shared_items: The denominator the comparison reports.
+            mid_p: The mid-p value the comparison reports.
         """
         directory = _RUNS / run_name
         committed = _committed_report(directory)
