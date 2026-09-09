@@ -43,10 +43,14 @@ from platform_core.errors import AppError, Hpc3ErrorCode
 from hpc3.core.remote import run_remote
 from hpc3.core.stage import CERTIFICATION_SUFFIX
 
-#: A lowercase sha256, as both the digest command and the record spell it.
-_SHA256 = re.compile(r"\b[0-9a-f]{64}\b")
-
-_DIGEST_LINE = re.compile(r"^([0-9a-f]{64})\s+(\S.*)$")
+#: One ``<digest>  <name>`` row, as `sha256sum` prints it and as
+#: :func:`hpc3.core.stage.certification_text` writes it.
+#:
+#: The name is a SINGLE token deliberately. A certification record ends with a
+#: free-form ``provenance ...`` line, and matching ``\\S.*`` would let a
+#: sentence that happens to open with 64 hex characters register as a file row.
+#: A filename has no spaces; prose does.
+_DIGEST_LINE = re.compile(r"^([0-9a-f]{64})\s+(\S+)$")
 
 
 def certification_probe(paths: tuple[str, ...]) -> str:
@@ -76,8 +80,21 @@ def certification_probe(paths: tuple[str, ...]) -> str:
     return "; ".join(parts)
 
 
-def parse_probe(output: str, paths: tuple[str, ...]) -> dict[str, tuple[str, frozenset[str]]]:
+def parse_probe(
+    output: str, paths: tuple[str, ...]
+) -> dict[str, tuple[str, frozenset[tuple[str, str]]]]:
     """Read the probe's answer back into one entry per path.
+
+    THE RECORD'S NAME COLUMN IS KEPT, and that is the whole point. An earlier
+    version collected only the digests and asked whether the file's digest
+    appeared ANYWHERE in the directory's records. That proves "these bytes are
+    known here", which is a weaker claim than it reads as: two files staged
+    into one directory both appear in one record, so a pair holding EACH
+    OTHER'S bytes satisfies it. For the generation specs that is precisely the
+    confound the arms must not have -- base and candidate differing in exactly
+    one field -- and the check would have waved a swap through. Caught in audit
+    2026-09-09; the name was already captured by the pattern and simply never
+    read.
 
     Args:
         output: The probe's stdout.
@@ -85,48 +102,52 @@ def parse_probe(output: str, paths: tuple[str, ...]) -> dict[str, tuple[str, fro
 
     Returns:
         For each path, its digest on the cluster -- empty string when the
-        file is absent or unreadable -- and every digest its neighbouring
-        certification records name.
+        file is absent or unreadable -- and every ``(name, digest)`` pair its
+        neighbouring certification records assert.
     """
-    found: dict[str, tuple[str, frozenset[str]]] = {path: ("", frozenset()) for path in paths}
+    found: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
+        path: ("", frozenset()) for path in paths
+    }
     current = ""
     mode = ""
-    certified: set[str] = set()
+    recorded: set[tuple[str, str]] = set()
     digest = ""
 
     def _flush() -> None:
         if current:
-            found[current] = (digest, frozenset(certified))
+            found[current] = (digest, frozenset(recorded))
 
     for line in output.splitlines():
         if line.startswith("FILE "):
             _flush()
             current = line[len("FILE ") :]
-            mode, digest, certified = "file", "", set()
+            mode, digest, recorded = "file", "", set()
             continue
         if line.startswith("RECORDS "):
             mode = "records"
             continue
         if not current:
             continue
+        matched = _DIGEST_LINE.match(line.strip())
+        if not matched:
+            continue
         if mode == "file":
-            matched = _DIGEST_LINE.match(line.strip())
-            if matched:
-                digest = matched.group(1)
+            digest = matched.group(1)
         else:
-            # Annotated at the assignment: `findall` is typed to return
-            # list[Any], and letting that flow into the set would put an Any
-            # inside a value this module's whole job is to compare exactly.
-            matches: list[str] = _SHA256.findall(line)
-            certified.update(matches)
+            recorded.add((matched.group(2), matched.group(1)))
     _flush()
     return found
 
 
 def uncertified(
-    paths: tuple[str, ...], probed: dict[str, tuple[str, frozenset[str]]]
+    paths: tuple[str, ...], probed: dict[str, tuple[str, frozenset[tuple[str, str]]]]
 ) -> tuple[str, ...]:
     """Name the declared inputs no record beside them vouches for.
+
+    A file is admitted only when a record asserts ITS OWN NAME against the
+    digest it actually has. Matching the digest alone would admit any file
+    whose bytes are recorded somewhere in the directory, which two files
+    staged together can satisfy by holding each other's contents.
 
     A path whose file is absent is NOT reported here. Absence is
     :func:`hpc3.core.inputs.require_inputs_present`'s question, and reporting
@@ -141,7 +162,9 @@ def uncertified(
         The unvouched paths, in declaration order.
     """
     return tuple(
-        path for path in paths if probed[path][0] and probed[path][0] not in probed[path][1]
+        path
+        for path in paths
+        if probed[path][0] and (path.rsplit("/", 1)[-1], probed[path][0]) not in probed[path][1]
     )
 
 

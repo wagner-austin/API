@@ -47,7 +47,8 @@ def _probe_output(*blocks: tuple[str, str, Sequence[str]]) -> str:
         if digest:
             lines.append(f"{digest}  {path}")
         lines.append(f"RECORDS {path}")
-        lines.extend(f"{record}  something.jsonl" for record in records)
+        name = path.rsplit("/", 1)[-1]
+        lines.extend(f"{record}  {name}" for record in records)
     return "\n".join(lines) + "\n"
 
 
@@ -84,12 +85,12 @@ class TestReadingTheAnswer:
     def test_a_certified_file_is_matched_to_its_record(self) -> None:
         parsed = parse_probe(_probe_output((_PAYLOAD, _DIGEST_A, [_DIGEST_A])), (_PAYLOAD,))
 
-        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({_DIGEST_A}))
+        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({("train.json", _DIGEST_A)}))
 
     def test_a_record_naming_other_digests_does_not_vouch_for_this_file(self) -> None:
         parsed = parse_probe(_probe_output((_PAYLOAD, _DIGEST_A, [_DIGEST_B])), (_PAYLOAD,))
 
-        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({_DIGEST_B}))
+        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({("train.json", _DIGEST_B)}))
 
     def test_an_absent_file_reads_as_no_digest(self) -> None:
         parsed = parse_probe(_probe_output((_PAYLOAD, "", [])), (_PAYLOAD,))
@@ -112,7 +113,7 @@ class TestReadingTheAnswer:
         noise = "Welcome to the cluster\nLast login: never\n"
         parsed = parse_probe(noise + _probe_output((_PAYLOAD, _DIGEST_A, [_DIGEST_A])), (_PAYLOAD,))
 
-        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({_DIGEST_A}))
+        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({("train.json", _DIGEST_A)}))
 
     def test_a_line_that_is_not_a_digest_line_does_not_become_one(self) -> None:
         """sha256sum's own error text sits in the file section."""
@@ -130,19 +131,45 @@ class TestReadingTheAnswer:
             (_PAYLOAD, _SPEC),
         )
 
-        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({_DIGEST_A}))
+        assert parsed[_PAYLOAD] == (_DIGEST_A, frozenset({("train.json", _DIGEST_A)}))
         assert parsed[_SPEC] == (_DIGEST_B, frozenset())
+
+
+class TestTheProvenanceLineIsNotAFileRow:
+    def test_a_sentence_opening_with_a_digest_is_not_a_record_row(self) -> None:
+        """A certification record ends with free-form provenance.
+
+        `<digest> <single-token>` is a row; `<digest> some words` is prose.
+        Matching the looser form would let a provenance sentence register a
+        name nobody staged.
+        """
+        prose = f"{_DIGEST_B}  and then some explanatory words"
+        output = "\n".join(
+            [
+                f"FILE {_PAYLOAD}",
+                f"{_DIGEST_A}  {_PAYLOAD}",
+                f"RECORDS {_PAYLOAD}",
+                f"{_DIGEST_A}  train.json",
+                prose,
+            ]
+        )
+
+        parsed = parse_probe(output, (_PAYLOAD,))
+
+        assert parsed[_PAYLOAD][1] == frozenset({("train.json", _DIGEST_A)})
 
 
 class TestWhichAreUnvouchedFor:
     def test_a_file_no_record_names_is_reported(self) -> None:
-        probed: dict[str, tuple[str, frozenset[str]]] = {_PAYLOAD: (_DIGEST_A, frozenset())}
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
+            _PAYLOAD: (_DIGEST_A, frozenset())
+        }
 
         assert uncertified((_PAYLOAD,), probed) == (_PAYLOAD,)
 
     def test_a_file_its_record_names_is_not(self) -> None:
-        probed: dict[str, tuple[str, frozenset[str]]] = {
-            _PAYLOAD: (_DIGEST_A, frozenset({_DIGEST_A}))
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
+            _PAYLOAD: (_DIGEST_A, frozenset({("train.json", _DIGEST_A)}))
         }
 
         assert uncertified((_PAYLOAD,), probed) == ()
@@ -154,12 +181,44 @@ class TestWhichAreUnvouchedFor:
         know is missing, and bury the ones that are present and unvouched --
         which are the only ones this check can say anything new about.
         """
-        probed: dict[str, tuple[str, frozenset[str]]] = {_PAYLOAD: ("", frozenset())}
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {_PAYLOAD: ("", frozenset())}
 
         assert uncertified((_PAYLOAD,), probed) == ()
 
+    def test_two_files_holding_each_other_s_bytes_are_both_refused(self) -> None:
+        """The defect this pairing exists to prevent, pinned.
+
+        Both generation specs are staged into one directory, so ONE record
+        names both digests. An earlier version asked only whether a file's
+        digest appeared anywhere in that record, which a swapped pair
+        satisfies: each file's bytes really are recorded there, just against
+        the other name. That is exactly the confound the specs must not have
+        -- the arms differ in one field, and a swap silently exchanges them
+        while every digest still checks out.
+
+        Found in audit rather than by these tests, which is why it is here.
+        """
+        base = "/pub/w/specs/gen-base.json"
+        candidate = "/pub/w/specs/gen-candidate.json"
+        # The record is CORRECT. The files are not: each holds the other's.
+        recorded = frozenset({("gen-base.json", _DIGEST_A), ("gen-candidate.json", _DIGEST_B)})
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
+            base: (_DIGEST_B, recorded),
+            candidate: (_DIGEST_A, recorded),
+        }
+
+        assert uncertified((base, candidate), probed) == (base, candidate)
+
+    def test_a_digest_recorded_against_another_name_does_not_vouch(self) -> None:
+        """The single-file form of the same rule."""
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
+            _PAYLOAD: (_DIGEST_A, frozenset({("some-other-file.json", _DIGEST_A)}))
+        }
+
+        assert uncertified((_PAYLOAD,), probed) == (_PAYLOAD,)
+
     def test_order_follows_the_declaration(self) -> None:
-        probed: dict[str, tuple[str, frozenset[str]]] = {
+        probed: dict[str, tuple[str, frozenset[tuple[str, str]]]] = {
             _PAYLOAD: (_DIGEST_A, frozenset()),
             _SPEC: (_DIGEST_B, frozenset()),
         }
