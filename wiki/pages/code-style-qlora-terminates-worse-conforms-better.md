@@ -28,7 +28,7 @@ source_git_blobs:
   "tools/code-style-eval/runs/gen-v1/base.outcomes.jsonl": 06ec61b8eec320c038f58671d1bfc3849ccf606b
   "tools/code-style-eval/runs/gen-v1/candidate.outcomes.jsonl": cefb9901a37630e030f4155456c257b1a1b5ea9e
   "libs/platform_core/src/platform_core/continuation_task.py": eaab054bfd2b59a0227261e6455a2067630af31b
-  "services/Model-Trainer/src/model_trainer/cli/_test_hooks.py": 3abe6387a146450ad24bd415d589ed3ed09bb744
+  "services/Model-Trainer/src/model_trainer/cli/_test_hooks.py": bb812bd0b9d9b2945d556dba0f81ebc82af5d3ad
   "tools/code-style-eval/README.md": 0d5b561e739e680393d9aa3906e7df0143c6a92e
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
@@ -122,6 +122,19 @@ net −56 (mid-p 3.5e-07), −6.6pp against −6.4pp.[^5] The guards *gain* has 
 second sample: v1 was +6 and null, and that null is uninformative rather than
 contradictory — see below.
 
+**The unit of *n* is the file, and files are not independent draws.** Every
+count here is over held-out files from two repositories, and McNemar assumes
+the pairs are independent of each other. These are not: files in one package
+share an author, a layout and often a near-identical shape, and the emitter
+deduplicates only byte-identical ones.[^8] Correlation between items inflates
+significance, and nothing here corrects for it. Termination at mid-p 2e-28
+would survive a great deal of it; the guards gain at mid-p 0.020 on 282 items
+is the result most exposed, and it is already the one flagged above as sitting
+below its own MDE. Treat that number as directional. This is unquantified
+rather than dismissed — the correction needs a clustering unit nobody has
+chosen for this corpus, and picking one to make a p-value look better is the
+wrong order.
+
 ## What each null could have detected
 
 A McNemar test conditions on the discordant pairs, so its power is a property
@@ -155,7 +168,7 @@ discordant pairs it rejects **only** on a perfect 7:0 split, one item away from
 a test no outcome could have failed. The exact test's floor is twice the mid-p
 floor, and that gap is not academic — at *d*=5 it is the difference between
 "rejects only at 5:0" and "cannot reject at all", which is the condition the
-sibling page [[code-style-guard-pass-instrument-limits]] runs into.
+sibling page [[code-style-guard-pass-instrument-limits]] runs into.[^10]
 
 **v1's guards null could not have found the v2 effect.**[^10] Its MDE is 11.79pp
 against a v2 effect of 6.38pp, so v1 was structurally incapable of detecting
