@@ -22,7 +22,7 @@ source_paths:
   - libs/platform_core/src/platform_core/power_distributions.py
   - tools/code-style-eval/tests/test_published_comparisons.py
 source_git_blobs:
-  "tools/code-style-eval/runs/gen-v2/comparison.json": adcdf3a42c78828456790b7b9f6f5a8e17f354ba
+  "tools/code-style-eval/runs/gen-v2/comparison.json": 59740d9ff18ef856ec3afee9b1e4cdf86995b3eb
   "tools/code-style-eval/runs/gen-v2/base.outcomes.jsonl": ba1a470e0abb607c5d1dd523b323638952ef64fd
   "tools/code-style-eval/runs/gen-v2/candidate.outcomes.jsonl": 17dbefe2994932bbc2e7cb93991ba6c9445cef89
   "tools/code-style-eval/runs/gen-v2/base.generation.jsonl": 28d3c2096b3ee0b42d3a5fc27b6369cc591372ba
@@ -36,13 +36,14 @@ source_git_blobs:
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
-  "tools/code-style-eval/tests/test_published_comparisons.py": e58058d5186ed305201eb98d8af06fbfb5023cb1
+  "tools/code-style-eval/tests/test_published_comparisons.py": 9d8789a618d8e870136cb758d5059a70c4ebe678
 provenance:
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
   - "adapter sha256 e675f88218fde25a0b410bd44da29c345a6701dac92e81dcf6bb9b624427b7fd"
   - "holdout sha256 5c1697e2fe06d8a5819fdb0348031f242b6609d029c9263405337fad27709e20, verified against the digests record on pull"
   - "scored 2026-09-08 on Windows with tools/code-style-eval, ruff + mypy strict + scripts.guard"
+  - "THE RUNS THIS PAGE REPORTS, BY DIGEST rather than by directory: gen-v2 (the 875-item aggregate and both splits) payload_digest 0e3e9080fafbe2c46057c27a01298fd84002518e441bde50e076d26f1e9ddb9f; gen-v1 (the replication figures) payload_digest face4e797b8ac150fbaa56516232c92183807daa3d3cad3a5f4147f5b679b8ec. Name-paired sha256 over each run's two *.outcomes.jsonl, carried inside its comparison.json. A run name is not an identity -- gen-v1 and sweep-v1 both scored 226 items and agree on nothing else -- and quoting a figure by run name is how it gets matched back to the wrong artifact."
   - "cluster structure counted 2026-09-09 over the 875 shared item ids in runs/gen-v2/{base,candidate}.outcomes.jsonl: k = 14 / 64 / 336 by path segment, largest package 165, median 5"
   - "tech-wiki/sources/killip-2004-intracluster-correlation.txt sha256 2fae776213c2ab342d4380f8b5dabb92ed66e487d001e3e9b33bd9a18400877e -- outside this wiki's workspaceRoot; the design-effect formula and its equal-cluster-size limit, read from the archived text"
   - "tech-wiki/sources/lazic-2010-pseudoreplication-neuroscience.txt sha256 57643fecd2130189bffc9a8ea105de68dfc927a6ac24b357ba6d110a566bc0af -- outside this wiki's workspaceRoot; the IC=0.30 -> 37% figure, read from the archived text"

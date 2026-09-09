@@ -167,7 +167,13 @@ class TestTheReport:
             "shared_fail.py": _outcome("shared_fail.py", "cand", passed=True),
         }
 
-        report = build_report(baseline, candidate, baseline_arm="base", candidate_arm="cand")
+        report = build_report(
+            baseline,
+            candidate,
+            baseline_arm="base",
+            candidate_arm="cand",
+            payload_digest="d" * 64,
+        )
 
         assert report["shared_items"] == 2
         assert report["baseline_pass_rate"] == 0.5
@@ -179,7 +185,13 @@ class TestTheReport:
         baseline = {f"i{n}.py": _outcome(f"i{n}.py", "base", passed=False) for n in range(6)}
         candidate = {f"i{n}.py": _outcome(f"i{n}.py", "cand", passed=True) for n in range(6)}
 
-        report = build_report(baseline, candidate, baseline_arm="base", candidate_arm="cand")
+        report = build_report(
+            baseline,
+            candidate,
+            baseline_arm="base",
+            candidate_arm="cand",
+            payload_digest="d" * 64,
+        )
 
         assert report["counts"]["candidate_only"] == 6
         assert report["mid_p"] < report["exact_p"]
@@ -188,16 +200,70 @@ class TestTheReport:
         """The record survives serialization intact."""
         baseline = {"a.py": _outcome("a.py", "base", passed=False)}
         candidate = {"a.py": _outcome("a.py", "cand", passed=True)}
-        report = build_report(baseline, candidate, baseline_arm="base", candidate_arm="cand")
+        report = build_report(
+            baseline,
+            candidate,
+            baseline_arm="base",
+            candidate_arm="cand",
+            payload_digest="d" * 64,
+        )
 
         assert decode_comparison_report(encode_comparison_report(report)) == report
+
+    def test_a_report_that_cannot_name_its_bytes_is_refused_at_construction(self) -> None:
+        """The anonymous report must be unconstructible, not merely discouraged.
+
+        Every other field is a number, and numbers do not say what produced
+        them. If this could be defaulted or left empty, a comparison could be
+        built that no reader could ever trace to an input -- which is how a
+        figure quoted onto a page gets matched back to the wrong run by
+        resemblance.
+        """
+        baseline = {"a.py": _outcome("a.py", "base", passed=True)}
+        candidate = {"a.py": _outcome("a.py", "cand", passed=True)}
+
+        with pytest.raises(ValueError, match="cannot be traced to its bytes"):
+            _ = build_report(
+                baseline,
+                candidate,
+                baseline_arm="base",
+                candidate_arm="cand",
+                payload_digest="",
+            )
+
+    def test_a_stored_report_with_an_empty_digest_is_refused_on_decode(self) -> None:
+        """Construction is not the only way a report arrives.
+
+        A comparison.json edited by hand, or written by a version that
+        predates the field, decodes into something whose figures look
+        complete and whose identity is gone. Refused here rather than read.
+        """
+        encoded = encode_comparison_report(
+            build_report(
+                {"a.py": _outcome("a.py", "base", passed=True)},
+                {"a.py": _outcome("a.py", "cand", passed=True)},
+                baseline_arm="base",
+                candidate_arm="cand",
+                payload_digest="d" * 64,
+            )
+        )
+        encoded["payload_digest"] = ""
+
+        with pytest.raises(JSONTypeError, match="payload_digest"):
+            _ = decode_comparison_report(encoded)
 
     def test_a_report_whose_table_contradicts_its_count_is_refused(self) -> None:
         """A denominator that disagrees with the table cannot be read."""
         baseline = {"a.py": _outcome("a.py", "base", passed=True)}
         candidate = {"a.py": _outcome("a.py", "cand", passed=True)}
         encoded = encode_comparison_report(
-            build_report(baseline, candidate, baseline_arm="base", candidate_arm="cand")
+            build_report(
+                baseline,
+                candidate,
+                baseline_arm="base",
+                candidate_arm="cand",
+                payload_digest="d" * 64,
+            )
         )
         encoded["shared_items"] = 99
 
@@ -212,7 +278,13 @@ class TestRendering:
         """A reader must see the effect size beside the p-value."""
         baseline = {"a.py": _outcome("a.py", "base", passed=False)}
         candidate = {"a.py": _outcome("a.py", "cand", passed=True)}
-        report = build_report(baseline, candidate, baseline_arm="base", candidate_arm="cand")
+        report = build_report(
+            baseline,
+            candidate,
+            baseline_arm="base",
+            candidate_arm="cand",
+            payload_digest="d" * 64,
+        )
 
         lines = render(report)
         joined = "\n".join(lines)

@@ -123,6 +123,24 @@ class ComparisonReport(TypedDict):
     significance without effect size would invite reading the first as the
     second.
 
+    ``payload_digest`` IS PART OF THE REPORT AND NOT A SIDECAR, and that is
+    the whole reason this class was changed on 2026-09-09. Every other field
+    here is a number. Numbers do not say what produced them, and two runs of
+    this package can agree on every one of them by coincidence: ``gen-v1``
+    and ``sweep-v1`` both scored 226 shared items, and a reader holding "226
+    items, mid-p 0.688" has no way to tell which run it came from. Until this
+    field existed a ``comparison.json`` was identified ONLY by the directory
+    it sat in, so the identity was lost the instant a figure was quoted onto
+    a wiki page, into a board post, or into a script -- and a figure that
+    cannot be traced back to its bytes gets traced back by resemblance
+    instead, which finds the wrong run. That happened on 2026-09-09 and the
+    recomputation looked entirely correct.
+
+    The digest was always being computed; it was written to
+    ``*.runrecord.json`` beside the report rather than into it. Beside is not
+    good enough for the one property that has to survive being quoted, and
+    two of this package's six committed runs had no sidecar at all.
+
     Attributes:
         baseline_arm: Name recorded on the baseline outcomes.
         candidate_arm: Name recorded on the candidate outcomes.
@@ -134,6 +152,11 @@ class ComparisonReport(TypedDict):
         net_improvement: Items fixed minus items broken.
         mid_p: Two-sided McNemar mid-p value.
         exact_p: Two-sided exact conditional McNemar p-value.
+        payload_digest: Name-paired sha256 over the two outcome files this
+            was computed from, from
+            :func:`code_style_eval.core.provenance.payload_digest`. Never
+            empty: a report that cannot say which bytes produced it is the
+            anonymous artifact this field exists to abolish.
     """
 
     baseline_arm: str
@@ -145,6 +168,7 @@ class ComparisonReport(TypedDict):
     net_improvement: int
     mid_p: float
     exact_p: float
+    payload_digest: str
 
 
 def encode_comparison_report(report: ComparisonReport) -> JSONObject:
@@ -166,6 +190,7 @@ def encode_comparison_report(report: ComparisonReport) -> JSONObject:
         "net_improvement": report["net_improvement"],
         "mid_p": report["mid_p"],
         "exact_p": report["exact_p"],
+        "payload_digest": report["payload_digest"],
     }
 
 
@@ -179,11 +204,20 @@ def decode_comparison_report(obj: JSONObject) -> ComparisonReport:
         The validated report.
 
     Raises:
-        JSONTypeError: If a field is missing, has the wrong type, or the
-            stored table does not sum to the stored item count.
+        JSONTypeError: If a field is missing, has the wrong type, the stored
+            table does not sum to the stored item count, or the payload
+            digest is empty.
     """
     counts = decode_paired_counts(require_dict(obj, "counts"))
     shared_items = require_int(obj, "shared_items")
+    payload_digest = require_str(obj, "payload_digest")
+    if not payload_digest:
+        raise JSONTypeError(
+            "Field 'payload_digest' is empty; a comparison that cannot name "
+            "the bytes it was computed from is indistinguishable from one "
+            "computed over different bytes, which is the confusion this field "
+            "exists to prevent"
+        )
     total = (
         counts["both_passed"]
         + counts["baseline_only"]
@@ -206,6 +240,7 @@ def decode_comparison_report(obj: JSONObject) -> ComparisonReport:
         net_improvement=require_int(obj, "net_improvement"),
         mid_p=require_float(obj, "mid_p"),
         exact_p=require_float(obj, "exact_p"),
+        payload_digest=payload_digest,
     )
 
 

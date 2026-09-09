@@ -239,6 +239,28 @@ tools/code-style-eval/runs/gen-v2/*
 !tools/code-style-eval/runs/gen-v*/*.generation.jsonl
 !tools/code-style-eval/runs/gen-v*/comparison.json
 !tools/code-style-eval/runs/gen-v*/comparison.json.runrecord.json
+# The sweep-* runs are the evidence behind the guard-pass instrument-limits
+# page -- its whole strata table (3v3 at 0.844, both 3v2 rows at 0.688) is
+# sweep-v1, its perplexity claim is sweep-v1-cap384, and its
+# scored-before-the-corpus-group headline is sweep-v3-nodeps. All four were
+# untracked until 2026-09-09: the page cited artifacts that existed on one
+# machine, and tests/test_published_comparisons.py pinned six runs of which
+# only two were in the repository, so it was green here and red on any other
+# checkout. Same omission as the gen-* runs above, found later.
+!tools/code-style-eval/runs/sweep-v1/
+tools/code-style-eval/runs/sweep-v1/*
+!tools/code-style-eval/runs/sweep-v1-cap384/
+tools/code-style-eval/runs/sweep-v1-cap384/*
+!tools/code-style-eval/runs/sweep-v2-greedy/
+tools/code-style-eval/runs/sweep-v2-greedy/*
+!tools/code-style-eval/runs/sweep-v3-nodeps/
+tools/code-style-eval/runs/sweep-v3-nodeps/*
+!tools/code-style-eval/runs/sweep-v*/*.outcomes.jsonl
+!tools/code-style-eval/runs/sweep-v*/*.generation.jsonl
+!tools/code-style-eval/runs/sweep-v*/comparison.json
+!tools/code-style-eval/runs/sweep-v*/comparison.json.runrecord.json
+!tools/code-style-eval/runs/sweep-v*/perplexity.json
+!tools/code-style-eval/runs/gen-v*/comparison.json.runrecord.json
 **/corpus/
 
 # But allow source code directories named "data"

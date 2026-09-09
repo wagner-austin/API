@@ -1,0 +1,17 @@
+{
+  "baseline_arm": "base",
+  "candidate_arm": "candidate",
+  "shared_items": 226,
+  "baseline_pass_rate": 0.022123893805309734,
+  "candidate_pass_rate": 0.022123893805309734,
+  "counts": {
+    "both_passed": 2,
+    "baseline_only": 3,
+    "candidate_only": 3,
+    "neither": 218
+  },
+  "net_improvement": 0,
+  "mid_p": 0.84375,
+  "exact_p": 1.0,
+  "payload_digest": "d00c4b5057f2ba0bb073d771df9986a85886a30e08a950ba6dfd5c3002a129e5"
+}

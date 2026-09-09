@@ -40,6 +40,7 @@ def _report() -> ComparisonReport:
         net_improvement=2,
         mid_p=0.25,
         exact_p=0.5,
+        payload_digest="a" * 64,
     )
 
 
@@ -229,42 +230,37 @@ class TestTheObservations:
 class TestTheRecord:
     """The whole record, as it lands beside the comparison."""
 
-    def test_the_record_names_the_experiment_and_the_run(self, tmp_path: pathlib.Path) -> None:
-        """Experiment pairs runs; label distinguishes them within it.
-
-        Args:
-            tmp_path: Directory for the covered file.
-        """
-        covered = tmp_path / "base.jsonl"
-        covered.write_text("x", encoding="utf-8")
-
-        record = comparison_run_record(_report(), "sweep-v3", [covered], ("ruff", "mypy"))
+    def test_the_record_names_the_experiment_and_the_run(self) -> None:
+        """Experiment pairs runs; label distinguishes them within it."""
+        record = comparison_run_record(_report(), "sweep-v3", ("ruff", "mypy"))
 
         assert record["experiment"] == EXPERIMENT
         assert record["label"] == "sweep-v3"
 
-    def test_observations_are_sorted_by_name(self, tmp_path: pathlib.Path) -> None:
-        """Canonical order, so two records list them the same way.
-
-        Args:
-            tmp_path: Directory for the covered file.
-        """
-        covered = tmp_path / "base.jsonl"
-        covered.write_text("x", encoding="utf-8")
-
-        record = comparison_run_record(_report(), "s", [covered], ("ruff", "mypy"))
+    def test_observations_are_sorted_by_name(self) -> None:
+        """Canonical order, so two records list them the same way."""
+        record = comparison_run_record(_report(), "s", ("ruff", "mypy"))
         names = [observation["name"] for observation in record["observations"]]
 
         assert names == sorted(names)
 
-    def test_an_unlabelled_run_is_refused(self, tmp_path: pathlib.Path) -> None:
-        """A run with no label cannot be told apart from another.
-
-        Args:
-            tmp_path: Directory for the covered file.
-        """
-        covered = tmp_path / "base.jsonl"
-        covered.write_text("x", encoding="utf-8")
-
+    def test_an_unlabelled_run_is_refused(self) -> None:
+        """A run with no label cannot be told apart from another."""
         with pytest.raises(ValueError, match="label"):
-            _ = comparison_run_record(_report(), "", [covered], ("ruff", "mypy"))
+            _ = comparison_run_record(_report(), "", ("ruff", "mypy"))
+
+
+class TestTheRecordQuotesTheReportsDigest:
+    """One identity, computed once, so the two copies cannot disagree."""
+
+    def test_the_record_carries_the_reports_digest_verbatim(self) -> None:
+        """The record no longer recomputes; it quotes.
+
+        Two computations of one identity are two things that can drift, and
+        the copy in the sidecar is the one a reader is least likely to have.
+        """
+        report = _report()
+
+        record = comparison_run_record(report, "sweep-v3", ("ruff", "mypy"))
+
+        assert record["payload_digest"] == report["payload_digest"]

@@ -1,0 +1,75 @@
+{
+  "experiment": "code-style-guard-pass",
+  "label": "sweep-v3-cap1536-reppen1.1",
+  "fingerprint": {
+    "image_digest": "",
+    "gpu_model": "",
+    "driver_version": "",
+    "determinism": {
+      "stack": "none",
+      "settings": {}
+    },
+    "host": {
+      "platform": "Windows-10-10.0.26200-SP0",
+      "machine": "AMD64",
+      "logical_cores": 24
+    },
+    "packages": [
+      {
+        "name": "mypy",
+        "version": "1.20.2"
+      },
+      {
+        "name": "platform-core",
+        "version": "0.1.0"
+      },
+      {
+        "name": "ruff",
+        "version": "0.14.14"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "name": "baseline_only",
+      "value": 3.0
+    },
+    {
+      "name": "baseline_pass_rate",
+      "value": 0.022123893805309734
+    },
+    {
+      "name": "both_passed",
+      "value": 2.0
+    },
+    {
+      "name": "candidate_only",
+      "value": 3.0
+    },
+    {
+      "name": "candidate_pass_rate",
+      "value": 0.022123893805309734
+    },
+    {
+      "name": "exact_p",
+      "value": 1.0
+    },
+    {
+      "name": "mid_p",
+      "value": 0.84375
+    },
+    {
+      "name": "neither",
+      "value": 218.0
+    },
+    {
+      "name": "net_improvement",
+      "value": 0.0
+    },
+    {
+      "name": "shared_items",
+      "value": 226.0
+    }
+  ],
+  "payload_digest": "d00c4b5057f2ba0bb073d771df9986a85886a30e08a950ba6dfd5c3002a129e5"
+}

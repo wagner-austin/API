@@ -1,0 +1,1589 @@
+{
+  "base": {
+    "arm": "base",
+    "items": 392,
+    "tokens": 267380,
+    "mean_nll": 1.041220036698637,
+    "perplexity": 2.832670869424028
+  },
+  "candidate": {
+    "arm": "candidate",
+    "items": 392,
+    "tokens": 267380,
+    "mean_nll": 0.6745322992843032,
+    "perplexity": 1.9631146111180238
+  },
+  "shared_items": 392,
+  "items_improved": 392,
+  "items_worsened": 0,
+  "per_item_nll": {
+    "_missing_attachments.py": {
+      "base": 1.2749453783035278,
+      "candidate": 1.0863813161849976
+    },
+    "campaign-finance/upload_pdfs.py": {
+      "base": 0.7994943261146545,
+      "candidate": 0.6799242496490479
+    },
+    "clients/DiscordBot/scripts/guard.py": {
+      "base": 0.767876148223877,
+      "candidate": 0.10920704901218414
+    },
+    "clients/DiscordBot/src/clubbot/cogs/example.py": {
+      "base": 1.1174029111862183,
+      "candidate": 0.6154646277427673
+    },
+    "clients/DiscordBot/src/clubbot/cogs/trainer.py": {
+      "base": 1.0942765474319458,
+      "candidate": 0.655954122543335
+    },
+    "clients/DiscordBot/src/clubbot/services/registry.py": {
+      "base": 0.8431575894355774,
+      "candidate": 0.5552210211753845
+    },
+    "clients/DiscordBot/tests/clubbot/cogs/test_transcript_cog_ensure_start_noop.py": {
+      "base": 1.6241278648376465,
+      "candidate": 0.5054731369018555
+    },
+    "clients/DiscordBot/tests/clubbot/services/test_cov_trainer_notifier_stop.py": {
+      "base": 1.4733425378799438,
+      "candidate": 1.2797592878341675
+    },
+    "clients/DiscordBot/tests/clubbot/services/test_digits_events_unit.py": {
+      "base": 0.7178188562393188,
+      "candidate": 0.3781742453575134
+    },
+    "clients/DiscordBot/tests/clubbot/services/test_transcript_api_client_400_generic.py": {
+      "base": 0.9350733160972595,
+      "candidate": 0.3819084167480469
+    },
+    "clients/DiscordBot/tests/clubbot/test_config_parsing.py": {
+      "base": 1.0006208419799805,
+      "candidate": 0.6663239598274231
+    },
+    "clients/DiscordBot/tests/clubbot/test_container_trainer_wiring.py": {
+      "base": 1.2118333578109741,
+      "candidate": 0.6698516011238098
+    },
+    "clients/DiscordBot/tests/clubbot/test_guardrails.py": {
+      "base": 0.9711309671401978,
+      "candidate": 0.7845818996429443
+    },
+    "clients/DiscordBot/tests/clubbot/test_orchestrator_connect_resumed.py": {
+      "base": 1.098758339881897,
+      "candidate": 0.8164462447166443
+    },
+    "clients/DiscordBot/tests/clubbot/test_trainer_cog_subscriber_start.py": {
+      "base": 1.1046230792999268,
+      "candidate": 0.7244142889976501
+    },
+    "clients/DiscordBot/tests/test_modeltrainer_client_message_default.py": {
+      "base": 1.00822114944458,
+      "candidate": 0.2784358859062195
+    },
+    "clients/DiscordBot/tests/test_trainer_notifier_start_stop.py": {
+      "base": 0.9504182934761047,
+      "candidate": 0.566885769367218
+    },
+    "clients/NavProbe/src/navprobe/__init__.py": {
+      "base": 2.369485378265381,
+      "candidate": 1.6971272230148315
+    },
+    "clients/NavProbe/src/navprobe/_test_hooks.py": {
+      "base": 0.37777525186538696,
+      "candidate": 0.20594650506973267
+    },
+    "clients/NavProbe/src/navprobe/adapters/mujoco_bindings.py": {
+      "base": 1.206032156944275,
+      "candidate": 0.7794851660728455
+    },
+    "clients/NavProbe/tests/codecs/test_comparison.py": {
+      "base": 1.1666724681854248,
+      "candidate": 0.6834726333618164
+    },
+    "clients/NavProbe/tests/factories.py": {
+      "base": 1.3360596895217896,
+      "candidate": 1.05319082736969
+    },
+    "clients/RustedWarfareBot/scripts/pairs.py": {
+      "base": 1.0926518440246582,
+      "candidate": 0.8208298087120056
+    },
+    "clients/RustedWarfareBot/scripts/sweep.py": {
+      "base": 1.9754160642623901,
+      "candidate": 1.410994291305542
+    },
+    "clients/RustedWarfareBot/src/rw_bot/harness/boot_log.py": {
+      "base": 1.392371416091919,
+      "candidate": 1.2008358240127563
+    },
+    "clients/RustedWarfareBot/src/rw_bot/mechanics/catalogue.py": {
+      "base": 1.717606782913208,
+      "candidate": 1.3110918998718262
+    },
+    "clients/RustedWarfareBot/src/rw_bot/mechanics/income.py": {
+      "base": 1.6143798828125,
+      "candidate": 1.2312524318695068
+    },
+    "clients/RustedWarfareBot/src/rw_bot/mechanics/registry_dump.py": {
+      "base": 1.6122294664382935,
+      "candidate": 1.0554708242416382
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/build_order.py": {
+      "base": 2.668853759765625,
+      "candidate": 1.9940754175186157
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/doctrine_codecs.py": {
+      "base": 1.264906644821167,
+      "candidate": 0.9473846554756165
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/guard.py": {
+      "base": 1.7953382730484009,
+      "candidate": 1.1450691223144531
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/ledger.py": {
+      "base": 2.817878007888794,
+      "candidate": 2.1546428203582764
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/navy.py": {
+      "base": 2.9214839935302734,
+      "candidate": 2.1438894271850586
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/rush.py": {
+      "base": 2.2815968990325928,
+      "candidate": 1.5449764728546143
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/scoreboard.py": {
+      "base": 2.694835662841797,
+      "candidate": 1.9483388662338257
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/scorekeeper.py": {
+      "base": 1.8150410652160645,
+      "candidate": 1.180174708366394
+    },
+    "clients/RustedWarfareBot/src/rw_bot/policy/spending.py": {
+      "base": 2.905172824859619,
+      "candidate": 2.183948040008545
+    },
+    "clients/RustedWarfareBot/src/rw_bot/service/dashboard.py": {
+      "base": 1.5333430767059326,
+      "candidate": 1.2984923124313354
+    },
+    "clients/RustedWarfareBot/src/rw_bot/service/queue.py": {
+      "base": 1.5182929039001465,
+      "candidate": 1.2436803579330444
+    },
+    "clients/RustedWarfareBot/tests/test_boot_log_cli.py": {
+      "base": 1.1102944612503052,
+      "candidate": 0.7784653902053833
+    },
+    "clients/RustedWarfareBot/tests/test_campaign_loop.py": {
+      "base": 1.9820523262023926,
+      "candidate": 1.2840707302093506
+    },
+    "clients/RustedWarfareBot/tests/test_detprobe.py": {
+      "base": 1.4880114793777466,
+      "candidate": 1.0930849313735962
+    },
+    "clients/RustedWarfareBot/tests/test_fleet.py": {
+      "base": 1.2173601388931274,
+      "candidate": 0.9538090825080872
+    },
+    "clients/RustedWarfareBot/tests/test_harness_sweep.py": {
+      "base": 1.4806702136993408,
+      "candidate": 1.1114120483398438
+    },
+    "clients/RustedWarfareBot/tests/test_policy_assess.py": {
+      "base": 1.4680107831954956,
+      "candidate": 1.0314375162124634
+    },
+    "clients/RustedWarfareBot/tests/test_service_queue.py": {
+      "base": 1.6219086647033691,
+      "candidate": 1.1404134035110474
+    },
+    "clients/TankpitBot/scripts/analyze_viewport_entities.py": {
+      "base": 0.6666093468666077,
+      "candidate": 0.33662477135658264
+    },
+    "clients/TankpitBot/scripts/movement_probe.py": {
+      "base": 0.7131047248840332,
+      "candidate": 0.2731221914291382
+    },
+    "clients/TankpitBot/scripts/shim_rules.py": {
+      "base": 1.577238917350769,
+      "candidate": 1.2353360652923584
+    },
+    "clients/TankpitBot/src/tankpit_bot/_pillow.py": {
+      "base": 0.6492082476615906,
+      "candidate": 0.4502394199371338
+    },
+    "clients/TankpitBot/src/tankpit_bot/_test_hooks/__init__.py": {
+      "base": 0.8249498009681702,
+      "candidate": 0.5569738745689392
+    },
+    "clients/TankpitBot/src/tankpit_bot/_test_hooks/fs.py": {
+      "base": 1.1810907125473022,
+      "candidate": 0.9489207863807678
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/capture.py": {
+      "base": 0.9751511216163635,
+      "candidate": 0.49079015851020813
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/equipment_probe_attempt.py": {
+      "base": 1.3118234872817993,
+      "candidate": 0.36423546075820923
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/equipment_probe_operations.py": {
+      "base": 1.3213642835617065,
+      "candidate": 0.5763766765594482
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/equipment_targeting.py": {
+      "base": 0.7239779233932495,
+      "candidate": 0.397368460893631
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/probe_entrypoint.py": {
+      "base": 1.4279948472976685,
+      "candidate": 0.9914636015892029
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/radar_watch.py": {
+      "base": 1.0060900449752808,
+      "candidate": 0.2746233344078064
+    },
+    "clients/TankpitBot/src/tankpit_bot/action_lab/teleport_phase.py": {
+      "base": 1.125873327255249,
+      "candidate": 0.4053606390953064
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/ai/combat_strategy.py": {
+      "base": 2.6514742374420166,
+      "candidate": 1.6158503293991089
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/ai/context.py": {
+      "base": 1.8209573030471802,
+      "candidate": 1.0681428909301758
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/ai/pathfinding.py": {
+      "base": 0.8231539726257324,
+      "candidate": 0.6676863431930542
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/config.py": {
+      "base": 1.5232646465301514,
+      "candidate": 1.1457792520523071
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/tick_loop_actions.py": {
+      "base": 1.4995286464691162,
+      "candidate": 0.939598798751831
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/tick_loop_types.py": {
+      "base": 0.6302847266197205,
+      "candidate": 0.392711877822876
+    },
+    "clients/TankpitBot/src/tankpit_bot/bot/world_sync.py": {
+      "base": 2.476165771484375,
+      "candidate": 1.6947170495986938
+    },
+    "clients/TankpitBot/src/tankpit_bot/browser/cdp_helpers.py": {
+      "base": 0.8293715715408325,
+      "candidate": 0.6207293272018433
+    },
+    "clients/TankpitBot/src/tankpit_bot/browser/cdp_utils.py": {
+      "base": 1.0925395488739014,
+      "candidate": 0.7685335874557495
+    },
+    "clients/TankpitBot/src/tankpit_bot/browser/inject_script.py": {
+      "base": 0.9497836828231812,
+      "candidate": 0.8665857911109924
+    },
+    "clients/TankpitBot/src/tankpit_bot/browser/room_join.py": {
+      "base": 1.762586236000061,
+      "candidate": 1.2543284893035889
+    },
+    "clients/TankpitBot/src/tankpit_bot/browser/session_base.py": {
+      "base": 1.3192753791809082,
+      "candidate": 0.8643685579299927
+    },
+    "clients/TankpitBot/src/tankpit_bot/container/encoders.py": {
+      "base": 0.7384757995605469,
+      "candidate": 0.4992886483669281
+    },
+    "clients/TankpitBot/src/tankpit_bot/diagnostics/issue_report_codecs_scorecard.py": {
+      "base": 0.4840736985206604,
+      "candidate": 0.32812178134918213
+    },
+    "clients/TankpitBot/src/tankpit_bot/diagnostics/runs_index.py": {
+      "base": 0.9307031631469727,
+      "candidate": 0.6556047797203064
+    },
+    "clients/TankpitBot/src/tankpit_bot/diagnostics/session_scorecard_accumulator.py": {
+      "base": 2.1687982082366943,
+      "candidate": 1.4795422554016113
+    },
+    "clients/TankpitBot/src/tankpit_bot/diagnostics/session_stats.py": {
+      "base": 1.058079719543457,
+      "candidate": 0.642431914806366
+    },
+    "clients/TankpitBot/src/tankpit_bot/diagnostics/session_stats_types.py": {
+      "base": 0.7168002724647522,
+      "candidate": 0.4412589371204376
+    },
+    "clients/TankpitBot/src/tankpit_bot/fleetshare/types.py": {
+      "base": 2.3308632373809814,
+      "candidate": 1.653491735458374
+    },
+    "clients/TankpitBot/src/tankpit_bot/ledger/ammo_book.py": {
+      "base": 0.9908864498138428,
+      "candidate": 0.7439734935760498
+    },
+    "clients/TankpitBot/src/tankpit_bot/ledger/outcome/map_open.py": {
+      "base": 0.5851076245307922,
+      "candidate": 0.15089969336986542
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/decoders/map_data.py": {
+      "base": 1.2783923149108887,
+      "candidate": 0.9346262216567993
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/decoders/radar.py": {
+      "base": 1.303384780883789,
+      "candidate": 0.8615760207176208
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/decoders/world.py": {
+      "base": 1.1442508697509766,
+      "candidate": 0.7315216660499573
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/encoders/movement.py": {
+      "base": 0.9237970113754272,
+      "candidate": 0.6502134799957275
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/framing.py": {
+      "base": 0.5159409642219543,
+      "candidate": 0.3834720849990845
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/types/combat.py": {
+      "base": 1.824701189994812,
+      "candidate": 1.5178110599517822
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/types/movement.py": {
+      "base": 1.6030522584915161,
+      "candidate": 1.2475013732910156
+    },
+    "clients/TankpitBot/src/tankpit_bot/protocol/types/text.py": {
+      "base": 1.8252466917037964,
+      "candidate": 1.4067516326904297
+    },
+    "clients/TankpitBot/src/tankpit_bot/service/watch_page.py": {
+      "base": 0.7993349432945251,
+      "candidate": 0.7251240015029907
+    },
+    "clients/TankpitBot/src/tankpit_bot/sim/__init__.py": {
+      "base": 0.4230802357196808,
+      "candidate": 0.20072588324546814
+    },
+    "clients/TankpitBot/src/tankpit_bot/sim/blocks.py": {
+      "base": 1.2384448051452637,
+      "candidate": 0.8022161722183228
+    },
+    "clients/TankpitBot/src/tankpit_bot/sim/world_seed_mines.py": {
+      "base": 2.211948871612549,
+      "candidate": 1.7184258699417114
+    },
+    "clients/TankpitBot/src/tankpit_bot/sniffer/chrome_launch.py": {
+      "base": 2.250410556793213,
+      "candidate": 1.9764691591262817
+    },
+    "clients/TankpitBot/src/tankpit_bot/sniffer/world_state_inventory.py": {
+      "base": 1.3924102783203125,
+      "candidate": 0.9169942736625671
+    },
+    "clients/TankpitBot/src/tankpit_bot/terrain.py": {
+      "base": 1.082444190979004,
+      "candidate": 0.9247397184371948
+    },
+    "clients/TankpitBot/src/tankpit_bot/types/__init__.py": {
+      "base": 0.4990716576576233,
+      "candidate": 0.38749808073043823
+    },
+    "clients/TankpitBot/src/tankpit_bot/types/config.py": {
+      "base": 0.4543050229549408,
+      "candidate": 0.23269976675510406
+    },
+    "clients/TankpitBot/src/tankpit_bot/types/modes.py": {
+      "base": 0.5244397521018982,
+      "candidate": 0.3005238175392151
+    },
+    "clients/TankpitBot/src/tankpit_bot/types/session.py": {
+      "base": 0.6284447312355042,
+      "candidate": 0.3121035695075989
+    },
+    "clients/TankpitBot/src/tankpit_bot/validate/shadow_laws.py": {
+      "base": 2.634167432785034,
+      "candidate": 2.089400291442871
+    },
+    "clients/TankpitBot/src/tankpit_bot/validate/shadow_timeline.py": {
+      "base": 1.5707603693008423,
+      "candidate": 0.9290304780006409
+    },
+    "clients/TankpitBot/tests/action_lab/_equipment_collection_harness.py": {
+      "base": 1.478849172592163,
+      "candidate": 0.4193551540374756
+    },
+    "clients/TankpitBot/tests/action_lab/_movement_probe_harness.py": {
+      "base": 1.4702712297439575,
+      "candidate": 0.31131482124328613
+    },
+    "clients/TankpitBot/tests/action_lab/_viewport_probe_harness2.py": {
+      "base": 1.44937002658844,
+      "candidate": 0.6849392056465149
+    },
+    "clients/TankpitBot/tests/action_lab/test_enemy_tracking_stages.py": {
+      "base": 1.4395883083343506,
+      "candidate": 0.3820873498916626
+    },
+    "clients/TankpitBot/tests/action_lab/test_equipment_collection_coverage.py": {
+      "base": 1.6985352039337158,
+      "candidate": 0.7757627367973328
+    },
+    "clients/TankpitBot/tests/action_lab/test_equipment_pickup.py": {
+      "base": 1.3183331489562988,
+      "candidate": 0.43038609623908997
+    },
+    "clients/TankpitBot/tests/action_lab/test_equipment_probe_methods.py": {
+      "base": 1.642871618270874,
+      "candidate": 0.6245245933532715
+    },
+    "clients/TankpitBot/tests/action_lab/test_larder_probe_execute.py": {
+      "base": 1.3913134336471558,
+      "candidate": 0.831039309501648
+    },
+    "clients/TankpitBot/tests/action_lab/test_movement_probe.py": {
+      "base": 1.344393253326416,
+      "candidate": 0.541530191898346
+    },
+    "clients/TankpitBot/tests/action_lab/test_replay_enemy_teleport_probe.py": {
+      "base": 1.3672691583633423,
+      "candidate": 0.7582295536994934
+    },
+    "clients/TankpitBot/tests/action_lab/test_replay_movement_probe.py": {
+      "base": 1.4275188446044922,
+      "candidate": 0.8732367753982544
+    },
+    "clients/TankpitBot/tests/action_lab/test_session.py": {
+      "base": 1.0669447183609009,
+      "candidate": 0.3694288730621338
+    },
+    "clients/TankpitBot/tests/bot/_state_machine_fixtures.py": {
+      "base": 1.2782264947891235,
+      "candidate": 0.6722558736801147
+    },
+    "clients/TankpitBot/tests/bot/ai/_threat_fixtures.py": {
+      "base": 1.4510836601257324,
+      "candidate": 0.8993502855300903
+    },
+    "clients/TankpitBot/tests/bot/ai/test_ferry_landing.py": {
+      "base": 1.7075779438018799,
+      "candidate": 1.2973042726516724
+    },
+    "clients/TankpitBot/tests/bot/ai/test_human_fight_restock.py": {
+      "base": 1.2231394052505493,
+      "candidate": 0.7048091888427734
+    },
+    "clients/TankpitBot/tests/bot/ai/test_hunt_disengage.py": {
+      "base": 2.060549020767212,
+      "candidate": 1.0601837635040283
+    },
+    "clients/TankpitBot/tests/bot/ai/test_larder.py": {
+      "base": 1.0775713920593262,
+      "candidate": 0.7207871675491333
+    },
+    "clients/TankpitBot/tests/bot/ai/test_pathfinding.py": {
+      "base": 0.8180334568023682,
+      "candidate": 0.585570216178894
+    },
+    "clients/TankpitBot/tests/bot/test_completion_events_actions.py": {
+      "base": 1.2680543661117554,
+      "candidate": 0.69185870885849
+    },
+    "clients/TankpitBot/tests/bot/test_fleet_exchange.py": {
+      "base": 1.6068397760391235,
+      "candidate": 0.8749390244483948
+    },
+    "clients/TankpitBot/tests/bot/test_tick_loop_coverage.py": {
+      "base": 1.2750823497772217,
+      "candidate": 0.8949531316757202
+    },
+    "clients/TankpitBot/tests/bot/test_tick_loop_types.py": {
+      "base": 0.5701421499252319,
+      "candidate": 0.33707332611083984
+    },
+    "clients/TankpitBot/tests/browser/test_cdp_utils.py": {
+      "base": 0.9659110903739929,
+      "candidate": 0.7950513362884521
+    },
+    "clients/TankpitBot/tests/browser/test_errors.py": {
+      "base": 0.17231003940105438,
+      "candidate": 0.06373284012079239
+    },
+    "clients/TankpitBot/tests/capture/test_protocol_census.py": {
+      "base": 1.06976318359375,
+      "candidate": 0.5279377102851868
+    },
+    "clients/TankpitBot/tests/capture/test_signature.py": {
+      "base": 1.339103102684021,
+      "candidate": 1.0328994989395142
+    },
+    "clients/TankpitBot/tests/capture/test_stats.py": {
+      "base": 1.1737487316131592,
+      "candidate": 0.7176637053489685
+    },
+    "clients/TankpitBot/tests/contracts/test_base.py": {
+      "base": 0.7641738653182983,
+      "candidate": 0.6693438291549683
+    },
+    "clients/TankpitBot/tests/diagnostics/test_entity_alignment.py": {
+      "base": 1.3957244157791138,
+      "candidate": 0.609018862247467
+    },
+    "clients/TankpitBot/tests/diagnostics/test_run_audit.py": {
+      "base": 1.2565408945083618,
+      "candidate": 0.7836931347846985
+    },
+    "clients/TankpitBot/tests/diagnostics/test_run_digest.py": {
+      "base": 1.1780681610107422,
+      "candidate": 0.7242555618286133
+    },
+    "clients/TankpitBot/tests/facts/test_provenance.py": {
+      "base": 1.0130082368850708,
+      "candidate": 0.6309816241264343
+    },
+    "clients/TankpitBot/tests/fakes/cdp.py": {
+      "base": 1.5293643474578857,
+      "candidate": 1.108655571937561
+    },
+    "clients/TankpitBot/tests/integration/test_tier2_lifecycle_signals.py": {
+      "base": 1.7442479133605957,
+      "candidate": 1.0438270568847656
+    },
+    "clients/TankpitBot/tests/ledger/test_outcome_dispatchers.py": {
+      "base": 1.0099918842315674,
+      "candidate": 0.6310251355171204
+    },
+    "clients/TankpitBot/tests/no_op_keyboard.py": {
+      "base": 0.5845597982406616,
+      "candidate": 0.20391425490379333
+    },
+    "clients/TankpitBot/tests/protocol/test_movement.py": {
+      "base": 0.9055877327919006,
+      "candidate": 0.693135142326355
+    },
+    "clients/TankpitBot/tests/protocol/test_radar.py": {
+      "base": 0.8030659556388855,
+      "candidate": 0.5315337777137756
+    },
+    "clients/TankpitBot/tests/scenarios/_wire_builders.py": {
+      "base": 1.3143939971923828,
+      "candidate": 0.8794409036636353
+    },
+    "clients/TankpitBot/tests/service/test_fleet.py": {
+      "base": 1.2861995697021484,
+      "candidate": 0.9887515902519226
+    },
+    "clients/TankpitBot/tests/service/test_probe.py": {
+      "base": 1.1762659549713135,
+      "candidate": 0.9906855821609497
+    },
+    "clients/TankpitBot/tests/sim/test_server_actions.py": {
+      "base": 1.8154571056365967,
+      "candidate": 1.0983701944351196
+    },
+    "clients/TankpitBot/tests/sniffer/test_world_state_dispatch_combat.py": {
+      "base": 1.3533793687820435,
+      "candidate": 0.9775314331054688
+    },
+    "clients/TankpitBot/tests/sniffer/test_world_state_inventory.py": {
+      "base": 1.038292646408081,
+      "candidate": 0.70357745885849
+    },
+    "clients/TankpitBot/tests/sniffer/trackers/test_mine.py": {
+      "base": 1.4973108768463135,
+      "candidate": 1.1948182582855225
+    },
+    "clients/TankpitBot/tests/test_combat.py": {
+      "base": 0.7031306624412537,
+      "candidate": 0.5718739032745361
+    },
+    "clients/TankpitBot/tests/test_combat_probe_script.py": {
+      "base": 1.103715419769287,
+      "candidate": 0.27201566100120544
+    },
+    "clients/TankpitBot/tests/test_fuel_probe_script.py": {
+      "base": 1.1482410430908203,
+      "candidate": 0.27289336919784546
+    },
+    "clients/TankpitBot/tests/test_parser_codecs.py": {
+      "base": 0.548468828201294,
+      "candidate": 0.35516080260276794
+    },
+    "clients/TankpitBot/tests/validate/builders.py": {
+      "base": 0.9355940818786621,
+      "candidate": 0.5828679203987122
+    },
+    "clients/TankpitBot/tests/validate/test_fight_timeline.py": {
+      "base": 1.1240054368972778,
+      "candidate": 0.8919498324394226
+    },
+    "clients/TankpitBot/tests/world_state/test_decoders.py": {
+      "base": 0.7804661989212036,
+      "candidate": 0.4412582814693451
+    },
+    "clients/TankpitBot/tests/world_state/test_encoders.py": {
+      "base": 0.34306269884109497,
+      "candidate": 0.14266914129257202
+    },
+    "clients/TankpitBot/tests/world_state/test_rendering.py": {
+      "base": 0.982040524482727,
+      "candidate": 0.6272091865539551
+    },
+    "doc-extract-api/src/doc_extract_api/docx_extractor.py": {
+      "base": 1.7899279594421387,
+      "candidate": 1.2925912141799927
+    },
+    "doc-extract-api/src/doc_extract_api/from_url_admission.py": {
+      "base": 2.384701728820801,
+      "candidate": 1.9150474071502686
+    },
+    "doc-extract-api/src/doc_extract_api/settings.py": {
+      "base": 1.4946141242980957,
+      "candidate": 1.0008410215377808
+    },
+    "doc-extract-api/src/doc_extract_api/startup.py": {
+      "base": 2.48647141456604,
+      "candidate": 1.6423970460891724
+    },
+    "doc-extract-api/tests/_test_hooks.py": {
+      "base": 1.0642842054367065,
+      "candidate": 0.7779358625411987
+    },
+    "doc-extract-api/tests/conftest.py": {
+      "base": 1.942672848701477,
+      "candidate": 1.2458159923553467
+    },
+    "doc-extract-api/tests/test_backfill_ocr_quality.py": {
+      "base": 1.5388104915618896,
+      "candidate": 0.7839811444282532
+    },
+    "doc-extract-api/tests/test_image_extractor.py": {
+      "base": 1.3577167987823486,
+      "candidate": 1.0059434175491333
+    },
+    "doc-extract-api/tests/test_pptx_extractor.py": {
+      "base": 1.4846442937850952,
+      "candidate": 1.168889045715332
+    },
+    "doc-extract-api/tests/test_settings.py": {
+      "base": 0.4799908697605133,
+      "candidate": 0.265902578830719
+    },
+    "doc-extract-api/tests/test_startup.py": {
+      "base": 1.7399564981460571,
+      "candidate": 1.1981478929519653
+    },
+    "libs/cleargbm/scripts/_test_hooks.py": {
+      "base": 0.5904156565666199,
+      "candidate": 0.2809574604034424
+    },
+    "libs/cleargbm/scripts/guard.py": {
+      "base": 0.9309360384941101,
+      "candidate": 0.07660053670406342
+    },
+    "libs/cleargbm/tests/test_types_json.py": {
+      "base": 0.3546649217605591,
+      "candidate": 0.22351327538490295
+    },
+    "libs/cleargbm/tests/test_types_tuning.py": {
+      "base": 0.37225937843322754,
+      "candidate": 0.21921642124652863
+    },
+    "libs/covenant_ml/scripts/experiment_growth_policy_xgb_instrument.py": {
+      "base": 0.911115288734436,
+      "candidate": 0.686238706111908
+    },
+    "libs/covenant_ml/scripts/guard.py": {
+      "base": 0.9352717399597168,
+      "candidate": 0.08305399864912033
+    },
+    "libs/covenant_ml/src/covenant_ml/backends/cleargbm/__init__.py": {
+      "base": 0.4933694899082184,
+      "candidate": 0.003517082193866372
+    },
+    "libs/covenant_ml/src/covenant_ml/backends/protocol.py": {
+      "base": 0.9546579718589783,
+      "candidate": 0.33025628328323364
+    },
+    "libs/covenant_ml/src/covenant_ml/benchmarking/runner.py": {
+      "base": 1.2748152017593384,
+      "candidate": 0.940735936164856
+    },
+    "libs/covenant_ml/src/covenant_ml/benchmarking/timing.py": {
+      "base": 1.8679547309875488,
+      "candidate": 1.3494322299957275
+    },
+    "libs/covenant_ml/src/covenant_ml/datasets/loaders/_netcdf_trend_testing.py": {
+      "base": 0.8797541856765747,
+      "candidate": 0.6566234827041626
+    },
+    "libs/covenant_ml/src/covenant_ml/datasets/loaders/_polars_aggregation.py": {
+      "base": 0.3334328532218933,
+      "candidate": 0.20052647590637207
+    },
+    "libs/covenant_ml/src/covenant_ml/datasets/loaders/parquet_cache.py": {
+      "base": 1.0553796291351318,
+      "candidate": 0.806804895401001
+    },
+    "libs/covenant_ml/src/covenant_ml/ensemble/regression_testing.py": {
+      "base": 0.5491213798522949,
+      "candidate": 0.2405318021774292
+    },
+    "libs/covenant_ml/src/covenant_ml/ensemble/types.py": {
+      "base": 0.698606550693512,
+      "candidate": 0.4129047989845276
+    },
+    "libs/covenant_ml/src/covenant_ml/finetuning/protocol.py": {
+      "base": 0.8803868293762207,
+      "candidate": 0.4436304271221161
+    },
+    "libs/covenant_ml/src/covenant_ml/finetuning/strategies/staged.py": {
+      "base": 0.9921026825904846,
+      "candidate": 0.5753363370895386
+    },
+    "libs/covenant_ml/src/covenant_ml/optimizer/objectives/lightgbm_objective.py": {
+      "base": 1.0479614734649658,
+      "candidate": 0.6811570525169373
+    },
+    "libs/covenant_ml/src/covenant_ml/optimizer/search_spaces/lstm.py": {
+      "base": 0.46070101857185364,
+      "candidate": 0.2623165547847748
+    },
+    "libs/covenant_ml/src/covenant_ml/predictor.py": {
+      "base": 0.9494218230247498,
+      "candidate": 0.6395723223686218
+    },
+    "libs/covenant_ml/src/covenant_ml/types.py": {
+      "base": 1.4263068437576294,
+      "candidate": 1.0466428995132446
+    },
+    "libs/covenant_ml/src/covenant_ml/validation/strategies/group_stratified_kfold.py": {
+      "base": 1.0362063646316528,
+      "candidate": 0.5605002045631409
+    },
+    "libs/covenant_ml/tests/benchmarking/test_adapters.py": {
+      "base": 0.8516283631324768,
+      "candidate": 0.6203193068504333
+    },
+    "libs/covenant_ml/tests/benchmarking/test_model_shape.py": {
+      "base": 0.5349568128585815,
+      "candidate": 0.4388870894908905
+    },
+    "libs/covenant_ml/tests/benchmarking/test_runner.py": {
+      "base": 0.937533438205719,
+      "candidate": 0.6983967423439026
+    },
+    "libs/covenant_ml/tests/benchmarking/test_script_benchmark_cli.py": {
+      "base": 1.0026187896728516,
+      "candidate": 0.8011049628257751
+    },
+    "libs/covenant_ml/tests/calibration/test_testing.py": {
+      "base": 0.257446825504303,
+      "candidate": 0.1420586109161377
+    },
+    "libs/covenant_ml/tests/datasets/loaders/test_parquet_cache.py": {
+      "base": 0.7942414879798889,
+      "candidate": 0.560651957988739
+    },
+    "libs/covenant_ml/tests/ensemble/conftest.py": {
+      "base": 0.9640890955924988,
+      "candidate": 0.6172996759414673
+    },
+    "libs/covenant_ml/tests/test_module_testing.py": {
+      "base": 0.2835775911808014,
+      "candidate": 0.16712890565395355
+    },
+    "libs/covenant_nn/scripts/guard.py": {
+      "base": 0.9324138760566711,
+      "candidate": 0.07945694029331207
+    },
+    "libs/covenant_nn/tests/objectives/test_lstm_objective.py": {
+      "base": 0.677013635635376,
+      "candidate": 0.36073631048202515
+    },
+    "libs/covenant_nn/tests/objectives/test_mlp_regressor_objective.py": {
+      "base": 0.6386258006095886,
+      "candidate": 0.30783990025520325
+    },
+    "libs/covenant_persistence/src/covenant_persistence/postgres.py": {
+      "base": 0.4160609543323517,
+      "candidate": 0.30177879333496094
+    },
+    "libs/covenant_persistence/src/covenant_persistence/repositories.py": {
+      "base": 0.41862785816192627,
+      "candidate": 0.2619241178035736
+    },
+    "libs/covenant_persistence/tests/test_postgres_repos.py": {
+      "base": 0.4577844440937042,
+      "candidate": 0.23088960349559784
+    },
+    "libs/instrument_io/scripts/create_audit_excel.py": {
+      "base": 0.5574725866317749,
+      "candidate": 0.4256049394607544
+    },
+    "libs/instrument_io/scripts/verify_sheets.py": {
+      "base": 1.3170346021652222,
+      "candidate": 0.9098121523857117
+    },
+    "libs/instrument_io/src/instrument_io/_decoders/mat.py": {
+      "base": 0.6976255774497986,
+      "candidate": 0.5565508008003235
+    },
+    "libs/instrument_io/tests/_mzml_helpers.py": {
+      "base": 0.560065507888794,
+      "candidate": 0.2692119777202606
+    },
+    "libs/instrument_io/tests/test_decoders_agilent.py": {
+      "base": 0.1985950917005539,
+      "candidate": 0.14254815876483917
+    },
+    "libs/instrument_io/tests/test_protocols_polars.py": {
+      "base": 0.5801095366477966,
+      "candidate": 0.30994781851768494
+    },
+    "libs/instrument_io/tests/test_readers_pdf.py": {
+      "base": 0.2951059937477112,
+      "candidate": 0.1740434467792511
+    },
+    "libs/instrument_io/tests/test_readers_thermo.py": {
+      "base": 0.4064827859401703,
+      "candidate": 0.2284873127937317
+    },
+    "libs/instrument_io/tests/test_scripts_scan_missing_data.py": {
+      "base": 0.9381033778190613,
+      "candidate": 0.7247194647789001
+    },
+    "libs/instrument_io/tests/test_scripts_verify_sheets.py": {
+      "base": 0.7816961407661438,
+      "candidate": 0.6066699624061584
+    },
+    "libs/instrument_io/tests/test_types_document.py": {
+      "base": 0.35690054297447205,
+      "candidate": 0.23317497968673706
+    },
+    "libs/instrument_io/tests/test_types_metadata.py": {
+      "base": 0.43719106912612915,
+      "candidate": 0.3868187665939331
+    },
+    "libs/instrument_io/tests/test_types_peaklist.py": {
+      "base": 0.41172653436660767,
+      "candidate": 0.33072251081466675
+    },
+    "libs/instrument_io/tests/test_types_spectrum.py": {
+      "base": 0.30826646089553833,
+      "candidate": 0.19401578605175018
+    },
+    "libs/instrument_io/tests/test_writers_pdf.py": {
+      "base": 0.47001710534095764,
+      "candidate": 0.31145673990249634
+    },
+    "libs/monorepo_guards/src/monorepo_guards/fake_redis_rules.py": {
+      "base": 0.825706422328949,
+      "candidate": 0.6077772378921509
+    },
+    "libs/platform_calendar/src/platform_calendar/competitions.py": {
+      "base": 0.47646772861480713,
+      "candidate": 0.28873446583747864
+    },
+    "libs/platform_calendar/tests/test_config.py": {
+      "base": 0.6268215179443359,
+      "candidate": 0.44530364871025085
+    },
+    "libs/platform_calendar/tests/test_prod_hooks.py": {
+      "base": 0.5751602649688721,
+      "candidate": 0.3543144762516022
+    },
+    "libs/platform_core/src/platform_core/config/discordbot.py": {
+      "base": 0.9910340309143066,
+      "candidate": 0.6174459457397461
+    },
+    "libs/platform_core/src/platform_core/covenant_metrics_events.py": {
+      "base": 0.7481470108032227,
+      "candidate": 0.36754027009010315
+    },
+    "libs/platform_core/src/platform_core/validators.py": {
+      "base": 0.21414858102798462,
+      "candidate": 0.12114503979682922
+    },
+    "libs/platform_core/tests/test_errors_codes.py": {
+      "base": 0.4103066325187683,
+      "candidate": 0.3135213553905487
+    },
+    "libs/platform_core/tests/test_http_fakes.py": {
+      "base": 0.5799620747566223,
+      "candidate": 0.4843388497829437
+    },
+    "libs/platform_devpost/tests/test_guard.py": {
+      "base": 0.788554310798645,
+      "candidate": 0.3697951138019562
+    },
+    "libs/platform_devpost/tests/test_types_hackathon.py": {
+      "base": 0.6583881378173828,
+      "candidate": 0.3340432941913605
+    },
+    "libs/platform_devpost/tests/test_types_match.py": {
+      "base": 0.6028695702552795,
+      "candidate": 0.26827412843704224
+    },
+    "libs/platform_discord/src/platform_discord/protocols.py": {
+      "base": 0.5761914849281311,
+      "candidate": 0.4293021261692047
+    },
+    "libs/platform_discord/src/platform_discord/testing.py": {
+      "base": 0.5004168152809143,
+      "candidate": 0.3658483922481537
+    },
+    "libs/platform_discord/src/platform_discord/transcript/embeds.py": {
+      "base": 0.5088371634483337,
+      "candidate": 0.33920228481292725
+    },
+    "libs/platform_discord/tests/test_transcript_embeds.py": {
+      "base": 0.4102109968662262,
+      "candidate": 0.3915335237979889
+    },
+    "libs/platform_discord/tests/turkic/test_turkic_handler.py": {
+      "base": 0.4293530583381653,
+      "candidate": 0.19887742400169373
+    },
+    "libs/platform_email/src/platform_email/providers/outlook.py": {
+      "base": 0.7921393513679504,
+      "candidate": 0.5020661354064941
+    },
+    "libs/platform_email/tests/types/test_oauth.py": {
+      "base": 0.2954324781894684,
+      "candidate": 0.17139500379562378
+    },
+    "libs/platform_kaggle/src/platform_kaggle/_capabilities_ml.py": {
+      "base": 0.44536280632019043,
+      "candidate": 0.30641940236091614
+    },
+    "libs/platform_kaggle/src/platform_kaggle/_testing_factories.py": {
+      "base": 0.5890111923217773,
+      "candidate": 0.3384803831577301
+    },
+    "libs/platform_kaggle/src/platform_kaggle/_types_match.py": {
+      "base": 0.5181457996368408,
+      "candidate": 0.2130262404680252
+    },
+    "libs/platform_kaggle/src/platform_kaggle/capabilities.py": {
+      "base": 0.7684240341186523,
+      "candidate": 0.5977985858917236
+    },
+    "libs/platform_kaggle/src/platform_kaggle/filters.py": {
+      "base": 0.6677970290184021,
+      "candidate": 0.5321267247200012
+    },
+    "libs/platform_kaggle/src/platform_kaggle/internal_api.py": {
+      "base": 0.8651754856109619,
+      "candidate": 0.6009173393249512
+    },
+    "libs/platform_ml/src/platform_ml/_test_hooks.py": {
+      "base": 1.164679765701294,
+      "candidate": 0.5620901584625244
+    },
+    "libs/platform_ml/tests/conftest.py": {
+      "base": 0.19488894939422607,
+      "candidate": 0.08225245028734207
+    },
+    "libs/platform_ml/tests/http_fakes.py": {
+      "base": 0.5752472281455994,
+      "candidate": 0.5004464983940125
+    },
+    "libs/platform_ml/tests/test_manifest_more_v2.py": {
+      "base": 0.790249764919281,
+      "candidate": 0.5743252038955688
+    },
+    "libs/platform_music/src/platform_music/services/spotify.py": {
+      "base": 0.92552649974823,
+      "candidate": 0.6157742738723755
+    },
+    "libs/platform_music/tests/test_guard_script.py": {
+      "base": 0.9369496703147888,
+      "candidate": 0.6235296130180359
+    },
+    "libs/platform_music/tests/test_jobs_takeout.py": {
+      "base": 0.9716972708702087,
+      "candidate": 0.4027932584285736
+    },
+    "libs/platform_music/tests/test_youtube_takeout_importer.py": {
+      "base": 0.8634228110313416,
+      "candidate": 0.6423641443252563
+    },
+    "libs/platform_stt/src/platform_stt/testing.py": {
+      "base": 0.7424464225769043,
+      "candidate": 0.4116051197052002
+    },
+    "libs/platform_stt/tests/test_test_hooks.py": {
+      "base": 0.39859214425086975,
+      "candidate": 0.27648070454597473
+    },
+    "libs/platform_translate/tests/test_backends.py": {
+      "base": 0.6078982949256897,
+      "candidate": 0.39879968762397766
+    },
+    "libs/platform_translate/tests/test_translator.py": {
+      "base": 0.5074203014373779,
+      "candidate": 0.31507229804992676
+    },
+    "libs/platform_workers/src/platform_workers/_fakes_rq.py": {
+      "base": 0.5542370080947876,
+      "candidate": 0.34496980905532837
+    },
+    "libs/platform_workers/src/platform_workers/testing.py": {
+      "base": 1.202905535697937,
+      "candidate": 0.819706380367279
+    },
+    "libs/procart/src/procart/modules/fractal_mandelbrot.py": {
+      "base": 0.9302188158035278,
+      "candidate": 0.7251114845275879
+    },
+    "libs/procart/tests/test_color_and_geometry.py": {
+      "base": 0.83504319190979,
+      "candidate": 0.6189291477203369
+    },
+    "libs/procart/tests/test_ffmpeg_runner.py": {
+      "base": 0.7391496896743774,
+      "candidate": 0.6826345324516296
+    },
+    "mcp-shared-py/src/mcp_shared_py/auth_middleware_protocols.py": {
+      "base": 2.0907952785491943,
+      "candidate": 1.3787568807601929
+    },
+    "mcp-shared-py/src/mcp_shared_py/error_responses.py": {
+      "base": 1.9552302360534668,
+      "candidate": 1.5461866855621338
+    },
+    "mcp-shared-py/src/mcp_shared_py/guard/cli.py": {
+      "base": 1.0569756031036377,
+      "candidate": 0.7259087562561035
+    },
+    "mcp-shared-py/src/mcp_shared_py/guard/rules/pyi_typing_comments.py": {
+      "base": 0.6489102840423584,
+      "candidate": 0.41997030377388
+    },
+    "mcp-shared-py/src/mcp_shared_py/hashing.py": {
+      "base": 1.6439785957336426,
+      "candidate": 1.376867413520813
+    },
+    "mcp-shared-py/src/mcp_shared_py/job_status.py": {
+      "base": 2.1988399028778076,
+      "candidate": 1.5027272701263428
+    },
+    "mcp-shared-py/tests/test_contract_hash.py": {
+      "base": 0.24056096374988556,
+      "candidate": 0.17171595990657806
+    },
+    "mcp-shared-py/tests/test_guard_tenancy.py": {
+      "base": 0.7884873151779175,
+      "candidate": 0.44557875394821167
+    },
+    "mcp-shared-py/tests/test_job_status.py": {
+      "base": 1.0426276922225952,
+      "candidate": 0.8002426624298096
+    },
+    "mcp-shared-py/tests/test_platform_keys.py": {
+      "base": 1.4095420837402344,
+      "candidate": 1.0081424713134766
+    },
+    "outlook/src/outlook_mcp/log.py": {
+      "base": 1.0433870553970337,
+      "candidate": 0.806378185749054
+    },
+    "outlook/src/outlook_mcp/tools/attachments.py": {
+      "base": 0.606201171875,
+      "candidate": 0.31524285674095154
+    },
+    "outlook/src/outlook_mcp/tools/compose.py": {
+      "base": 0.34210774302482605,
+      "candidate": 0.2012854814529419
+    },
+    "outlook/src/outlook_mcp/tools/organize.py": {
+      "base": 0.26589465141296387,
+      "candidate": 0.15552842617034912
+    },
+    "outlook/tests/test_hooks.py": {
+      "base": 0.4479851722717285,
+      "candidate": 0.2738300859928131
+    },
+    "packages/credential-client/tests/test_testing.py": {
+      "base": 0.7626312375068665,
+      "candidate": 0.6883435845375061
+    },
+    "packages/db-python/src/corvis_db/account.py": {
+      "base": 1.17001211643219,
+      "candidate": 0.8563797473907471
+    },
+    "packages/db-python/src/corvis_db/provider.py": {
+      "base": 0.9894520044326782,
+      "candidate": 0.6983466148376465
+    },
+    "packages/db-python/tests/test_provider.py": {
+      "base": 0.9716695547103882,
+      "candidate": 0.6915714740753174
+    },
+    "scripts/compute_py_contract_hash.py": {
+      "base": 1.393393635749817,
+      "candidate": 1.1457784175872803
+    },
+    "scripts/data/upload-all-sheets.py": {
+      "base": 1.0502102375030518,
+      "candidate": 0.824731707572937
+    },
+    "scripts/data/write-to-sheets.py": {
+      "base": 0.9991406202316284,
+      "candidate": 0.9091983437538147
+    },
+    "services/Art-Trainer/src/art_trainer/api/main.py": {
+      "base": 0.8868290185928345,
+      "candidate": 0.48165327310562134
+    },
+    "services/Art-Trainer/src/art_trainer/api/routes/health.py": {
+      "base": 0.5626129508018494,
+      "candidate": 0.24131138622760773
+    },
+    "services/Art-Trainer/src/art_trainer/api/validators/lora.py": {
+      "base": 0.5056586265563965,
+      "candidate": 0.11004973202943802
+    },
+    "services/Art-Trainer/src/art_trainer/core/contracts/job_result.py": {
+      "base": 0.7308700084686279,
+      "candidate": 0.3915315866470337
+    },
+    "services/Art-Trainer/src/art_trainer/core/contracts/progress.py": {
+      "base": 0.4853232204914093,
+      "candidate": 0.1931789666414261
+    },
+    "services/Art-Trainer/src/art_trainer/core/infra/redis_keys.py": {
+      "base": 0.183070108294487,
+      "candidate": 0.05184214562177658
+    },
+    "services/Art-Trainer/src/art_trainer/core/services/dataset/uploader.py": {
+      "base": 0.7690324187278748,
+      "candidate": 0.43060800433158875
+    },
+    "services/Art-Trainer/src/art_trainer/core/services/deployment/lora_deployer.py": {
+      "base": 0.5987339019775391,
+      "candidate": 0.38103601336479187
+    },
+    "services/Art-Trainer/src/art_trainer/core/services/registries.py": {
+      "base": 0.4197770357131958,
+      "candidate": 0.23927368223667145
+    },
+    "services/Art-Trainer/tests/api/routes/test_dataset.py": {
+      "base": 0.8920556306838989,
+      "candidate": 0.3097247779369354
+    },
+    "services/Art-Trainer/tests/core/infra/test_paths.py": {
+      "base": 0.8628092408180237,
+      "candidate": 0.13709768652915955
+    },
+    "services/Art-Trainer/tests/core/services/dataset/test_hooks.py": {
+      "base": 0.5559762716293335,
+      "candidate": 0.43876177072525024
+    },
+    "services/Model-Trainer/src/model_trainer/api/middleware.py": {
+      "base": 0.941303014755249,
+      "candidate": 0.3304626941680908
+    },
+    "services/Model-Trainer/src/model_trainer/api/routes/tokenizers.py": {
+      "base": 0.8304815292358398,
+      "candidate": 0.40614238381385803
+    },
+    "services/Model-Trainer/src/model_trainer/core/infra/paths.py": {
+      "base": 1.1487987041473389,
+      "candidate": 0.8734441995620728
+    },
+    "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/_test_hooks.py": {
+      "base": 0.6075039505958557,
+      "candidate": 0.44890016317367554
+    },
+    "services/Model-Trainer/src/model_trainer/core/services/model/backends/char_lstm/score.py": {
+      "base": 1.0898120403289795,
+      "candidate": 0.733810544013977
+    },
+    "services/Model-Trainer/src/model_trainer/core/services/tokenizer/spm_backend.py": {
+      "base": 0.9012973308563232,
+      "candidate": 0.5890047550201416
+    },
+    "services/Model-Trainer/src/model_trainer/infra/storage/run_store.py": {
+      "base": 1.5535005331039429,
+      "candidate": 1.3077481985092163
+    },
+    "services/Model-Trainer/src/model_trainer/maintenance/cleanup.py": {
+      "base": 0.6190730929374695,
+      "candidate": 0.331241637468338
+    },
+    "services/Model-Trainer/src/model_trainer/worker/chat_job.py": {
+      "base": 1.100459098815918,
+      "candidate": 0.5938968062400818
+    },
+    "services/Model-Trainer/tests/api/validators/test_runs_loss_mask.py": {
+      "base": 1.0869475603103638,
+      "candidate": 0.6812431216239929
+    },
+    "services/Model-Trainer/tests/maintenance/test_cleanup_corpus_cache.py": {
+      "base": 0.4365335702896118,
+      "candidate": 0.27159053087234497
+    },
+    "services/Model-Trainer/tests/test_char_lstm_prepare_train_eval.py": {
+      "base": 1.396242380142212,
+      "candidate": 0.6060225963592529
+    },
+    "services/Model-Trainer/tests/test_gguf_export.py": {
+      "base": 0.274325430393219,
+      "candidate": 0.17244824767112732
+    },
+    "services/Model-Trainer/tests/test_gpt2_prepare_and_backend_impl.py": {
+      "base": 1.1452981233596802,
+      "candidate": 0.3484378457069397
+    },
+    "services/Model-Trainer/tests/test_health_readyz_branches.py": {
+      "base": 0.6078298687934875,
+      "candidate": 0.32246923446655273
+    },
+    "services/Model-Trainer/tests/test_runs_logs_stream_follow_yields_data.py": {
+      "base": 0.8760105967521667,
+      "candidate": 0.6067301034927368
+    },
+    "services/Model-Trainer/tests/test_tokenizers_xor_validation.py": {
+      "base": 0.8290037512779236,
+      "candidate": 0.38168516755104065
+    },
+    "services/Model-Trainer/tests/test_training_orchestrator_errors.py": {
+      "base": 1.0746859312057495,
+      "candidate": 0.39792099595069885
+    },
+    "services/Model-Trainer/tests/test_training_worker_char_tokenizer_load.py": {
+      "base": 0.9944918751716614,
+      "candidate": 0.4079422652721405
+    },
+    "services/covenant-radar-api/scripts/discover_datasets/parsers/excel.py": {
+      "base": 0.8016901612281799,
+      "candidate": 0.6345126628875732
+    },
+    "services/covenant-radar-api/scripts/explain/__init__.py": {
+      "base": 0.5344194769859314,
+      "candidate": 0.26447010040283203
+    },
+    "services/covenant-radar-api/scripts/explain/main.py": {
+      "base": 0.7506340742111206,
+      "candidate": 0.4745458662509918
+    },
+    "services/covenant-radar-api/scripts/optimize/_runners.py": {
+      "base": 0.9461390376091003,
+      "candidate": 0.7348385453224182
+    },
+    "services/covenant-radar-api/scripts/optimize/cli.py": {
+      "base": 1.0005325078964233,
+      "candidate": 0.7434104681015015
+    },
+    "services/covenant-radar-api/scripts/optimize/history.py": {
+      "base": 0.8122667670249939,
+      "candidate": 0.48025405406951904
+    },
+    "services/covenant-radar-api/scripts/seed.py": {
+      "base": 0.7914444804191589,
+      "candidate": 0.399100124835968
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/api/decode.py": {
+      "base": 0.8927057385444641,
+      "candidate": 0.39811578392982483
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/api/routes/health.py": {
+      "base": 0.7493305802345276,
+      "candidate": 0.4680542051792145
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/domains/weather/domain.py": {
+      "base": 1.3516207933425903,
+      "candidate": 0.8712409138679504
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/domains/weather/features.py": {
+      "base": 0.8241443037986755,
+      "candidate": 0.6086480617523193
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/seeding/synthetic.py": {
+      "base": 0.8824895024299622,
+      "candidate": 0.7744147181510925
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/streaming/generic_worker.py": {
+      "base": 1.0558265447616577,
+      "candidate": 0.7764599323272705
+    },
+    "services/covenant-radar-api/src/covenant_radar_api/worker/evaluate_job.py": {
+      "base": 0.8917447924613953,
+      "candidate": 0.5549862384796143
+    },
+    "services/covenant-radar-api/tests/optimize/test_datasets.py": {
+      "base": 1.048081398010254,
+      "candidate": 0.4348674416542053
+    },
+    "services/covenant-radar-api/tests/optimize/test_runner.py": {
+      "base": 0.597876787185669,
+      "candidate": 0.3802528977394104
+    },
+    "services/covenant-radar-api/tests/scripts/amex/test_test_hooks.py": {
+      "base": 0.49587810039520264,
+      "candidate": 0.31829917430877686
+    },
+    "services/covenant-radar-api/tests/scripts/replay_data/test_test_hooks.py": {
+      "base": 0.5753799676895142,
+      "candidate": 0.38251635432243347
+    },
+    "services/covenant-radar-api/tests/seeding/test_profiles.py": {
+      "base": 0.46736499667167664,
+      "candidate": 0.34048911929130554
+    },
+    "services/covenant-radar-api/tests/streaming/test_worker_fakes.py": {
+      "base": 0.35624802112579346,
+      "candidate": 0.19553934037685394
+    },
+    "services/covenant-radar-api/tests/test_evaluate_job.py": {
+      "base": 0.796864926815033,
+      "candidate": 0.3762318789958954
+    },
+    "services/covenant-radar-api/tests/test_main.py": {
+      "base": 1.0763778686523438,
+      "candidate": 0.7325899004936218
+    },
+    "services/covenant-radar-api/tests/train_external/test_helpers.py": {
+      "base": 0.35761168599128723,
+      "candidate": 0.23078599572181702
+    },
+    "services/covenant-radar-api/tests/train_external/test_process_job.py": {
+      "base": 0.8023081421852112,
+      "candidate": 0.3070538640022278
+    },
+    "services/data-bank-api/src/data_bank_api/testing.py": {
+      "base": 0.6004775166511536,
+      "candidate": 0.4828776717185974
+    },
+    "services/data-bank-api/tests/conftest.py": {
+      "base": 0.8099426627159119,
+      "candidate": 0.519823431968689
+    },
+    "services/data-bank-api/tests/test_app_factory_startup.py": {
+      "base": 0.7654157280921936,
+      "candidate": 0.498404324054718
+    },
+    "services/data-bank-api/tests/test_client.py": {
+      "base": 0.8158307075500488,
+      "candidate": 0.6393083930015564
+    },
+    "services/data-bank-api/tests/test_scripts_guard_programmatic.py": {
+      "base": 1.0715495347976685,
+      "candidate": 0.7863752245903015
+    },
+    "services/github-stats-api/src/github_stats_api/_icons_frontend.py": {
+      "base": 1.1188831329345703,
+      "candidate": 1.0954205989837646
+    },
+    "services/github-stats-api/src/github_stats_api/renderers/skills.py": {
+      "base": 0.8376163244247437,
+      "candidate": 0.6796126365661621
+    },
+    "services/github-stats-api/src/github_stats_api/settings.py": {
+      "base": 0.7695430517196655,
+      "candidate": 0.3670370876789093
+    },
+    "services/github-stats-api/tests/test_themes.py": {
+      "base": 0.5290936231613159,
+      "candidate": 0.4191516935825348
+    },
+    "services/grandma-api/scripts/webserver.py": {
+      "base": 0.5838431119918823,
+      "candidate": 0.4717417359352112
+    },
+    "services/handwriting-ai/src/handwriting_ai/training/augment.py": {
+      "base": 0.5544068217277527,
+      "candidate": 0.4407213032245636
+    },
+    "services/handwriting-ai/src/handwriting_ai/training/calibration/signature.py": {
+      "base": 0.6994819641113281,
+      "candidate": 0.41795074939727783
+    },
+    "services/handwriting-ai/src/handwriting_ai/training/mnist_train.py": {
+      "base": 1.2188218832015991,
+      "candidate": 0.9084528684616089
+    },
+    "services/handwriting-ai/tests/test_calibration_cleanup_processes.py": {
+      "base": 0.9557317495346069,
+      "candidate": 0.8235580325126648
+    },
+    "services/handwriting-ai/tests/test_calibration_measure_cleanup.py": {
+      "base": 1.4423907995224,
+      "candidate": 0.6870825290679932
+    },
+    "services/handwriting-ai/tests/test_engine_build_fail.py": {
+      "base": 1.3507615327835083,
+      "candidate": 0.46676909923553467
+    },
+    "services/handwriting-ai/tests/test_engine_load.py": {
+      "base": 0.9920817017555237,
+      "candidate": 0.43950343132019043
+    },
+    "services/handwriting-ai/tests/test_jobs_digits_publisher_none.py": {
+      "base": 1.2436134815216064,
+      "candidate": 0.5784426331520081
+    },
+    "services/handwriting-ai/tests/test_jobs_digits_uncovered.py": {
+      "base": 1.1103980541229248,
+      "candidate": 0.3713822066783905
+    },
+    "services/handwriting-ai/tests/test_manifest.py": {
+      "base": 1.0280704498291016,
+      "candidate": 0.28012919425964355
+    },
+    "services/handwriting-ai/tests/test_preprocess_more.py": {
+      "base": 0.5775927901268005,
+      "candidate": 0.48220646381378174
+    },
+    "services/handwriting-ai/tests/test_training_artifacts_prune.py": {
+      "base": 0.689343273639679,
+      "candidate": 0.57657790184021
+    },
+    "services/music-wrapped-api/tests/test_guard_script_entrypoint.py": {
+      "base": 0.8659818768501282,
+      "candidate": 0.38810306787490845
+    },
+    "services/music-wrapped-api/tests/test_lastfm_auth.py": {
+      "base": 0.6379866600036621,
+      "candidate": 0.45171642303466797
+    },
+    "services/music-wrapped-api/tests/test_takeout_import.py": {
+      "base": 0.7680630087852478,
+      "candidate": 0.4672240912914276
+    },
+    "services/qr-api/src/qr_api/health.py": {
+      "base": 1.3387266397476196,
+      "candidate": 0.606121838092804
+    },
+    "services/qr-api/tests/conftest.py": {
+      "base": 1.3790830373764038,
+      "candidate": 0.8353134989738464
+    },
+    "services/qr-api/tests/test_generator.py": {
+      "base": 1.0409337282180786,
+      "candidate": 0.7754375338554382
+    },
+    "services/qr-api/tests/test_guard_checks.py": {
+      "base": 0.8849237561225891,
+      "candidate": 0.4404550790786743
+    },
+    "services/transcript-api/src/transcript_api/merger.py": {
+      "base": 0.6312955617904663,
+      "candidate": 0.3704025447368622
+    },
+    "services/transcript-api/src/transcript_api/settings.py": {
+      "base": 0.7139502167701721,
+      "candidate": 0.17190143465995789
+    },
+    "services/transcript-api/src/transcript_api/url/parse.py": {
+      "base": 0.774501621723175,
+      "candidate": 0.48173490166664124
+    },
+    "services/transcript-api/src/transcript_api/vtt_parser.py": {
+      "base": 0.7572855353355408,
+      "candidate": 0.663616955280304
+    },
+    "services/transcript-api/tests/test_dependencies_generic.py": {
+      "base": 1.1153545379638672,
+      "candidate": 0.7214623689651489
+    },
+    "services/transcript-api/tests/test_transcript_cleaner.py": {
+      "base": 0.8069542050361633,
+      "candidate": 0.6117115020751953
+    },
+    "services/transcript-api/tests/test_url_vimeo.py": {
+      "base": 0.3345252275466919,
+      "candidate": 0.25006404519081116
+    },
+    "services/transcript-api/tests/test_url_youtube.py": {
+      "base": 0.38880738615989685,
+      "candidate": 0.2984287440776825
+    },
+    "services/transcript-api/tests/test_whisper_parse_unit.py": {
+      "base": 0.8701079487800598,
+      "candidate": 0.682274580001831
+    },
+    "services/turkic-api/src/turkic_api/api/provider_context.py": {
+      "base": 0.46713343262672424,
+      "candidate": 0.36161094903945923
+    },
+    "services/turkic-api/src/turkic_api/api/routes/__init__.py": {
+      "base": 0.5002946257591248,
+      "candidate": 0.009726783260703087
+    },
+    "services/turkic-api/src/turkic_api/core/rule_provenance.py": {
+      "base": 1.4947117567062378,
+      "candidate": 1.1650402545928955
+    },
+    "services/turkic-api/src/turkic_api/worker_entry.py": {
+      "base": 0.742978572845459,
+      "candidate": 0.2175285965204239
+    },
+    "services/turkic-api/tests/test_api.py": {
+      "base": 0.8862082958221436,
+      "candidate": 0.5615087747573853
+    },
+    "services/turkic-api/tests/test_azerbaijani_ipa_letters.py": {
+      "base": 0.7659319043159485,
+      "candidate": 0.685196578502655
+    },
+    "services/turkic-api/tests/test_langid_load_model.py": {
+      "base": 0.6963596940040588,
+      "candidate": 0.412039190530777
+    },
+    "services/turkic-api/tests/test_main_overrides.py": {
+      "base": 0.8223004937171936,
+      "candidate": 0.5439813733100891
+    },
+    "services/turkic-api/tests/test_russian_northwind.py": {
+      "base": 1.0472222566604614,
+      "candidate": 0.999839723110199
+    },
+    "services/turkic-api/tests/test_translit_core.py": {
+      "base": 1.1018123626708984,
+      "candidate": 0.9244921803474426
+    },
+    "services/turkic-api/tests/test_uzbek_cyr_ipa_letters.py": {
+      "base": 1.340851902961731,
+      "candidate": 1.0409735441207886
+    },
+    "transcriber-api/tests/_integration.py": {
+      "base": 2.206993579864502,
+      "candidate": 1.3010166883468628
+    },
+    "transcriber-api/tests/test_host_rate_limit.py": {
+      "base": 1.1213253736495972,
+      "candidate": 0.6610798239707947
+    },
+    "transcriber-api/tests/test_transcript_doc.py": {
+      "base": 1.1440272331237793,
+      "candidate": 0.7761669754981995
+    },
+    "voice-call/src/voice_call/types.py": {
+      "base": 0.9066333174705505,
+      "candidate": 0.605147123336792
+    },
+    "voice-call/tests/test_session.py": {
+      "base": 0.650115966796875,
+      "candidate": 0.5204777121543884
+    },
+    "voice-call/tests/test_tts.py": {
+      "base": 0.6982660293579102,
+      "candidate": 0.5422123074531555
+    }
+  }
+}

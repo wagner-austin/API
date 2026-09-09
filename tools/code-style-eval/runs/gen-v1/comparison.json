@@ -12,5 +12,6 @@
   },
   "net_improvement": -1,
   "mid_p": 0.7265625,
-  "exact_p": 1.0
+  "exact_p": 1.0,
+  "payload_digest": "face4e797b8ac150fbaa56516232c92183807daa3d3cad3a5f4147f5b679b8ec"
 }

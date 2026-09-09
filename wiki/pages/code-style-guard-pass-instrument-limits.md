@@ -15,15 +15,17 @@ source_paths:
   - libs/platform_core/src/platform_core/minimum_detectable_effect.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
-  "tools/code-style-eval/src/code_style_eval/core/provenance.py": 96d1c2e03e64c90ed6c720d287c846049f67bdf2
+  "tools/code-style-eval/src/code_style_eval/core/provenance.py": 2ae8f760d7e83ea5e8a37c8d81939219dbe6e202
   "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 7ee61da22b34a03c91377041ec92772af0679237
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
-  "libs/platform_core/src/platform_core/minimum_detectable_effect.py": 8d65b793f05aa5d3bda1c0ed68b14f0d46e28dbe
+  "libs/platform_core/src/platform_core/minimum_detectable_effect.py": f627746507d4fc01e32e977cee60f38c09e4f847
 provenance:
-  - "runs/sweep-v1/comparison.json + .runrecord.json (label sweep-v4-cap1536-reppen1.1-corpusdeps, 19 distributions recorded)"
-  - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded)"
+  - "EVERY RUN BELOW IS NAMED BY ITS payload_digest, not only by its directory. Two runs of this package can agree on every published figure -- sweep-v1 and gen-v1 both scored 226 items -- so a run name is not an identity and a figure quoted off this page was, until 2026-09-09, traceable only by resemblance. It was traced to the wrong run once. The digest is name-paired sha256 over the two *.outcomes.jsonl the comparison was computed from, carried inside comparison.json since 63770146."
+  - "runs/sweep-v1/comparison.json + .runrecord.json (label sweep-v4-cap1536-reppen1.1-corpusdeps, 19 distributions recorded) -- payload_digest 1fd266b0f0dc050c54eaeef33523a59b45a7337fb2f586ff28fc3767853fb5e6"
+  - "runs/sweep-v1-cap384 -- payload_digest 75efd9fd3192447173d245615830425e1b3a3631961b70d45953a9044bba1876"
+  - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded) -- payload_digest d00c4b5057f2ba0bb073d771df9986a85886a30e08a950ba6dfd5c3002a129e5"
   - "runs/sweep-v1/{base,candidate}.outcomes.jsonl and .generation.jsonl — per-item verdicts and termination flags"
   - "runs/sweep-v1-cap384/perplexity.json — teacher-forced NLL per item, both arms"
 fact_checked: "2026-09-08"

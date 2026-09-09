@@ -31,7 +31,7 @@ from code_style_eval.contracts.outcomes import (
     decode_item_outcome,
     encode_comparison_report,
 )
-from code_style_eval.core.provenance import comparison_run_record
+from code_style_eval.core.provenance import comparison_run_record, payload_digest
 from code_style_eval.core.scoring import (
     discordant_split,
     net_improvement,
@@ -100,6 +100,7 @@ def build_report(
     *,
     baseline_arm: str,
     candidate_arm: str,
+    payload_digest: str,
 ) -> ComparisonReport:
     """Compute every figure the comparison reports.
 
@@ -113,10 +114,22 @@ def build_report(
         candidate: Candidate outcomes by item id.
         baseline_arm: Baseline arm name.
         candidate_arm: Candidate arm name.
+        payload_digest: Name-paired digest of the two outcome files these
+            outcomes were read from. Required, not defaulted: a default would
+            make the anonymous report constructible, and every figure below
+            is a number that cannot say what produced it.
 
     Returns:
         The report.
+
+    Raises:
+        ValueError: If the digest is empty.
     """
+    if not payload_digest:
+        raise ValueError(
+            "build_report needs the digest of the files it is summarising; an "
+            "empty one produces a comparison that cannot be traced to its bytes"
+        )
     shared = sorted(set(baseline) & set(candidate))
     counts = paired_counts(baseline, candidate)
     minority, discordant = discordant_split(counts)
@@ -130,6 +143,7 @@ def build_report(
         net_improvement=net_improvement(counts),
         mid_p=mcnemar_p(minority, discordant, McNemarTest.MID_P),
         exact_p=mcnemar_p(minority, discordant, McNemarTest.EXACT),
+        payload_digest=payload_digest,
     )
 
 
@@ -212,6 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         candidate,
         baseline_arm=arm_name(baseline, baseline_path),
         candidate_arm=arm_name(candidate, candidate_path),
+        payload_digest=payload_digest([baseline_path, candidate_path]),
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -230,7 +245,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 comparison_run_record(
                     report,
                     label,
-                    [baseline_path, candidate_path],
                     _test_hooks.record_distributions,
                 )
             ),

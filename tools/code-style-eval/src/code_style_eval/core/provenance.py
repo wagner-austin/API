@@ -248,15 +248,20 @@ def comparison_observations(report: ComparisonReport) -> tuple[Observation, ...]
 def comparison_run_record(
     report: ComparisonReport,
     label: str,
-    covered: Sequence[Path],
     distributions: tuple[str, ...] = FINGERPRINT_DISTRIBUTIONS,
 ) -> RunRecord:
     """Build the record that belongs beside a comparison.
 
+    TAKES THE DIGEST FROM THE REPORT rather than recomputing it from the
+    paths. Two computations of one identity are two things that can disagree,
+    and the one in the record is the copy a reader is least likely to have in
+    front of them. The report is now the origin of that value and this record
+    quotes it.
+
     Args:
-        report: The computed comparison.
+        report: The computed comparison, carrying the digest of the outcome
+            files it was built from.
         label: Which sweep this was, e.g. ``"sweep-v3-cap1536-reppen1.1"``.
-        covered: The files the comparison was computed from.
         distributions: Passed through to :func:`scoring_fingerprint`.
 
     Returns:
@@ -264,14 +269,14 @@ def comparison_run_record(
 
     Raises:
         ValueError: Propagated from :func:`run_record` when the label is
-            empty, and from :func:`payload_digest` when nothing is covered.
+            empty.
     """
     return run_record(
         experiment=EXPERIMENT,
         label=label,
         fingerprint=scoring_fingerprint(distributions),
         observations=comparison_observations(report),
-        payload_digest=payload_digest(covered),
+        payload_digest=report["payload_digest"],
     )
 
 

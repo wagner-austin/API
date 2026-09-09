@@ -31,6 +31,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from code_style_eval.cli.compare import build_report, read_outcomes
 from code_style_eval.contracts.outcomes import ComparisonReport, decode_comparison_report
+from code_style_eval.core.provenance import payload_digest
 
 _RUNS = pathlib.Path(__file__).resolve().parent.parent / "runs"
 
@@ -65,6 +66,32 @@ _COMMITTED_MID_P: tuple[tuple[str, int, float], ...] = (
     ("sweep-v2-greedy", 226, 0.6875),
     ("sweep-v3-nodeps", 226, 0.84375),
 )
+
+
+def _rebuild(directory: pathlib.Path, committed: ComparisonReport) -> ComparisonReport:
+    """Recompute a run's comparison from the outcome files beside it.
+
+    The digest is recomputed from those same two files rather than copied
+    from the committed report, so an equality check against the committed
+    report tests the IDENTITY as well as the figures: a comparison.json whose
+    digest names bytes other than its neighbours' fails here.
+
+    Args:
+        directory: The run directory.
+        committed: The committed report, for the arm names.
+
+    Returns:
+        The rebuilt report.
+    """
+    baseline = directory / "base.outcomes.jsonl"
+    candidate = directory / "candidate.outcomes.jsonl"
+    return build_report(
+        read_outcomes(baseline),
+        read_outcomes(candidate),
+        baseline_arm=committed["baseline_arm"],
+        candidate_arm=committed["candidate_arm"],
+        payload_digest=payload_digest([baseline, candidate]),
+    )
 
 
 def _committed_report(directory: pathlib.Path) -> ComparisonReport:
@@ -128,12 +155,7 @@ class TestEveryCommittedComparisonReproduces:
         directory = _RUNS / run_name
         committed = _committed_report(directory)
 
-        rebuilt = build_report(
-            read_outcomes(directory / "base.outcomes.jsonl"),
-            read_outcomes(directory / "candidate.outcomes.jsonl"),
-            baseline_arm=committed["baseline_arm"],
-            candidate_arm=committed["candidate_arm"],
-        )
+        rebuilt = _rebuild(directory, committed)
 
         assert rebuilt == committed
 
@@ -154,12 +176,43 @@ class TestEveryCommittedComparisonReproduces:
         directory = _RUNS / run_name
         committed = _committed_report(directory)
 
-        rebuilt = build_report(
-            read_outcomes(directory / "base.outcomes.jsonl"),
-            read_outcomes(directory / "candidate.outcomes.jsonl"),
-            baseline_arm=committed["baseline_arm"],
-            candidate_arm=committed["candidate_arm"],
-        )
+        rebuilt = _rebuild(directory, committed)
 
         assert rebuilt["shared_items"] == shared_items
         assert rebuilt["mid_p"] == mid_p
+
+    @pytest.mark.parametrize("run_name", [name for name, _, _ in _COMMITTED_MID_P])
+    def test_the_committed_digest_names_the_outcome_files_beside_it(self, run_name: str) -> None:
+        """The property that makes a QUOTED figure traceable.
+
+        Every other test here compares numbers against numbers, and numbers
+        do not say what produced them: ``gen-v1`` and ``sweep-v1`` both report
+        226 shared items, so "226 items" identifies neither. The digest is the
+        only field that ties a report to bytes, and this asserts it names the
+        outcome files actually sitting beside it rather than some other run's.
+
+        Args:
+            run_name: The run directory to check.
+        """
+        directory = _RUNS / run_name
+        committed = _committed_report(directory)
+
+        recomputed = payload_digest(
+            [directory / "base.outcomes.jsonl", directory / "candidate.outcomes.jsonl"]
+        )
+
+        assert committed["payload_digest"] == recomputed
+
+    def test_no_two_runs_share_a_digest(self) -> None:
+        """The digests must actually discriminate, or they prove nothing.
+
+        Six runs whose reports all carried the same digest would satisfy every
+        other assertion in this file while identifying nothing. This is the
+        check that the field does the job it was added for.
+        """
+        digests = {
+            name: _committed_report(_RUNS / name)["payload_digest"]
+            for name, _, _ in _COMMITTED_MID_P
+        }
+
+        assert len(set(digests.values())) == len(digests)

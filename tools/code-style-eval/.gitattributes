@@ -16,5 +16,12 @@
 #
 # -text rather than `text eol=lf`: no conversion in either direction, so the
 # bytes committed are the bytes scored.
+#
+# sweep-* joined gen-* on 2026-09-09. Those four runs were evidence for a
+# published wiki table and existed on this machine only; committing them
+# without this rule would have rewritten their line endings and moved the
+# payload digests of records whose entire purpose is to be comparable.
 runs/gen-*/*.jsonl -text
 runs/gen-*/*.json -text
+runs/sweep-*/*.jsonl -text
+runs/sweep-*/*.json -text
