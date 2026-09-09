@@ -154,3 +154,82 @@ class TestRetrieve:
 
     def test_an_empty_index_retrieves_nothing(self) -> None:
         assert retrieval.retrieve(retrieval.build_index(()), "anything") == ""
+
+
+class TestReciprocalRankFusion:
+    """Ported from wiki-search's fusion.ts, so the tests pin what must agree.
+
+    The constant and the tie-break are the two things that would silently
+    give the two repos different retrievers under one name.
+    """
+
+    def test_the_damping_constant_matches_the_typescript_it_was_ported_from(self) -> None:
+        """Sixty, from Cormack et al. (2009), same as fusion.ts."""
+        assert retrieval.RRF_K == 60
+
+    def test_agreeing_arms_beat_one_arm_s_first_place(self) -> None:
+        """THE PROPERTY THE WHOLE FUSION EXISTS FOR.
+
+        Chunk 7 places second in both arms; chunk 1 places first in one and
+        nowhere in the other. Any scheme that merely took the best single
+        rank would put chunk 1 on top, and the hybrid would then be an
+        expensive way to run whichever arm was loudest.
+        """
+        dense = [1, 7, 2]
+        lexical = [3, 7, 4]
+
+        fused = retrieval.fuse_by_reciprocal_rank(dense, lexical, limit=1)
+
+        assert fused == (7,)
+
+    def test_a_chunk_only_one_arm_found_still_places(self) -> None:
+        """A strong single-arm hit must survive, or the fusion is an AND.
+
+        The lexical arm is what finds proper nouns the embedder misses; if
+        appearing in one arm disqualified a chunk, the hybrid would be worse
+        than either half.
+        """
+        fused = retrieval.fuse_by_reciprocal_rank([5], [9], limit=2)
+
+        assert set(fused) == {5, 9}
+
+    def test_a_repeated_id_keeps_its_best_position(self) -> None:
+        """A later duplicate does not make a chunk less relevant."""
+        first = retrieval.fuse_by_reciprocal_rank([4, 8, 4], [8], limit=2)
+        without = retrieval.fuse_by_reciprocal_rank([4, 8], [8], limit=2)
+
+        assert first == without
+
+    def test_ties_break_by_chunk_index_so_the_order_is_total(self) -> None:
+        """Two chunks in identical positions in both arms score identically.
+
+        Left to sort stability that would depend on set iteration order,
+        which is not a reproducible measurement.
+        """
+        fused = retrieval.fuse_by_reciprocal_rank([2, 6], [2, 6], limit=2)
+
+        assert fused == (2, 6)
+
+    def test_the_limit_bounds_the_fused_result(self) -> None:
+        assert len(retrieval.fuse_by_reciprocal_rank([1, 2, 3], [3, 2, 1], limit=2)) == 2
+
+    def test_fusing_nothing_returns_nothing(self) -> None:
+        assert retrieval.fuse_by_reciprocal_rank([], [], limit=5) == ()
+
+
+class TestRankAndJoin:
+    def test_ranking_returns_every_chunk_best_first(self) -> None:
+        index = retrieval.build_index(_DOCUMENTS)
+
+        ranked = retrieval.rank_chunks(index, "How are sonar returns handled?")
+
+        assert len(ranked) == len(index["chunks"])
+        assert "Sonar returns are filtered" in index["chunks"][ranked[0]]
+
+    def test_joining_reads_back_in_corpus_order_not_rank_order(self) -> None:
+        """Evidence in relevance order changes what the prose says."""
+        index = retrieval.build_index(_DOCUMENTS)
+
+        joined = retrieval.join_chunks(index, [4, 3])
+
+        assert joined == f"{index['chunks'][3]} {index['chunks'][4]}"

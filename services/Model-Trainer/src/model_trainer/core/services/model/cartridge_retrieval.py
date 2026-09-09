@@ -64,6 +64,16 @@ RETRIEVED_CHUNKS = 5
 #: the model's own.
 _WORD = re.compile(r"[a-z0-9]+")
 
+#: Reciprocal-rank-fusion damping, from Cormack et al. (2009).
+#:
+#: Sixty, matching `packages/wiki-search/src/fusion.ts` in the MCPs repo
+#: exactly. It sets how sharply rank 1 outweighs rank 2: at this value the
+#: top few ranks sit close together, so AGREEMENT BETWEEN ARMS matters more
+#: than either arm's confidence in its own ordering. Changing it here
+#: without changing it there would give the two wikis different retrievers
+#: under one name.
+RRF_K = 60
+
 
 class Bm25Index(TypedDict):
     """A searchable index over one corpus's sentences.
@@ -202,6 +212,26 @@ def retrieve(index: Bm25Index, query: str, *, limit: int = RETRIEVED_CHUNKS) -> 
         The chosen chunks joined by spaces, in corpus order. Empty when the
         index holds no chunks.
     """
+    return join_chunks(index, rank_chunks(index, query)[:limit])
+
+
+def rank_chunks(index: Bm25Index, query: str) -> tuple[int, ...]:
+    """Rank every chunk against one query, best first.
+
+    Separated from :func:`retrieve` because fusion consumes RANKS rather
+    than text: reciprocal-rank fusion combines the positions two arms
+    assigned, so an arm that only returned its joined evidence could not
+    participate.
+
+    Args:
+        index: The index to search.
+        query: The question. The ANSWER is not an argument, which is the
+            whole difference from the oracle.
+
+    Returns:
+        Every chunk index, best first. Ties break by corpus position, so the
+        order is a total function of the corpus and the query.
+    """
     query_terms = terms(query)
 
     def rank(chunk: int) -> tuple[float, int]:
@@ -220,17 +250,97 @@ def retrieve(index: Bm25Index, query: str, *, limit: int = RETRIEVED_CHUNKS) -> 
         """
         return (-score_chunk(index, query_terms, chunk), chunk)
 
-    ranked = sorted(range(len(index["chunks"])), key=rank)
-    chosen = sorted(ranked[:limit])
-    return " ".join(index["chunks"][chunk] for chunk in chosen)
+    return tuple(sorted(range(len(index["chunks"])), key=rank))
+
+
+def join_chunks(index: Bm25Index, chosen: Sequence[int]) -> str:
+    """Render chosen chunks as evidence text.
+
+    Args:
+        index: The index the chunks belong to.
+        chosen: Chunk indices, in any order.
+
+    Returns:
+        The chunks joined by spaces, in CORPUS order rather than rank order.
+        Evidence read back in relevance order would put a later sentence
+        before an earlier one it depends on, changing what the prose says
+        without changing which sentences were chosen.
+    """
+    return " ".join(index["chunks"][chunk] for chunk in sorted(chosen))
+
+
+def fuse_by_reciprocal_rank(
+    dense_ranked: Sequence[int], lexical_ranked: Sequence[int], *, limit: int
+) -> tuple[int, ...]:
+    """Fuse two rankings into one by reciprocal rank.
+
+    PORTED, NOT SHARED, and the reason is a language boundary rather than a
+    preference. ``packages/wiki-search/src/fusion.ts`` in the MCPs repo
+    already does this for the civic wiki and its docstring carries the
+    argument for it; that file is TypeScript and this is Python, so there is
+    no lift available -- only a reimplementation. The constant and the
+    tie-break are kept identical to it so the two agree, and the algorithm
+    is Cormack et al. (2009) rather than either codebase's invention.
+
+    WHY RANKS RATHER THAN SCORES, from that same file's reasoning: the two
+    arms produce scores on incomparable scales. Cosine similarity lands in a
+    compressed band while BM25 is unbounded above and depends on corpus
+    statistics, so normalising either onto the other is a tuning exercise
+    that silently re-tunes itself every time the corpus grows. Combining
+    positions sidesteps the scales entirely -- placing second in both arms
+    beats placing first in one and nowhere in the other, which is exactly
+    the behaviour a hybrid retriever exists to get.
+
+    Args:
+        dense_ranked: Chunk indices from the embedding arm, best first.
+        lexical_ranked: Chunk indices from BM25, best first.
+        limit: How many fused chunks to return.
+
+    Returns:
+        The fused top chunks, best first. Ties break by chunk index
+        ascending so the ordering is total and reproducible.
+    """
+    dense_at = _first_positions(dense_ranked)
+    lexical_at = _first_positions(lexical_ranked)
+    scored: list[tuple[float, int]] = []
+    for chunk in sorted(set(dense_ranked) | set(lexical_ranked)):
+        score = 0.0
+        for positions in (dense_at, lexical_at):
+            rank = positions.get(chunk)
+            if rank is not None:
+                score += 1.0 / float(RRF_K + rank)
+        scored.append((-score, chunk))
+    return tuple(chunk for _score, chunk in sorted(scored)[:limit])
+
+
+def _first_positions(ranked: Sequence[int]) -> dict[int, int]:
+    """Map each chunk to its 1-based rank, keeping the first occurrence.
+
+    Args:
+        ranked: Chunk indices, best first.
+
+    Returns:
+        Chunk to rank. A repeated id keeps its BEST position rather than its
+        last, because a duplicate later in a list does not make a document
+        less relevant than the first mention said it was.
+    """
+    positions: dict[int, int] = {}
+    for index, chunk in enumerate(ranked):
+        if chunk not in positions:
+            positions[chunk] = index + 1
+    return positions
 
 
 __all__ = [
     "K1",
     "RETRIEVED_CHUNKS",
+    "RRF_K",
     "B",
     "Bm25Index",
     "build_index",
+    "fuse_by_reciprocal_rank",
+    "join_chunks",
+    "rank_chunks",
     "retrieve",
     "score_chunk",
     "terms",

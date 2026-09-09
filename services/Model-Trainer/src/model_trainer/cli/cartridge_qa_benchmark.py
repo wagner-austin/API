@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import pathlib
 import sys
-from collections import Counter
 from collections.abc import Sequence
 
 from platform_core import cli_args
@@ -47,13 +46,12 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
-from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem
+from model_trainer.core.contracts.cloze import BLANK_MARKER
 from model_trainer.core.contracts.replicated_measurement import (
     gain_observations,
     per_seed_observations,
     replicate,
 )
-from model_trainer.core.encoding import Encoder
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
     describe_run_fingerprint,
@@ -65,14 +63,13 @@ from model_trainer.core.services.model.backends.hf_lm.encoding import HFTokenize
 from model_trainer.core.services.model.cartridge_corpus import (
     build_windows,
     split_by_stride,
-    window_documents,
 )
+from model_trainer.core.services.model.cartridge_dense import dense_ranking
 from model_trainer.core.services.model.cartridge_measurement import train_cartridge
 from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     require_cartridge_plan,
 )
-from model_trainer.core.services.model.cartridge_dense import dense_ranking
 from model_trainer.core.services.model.cartridge_qa import (
     answer_nll_pairs,
     bm25_retrieval_items,
@@ -94,7 +91,6 @@ from model_trainer.core.services.model.cartridge_retrieval import (
 )
 from model_trainer.core.services.model.cloze.score import score_cloze_items
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
-from model_trainer.core.services.model.corpus_cloze import build_items
 from model_trainer.core.services.model.gemm_timing import synchroniser
 
 _log = get_logger(__name__)

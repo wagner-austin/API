@@ -36,6 +36,7 @@ from model_trainer.core._hook_protocols_ml import (
 from model_trainer.core.contracts.cloze import ClozeEvalResult, ClozeItem
 from model_trainer.core.contracts.continuation_sweep import Completion, ContinuationArm
 from model_trainer.core.contracts.model import PreparedLMModel
+from model_trainer.core.services.model.cartridge_dense import EmbedderProto, _default_embedder
 
 
 class LoadHubModelProto(Protocol):
@@ -518,11 +519,19 @@ env_cublaslt_workspace: EnvCublasltWorkspaceProto = _default_env_cublaslt_worksp
 
 monotonic_clock: MonotonicClockProto = _default_monotonic_clock
 
+#: The dense retrieval arm's embedder.
+#:
+#: Behind a hook because it loads real gte weights. A measurement run gets
+#: the production one; a test installs planted vectors so the ranking under
+#: test is a function it can state the right answer for.
+embed_texts: EmbedderProto = _default_embedder
+
 run_benchmark_child: RunBenchmarkChildProto = _default_run_benchmark_child
 
 
 __all__ = [
     "ApplyDeterminismProto",
+    "EmbedderProto",
     "EnvCublasltWorkspaceProto",
     "GenerateContinuationBatchProto",
     "LoadContinuationArmProto",
@@ -532,7 +541,13 @@ __all__ = [
     "ReadCorpusDocumentsProto",
     "RunBenchmarkChildProto",
     "ScoreClozeProto",
+    # Re-exported explicitly because it is IMPORTED from `cartridge_dense`
+    # rather than defined here. Every other default in this module is local,
+    # so mypy hands them on without asking; an imported name needs this line
+    # or a test cannot restore the production hook it replaced.
+    "_default_embedder",
     "apply_determinism_hook",
+    "embed_texts",
     "env_cublaslt_workspace",
     "generate_continuation_batch",
     "load_continuation_arm",

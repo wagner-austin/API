@@ -19,11 +19,11 @@ from __future__ import annotations
 import pathlib
 import runpy
 import sys
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Generator
 
 import pytest
 from platform_core.json_utils import load_json_str
-from platform_core.run_record import Observation, decode_run_record
+from platform_core.run_record import decode_run_record
 from platform_ml.determinism import (
     ATTENTION_MATH_ONLY,
     ATTENTION_SETTING,
@@ -31,166 +31,30 @@ from platform_ml.determinism import (
     SPLIT_K_SETTING,
 )
 
-from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli import cartridge_qa_benchmark as bench
-from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
-from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
-from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
-from model_trainer.core.services.model.cartridge_qa_plans import QA_EXPERIMENT, QaPlan
-from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
-from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
-from model_trainer.core.types import LMModelProto
-
-#: A plan small enough to run in a test and shaped like the real one.
-#:
-#: Sized against the tiny rung's 64 positions, which is the binding
-#: constraint: a 48-token budget plus an 8-slot prefix is 56, leaving room for
-#: an item and some evidence without reaching the position embedding's end.
-TINY_PLAN: QaPlan = {
-    "model_id": "tiny-under-test",
-    "window": 8,
-    "held_out_stride": 2,
-    "num_slots": 8,
-    "max_seq_len": 48,
-    "seeds": (7, 8, 9),
-    "epochs": 1,
-    "learning_rate": 0.05,
-    "distractor_count": 2,
-    "max_items": 6,
-}
-
-#: Four documents, each naming its own subject in several sentences.
-#:
-#: FOUR RATHER THAN TWO because a distractor may not be a term from the item's
-#: own document: with two documents an item could draw only one distractor,
-#: and the builder correctly refuses. Each subject recurs so that it lands in
-#: both a held-out window and a training one, which is what makes its item
-#: answerable from the corpus rather than a guess.
-#: NO SENTENCE BEGINS WITH ITS SUBJECT, and that is a constraint of the fake
-#: tokenizer rather than of the corpus. It is word-level, so each name is one
-#: token; a name at position zero is the sequence's first token, which no
-#: causal model can score because nothing precedes it, and `answer_nll`
-#: correctly refuses the item. Real byte-pair encoding splits these names into
-#: several tokens and the question does not arise.
-_DOCUMENTS: tuple[str, ...] = tuple(
-    (
-        f"The engine called {name} rebuilt the measurement path inside one core. "
-        f"A later pass moved {name} onto a faster route for speed and memory. "
-        f"The team measured {name} against the usual baseline over many weeks. "
-        f"Written notes about {name} explain the design in considerable detail."
-    )
-    for name in ("ClearGBM", "TankpitBot", "NavProbe", "CoverGate")
+from model_trainer.core.services.model.cartridge_qa_plans import QA_EXPERIMENT
+from tests._qa_benchmark_support import (
+    DOCUMENTS as _DOCUMENTS,
 )
-
-
-class _Tokenizer:
-    """A reversible word-level tokenizer inside the tiny rung's vocabulary.
-
-    WORD-LEVEL RATHER THAN CHARACTER-LEVEL, and the reason is a real
-    constraint rather than convenience. The tiny rung has 64 positions, the
-    item builder requires sentences of at least
-    :data:`~corpus_cloze.MIN_SENTENCE_CHARS` characters, and a character
-    tokenizer turns such a sentence into sixty-odd tokens -- more than the
-    whole window, before any evidence. `with_evidence` then correctly refuses
-    every item, and the test measures nothing.
-
-    REVERSIBLE because the pipeline decodes windows back to text to build
-    items from them. A hashing tokenizer would encode fine and decode to
-    nothing, so the vocabulary is kept both ways and grown on demand.
-    """
-
-    _to_id: dict[str, int]
-    _to_word: dict[int, str]
-
-    def __init__(self) -> None:
-        self._to_id = {}
-        self._to_word = {}
-
-    @property
-    def eos_token_id(self) -> int | None:
-        return 0
-
-    @property
-    def pad_token_id(self) -> int | None:
-        return 1
-
-    def __len__(self) -> int:
-        return PROBE_SHAPES["tiny"]["vocab_size"]
-
-    def encode(self, text: str) -> list[int]:
-        ids: list[int] = []
-        for word in text.split():
-            known = self._to_id.get(word)
-            if known is None:
-                # Ids start at 2 so neither collides with eos or pad, and stay
-                # inside the rung's vocabulary or the embedding lookup fails.
-                known = len(self._to_id) + 2
-                assert known < len(self), "the fake corpus outgrew the tiny vocabulary"
-                self._to_id[word] = known
-                self._to_word[known] = word
-            ids.append(known)
-        return ids
-
-    def decode(self, ids: list[int]) -> str:
-        return " ".join(self._to_word[value] for value in ids)
-
-    def convert_tokens_to_ids(self, token: str) -> int:
-        return self.encode(token)[0] if token.split() else 0
-
-
-def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
-    """Stand in for the hub tokenizer loader."""
-    assert model_id_or_path == TINY_PLAN["model_id"]
-    return _Tokenizer()
-
-
-def _fake_model(
-    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
-) -> LMModelProto:
-    """Stand in for the hub model loader, returning a real tiny GPT-2.
-
-    The model is real; only its provenance is faked, so the arms run real
-    attention without needing a cache.
-    """
-    assert model_id_or_path == TINY_PLAN["model_id"]
-    assert quantization is None
-    model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
-    return model
-
-
-def _fake_plans() -> Mapping[str, QaPlan]:
-    """Stand in for the production plan table, with one runnable plan."""
-    return {"tiny": TINY_PLAN}
-
-
-def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
-    """Stand in for the corpus reader."""
-    return _DOCUMENTS
+from tests._qa_benchmark_support import (
+    TINY_PLAN,
+    install_fakes,
+    restore_fakes,
+)
+from tests._qa_benchmark_support import (
+    Tokenizer as _Tokenizer,
+)
+from tests._qa_benchmark_support import (
+    values as _values,
+)
 
 
 @pytest.fixture(name="wired", autouse=True)
 def _wired() -> Generator[None, None, None]:
-    """Install the fakes, and put the real hooks back afterwards."""
-    _measurement_hooks.qa_plans = _fake_plans
-    _test_hooks.read_corpus_documents = _fake_corpus_reader
-    hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
-    hf_hooks.Hooks.load_hf_model = _fake_model
+    """Install the shared fakes, and put the real hooks back afterwards."""
+    install_fakes()
     yield None
-    _measurement_hooks.qa_plans = _measurement_hooks._default_qa_plans
-    _test_hooks.read_corpus_documents = _test_hooks._default_read_corpus_documents
-    hf_hooks.Hooks.reset()
-
-
-def _values(observations: Sequence[Observation]) -> dict[str, float]:
-    """Read a record's observations into a name-to-value mapping.
-
-    Args:
-        observations: The observations to read.
-
-    Returns:
-        Each observation's value, keyed by its name.
-    """
-    return {observation["name"]: observation["value"] for observation in observations}
+    restore_fakes()
 
 
 class TestBuildQuestionSet:
@@ -281,204 +145,6 @@ class TestMeasureQaPlan:
 
         named = _values(observations)
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
-
-
-class TestHeldOutSplit:
-    """The split has to examine every page it trains on.
-
-    Measured on the real twelve-page corpus, the first version of this strode
-    over the GLOBAL window index, and three of twelve pages held out nothing:
-    trained on, never tested. A short question set looks exactly like a short
-    corpus, so nothing surfaced it.
-    """
-
-    def test_every_document_is_examined_not_only_trained_on(self) -> None:
-        """The assertion the global stride failed on the real corpus.
-
-        Asserted through the ITEM IDS, which carry their document index as a
-        ``d{index:03d}`` prefix, because that is the observable consequence:
-        a page that holds out nothing produces no item, and the arm is then
-        fitted to more pages than it is scored on.
-
-        `max_items` is raised for this test only. The tiny plan stops at six
-        items, which could exhaust the budget inside the first documents and
-        fail this for a reason that has nothing to do with the split.
-        """
-        plan: QaPlan = {**TINY_PLAN, "max_items": 120}
-        tok = _Tokenizer()
-        encoder = bench.HFTokenizerEncoder(tok)
-        encoded = [encoder.encode(document).ids for document in _DOCUMENTS]
-
-        items, _training = bench.build_question_set(_DOCUMENTS, encoded, encoder, plan)
-
-        examined = {item["item_id"].split("-")[0] for item in items}
-        assert examined == {f"d{index:03d}" for index in range(len(_DOCUMENTS))}
-
-    def test_a_single_window_document_is_trained_on_rather_than_tested(self) -> None:
-        """It cannot be both, and training is the useful half.
-
-        Holding out its only window would leave that page's terms absent from
-        the training text, and `build_items` would then refuse every item
-        drawn from it as unanswerable -- so the page would be excluded either
-        way, but silently and for a confusing reason.
-        """
-        one_window = "  ".join(_DOCUMENTS[0].split()[: TINY_PLAN["window"] - 2])
-        documents = (one_window, _DOCUMENTS[1], _DOCUMENTS[2], _DOCUMENTS[3])
-        tok = _Tokenizer()
-        encoder = bench.HFTokenizerEncoder(tok)
-        encoded = [encoder.encode(document).ids for document in documents]
-
-        _items, training = bench.build_question_set(documents, encoded, encoder, TINY_PLAN)
-
-        first_terms = set(one_window.split())
-        assert first_terms & set(training.split()), "the single-window page was not trained on"
-
-
-class TestLatencyObservations:
-    def test_it_names_every_arm_including_the_costs_it_excludes(self) -> None:
-        """Two costs are recorded and left OUT of their arm's total, for
-        opposite reasons, and the record has to show both.
-
-        The oracle's build is excluded because it cheats -- no real pipeline
-        pays it. The BM25 index build is excluded because it is OFFLINE -- a
-        deployment pays it once per corpus change, not per query. The BM25
-        SELECT is the one selection cost that is charged, because searching
-        from the question is what every real retriever does per request.
-        """
-        named = {
-            observation["name"]: observation["value"]
-            for observation in bench.latency_observations(
-                base_seconds=2.0,
-                retrieval_seconds=10.0,
-                cartridge_seconds=3.0,
-                retrieval_build_seconds=0.5,
-                real_seconds=7.0,
-                real_select_seconds=1.0,
-                real_index_seconds=0.25,
-            )
-        }
-
-        assert named == {
-            "base_serve_seconds": 2.0,
-            "retrieval_serve_seconds": 10.0,
-            "cartridge_serve_seconds": 3.0,
-            "retrieval_oracle_build_seconds": 0.5,
-            "bm25_serve_seconds": 7.0,
-            "bm25_select_seconds": 1.0,
-            "bm25_total_serve_seconds": 8.0,
-            "bm25_index_seconds": 0.25,
-        }
-
-    def test_the_bm25_total_charges_selection_and_not_indexing(self) -> None:
-        """The asymmetry is the whole design, so it is asserted directly."""
-        named = {
-            observation["name"]: observation["value"]
-            for observation in bench.latency_observations(
-                base_seconds=1.0,
-                retrieval_seconds=1.0,
-                cartridge_seconds=1.0,
-                retrieval_build_seconds=1.0,
-                real_seconds=7.0,
-                real_select_seconds=1.0,
-                real_index_seconds=100.0,
-            )
-        }
-
-        assert named["bm25_total_serve_seconds"] == 8.0
-        assert named["bm25_index_seconds"] == 100.0
-
-
-class TestServeLatency:
-    def test_each_arm_is_timed_against_a_scripted_clock(self, tmp_path: pathlib.Path) -> None:
-        """Twelve reads: base, oracle build, retrieval, then two per seed.
-
-        The load-bearing assertion is the cartridge one. Its three seeds are
-        scripted at 1.0, 2.0 and 3.0 seconds, so the MEAN is 2.0 and a sum
-        would be 6.0. Recording the sum would make the cartridge arm look
-        worse the more seeds a plan happened to declare, which is a property
-        of the plan and not of serving.
-        """
-        ticks = iter(
-            [
-                100.0,
-                102.0,  # base: 2.0
-                102.0,
-                102.5,  # oracle build: 0.5
-                200.0,
-                210.0,  # oracle retrieval: 10.0
-                210.0,
-                210.25,  # bm25 index: 0.25
-                211.0,
-                212.0,  # bm25 select: 1.0
-                220.0,
-                227.0,  # bm25 scoring: 7.0
-                300.0,
-                301.0,  # seed 7: 1.0
-                400.0,
-                402.0,  # seed 8: 2.0
-                500.0,
-                503.0,  # seed 9: 3.0
-            ]
-        )
-        _test_hooks.monotonic_clock = lambda: next(ticks)
-        try:
-            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
-        finally:
-            _test_hooks.monotonic_clock = _test_hooks._default_monotonic_clock
-
-        named = {observation["name"]: observation["value"] for observation in observations}
-        assert named["base_serve_seconds"] == 2.0
-        assert named["retrieval_oracle_build_seconds"] == 0.5
-        assert named["retrieval_serve_seconds"] == 10.0
-        assert named["bm25_index_seconds"] == 0.25
-        assert named["bm25_select_seconds"] == 1.0
-        assert named["bm25_serve_seconds"] == 7.0
-        assert named["bm25_total_serve_seconds"] == 8.0
-        assert named["cartridge_serve_seconds"] == 2.0
-
-    def test_the_oracle_build_is_not_folded_into_the_retrieval_arm(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """The two are adjacent in time and must stay separate in the record.
-
-        A single bracket around selection-plus-scoring would charge the
-        cartridge's competitor for an answer-aware search no real retriever
-        can run, which is the one way this comparison could be made dishonest
-        in retrieval's favour.
-        """
-        ticks = iter(
-            [
-                0.0,
-                1.0,  # base
-                1.0,
-                8.0,  # oracle build, deliberately large
-                10.0,
-                11.0,  # oracle scoring, deliberately small
-                11.0,
-                12.0,  # bm25 index
-                12.0,
-                13.0,  # bm25 select
-                13.0,
-                14.0,  # bm25 scoring
-                20.0,
-                21.0,
-                30.0,
-                31.0,
-                40.0,
-                41.0,
-            ]
-        )
-        _test_hooks.monotonic_clock = lambda: next(ticks)
-        try:
-            observations, _digest = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
-        finally:
-            _test_hooks.monotonic_clock = _test_hooks._default_monotonic_clock
-
-        named = {observation["name"]: observation["value"] for observation in observations}
-        assert named["retrieval_serve_seconds"] == 1.0
-        assert named["retrieval_oracle_build_seconds"] == 7.0
-        # A single bracket from build-start to scoring-end would read 10.0.
-        assert named["retrieval_serve_seconds"] != 10.0
 
 
 class TestRunRecord:

@@ -58,7 +58,11 @@ from model_trainer.core.contracts.paired_comparison import (
     summarise_pairs,
 )
 from model_trainer.core.encoding import Encoder
-from model_trainer.core.services.model.cartridge_retrieval import Bm25Index, retrieve
+from model_trainer.core.services.model.cartridge_retrieval import (
+    Bm25Index,
+    join_chunks,
+    retrieve,
+)
 from model_trainer.core.services.model.corpus_cloze import sentences
 from model_trainer.core.types import LogitsOutProto, ScoreableLMProto
 
@@ -276,6 +280,42 @@ def bm25_retrieval_items(
             max_seq_len=max_seq_len,
         )
         for item in items
+    ]
+
+
+def ranked_retrieval_items(
+    items: Sequence[ClozeItem],
+    index: Bm25Index,
+    encoder: Encoder,
+    rankings: Sequence[Sequence[int]],
+    *,
+    max_seq_len: int,
+) -> list[ClozeItem]:
+    """Build an arm's item set from a pre-computed ranking per item.
+
+    Takes the RANKING rather than computing it, so the caller can time the
+    retrieval separately from the item assembly and can feed the same shape
+    from a dense arm, a fused arm, or anything else that orders chunks. The
+    BM25 arm has its own entry point because it also owns its ranking.
+
+    Args:
+        items: The shared question set.
+        index: The index the rankings refer to.
+        encoder: Tokenizer the scorer will use.
+        rankings: Per item, chunk indices best first, already truncated to
+            however many the arm retrieves.
+        max_seq_len: The scorer's token budget.
+
+    Returns:
+        One item per input, carrying that item's chosen chunks.
+
+    Raises:
+        AppError: With ``CLOZE_ITEM_UNSCOREABLE`` via :func:`with_evidence`
+            when an item leaves no room for evidence.
+    """
+    return [
+        with_evidence(item, join_chunks(index, chosen), encoder, max_seq_len=max_seq_len)
+        for item, chosen in zip(items, rankings, strict=True)
     ]
 
 
@@ -527,6 +567,7 @@ __all__ = [
     "evidence_budget_tokens",
     "evidence_for",
     "longest_rendering_tokens",
+    "ranked_retrieval_items",
     "retrieval_items",
     "with_evidence",
 ]
