@@ -41,7 +41,7 @@ source_git_blobs:
   "tools/code-style-eval/pyproject.toml": 461d05a24ec38163c18471a6bee77c071960e823
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
-  "libs/platform_core/src/platform_core/power_distributions.py": a8a135d23069b89fac3a4c7a3ae4c0627130a3a3
+  "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
   "tools/code-style-eval/tests/test_published_comparisons.py": 9d8789a618d8e870136cb758d5059a70c4ebe678
   "tools/hpc3/runs/code-style-gen-v1-base.json": c650a9dcb602022d5bc8ab9c35e9b586fa4ce133
   "tools/hpc3/runs/code-style-gen-v1-candidate.json": 0ba923bf44663318bbcb1ba24cd52321a22949be
