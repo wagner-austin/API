@@ -73,7 +73,7 @@ def _spec(name: str, artifact: str | None) -> JobSpec:
         "mem_gb": 16,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,

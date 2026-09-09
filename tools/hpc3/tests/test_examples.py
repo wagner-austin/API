@@ -244,4 +244,4 @@ class TestExampleSweep:
     def test_its_overrides_reach_every_member(self) -> None:
         specs = expand_sweep(resolve_sweep(_workspace(), _load("sweep-scale-rung.json")))
         assert {s["minutes"] for s in specs} == {900}
-        assert {s["checkpoint_steps"] for s in specs} == {250}
+        assert {s["resumes_from_checkpoint"] for s in specs} == {True}

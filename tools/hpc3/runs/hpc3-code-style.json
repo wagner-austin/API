@@ -15,7 +15,6 @@
       "mem_gb": 32,
       "minutes": 240,
       "requeue": true,
-      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/images/v33/abl.sif",
         "sha256": "5dfd78a7eb14c7691811e54e848a802f138f6b3e842fd8fb590d21f1b3e899a0",
@@ -37,7 +36,8 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../.."
+      "repo": "../../..",
+      "resumes_from_checkpoint": false
     }
   }
 }

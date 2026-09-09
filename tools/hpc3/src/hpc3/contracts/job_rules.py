@@ -131,7 +131,7 @@ def _check_preemption_protection(
     partition: str,
     minutes: int,
     requeue: bool,
-    checkpoint_steps: int,
+    resumes_from_checkpoint: bool,
     deterministic: bool,
 ) -> None:
     """Reject a long preemptible job that would lose everything if evicted.
@@ -140,37 +140,61 @@ def _check_preemption_protection(
         cluster: The selected cluster.
         partition: Target partition.
         minutes: Requested wall clock.
-        requeue: Whether Slurm should resubmit after preemption.
-        checkpoint_steps: Steps between checkpoints; 0 means none.
+        requeue: Whether the script carries ``--requeue``. Only protection
+            where the partition's mode is ``REQUEUE``, because that is the
+            only mode in which Slurm resubmits anything. Under ``CANCEL``
+            the flag is inert -- measured 2026-09-02, when a wave took 22
+            array tasks carrying it straight to terminal PREEMPTED -- so it
+            is not demanded there.
+        resumes_from_checkpoint: Whether the payload checkpoints and resumes
+            from one. Asserted by the operator; nothing here can check it.
         deterministic: Whether the workload replays identically from the
-            start. For such a job requeue alone IS protection: a preempted
-            run resubmits, replays, and produces the same result -- the
-            whole run is a checkpoint at step zero. Rusted's pinned-regime
-            matches are the workload this clause was measured against
-            (replicated seed-for-seed across independent submissions,
-            2026-09-01); a stochastic trainer restarting from step zero is
-            not protected, which is what the checkpoint half still refuses.
+            start. For such a job the whole run is a checkpoint at step
+            zero: resubmit it and the same result comes back. Rusted's
+            pinned-regime matches are the workload this clause was measured
+            against (replicated seed-for-seed across independent
+            submissions, 2026-09-01); a stochastic trainer restarting from
+            step zero is not protected, which is what the checkpoint half
+            still refuses.
+
+    The check is in two parts because eviction poses two questions. Does the
+    work survive it -- a checkpoint to resume from, or a replay that returns
+    the same answer? And does anything resubmit? Slurm answers the second
+    only under ``REQUEUE``; under ``CANCEL`` the resubmission comes from a
+    campaign or a person, outside anything this guard can inspect, so it
+    checks the first question alone rather than demanding a flag that does
+    nothing.
 
     Raises:
-        AppError: With ``PREEMPTIBLE_RUN_UNPROTECTED`` if the job is
-            preemptible, longer than
-            :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES`, and lacks
-            requeue paired with either checkpointing or deterministic
-            replay. Requeue without either restarts a stochastic run from
-            step zero as a DIFFERENT run, which is not protection.
+        AppError: With ``PREEMPTIBLE_RUN_UNPROTECTED`` if the partition
+            preempts, the job is longer than
+            :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES`, and the work
+            would not survive eviction -- or, on a ``REQUEUE`` partition,
+            if it would survive but nothing asked Slurm to bring it back.
     """
-    if not partition_facts(cluster, partition)["preemptible"]:
+    mode = partition_facts(cluster, partition)["preempt_mode"]
+    if mode == "OFF":
         return
     if minutes <= PREEMPTION_PROTECTION_THRESHOLD_MINUTES:
         return
-    if requeue and (checkpoint_steps > 0 or deterministic):
+    survives_eviction = resumes_from_checkpoint or deterministic
+    if survives_eviction and (mode == "CANCEL" or requeue):
         return
+    if not survives_eviction:
+        raise AppError(
+            Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED,
+            f"A {minutes}-minute job on {partition!r} (PreemptMode={mode}) would "
+            "lose everything if evicted; got "
+            f"resumes_from_checkpoint={resumes_from_checkpoint}, "
+            f"deterministic={deterministic}. It needs 'resumes_from_checkpoint' "
+            "so a restart picks up where it stopped, or 'deterministic' replay "
+            "so a resubmission returns the same result.",
+        )
     raise AppError(
         Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED,
-        f"A {minutes}-minute job on preemptible {partition!r} needs 'requeue' "
-        "paired with a positive 'checkpoint_steps' or with 'deterministic' "
-        f"replay; got requeue={requeue}, checkpoint_steps={checkpoint_steps}, "
-        f"deterministic={deterministic}. Preemption cancels the job.",
+        f"A {minutes}-minute job on {partition!r} survives eviction but nothing "
+        f"would bring it back: PreemptMode={mode} means Slurm resubmits a "
+        "preempted job, and this one does not carry 'requeue'.",
     )
 
 

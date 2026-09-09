@@ -12,7 +12,6 @@
       "mem_gb": 2,
       "minutes": 60,
       "requeue": true,
-      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/tankpit/images/v2/tankpit.sif",
         "sha256": "0cfdd5592a1ab0df1cbe121ae567eb5d75a42f53c619f7c80fdbefaa8144a0e6",
@@ -32,7 +31,8 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../../clients/TankpitBot"
+      "repo": "../../../clients/TankpitBot",
+      "resumes_from_checkpoint": false
     }
   }
 }

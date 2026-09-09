@@ -15,7 +15,6 @@
       "mem_gb": 96,
       "minutes": 720,
       "requeue": true,
-      "checkpoint_steps": 500,
       "env_path": "/opt/env",
       "pinned_packages": {
         "torch": "2.6.0+cu124",
@@ -35,7 +34,8 @@
         "binds": [
           "/pub/wagnera3"
         ]
-      }
+      },
+      "resumes_from_checkpoint": true
     },
     "sirius": {
       "partition": "free",
@@ -44,7 +44,6 @@
       "mem_gb": 64,
       "minutes": 360,
       "requeue": true,
-      "checkpoint_steps": 1,
       "env_path": "/opt/env",
       "pinned_packages": {},
       "deterministic": false,
@@ -61,7 +60,8 @@
         "binds": [
           "/pub/wagnera3"
         ]
-      }
+      },
+      "resumes_from_checkpoint": true
     }
   }
 }

@@ -43,7 +43,7 @@ HPC3: ClusterFacts = ClusterFacts(
     partitions={
         "free-gpu": PartitionFacts(
             usage_factor=0.0,
-            preemptible=True,
+            preempt_mode="CANCEL",
             max_hours=72,
             gpus=("V100", "A30", "A100"),
             max_gpus_per_user=24,
@@ -52,7 +52,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "free-gpu32": PartitionFacts(
             usage_factor=0.0,
-            preemptible=True,
+            preempt_mode="CANCEL",
             max_hours=72,
             gpus=("L40S", "RTX6000"),
             max_gpus_per_user=4,
@@ -61,7 +61,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "gpu": PartitionFacts(
             usage_factor=1.0,
-            preemptible=False,
+            preempt_mode="OFF",
             max_hours=336,
             gpus=("V100", "A30", "A100"),
             max_gpus_per_user=40,
@@ -70,7 +70,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "gpu32": PartitionFacts(
             usage_factor=1.0,
-            preemptible=False,
+            preempt_mode="OFF",
             max_hours=336,
             gpus=("L40S", "RTX6000"),
             max_gpus_per_user=12,
@@ -79,7 +79,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "free": PartitionFacts(
             usage_factor=0.0,
-            preemptible=True,
+            preempt_mode="CANCEL",
             max_hours=72,
             gpus=(),
             max_gpus_per_user=None,
@@ -88,7 +88,7 @@ HPC3: ClusterFacts = ClusterFacts(
         ),
         "standard": PartitionFacts(
             usage_factor=1.0,
-            preemptible=False,
+            preempt_mode="OFF",
             max_hours=336,
             gpus=(),
             max_gpus_per_user=None,

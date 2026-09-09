@@ -61,7 +61,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "mem_gb": 16,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,

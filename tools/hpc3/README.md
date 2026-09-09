@@ -115,7 +115,7 @@ A full workspace — two projects, one GPU and one CPU:
       "mem_gb": 96,
       "minutes": 720,
       "requeue": true,
-      "checkpoint_steps": 500,
+      "resumes_from_checkpoint": true,
       "image": {
         "path": "/pub/wagnera3/images/v20/abl.sif",
         "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
@@ -135,7 +135,7 @@ A full workspace — two projects, one GPU and one CPU:
       "mem_gb": 64,
       "minutes": 360,
       "requeue": true,
-      "checkpoint_steps": 1,
+      "resumes_from_checkpoint": true,
       "image": {
         "path": "/pub/wagnera3/images/sirius-v3/sirius.sif",
         "sha256": "d3e9daf77afae31ca644b8cf9d9d25b604ec35bd34965b94f930e3a3b0a1f88a",
@@ -160,7 +160,7 @@ carries an image):
 "turkic-lstm": {
   "partition": "free-gpu", "gpu": { "model": "V100", "count": 1 },
   "cpus": 4, "mem_gb": 32, "minutes": 240,
-  "requeue": true, "checkpoint_steps": 200,
+  "requeue": true, "resumes_from_checkpoint": true,
   "image": {
     "path": "/pub/wagnera3/images/turkic-lstm-v1/turkic-lstm.sif",
     "sha256": "8e1f2c41f7f426012d735d5b5e853d8dd2632815de1fe2f5d1d2f93bbed9e702",
@@ -193,7 +193,7 @@ same decoder:
 ```json
 {
   "project": "abl", "name": "armC-full", "command": "python -u train.py --arm C",
-  "minutes": 900, "checkpoint_steps": 250
+  "minutes": 900, "resumes_from_checkpoint": true
 }
 ```
 
@@ -203,7 +203,7 @@ A sweep — each member declares its own `artifact`
 ```json
 {
   "project": "abl", "name": "rung-large",
-  "minutes": 900, "checkpoint_steps": 250,
+  "minutes": 900, "resumes_from_checkpoint": true,
   "members": [
     { "suffix": "armB-s0", "command": "python -u train.py --arm B --seed 0 --out /pub/wagnera3/abl/s0.json",
       "artifact": "/pub/wagnera3/abl/s0.json" },

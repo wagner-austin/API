@@ -25,10 +25,30 @@ cluster's partitions instead of some other machine's.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Literal
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, require_int, require_str
 from typing_extensions import TypedDict
+
+PreemptMode = Literal["OFF", "CANCEL", "REQUEUE"]
+"""What a partition does to a job it preempts, as ``scontrol`` spells it.
+
+``OFF`` is a partition that does not preempt at all. The other two differ in
+who resubmits, and that difference decides whether ``--requeue`` buys
+anything: under ``REQUEUE`` Slurm resubmits the job itself, and under
+``CANCEL`` it does not, so the flag is inert and something outside Slurm has
+to resubmit.
+
+Stored as the mode rather than a preemptible/not flag because those are not
+the same question. A boolean answers "can this job be evicted?" and every
+consumer that needs to know "and does anything bring it back?" was left
+reading prose. That distinction sat in a docstring here for months while the
+submission guard demanded ``--requeue`` on partitions where it does nothing.
+"""
+
+PREEMPT_MODES: tuple[PreemptMode, ...] = ("OFF", "CANCEL", "REQUEUE")
+"""Every mode this package recognises, for exhaustiveness in tests."""
 
 
 class GpuRequest(TypedDict):
@@ -61,9 +81,13 @@ class PartitionFacts(TypedDict):
             rather than a bills/does-not-bill flag because Slurm permits any
             non-negative value, and a site that charges half rate is neither
             free nor full price.
-        preemptible: Whether a job here can be cancelled to make room for a
-            higher-tier job. Where the cluster runs ``PreemptMode=CANCEL``,
-            a preemption destroys unsaved work outright.
+        preempt_mode: What the partition does to a job it evicts. ``OFF``
+            means it does not preempt. ``CANCEL`` destroys unsaved work
+            outright and does NOT resubmit, so ``--requeue`` is inert there
+            and resubmission has to come from outside Slurm. ``REQUEUE``
+            means Slurm resubmits the job itself, which is the only mode
+            where the flag is protection. Measured per partition with
+            ``scontrol show partition``; see :data:`PreemptMode`.
         max_hours: Wall-clock ceiling the partition enforces.
         gpus: GPU models physically present, by Slurm GRES name. Must be a
             subset of the cluster's own ``gpus``. **Empty means this is a CPU
@@ -86,7 +110,7 @@ class PartitionFacts(TypedDict):
     """
 
     usage_factor: float
-    preemptible: bool
+    preempt_mode: PreemptMode
     max_hours: int
     gpus: tuple[str, ...]
     max_gpus_per_user: int | None

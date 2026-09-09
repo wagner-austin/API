@@ -52,7 +52,7 @@ def _project(
         mem_gb=16,
         minutes=minutes,
         requeue=True,
-        checkpoint_steps=0,
+        resumes_from_checkpoint=False,
         image={"path": "/pub/x.sif", "sha256": image_sha, "binds": ["/pub"]},
         env_path="/opt/env",
         pinned_packages={},

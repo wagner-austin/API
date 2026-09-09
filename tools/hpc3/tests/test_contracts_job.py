@@ -40,7 +40,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "mem_gb": 96,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "image": None,
         "env_path": "/pub/wagnera3/envs/abl-pinned",
         "pinned_packages": {},
@@ -63,7 +63,6 @@ class TestValidSpec:
         decoded = decode_job_spec(_spec())
         assert sorted(decoded.keys()) == [
             "artifact",
-            "checkpoint_steps",
             "command",
             "cpus",
             "depends_on",
@@ -80,6 +79,7 @@ class TestValidSpec:
             "pinned_packages",
             "project",
             "requeue",
+            "resumes_from_checkpoint",
         ]
 
 
@@ -279,17 +279,24 @@ class TestRulePreemptibleRunsMustBeProtected:
         """Restarting a stochastic trainer from step zero is a DIFFERENT
         run, so requeue alone protects nothing it produces."""
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=600, requeue=True, checkpoint_steps=0))
+            decode_job_spec(_spec(minutes=600, requeue=True, resumes_from_checkpoint=False))
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
         assert "deterministic" in excinfo.value.message
 
-    def test_checkpoints_without_requeue_is_not_protection(self) -> None:
-        with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=600, requeue=False, checkpoint_steps=50))
-        assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
+    def test_checkpoints_alone_admit_the_run_on_a_cancel_partition(self) -> None:
+        """Every HPC3 partition that preempts is ``PreemptMode=CANCEL``, where
+        ``--requeue`` is inert -- measured 2026-09-02, when 22 array tasks
+        carrying it went straight to terminal PREEMPTED with nothing left in
+        the queue. Demanding it there told submitters to add a flag that buys
+        nothing, so what the rule asks for now is work that survives eviction.
+
+        This assertion is the inverse of the one it replaces."""
+        decoded = decode_job_spec(_spec(minutes=600, requeue=False, resumes_from_checkpoint=True))
+        assert decoded["minutes"] == 600
+        assert decoded["requeue"] is False
 
     def test_both_together_admit_the_run(self) -> None:
-        decoded = decode_job_spec(_spec(minutes=600, requeue=True, checkpoint_steps=50))
+        decoded = decode_job_spec(_spec(minutes=600, requeue=True, resumes_from_checkpoint=True))
         assert decoded["minutes"] == 600
 
     def test_requeue_with_deterministic_replay_admits_the_run(self) -> None:
@@ -299,16 +306,32 @@ class TestRulePreemptibleRunsMustBeProtected:
         seed-for-seed across independent submissions (2026-09-01), are the
         workload this clause was measured against."""
         decoded = decode_job_spec(
-            _spec(minutes=600, requeue=True, checkpoint_steps=0, deterministic=True)
+            _spec(minutes=600, requeue=True, resumes_from_checkpoint=False, deterministic=True)
         )
         assert decoded["minutes"] == 600
         assert decoded["deterministic"] is True
 
-    def test_deterministic_without_requeue_is_not_protection(self) -> None:
-        """Replayability protects nothing if Slurm never resubmits."""
+    def test_deterministic_alone_admits_the_run_on_a_cancel_partition(self) -> None:
+        """The superseded version of this test read 'replayability protects
+        nothing if Slurm never resubmits', which is true and does not reach
+        ``requeue``: under CANCEL Slurm never resubmits WHETHER OR NOT the
+        flag is set. What resubmits there is a campaign or a person, outside
+        anything this guard can inspect, so it checks the half it can see."""
+        decoded = decode_job_spec(_spec(minutes=600, requeue=False, deterministic=True))
+        assert decoded["minutes"] == 600
+        assert decoded["deterministic"] is True
+
+    def test_neither_checkpoints_nor_replay_is_still_refused(self) -> None:
+        """The rule did not get weaker. Work that cannot survive eviction is
+        refused on a CANCEL partition exactly as before, and the message now
+        names the mode rather than demanding an inert flag."""
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=600, requeue=False, deterministic=True))
+            decode_job_spec(
+                _spec(minutes=600, requeue=True, resumes_from_checkpoint=False, deterministic=False)
+            )
         assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
+        assert "PreemptMode=CANCEL" in excinfo.value.message
+        assert "lose everything if evicted" in excinfo.value.message
 
     def test_a_short_run_needs_no_protection(self) -> None:
         decoded = decode_job_spec(_spec(minutes=PREEMPTION_PROTECTION_THRESHOLD_MINUTES))
@@ -332,11 +355,13 @@ class TestRulePreemptibleRunsMustBeProtected:
 class TestRuleTimeLimitFitsThePartition:
     def test_over_the_ceiling_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            decode_job_spec(_spec(minutes=72 * 60 + 1, requeue=True, checkpoint_steps=50))
+            decode_job_spec(_spec(minutes=72 * 60 + 1, requeue=True, resumes_from_checkpoint=True))
         assert excinfo.value.code is Hpc3ErrorCode.TIME_LIMIT_EXCEEDS_PARTITION
 
     def test_exactly_the_ceiling_is_admitted(self) -> None:
-        decoded = decode_job_spec(_spec(minutes=72 * 60, requeue=True, checkpoint_steps=50))
+        decoded = decode_job_spec(
+            _spec(minutes=72 * 60, requeue=True, resumes_from_checkpoint=True)
+        )
         assert decoded["minutes"] == 4320
 
 
@@ -374,9 +399,13 @@ class TestFieldValidation:
         with pytest.raises(JSONTypeError):
             decode_job_spec(_spec(minutes=0))
 
-    def test_negative_checkpoint_steps_is_refused(self) -> None:
+    def test_a_non_boolean_resumes_from_checkpoint_is_refused(self) -> None:
+        """This replaces a test that a NEGATIVE step count was refused. The
+        field was an integer whose magnitude nothing read, so the only
+        validation it could carry was about a number nobody used; a boolean
+        cannot be negative and the type check is what remains."""
         with pytest.raises(JSONTypeError):
-            decode_job_spec(_spec(checkpoint_steps=-1))
+            decode_job_spec(_spec(resumes_from_checkpoint=27344))
 
 
 class TestEncodeCpuOnly:

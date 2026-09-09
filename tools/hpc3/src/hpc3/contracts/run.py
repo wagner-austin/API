@@ -9,7 +9,7 @@ comes from the project's entry in the workspace. Any of those may be restated
 in the run document to override it for this run alone::
 
     {"project": "abl", "name": "armC-full", "command": "...",
-     "minutes": 600, "requeue": true, "checkpoint_steps": 500}
+     "minutes": 600, "requeue": true, "resumes_from_checkpoint": true}
 
 Overriding is not a way around validation. The merge produces an ordinary job
 object and hands it to :func:`~hpc3.contracts.job.decode_job_spec`, which

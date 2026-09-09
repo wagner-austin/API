@@ -10,7 +10,6 @@
   "mem_gb": 64,
   "minutes": 45,
   "requeue": true,
-  "checkpoint_steps": 0,
   "image": {
     "path": "/pub/wagnera3/images/v14/abl.sif",
     "sha256": "a274e4eed56a6b38fd4207e5f10078036b1c83798b6f5438d3a188e487d4b670",
@@ -25,5 +24,6 @@
     "card": "A100",
     "image": "v14",
     "splitk": "nosplitk"
-  }
+  },
+  "resumes_from_checkpoint": false
 }

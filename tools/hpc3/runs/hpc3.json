@@ -12,7 +12,6 @@
       "mem_gb": 16,
       "minutes": 60,
       "requeue": false,
-      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/images/cleargbm-v1/cleargbm-v1.sif",
         "sha256": "0a525f532a9e5e610913fc14e5fbcd248b7883c28063fe94d84981a2040cb980",
@@ -33,7 +32,8 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../.."
+      "repo": "../../..",
+      "resumes_from_checkpoint": false
     }
   }
 }

@@ -15,7 +15,6 @@
       "mem_gb": 64,
       "minutes": 55,
       "requeue": true,
-      "checkpoint_steps": 0,
       "image": {
         "path": "/pub/wagnera3/images/cu128-v1/abl-cu128.sif",
         "sha256": "6d9ba0baac40b238b2e8b479c17ed5d08b055c7af6b000711888d6e22afc69b2",
@@ -35,7 +34,8 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../.."
+      "repo": "../../..",
+      "resumes_from_checkpoint": false
     }
   }
 }

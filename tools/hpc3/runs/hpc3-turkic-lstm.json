@@ -15,7 +15,6 @@
       "mem_gb": 16,
       "minutes": 150,
       "requeue": true,
-      "checkpoint_steps": 27344,
       "image": {
         "path": "/pub/wagnera3/images/turkic-lstm-v3/turkic-lstm.sif",
         "sha256": "6e034383e300aa22c067415bd23122212d21b9f3bc5a54eb0eeb540ff199762c",
@@ -35,7 +34,8 @@
         "max_service_units": 0.0,
         "charge_account": ""
       },
-      "repo": "../../../../LSTM"
+      "repo": "../../../../LSTM",
+      "resumes_from_checkpoint": true
     }
   }
 }

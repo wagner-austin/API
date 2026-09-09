@@ -12,7 +12,7 @@ from __future__ import annotations
 import pathlib
 
 from platform_core.errors import AppError, Hpc3ErrorCode
-from platform_core.json_utils import JSONTypeError, JSONValue, require_bool, require_int
+from platform_core.json_utils import JSONTypeError, JSONValue, require_bool
 from typing_extensions import TypedDict
 
 from hpc3.contracts.budget import Budget, decode_budget, encode_budget
@@ -47,7 +47,8 @@ class ProjectConfig(TypedDict):
         mem_gb: Host memory per job, in GiB.
         minutes: Wall-clock limit per job.
         requeue: Whether Slurm should resubmit after a preemption.
-        checkpoint_steps: Training steps between checkpoints; 0 means none.
+        resumes_from_checkpoint: Whether the payload checkpoints and picks
+            one up on restart. An operator assertion; nothing verifies it.
         image: Image this project's payloads run inside. REQUIRED, and not
             optional in this type: a project without one cannot be decoded,
             so no reader downstream needs a branch for its absence. This is
@@ -150,7 +151,7 @@ class ProjectConfig(TypedDict):
     mem_gb: int
     minutes: int
     requeue: bool
-    checkpoint_steps: int
+    resumes_from_checkpoint: bool
     image: ImageReference
     env_path: str
     pinned_packages: dict[str, str]
@@ -167,7 +168,7 @@ PROJECT_FIELDS = (
     "mem_gb",
     "minutes",
     "requeue",
-    "checkpoint_steps",
+    "resumes_from_checkpoint",
     "image",
     "env_path",
     "pinned_packages",
@@ -297,12 +298,6 @@ def decode_project_config(
     if not isinstance(value, dict):
         raise JSONTypeError(f"project config must be a JSON object, got {type(value).__name__}")
 
-    checkpoint_steps = require_int(value, "checkpoint_steps")
-    if checkpoint_steps < 0:
-        raise JSONTypeError(
-            f"Field 'checkpoint_steps' must not be negative, got {checkpoint_steps}"
-        )
-
     return ProjectConfig(
         partition=require_partition(cluster, value, "partition"),
         gpu=decode_gpu_request(cluster, value.get("gpu"), "gpu"),
@@ -310,7 +305,7 @@ def decode_project_config(
         mem_gb=require_positive(value, "mem_gb"),
         minutes=require_positive(value, "minutes"),
         requeue=require_bool(value, "requeue"),
-        checkpoint_steps=checkpoint_steps,
+        resumes_from_checkpoint=require_bool(value, "resumes_from_checkpoint"),
         image=_require_project_image(decode_image_reference(value.get("image"), "image")),
         env_path=require_nonempty_str(value, "env_path"),
         pinned_packages=require_pinned_packages(value, "pinned_packages"),
@@ -337,7 +332,7 @@ def encode_project_config(config: ProjectConfig) -> dict[str, JSONValue]:
         "mem_gb": config["mem_gb"],
         "minutes": config["minutes"],
         "requeue": config["requeue"],
-        "checkpoint_steps": config["checkpoint_steps"],
+        "resumes_from_checkpoint": config["resumes_from_checkpoint"],
         "image": encode_image_reference(config["image"]),
         "env_path": config["env_path"],
         "pinned_packages": encode_pinned_packages(config["pinned_packages"]),

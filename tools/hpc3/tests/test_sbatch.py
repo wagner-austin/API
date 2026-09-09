@@ -86,7 +86,7 @@ class TestRenderSbatch:
         assert "--requeue" not in _render(spec())
 
     def test_requeue_appears_when_the_spec_carries_it(self) -> None:
-        job = spec(minutes=600, requeue=True, checkpoint_steps=50)
+        job = spec(minutes=600, requeue=True, resumes_from_checkpoint=True)
         assert "#SBATCH --requeue" in _render(job)
 
     def test_the_script_starts_with_a_login_shell_shebang(self) -> None:
@@ -115,7 +115,7 @@ class TestRenderSbatch:
         appearance of a wired setting; the export returns when a payload
         reads it, in that same change.
         """
-        job = spec(minutes=600, requeue=True, checkpoint_steps=50)
+        job = spec(minutes=600, requeue=True, resumes_from_checkpoint=True)
         assert "HPC3_CHECKPOINT_STEPS" not in _render(job)
 
     def test_it_does_not_set_e_so_the_payload_status_survives(self) -> None:
@@ -384,7 +384,7 @@ class TestResumeSurface:
         tooling cannot verify, and nothing in the rendered script pretends
         otherwise any more.
         """
-        job = spec(minutes=600, requeue=True, checkpoint_steps=50)
+        job = spec(minutes=600, requeue=True, resumes_from_checkpoint=True)
         script = _render(job)
         assert "#SBATCH --requeue" in script
         assert "HPC3_CHECKPOINT_STEPS" not in script

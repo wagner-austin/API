@@ -98,7 +98,14 @@ class JobSpec(TypedDict):
             nothing left in the queue, and one ``hpc3-campaign`` converge
             pass was the thing that actually resubmitted them. On a
             CANCEL partition the campaign is the requeue.
-        checkpoint_steps: Training steps between checkpoints; 0 means none.
+        resumes_from_checkpoint: Whether the payload writes checkpoints and
+            picks one up when it starts again. An operator assertion the
+            tooling cannot verify, and named as a boolean because that is
+            what it is. It replaced an integer step cadence that no payload
+            in any repository ever read: the number's only effect was
+            satisfying the rule that read it, and both payloads that do
+            checkpoint do so per EPOCH from their own configuration, so even
+            a reader would have found the cadence wrong.
         depends_on: Jobs that must finish before this one starts, or None for
             a job that waits on nothing. Emitted alongside
             ``--kill-on-invalid-dep=yes`` so an unsatisfiable wait cancels
@@ -152,7 +159,7 @@ class JobSpec(TypedDict):
     mem_gb: int
     minutes: int
     requeue: bool
-    checkpoint_steps: int
+    resumes_from_checkpoint: bool
     depends_on: Dependency | None
     image: ImageReference | None
     env_path: str
@@ -322,7 +329,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "mem_gb": spec["mem_gb"],
         "minutes": spec["minutes"],
         "requeue": spec["requeue"],
-        "checkpoint_steps": spec["checkpoint_steps"],
+        "resumes_from_checkpoint": spec["resumes_from_checkpoint"],
         "depends_on": encode_dependency(spec["depends_on"]),
         "artifact": spec["artifact"],
         "image": encode_image_reference(spec["image"]),
@@ -368,18 +375,13 @@ def decode_job_spec(
     minutes = _require_positive(value, "minutes")
     requeue = require_bool(value, "requeue")
 
-    checkpoint_steps = require_int(value, "checkpoint_steps")
-    if checkpoint_steps < 0:
-        raise JSONTypeError(
-            f"Field 'checkpoint_steps' must not be negative, got {checkpoint_steps}"
-        )
-
+    resumes_from_checkpoint = require_bool(value, "resumes_from_checkpoint")
     deterministic = require_bool(value, "deterministic")
     _check_partition_carries_gpu(cluster, partition, gpu)
     _check_partition_is_funded(cluster, partition, max_service_units)
     _check_time_limit(cluster, partition, minutes)
     _check_preemption_protection(
-        cluster, partition, minutes, requeue, checkpoint_steps, deterministic
+        cluster, partition, minutes, requeue, resumes_from_checkpoint, deterministic
     )
 
     image = decode_image_reference(value.get("image"), "image")
@@ -409,7 +411,7 @@ def decode_job_spec(
         mem_gb=_require_positive(value, "mem_gb"),
         minutes=minutes,
         requeue=requeue,
-        checkpoint_steps=checkpoint_steps,
+        resumes_from_checkpoint=resumes_from_checkpoint,
         depends_on=decode_dependency(value.get("depends_on"), "depends_on"),
         image=image,
         env_path=_require_env_path(value, image),

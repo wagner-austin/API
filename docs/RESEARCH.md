@@ -36,16 +36,16 @@ is generated and `hpc3-research-index` fails when it drifts.
 
 Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index --write`.
 
-| project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | ckpt steps |
+| project | partition | gpu | cpus | mem GiB | minutes | image | deterministic | resumes |
 |---|---|---|---|---|---|---|---|---|
-| `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | 0 |
-| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | 0 |
-| `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | 0 |
-| `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | 0 |
-| `mi-cu128` | free-gpu32 | `RTX6000` x1 | 8 | 64 | 55 | `6d9ba0baac40` | yes | 0 |
-| `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | 0 |
-| `tankpit` | free | cpu | 2 | 2 | 60 | `0cfdd5592a1a` | yes | 0 |
-| `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | 27344 |
+| `cleargbm` | free | cpu | 4 | 16 | 60 | `0a525f532a9e` | yes | no |
+| `code-style` | free-gpu | `A100` x1 | 8 | 32 | 240 | `5dfd78a7eb14` | yes | no |
+| `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | no |
+| `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | no |
+| `mi-cu128` | free-gpu32 | `RTX6000` x1 | 8 | 64 | 55 | `6d9ba0baac40` | yes | no |
+| `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | no |
+| `tankpit` | free | cpu | 2 | 2 | 60 | `0cfdd5592a1a` | yes | no |
+| `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | yes |
 
 <!-- /generated: hpc3-projects -->
 

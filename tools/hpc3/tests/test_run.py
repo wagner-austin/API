@@ -94,7 +94,7 @@ class TestResolveRun:
             "mem_gb": 96,
             "minutes": 30,
             "requeue": False,
-            "checkpoint_steps": 0,
+            "resumes_from_checkpoint": False,
             "image": {
                 "path": "/pub/images/v1/abl.sif",
                 "sha256": "a" * 64,
@@ -134,8 +134,14 @@ class TestResolveRun:
         assert resolve_run(workspace, _run())["cpus"] == 8
 
     def test_several_overrides_apply_together(self) -> None:
-        spec = resolve_run(_workspace(), _run(minutes=600, requeue=True, checkpoint_steps=500))
-        assert (spec["minutes"], spec["requeue"], spec["checkpoint_steps"]) == (600, True, 500)
+        spec = resolve_run(
+            _workspace(), _run(minutes=600, requeue=True, resumes_from_checkpoint=True)
+        )
+        assert (spec["minutes"], spec["requeue"], spec["resumes_from_checkpoint"]) == (
+            600,
+            True,
+            True,
+        )
 
     def test_an_undeclared_project_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
@@ -260,7 +266,9 @@ class TestOverridingCannotEvadeARule:
 
     def test_an_override_past_the_partition_ceiling_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            resolve_run(_workspace(), _run(minutes=5000, requeue=True, checkpoint_steps=10))
+            resolve_run(
+                _workspace(), _run(minutes=5000, requeue=True, resumes_from_checkpoint=True)
+            )
         assert excinfo.value.code is Hpc3ErrorCode.TIME_LIMIT_EXCEEDS_PARTITION
 
     def test_an_override_to_a_generic_gpu_is_refused(self) -> None:
@@ -286,10 +294,12 @@ class TestResolveSweep:
 
     def test_an_override_applies_to_the_whole_sweep(self) -> None:
         specs = expand_sweep(
-            resolve_sweep(_workspace(), _sweep(minutes=600, requeue=True, checkpoint_steps=250))
+            resolve_sweep(
+                _workspace(), _sweep(minutes=600, requeue=True, resumes_from_checkpoint=True)
+            )
         )
         assert {s["minutes"] for s in specs} == {600}
-        assert {s["checkpoint_steps"] for s in specs} == {250}
+        assert {s["resumes_from_checkpoint"] for s in specs} == {True}
 
     def test_a_sweep_past_the_qos_ceiling_is_refused(self) -> None:
         with pytest.raises(AppError) as excinfo:

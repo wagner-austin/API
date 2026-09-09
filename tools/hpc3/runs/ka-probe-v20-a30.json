@@ -10,7 +10,6 @@
   "mem_gb": 16,
   "minutes": 20,
   "requeue": false,
-  "checkpoint_steps": 0,
   "image": {
     "path": "/pub/wagnera3/images/v20/abl.sif",
     "sha256": "2b89283fccf289e3060b7b66f61315a5ea0922dbad1b63352540d5f9bdd2d1a5",
@@ -25,5 +24,6 @@
     "label": "gpt2-tiny-L2-d128-h2-v512-len64-seed42",
     "card": "A30",
     "image": "v20"
-  }
+  },
+  "resumes_from_checkpoint": false
 }

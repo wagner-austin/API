@@ -62,7 +62,7 @@ def job_submitted(spec: JobSpec, *, host: str, job_id: str, cluster: ClusterFact
             # constant.
             "usage_factor": partition_facts(cluster, spec["partition"])["usage_factor"],
             "requeue": spec["requeue"],
-            "checkpoint_steps": spec["checkpoint_steps"],
+            "resumes_from_checkpoint": spec["resumes_from_checkpoint"],
         },
     )
 

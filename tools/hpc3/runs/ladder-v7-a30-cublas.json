@@ -10,7 +10,6 @@
   "mem_gb": 64,
   "minutes": 60,
   "requeue": true,
-  "checkpoint_steps": 0,
   "image": {
     "path": "/pub/wagnera3/images/v7/abl.sif",
     "sha256": "bf36d17e6a285fe9b88ee4f4d6208bb369d6b0aa73d3f2a5cf2f8030da9ac079",
@@ -26,5 +25,6 @@
     "card": "A30",
     "image": "v7",
     "cublas-log": "trace"
-  }
+  },
+  "resumes_from_checkpoint": false
 }

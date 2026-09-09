@@ -41,7 +41,7 @@ OTHER: ClusterFacts = ClusterFacts(
     partitions={
         "batch": PartitionFacts(
             usage_factor=0.5,
-            preemptible=False,
+            preempt_mode="OFF",
             max_hours=8,
             gpus=("H100",),
             max_gpus_per_user=2,
@@ -50,7 +50,16 @@ OTHER: ClusterFacts = ClusterFacts(
         ),
         "scavenge": PartitionFacts(
             usage_factor=0.0,
-            preemptible=True,
+            preempt_mode="CANCEL",
+            max_hours=4,
+            gpus=("MI300X",),
+            max_gpus_per_user=1,
+            max_cpus_per_user=None,
+            max_jobs_per_user=1,
+        ),
+        "salvage": PartitionFacts(
+            usage_factor=0.0,
+            preempt_mode="REQUEUE",
             max_hours=4,
             gpus=("MI300X",),
             max_gpus_per_user=1,
@@ -59,7 +68,7 @@ OTHER: ClusterFacts = ClusterFacts(
         ),
         "serial": PartitionFacts(
             usage_factor=0.0,
-            preemptible=False,
+            preempt_mode="OFF",
             max_hours=2,
             gpus=(),
             max_gpus_per_user=None,
@@ -71,15 +80,21 @@ OTHER: ClusterFacts = ClusterFacts(
 """Nothing about this overlaps HPC3: not a partition name, not a GPU, not a
 ceiling, and its billing partition charges half rate rather than full.
 
-It also reaches two states HPC3 cannot, which is now most of its value:
+It also reaches three states HPC3 cannot, which is now most of its value:
 
-* ``serial`` is free AND non-preemptible, so the "a long run here needs no
-  protection" branch has somewhere to run. Every free partition on HPC3 is
-  preemptible, so that branch is unreachable there without spending money.
+* ``serial`` is free AND does not preempt, so the "a long run here needs no
+  protection" branch has somewhere to run. Every free partition on HPC3
+  preempts, so that branch is unreachable there without spending money.
 * ``serial``'s job ceiling (3) is below what its core ceiling (12) admits, so
   ``SWEEP_EXCEEDS_JOB_CEILING`` can fire on its own. On HPC3's free partitions
   the GPU or core ceiling always binds first, which used to be tested against
   the billing ``gpu`` partition and no longer can be.
+* ``salvage`` is ``PreemptMode=REQUEUE``, which HPC3 has nowhere. All six of
+  its partitions measured ``OFF`` or ``CANCEL`` on 2026-09-09, so the branch
+  where ``--requeue`` is genuinely load-bearing -- work that survives eviction
+  but has nothing to bring it back -- has no other home. Without this
+  partition that branch is dead code that nothing could cover, which is how a
+  guard clause survives being wrong.
 """
 
 
@@ -101,7 +116,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "mem_gb": 16,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "env_path": "/scratch/env",
         "pinned_packages": {},
         "deterministic": False,
@@ -290,6 +305,45 @@ class TestTheRulesFollowTheCluster:
             _spec(partition="serial", gpu=None, minutes=110), OTHER, max_service_units=0.0
         )
         assert decoded["requeue"] is False
+
+    def test_on_a_requeue_partition_survivable_work_still_needs_the_flag(self) -> None:
+        """The only branch where ``--requeue`` is load-bearing, and HPC3 cannot
+        reach it: all six of its partitions measured ``OFF`` or ``CANCEL`` on
+        2026-09-09. Under ``REQUEUE`` Slurm WILL resubmit a preempted job, so a
+        run that could resume and did not ask to be brought back is genuinely
+        unprotected -- work survives the eviction and then simply stops."""
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(
+                _spec(
+                    partition="salvage",
+                    gpu=gpus("MI300X"),
+                    minutes=200,
+                    requeue=False,
+                    resumes_from_checkpoint=True,
+                ),
+                OTHER,
+                max_service_units=0.0,
+            )
+        assert excinfo.value.code is Hpc3ErrorCode.PREEMPTIBLE_RUN_UNPROTECTED
+        assert "survives eviction but nothing" in excinfo.value.message
+        assert "PreemptMode=REQUEUE" in excinfo.value.message
+
+    def test_on_a_requeue_partition_the_flag_admits_the_run(self) -> None:
+        """The other side of the branch above: same partition, same work, the
+        flag set. This is the configuration the old rule demanded everywhere,
+        and it is correct in the one mode that honours it."""
+        decoded = decode_job_spec(
+            _spec(
+                partition="salvage",
+                gpu=gpus("MI300X"),
+                minutes=200,
+                requeue=True,
+                resumes_from_checkpoint=True,
+            ),
+            OTHER,
+            max_service_units=0.0,
+        )
+        assert decoded["requeue"] is True
 
     def test_its_billing_partition_is_refused_at_a_half_rate_too(self) -> None:
         """0.5 is neither free nor full price, and the rule is "above zero"

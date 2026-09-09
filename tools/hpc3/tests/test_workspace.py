@@ -169,12 +169,16 @@ class TestDecodeProjectConfig:
         assert config["gpu"] is None
         assert config["partition"] == "free"
 
-    def test_a_negative_checkpoint_interval_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must not be negative"):
-            decode_project_config(project_config(checkpoint_steps=-1))
+    def test_a_non_boolean_resume_declaration_is_refused(self) -> None:
+        """Replaces a test that a negative step INTERVAL was refused. The
+        interval was an integer nothing read, so its only validation guarded a
+        magnitude that never reached a payload."""
+        with pytest.raises(JSONTypeError):
+            decode_project_config(project_config(resumes_from_checkpoint=27344))
 
-    def test_zero_checkpoint_steps_means_no_checkpointing(self) -> None:
-        assert decode_project_config(project_config(checkpoint_steps=0))["checkpoint_steps"] == 0
+    def test_declaring_no_resume_is_carried_through(self) -> None:
+        config = decode_project_config(project_config(resumes_from_checkpoint=False))
+        assert config["resumes_from_checkpoint"] is False
 
     def test_a_non_positive_resource_is_refused(self) -> None:
         for field in ("cpus", "mem_gb", "minutes"):

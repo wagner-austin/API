@@ -37,7 +37,7 @@ def _spec(**overrides: JSONValue) -> JobSpec:
         "mem_gb": 96,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},
         "deterministic": False,
@@ -68,7 +68,7 @@ class TestJobSubmittedEvent:
             "minutes": 30,
             "usage_factor": 0.0,
             "requeue": False,
-            "checkpoint_steps": 0,
+            "resumes_from_checkpoint": False,
         }
 
     def test_a_cpu_job_logs_readable_hardware_not_a_null(self, logged: list[LoggedEvent]) -> None:
@@ -99,10 +99,10 @@ class TestJobSubmittedEvent:
         assert logged[0].fields["usage_factor"] == 0.0
 
     def test_a_protected_run_records_its_protection(self, logged: list[LoggedEvent]) -> None:
-        spec = _spec(minutes=600, requeue=True, checkpoint_steps=50)
+        spec = _spec(minutes=600, requeue=True, resumes_from_checkpoint=True)
         audit.job_submitted(spec, host="hpc3", job_id="1", cluster=cluster())
         assert logged[0].fields["requeue"] is True
-        assert logged[0].fields["checkpoint_steps"] == 50
+        assert logged[0].fields["resumes_from_checkpoint"] is True
 
 
 class TestSweepSubmittedEvent:

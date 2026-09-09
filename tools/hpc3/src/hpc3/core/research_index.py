@@ -103,7 +103,7 @@ def render_project_row(name: str, project: ProjectConfig) -> str:
         f"| {project['minutes']} "
         f"| {_image_cell(project)} "
         f"| {'yes' if project['deterministic'] else 'no'} "
-        f"| {project['checkpoint_steps']} |"
+        f"| {'yes' if project['resumes_from_checkpoint'] else 'no'} |"
     )
 
 
@@ -126,7 +126,7 @@ def render_projects_block(projects: dict[str, ProjectConfig]) -> str:
         "minutes",
         "image",
         "deterministic",
-        "ckpt steps",
+        "resumes",
     )
     header = [
         "| " + " | ".join(columns) + " |",

@@ -41,7 +41,7 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "mem_gb": 96,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "image": None,
         "env_path": "/pub/envs/abl-pinned",
         "pinned_packages": {},

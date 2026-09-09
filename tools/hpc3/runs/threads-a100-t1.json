@@ -10,7 +10,6 @@
   "mem_gb": 16,
   "minutes": 20,
   "requeue": false,
-  "checkpoint_steps": 0,
   "image": {
     "path": "/pub/wagnera3/images/v6/abl.sif",
     "sha256": "1112dbb11706245c5110c59f54b0da5c2dd8d6618ed84aafdc67164cbd024828",
@@ -27,5 +26,6 @@
     "image": "v6",
     "omp_num_threads": "1",
     "question": "does_host_thread_count_change_a_cuda_probe_result"
-  }
+  },
+  "resumes_from_checkpoint": false
 }

@@ -364,7 +364,7 @@ def project_config(**overrides: JSONValue) -> dict[str, JSONValue]:
         "mem_gb": 96,
         "minutes": 30,
         "requeue": False,
-        "checkpoint_steps": 0,
+        "resumes_from_checkpoint": False,
         "image": image_reference(),
         "env_path": "/opt/env",
         "pinned_packages": {},

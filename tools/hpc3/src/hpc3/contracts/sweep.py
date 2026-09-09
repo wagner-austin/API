@@ -89,7 +89,7 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             mem_gb=spec["base"]["mem_gb"],
             minutes=spec["base"]["minutes"],
             requeue=spec["base"]["requeue"],
-            checkpoint_steps=spec["base"]["checkpoint_steps"],
+            resumes_from_checkpoint=spec["base"]["resumes_from_checkpoint"],
             # Every member waits on the same thing. A sweep is one rung run
             # several ways, so if the rung depends on a staging job then each
             # of its members does.
