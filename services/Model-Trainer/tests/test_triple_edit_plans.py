@@ -21,6 +21,18 @@ from model_trainer.core.services.model.editing.triple_edit_plans import (
 
 _REFERENCE = "gpt2-triples"
 
+#: The rungs that hold the base fixed and move the dose.
+_DOSE_RUNGS = (
+    _REFERENCE,
+    "gpt2-triples-dose-25s-lr005",
+    "gpt2-triples-dose-10s-lr005",
+    "gpt2-triples-dose-5s-lr005",
+    "gpt2-triples-dose-5s-lr001",
+)
+
+#: The rungs that hold the dose fixed and move the base.
+_LADDER_RUNGS = ("gpt2-medium-triples", "gpt2-large-triples", "gpt2-xl-triples")
+
 
 class TestTheTable:
     def test_every_plan_names_a_question_set_that_exists(self) -> None:
@@ -30,6 +42,12 @@ class TestTheTable:
         """
         for name, plan in TRIPLE_EDIT_PLANS.items():
             assert plan["qa_plan"] in QA_PLANS, name
+
+    def test_the_table_is_exactly_the_two_families(self) -> None:
+        """A plan in neither family belongs to no comparison, and would be
+        reported beside numbers it cannot be differenced against.
+        """
+        assert set(TRIPLE_EDIT_PLANS) == set(_DOSE_RUNGS) | set(_LADDER_RUNGS)
 
     def test_every_plan_carries_the_curation_it_is_judged_on(self) -> None:
         for name, plan in TRIPLE_EDIT_PLANS.items():
@@ -44,7 +62,8 @@ class TestTheTable:
         would stop being the dose.
         """
         reference = TRIPLE_EDIT_PLANS[_REFERENCE]
-        for name, plan in TRIPLE_EDIT_PLANS.items():
+        for name in _DOSE_RUNGS:
+            plan = TRIPLE_EDIT_PLANS[name]
             assert plan["site"] == reference["site"], name
             assert plan["qa_plan"] == reference["qa_plan"], name
 
@@ -53,10 +72,39 @@ class TestTheTable:
         from 'this was pushed too hard'.
         """
         doses = [
-            plan["value_steps"] * plan["value_learning_rate"] for plan in TRIPLE_EDIT_PLANS.values()
+            TRIPLE_EDIT_PLANS[name]["value_steps"] * TRIPLE_EDIT_PLANS[name]["value_learning_rate"]
+            for name in _DOSE_RUNGS
         ]
 
         assert max(doses) / min(doses) >= 100.0
+
+    def test_the_ladder_rungs_differ_from_each_other_only_in_the_base(self) -> None:
+        """THE PROPERTY THAT MAKES A SCALE LADDER A SCALE LADDER.
+
+        Fact token, module template, dose, corpus and triples fixed; the
+        question set changes only because each base needs its own plan, and
+        those plans are themselves copies differing in ``model_id``. A rung
+        that also moved the dose would confound scale with over-driving.
+        """
+        for name in _LADDER_RUNGS:
+            plan = TRIPLE_EDIT_PLANS[name]
+            assert plan["value_steps"] == 10, name
+            assert plan["value_learning_rate"] == 0.05, name
+            assert plan["site"]["fact_token"] == "subject_last", name
+            assert plan["site"]["module_template"] == "transformer.h.{}.mlp.c_proj", name
+
+    def test_every_ladder_rung_edits_at_the_same_relative_depth(self) -> None:
+        """Half way down, at every scale.
+
+        The same ABSOLUTE index would be a shallower site on every larger
+        base, so a difference between rungs would be a difference in where the
+        edit went as much as in how big the model is.
+        """
+        depths = {"gpt2-medium-triples": 24, "gpt2-large-triples": 36, "gpt2-xl-triples": 48}
+        for name, layers in depths.items():
+            assert TRIPLE_EDIT_PLANS[name]["site"]["layer"] * 2 == layers, name
+        # And the reference the ladder extends sits at the same fraction.
+        assert TRIPLE_EDIT_PLANS[_REFERENCE]["site"]["layer"] * 2 == 12
 
     def test_the_experiment_name_is_its_own(self) -> None:
         """Two experiments that share a name are two records the comparability

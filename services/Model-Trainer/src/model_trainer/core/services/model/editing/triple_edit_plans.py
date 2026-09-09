@@ -117,6 +117,60 @@ TRIPLE_EDIT_PLANS: Final[dict[str, TripleEditPlan]] = {
         "value_steps": 5,
         "value_learning_rate": 0.01,
     },
+    # THE SCALE LADDER. The cartridge arm's verdict INVERTED between 355M and
+    # 774M, so a representation result measured only at 124M says what that
+    # one said: something about gpt2. These rungs hold the dose, the corpus,
+    # the triples and the question set fixed and move only the base.
+    #
+    # THE DOSE IS 10 x 0.05 AT EVERY RUNG, and it is chosen rather than swept:
+    # on gpt2 it is the cheapest rung whose edit success is 1.00, so every
+    # association really lands and the accuracy it costs is the price of
+    # landing them. The reference plan's 25 x 0.5 is excluded from the ladder
+    # because at that dose the edits damage each other (success falls to 0.77),
+    # which would confound scale with over-driving.
+    #
+    # THE LAYER IS THE SAME RELATIVE DEPTH, not the same index: 6 of gpt2's 12
+    # is halfway down, so the rungs take 12 of 24, 18 of 36 and 24 of 48. That
+    # is a CHOICE and it is not the reference implementation's -- ROME targets
+    # layer 17 of GPT-2 XL's 48, about a third down. A negative ladder at half
+    # depth therefore does not rule out a shallower site, and the write-up has
+    # to say so.
+    "gpt2-medium-triples": {
+        "qa_plan": "gpt2-medium-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 12,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
+    "gpt2-large-triples": {
+        "qa_plan": "gpt2-large-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 18,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
+    "gpt2-xl-triples": {
+        "qa_plan": "gpt2-xl-wiki-qa",
+        "corpus_digest": CORPUS_DIGEST,
+        "candidates": ME_WIKI_PUBLIC_TRIPLES,
+        "site": {
+            "layer": 24,
+            "module_template": "transformer.h.{}.mlp.c_proj",
+            "fact_token": "subject_last",
+        },
+        "value_steps": 10,
+        "value_learning_rate": 0.05,
+    },
 }
 
 
