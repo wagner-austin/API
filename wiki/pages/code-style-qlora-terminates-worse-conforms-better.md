@@ -43,7 +43,10 @@ provenance:
   - "adapter sha256 e675f88218fde25a0b410bd44da29c345a6701dac92e81dcf6bb9b624427b7fd"
   - "holdout sha256 5c1697e2fe06d8a5819fdb0348031f242b6609d029c9263405337fad27709e20, verified against the digests record on pull"
   - "scored 2026-09-08 on Windows with tools/code-style-eval, ruff + mypy strict + scripts.guard"
-fact_checked: 2026-09-08
+  - "cluster structure counted 2026-09-09 over the 875 shared item ids in runs/gen-v2/{base,candidate}.outcomes.jsonl: k = 14 / 64 / 336 by path segment, largest package 165, median 5"
+  - "tech-wiki/sources/killip-2004-intracluster-correlation.txt sha256 2fae776213c2ab342d4380f8b5dabb92ed66e487d001e3e9b33bd9a18400877e -- outside this wiki's workspaceRoot; the design-effect formula and its equal-cluster-size limit, read from the archived text"
+  - "tech-wiki/sources/lazic-2010-pseudoreplication-neuroscience.txt sha256 57643fecd2130189bffc9a8ea105de68dfc927a6ac24b357ba6d110a566bc0af -- outside this wiki's workspaceRoot; the IC=0.30 -> 37% figure, read from the archived text"
+fact_checked: 2026-09-09
 confidence: high
 hubs: [services]
 ---
@@ -134,10 +137,38 @@ deduplicates only byte-identical ones.[^8] Correlation between items inflates
 significance, and nothing here corrects for it. Termination at mid-p 2e-28
 would survive a great deal of it; the guards gain at mid-p 0.020 on 282 items
 is the result most exposed, and it is already the one flagged above as sitting
-below its own MDE. Treat that number as directional. This is unquantified
-rather than dismissed — the correction needs a clustering unit nobody has
-chosen for this corpus, and picking one to make a p-value look better is the
-wrong order.
+below its own MDE. Treat that number as directional.
+
+**How big the unknown is, measured.** The correction still needs a rho nobody
+has, but the *cluster structure* is a fact about the corpus and can be
+counted. Over the 875 scored items[^12]:
+
+| clustering unit | clusters *k* | mean per cluster *m* | effective *n* at ρ=0.05 | at ρ=0.30 |
+|---|---|---|---|---|
+| top-level category | 14 | 62.5 | 215 | 45 |
+| package | 64 | 13.7 | 536 | 182 |
+| containing directory | 336 | 2.6 | 810 | 591 |
+
+Effective *n* is `mk / DE` with `DE = 1 + ρ(m−1)`, Killip's design effect[^12].
+**No row is this page's answer**, and that is the point: *k* ranges from 14 to
+336 purely on what one chooses to call a cluster, and nobody has chosen. Lazic
+reports that an ICC of 0.30 turns a nominal 5% false-positive rate into 37%,
+and ranks non-independence as more serious than the normality and
+equal-variance assumptions that get checked routinely[^12].
+
+Two limits on that table, both in the direction of it being *too kind*. Killip
+states `DE = 1 + ρ(m−1)` for the special case of equal cluster sizes, and these
+are severely unequal — the largest package holds 165 of the 875 files against a
+median of 5 — so a mean *m* understates the design effect and every effective
+*n* above is an upper bound[^12]. And Lazic's 37% is measured on a two-group
+comparison of continuous data, not on McNemar; it is cited for the magnitude of
+the hazard, not as a transferable rate.
+
+So this is now quantified as a *range* rather than dismissed or corrected. The
+honest reading is that the termination result at mid-p 2e-28 survives every
+row of that table, and the guards gain at mid-p 0.020 does not survive the
+coarser ones. Picking the row that keeps a p-value under 0.05 is exactly the
+move this table exists to make visible, and it is not made here.
 
 ## What each null could have detected
 
@@ -246,6 +277,31 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
+[^12]: Cluster counts computed over the 875 shared item ids in
+       `tools/code-style-eval/runs/gen-v2/{base,candidate}.outcomes.jsonl`,
+       grouping by the first path segment, the first two, and the containing
+       directory: k = 14 / 64 / 336, largest package 165 files, median 5.
+       The design effect is Killip, Mahfoud & Pearce 2004 (Ann Fam Med, doi
+       10.1370/afm.141), archived at `tech-wiki/sources/`
+       `killip-2004-intracluster-correlation.txt` sha256
+       2fae776213c2ab342d4380f8b5dabb92ed66e487d001e3e9b33bd9a18400877e,
+       "EFFECTIVE SAMPLE SIZE AND THE DESIGN EFFECT" -- "DE = 1 + ρ (m-1),
+       where m = number of subjects in a cluster, k = number of clusters, mk =
+       total number of subjects in a clustered study, ESS = effective sample
+       size". The equal-size limit is that section's own: it derives the
+       formula for "the special case of clustered data with all groups having
+       the same number of subjects". The 37% figure and the ranking against
+       normality are Lazic 2010 (BMC Neuroscience, doi 10.1186/1471-2202-11-5),
+       `lazic-2010-pseudoreplication-neuroscience.txt` sha256
+       57643fecd2130189bffc9a8ea105de68dfc927a6ac24b357ba6d110a566bc0af --
+       "a two independent group comparison with n = 10 in each group and with
+       a modest within group correlation of IC = 0.30 would give an a
+       probability of 0.37; in other words, 37% of the time (and not 5%) the
+       null hypotheses would be (erroneously) rejected", and violating
+       independence "can be more serious than violating the normality or equal
+       variances assumption". Both read from the archived text, not from a
+       summary. Neither paper is about this corpus and neither supplies a ρ
+       for it; nothing here estimates one.
 [^11]: The choice of variant and the arithmetic behind it now sit in two
        places, because the statistic moved out of this package on 2026-09-09
        (commit `63770146`) and citing the old home would be citing a symbol
