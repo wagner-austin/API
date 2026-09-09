@@ -636,13 +636,41 @@ test and by image smoke.
   (lr 0.003 × c256) — the two indistinguishable cells could have hidden
   effects up to those sizes, an order below the 0.36-nat recovery the
   rung was hunting.
-- **Open, filed rather than implied:** the last unmeasured training
-  axis at 7B (epochs / optimizer schedule) — and, if that also fails,
-  the honest conclusion becomes that KV-prefix capacity itself does
-  not transfer into this architecture at this scale, a finding about
-  the METHOD rather than the tuning; a 7B composition rung stays
-  unjustified; the mechanism of the mid-depth valley; the remaining
-  0.30 content gap at medium n8.
+- **The epochs line closes the training axes, and the conclusion is
+  about the METHOD (board task `e03cd293`; declared-cells refactor
+  commit `fe692719` — `SoloGridCell`/`SoloCellSet` carry knobs AND
+  recorded observation tokens as data, `cell_set_for` refuses
+  undeclared selectors; image v48 `dd04cb08…`, 48 smokes; jobs
+  55848106 + twin 55848109, ~55 min each, records BYTE-IDENTICAL
+  sha256 `114acee2…`, same A30 pool; the 12-epoch cell reuses
+  `ANCHOR_TOKEN` so its nine rows reproduce BOTH the `bc18d701` grid
+  and the `445e345f` solo certificates BIT-FOR-BIT, seed for seed —
+  the line reads):** **exposure does not recover the 7B solo gain;
+  it destroys it.** Doubling epochs to 24 halves the mean (+0.046 vs
+  +0.102; paired −0.055 vs anchor, t −2.14, under the 2.306 crit but
+  with MDE 0.060 — any recovery ≥ 0.060 nats would have been seen,
+  and none was). Quadrupling to 48 is catastrophic: mean −0.240,
+  NINE OF NINE seeds negative (Clopper-Pearson 95% failure bound
+  [66.4%, 100%]), paired −0.342 vs anchor (t −5.55, MDE 0.142). The
+  per-cell negative counts bound as: e12 2/9 → [2.8%, 60.0%], e24
+  1/9 → [0.3%, 48.2%], e48 9/9 → [66.4%, 100%]. The dose-response is
+  monotone DOWN from the recorded knob, which now sits at the maximum
+  of every training axis measured — learning rate, slots, epochs —
+  with precision exonerated (bf16−NF4 null at MDE 0.075) and ~0.4
+  nats of headroom demonstrably present. **METHOD-LEVEL CONCLUSION,
+  stated as filed:** KV-prefix cartridge capacity does not transfer
+  into pythia-6.9b at this scale under naive solo training. The
+  ~0.10-0.16-nat regime is a property of the method on this
+  architecture, not of any tuning knob; the ~0.36-nat residual to
+  the family's adapted floor is unreachable by training-axis search.
+  A 7B composition rung is therefore not merely unjustified but
+  moot until the method itself changes (companioned/composition-aware
+  training at 7B is the one measured lever left standing at smaller
+  scales, and it is a different experiment, not a knob).
+- **Open, filed rather than implied:** the mechanism of the mid-depth
+  valley; the remaining 0.30 content gap at medium n8; whether the
+  companioned recipe's levers survive at 7B (a method change, per the
+  conclusion above — not a training-axis continuation).
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
@@ -1065,6 +1093,41 @@ name appeared nowhere here — was mine, and another session bridged it.
   needed and a weaker one than `rusted`'s: this is a single pair, where
   rusted's panel was twelve seeds across two arms. One pair cannot see an
   intermittent divergence, which is precisely the failure rusted found.
+
+  **What the one pair excludes — power audit, board `1e4ab572`,
+  2026-09-09.** This is a ZERO-FAILURE claim, so no spread exists to
+  divide by and the t-based MDE does not apply; the instrument is the
+  exact one-sided Clopper-Pearson bound `1 - 0.05^(1/n)`. The answer
+  depends entirely on which axis `n` counts, and the two readings differ
+  by three orders of magnitude:
+
+  | axis | n | 95% UB | the question it answers |
+  |---|---|---|---|
+  | per-ELEMENT, inside the one pair | 9,003 | 0.033% | would a divergence in any single world element have been seen |
+  | per-NODE-PAIR | 1 | 95.0% | would a divergence between two DIFFERENT nodes have been seen |
+
+  `world.json` carries 8,996 mines plus tanks, containers and ferries, so
+  the digest is a conjunction over ~9,000 elements and is a very sensitive
+  detector — the same reason `mi-cu128`'s digest row is its tightest, not
+  its weakest. **But the elements are not independent replicates of the
+  thing this flag claims.** A node-specific divergence mechanism — CPU
+  stepping, libm, image contents — moves many elements together or none,
+  so 9,003 elements is one thorough observation of ONE pair, not 9,003
+  trials of the pair-level question. `deterministic: true` licenses
+  subtracting measurements ACROSS NODES, so it rides on the pair axis.
+
+  **Stated threshold of practical interest: one divergent pair in twelve,
+  8.3%** — `rusted`'s panel width, the smallest cross-node panel anyone on
+  this machine has actually run. Against it this claim is **NOT TESTED**,
+  by a factor of eleven. The prose above is already honest that one pair
+  cannot see an intermittent divergence; 95% is what that sentence is
+  worth as a number.
+
+  Three boundaries were crossed simultaneously — node, image, and the code
+  change between the jobs — so the zero is a joint result over all three
+  and **no single term is separately measured.** A future panel should
+  vary one axis at a time, or it will inherit the same confound at greater
+  cost.
 
   **Image `b838e0242ecc` (v1) was deleted on 2026-09-03** as a superseded
   120 MB artifact, so this measurement now stands on what is RECORDED
