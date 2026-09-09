@@ -1,17 +1,23 @@
-"""The paired statistics, including the trap the spec warned about.
+"""The guard-pass rates, and the table the paired test is handed.
 
 The load-bearing property is that only DISCORDANT items move the p-value.
 Two arms that pass and fail exactly the same files carry no evidence of a
 difference no matter how many files there are, and a test that reported
 otherwise would let a sweep claim an improvement it never measured.
+
+The p-values themselves are not computed here and are not tested here:
+:mod:`platform_core.power_distributions` owns both McNemar variants for the
+whole monorepo. That they still produce this package's PUBLISHED digits is
+held by ``test_published_comparisons.py``, against the committed artifacts
+rather than against a fixture, because a fixture written beside the code
+agrees with it by construction.
 """
 
 from __future__ import annotations
 
 from code_style_eval.contracts.outcomes import CheckOutcome, ItemOutcome, PairedCounts
 from code_style_eval.core.scoring import (
-    exact_mcnemar_p,
-    mid_p_mcnemar_p,
+    discordant_split,
     net_improvement,
     paired_counts,
     pass_rate,
@@ -156,54 +162,61 @@ class TestPairedCounts:
         assert counts["neither"] == 0
 
 
-class TestExactMcNemar:
-    """Only discordant pairs carry evidence."""
+class TestDiscordantSplit:
+    """The projection onto the two numbers a conditional test takes.
 
-    def test_no_discordant_pairs_is_p_one(self) -> None:
+    The ARITHMETIC is no longer tested here: it lives in
+    :mod:`platform_core.power_distributions`, which owns it for the whole
+    monorepo and tests it there. What is this package's, and what these
+    tests hold, is which cells of a guard-pass table reach the test at all.
+    """
+
+    def test_no_discordant_pairs_is_an_empty_split(self) -> None:
         """Identical arms carry no evidence of a difference.
 
         Not a sentinel: if both arms passed and failed exactly the same
-        items, the data say nothing about which is better.
+        items, the data say nothing about which is better, and the split the
+        test is handed says so.
         """
         counts = PairedCounts(both_passed=500, baseline_only=0, candidate_only=0, neither=500)
 
-        assert exact_mcnemar_p(counts) == 1.0
+        assert discordant_split(counts) == (0, 0)
 
-    def test_a_large_concordant_count_does_not_manufacture_significance(self) -> None:
+    def test_a_large_concordant_count_does_not_reach_the_test(self) -> None:
         """The trap, stated as a test.
 
         A thousand items where both arms agree, and one discordant pair, is
         weak evidence. A test that pooled the arms would report a tiny
-        p-value off the sample size alone.
+        p-value off the sample size alone, so the concordant cells must be
+        dropped by the projection rather than trusted to cancel later.
         """
         counts = PairedCounts(both_passed=999, baseline_only=0, candidate_only=1, neither=0)
 
-        assert exact_mcnemar_p(counts) == 1.0
+        assert discordant_split(counts) == (0, 1)
 
-    def test_a_perfectly_one_sided_split_is_significant(self) -> None:
-        """Ten fixed and none broken is 2 * 0.5**10."""
-        counts = PairedCounts(both_passed=0, baseline_only=0, candidate_only=10, neither=0)
+    def test_the_minority_cell_is_the_one_returned(self) -> None:
+        """Two fixed against nine broken hands over 2, not 9."""
+        counts = PairedCounts(both_passed=3, baseline_only=9, candidate_only=2, neither=4)
 
-        assert exact_mcnemar_p(counts) == 2.0 / 1024.0
+        assert discordant_split(counts) == (2, 11)
 
-    def test_an_even_split_is_p_one(self) -> None:
-        """Five fixed and five broken is no evidence either way."""
-        counts = PairedCounts(both_passed=0, baseline_only=5, candidate_only=5, neither=0)
+    def test_the_split_is_symmetric(self) -> None:
+        """Swapping the arms cannot change the strength of the evidence.
 
-        assert exact_mcnemar_p(counts) == 1.0
-
-    def test_the_p_value_is_symmetric(self) -> None:
-        """Swapping the arms cannot change the strength of the evidence."""
+        The two-sided p-value is symmetric, and returning the minority is
+        what makes that a property of the projection rather than something
+        the test has to restore.
+        """
         forward = PairedCounts(both_passed=3, baseline_only=2, candidate_only=9, neither=4)
         reversed_arms = PairedCounts(both_passed=3, baseline_only=9, candidate_only=2, neither=4)
 
-        assert exact_mcnemar_p(forward) == exact_mcnemar_p(reversed_arms)
+        assert discordant_split(forward) == discordant_split(reversed_arms)
 
-    def test_a_p_value_never_exceeds_one(self) -> None:
-        """The doubled tail is clamped, which matters at the even split."""
-        counts = PairedCounts(both_passed=0, baseline_only=1, candidate_only=1, neither=0)
+    def test_an_even_split_reports_the_shared_value(self) -> None:
+        """Five fixed and five broken is a 5-of-10 split, the tie form."""
+        counts = PairedCounts(both_passed=0, baseline_only=5, candidate_only=5, neither=0)
 
-        assert exact_mcnemar_p(counts) <= 1.0
+        assert discordant_split(counts) == (5, 10)
 
 
 class TestNetImprovement:
@@ -220,80 +233,3 @@ class TestNetImprovement:
         counts = PairedCounts(both_passed=0, baseline_only=6, candidate_only=1, neither=0)
 
         assert net_improvement(counts) == -5
-
-
-class TestMidP:
-    """The variant this package reports, and why it differs from exact."""
-
-    def test_no_discordant_pairs_is_p_one(self) -> None:
-        """Same answer as exact: identical arms carry no evidence."""
-        counts = PairedCounts(both_passed=9, baseline_only=0, candidate_only=0, neither=9)
-
-        assert mid_p_mcnemar_p(counts) == 1.0
-
-    def test_mid_p_is_the_exact_value_minus_the_point_probability(self) -> None:
-        """Ten fixed, none broken: 2/1024 exact, less 1/1024, is 1/1024."""
-        counts = PairedCounts(both_passed=0, baseline_only=0, candidate_only=10, neither=0)
-
-        assert exact_mcnemar_p(counts) == 2.0 / 1024.0
-        assert mid_p_mcnemar_p(counts) == 1.0 / 1024.0
-
-    def test_an_even_split_uses_its_own_form(self) -> None:
-        """With the cells equal the general form would exceed 1.
-
-        Five and five over ten discordant pairs: 1 - C(10,5)/2**11.
-        """
-        counts = PairedCounts(both_passed=0, baseline_only=5, candidate_only=5, neither=0)
-
-        assert exact_mcnemar_p(counts) == 1.0
-        assert mid_p_mcnemar_p(counts) == 1.0 - (252.0 / 1024.0) / 2.0
-
-    def test_mid_p_is_never_more_conservative_than_exact(self) -> None:
-        """The property the whole substitution rests on.
-
-        Swept rather than spot-checked: for every table up to 12 discordant
-        pairs the mid-p value must be no larger than the exact one, because
-        it is that value less a non-negative point probability.
-        """
-        for baseline_only in range(13):
-            for candidate_only in range(13):
-                counts = PairedCounts(
-                    both_passed=4,
-                    baseline_only=baseline_only,
-                    candidate_only=candidate_only,
-                    neither=4,
-                )
-                assert mid_p_mcnemar_p(counts) <= exact_mcnemar_p(counts)
-
-    def test_mid_p_stays_in_the_unit_interval(self) -> None:
-        """A probability that left [0, 1] would be a reporting bug."""
-        for baseline_only in range(13):
-            for candidate_only in range(13):
-                counts = PairedCounts(
-                    both_passed=0,
-                    baseline_only=baseline_only,
-                    candidate_only=candidate_only,
-                    neither=0,
-                )
-                value = mid_p_mcnemar_p(counts)
-                assert 0.0 <= value <= 1.0
-
-    def test_the_conservativeness_gap_changes_a_verdict(self) -> None:
-        """The measured reason for preferring mid-p, as a test.
-
-        Nine items fixed against two broken: the exact test returns 0.065 and
-        declines to call it at the 0.05 level, the mid-p test returns 0.039
-        and calls it. Fagerland et al. found that pattern across 9,595
-        scenarios, which is why this package reports the latter.
-        """
-        counts = PairedCounts(both_passed=3, baseline_only=2, candidate_only=9, neither=4)
-
-        assert exact_mcnemar_p(counts) > 0.05
-        assert mid_p_mcnemar_p(counts) < 0.05
-
-    def test_mid_p_is_symmetric(self) -> None:
-        """Swapping the arms cannot change the strength of the evidence."""
-        forward = PairedCounts(both_passed=3, baseline_only=2, candidate_only=9, neither=4)
-        reversed_arms = PairedCounts(both_passed=3, baseline_only=9, candidate_only=2, neither=4)
-
-        assert mid_p_mcnemar_p(forward) == mid_p_mcnemar_p(reversed_arms)

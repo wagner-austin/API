@@ -18,21 +18,33 @@ because a guard-pass sweep over a few hundred held-out files routinely
 produces single-digit discordant counts, which is where the approximation is
 worst.
 
-WHICH VARIANT THIS REPORTS, AND WHY NOT THE EXACT ONE. Both are here.
-:func:`mid_p_mcnemar_p` is the one to read; :func:`exact_mcnemar_p` is kept
-because it is the guaranteed-level reference the mid-p value is derived from.
-Fagerland, Lydersen and Laake measured type I error and power over 9,595
-scenarios and found the exact conditional test overly conservative in all of
-them, while the mid-p test never violated the nominal level and was almost as
-powerful as the asymptotic test. On a table of 9 items fixed against 2
-broken, exact returns 0.065 and mid-p returns 0.039: the exact test declines
-to call an improvement the data support.
+WHICH VARIANT THIS REPORTS, AND WHY NOT THE EXACT ONE. Both are reported.
+The mid-p value is the one to read; the exact conditional value is kept
+beside it because it is the guaranteed-level reference the mid-p value is
+derived from. Fagerland, Lydersen and Laake measured type I error and power
+over 9,595 scenarios and found the exact conditional test overly conservative
+in all of them, while the mid-p test never violated the nominal level and was
+almost as powerful as the asymptotic test. On a table of 9 items fixed
+against 2 broken, exact returns 0.065 and mid-p returns 0.039: the exact test
+declines to call an improvement the data support.
+
+WHERE THE ARITHMETIC LIVES, AND WHY IT NO LONGER LIVES HERE. This module
+carried its own binomial tail and point probability until 2026-09-09.
+:mod:`platform_core.power_distributions` now ships the same two tests for the
+whole monorepo, written independently for the power audit, and a second
+implementation of a published statistic is a second thing that can drift.
+Before removing them the two were compared over EVERY split of every
+discordant count up to 60 -- 1,922 tables, both arm orientations -- and agreed
+to the bit on both tests, including the tie form (0.84375 at 3:3, which a
+version that doubles the tail gets wrong) and the 4:3 table this package
+published as 0.7265625. What remains here is :func:`discordant_split`, which
+is the part that is genuinely this package's: the projection from a 2x2
+guard-pass table onto the two numbers a conditional test takes.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from math import comb
 
 from code_style_eval.contracts.outcomes import CHECKERS, ItemOutcome, PairedCounts
 
@@ -116,102 +128,27 @@ def paired_counts(
     return counts
 
 
-def _binomial_tail(successes: int, trials: int) -> float:
-    """Probability of a result at least as extreme, under p = 0.5.
+def discordant_split(counts: PairedCounts) -> tuple[int, int]:
+    """Project the 2x2 table onto the two numbers a conditional test takes.
 
-    Args:
-        successes: Count in one discordant cell.
-        trials: Total discordant pairs.
-
-    Returns:
-        The two-sided exact binomial p-value.
-    """
-    extreme = min(successes, trials - successes)
-    tail = sum(comb(trials, k) for k in range(extreme + 1))
-    # ``1 << trials`` rather than ``2 ** trials``: the latter is typed Any,
-    # because a negative exponent would make it a float. Both are exact
-    # integers here, and staying in integer arithmetic until the final
-    # division is what keeps the p-value exact rather than accumulated.
-    two_sided = 2.0 * tail / float(1 << trials)
-    return min(1.0, two_sided)
-
-
-def exact_mcnemar_p(counts: PairedCounts) -> float:
-    """Two-sided exact conditional McNemar p-value.
-
-    Conditions on the number of discordant pairs and sums binomial point
-    probabilities under p = 1/2, doubling for the two-sided answer. Its type
-    I error rate is guaranteed not to exceed the nominal level, and that
-    guarantee is bought with power: see :func:`mid_p_mcnemar_p`, which is
-    what this package reports.
+    McNemar conditions on the discordant pairs alone, so the concordant cells
+    carry no information about a difference and are dropped here rather than
+    inside the test. The MINORITY cell is returned rather than the candidate
+    cell: the p-value is two-sided and therefore symmetric under a swap of the
+    arms, and naming the smaller cell makes that symmetry a property of the
+    projection instead of something the test has to restore.
 
     Args:
         counts: The 2x2 table.
 
     Returns:
-        The p-value. Returns 1.0 when there are no discordant pairs, which is
-        the correct answer rather than a sentinel: if the two arms passed and
-        failed exactly the same items, the data contain no evidence of any
-        difference at all.
-    """
-    discordant = counts["baseline_only"] + counts["candidate_only"]
-    if discordant == 0:
-        return 1.0
-    return _binomial_tail(counts["candidate_only"], discordant)
-
-
-def _point_probability(successes: int, trials: int) -> float:
-    """Binomial point probability of the observed statistic under p = 1/2.
-
-    Args:
-        successes: Count in one discordant cell.
-        trials: Total discordant pairs.
-
-    Returns:
-        The point probability.
-    """
-    extreme = min(successes, trials - successes)
-    return comb(trials, extreme) / float(1 << trials)
-
-
-def mid_p_mcnemar_p(counts: PairedCounts) -> float:
-    """Two-sided McNemar mid-p value, which is what this package reports.
-
-    THE EXACT CONDITIONAL TEST IS THE WRONG DEFAULT HERE, and that is a
-    measured result rather than a preference. Fagerland, Lydersen and Laake
-    (BMC Med Res Methodol 2013) compared type I error and power across 9,595
-    scenarios and concluded that the exact conditional test "did not perform
-    well for any of the considered scenarios": guaranteeing the nominal level
-    makes it overly conservative, so it fails to detect real differences.
-    The mid-p test did not violate the nominal level in any of those
-    scenarios and was almost as powerful as the asymptotic test.
-
-    That matters most exactly where a guard-pass sweep lives. Discordant
-    counts here are small, which is the regime where the exact test's
-    conservativeness is largest, so reporting it alone would systematically
-    under-call a real improvement in style compliance.
-
-    The correction is one term: subtract the point probability of the
-    observed statistic from the two-sided exact value, with a separate form
-    when the two discordant cells are equal.
-
-    Args:
-        counts: The 2x2 table.
-
-    Returns:
-        The mid-p value, clamped to [0, 1]. Returns 1.0 when there are no
-        discordant pairs, for the same reason the exact test does.
+        The minority discordant count and the total discordant count, in that
+        order -- the argument order
+        :func:`platform_core.power_distributions.mcnemar_p` takes.
     """
     baseline_only = counts["baseline_only"]
     candidate_only = counts["candidate_only"]
-    discordant = baseline_only + candidate_only
-    if discordant == 0:
-        return 1.0
-    point = _point_probability(candidate_only, discordant)
-    if baseline_only == candidate_only:
-        return 1.0 - 0.5 * point
-    exact = _binomial_tail(candidate_only, discordant)
-    return max(0.0, min(1.0, exact - point))
+    return min(baseline_only, candidate_only), baseline_only + candidate_only
 
 
 def net_improvement(counts: PairedCounts) -> int:
@@ -230,8 +167,7 @@ def net_improvement(counts: PairedCounts) -> int:
 
 
 __all__ = [
-    "exact_mcnemar_p",
-    "mid_p_mcnemar_p",
+    "discordant_split",
     "net_improvement",
     "paired_counts",
     "pass_rate",

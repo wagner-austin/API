@@ -21,6 +21,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.power_distributions import McNemarTest, mcnemar_p
 from platform_core.run_record import encode_run_record, run_record_sidecar
 
 from code_style_eval.cli import _test_hooks
@@ -32,8 +33,7 @@ from code_style_eval.contracts.outcomes import (
 )
 from code_style_eval.core.provenance import comparison_run_record
 from code_style_eval.core.scoring import (
-    exact_mcnemar_p,
-    mid_p_mcnemar_p,
+    discordant_split,
     net_improvement,
     paired_counts,
     pass_rate,
@@ -119,6 +119,7 @@ def build_report(
     """
     shared = sorted(set(baseline) & set(candidate))
     counts = paired_counts(baseline, candidate)
+    minority, discordant = discordant_split(counts)
     return ComparisonReport(
         baseline_arm=baseline_arm,
         candidate_arm=candidate_arm,
@@ -127,8 +128,8 @@ def build_report(
         candidate_pass_rate=pass_rate([candidate[item] for item in shared]),
         counts=counts,
         net_improvement=net_improvement(counts),
-        mid_p=mid_p_mcnemar_p(counts),
-        exact_p=exact_mcnemar_p(counts),
+        mid_p=mcnemar_p(minority, discordant, McNemarTest.MID_P),
+        exact_p=mcnemar_p(minority, discordant, McNemarTest.EXACT),
     )
 
 
