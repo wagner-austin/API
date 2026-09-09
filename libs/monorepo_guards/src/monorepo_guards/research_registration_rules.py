@@ -48,8 +48,8 @@ Violations:
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+from string import ascii_letters, digits
 from typing import Final
 
 from monorepo_guards import Violation
@@ -77,6 +77,18 @@ _ENTRY_POINT_SEGMENT: Final[str] = "cli"
 #: ``monorepo_guards`` names them only in this rule's own text and tests.
 _DEFINING_PACKAGES: Final[frozenset[str]] = frozenset({"platform_core", "monorepo_guards"})
 
+#: What a qualified command name may be spelled with. Read directly rather
+#: than through a regular expression: this package sets ``disallow_any_expr``,
+#: and ``re.findall`` is typed ``list[Any]``, which no amount of annotation at
+#: the call site removes.
+_NAME_CHARACTERS: Final[frozenset[str]] = frozenset(ascii_letters + digits + "_.")
+
+#: Returned when a token opens no brace group. It is ``-1`` so that an
+#: UNCLOSED group -- where ``str.find`` also answers ``-1`` -- takes the same
+#: path as no group at all, rather than needing a branch that says the same
+#: thing twice.
+_NO_BRACE_GROUP: Final[int] = -1
+
 
 def _is_entry_point(path: Path) -> bool:
     """Decide whether a file is a command rather than a library module.
@@ -93,23 +105,87 @@ def _is_entry_point(path: Path) -> bool:
     return _ENTRY_POINT_SEGMENT in path.parts and not path.name.startswith("_")
 
 
-def _is_registered(module_name: str, registry_text: str) -> bool:
-    """Decide whether the registry names a module.
-
-    Matched on a word boundary rather than as a substring. ``gemm_probe`` is a
-    substring of ``legacy_gemm_probe``, so a substring test would report the
-    shorter one registered on the strength of an entry describing the longer
-    one -- two different measurements, one of them silently credited to the
-    other's paperwork.
+def _qualified_name(path: Path) -> str:
+    """Name an entry point the way the registry names it.
 
     Args:
-        module_name: The entry point's module name, without extension.
+        path: The entry point's file.
+
+    Returns:
+        The dotted import path from the package root, e.g.
+        ``model_trainer.cli.gemm_probe``, taking everything after the ``src``
+        marker. A file outside that layout yields its parent and stem, which
+        is the most qualification its path carries.
+    """
+    parts = path.with_suffix("").as_posix().split("/")
+    if "src" in parts:
+        return ".".join(parts[parts.index("src") + 1 :])
+    return ".".join(parts[-2:])
+
+
+def _closing_brace(registry_text: str, index: int, token: str) -> int:
+    """Locate the brace group a qualified prefix opens, if it opens one.
+
+    Args:
+        registry_text: The registry file's full text.
+        index: Offset just past ``token``.
+        token: The name-characters run that was just read.
+
+    Returns:
+        The offset of the ``}`` closing a group this token introduces, or
+        :data:`_NO_BRACE_GROUP` when the token introduces no group -- it is
+        not followed by ``{``, does not end in the ``.`` that makes it a
+        prefix, or opens a group nothing closes.
+    """
+    if index >= len(registry_text) or registry_text[index] != "{" or not token.endswith("."):
+        return _NO_BRACE_GROUP
+    return registry_text.find("}", index)
+
+
+def _registered_names(registry_text: str) -> frozenset[str]:
+    """Read every command the registry names, expanding its brace notation.
+
+    THE BARE MODULE STEM IS NOT USABLE HERE, and this is the bug this
+    function exists to close. An earlier version matched the stem on a word
+    boundary, which passed ``code_style_eval.cli.compare`` because the word
+    "compare" appears twice in the registry as ordinary English, and would
+    have passed ``scripts.batch`` on the word "batch". A check that a module
+    can satisfy by sharing a spelling with prose is one that reads as
+    verified while having looked at nothing -- the same failure the
+    run-record rule records for collecting ``Name`` nodes.
+
+    So a command counts as named only when its QUALIFIED path appears. The
+    registry writes those two ways: in full, and grouped as
+    ``pkg.cli.{a, b, c}``, which is the house notation this expands.
+
+    Args:
         registry_text: The registry file's full text.
 
     Returns:
-        True when the name occurs as a whole word.
+        Every qualified command name the registry declares.
     """
-    return re.search(rf"\b{re.escape(module_name)}\b", registry_text) is not None
+    names: set[str] = set()
+    index = 0
+    while index < len(registry_text):
+        if registry_text[index] not in _NAME_CHARACTERS:
+            index += 1
+            continue
+        start = index
+        while index < len(registry_text) and registry_text[index] in _NAME_CHARACTERS:
+            index += 1
+        token = registry_text[start:index]
+        closing = _closing_brace(registry_text, index, token)
+        if closing == _NO_BRACE_GROUP:
+            if "." in token:
+                names.add(token.strip("."))
+            continue
+        names.update(
+            token + member.strip()
+            for member in registry_text[index + 1 : closing].split(",")
+            if member.strip()
+        )
+        index = closing + 1
+    return frozenset(names)
 
 
 class ResearchRegistrationRule:
@@ -143,7 +219,7 @@ class ResearchRegistrationRule:
             if package_of(path) in _DEFINING_PACKAGES or not _is_entry_point(path):
                 continue
             if imported_names(parse_source(path)) & _PRODUCER_SYMBOLS:
-                producers[path.stem] = path
+                producers[_qualified_name(path)] = path
         if not producers:
             return []
         registry = self._monorepo_root.joinpath(*REGISTRY_RELATIVE_PATH)
@@ -161,20 +237,20 @@ class ResearchRegistrationRule:
                     ),
                 )
             ]
-        registry_text = registry.read_text(encoding="utf-8")
+        registered = _registered_names(registry.read_text(encoding="utf-8"))
         return [
             Violation(
                 file=path,
                 line_no=1,
                 kind="research-entry-point-unregistered",
                 line=(
-                    f"entry point '{module_name}' builds a RunRecord and is named nowhere in "
-                    f"{registry.name}; register it, and name it explicitly rather than "
-                    f"extending a list with an ellipsis, which nothing can check"
+                    f"entry point '{qualified}' builds a RunRecord and is named nowhere in "
+                    f"{registry.name}; name it by its qualified path, explicitly rather than "
+                    f"behind an ellipsis, which nothing can check"
                 ),
             )
-            for module_name, path in sorted(producers.items())
-            if not _is_registered(module_name, registry_text)
+            for qualified, path in sorted(producers.items())
+            if qualified not in registered
         ]
 
 

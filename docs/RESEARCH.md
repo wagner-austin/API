@@ -707,6 +707,14 @@ name appeared nowhere here — was mine, and another session bridged it.
 - **Repo:** this one, `services/Model-Trainer` + `clients/OrderedKernels`;
   workspace `tools/hpc3/runs/hpc3-mi-cu128.json`, spec
   `tools/hpc3/specs/abl-cu128-image.json`
+- **Entry points:** `ordered_kernels.cli.{attn_probe, gemm_probe, score,
+  train_step}`. Added 2026-09-09 by the `research-registration` guard rule,
+  which found four commands here that build a `RunRecord` and were named
+  nowhere in this file. The section discussed `ordered_kernels`' work in prose
+  and named none of the commands producing it, which is the same defect the
+  `mi` entry's ellipsis had. Names are qualified because the guard matches
+  qualified paths: `gemm_probe` alone is ambiguous between this project and
+  `model_trainer.cli.gemm_probe`, and they are different measurements.
 - **Why it exists:** the `RTX6000` GRES on `free-gpu32` is 96 GB RTX PRO 6000
   Blackwell hardware, `sm_120`, which the cu124 image cannot drive — its CUDA
   runtime enumerates zero devices there. The blocker was software, not
@@ -1285,6 +1293,15 @@ name appeared nowhere here — was mine, and another session bridged it.
 - **Repo:** this one. Corpus emitter `tools/code-corpus`, training and
   generation through `services/Model-Trainer`, scoring through
   `tools/code-style-eval`.
+- **Entry points:** `code_style_eval.cli.compare`, the console script
+  `code-style-eval-compare`, which emits `comparison.json` and its
+  `RunRecord`. Added 2026-09-09 by the `research-registration` guard rule.
+  This entry already described the ARTIFACT and the PACKAGE and named no
+  command, so a mechanical reader found nothing while a human reader found
+  everything — and the rule's first version passed this module anyway,
+  because it matched the bare stem `compare` against the word "compare" used
+  in prose two paragraphs down. Both halves of that are why the names here
+  are qualified.
 - **Runs:** `runs/code-style-run-train.json`, then
   `runs/code-style-run-gen-base.json` and `-candidate.json`. The order is not
   enforced by a dependency: the generation arms load the adapter the training

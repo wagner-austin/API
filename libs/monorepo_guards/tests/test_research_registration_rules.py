@@ -3,9 +3,11 @@
 The rule under test exists because ``cartridge_qa_benchmark`` produced a
 programme headline while appearing in no run document, no registry entry and
 no tracked artifact. These tests pin the predicate that would have caught it,
-and -- more importantly -- pin the two ways such a predicate goes wrong: by
-convicting a report module that only reads records back, and by crediting one
-measurement with another's registry entry because one name contains the other.
+and -- more importantly -- pin the three ways such a predicate goes wrong: by
+convicting a report module that only reads records back, by crediting one
+measurement with another's registry entry because one name contains the other,
+and by accepting a module because its bare stem happens to be an English word
+the registry uses in prose.
 """
 
 from __future__ import annotations
@@ -101,18 +103,14 @@ class TestAProducerThatNobodyRegistered:
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/cartridge_qa_benchmark.py",
-            _PRODUCER_SOURCE,
-        )
+        path = _write(tmp_path, "services/T/src/t/cli/cartridge_qa_benchmark.py", _PRODUCER_SOURCE)
         _write_registry(tmp_path, "# Research index\n\nNothing here names it.\n")
 
         found = ResearchRegistrationRule(_config(tmp_path)).run([path])
 
         assert [v.kind for v in found] == ["research-entry-point-unregistered"]
 
-    def test_the_violation_names_the_entry_point_and_points_at_its_file(
+    def test_the_violation_names_the_qualified_path_and_points_at_its_file(
         self, tmp_path: pathlib.Path
     ) -> None:
         """A message that names neither is a message nobody acts on.
@@ -120,11 +118,7 @@ class TestAProducerThatNobodyRegistered:
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/cartridge_qa_benchmark.py",
-            _PRODUCER_SOURCE,
-        )
+        path = _write(tmp_path, "services/T/src/t/cli/cartridge_qa_benchmark.py", _PRODUCER_SOURCE)
         _write_registry(tmp_path, "# Research index\n")
 
         found = ResearchRegistrationRule(_config(tmp_path)).run([path])
@@ -132,22 +126,35 @@ class TestAProducerThatNobodyRegistered:
         assert len(found) == 1
         assert found[0].file == path
         assert found[0].line_no == 1
-        assert "cartridge_qa_benchmark" in found[0].line
+        assert "t.cli.cartridge_qa_benchmark" in found[0].line
 
-    def test_registering_the_entry_point_clears_it(self, tmp_path: pathlib.Path) -> None:
+    def test_naming_the_qualified_path_clears_it(self, tmp_path: pathlib.Path) -> None:
         """The remedy must be a registry entry, and it must actually work.
 
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/cartridge_qa_benchmark.py",
-            _PRODUCER_SOURCE,
-        )
-        _write_registry(tmp_path, "- **Runs:** `model_trainer.cli.cartridge_qa_benchmark`\n")
+        path = _write(tmp_path, "services/T/src/t/cli/cartridge_qa_benchmark.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `t.cli.cartridge_qa_benchmark`\n")
 
         assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
+
+    def test_the_brace_notation_the_registry_actually_uses_is_expanded(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """``pkg.cli.{a, b}`` is how the registry groups commands.
+
+        A reader treating that as one opaque token would demand every entry be
+        rewritten, so the rule reads the notation the file already uses.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        first = _write(tmp_path, "services/T/src/t/cli/gemm_benchmark.py", _PRODUCER_SOURCE)
+        second = _write(tmp_path, "services/T/src/t/cli/probe_ladder.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `t.cli.{gemm_benchmark, probe_ladder}`\n")
+
+        assert ResearchRegistrationRule(_config(tmp_path)).run([first, second]) == []
 
 
 class TestTheThingsTheRuleMustNotConvict:
@@ -164,11 +171,7 @@ class TestTheThingsTheRuleMustNotConvict:
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/sdpa_benchmark_report.py",
-            _REPORTER_SOURCE,
-        )
+        path = _write(tmp_path, "services/T/src/t/cli/sdpa_benchmark_report.py", _REPORTER_SOURCE)
         _write_registry(tmp_path, "# Research index\n")
 
         assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
@@ -208,11 +211,65 @@ class TestTheThingsTheRuleMustNotConvict:
             tmp_path: Temporary monorepo root.
         """
         path = _write(
-            tmp_path,
-            "libs/platform_core/src/platform_core/cli/emit.py",
-            _PRODUCER_SOURCE,
+            tmp_path, "libs/platform_core/src/platform_core/cli/emit.py", _PRODUCER_SOURCE
         )
         _write_registry(tmp_path, "# Research index\n")
+
+        assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
+
+    def test_an_entry_point_outside_the_src_layout_still_gets_a_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A tool laid out without ``src`` must still be nameable.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "scripts/cli/batch.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `cli.batch`\n")
+
+        assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
+
+
+class TestANameThatIsAlsoAnOrdinaryWord:
+    """The false negative that shipped in this rule's first version.
+
+    ``code_style_eval.cli.compare`` passed because the word "compare" occurs
+    twice in the real registry as English prose, and ``scripts.batch`` had the
+    same exposure on "batch". A module that satisfies a check by sharing a
+    spelling with a sentence has not been checked at all.
+    """
+
+    def test_the_registry_using_the_stem_as_prose_does_not_register_it(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Prose is not a declaration.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "tools/E/src/e/cli/compare.py", _PRODUCER_SOURCE)
+        _write_registry(
+            tmp_path,
+            "### code-style\n\nThe entry emits a table so a reader can compare\n"
+            "two arms, and compare them again after a rebuild.\n",
+        )
+
+        found = ResearchRegistrationRule(_config(tmp_path)).run([path])
+
+        assert [v.kind for v in found] == ["research-entry-point-unregistered"]
+        assert "e.cli.compare" in found[0].line
+
+    def test_the_qualified_path_registers_it_where_the_bare_word_did_not(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """And the remedy is to name the command, which prose cannot fake.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "tools/E/src/e/cli/compare.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "### code-style\n\n- **Runs:** `e.cli.compare`\n")
 
         assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
 
@@ -232,7 +289,7 @@ class TestOneNameInsideAnother:
             tmp_path: Temporary monorepo root.
         """
         path = _write(tmp_path, "services/T/src/t/cli/gemm_probe.py", _PRODUCER_SOURCE)
-        _write_registry(tmp_path, "- **Runs:** `model_trainer.cli.legacy_gemm_probe`\n")
+        _write_registry(tmp_path, "- **Runs:** `t.cli.legacy_gemm_probe`\n")
 
         found = ResearchRegistrationRule(_config(tmp_path)).run([path])
 
@@ -247,11 +304,71 @@ class TestOneNameInsideAnother:
             tmp_path: Temporary monorepo root.
         """
         path = _write(tmp_path, "services/T/src/t/cli/legacy_gemm_probe.py", _PRODUCER_SOURCE)
-        _write_registry(tmp_path, "- **Runs:** `model_trainer.cli.gemm_probe`\n")
+        _write_registry(tmp_path, "- **Runs:** `t.cli.gemm_probe`\n")
 
         found = ResearchRegistrationRule(_config(tmp_path)).run([path])
 
         assert [v.kind for v in found] == ["research-entry-point-unregistered"]
+
+    def test_another_package_with_the_same_command_name_does_not_register_it(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Two projects may both ship a ``compare``; the package disambiguates.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "tools/E/src/e/cli/compare.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `other_package.cli.compare`\n")
+
+        found = ResearchRegistrationRule(_config(tmp_path)).run([path])
+
+        assert [v.kind for v in found] == ["research-entry-point-unregistered"]
+
+
+class TestTheBraceNotationsEdges:
+    """Malformed grouping must not silently register anything."""
+
+    def test_an_unclosed_group_registers_nothing_from_it(self, tmp_path: pathlib.Path) -> None:
+        """A truncated entry is not a declaration.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "services/T/src/t/cli/gemm_benchmark.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `t.cli.{gemm_benchmark, probe_ladder\n")
+
+        found = ResearchRegistrationRule(_config(tmp_path)).run([path])
+
+        assert [v.kind for v in found] == ["research-entry-point-unregistered"]
+
+    def test_a_brace_not_preceded_by_a_dotted_prefix_registers_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """``word{a}`` is prose punctuation, not the registry's notation.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "services/T/src/t/cli/gemm_benchmark.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "see runs{gemm_benchmark} for the arm\n")
+
+        found = ResearchRegistrationRule(_config(tmp_path)).run([path])
+
+        assert [v.kind for v in found] == ["research-entry-point-unregistered"]
+
+    def test_an_empty_member_in_a_group_is_skipped_and_the_rest_register(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A stray comma must not register the prefix on its own.
+
+        Args:
+            tmp_path: Temporary monorepo root.
+        """
+        path = _write(tmp_path, "services/T/src/t/cli/gemm_benchmark.py", _PRODUCER_SOURCE)
+        _write_registry(tmp_path, "- **Runs:** `t.cli.{, gemm_benchmark, }`\n")
+
+        assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
 
 
 class TestWhenTheRegistryItselfIsAbsent:
@@ -263,11 +380,7 @@ class TestWhenTheRegistryItselfIsAbsent:
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/cartridge_qa_benchmark.py",
-            _PRODUCER_SOURCE,
-        )
+        path = _write(tmp_path, "services/T/src/t/cli/cartridge_qa_benchmark.py", _PRODUCER_SOURCE)
 
         found = ResearchRegistrationRule(_config(tmp_path)).run([path])
 
@@ -280,10 +393,6 @@ class TestWhenTheRegistryItselfIsAbsent:
         Args:
             tmp_path: Temporary monorepo root.
         """
-        path = _write(
-            tmp_path,
-            "services/T/src/t/cli/sdpa_benchmark_report.py",
-            _REPORTER_SOURCE,
-        )
+        path = _write(tmp_path, "services/T/src/t/cli/sdpa_benchmark_report.py", _REPORTER_SOURCE)
 
         assert ResearchRegistrationRule(_config(tmp_path)).run([path]) == []
