@@ -203,6 +203,29 @@ QA_EXPERIMENT = "cartridge-question-set"
 #: sibling transfer has been argued rather than assumed. Take the native
 #: number the moment one exists.
 #:
+#: THIS SEI IS SELF-SEALING, AND SAYING SO IS THE POINT OF THIS PARAGRAPH.
+#: The replacement condition is "when this programme first ACTS on an
+#: effect" -- and acting requires resolving, which at 0.02 nothing in this
+#: table can do:
+#:
+#:   needed at 0.02, mid-p     250 items
+#:   api-codebase realises     235 raw, 224 reshaped   -> both REFUSED
+#:   me-wiki plans realise      32                     -> REFUSED
+#:
+#: Every plan refused means no run produces a result, means the programme
+#: never acts on or declines anything in ACCURACY units, means the condition
+#: that would retire this number can never fire. The loss arms cannot supply
+#: it either: they answer in nats, and an accuracy threshold cannot be
+#: anchored to a surprise measurement. So this is not a placeholder that
+#: measurement will quietly replace -- as written it is PERMANENT, and its
+#: own strictness is what prevents the evidence that would end it.
+#:
+#: THE EXIT IS CORPUS, NOT MEASUREMENT, AND IT IS 15 ITEMS. 235 -> 250 on
+#: the api-codebase wiki, about 6%; the reshaped side needs 26, about 12%.
+#: That is the entire gate. Nobody has scheduled it, and a later session
+#: reading only the replacement condition will wait for something that
+#: cannot arrive.
+#:
 #: THIS FIELD READ 0.05 BETWEEN 376b0f24 AND 2026-09-09T20:24Z, AND THE
 #: DEFECT WAS THE SENTENCE, NOT ONLY THE VALUE. The comment here was headed
 #: "WHY THAT NUMBER IS NOT A PREFERENCE" and asserted a floor its own anchor
