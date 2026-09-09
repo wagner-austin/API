@@ -1430,12 +1430,22 @@ name appeared nowhere here — was mine, and another session bridged it.
   provisioning. That is the opposite history from the `rusted` entry above,
   which was false at the moment of writing with 2,065 jobs already behind
   it, and the two are worth keeping side by side: the same symptom reached
-  from opposite directions, and neither detectable by anything in this
-  repository. `test_committed_runs.py` passes either way, both clients'
-  `runs/` are gitignored, and the ledger that knows what ran lives on the
-  cluster. **Run state is the ledger's answer and this file should not
-  assert it** — which is why the bullet above cites job ids instead of
+  from opposite directions. `test_committed_runs.py` passes either way, both
+  clients' `runs/` are gitignored, and the ledger that knows what ran lives
+  on the cluster. **Run state is the ledger's answer and this file should
+  not assert it** — which is why the bullet above cites job ids instead of
   claiming a condition.
+- **And this entry refuted itself for six days, in the same section, which
+  is worse than being stale.** `fe34f585` added the cross-node determinism
+  bullet above on 2026-09-03 — *"measured 2026-09-03 … Jobs `55715577` and
+  `55718398` produced a byte-identical `world.json` across two different
+  NODES"* — while the bullet below it went on saying nothing had been
+  submitted. Two named job ids and an artifact digest, eighty-six lines from
+  a claim that no job existed, both under `### tankpit`. Staleness would
+  mean the information was elsewhere; here it was **added to this entry**
+  and the contradicted claim was left standing beside it. That version needs
+  no cluster to detect: an entry that cites job ids and also says no jobs ran
+  disagrees with itself, and nothing compares a file to itself.
 - **It ships an image, and the image is self-contained.** v2 at
   `/pub/wagnera3/tankpit/images/v2/tankpit.sif`, sha256 `0cfdd5592a1a…`,
   127 MB, `env_path` `/opt/env`, built from commit `bccf5afa`.
