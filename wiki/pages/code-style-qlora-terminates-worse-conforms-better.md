@@ -366,10 +366,19 @@ measured the sandbox.
        this package calls neither of those. So the library never offers a
        TESTED it has not earned, and the absence of one here is the
        instrument reporting its own limit rather than a gap in this page.
-[^15]: Jobs 55877275 (`gen-v2-base-s1`, 7998s, hpc3-gpu-l54-07) and 55877509
-       (`gen-v2-base-s2`, 7879s, hpc3-gpu-l54-08), against the existing
-       55809956 (`gen-v2-base`, 6297s, hpc3-gpu-k54-01). Records at
-       `/pub/wagnera3/code-style/results/gen-v2-base{,-s1,-s2}.json`; the
+[^15]: SIX runs, both arms, seeds 0/1/2. New jobs 55877275
+       (`gen-v2-base-s1`, 7998s, l54-07), 55877509 (`gen-v2-base-s2`, 7879s,
+       l54-08), 55877370 (`gen-v2-candidate-s1`, 9227s) and 55877841
+       (`gen-v2-candidate-s2`, 9555s), against the existing 55809956
+       (`gen-v2-base`, 6297s, k54-01) and 55809960 (`gen-v2-candidate`,
+       8191s, l54-08). Digests, truncated to 16:
+       base `db1795e0bd114f9b` three times, 564 finished each;
+       candidate `0fbcd792fd871772` three times, 360 finished each.
+       IDENTICAL WITHIN EACH ARM AND DIFFERENT BETWEEN THEM -- the second
+       half is the control, and without it identical digests would also be
+       what a digest insensitive to everything looks like.
+       Records at
+       `/pub/wagnera3/code-style/results/gen-v2-{base,candidate}{,-s1,-s2}.json`; the
        `payload_digest` is a digest over which items finished, so it moves if
        the decode moves. Specs staged and certified via
        `tools/hpc3/runs/code-style-specs-v2-seeds-stage.json`, each differing
