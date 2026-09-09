@@ -82,9 +82,22 @@ Paired McNemar over all 875 items.[^2]
 | checker | base | candidate | net | mid-p |
 |---|---|---|---|---|
 | ruff | 134 (15.3%) | 78 (8.9%) | −56 | 3.5e-07 |
-| mypy | 54 (6.2%) | 50 (5.7%) | −4 | 0.590 |
+| mypy | 54 (6.2%) | 50 (5.7%) | −4 † | 0.590 |
 | guards | 431 (49.3%) | 359 (41.0%) | −72 | 9.1e-05 |
-| all three | 29 (3.3%) | 24 (2.7%) | −5 | 0.362 |
+| all three | 29 (3.3%) | 24 (2.7%) | −5 ‡ | 0.362 |
+
+**† A net this small could not have been significant under any arrangement,
+and ‡ only under one.**[^14] A paired test's best case for a net of *k* is *k*
+discordant pairs all falling one way, giving mid-p `0.5^k`. That is 0.0625 at
+net 4 — above α — so the −4 and +4 rows above were never capable of a
+significant result whatever the data did, and their p-values carry no
+information about the adapter. At net 5 (‡) it is 0.03125, reachable only on a
+perfect 5:0 split. This is a **different floor** from the discordant-count one
+in "What each null could have detected": that one asks whether a given *d*
+could ever reject, this one asks whether a given *net* could ever be
+significant, and a row can pass the first and fail the second when *d* is
+large and the split near even. The mypy row does exactly that — *d*=54, so its
+own floor is effectively zero, and its net still cannot clear α.[^14]
 
 The combined row is the least informative number here.[^2] It is the AND of three
 checkers at a 3% floor, it is null, and reading only that would report "no
@@ -103,7 +116,7 @@ ruff on syntax alone, so the aggregate above cannot separate *style* from
 |---|---|---|---|---|
 | guards | 203 (72.0%) | 221 (78.4%) | **+18** | **0.020** |
 | ruff | 82 (29.1%) | 66 (23.4%) | −16 | 0.046 |
-| mypy | 36 (12.8%) | 40 (14.2%) | +4 | 0.473 |
+| mypy | 36 (12.8%) | 40 (14.2%) | +4 † | 0.473 |
 
 **At least one arm truncated, n=593:**[^9]
 
@@ -315,6 +328,18 @@ measured the sandbox.
        Binomial(n, 0.5), so the rejection region is the binomial tail and the
        MDE is the smallest split reaching 80% power against it. No data beyond
        the pinned records is used.
+[^14]: Discordant counts recomputed per checker over
+       `runs/gen-v2/{base,candidate}.outcomes.jsonl` joined on `item_id`:
+       aggregate mypy 54, all-three 29; both-finished mypy 30, all-three 24;
+       truncated all-three 5. Best-case values from
+       `platform_core.power_distributions.mcnemar_p(0, net, McNemarTest.MID_P)`
+       — 0.25 at net 2, 0.125 at 3, 0.0625 at 4, 0.03125 at 5. Four of this
+       page's twelve per-checker rows fail this floor (aggregate mypy,
+       both-finished mypy, both-finished all-three, truncated all-three); the
+       eight that pass include every result this page argues from. The check is
+       @opus-weight-injection-0902's, board 2026-09-09, who stated it at 6
+       items for the EXACT test; under the mid-p this page reports the
+       threshold is 5.
 [^13]: `tools/hpc3/runs/code-style-gen-v1-base.json` key `seed`,
        and the same key in `code-style-gen-v1-candidate.json`,
        `code-style-gen-v2-base.json`, `code-style-gen-v2-candidate.json`,
