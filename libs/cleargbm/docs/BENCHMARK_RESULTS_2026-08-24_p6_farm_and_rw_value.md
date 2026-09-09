@@ -325,6 +325,50 @@ blank-filter prior exists even for runs where blanks are missing,
 disputed, or contaminated — exactly the situation the dashboard's
 blank-assignment findings describe.
 
+## Power: the per-seed win counts cannot resolve anything at n=5
+
+Added by the power audit, board `1e4ab572`, 2026-09-09, and it applies to
+every "per-seed wins: a/b/c" verdict in this document.
+
+**A win count over paired seeds is a sign test**, and its floor is fixed by
+the design before any data arrives — the best attainable outcome is a clean
+sweep, and its exact two-sided p is `2·(0.5^d)`:
+
+| seeds | best attainable p (clean sweep) | |
+|---|---|---|
+| 4 | 0.1250 | unfalsifiable at 0.05 |
+| **5** | **0.0625** | **unfalsifiable at 0.05 — this family** |
+| 6 | 0.0312 | can reject |
+
+**This family runs five seeds, so no outcome rejects.** A 5–0 sweep for one
+arm would still read p = 0.0625. The splits actually observed are far from a
+sweep and land where the floor implies: weather_tmax's 4/1/0 gives p = 0.375,
+and the 3/1/1 splits on metab_confidence and voc_match give p = 1.0. On this
+instrument, **"ClearGBM does not lead it" and "the arms are effectively tied"
+are the same verdict — nothing resolved.** One additional seed changes that.
+
+**The same data supports a much sharper verdict.** The manifests carry
+per-seed R², so the arms can be compared as paired differences instead of
+counted as wins. Against a **stated threshold of practical interest of 0.01
+R²** — one point of the metric, the scale this program has acted on
+elsewhere — the paired instrument gives:
+
+| corpus | cleargbm − lightgbm | MDE | verdict |
+|---|---|---|---|
+| weather_tmax | −0.00279 | 0.00158 | powered; effect below threshold |
+| metab_confidence | −0.00160 | 0.00193 | powered; effect below threshold |
+| voc_match_quality | −0.00761 | 0.01273 | INCONCLUSIVE |
+| rw_value | +0.00880 | 0.03081 | INCONCLUSIVE |
+
+So weather_tmax and metab_confidence are **genuine nulls, adequately
+powered** — a stronger and more useful statement than "no arm separates from
+the pack", reached from data already on disk with no re-runs. The other two
+are unresolved and should say so.
+
+This section states the threshold the B3 entry above already asks for when it
+says differences "are noise until an arm moves R² materially" — that sentence
+identifies the missing number correctly and does not supply it.
+
 ## Remaining P6 scope (recorded, not hidden)
 
 - Larger-budget farm rungs (100+ trials with the coarseness dial in

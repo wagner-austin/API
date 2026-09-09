@@ -259,7 +259,40 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   clean instruments measure 88–100% exact on the real archive; the
   residual is positive-signed noise (collision-truncated walks,
   unmodeled events inside windows). Real drift collapses the share
-  toward zero, so the floor loses no detection power. Mine
+  toward zero, so the floor loses no detection power.
+
+  **The gate tests the RATE and puts no floor on `n`** — power audit,
+  board `1e4ab572`, 2026-09-09. `passes_claim` at `validate/audit.py:151`
+  reads `samples > 0 and exact / samples >= EXACTNESS_FLOOR`, with
+  `EXACTNESS_FLOOR = 0.85` at `validate/audit.py:129`, so a claim clears it
+  on one sample. Against the floor itself, as a one-sided exact binomial on
+  the `make audit` numbers below:[^power]
+
+  | claim | exact/n | rate | p vs 0.85 | |
+  |---|---|---|---|---|
+  | capacity within bound | 18,649/18,649 | 100% | 0.0000 | TESTED |
+  | single-hit cost | 738/738 | 100% | 0.0000 | TESTED |
+  | teleport cost | 63/63 | 100% | 0.0000 | TESTED |
+  | single | 242/247 | 98.0% | 0.0000 | TESTED |
+  | homing | 487/522 | 93.3% | 0.0000 | TESTED |
+  | dual | 863/932 | 92.6% | 0.0000 | TESTED |
+  | walk | 204/232 | 87.9% | 0.1216 | **NOT TESTED** |
+  | dual-hit | 6/6 | 100% | 0.3771 | **NOT TESTED** |
+  | missile | 6/6 | 100% | 0.3771 | **NOT TESTED** |
+
+  **A perfect record needs `n ≥ 19` to clear 0.85 at α = 0.05** —
+  `0.85 ** 19 = 0.0456` against `0.85 ** 18 = 0.0536`. At n = 6 a flawless
+  6/6 occurs 37.7% of the time even when the true rate is exactly the
+  floor, so `dual-hit` and `missile` pass `passes_claim`
+  (`validate/audit.py:151`) at 100% and carry no evidence they exceed it.
+  `walk` is the opposite shape: it has the samples (n = 232) and sits close
+  enough to the floor that 87.9% is not distinguishable from 0.85.[^power]
+
+  This does not overturn the verdicts. The sentence above is right that
+  real drift collapses the share toward zero, and `collect_evidence`
+  (`validate/audit.py`) remains a good detector of that; what the bound
+  constrains is only what a PASS means for the three rows where the sample
+  is small or the margin is thin.[^power] Mine
   detonations (0x45) and deposits (0x64) are modeled — detonations
   contaminate windows, deposits are absolute fuel readings.
 - **`audit.py`** — `tankpit-audit --stamp`: prints one evidence row
@@ -1336,3 +1369,5 @@ follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).[^2]
 [^1]: Design conversation 2026-07-20: user framing "wiki as the source of truth... with 3 consumers" (code, archived wire evidence, live wire) and "no handwaving, no half assing it at all. the full complete process verified. quality." The three consumers named in that framing are all on disk and blob-pinned in this page's frontmatter: `src/tankpit_bot/physics` (the law layer, e.g. `fuel_pickup_close_code` at `physics/supervisor.py:52` and `fuel_pickup_refusal` at `:73`), `src/tankpit_bot/sim` (the fake server that replays archived wire, e.g. `emit_fuel_pickup_close` at `sim/emissions.py:213`), and `src/tankpit_bot/validate` (the shadow comparison against live wire, `validate/shadow_laws.py`). Phase ordering user-approved; Phase 1 explicitly agreed as the starting point.
 [^2]: receipts for every design and as-built claim above, three-fold: (1) CODE — the blob-pinned trees in frontmatter (`src/tankpit_bot/physics`, `src/tankpit_bot/sim`, `src/tankpit_bot/validate`) plus `protocol/encoders/`, `ledger/fuel_book.py`/`ammo_book.py`, `scripts/physics_claims.py`, and the named `tests/sim/*` files — every symbol, constant, and law named above is greppable on disk, and design paragraphs describe the plan those trees implement (deviations recorded inline); (2) INSTRUMENTS — `make check` (gate/coverage), `make audit` (per-claim sample counts), `make roundtrip` (72,916-message corpus), `make shadow` (law table), `make sim-run` re-derive every number quoted above on demand; (3) HISTORY — the dated 2026-07-20/21/22 commits in git history and their wiki-log entries, plus soak artifacts under `runs/`.
 [^3]: `src/tankpit_bot/sim/server.py` and `src/tankpit_bot/sim/wire_statements.py` both exist as of 2026-07-31, matching the split this phase describes. The "no law changed" claim is a statement of intent for the split, not a measurement — the shadow verdicts it refers to are the ones recorded earlier on this page.
+
+[^power]: Power audit of this page's zero-failure and rate claims, board task `1e4ab572`, 2026-09-09. The gate under test is `passes_claim` at `validate/audit.py:151` with `EXACTNESS_FLOOR = 0.85` at `validate/audit.py:129`; its only size condition is `samples > 0`. The p-values are one-sided exact binomial, `P(X >= exact | n, 0.85)`, computed against the nine per-claim sample counts `make audit` reports and quoted in the Phase 4 step-(a) block on this page. `n >= 19` is the smallest perfect record that clears 0.85 at alpha 0.05, from the same distribution: `0.85 ** 19 = 0.0456 < 0.05` while `0.85 ** 18 = 0.0536`. The zero-failure bounds elsewhere in this audit use the exact one-sided Clopper-Pearson form `1 - alpha ** (1 / n)`, implemented as `zero_failure_power` in `platform_core.minimum_detectable_effect`; no second implementation was written for this page.

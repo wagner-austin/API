@@ -127,6 +127,30 @@ let an identical adjacent pickup credit, isolating the cap as the
 cause), so each attempt now burns one extra radar first for
 guaranteed headroom.[^5]
 
+**What 3/3 excludes — power audit, board `1e4ab572`, 2026-09-09.**[^power] This is
+a zero-failure claim, so there is no spread to divide by and the t-based
+MDE does not apply; the instrument is the exact one-sided Clopper-Pearson
+bound `1 - 0.05^(1/n)`. At n = 3 that bound is **63.2%**: three successes
+with no counterexample are consistent with the server refusing an own-tile
+pickup up to roughly three times in five. **Stated threshold of practical
+interest: 5%**, since the larder plans hops on the assumption the pickup
+credits and a one-in-twenty refusal would be visible as wasted fuel.
+Against that this gate is **NOT TESTED**, by an order of magnitude.[^power]
+
+Two things this does NOT say. The mechanism is not in doubt — the wire
+answered, and the two control runs above isolate the failure modes rather
+than leaving them to chance, which is worth more than three more trials of
+the happy path. And the DOCTRINE is not thereby wrong: a cheap capability
+adopted on three clean trials is a reasonable bet. What is unsupported is
+reading "3/3" as a settled rate. Ten trials would put the bound near 26%
+and thirty near 9.5%; the probe is one `make larder-probe` invocation, so
+the cost of tightening it is minutes.[^power]
+
+Contrast [[mine-mechanics]], whose ring-2 displacement law began at the same
+3/3 and was later confirmed by an archive sweep at 534/534 (bound 0.56%)
+with a friendly-mine control arm. That is what a settled gate looks like,
+and it is the same probe pattern carried one step further.[^power]
+
 ## Implementation (2026-07-27)
 
 `bot/ai/larder.py` holds the fuel scorer (``select_fuel_larder_hop``:
@@ -161,3 +185,5 @@ gets harvested instead of rediscovered.[^2]
 [^6]: Code: `src/tankpit_bot/bot/ai/larder.py` (scorer + FuelLarderSelectionDict), `collect_hops.py` (`larder_harvest` at `:261`, `_hop_toward_fuel_larder` at `:284`) and `collect_mode_outcomes.py` (suppress-aware `_scan_on_landing_decision` at `:297`) -- all three split out of `collect_mode.py` 2026-08-07, and `larder_harvest` is public now, not `_larder_harvest`, `types.py` `suppress_landing_scan` field; run artifacts `runs/bot/bot-20260727-234645.*`; forage-economy output recorded in wiki/log.md (2026-07-27 larder implementation entry) against baselines bot-20260726-145124 (3.10) and bot-20260726-094309 (7.70).
 [^5]: Probe artifacts on disk: `runs/probe/larder-20260727-224933.json` (water-sitting candidates, 0 trials), `-225643.json` (own-tile 0/2 + adjacent control 1, all-capped inventory, code-7 receipts in the paired `.log`), `-230858.json` (own-tile 3/3, no errors) with matching `.capture_session.json` wire evidence; historical own-tile sample capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6) superseded by the deliberate trials; long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture); code-7 string table [[decode-coverage]] §Supervisor error codes.
 [^7]: [synthesis] — the larder plan is a cascade priority inside COLLECT, so it edits the `collect_*` modules only. The HUNT family (`src/tankpit_bot/bot/ai/hunt_mode.py`, `hunt_acquire.py`, `hunt_lock.py`, `hunt_relay.py`) carries lock, chase, and break-threshold logic and is not in this change's scope. Verified 2026-07-31 that all four modules exist and own that behaviour; this footnote records scope, not a measured no-op.
+
+[^power]: Power audit of this page's probe gate, board task `1e4ab572`, 2026-09-09. The trials are the three own-tile pickups in `runs/probe/larder-20260727-230858.json`, produced by `LarderProbe` in `src/tankpit_bot/action_lab/larder_probe.py`; the two control runs are cited in [^5]. The bound is the exact one-sided Clopper-Pearson form for zero observed failures, `1 - alpha ** (1 / n)`, giving 63.16% at n=3, 25.9% at n=10 and 9.5% at n=30 for alpha 0.05. It is computed by `zero_failure_power` in `platform_core.minimum_detectable_effect`, not by a second implementation written for this page. The contrasting 534/534 figure and its friendly-mine control arm are recorded on [[mine-mechanics]] under the teleport-displacement section.

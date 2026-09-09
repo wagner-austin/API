@@ -61,6 +61,47 @@ tightens. LightGBM's weighted result on the identical protocol is
 0.7299 ± 0.0749: with both engines finally weighting the same way,
 ClearGBM leads by ~2 points of mean held-out AUC on the production corpus.
 
+### Power: neither number above is resolved by this design
+
+Added by the power audit, board `1e4ab572`, 2026-09-09. **The ± figures in
+the table are the ACROSS-FOLD spread within each arm, which is not the
+dispersion either comparison needs.** Both arms run on the same five folds,
+so the fold-to-fold movement is common-mode and cancels under pairing. The
+paired instrument, from the per-fold values published above:
+
+| quantity | value |
+|---|---|
+| mean paired difference | +0.01276 (the "1.3 AUC points") |
+| paired sd of the differences | 0.02908 |
+| across-fold sd, as tabled | 0.0754 / 0.0783 — **2.7× larger** |
+| MDE, `t_crit(4)·sd/√n` | **0.03611** |
+| paired t | 0.981 on 4 df (`t_crit` 2.776) |
+
+**The observed effect is 0.35× its own detection floor: NOT TESTED.** Fold 4
+moves −0.0229 against fold 2's +0.0545, and at n=5 that spread swamps the
+mean. "Four of five folds improve" is a 4-of-5 sign split, which alone is
+p = 0.375.
+
+**The ~2-point lead over LightGBM cannot be tested at all from this page**,
+because LightGBM's per-fold values are not published — only its mean and
+across-fold sd. `platform_core.minimum_detectable_effect` takes actual
+per-replicate differences and refuses a summary statistic, by design.
+
+**What this does NOT undermine.** Shipping weighted log-loss was correct
+independently of the effect size: the prior comparison ran weighted LightGBM
+against unweighted ClearGBM, which is not a like-for-like comparison at any
+n. The fix removed a real asymmetry. What is unsupported is the MAGNITUDE —
+"+1.3 points", and the "1.5 points combined" in the ledger below that
+inherits from it. **Stated threshold of practical interest: 0.013 AUC**, the
+size of this claim itself, since it is the smallest difference this program
+has acted on.
+
+**The cheapest repair is one column.** Publishing LightGBM's five per-fold
+values, and the per-fold values for every other rw_matches CV claim, makes
+all of them checkable — this is the only one of 24 `BENCHMARK_RESULTS_*.md`
+documents that publishes a per-fold table at all, which is why it is the
+only one this audit could test.
+
 ## The day's bug-class ledger
 
 Three same-class defects (config value silently not reaching training)
