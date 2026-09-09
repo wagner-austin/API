@@ -13,7 +13,7 @@ prose.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Literal
 
 from typing_extensions import TypedDict
 
@@ -54,7 +54,11 @@ class VariedCompanionSweepPlan(TypedDict):
             declaration (every recorded gpt2-family row), or
             ``"stored-bf16"`` for the declared unquantized-bf16 load the
             7B rows measure at. Declared per row like every other field,
-            because precision is part of what the record means.
+            because precision is part of what the record means -- and a
+            ``Literal`` rather than ``str``, so a row carrying a selector
+            the chokepoint would refuse cannot be WRITTEN; the runtime
+            refusal in ``resolve_precision`` still guards the CLI path,
+            whose selector arrives as untyped argv.
     """
 
     model_id: str
@@ -67,7 +71,7 @@ class VariedCompanionSweepPlan(TypedDict):
     seeds: tuple[int, ...]
     epochs: int
     learning_rate: float
-    precision_selector: str
+    precision_selector: Literal["policy", "stored-bf16"]
 
 
 #: Fixed for the reason the other experiment names are.
