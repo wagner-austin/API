@@ -50,6 +50,11 @@ checkpoints/
 corpus_cache/
 *.json
 
+# Allow the archived cartridge RunRecords: their sha256s are quoted as
+# certificates in docs/RESEARCH.md and the api-codebase wiki, so the files
+# themselves must live where any checkout can verify them (2026-09-09).
+!results/cartridge/*.json
+
 # Allow type stubs under typings even if named like ignored dirs
 !typings/datasets/
 !typings/torch/utils/data/
