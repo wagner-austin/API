@@ -33,6 +33,7 @@ from monorepo_guards.pattern_rules import PatternRule
 from monorepo_guards.redis_rules import RedisRule
 from monorepo_guards.replicated_gain_rules import ReplicatedGainRule
 from monorepo_guards.request_context_rules import RequestContextRule
+from monorepo_guards.research_registration_rules import ResearchRegistrationRule
 from monorepo_guards.restricted_symbol_rules import RestrictedSymbolRule
 from monorepo_guards.run_fingerprint_rules import RunFingerprintLiteralRule
 from monorepo_guards.run_record_rules import RunRecordRule
@@ -91,6 +92,7 @@ def _run_with_config(config: GuardConfig) -> int:
         RunFingerprintLiteralRule(),
         ReplicatedGainRule(),
         RunRecordRule(),
+        ResearchRegistrationRule(config),
         *(LiteralSetRule(declared, config) for declared in REGISTERED_SETS),
         FileSizeRule(),
         GuardShimRule(),

@@ -153,10 +153,82 @@ def find_monorepo_root(start: Path) -> Path | None:
         current = current.parent
 
 
+def package_of(path: Path) -> str:
+    """Name the package a file belongs to.
+
+    Args:
+        path: The file.
+
+    Returns:
+        The directory name immediately above the ``src``/``tests``/``scripts``
+        marker where the monorepo's layout puts the package, or the file's own
+        parent when the path carries no marker.
+    """
+    parts = path.as_posix().split("/")
+    for marker in ("src", "tests", "scripts"):
+        if marker in parts:
+            index = parts.index(marker)
+            if index > 0:
+                return parts[index - 1]
+    return path.parent.name
+
+
+def imported_names(tree: ast.Module) -> set[str]:
+    """Collect the names a module BINDS through an import.
+
+    Imports only, deliberately: collecting every ``Name`` node lets a local
+    variable that happens to share a symbol's spelling satisfy a rule, and a
+    rule that can be passed by accident is worse than no rule because it reads
+    as verified.
+
+    Separate from :func:`imported_module_names` rather than a flag over one
+    function, because the two answer different questions and a rule needs
+    exactly one of them. ``from platform_core.run_record import RunRecord``
+    binds ``RunRecord`` and names the module ``run_record``; a rule asking
+    "does this module build a record" must not see the second, or every
+    module that annotates a record it read back becomes a producer.
+
+    Args:
+        tree: Parsed module.
+
+    Returns:
+        The bound names, taking ``asname`` where one is given, and the final
+        component of a dotted plain import.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names.update(alias.asname or alias.name for alias in node.names)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.rsplit(".", maxsplit=1)[-1])
+    return names
+
+
+def imported_module_names(tree: ast.Module) -> set[str]:
+    """Collect the final component of every module a file imports FROM.
+
+    Args:
+        tree: Parsed module.
+
+    Returns:
+        The last dotted component of each ``from X.Y import ...`` module. A
+        relative import with no module contributes nothing.
+    """
+    return {
+        node.module.rsplit(".", maxsplit=1)[-1]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+
+
 __all__ = [
     "CONFIG_FILENAME",
     "find_monorepo_root",
+    "imported_module_names",
+    "imported_names",
     "iter_py_files",
+    "package_of",
     "parse_source",
     "read_lines",
     "read_source",

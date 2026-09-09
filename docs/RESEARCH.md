@@ -52,9 +52,34 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 ### `mi` — Model-Trainer probes and benchmarks
 
 - **Repo:** this one, `services/Model-Trainer`
-- **Runs:** `model_trainer.cli.{gemm_benchmark, probe_ladder, train_benchmark,
-  sdpa_benchmark, known_answer_probe, forward_benchmark, probe_trace,
-  cartridge_benchmark, ...}`
+- **Runs:** every entry point below, named in full. THE LIST USED TO END IN AN
+  ELLIPSIS, and that ellipsis was the defect: prose that says "and others"
+  cannot be checked, so a command could produce compared numbers for weeks
+  while appearing nowhere. `cartridge_qa_benchmark` did exactly that — it
+  carried the cartridge programme's headline result with 0 committed run
+  documents, 0 lines here and 0 tracked artifacts, and the claim was retracted
+  on 2026-09-09 for sitting four times below what its instrument could
+  resolve. `score_baseline`, with more committed run documents than any other
+  entry point in the workspace, was equally absent. The
+  `research-registration` guard rule now fails `make lint` on any entry point
+  that builds a `RunRecord` and is not named here, so this list cannot go
+  stale silently again.
+
+  `model_trainer.cli.{cartridge_base_lora_sweep, cartridge_benchmark,
+  cartridge_companion_sweep, cartridge_composition_sweep,
+  cartridge_content_lora_sweep, cartridge_diverse_companion_sweep,
+  cartridge_headroom, cartridge_qa_benchmark, cartridge_solo_grid,
+  cartridge_solo_seeds, cartridge_varied_companion_sweep, continuations,
+  forward_benchmark, gemm_benchmark, gemm_probe, known_answer_probe,
+  known_answer_registry, legacy_gemm_probe, probe_ladder, probe_trace,
+  score_baseline, score_run, sdpa_benchmark, sdpa_probe, train_benchmark,
+  train_step_probe, triple_edit_benchmark}`
+
+  Naming a command here records that it produces a comparable number. It does
+  NOT assert that the number is adequately powered — that is the separate
+  minimum-detectable-effect sweep's question, and `cartridge_qa_benchmark` is
+  the standing proof that a surface can be registered and still be running an
+  instrument too weak for what it reports.
 - **Produces:** one `RunRecord` JSON per run under `/pub/wagnera3/{bench,gemm,
   sdpa,ladder,trace,...}`
 - **Provenance:** `RunRecord` + `RunFingerprint` — image digest, GPU model,
@@ -809,6 +834,40 @@ name appeared nowhere here — was mine, and another session bridged it.
     not reproducible against themselves. Fixing that means pinning before
     numpy loads, which `scripts/optimize/__init__.py` currently prevents by
     importing the world at package import time.
+- **Power:** audited 2026-09-09, board `1e4ab572`. The benchmark family's
+  verdicts are stated as per-seed WIN COUNTS over five seeds, which is a sign
+  test whose best attainable two-sided p is 0.0625 — **no outcome rejects at
+  0.05**, so "leads" and "ties" are the same verdict on that instrument. The
+  manifests carry per-seed `r_squared` and `auc_roc`, so the paired instrument
+  runs on data already on disk, and it splits the standing scoreboard:
+  `weather_tmax` and `metab_confidence` are genuine adequately-powered nulls;
+  `rw_value`'s claimed ClearGBM lead is a powered NULL at one point of R²;
+  `voc_match_quality`, `financial_distress` and the `us_binary` head-to-head
+  are NOT TESTED. **42 additional seed-runs make the whole board conclusive
+  and 13 of them cover three of the four corpora** — counts from
+  `required_replicates` in `platform_core.minimum_detectable_effect`.
+  **The root cause is a timing constant that crossed into quality work:**
+  `DEFAULT_SEEDS = (42, 43, 44)` in `covenant_ml`'s `benchmarking/factory.py`
+  is documented as reproducing "the workload the ClearGBM PERFORMANCE work is
+  tuned against", beside `DEFAULT_REPEATS` and `DEFAULT_WARMUPS` — wall-clock
+  knobs. Three seeds stabilises a timing median; inherited by a QUALITY arm it
+  instead sets what can be concluded, and it is the bare `MIN_REPLICATES` floor
+  the power module accepts. It is an overridable CLI default rather than a
+  value stranded in each plan, and **the override was used and did not help**:
+  the p6 and binning runs all passed seeds 42–46 and still reach four NOT
+  TESTED verdicts out of six, because `--seeds` takes a count and not an effect
+  size. That is the argument for deriving the count instead of picking it. **A separate provenance gap sits under all of it:
+  none of the ten p6/binning quality manifests carries a `fingerprint` — they
+  predate the 2026-08-27 entry-point pin, so the numbers the standing rests on
+  were produced by nothing recorded.**
+  Two claims cannot be tested from disk at all because only means and
+  across-fold sds were published: the rw_matches CV ties, and
+  `scale_pos_weight`'s "+1.3 AUC points". The fix for both is one column of
+  per-fold numbers. Details in the `Power:` sections of
+  `BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md`,
+  `BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md`,
+  `BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md` and
+  `BENCHMARK_RESULTS_2026-08-22_knob_closure.md`.
 - **Scale:** 108 ledger rows.
 
 ### `floor` — cloze floor scoring
@@ -1151,6 +1210,20 @@ name appeared nowhere here — was mine, and another session bridged it.
   Note also that `free` is `PreemptMode=CANCEL`, so `requeue` is inert on it;
   the flag's live consequence here is the comparability axis, not restart
   behaviour.
+- **Power, beyond the determinism flag:** the same 2026-09-09 audit covered
+  this project's other zero-failure claims, all recorded on the client wiki
+  rather than restated here. `make audit`'s gate (`_passed`,
+  `validate/audit.py:141`) tests a RATE with no floor on `n`, so a perfect
+  record needs n ≥ 19 to clear its 0.85 floor: `dual-hit` 6/6 and `missile`
+  6/6 pass at 100% carrying no evidence they exceed it, and `walk` 204/232
+  sits too close to separate — six of the nine claims ARE tested, some
+  overwhelmingly. The larder probe's `3/3` bounds its refusal rate at 63.2%
+  and the 3 is a default argument rather than a stopping rule. The
+  divergence soaks are one scripted scenario each, so their per-scenario
+  bound is 95% and their weight comes from the negative control that proves
+  the detector fires, not from the round count. Pages:
+  `clients/TankpitBot/wiki/pages/physics-module-roadmap.md` and
+  `larder-plan.md`.
 - **The stamp is no longer an input to the world.** It selected the practice
   layout AND the container-population seed until 2026-09-02, so an array
   whose tasks stamp themselves varied the room and the larder along with

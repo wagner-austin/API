@@ -40,12 +40,11 @@ Violations:
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 from typing import Final
 
 from monorepo_guards import Violation
-from monorepo_guards.util import parse_source
+from monorepo_guards.util import imported_module_names, imported_names, package_of, parse_source
 
 #: The symbol whose presence means a package is recording provenance.
 _FINGERPRINT_SYMBOL: Final[str] = "RunFingerprint"
@@ -61,53 +60,6 @@ _RECORD_SYMBOLS: Final[frozenset[str]] = frozenset(
 #: ``platform_core`` owns both types, and the guard package itself names them
 #: only in this rule's own text and tests.
 _DEFINING_PACKAGES: Final[frozenset[str]] = frozenset({"platform_core", "monorepo_guards"})
-
-
-def _package_of(path: Path) -> str:
-    """Name the package a file belongs to.
-
-    Args:
-        path: The file.
-
-    Returns:
-        The directory name two levels above ``src``/``tests`` where the
-        monorepo's layout puts the package, or the file's own parent when the
-        path is shorter than that.
-    """
-    parts = path.as_posix().split("/")
-    for marker in ("src", "tests", "scripts"):
-        if marker in parts:
-            index = parts.index(marker)
-            if index > 0:
-                return parts[index - 1]
-    return path.parent.name
-
-
-def _imported_symbols(tree: ast.Module) -> set[str]:
-    """Collect the names a module IMPORTS.
-
-    Imports only, deliberately. An earlier version also collected every
-    ``Name`` and ``Attribute`` node, which meant a local variable happening to
-    be called ``run_record`` satisfied the rule -- a check that a package can
-    pass by accident is worse than no check, because it reads as verified.
-
-    Args:
-        tree: Parsed module.
-
-    Returns:
-        The imported names, including the final component of a dotted module
-        import so ``import platform_core.run_record`` counts.
-    """
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            names.update(alias.asname or alias.name for alias in node.names)
-            if node.module is not None:
-                names.add(node.module.rsplit(".", maxsplit=1)[-1])
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                names.add(alias.asname or alias.name.rsplit(".", maxsplit=1)[-1])
-    return names
 
 
 class RunRecordRule:
@@ -128,10 +80,11 @@ class RunRecordRule:
         captures: dict[str, Path] = {}
         records: set[str] = set()
         for path in files:
-            package = _package_of(path)
+            package = package_of(path)
             if package in _DEFINING_PACKAGES:
                 continue
-            names = _imported_symbols(parse_source(path))
+            tree = parse_source(path)
+            names = imported_names(tree) | imported_module_names(tree)
             if _FINGERPRINT_SYMBOL in names and package not in captures:
                 captures[package] = path
             if names & _RECORD_SYMBOLS:
