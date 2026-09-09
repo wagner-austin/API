@@ -1261,23 +1261,37 @@ name appeared nowhere here — was mine, and another session bridged it.
   median worth, unengageable targets and intercepts.
 - **Sizing, read off `runs/hpc3-rusted.json` rather than described:** four
   CPUs, 2 GB, 100 minutes on `free`, `requeue` on, `deterministic` on,
-  `checkpoint_steps: 0`. The zero is honest because the per-match scorecard
-  IS the checkpoint: a preempted match costs one match.
+  `resumes_from_checkpoint: false`. The false is honest because the
+  per-match scorecard IS the checkpoint: a preempted match costs one match.
 - **Declares an image**, `/pub/wagnera3/rusted/images/v4/rusted.sif` pinned
   by sha256 `b1eaaa2e`, binding `/pub/wagnera3`, with `env_path` `/opt/env`
   inside it.
-- **Not yet submitted, and what is missing is the staged game tree**, not the
-  image. Nothing has been run against the cluster to see how that failure
-  presents, so no claim is made here about which command reports it first.
-- **This entry disagreed with the registry until 2026-09-02**, claiming one
-  CPU, 45 minutes and no image at all, against a workspace document committed
-  seven minutes earlier in `b81c7f91` that declared four CPUs, 100 minutes
-  and an sha256-pinned image. The prose was corrected against the registry,
-  which this file's own preamble names as the machine-readable half. Worth
-  keeping as a worked example: `test_committed_runs.py` passed throughout,
-  because it asserts that every registered project APPEARS here and that
-  declared repo paths exist, and nothing compares a sizing sentence against
-  the numbers it describes. Presence is enforced; agreement is not.
+- **The largest cluster consumer on this account, and every current-era
+  verdict is cluster-played.** First job `rusted.image-v1` on 2026-08-30;
+  11,485 jobs by 2026-09-09, the bulk in the CEM evolution and search
+  families (`evolve1`-`evolve6`, `tacsearch1`, `vhsearch3`/`4`). The game
+  tree that an earlier version of this entry called missing is staged per
+  batch by the drivers themselves — `scripts.stage_payload` freezes the
+  working tree at a stated commit and `hpc3.cli.stage` ships it as
+  `payload-<batch>` — so every scorecard names the tree it played under.
+- **This entry has now been caught disagreeing with reality twice, in two
+  different directions, and both are worth keeping as worked examples.**
+  Until 2026-09-02 it claimed one CPU, 45 minutes and no image, against a
+  workspace document committed seven minutes earlier in `b81c7f91` — the
+  prose was corrected against the registry, which this file's own preamble
+  names as the machine-readable half. Then until 2026-09-09 it claimed
+  "not yet submitted / nothing has been run against the cluster" — a
+  sentence that was READ, NARROWED AND RE-PUBLISHED in `3aeadf5a` with
+  2,065 rusted jobs already in `sacct` behind it, and that stood until the
+  fleet research-integrity audit's registration sweep (board task
+  `bc307caa`) compared the prose against the accounting record. In both
+  cases `test_committed_runs.py` passed throughout, because it asserts
+  that every registered project APPEARS here and that declared repo paths
+  exist, and nothing compares a prose claim against the registry or the
+  cluster's own ledger. Presence is enforced; agreement is not — and a
+  current-tense capability claim in this file decays silently the moment
+  the capability changes, so state such claims with their as-of date or
+  point at the record that stays true.
 
 ---
 
