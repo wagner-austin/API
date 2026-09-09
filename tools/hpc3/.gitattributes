@@ -1,0 +1,19 @@
+# Staged specs are digested, and a digest over bytes that change on checkout
+# is a digest that only validates on the machine that wrote it.
+#
+# MEASURED 2026-09-09: tools/hpc3/runs/code-style-gen-v2-base.json is stored
+# in git with LF (blob 2cae397c...) and checked out on Windows with CRLF
+# (ffe2e671...), and code-style-specs-v2-stage.json records the CRLF value --
+# because that is what was actually staged to /pub. So that manifest is
+# correct about what it staged and NOT reproducible from a Linux checkout.
+#
+# The seed-0 pair is deliberately NOT renormalised here. Those exact bytes
+# produced the v2 generation jobs 55809956/55809960, and changing them would
+# make the committed digests disagree with the artifacts on /pub -- rewriting
+# the provenance of a finished run to tidy a filename convention.
+#
+# The seed-axis specs added the same day are held to the stricter rule, so
+# their digests mean the same thing on every machine.
+runs/code-style-gen-v2-base-s?.json -text
+runs/code-style-gen-v2-candidate-s?.json -text
+runs/code-style-specs-v2-seeds-stage.json -text

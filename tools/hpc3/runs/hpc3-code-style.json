@@ -32,9 +32,10 @@
       "deterministic": true,
       "certified_inputs": true,
       "budget": {
-        "self_imposed_gpu_hours": 6.0,
+        "self_imposed_gpu_hours": 24.0,
         "max_service_units": 0.0,
-        "charge_account": ""
+        "charge_account": "",
+        "budget_note": "Raised from 6.0 to 24.0 on 2026-09-09, operator-authorised, to fund the seed axis. The v2 seed-0 pair measured 6297s + 8191s on A30s = 4.03 GPU-hours per seed, so seeds 1 and 2 cost ~8.1 and the old cap would have refused the second one mid-experiment. This is a SELF-IMPOSED cap, not a cluster limit: partition is free-gpu, max_service_units stays 0.0 and charge_account stays empty, so the number bounds this project's own appetite rather than any spend. It is preemptible time and the jobs requeue."
       },
       "repo": "../../..",
       "resumes_from_checkpoint": false

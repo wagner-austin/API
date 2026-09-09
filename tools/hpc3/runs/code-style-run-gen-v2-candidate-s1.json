@@ -1,0 +1,23 @@
+{
+  "project": "code-style",
+  "name": "gen-v2-candidate-s1",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 modeltrainer-continuations --spec /pub/wagnera3/code-style/specs/code-style-gen-v2-candidate-s1.json --out-dir /pub/wagnera3/code-style/generated/v2-candidate-s1 --record /pub/wagnera3/code-style/results/gen-v2-candidate-s1.json",
+  "artifact": "/pub/wagnera3/code-style/generated/v2-candidate-s1",
+  "experiment": {
+    "arm": "candidate",
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B",
+    "adapter_run": "code-style-qlora-qwen-v2",
+    "decoding": "greedy-repetition-penalty-1.1",
+    "max_new_tokens": "1536",
+    "batch_size": "32",
+    "seed": "1",
+    "holdout": "code-corpus-v2.holdout-5c1697e2",
+    "card": "A30",
+    "card_reason": "both-arms-must-share-a-card-model-or-the-pairing-is-confounded;free-gpu-has-8-A100s-against-64-A30s",
+    "seed_axis": "one-of-three-realizations-0-1-2;spread-across-them-is-this-projects-first-noise-floor"
+  }
+}

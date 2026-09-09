@@ -1,0 +1,36 @@
+# Independent digest record: code-style v2 SEED-AXIS generation specs
+#
+# --expect-from is REQUIRED by hpc3-stage, and a record derived from the
+# manifest would agree with it by construction and check nothing. So these
+# four digests were NOT read off the files being staged. They were
+# RECONSTRUCTED, by a separate act, from bytes that were already published
+# and already certified on the cluster:
+#
+#   start from code-style-gen-v2-{base,candidate}.json, whose digests
+#   ffe2e671... and f661a9e3... are published in code-style-specs-v2-stage.json
+#   and certified beside the files on /pub;
+#   apply the ONLY declared edit -- seed := 1 or 2, and label := the same name
+#   with -s<seed> appended;
+#   serialise as json.dumps(indent=2) + "\n", UTF-8, LF (see
+#   tools/hpc3/.gitattributes, which holds these four files to -text so the
+#   bytes are the same on every checkout).
+#
+# That makes this record a statement about the TRANSFORMATION rather than
+# about the files: if a spec being staged differs from the published seed-0
+# spec in anything other than seed and label, its digest is not here and
+# staging refuses it. That is exactly the confound the seed axis must not
+# have -- three realizations that differ in the decode seed and in nothing
+# else.
+#
+# WHAT IT STILL CANNOT DO, stated for the same reason the payload record
+# states it: it cannot verify a first staging of bytes never published
+# before. Nothing can. Its value is that the manifest and this file cannot be
+# made to agree by repeating one mistake.
+#
+# Written 2026-09-09 for the seed axis. seed was 0 in all six code-style run
+# documents until this date, so every published v2 figure was one realization
+# of the decode and the project had no noise floor.
+3b0170ac43b41f419fce52775ea5946c8f2e8a0f61aeb55efd7d1ba63d40fe8b  code-style-gen-v2-base-s1.json
+1a0a7e50c28852ee6fc73f055083a55ed114f6b377cac1e1c2d9eeb6b4dee50f  code-style-gen-v2-base-s2.json
+cd04a76520cccdd5c5cf553bba8f7974f3b1f51e11deb9f3388df45656bd9ef0  code-style-gen-v2-candidate-s1.json
+296189c8a8e11fadacfab01bf8c318e006db8eb257e295bf46239ffe1eb5f264  code-style-gen-v2-candidate-s2.json
