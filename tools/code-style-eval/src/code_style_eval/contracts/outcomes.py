@@ -21,6 +21,8 @@ from platform_core.json_utils import (
     require_list,
     require_str,
 )
+from platform_core.power_records import decode_mcnemar_power, encode_mcnemar_power
+from platform_core.power_types import McNemarPower
 from typing_extensions import TypedDict
 
 #: The three checkers a generated file is scored under, and the ONE place the
@@ -152,6 +154,10 @@ class ComparisonReport(TypedDict):
         net_improvement: Items fixed minus items broken.
         mid_p: Two-sided McNemar mid-p value.
         exact_p: Two-sided exact conditional McNemar p-value.
+        power: What this comparison could ever have resolved, from
+            :func:`platform_core.minimum_detectable_effect.mcnemar_power`.
+            Carried BESIDE the p-values so a reader never has to ask whether
+            a null was a finding or a sample size -- the record answers it.
         payload_digest: Name-paired sha256 over the two outcome files this
             was computed from, from
             :func:`code_style_eval.core.provenance.payload_digest`. Never
@@ -169,6 +175,7 @@ class ComparisonReport(TypedDict):
     mid_p: float
     exact_p: float
     payload_digest: str
+    power: McNemarPower
 
 
 def encode_comparison_report(report: ComparisonReport) -> JSONObject:
@@ -191,6 +198,7 @@ def encode_comparison_report(report: ComparisonReport) -> JSONObject:
         "mid_p": report["mid_p"],
         "exact_p": report["exact_p"],
         "payload_digest": report["payload_digest"],
+        "power": encode_mcnemar_power(report["power"]),
     }
 
 
@@ -241,6 +249,7 @@ def decode_comparison_report(obj: JSONObject) -> ComparisonReport:
         mid_p=require_float(obj, "mid_p"),
         exact_p=require_float(obj, "exact_p"),
         payload_digest=payload_digest,
+        power=decode_mcnemar_power(require_dict(obj, "power")),
     )
 
 

@@ -21,6 +21,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
 )
+from platform_core.minimum_detectable_effect import mcnemar_power
 from platform_core.power_distributions import McNemarTest, mcnemar_p
 from platform_core.run_record import encode_run_record, run_record_sidecar
 
@@ -38,6 +39,13 @@ from code_style_eval.core.scoring import (
     paired_counts,
     pass_rate,
 )
+
+#: The level every verdict on this instrument is read at, declared here once
+#: rather than defaulted at each call site. It is NOT a knob frozen by copy:
+#: it is recorded INSIDE each report's power record, so a comparison read
+#: years later states the level it was judged at instead of inheriting
+#: whatever this constant says then.
+ALPHA = 0.05
 
 _BASELINE_FLAG = "--baseline"
 _CANDIDATE_FLAG = "--candidate"
@@ -144,6 +152,11 @@ def build_report(
         mid_p=mcnemar_p(minority, discordant, McNemarTest.MID_P),
         exact_p=mcnemar_p(minority, discordant, McNemarTest.EXACT),
         payload_digest=payload_digest,
+        # Computed for MID_P because that is the variant this package
+        # reports. An MDE against the exact test's rejection region would
+        # describe a test nobody ran, which is what mcnemar_power's required
+        # `test` argument exists to prevent.
+        power=mcnemar_power(discordant, ALPHA, McNemarTest.MID_P),
     )
 
 
@@ -168,6 +181,12 @@ def render(report: ComparisonReport) -> list[str]:
         f"net items fixed           {report['net_improvement']:+d}",
         f"mid-p                     {report['mid_p']:.6f}",
         f"exact conditional p       {report['exact_p']:.6f}",
+        # The floor is printed BESIDE the p-value, not below a heading a
+        # reader may not reach. A p of 0.688 over five discordant pairs and a
+        # p of 0.688 over fifty are different claims and look identical here
+        # without it.
+        f"smallest p attainable     {report['power']['smallest_attainable_p']:.6f}",
+        f"could ever reject         {'yes' if report['power']['can_ever_reject'] else 'NO'}",
     ]
 
 

@@ -13,5 +13,14 @@
   "net_improvement": 0,
   "mid_p": 0.84375,
   "exact_p": 1.0,
-  "payload_digest": "1fd266b0f0dc050c54eaeef33523a59b45a7337fb2f586ff28fc3767853fb5e6"
+  "payload_digest": "1fd266b0f0dc050c54eaeef33523a59b45a7337fb2f586ff28fc3767853fb5e6",
+  "power": {
+    "instrument": "mcnemar",
+    "test": "mid_p",
+    "discordant_pairs": 6,
+    "alpha": 0.05,
+    "smallest_attainable_p": 0.015625,
+    "can_ever_reject": true,
+    "most_balanced_rejecting_minority": 0
+  }
 }

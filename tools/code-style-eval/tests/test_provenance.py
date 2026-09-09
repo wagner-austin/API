@@ -7,6 +7,8 @@ import pathlib
 
 import pytest
 from platform_core.determinism_record import UNPINNED_STACK
+from platform_core.minimum_detectable_effect import mcnemar_power
+from platform_core.power_distributions import McNemarTest
 
 from code_style_eval.contracts.outcomes import ComparisonReport, PairedCounts
 from code_style_eval.core.provenance import (
@@ -41,6 +43,7 @@ def _report() -> ComparisonReport:
         mid_p=0.25,
         exact_p=0.5,
         payload_digest="a" * 64,
+        power=mcnemar_power(4, 0.05, McNemarTest.MID_P),
     )
 
 
