@@ -11,7 +11,7 @@ source_paths:
   - "sweeps/run-xmap-1v1.sh"
 source_git_blobs:
   "scripts/sweep.py": "97093577af50258d78e1609cb705fea02efc6738"
-  "src/rw_bot/harness/runner.py": "25d473219d57a2dbc11c52cbbc66fdc183498e88"
+  "src/rw_bot/harness/runner.py": "963ca0e1d8044f0f24a0cdd2eb547aa5875d21b8"
   "sweeps/run-xmap-1v1.sh": "4bf70377b380d60fae8fa09c1dd5509ddd483f5f"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17

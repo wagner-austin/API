@@ -16,7 +16,7 @@ source_paths:
 source_git_blobs:
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
   "src/rw_bot/harness/clone.py": "6083a9f62b07cde157b0956f7b6801a7de5fe2f5"
-  "src/rw_bot/harness/runner.py": "25d473219d57a2dbc11c52cbbc66fdc183498e88"
+  "src/rw_bot/harness/runner.py": "963ca0e1d8044f0f24a0cdd2eb547aa5875d21b8"
   "scripts/sweep.py": "97093577af50258d78e1609cb705fea02efc6738"
   "Makefile": "d4a3f7442441fb2445ff62601341247b66f41cf8"
 game_version: "1.15 (code 176, build #28)"
