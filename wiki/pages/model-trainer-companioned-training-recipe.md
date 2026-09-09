@@ -17,17 +17,17 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py
   - docs/RESEARCH.md
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 832de4e79068336b1cb8e6491d8b0553029f528a
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 9300942991b85dcc3bb354ecca84e4680ce9ee2d
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
   "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": 86c614151f8752fb3e16f78fca41f949448bdfab
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 944a2a1033890596c7c3d722647df505a023e63a
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": f41deeec935e92643b7263ab6e564cdd2e9347b8
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": 75b3370cb8fd7ba5a7d5cac712e2a61c3abe6fdb
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 51621f94781dd5b27149fcc5931c4bb6e7209006
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": a370a0eb5ea60cef5b7b86d3c66c42a048cfbf61
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 6e96538b0370caebbe7e459104283392b9a2941a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": f3271e27653e4496fb84ce19e2491fcd4c982603
-  "docs/RESEARCH.md": 942f70281ca582e9297b1779279479c3d5184a7d
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dc758263db2d9ac7e08156d40fd79e11d728b12e
+  "docs/RESEARCH.md": 09a58adce295fb8476f124041a0147b76659b155
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
@@ -52,6 +52,7 @@ provenance:
   - "nine-seed solo reliability 2026-09-07/08, board task b89cd348: cartridge_solo_seeds CLI (commit 4fc8dfbb), image v45 sha256 567cb42d (truncated), solo cartridges trained AND scored behind the PLAIN base at the recorded knobs; 7B pair 55813508 + twin 55813516 BYTE-IDENTICAL sha256 353ab575 (truncated, same-node k54-01); xl control pair 55818092 + twin 55813528 CROSS-NODE (l54-09 / l54-07) with all 14 observations bit-equal, shas differing solely in fingerprint/host/logical_cores 64 vs 32; xl mean +0.827 spread 0.079 over nine seeds, pythia-6.9b/NF4 mean +0.160 spread 0.320 with one negative draw"
   - "bf16 precision control 2026-09-09, board task c4b9a01b: StoredBf16Precision loader state (commit f4447989), image v46 sha256 bd6ca365 (truncated), jobs 55833896 + twin 55833931 (~9 min each, half NF4's wall clock), records BYTE-IDENTICAL sha256 445e345f (truncated) ACROSS nodes gpu-24-07 / gpu-l54-07 -- the arc's first full cross-node byte identity on a 7B record; bf16 mean +0.102 spread 0.248 two negatives; paired bf16-minus-NF4 -0.058 +/- 0.032 (t -1.80, MDE 0.075 nats): NF4 exonerated"
   - "MDE rows computed 2026-09-09 from stored per-seed rows (machine-wide MDE standard): 1.5B n8-equals-n4 holds (LM +0.0004 vs MDE 0.019; invariance +0.0001 vs 0.068); objectives' diverse-n4 tie at 1.5B holds (-0.008 vs MDE 0.047); diverse-n8 CORRECTED from tie to a resolved -0.0088 +/- 0.0014 LM advantage (t ~ -6.5), ~1% of the alone gain, no operating decision changes"
+  - "hyperparameter grid 2026-09-09, board task 47d5f8c6 (operator-directed): cartridge_solo_grid CLI (commit 103bdaf7), image v47 sha256 290794b0 (truncated) from fcb39991, jobs 55841983 + twin 55841997 (1h08m each), records BYTE-IDENTICAL sha256 bc18d701 (truncated, same-node k54-05); the lr0.01xc64 anchor cell reproduces the certified 445e345f bf16 record BIT-FOR-BIT seed for seed; lr {0.001,0.003,0.01,0.03} x slots {64,256} at nine seeds: 0.001 all-negative, 0.03 divergent (means to -1.67), 0.003 indistinguishable-to-worse (t -1.04), 256 slots never better than 64 (at lr0.003 significantly worse, t -5.19) -- the recorded knobs sit at the grid's maximum"
 fact_checked: "2026-09-07"
 confidence: high
 hubs: [services]
@@ -309,11 +310,19 @@ pythia-plus-cartridge (~3.50) does not reach xl-plus-cartridge
 (~3.28), so the training-side deficit is real beside headroom. The bf16 precision control has
 since run (provenance below) and EXONERATES NF4: quantization removed,
 the same nine seeds land in the same broken regime (mean +0.102, two
-negatives; paired difference −0.058 against an MDE of 0.075), so by
-elimination the 7B training deficit is the hyperparameter/architecture
-mismatch riding on the measured headroom. Still open, filed rather
-than implied: the single remaining 7B recovery lever (slot count /
-learning rate scaled to the architecture) before any 7B composition
-rung, the mechanism of the mid-depth valley, the remaining 0.30
-content gap at medium n8, and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
+negatives; paired difference −0.058 against an MDE of 0.075). The
+hyperparameter grid has since run too (provenance below) and REFUTES
+the tuning hypothesis in its measured ranges: the recorded lr 0.01 ×
+64 slots sits at the grid's maximum — the learning-rate bracket is
+worse in both directions, catastrophically at 0.03, and 256 slots
+never beats 64 — with the anchor cell reproducing the certified bf16
+record bit for bit. After three eliminations (headroom measured, NF4
+exonerated, lr/slots refuted) the standing verdict is that ~0.10-0.16
+nats IS the 7B solo regime for this recipe at 12 epochs. Still open,
+filed rather than implied: the last unmeasured training axis (epochs /
+schedule) — past which the conclusion becomes that KV-prefix capacity
+itself does not transfer to this architecture at this scale, a finding
+about the method rather than the tuning — any 7B composition rung, the
+mechanism of the mid-depth valley, the remaining 0.30 content gap at
+medium n8, and the budget slot policy. The RESEARCH.md entry under `mi` carries all the run summaries
 and the extension list.
