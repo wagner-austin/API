@@ -94,7 +94,7 @@ def _workspace(
                 "mem_gb": 2,
                 "minutes": 45,
                 "requeue": False,
-                "checkpoint_steps": 0,
+                "resumes_from_checkpoint": False,
                 "image": {
                     "path": f"{root}/images/v4/rusted.sif",
                     "sha256": "b1eaaa2e5a43fd963ddeff20ba06f92c9128135cda918fed1bde458c5de93edb",

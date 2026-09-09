@@ -45,6 +45,13 @@ VERDICT_SCORES: Mapping[str, float] = {
     "wiped": -2.0,
 }
 
+#: The margin at or above which a match was WON. The bands cannot cross
+#: (any won >= 2, any survived < 2), so this reads the win bit back off a
+#: margin without re-parsing the verdict word -- one threshold, named,
+#: instead of the literal that sat in two lines of :func:`report` and was
+#: about to be copied into a third module.
+WIN_THRESHOLD: float = VERDICT_SCORES["won"]
+
 
 def scorecard_fields(text: str) -> dict[str, str]:
     """Read a scorecard's label/value pairs by the shape the sweep trusts.
@@ -212,7 +219,7 @@ def report(batch: str, margins: Mapping[str, Mapping[int, float]]) -> tuple[str,
     lines = [f"## {batch}"]
     for arm in sorted(margins):
         scores = list(margins[arm].values())
-        wins = sum(1 for s in scores if s >= 2.0)
+        wins = sum(1 for s in scores if s >= WIN_THRESHOLD)
         lines.append(
             f"{arm:12} n={len(scores):3}  mean margin {_mean(scores):+.3f}"
             f"  wins {wins}/{len(scores)}"
@@ -225,7 +232,8 @@ def report(batch: str, margins: Mapping[str, Mapping[int, float]]) -> tuple[str,
                 continue
             deltas = [margins[other][s] - margins[base][s] for s in shared]
             win_delta = sum(
-                (1 if margins[other][s] >= 2.0 else 0) - (1 if margins[base][s] >= 2.0 else 0)
+                (1 if margins[other][s] >= WIN_THRESHOLD else 0)
+                - (1 if margins[base][s] >= WIN_THRESHOLD else 0)
                 for s in shared
             )
             centre = _mean(deltas)
@@ -240,6 +248,7 @@ def report(batch: str, margins: Mapping[str, Mapping[int, float]]) -> tuple[str,
 
 __all__ = [
     "VERDICT_SCORES",
+    "WIN_THRESHOLD",
     "batch_margins",
     "batch_survivals",
     "margin_of",

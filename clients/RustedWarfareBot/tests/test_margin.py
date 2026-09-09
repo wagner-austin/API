@@ -137,7 +137,9 @@ def test_main_prints_usage_and_reports_a_batch(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main([]) == EXIT_BAD_USAGE
-    assert capsys.readouterr().out == "usage: margin <batch> [batch...]\n"
+    assert capsys.readouterr().out == (
+        "usage: margin <batch> [batch...] [--power <effect-of-interest>]\n"
+    )
     batch = tmp_path / "demo"
     batch.mkdir()
     (batch / "control-s7.txt").write_text(
