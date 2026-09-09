@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "f4447989c648489e978000b7fa89df3e34aabcae",
+  "git_commit": "fcb39991ff314cb6b75634d995eef57eb75d06a1",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -435,6 +435,14 @@
     {
       "module": "model_trainer.cli.cartridge_lora_policy",
       "attribute": "stored_bf16_for"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_solo_grid",
+      "attribute": "main"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_solo_grid",
+      "attribute": "measure_solo_grid"
     }
   ],
   "smoke_commands": [
@@ -484,7 +492,8 @@
     "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots; g = {'num_layers': 1, 'num_kv_heads': 2, 'num_slots': 3, 'head_dim': 4}; k = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; v = [torch.zeros((1, 2, 3, 4), requires_grad=True)]; s = CartridgeSlots(geometry=g, keys=k, values=v); bk, bv = s.layer_blocks(0, batch_size=2, dtype=torch.bfloat16); assert bk.dtype == torch.bfloat16 == bv.dtype, 'the boundary cast did not take'; assert k[0].dtype == torch.float32, 'masters must stay fp32'; fk, fv = s.layer_blocks(0, batch_size=2, dtype=torch.float32); assert fk.data_ptr() == k[0].data_ptr() and fv.data_ptr() == v[0].data_ptr(), 'the fp32 request must be the identity view, or every fp32 record changed'; grad = torch.autograd.grad(bk.float().sum(), [k[0]])[0]; assert grad.dtype == torch.float32, 'gradients must return to the fp32 masters'\"",
     "/opt/env/bin/python -c \"import pathlib; from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME, HEADROOM_EXPERIMENT, MEASURED_BASES, base_short, headroom_label; assert HEADROOM_EXPERIMENT == 'cartridge-headroom'; assert MEASURED_BASES == ('gpt2', 'gpt2-medium', 'gpt2-xl', 'EleutherAI/pythia-6.9b'), 'the headroom rows must cover exactly the measured ladder'; from model_trainer.core.services.model.cartridge_pool_plans import BASE_LORA_SWEEP_PLANS; row = BASE_LORA_SWEEP_PLANS[GEOMETRY_PLAN_NAME]; assert row['window'] == 256 and row['held_out_stride'] == 4, 'the headroom split must be the recorded split'; assert base_short('EleutherAI/pythia-6.9b') == 'pythia-6.9b' and base_short('gpt2-xl') == 'gpt2-xl'; assert headroom_label(bases=MEASURED_BASES, corpora=[pathlib.Path('a')], window=256, held_out_stride=4, digest='0' * 12) == 'cartridge-headroom-w256-s4-b4-c1-000000000000'; from model_trainer.core.services.model.cartridge_scoring import base_loss\"",
     "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_solo_seeds import SOLO_SEEDS, SOLO_SEEDS_EXPERIMENT, solo_seeds_label; assert SOLO_SEEDS_EXPERIMENT == 'cartridge-solo-seeds'; assert SOLO_SEEDS == (7, 8, 9, 10, 11, 12, 13, 14, 15), 'the first three seeds must be the original recorded draw'; assert solo_seeds_label(model_id='EleutherAI/pythia-6.9b', seeds=SOLO_SEEDS, precision_token='', digest='0' * 12) == 'cartridge-solo-seeds-pythia-6.9b-n9-000000000000'\"",
-    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.backends.hf_lm._test_hooks import load_arguments; config, dtype = load_arguments(None); assert config is None and dtype is torch.float32, 'None must stay fp32 -- every certified fp32 record depends on it'; config, dtype = load_arguments({'torch_dtype': 'bfloat16'}); assert config is None and dtype is torch.bfloat16, 'the declared stored-bf16 load must request no quantization and half precision'; from model_trainer.cli.cartridge_solo_seeds import resolve_precision; assert resolve_precision('EleutherAI/pythia-6.9b', 'stored-bf16') == ({'torch_dtype': 'bfloat16'}, '-storedbf16'); assert resolve_precision('gpt2', 'policy') == (None, ''), 'policy mode must leave every recorded gpt2 label and load byte-unchanged'; raised = None\ntry:\n    resolve_precision('gpt2', 'stored-bf16')\nexcept ValueError as e:\n    raised = e\nassert raised is not None, 'an undeclared bf16 base must refuse'\""
+    "/opt/env/bin/python -c \"import torch; from model_trainer.core.services.model.backends.hf_lm._test_hooks import load_arguments; config, dtype = load_arguments(None); assert config is None and dtype is torch.float32, 'None must stay fp32 -- every certified fp32 record depends on it'; config, dtype = load_arguments({'torch_dtype': 'bfloat16'}); assert config is None and dtype is torch.bfloat16, 'the declared stored-bf16 load must request no quantization and half precision'; from model_trainer.cli.cartridge_solo_seeds import resolve_precision; assert resolve_precision('EleutherAI/pythia-6.9b', 'stored-bf16') == ({'torch_dtype': 'bfloat16'}, '-storedbf16'); assert resolve_precision('gpt2', 'policy') == (None, ''), 'policy mode must leave every recorded gpt2 label and load byte-unchanged'; raised = None\ntry:\n    resolve_precision('gpt2', 'stored-bf16')\nexcept ValueError as e:\n    raised = e\nassert raised is not None, 'an undeclared bf16 base must refuse'\"",
+    "/opt/env/bin/python -c \"from model_trainer.cli.cartridge_solo_grid import ANCHOR_LEARNING_RATE, ANCHOR_SLOTS, GRID_LEARNING_RATES, GRID_SLOT_COUNTS, SOLO_GRID_EXPERIMENT, cell_token, solo_grid_label; assert SOLO_GRID_EXPERIMENT == 'cartridge-solo-grid'; assert GRID_LEARNING_RATES == (0.001, 0.003, 0.01, 0.03) and GRID_SLOT_COUNTS == (64, 256); from model_trainer.core.services.model.cartridge_pool_plans import BASE_LORA_SWEEP_PLANS; row = BASE_LORA_SWEEP_PLANS['gpt2-base-lora']; assert ANCHOR_LEARNING_RATE == row['learning_rate'] and ANCHOR_SLOTS == row['slots'], 'the in-grid anchor must be the recorded knobs or the grid cannot reproduce the solo record'; assert cell_token(learning_rate=0.003, num_slots=256) == 'lr0.003-c256'; from model_trainer.cli.cartridge_solo_seeds import SOLO_SEEDS; assert solo_grid_label(model_id='EleutherAI/pythia-6.9b', seeds=SOLO_SEEDS, learning_rates=GRID_LEARNING_RATES, slot_counts=GRID_SLOT_COUNTS, precision_token='-storedbf16', digest='0' * 12) == 'cartridge-solo-grid-pythia-6.9b-storedbf16-l4-c2-n9-000000000000'\""
   ],
   "labels": {
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"
