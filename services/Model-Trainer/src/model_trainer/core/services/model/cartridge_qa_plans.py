@@ -88,6 +88,20 @@ class QaPlan(TypedDict):
             rather than assumed because the exact and mid-p rejection regions
             differ, so a power statement computed against the wrong one
             describes a test nobody ran.
+        bm25_k1: BM25 term-frequency saturation for the retrieval arms.
+        bm25_b: BM25 length normalisation for the retrieval arms.
+        retrieved_chunks: How many chunks the retrieval arms return per
+            question, and the cutoff the dense and fused arms take too.
+
+            THESE THREE WERE MODULE CONSTANTS in ``cartridge_retrieval`` --
+            1.5, 0.75 and 5 -- which is how "the cartridge beats BM25" came
+            to be reported of a single arbitrary point in BM25's parameter
+            space. BM25 is a family, and all three move the arm the cartridge
+            is being compared against. They are declared here so a record
+            carries the configuration it was measured under and so the
+            retrieval side can be swept rather than assumed. The values below
+            are the constants they replaced, so nothing already measured
+            moves.
     """
 
     model_id: str
@@ -103,6 +117,9 @@ class QaPlan(TypedDict):
     smallest_effect_of_interest: float
     alpha: float
     mcnemar_test: McNemarTest
+    bm25_k1: float
+    bm25_b: float
+    retrieved_chunks: int
 
 
 #: Fixed rather than a flag, and distinct from the loss experiment's name.
@@ -152,6 +169,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     # THE SCALE LADDER. Every field except `model_id` is copied from
     # `gpt2-wiki-qa` deliberately: the 2026-09-07 verdict -- that a cartridge
@@ -179,6 +199,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-large-wiki-qa": {
         "model_id": "gpt2-large",
@@ -194,6 +217,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-xl-wiki-qa": {
         "model_id": "gpt2-xl",
@@ -209,6 +235,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     # THE POWERED PLANS, and the reason they exist is arithmetic rather than
     # taste. The me-wiki corpus yields 32 items, and a comparison of two
@@ -243,6 +272,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-large-api-wiki-qa": {
         "model_id": "gpt2-large",
@@ -258,6 +290,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     # THE RUNG ABOVE THE GPT-2 FAMILY, and the reason it did not exist until
     # 2026-09-09 is that nobody wrote it. The ladder stopped at gpt2-xl
@@ -287,6 +322,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     # THE CAPACITY AXIS, WHICH HAD NEVER BEEN VARIED. `num_slots` was 128 in
     # every plan above, six times over, while the programme's stated mechanism
@@ -315,6 +353,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-large-api-wiki-qa-slots-64": {
         "model_id": "gpt2-large",
@@ -330,6 +371,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-large-api-wiki-qa-slots-128": {
         "model_id": "gpt2-large",
@@ -345,6 +389,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
     "gpt2-large-api-wiki-qa-slots-256": {
         "model_id": "gpt2-large",
@@ -360,6 +407,9 @@ QA_PLANS: Final[dict[str, QaPlan]] = {
         "smallest_effect_of_interest": 0.05,
         "alpha": 0.05,
         "mcnemar_test": McNemarTest.MID_P,
+        "bm25_k1": 1.5,
+        "bm25_b": 0.75,
+        "retrieved_chunks": 5,
     },
 }
 

@@ -8,6 +8,8 @@ guesses even when they are wrong.
 
 from __future__ import annotations
 
+from tests._retrieval_support import standard_index
+
 from model_trainer.core.services.model import cartridge_retrieval as retrieval
 
 #: Two documents whose sentences share almost no vocabulary, so a correct
@@ -38,7 +40,7 @@ class TestTerms:
 
 class TestBuildIndex:
     def test_it_indexes_every_sentence_as_its_own_chunk(self) -> None:
-        index = retrieval.build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
 
         assert len(index["chunks"]) == 6
         assert len(index["term_frequencies"]) == 6
@@ -50,14 +52,14 @@ class TestBuildIndex:
         Conflating the two would deflate IDF for exactly the terms that
         distinguish a chunk, which is the ranking this arm depends on.
         """
-        index = retrieval.build_index(("Sonar and sonar and sonar. Ballast alone.",))
+        index = standard_index(("Sonar and sonar and sonar. Ballast alone.",))
 
         assert index["document_frequency"]["sonar"] == 1
         assert index["term_frequencies"][0]["sonar"] == 3
 
     def test_an_empty_corpus_indexes_to_nothing_without_dividing(self) -> None:
         """Zero chunks must not raise on the average-length division."""
-        index = retrieval.build_index(())
+        index = standard_index(())
 
         assert index["chunks"] == ()
         assert index["average_length"] == 0.0
@@ -65,7 +67,7 @@ class TestBuildIndex:
 
 class TestScoreChunk:
     def test_a_chunk_sharing_no_term_scores_zero(self) -> None:
-        index = retrieval.build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
 
         assert retrieval.score_chunk(index, retrieval.terms("xylophone"), 0) == 0.0
 
@@ -75,7 +77,7 @@ class TestScoreChunk:
         "the" opens most chunks here; "sonar" appears in one. A ranking that
         ignored IDF would rate them equally and retrieve on stopwords.
         """
-        index = retrieval.build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
         sonar = next(i for i, c in enumerate(index["chunks"]) if "Sonar" in c)
 
         rare = retrieval.score_chunk(index, retrieval.terms("sonar"), sonar)
@@ -90,16 +92,82 @@ class TestScoreChunk:
         for omitting it, so a query of common words would rank the least
         relevant chunks first. Lucene's non-negative form is used instead.
         """
-        index = retrieval.build_index(("shared alpha.", "shared beta.", "shared gamma."))
+        index = standard_index(("shared alpha.", "shared beta.", "shared gamma."))
 
         assert retrieval.score_chunk(index, retrieval.terms("shared"), 0) > 0.0
 
 
+class TestTheScoringParametersAreActuallyParameters:
+    """Declared fields that nothing can move are constants with extra steps.
+
+    ``k1``, ``b`` and ``retrieved_chunks`` were module constants until
+    2026-09-09, which is how "the cartridge beats BM25" came to be reported
+    of one arbitrary point in BM25's parameter space. Moving them onto the
+    plan is only worth anything if they demonstrably change the arm, so each
+    is measured here in the direction its definition predicts.
+    """
+
+    #: One chunk repeating a term, one longer chunk holding it once. Written
+    #: to make saturation and length normalisation separately visible.
+    _MIXED = (
+        "Sonar and sonar and sonar returns. Ballast tanks flood slowly and deliberately here now.",
+    )
+
+    def test_raising_saturation_raises_the_score_of_a_repeated_term(self) -> None:
+        """``k1`` is how slowly repetition stops counting.
+
+        At a low ``k1`` the second and third occurrence add almost nothing;
+        raising it lets them count. Measured 0.9050 -> 1.1980 -> 1.4648 for
+        the three-occurrence chunk.
+        """
+        scores = [
+            retrieval.score_chunk(
+                retrieval.build_index(self._MIXED, k1=k1, b=0.75, retrieved_chunks=5),
+                retrieval.terms("sonar"),
+                0,
+            )
+            for k1 in (0.5, 1.5, 3.0)
+        ]
+
+        assert scores[0] < scores[1] < scores[2]
+
+    def test_raising_length_normalisation_penalises_the_longer_chunk(self) -> None:
+        """``b`` is how much a long chunk is discounted for its length.
+
+        At ``b = 0`` length is ignored entirely; at 1 it is charged in full.
+        The chunk measured here is longer than the corpus average, so its
+        score must fall as ``b`` rises: 0.6931 -> 0.6513 -> 0.6384.
+        """
+        scores = [
+            retrieval.score_chunk(
+                retrieval.build_index(self._MIXED, k1=1.5, b=b, retrieved_chunks=5),
+                retrieval.terms("ballast"),
+                1,
+            )
+            for b in (0.0, 0.75, 1.0)
+        ]
+
+        assert scores[0] > scores[1] > scores[2]
+
+    def test_the_index_carries_the_configuration_it_was_built_under(self) -> None:
+        """A record has to be able to say what it measured.
+
+        The values live on the index rather than in a module so that nothing
+        can score one index under two configurations by accident, and so a
+        run can report the retriever it actually ran.
+        """
+        index = retrieval.build_index(self._MIXED, k1=2.25, b=0.4, retrieved_chunks=3)
+
+        assert index["k1"] == 2.25
+        assert index["b"] == 0.4
+        assert index["retrieved_chunks"] == 3
+
+
 class TestRetrieve:
     def test_it_finds_the_chunk_the_question_is_about(self) -> None:
-        index = retrieval.build_index(_DOCUMENTS)
-
-        found = retrieval.retrieve(index, "How are sonar returns handled?", limit=1)
+        found = retrieval.retrieve(
+            standard_index(_DOCUMENTS, retrieved_chunks=1), "How are sonar returns handled?"
+        )
 
         assert "Sonar returns are filtered" in found
 
@@ -112,9 +180,9 @@ class TestRetrieve:
         words it was given -- which is a retrieval failure, and exactly the
         failure mode the oracle arm can never exhibit.
         """
-        index = retrieval.build_index(_DOCUMENTS)
-
-        found = retrieval.retrieve(index, "Which ballast trims the histogram?", limit=1)
+        found = retrieval.retrieve(
+            standard_index(_DOCUMENTS, retrieved_chunks=1), "Which ballast trims the histogram?"
+        )
 
         assert "Ballast tanks flood" in found
         assert "histograms across feature bins" not in found
@@ -126,9 +194,9 @@ class TestRetrieve:
         arm, and the accuracy reported would then be an average over only
         the items retrieval happened to serve.
         """
-        index = retrieval.build_index(_DOCUMENTS)
-
-        found = retrieval.retrieve(index, "xylophone concerto", limit=2)
+        found = retrieval.retrieve(
+            standard_index(_DOCUMENTS, retrieved_chunks=2), "xylophone concerto"
+        )
 
         assert found != ""
         assert len(found.split(". ")) >= 2
@@ -140,20 +208,18 @@ class TestRetrieve:
         before an earlier one it depends on, which changes what the prose
         says without changing which sentences were chosen.
         """
-        index = retrieval.build_index(_DOCUMENTS)
-
-        found = retrieval.retrieve(index, "ballast sonar", limit=2)
+        found = retrieval.retrieve(standard_index(_DOCUMENTS, retrieved_chunks=2), "ballast sonar")
 
         assert found.index("Sonar returns") < found.index("Ballast tanks")
 
     def test_the_limit_bounds_what_comes_back(self) -> None:
-        index = retrieval.build_index(_DOCUMENTS)
-
-        assert len(retrieval.retrieve(index, "the", limit=1).split(". ")) == 1
-        assert len(retrieval.retrieve(index, "the", limit=3).split(". ")) == 3
+        returned = retrieval.retrieve(standard_index(_DOCUMENTS, retrieved_chunks=1), "the")
+        assert len(returned.split(". ")) == 1
+        returned = retrieval.retrieve(standard_index(_DOCUMENTS, retrieved_chunks=3), "the")
+        assert len(returned.split(". ")) == 3
 
     def test_an_empty_index_retrieves_nothing(self) -> None:
-        assert retrieval.retrieve(retrieval.build_index(()), "anything") == ""
+        assert retrieval.retrieve(standard_index(()), "anything") == ""
 
 
 class TestReciprocalRankFusion:
@@ -219,7 +285,7 @@ class TestReciprocalRankFusion:
 
 class TestRankAndJoin:
     def test_ranking_returns_every_chunk_best_first(self) -> None:
-        index = retrieval.build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
 
         ranked = retrieval.rank_chunks(index, "How are sonar returns handled?")
 
@@ -228,7 +294,7 @@ class TestRankAndJoin:
 
     def test_joining_reads_back_in_corpus_order_not_rank_order(self) -> None:
         """Evidence in relevance order changes what the prose says."""
-        index = retrieval.build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
 
         joined = retrieval.join_chunks(index, [4, 3])
 

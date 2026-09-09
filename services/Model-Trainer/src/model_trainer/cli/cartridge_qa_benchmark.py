@@ -88,7 +88,6 @@ from model_trainer.core.services.model.cartridge_qa_report import (
 )
 from model_trainer.core.services.model.cartridge_question_set import build_question_set
 from model_trainer.core.services.model.cartridge_retrieval import (
-    RETRIEVED_CHUNKS,
     build_index,
     fuse_by_reciprocal_rank,
     rank_chunks,
@@ -211,7 +210,12 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     # selection, the query time here IS chargeable: searching an index from
     # the question is work every real retriever does.
     started = clock()
-    index = build_index([training_text])
+    index = build_index(
+        [training_text],
+        k1=plan["bm25_k1"],
+        b=plan["bm25_b"],
+        retrieved_chunks=plan["retrieved_chunks"],
+    )
     real_index_seconds = clock() - started
 
     started = clock()
@@ -257,7 +261,7 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         items,
         index,
         encoder,
-        [ranking[:RETRIEVED_CHUNKS] for ranking in dense_ranks],
+        [ranking[: plan["retrieved_chunks"]] for ranking in dense_ranks],
         max_seq_len=max_seq,
     )
     wait()
@@ -274,7 +278,7 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     # so a reader can add whichever total they mean.
     started = clock()
     fused_ranks = [
-        fuse_by_reciprocal_rank(ranking, rank_chunks(index, query), limit=RETRIEVED_CHUNKS)
+        fuse_by_reciprocal_rank(ranking, rank_chunks(index, query), limit=plan["retrieved_chunks"])
         for ranking, query in zip(dense_ranks, queries, strict=True)
     ]
     fused_select_seconds = clock() - started

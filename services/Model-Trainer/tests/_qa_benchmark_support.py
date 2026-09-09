@@ -66,6 +66,9 @@ TINY_PLAN: QaPlan = {
     "smallest_effect_of_interest": 0.9,
     "alpha": 0.05,
     "mcnemar_test": McNemarTest.MID_P,
+    "bm25_k1": 1.5,
+    "bm25_b": 0.75,
+    "retrieved_chunks": 5,
 }
 
 #: Six documents, each naming its own subject in several sentences.

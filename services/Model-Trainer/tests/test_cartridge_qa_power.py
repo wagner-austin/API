@@ -46,6 +46,9 @@ def _plan(effect: float, alpha: float = 0.05, test: McNemarTest = McNemarTest.MI
         smallest_effect_of_interest=effect,
         alpha=alpha,
         mcnemar_test=test,
+        bm25_k1=1.5,
+        bm25_b=0.75,
+        retrieved_chunks=5,
     )
 
 

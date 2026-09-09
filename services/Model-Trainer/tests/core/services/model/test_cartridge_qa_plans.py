@@ -77,6 +77,9 @@ def _redrawn(
         smallest_effect_of_interest=plan["smallest_effect_of_interest"],
         alpha=plan["alpha"],
         mcnemar_test=plan["mcnemar_test"],
+        bm25_k1=plan["bm25_k1"],
+        bm25_b=plan["bm25_b"],
+        retrieved_chunks=plan["retrieved_chunks"],
     )
 
 

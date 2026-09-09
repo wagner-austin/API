@@ -14,9 +14,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import torch
+from tests._retrieval_support import standard_index
 
 from model_trainer.core.services.model import cartridge_dense as dense
-from model_trainer.core.services.model.cartridge_retrieval import build_index
 
 _DOCUMENTS: tuple[str, ...] = (
     "The submarine navigates by inertial dead reckoning under the ice. "
@@ -104,7 +104,7 @@ class TestRankBySimilarity:
 
 class TestEmbedChunks:
     def test_it_embeds_the_corpus_once_and_returns_a_row_per_chunk(self) -> None:
-        index = build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
         embed = _planted(dict.fromkeys(index["chunks"], (1.0, 0.0)))
 
         vectors = dense.embed_chunks(index, embed)
@@ -119,12 +119,12 @@ class TestEmbedChunks:
         def refuse(texts: Sequence[str], /) -> torch.Tensor:
             raise AssertionError("the embedder ran on an empty index")
 
-        assert dense.embed_chunks(build_index(()), refuse).shape == (0, 0)
+        assert dense.embed_chunks(standard_index(()), refuse).shape == (0, 0)
 
 
 class TestDenseRanking:
     def test_it_ranks_the_chunk_whose_meaning_matches(self) -> None:
-        index = build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
         sonar = next(i for i, c in enumerate(index["chunks"]) if "Sonar" in c)
         other = 1 - sonar
         embed = _planted(
@@ -148,7 +148,7 @@ class TestDenseRanking:
         BM25's 72 -- a 240x gap that measured a design nobody deploys. A
         per-request path may embed exactly one text: the question.
         """
-        index = build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
         embed = _planted(dict.fromkeys(index["chunks"], (1.0, 0.0)))
         vectors = dense.embed_chunks(index, embed)
         seen: list[int] = []
@@ -165,7 +165,7 @@ class TestDenseRanking:
         """Fusion combines POSITIONS, so a truncated ranking would give the
         dense arm no opinion about chunks it merely rated lower.
         """
-        index = build_index(_DOCUMENTS)
+        index = standard_index(_DOCUMENTS)
         embed = _planted({index["chunks"][0]: (1.0, 0.0)})
         vectors = dense.embed_chunks(index, embed)
 

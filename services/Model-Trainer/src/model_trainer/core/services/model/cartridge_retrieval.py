@@ -41,23 +41,21 @@ from typing_extensions import TypedDict
 
 from model_trainer.core.services.model.corpus_cloze import sentences
 
-#: BM25 term-frequency saturation. The standard value; a term occurring ten
-#: times in a chunk is not ten times as much evidence as one occurrence.
-K1 = 1.5
-
-#: BM25 length normalisation. The standard value: a long chunk matching a term
-#: is weaker evidence than a short one matching it.
-B = 0.75
-
-#: How many chunks one query retrieves.
-#:
-#: Five rather than one because the oracle arm concatenates EVERY sentence
-#: containing the answer, so a single-chunk retriever would be compared
-#: against a baseline carrying several sentences and would lose on evidence
-#: volume rather than on selection. Five is also small enough that
-#: `with_evidence` truncation is driven by the model's window rather than by
-#: this constant.
-RETRIEVED_CHUNKS = 5
+# THESE WERE MODULE CONSTANTS -- K1 = 1.5, B = 0.75, RETRIEVED_CHUNKS = 5 --
+# AND THAT IS WHY THE RETRIEVAL SIDE WAS THREE FIXED POINTS. A cartridge is
+# reported as beating or losing to "BM25", and BM25 is a family: its
+# saturation, its length normalisation and how many chunks it returns all
+# move the arm it names. Frozen at their standard values, in a module nothing
+# had to declare, they made the retriever look like a constant of nature
+# rather than a configuration somebody chose. Registered as this arm's
+# frozen-by-copy knobs in the 2026-09-09 audit and moved onto the plan, where
+# they can be swept and where a record carries the values it was measured
+# under.
+#
+# They live on the INDEX rather than being threaded through every scoring
+# call because the index is what a measurement builds once and reads many
+# times, and binding them there makes it impossible to score one index under
+# two configurations by accident.
 
 #: Words, lowercased. Deliberately crude: BM25's strength is that it needs no
 #: model, and a clever tokenizer here would be a second, untested one beside
@@ -92,6 +90,16 @@ class Bm25Index(TypedDict):
             (query term, chunk) pair.
         document_frequency: Per term, how many chunks contain it at all.
         average_length: Mean chunk length, the normaliser BM25 divides by.
+        k1: Term-frequency saturation. A term occurring ten times in a chunk
+            is not ten times as much evidence as one occurrence, and how
+            quickly that flattens is this number.
+        b: Length normalisation, in ``[0, 1]``. At 0 a long chunk is not
+            penalised for its length at all; at 1 it is penalised in full.
+        retrieved_chunks: How many chunks one query returns. Part of the
+            index because it is part of the ARM: an oracle that concatenates
+            every sentence containing the answer is not comparable to a
+            single-chunk retriever, and the difference would read as
+            selection quality rather than as evidence volume.
     """
 
     chunks: tuple[str, ...]
@@ -99,6 +107,9 @@ class Bm25Index(TypedDict):
     chunk_lengths: tuple[int, ...]
     document_frequency: Mapping[str, int]
     average_length: float
+    k1: float
+    b: float
+    retrieved_chunks: int
 
 
 def terms(text: str) -> list[str]:
@@ -116,18 +127,29 @@ def terms(text: str) -> list[str]:
     return [match.group(0) for match in _WORD.finditer(text.lower())]
 
 
-def build_index(documents: Sequence[str]) -> Bm25Index:
-    """Index a corpus's sentences for retrieval.
+def build_index(
+    documents: Sequence[str], *, k1: float, b: float, retrieved_chunks: int
+) -> Bm25Index:
+    """Index a corpus's sentences for retrieval, under a stated configuration.
 
     OFFLINE WORK, and timed as such by callers. A deployment builds this once
     when its corpus changes, not once per question, so charging it to
     per-query latency would overstate retrieval by however long indexing
     happens to take.
 
+    THE THREE PARAMETERS ARE KEYWORD-ONLY AND HAVE NO DEFAULTS. They used to
+    be module constants, which is how "the cartridge beats BM25" came to be
+    said of one arbitrary point in BM25's parameter space. A caller that has
+    not decided what saturation it is measuring under has not decided what it
+    is measuring.
+
     Args:
         documents: Document bodies. Split into sentences by the same splitter
             the item builder and the oracle arm use, so all three agree on
             what a sentence is.
+        k1: Term-frequency saturation.
+        b: Length normalisation.
+        retrieved_chunks: How many chunks a query returns.
 
     Returns:
         The index. Empty of chunks when the corpus yields no sentences, which
@@ -155,6 +177,9 @@ def build_index(documents: Sequence[str]) -> Bm25Index:
         # never runs without chunks, so the value is unused, and guarding it
         # here keeps the arithmetic below unconditional.
         average_length=total / float(len(chunks)) if chunks else 0.0,
+        k1=k1,
+        b=b,
+        retrieved_chunks=retrieved_chunks,
     )
 
 
@@ -184,11 +209,13 @@ def score_chunk(index: Bm25Index, query_terms: Sequence[str], chunk: int) -> flo
         # WORSE for containing a common query word than for omitting it.
         idf = math.log(1.0 + (total_chunks - containing + 0.5) / (containing + 0.5))
         normalised = length / index["average_length"]
-        score += idf * (occurrences * (K1 + 1.0)) / (occurrences + K1 * (1.0 - B + B * normalised))
+        k1 = index["k1"]
+        b = index["b"]
+        score += idf * (occurrences * (k1 + 1.0)) / (occurrences + k1 * (1.0 - b + b * normalised))
     return score
 
 
-def retrieve(index: Bm25Index, query: str, *, limit: int = RETRIEVED_CHUNKS) -> str:
+def retrieve(index: Bm25Index, query: str) -> str:
     """Retrieve the best chunks for one question.
 
     RETURNS ITS TOP CHOICES EVEN WHEN NOTHING MATCHES, which is deliberate
@@ -206,13 +233,12 @@ def retrieve(index: Bm25Index, query: str, *, limit: int = RETRIEVED_CHUNKS) -> 
         index: The index to search.
         query: The question, as the asker wrote it. The ANSWER is not an
             argument here, and that is the whole difference from the oracle.
-        limit: How many chunks to return.
 
     Returns:
         The chosen chunks joined by spaces, in corpus order. Empty when the
         index holds no chunks.
     """
-    return join_chunks(index, rank_chunks(index, query)[:limit])
+    return join_chunks(index, rank_chunks(index, query)[: index["retrieved_chunks"]])
 
 
 def rank_chunks(index: Bm25Index, query: str) -> tuple[int, ...]:
@@ -332,10 +358,7 @@ def _first_positions(ranked: Sequence[int]) -> dict[int, int]:
 
 
 __all__ = [
-    "K1",
-    "RETRIEVED_CHUNKS",
     "RRF_K",
-    "B",
     "Bm25Index",
     "build_index",
     "fuse_by_reciprocal_rank",
