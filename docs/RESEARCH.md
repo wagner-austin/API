@@ -573,13 +573,40 @@ test and by image smoke.
   headroom-to-a-common-floor, and the training-side deficit
   (GPT-2-tuned hyperparameters on 4096-dim KV geometry, or NF4
   gradient quality) is real and is what any recovery rung must fix.
-- **Open, filed rather than implied:** a 7B composition rung remains
-  unjustified — solo gain ~0.16 mean with an ~11%-at-n=9 hard-failure
-  rate is no precondition to compose on; the 7B recovery levers, now
-  ordered by the evidence (a hyperparameter rung — slot count /
-  learning rate scaled to the architecture — and an unquantized-bf16
-  precision control, which the certified NF4 determinism makes cheap
-  to compare); the mechanism of the mid-depth valley; the remaining
+- **The bf16 precision control (board task `c4b9a01b`, the loader's
+  third declared state landed in `f4447989`, image v46 `bd6ca365…`;
+  jobs 55833896 + twin 55833931, ~9 min each — half NF4's wall clock —
+  records BYTE-IDENTICAL sha256 `445e345f…` ACROSS NODES gpu-24-07 and
+  gpu-l54-07, the arc's first full cross-node byte identity on a 7B
+  record): **NF4 is exonerated — the 7B training deficit is not the
+  4-bit weights.** Same nine seeds, same knobs, quantization removed:
+  mean +0.102, spread 0.248, two negative draws (vs NF4's +0.160,
+  0.320, one negative; failures do not co-occur by seed, so failure is
+  regime-level, not seed-intrinsic). Paired per-seed, bf16 − NF4 reads
+  −0.058 ± 0.032 (t = −1.80, df 8, not significant; MDE 0.075 nats):
+  whatever NF4 costs or saves is bounded far below the 0.67-nat
+  family-vs-7B deficit. By elimination among the filed mechanisms, the
+  training-side deficit is the HYPERPARAMETER/ARCHITECTURE mismatch —
+  GPT-2-tuned lr/slots/epochs on 4096-dim KV geometry — riding on the
+  attributed headroom component.
+- **Minimum-detectable-effect rows for this program's published null
+  claims** (adopting the machine-wide MDE standard, 2026-09-08; all
+  computed from per-seed rows already in the records, no new runs):
+  the 1.5B n8-equals-n4 tie holds with numbers attached — LM observed
+  +0.0004 against an MDE of 0.019, invariance +0.0001 against 0.068 —
+  and the objectives' diverse-n4 tie at 1.5B holds (−0.008 against an
+  MDE of 0.047). ONE CLAIM IS CORRECTED: at 1.5B diverse n8 the paired
+  test RESOLVES what the range-based floor could not — invariance sits
+  −0.0088 ± 0.0014 below the LM objective (t ≈ −6.5), so "tie" was the
+  wrong word. The difference is ~1% of the alone gain and changes no
+  operating decision, but it is a resolved small LM advantage, not a
+  tie, and the floor instrument's blindness to paired effects is
+  exactly why these rows now exist.
+- **Open, filed rather than implied:** the 7B recovery lever is now
+  singular — a hyperparameter rung (slot count / learning rate scaled
+  to the architecture) — since precision is ruled out and headroom is
+  measured; a 7B composition rung stays unjustified until solo gains
+  exist reliably; the mechanism of the mid-depth valley; the remaining
   0.30 content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
@@ -620,6 +647,60 @@ name appeared nowhere here — was mine, and another session bridged it.
   a property:** it held for 2.6.0+cu124 → 2.7.1+cu128; the next toolchain
   starts unproven. Full narrative: personal wiki,
   `a-loss-agrees-where-the-computation-does-not` footnote 22 (`e2be2a3`).
+- **What the zeros exclude — power audit, board `ab5b9882`, 2026-09-08.**
+  Every verdict above is a ZERO-FAILURE identity claim, so neither a
+  t-based MDE nor McNemar applies: there is no spread to divide by, and
+  feeding `sd=0` into `t_crit*sd/sqrt(n)` returns 0 and reads as perfect
+  power. The instrument is the exact one-sided Clopper-Pearson bound
+  `1 - 0.05^(1/n)` — the largest per-comparison divergence rate that could
+  still have produced zero observed divergences:
+
+  | claim | comparisons | 95% UB | expected divergences in a 2,627-item run |
+  |---|---|---|---|
+  | ordered train_step, cross-card | 1,283 | 0.233% | 6.1 |
+  | full-set outcomes digest, cross-card | 2,627 | 0.114% | 3.0 |
+  | attention stages, cross-card | 140 | 2.117% | 55.6 |
+  | ordered gemm, cross-card | 93 | 3.170% | 83.3 |
+  | pooled over the four | 4,143 | 0.072% | 1.9 |
+
+  The digest row is the TIGHTEST, not the weakest: a sha256 over 2,627
+  items is a conjunction, so one differing item breaks it and it evidences
+  2,627 agreements rather than one.
+  **Stated threshold of practical interest: one divergence in a full
+  2,627-item scoring run, 0.0381%** — the scale this project operates at.
+  Against it every row is **NOT TESTED**, pooled included: the data are
+  consistent with a rate that would put a few divergent items in a full
+  run. Against a coarser 1% bar the two large rows are TESTED and the gemm
+  and attention rows are not. The verdicts are not wrong; what they
+  exclude is narrower than "bit-identical" reads.
+- **`186` is a RECORD count and `93` is the comparison count, and the
+  documents disagree.** This entry says cross-card `gemm 186/186`; the
+  personal-wiki narrative says the cards "agree on all 93 ordered ones"
+  against "18 of 93 vendor gemm digests". The ledger
+  (`tools/hpc3/runs/ledger.jsonl`, project `mi-cu128`) shows the L40S ran
+  only the `cublas` and `ordered` gemm arms — `owned`, `fp64`, `rank1` and
+  `sdpa` are RTX PRO 6000 only — so 186 cannot be ordered+owned cross-card
+  (owned has no L40S counterpart) and cannot include cublas (18 of 93).
+  The reconcilable reading is 93 shapes across 2 cards = 186 records
+  forming **93 comparisons**. It matters because reporting 186 as the
+  comparison count halves the stated uncertainty, 1.598% against 3.170%;
+  the table above therefore uses the conservative 93. Collapsing this
+  needs a read of `/pub/wagnera3/gemm/cu128-v1/*-ordered.json`, which is
+  cluster-only and was not reachable from this checkout.
+- **The run-level axis is n=1, and it is a different question.**
+  Bit-identity across 2,627 items says nothing about whether a FRESH pair
+  of runs reproduces it — that is the axis determinism pins address, and
+  it was observed once per arm, so its 95% bound is 95% and vacuous. The
+  cross-card question here is well evidenced; the repeat question is not
+  evidenced at all, and pinned determinism is not a substitute for
+  measuring it.
+- **The cross-boundary term is MEASURED, and large where the owned kernels
+  are not used.** Same card pair, same pins, same battery, same hour:
+  vendor cuBLAS gemm digests agree on 18 of 93, so **80.6% diverge**. The
+  ordered/owned arms' bit-identity is a property of THOSE KERNELS, not of
+  the card pair, and transfers to no arm calling vendor cuBLAS. Any future
+  comparison crossing this boundary on a vendor arm must carry that term;
+  a p-value from replicate spread cannot see it.
 - **Two toolchain defects banked, fixed at root:** torch 2.7's SDPA
   eligibility APIs initialise CUDA even for a CPU-device probe, fatal on
   driverless build nodes (`d6363b9b`); and `ordered_kernels`' gemm/bench
@@ -1094,9 +1175,24 @@ name appeared nowhere here — was mine, and another session bridged it.
   is the one that matters here, because `scripts/guard.py` is byte-identical
   across all 41 packages. Guard-pass showed NO detectable difference across
   three sweeps (mid-p 0.84 on the last), and the combined rate sits near 2%,
-  which is a floor where the metric has almost no power to move: 226 items
-  gave 5 discordant pairs and a power of 0.21, where roughly 800 items would
-  be needed for 0.73. The first two sweeps were void for reasons recorded on
+  which is a floor where the metric has almost no power to move.
+  **NOT TESTED, and for two strata not testable** — the counts in the
+  previous sentence were crossed between strata, which mattered because
+  the discordant count is exactly what decides falsifiability. Corrected
+  against the four `comparison.json` files 2026-09-08: the 226-item
+  all-scored stratum gave **6** discordant pairs (3v3, mid-p 0.844); the
+  **5** discordant pairs and the 5.6% rate behind the power figure of 0.21
+  belong to the 90-item finished-in-both-arms stratum, not to the 226.
+  McNemar conditions on the *d* discordant pairs, so the smallest p a
+  stratum can produce is `2*0.5^d` at a *d*:0 split — 0.0625 at *d*=5,
+  above α=0.05. **The finished (n=90, d=5) and clean-import (n=49, d=5)
+  strata could not have rejected under any outcome**, and their reported
+  `exact_p` of 1.0 could not have been anything else. Against a stated
+  threshold of +5 pp absolute guard-pass, all three strata are NOT TESTED;
+  the classification is insensitive to that threshold, since every
+  stratum's minimum detectable effect already equals or exceeds its own
+  base pass rate. Roughly 800 items reach power 0.73. Full derivation and
+  the strata table: `wiki/pages/code-style-guard-pass-instrument-limits.md`. The first two sweeps were void for reasons recorded on
   the board: a token budget that truncated 83% of completions, and before that
   an unscoped guard invocation that gave every item the same verdict.
 - **Not novel, and the task spec that says otherwise is wrong.** A systematic
