@@ -602,11 +602,35 @@ test and by image smoke.
   operating decision, but it is a resolved small LM advantage, not a
   tie, and the floor instrument's blindness to paired effects is
   exactly why these rows now exist.
-- **Open, filed rather than implied:** the 7B recovery lever is now
-  singular — a hyperparameter rung (slot count / learning rate scaled
-  to the architecture) — since precision is ruled out and headroom is
-  measured; a 7B composition rung stays unjustified until solo gains
-  exist reliably; the mechanism of the mid-depth valley; the remaining
+- **The hyperparameter rung (board task `47d5f8c6`, operator-directed;
+  `cartridge_solo_grid` CLI, commit `103bdaf7`, image v47 `290794b0…`
+  from `fcb39991`; jobs 55841983 + twin 55841997, 1h08m each, records
+  BYTE-IDENTICAL sha256 `bc18d701…`, same-node hpc3-gpu-k54-05; the
+  in-grid anchor cell lr0.01×c64 reproduces the certified `445e345f`
+  bf16 record BIT-FOR-BIT, seed for seed, so the grid reads):
+  **REFUTED in the measured ranges — the recorded knobs already sit at
+  the grid's maximum, and neither learning rate nor capacity recovers
+  the 7B solo gain.** The lr bracket is well-formed around 0.01: at
+  0.001 every seed is negative at both slot counts (means −0.17/−0.34),
+  at 0.03 training diverges catastrophically (means −0.63 to −1.67,
+  spreads up to 2.98, nine of nine negative), and 0.003 is
+  indistinguishable-to-worse (−0.039 vs anchor, t −1.04). Capacity
+  NEVER helps: 256 slots ≤ 64 slots at every learning rate, and at
+  lr 0.003 significantly worse (−0.134 vs anchor, t −5.19). The
+  winning cell IS the anchor — the recorded knobs — whose deployable
+  NF4 form is already certified (`353ab575`), so acceptance's
+  winner-under-NF4 leg is the existing record, not a new run. Standing
+  verdict after three eliminations (headroom measured, NF4 exonerated,
+  lr/slots refuted): at 12 epochs, ~0.10-0.16 nats IS the 7B solo
+  regime for KV-prefix cartridge training on this corpus, and the
+  ~0.36-nat residual to the family's adapted floor is not reachable by
+  any knob measured so far.
+- **Open, filed rather than implied:** the last unmeasured training
+  axis at 7B (epochs / optimizer schedule) — and, if that also fails,
+  the honest conclusion becomes that KV-prefix capacity itself does
+  not transfer into this architecture at this scale, a finding about
+  the METHOD rather than the tuning; a 7B composition rung stays
+  unjustified; the mechanism of the mid-depth valley; the remaining
   0.30 content gap at medium n8.
 
 ### `mi-cu128` — the Blackwell determinism baseline
