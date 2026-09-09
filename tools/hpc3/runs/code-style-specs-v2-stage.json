@@ -1,0 +1,22 @@
+{
+  "destination": "/pub/wagnera3/code-style/specs",
+  "provenance": {
+    "what": "The two generation specs for the v2 base/candidate comparison, staged through hpc3-stage rather than copied by hand",
+    "why": "Two arms MUST differ in exactly one field or the comparison is confounded. These specs carry max_new_tokens, max_prompt_tokens, batch_size, repetition_penalty, seed, the holdout path and the adapter path; the only field that differs between them is `arm`. A digest per spec makes that checkable after the fact instead of re-read by eye.",
+    "arms": "base and candidate name the SAME artifact_path deliberately -- model_trainer's _default_load_continuation_arm reattaches the adapter for `candidate` and loads the weights it was trained from for `base`, so sharing the path is what guarantees the base arm is the exact model the adapter came from",
+    "generated": "jobs 55809956 (base, 6297s) and 55809960 (candidate, 8191s), both A30, from the adapter e675f88218fd",
+    "holdout": "code-corpus-v2.holdout.jsonl, sha256 5c1697e2fe06..., referenced BY PATH from inside these specs rather than on the command line -- which is a gap the command-line input check cannot see and this record does not close"
+  },
+  "files": [
+    {
+      "name": "code-style-gen-v2-base.json",
+      "sha256": "ffe2e6716c6202740eee580584a60e00efd056e422c3dc3f2537df4ad355944d",
+      "size_bytes": 486
+    },
+    {
+      "name": "code-style-gen-v2-candidate.json",
+      "sha256": "f661a9e3ae9340c5188a5f5edc38f1b69e4f68aa5721e8fc61c5a81c596c90dc",
+      "size_bytes": 496
+    }
+  ]
+}

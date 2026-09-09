@@ -1,0 +1,27 @@
+# Independent digest record: code-style v2 payload and generation specs
+#
+# --expect-from is REQUIRED by hpc3-stage, and this file is what makes it mean
+# something. Its value is not that it verifies the first staging -- nothing
+# can, for bytes never published before -- but that it is written separately
+# from the manifest, so a manifest edited to match a wrong file no longer
+# agrees with anything. A record derived from the manifest would agree with it
+# by construction and check nothing.
+#
+# Recorded 2026-09-09 from the repo copies in tools/hpc3/runs/, which is where
+# these three documents live and are version-controlled.
+#
+# THE PAYLOAD IS WHAT DECIDES WHAT TRAINS: model_family, hub_model_id,
+# finetuning_strategy, max_seq_len, num_epochs, batch_size, learning_rate,
+# seed, precision and corpus_file_id. The two generation specs must differ in
+# exactly one field -- `arm` -- or the comparison they feed is confounded, and
+# a digest per spec is what makes that checkable after the fact rather than
+# re-read by eye.
+#
+# Checked 2026-09-09 against the bytes already on the cluster: the payload
+# matched (c3ad98bf...), so the run that produced adapter e675f88218fd used
+# these exact bytes. That was true by luck rather than by record; this file is
+# the record.
+
+c3ad98bf9caf08ef82f168b5b461afcc57ac481d9a9a1f580a405c39501e8cd2  code-style-qlora-v2.json
+ffe2e6716c6202740eee580584a60e00efd056e422c3dc3f2537df4ad355944d  code-style-gen-v2-base.json
+f661a9e3ae9340c5188a5f5edc38f1b69e4f68aa5721e8fc61c5a81c596c90dc  code-style-gen-v2-candidate.json

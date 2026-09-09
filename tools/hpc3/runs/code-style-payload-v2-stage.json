@@ -1,0 +1,18 @@
+{
+  "destination": "/pub/wagnera3/code-style/payloads",
+  "provenance": {
+    "what": "The training payload for code-style-qlora-qwen-v2, staged through hpc3-stage rather than copied by hand",
+    "why": "This file decides what trains -- model_family, hub_model_id, finetuning_strategy, max_seq_len, num_epochs, batch_size, learning_rate, seed, precision AND corpus_file_id. Until 2026-09-09 it reached /pub by scp with no manifest, no digest and no record, while the corpus beside it went through four checks. A stale or edited payload produces a run that completes and is comparable to nothing.",
+    "trained": "job 55806443, 3731s on an A30 (hpc3-gpu-l54-09), image digest 5dfd78a7eb14, adapter sha256 e675f88218fd",
+    "corpus": "corpus_file_id 801a7820... , itself staged and certified by code-style-train-corpus-v2-stage.json",
+    "retrospective": "The bytes on the cluster already matched this repo copy when checked on 2026-09-09 -- c3ad98bf... on both sides. That is evidence and NOT provenance: nothing recorded the transfer, nothing prevented drift in the interval, and nothing would have reported it if it had drifted. This staging is what makes the same claim checkable rather than lucky.",
+    "v1": "code-style-qlora-v1.json reached /pub the same unrecorded way and is NOT retrospectively certifiable. That run's corpus can be proved; its hyperparameters cannot."
+  },
+  "files": [
+    {
+      "name": "code-style-qlora-v2.json",
+      "sha256": "c3ad98bf9caf08ef82f168b5b461afcc57ac481d9a9a1f580a405c39501e8cd2",
+      "size_bytes": 1488
+    }
+  ]
+}
