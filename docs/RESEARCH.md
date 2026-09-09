@@ -1415,13 +1415,27 @@ name appeared nowhere here — was mine, and another session bridged it.
   `--layout` and `--population-seed` now state the world, and omitting
   either under `--sweep` or a set `SLURM_ARRAY_TASK_ID` is refused rather
   than defaulted.
-- **Registered but NOT YET RUNNABLE, and this is the honest state rather
-  than an oversight.** `/pub/wagnera3/envs/tankpit` does not exist. The
-  monorepo IS staged at `/pub/wagnera3/api` (at commit `80221ea`, behind this
-  tree), the cluster's system Python is 3.9 where this package needs 3.11,
-  and there is no Poetry on the login node. `hpc3-preflight` reports the
-  missing environment, which is the correct refusal; nothing has been
-  submitted. The remaining work is provisioning, not registration.
+- **Provisioned and run on 2026-09-02/03, six jobs, read off `sacct` rather
+  than described.** `55714246 image-v1` and `55718094 image-v2` built the
+  container; `55715577 tankpit-sim-v1r3` (1:12) and `55718398
+  tankpit-sim-v2clean` (1:22) completed, after `55715554 v1r1` and `55715564
+  v1r2` failed inside two seconds. `/pub/wagnera3/envs/tankpit` exists,
+  created `Sep 2 22:15`. The remaining work is scale, not provisioning.
+- **This bullet said the opposite for seven days, and the gap was
+  thirty-four minutes.** Until 2026-09-09 it read "Registered but NOT YET
+  RUNNABLE… `/pub/wagnera3/envs/tankpit` does not exist… nothing has been
+  submitted," written in `d0207823` at 21:41 on 2026-09-02. The environment
+  appeared at 22:15 and the first job ran at 22:36 — **the entry was TRUE
+  when written and stale within the hour**, by its own project's
+  provisioning. That is the opposite history from the `rusted` entry above,
+  which was false at the moment of writing with 2,065 jobs already behind
+  it, and the two are worth keeping side by side: the same symptom reached
+  from opposite directions, and neither detectable by anything in this
+  repository. `test_committed_runs.py` passes either way, both clients'
+  `runs/` are gitignored, and the ledger that knows what ran lives on the
+  cluster. **Run state is the ledger's answer and this file should not
+  assert it** — which is why the bullet above cites job ids instead of
+  claiming a condition.
 - **It ships an image, and the image is self-contained.** v2 at
   `/pub/wagnera3/tankpit/images/v2/tankpit.sif`, sha256 `0cfdd5592a1a…`,
   127 MB, `env_path` `/opt/env`, built from commit `bccf5afa`.
