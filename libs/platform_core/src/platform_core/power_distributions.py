@@ -269,7 +269,22 @@ def binomial_point_probability(minority: int, discordant_pairs: int) -> float:
     extreme = min(minority, discordant_pairs - minority)
     # ``1 << n`` rather than ``2 ** n``: integer arithmetic all the way to the
     # final division is what keeps the value exact rather than accumulated.
-    return math.comb(discordant_pairs, extreme) / float(1 << discordant_pairs)
+    #
+    # AND THE DIVISION IS int BY int, WHICH IS THE WHOLE POINT. A ``float()``
+    # around the denominator converts it BEFORE dividing, and ``2 ** 1024``
+    # exceeds the largest finite double -- so this raised OverflowError for
+    # every question set of 1024 discordant pairs or more, measured
+    # 2026-09-09 at n=1537. That is not an exotic size: this workspace's own
+    # corpus-extraction ablation ran 2,627 items, and the cartridge question
+    # sets are being scaled toward that number precisely because the small
+    # ones could not resolve anything. The instrument could not measure the
+    # regime it was being used to argue for.
+    #
+    # Python's int/int true division is correctly rounded at arbitrary
+    # precision and overflows only if the QUOTIENT is unrepresentable, which
+    # a probability never is. So removing the cast is both the fix and
+    # strictly more exact than what it replaced.
+    return math.comb(discordant_pairs, extreme) / (1 << discordant_pairs)
 
 
 def exact_mcnemar_p(minority: int, discordant_pairs: int) -> float:
@@ -291,8 +306,27 @@ def exact_mcnemar_p(minority: int, discordant_pairs: int) -> float:
     if discordant_pairs == 0:
         return 1.0
     extreme = min(minority, discordant_pairs - minority)
-    tail = sum(math.comb(discordant_pairs, k) for k in range(extreme + 1))
-    return min(1.0, 2.0 * tail / float(1 << discordant_pairs))
+    # THE TAIL IS ACCUMULATED BY RECURRENCE, NOT BY RECOMPUTING EACH TERM.
+    # ``comb(n, k+1) == comb(n, k) * (n - k) // (k + 1)`` exactly, in integers,
+    # because the product is always divisible. The obvious
+    # ``sum(math.comb(n, k) for k in ...)`` builds every coefficient from
+    # scratch, which is quadratic in big-integer work and measured 2026-09-09
+    # at 0.75 s for 1,024 discordant pairs, 7.17 s for 1,537 and over 107 s
+    # for 2,627 -- the size this workspace's own corpus-extraction ablation
+    # ran, and the size the cartridge question sets are being scaled toward.
+    # An instrument that cannot be evaluated at the sample size it recommends
+    # is one people stop consulting.
+    term = 1
+    tail = 1
+    for k in range(extreme):
+        term = term * (discordant_pairs - k) // (k + 1)
+        tail += term
+    # ``2 * tail`` and the shift both stay INTEGERS until the single division,
+    # for the reason :func:`binomial_point_probability` records. Note that
+    # ``2.0 * tail`` would have overflowed on its own, before the denominator
+    # was ever reached: the tail sum is itself astronomically large at the
+    # item counts this module is used to justify.
+    return min(1.0, 2 * tail / (1 << discordant_pairs))
 
 
 def mid_p_mcnemar_p(minority: int, discordant_pairs: int) -> float:

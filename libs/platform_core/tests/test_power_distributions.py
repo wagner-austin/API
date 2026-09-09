@@ -159,3 +159,97 @@ class TestMcNemarPValues:
         with pytest.raises(AppError) as excinfo:
             exact_mcnemar_p(minority, discordant)
         assert excinfo.value.code is StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID
+
+
+def _tail_from_the_definition(minority: int, discordant_pairs: int) -> float:
+    """Compute the exact two-sided p from the textbook sum, term by term.
+
+    The definition the optimised implementation must agree with, written the
+    obvious way: every binomial coefficient built independently by
+    :func:`math.comb`. Slow and unmistakable, which is what an oracle is for.
+
+    Args:
+        minority: Count in one discordant cell.
+        discordant_pairs: Total discordant pairs.
+
+    Returns:
+        The two-sided exact conditional p-value.
+    """
+    extreme = min(minority, discordant_pairs - minority)
+    tail = sum(math.comb(discordant_pairs, k) for k in range(extreme + 1))
+    return min(1.0, 2 * tail / (1 << discordant_pairs))
+
+
+class TestLargeDiscordantCounts:
+    """The regime these helpers are used to ARGUE FOR, and could not enter.
+
+    Both failures were measured on 2026-09-09 while sizing a cartridge
+    question set against this module. They matter because the sizes involved
+    are not hypothetical: the workspace's own corpus-extraction ablation ran
+    2,627 items, and that is the number the cartridge sets are being scaled
+    toward precisely because the small ones resolved nothing.
+    """
+
+    @pytest.mark.parametrize("discordant", [1024, 1200, 2627])
+    def test_a_thousand_or_more_pairs_returns_a_probability(self, discordant: int) -> None:
+        """``float(1 << n)`` exceeded the largest double at n = 1024.
+
+        The denominator was converted BEFORE the division, so every call at
+        or above 1,024 discordant pairs raised ``OverflowError`` rather than
+        returning a probability. Asserted AT THE CENTRE of the distribution,
+        where the value is comfortably representable -- the balanced split's
+        point probability is about ``sqrt(2 / (pi * n))`` -- so the test
+        proves the arithmetic ran rather than merely that nothing was raised.
+
+        Args:
+            discordant: Total discordant pairs.
+        """
+        centre = binomial_point_probability(discordant // 2, discordant)
+
+        assert math.isfinite(centre)
+        assert centre == pytest.approx(math.sqrt(2.0 / (math.pi * discordant)), rel=1e-3)
+        assert exact_mcnemar_p(discordant // 2, discordant) == pytest.approx(1.0, abs=0.05)
+
+    @pytest.mark.parametrize("discordant", [1200, 2627])
+    def test_the_most_extreme_split_underflows_to_zero_rather_than_raising(
+        self, discordant: int
+    ) -> None:
+        """``2 ** -1200`` is below the smallest denormal, and that is correct.
+
+        The rounded value of a 0-versus-1200 split really is zero to double
+        precision, and zero is the right answer for ``can_ever_reject`` to
+        read -- such a split rejects at any alpha. Pinned so that a later
+        change cannot turn a correct underflow into an exception, or a
+        sentinel, without a test noticing.
+
+        Args:
+            discordant: Total discordant pairs.
+        """
+        assert binomial_point_probability(0, discordant) == 0.0
+        assert exact_mcnemar_p(0, discordant) == 0.0
+
+    def test_the_tail_recurrence_equals_the_definition_at_every_split(self) -> None:
+        """The optimisation must be an optimisation and nothing else.
+
+        Exhaustive over every split of every size up to 120: the recurrence
+        ``comb(n, k+1) == comb(n, k) * (n - k) // (k + 1)`` is exact in
+        integers, so agreement should be bit-for-bit rather than approximate,
+        and that is what is asserted.
+        """
+        for discordant in range(0, 121):
+            for minority in range(discordant + 1):
+                assert exact_mcnemar_p(minority, discordant) == _tail_from_the_definition(
+                    minority, discordant
+                )
+
+    def test_the_resolvable_difference_shrinks_as_the_set_grows(self) -> None:
+        """Sanity on the direction, since the whole gate depends on it.
+
+        More items must resolve smaller differences, or a plan could be
+        refused for having too much data.
+        """
+        smallest = [
+            exact_mcnemar_p(discordant // 2 - 40, discordant) for discordant in (1024, 2048)
+        ]
+
+        assert smallest[1] > smallest[0]
