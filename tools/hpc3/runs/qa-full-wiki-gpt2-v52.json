@@ -1,0 +1,36 @@
+{
+  "project": "mi",
+  "name": "qa-full-wiki-gpt2-v52",
+  "image": {
+    "path": "/pub/wagnera3/images/v52/abl",
+    "sha256": "f148e0412b16595c53e9df657f22b1a898ff0b744af371e2bb725489f91b87ef",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 600,
+  "mem_gb": 64,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-me-wiki-full --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v52.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v52.json",
+  "experiment": {
+    "measurement": "cartridge-question-set",
+    "base_model": "gpt2",
+    "corpus": "me-wiki-full-841-pages",
+    "corpus_digest": "dccd3375f54d",
+    "items": "3740",
+    "resolvable_floor": "0.00134",
+    "declared_effect": "0.02",
+    "plan": "gpt2-full-wiki-qa",
+    "protection": "per-arm-and-per-seed-checkpoint-resume",
+    "image_commit": "53f0eb8918cd5e976bebfc6dad4383c69f956b8f",
+    "arms": "base-cartridge-oracle-bm25-dense-fused-expanded-reranked-longcontext",
+    "seeds": "7.8.9",
+    "why": "the-retracted-headline-re-run-on-an-instrument-that-can-resolve-it",
+    "supersedes": "32-item-runs-whose-floor-was-0.1562-against-claims-of-0.0417-and-0.0521"
+  },
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  }
+}
