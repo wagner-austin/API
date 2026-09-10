@@ -59,6 +59,7 @@ _BAD_GROUP_CAP = "RW-DOCTRINE-034"
 _BAD_PRIO = "RW-DOCTRINE-035"
 _BAD_SPACING = "RW-DOCTRINE-036"
 _BAD_RETREAT = "RW-DOCTRINE-037"
+_BAD_SIEGE = "RW-DOCTRINE-038"
 
 
 def _count(
@@ -182,6 +183,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     retreat = _count(
         payload, "retreat", _BAD_RETREAT, "a wave-disband survivor margin, 0 fights to the last"
     )
+    siege = _count(
+        payload, "siege", _BAD_SIEGE, "a sample count to switch on the artillery share, 0 never"
+    )
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -265,6 +269,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         prio=prio,
         spacing=spacing,
         retreat=retreat,
+        siege=siege,
         huntgate=huntgate,
         bank=bank,
     )
@@ -326,6 +331,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "prio": doctrine["prio"],
         "spacing": doctrine["spacing"],
         "retreat": doctrine["retreat"],
+        "siege": doctrine["siege"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

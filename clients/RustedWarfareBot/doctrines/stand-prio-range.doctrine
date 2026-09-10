@@ -35,6 +35,7 @@ groupcap 2
 prio 1
 spacing 0
 retreat 3
+siege 0
 expand 1
 counter 1
 cover 0

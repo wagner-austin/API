@@ -90,6 +90,7 @@ INT_FIELDS: Final = (
     "prio",
     "spacing",
     "retreat",
+    "siege",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -399,6 +400,20 @@ class Doctrine(TypedDict):
             per-unit flee reflexes (``hp_floor``, kite): this disengages
             a GROUP at a measured attrition margin and sends it home to
             join the next wave.
+        siege: Sample count past which one ``c_artillery`` share joins
+            the production ratio -- the counter-standoff switch (log
+            2026-09-10). The VH attrition anatomy read the ten-loss tail
+            as two-thirds GROUND standoff with enemy ``c_artillery``
+            (reach 290) the single largest killer over turret lines; our
+            own artillery is the only reach we field and was correctly
+            bred OUT of the fixed mix (a tempo cost in the 78 percent of
+            games that close early), so it returns CONDITIONALLY: from
+            this sample on, the composition gains one artillery entry,
+            screened by the standing ratio. Zero -- the identity every
+            prior measurement played -- never switches. Sized against
+            the bimodal split: wins bank by ~3,100 samples, so a gate
+            near 4,500 enters only the long-match regime the anatomy
+            names ([[campaign-ledger]]).
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -488,6 +503,7 @@ class Doctrine(TypedDict):
     prio: int
     spacing: int
     retreat: int
+    siege: int
     huntgate: bool
     bank: bool
 
@@ -552,6 +568,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     prio=PRIO_CONVERGENCE,
     spacing=0,
     retreat=FIRST_WAVE,
+    siege=0,
     huntgate=False,
     bank=False,
 )

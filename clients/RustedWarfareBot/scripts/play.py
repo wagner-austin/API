@@ -524,6 +524,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         prio=doctrine["prio"],
         spacing=doctrine["spacing"],
         retreat=doctrine["retreat"],
+        siege=doctrine["siege"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],

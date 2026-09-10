@@ -69,6 +69,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         prio=0,
         spacing=0,
         retreat=3,
+        siege=0,
         huntgate=False,
         bank=False,
     )
@@ -379,6 +380,17 @@ def test_a_negative_retreat_is_refused_and_a_margin_round_trips() -> None:
     assert caught.value.code == "RW-DOCTRINE-037"
     payload["retreat"] = 10
     assert decode_doctrine(payload)["retreat"] == 10
+
+
+def test_a_negative_siege_is_refused_and_a_gate_round_trips() -> None:
+    """Zero already means never switch; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["siege"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-038"
+    payload["siege"] = 4500
+    assert decode_doctrine(payload)["siege"] == 4500
 
 
 def test_a_gate_without_a_party_is_refused() -> None:
