@@ -55,6 +55,7 @@ pytest-xdist = "^3.8.0"
 modeltrainer-rq-worker = "model_trainer.worker_entry:main"
 modeltrainer-cluster-train = "model_trainer.cluster.entry:entrypoint"
 modeltrainer-score-baseline = "model_trainer.cli.score_baseline:entrypoint"
+modeltrainer-score-run = "model_trainer.cli.score_run:entrypoint"
 modeltrainer-continuations = "model_trainer.cli.continuations:entrypoint"
 
 [tool.mypy]
@@ -113,7 +114,34 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope"
+# -n 8 RATHER THAN -n auto, AND BOTH HALVES OF THE REASON ARE MEASURED.
+#
+# On 2026-09-10 this suite ran 16-wide inside lavender's WSL and ballooned
+# the VM to 25.88 GB against 1.83 GB of host memory left, at which point the
+# host stopped scheduling the VM: everything inside froze, the runners' HTTPS
+# listeners timed out, and BOTH GitHub runners dropped offline mid-run. One
+# suite did that. It also explains why the 900s pytest-timeout below recorded
+# ZERO firings over a 10322s hang -- a watchdog thread inside a VM that is not
+# being scheduled cannot fire, so every bound armed INSIDE the VM is blind to
+# this failure and only a bound outside it can see one.
+#
+# Measured here, same suite, same box, --no-cov, matched runs:
+#
+#   -n auto   24.45 GB peak over 38 processes   126 s
+#   -n 8      16.86 GB peak over 23 processes   106 s
+#
+# So the cap is 31% lighter AND 16% faster. It is not a speed/safety trade
+# and nothing was given up to buy the headroom.
+#
+# WHY IT IS FASTER IS NOT EXPLAINED HERE, deliberately. Oversubscription and
+# torch's own intra-op pools are both plausible and neither was measured, and
+# this file has already carried one confidently-narrated mechanism that turned
+# out to be wrong. The numbers are the claim.
+#
+# The cap only binds where there are many cores; a box with 8 or fewer gets
+# what `auto` would have given it. Measured on one machine, so the ratio is
+# this machine's -- what generalises is the direction and the ceiling.
+addopts = "-v -n 8 --dist loadscope"
 # 900, not 300. Measured 2026-08-19: the slowest test here
 # (test_cancel_during_eval_returns_partial_results, a 3-epoch CPU GPT-2 train)
 # takes 99.18 s ALONE on a fully idle box. Under `-n auto` each of ~31 workers
