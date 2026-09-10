@@ -208,6 +208,25 @@ tools/hpc3/runs/*
 # hypothetical this rule prevents, it is the steady state everywhere a prefix
 # has not been negated.
 !tools/hpc3/runs/cartridge-*.json
+# The question-set benchmark, which is the same argument a fourth time and the
+# clearest instance of what the note above calls the steady state. This axis
+# ran for weeks with ZERO committed run documents -- its records went to a
+# temporary directory that is purged, and the headline it produced was
+# retracted for resting on 1.3 items of 32. A run document naming an image
+# digest and a staged corpus is the difference between that and a number
+# somebody else can reproduce.
+#
+# `qa-*` rather than folding into `cartridge-*`, because the two are different
+# experiments by construction: `QA_EXPERIMENT` differs from
+# `CARTRIDGE_EXPERIMENT` precisely so the comparability layer refuses to
+# subtract a question-set record from a loss record. A prefix that merged them
+# in the filesystem would invite exactly the differencing the record shapes
+# forbid.
+#
+# A negation rather than `git add -f`, for the reason stated twice above: a
+# force works for whoever runs it and silently drops the file for the next
+# person. That failure is what this whole axis has been for.
+!tools/hpc3/runs/qa-*.json
 
 # extraction-ablation SCORE RECORDS, for the reason the code-style-eval block
 # below states two days earlier and for a different project. Every accuracy in
