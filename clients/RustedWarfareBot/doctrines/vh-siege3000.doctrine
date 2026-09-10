@@ -1,0 +1,55 @@
+# The earlier-gate variant (log 2026-09-10): siege at 3,000 samples,
+# just past the winning-close median (~3,100), after siegevh48 read the
+# 4,500 gate dead even WITH the mechanism firing. The question the
+# earlier gate asks: at 4,500 the enemy's compounding may already be
+# unanswerable (the loss anatomy's 120k-plus endgames) -- does the same
+# share, arriving while the long game is still contestable, convert
+# what the late one could not? Costs a little more tempo in slow wins,
+# spares the fast majority. One field off vh-siege4500.
+name vh-siege3000
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 3000
+brace 0
+huntgate 0
+bank 0
