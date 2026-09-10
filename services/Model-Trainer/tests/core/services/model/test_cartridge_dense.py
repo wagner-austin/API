@@ -121,6 +121,64 @@ class TestEmbedChunks:
 
         assert dense.embed_chunks(standard_index(()), refuse).shape == (0, 0)
 
+    def test_a_corpus_larger_than_one_batch_reaches_the_encoder_in_batches(self) -> None:
+        """THE DEFECT THIS PINS COST A GPU RUN TWENTY-FOUR MINUTES IN.
+
+        Job 55901956 handed the encoder all 15607 chunks of the 841-page wiki
+        corpus in ONE call and raised ``torch.OutOfMemoryError: Tried to
+        allocate 22.86 GiB`` on an 80 GiB A100 -- after the BM25 arm had
+        already scored 0.8535, so the failure cost the whole run rather than
+        one arm.
+
+        NOTHING IN THIS SUITE NOTICED, and the reason is the interesting
+        part: every corpus any test had ever built fits comfortably in a
+        single batch, so the absence of batching was not merely untested but
+        UNTESTABLE by the fixtures on hand. That is the shape of defect that
+        appears only at the scale the research actually runs at, which is
+        why this test builds a corpus bigger than the batch rather than a
+        realistic one.
+        """
+        documents = tuple(f"Chunk number {number} stands alone here." for number in range(600))
+        index = standard_index(documents)
+        chunks = index["chunks"]
+        assert len(chunks) > dense.EMBED_BATCH_CHUNKS, len(chunks)
+        place_of = {text: place for place, text in enumerate(chunks)}
+        assert len(place_of) == len(chunks), "the planted vectors need distinct chunks"
+        sizes: list[int] = []
+
+        def record(texts: Sequence[str], /) -> torch.Tensor:
+            """Embed a batch, recording its size and planting a distinct row.
+
+            Args:
+                texts: The batch.
+
+            Returns:
+                One normalised row per text, determined by corpus position so
+                that a reordered or duplicated batch is visible in the result.
+            """
+            sizes.append(len(texts))
+            # Annotated rather than inlined: `torch.tensor` takes Any, so a
+            # bare nested literal infers as list[Any] and this repo's mypy
+            # settings refuse an Any-typed expression even in a test.
+            rows: list[list[float]] = [[float(place_of[text]), 1.0] for text in texts]
+            return torch.nn.functional.normalize(
+                torch.tensor(rows, dtype=torch.float32), p=2.0, dim=1
+            )
+
+        vectors = dense.embed_chunks(index, record)
+
+        assert max(sizes) <= dense.EMBED_BATCH_CHUNKS, sizes
+        assert sum(sizes) == len(chunks), sizes
+        # Order is asserted, not just the shape: concatenating batches is the
+        # one way this function can silently return the right chunks against
+        # the wrong rows, and a wrong-but-plausible ranking is precisely the
+        # failure this module's header says does not raise.
+        in_order: list[list[float]] = [[float(place), 1.0] for place in range(len(chunks))]
+        expected = torch.nn.functional.normalize(
+            torch.tensor(in_order, dtype=torch.float32), p=2.0, dim=1
+        )
+        assert torch.equal(vectors, expected)
+
 
 class TestDenseRanking:
     def test_it_ranks_the_chunk_whose_meaning_matches(self) -> None:
@@ -245,3 +303,33 @@ class TestProductionEmbedder:
         unrelated = float(vectors[1] @ vectors[2])
 
         assert related > unrelated
+
+    def test_a_vector_does_not_depend_on_what_shares_its_batch(self) -> None:
+        """The claim :data:`cartridge_dense.EMBED_BATCH_CHUNKS` rests on.
+
+        Batching a corpus is only safe because padding is excluded from
+        attention by the mask and from pooling by :func:`masked_mean`, so
+        which chunks travel together cannot move any one chunk's vector. That
+        is a property of the MODEL rather than of :func:`embed_chunks`, and a
+        planted embedder cannot test it -- so it is asserted here against the
+        real encoder, with texts of deliberately unequal length so the two
+        groupings really do pad differently.
+
+        THE TOLERANCE IS NOT SLACK. Identical padding is not identical
+        arithmetic: different batch shapes take different kernels, so the
+        rows agree to floating-point rather than bitwise. 1e-4 is two orders
+        below the similarity gaps this arm ranks on -- the related/unrelated
+        gap asserted directly above is ~1e-2 -- so a difference this test
+        admits cannot reorder a retrieval.
+        """
+        short = "Sonar."
+        long = (
+            "Sonar returns are filtered through a towed array before the pilot ever "
+            "sees them, and that filtering is what makes the display legible at all."
+        )
+
+        together = _EMBED([short, long])
+        apart = torch.cat([_EMBED([short]), _EMBED([long])], dim=0)
+
+        assert together.shape == apart.shape
+        assert float((together - apart).abs().max()) < 1e-4

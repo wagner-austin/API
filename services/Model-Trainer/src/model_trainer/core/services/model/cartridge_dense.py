@@ -27,7 +27,7 @@ that reason.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Final, Protocol
 
 import torch
 
@@ -37,6 +37,33 @@ from model_trainer.core.services.model.cartridge_retrieval import Bm25Index
 #:
 #: Matched by FAMILY to what `packages/wiki-search` deploys, not by size.
 DENSE_MODEL_ID = "thenlper/gte-base"
+
+#: How many chunks go to the encoder in one forward pass.
+#:
+#: THIS CONSTANT EXISTS BECAUSE A RUN DIED FOR WANT OF IT. Job 55901956
+#: embedded the 841-page wiki corpus as a SINGLE batch of 15607 chunks and
+#: raised ``torch.OutOfMemoryError: Tried to allocate 22.86 GiB`` on an 80 GiB
+#: A100 -- 24 minutes in, after the BM25 arm had already scored 0.8535. The
+#: tokenizer pads a batch to its longest member, so one call over the whole
+#: corpus materialises a (chunks, longest) tensor whose activations scale with
+#: the product. At the 32-item scale every earlier run used, that product was
+#: small enough that the absence of batching was invisible.
+#:
+#: THE SIZE IS DERIVED, AND THE DERIVATION IS ARITHMETIC RATHER THAN A
+#: MEASUREMENT OF THE FIX. The failing call wanted 22.86 GiB for 15607 chunks,
+#: so the same padding assumption gives roughly 385 MiB at 256 -- against the
+#: 8.92 GiB that was actually free at the moment it failed, the base model and
+#: earlier arms already resident. That is a margin of about twenty, chosen so
+#: the bound holds for a corpus several times this one rather than for exactly
+#: this one.
+#:
+#: BATCHING CANNOT CHANGE THE ANSWER, which is why a plain fixed size is
+#: enough and no adaptive scheme is wanted. Padding is excluded from attention
+#: by the mask and from pooling by :func:`masked_mean`, so a chunk's vector
+#: does not depend on which chunks share its batch. The equivalence is pinned
+#: by test rather than asserted here, because a silent change to it would look
+#: like a weak dense arm rather than like a bug.
+EMBED_BATCH_CHUNKS: Final[int] = 256
 
 
 class EmbedderProto(Protocol):
@@ -141,6 +168,12 @@ def embed_chunks(index: Bm25Index, embed: EmbedderProto) -> torch.Tensor:
     the way to get it is to time this call separately -- not to move the work
     into the request path.
 
+    IN BATCHES OF :data:`EMBED_BATCH_CHUNKS`, and that is this function's job
+    rather than the embedder's. An embedder embeds a batch; deciding what a
+    batch may cost is a property of the CORPUS, which only this side knows.
+    The first version handed the encoder every chunk at once and a 15607-chunk
+    corpus exhausted an 80 GiB A100 -- see the constant for the measurement.
+
     Args:
         index: The index whose chunks to embed. Its BM25 statistics are
             unused; the chunk list is the shared corpus view, so both arms
@@ -148,14 +181,20 @@ def embed_chunks(index: Bm25Index, embed: EmbedderProto) -> torch.Tensor:
         embed: The embedder.
 
     Returns:
-        One L2-normalised row per chunk, shaped (chunks, features). An empty
-        tensor when the index holds no chunks -- embedding an empty batch is
-        a torch error rather than an empty result.
+        One L2-normalised row per chunk, shaped (chunks, features), in chunk
+        order. An empty tensor when the index holds no chunks -- embedding an
+        empty batch is a torch error rather than an empty result.
     """
     chunks = index["chunks"]
     if not chunks:
         return torch.zeros((0, 0), dtype=torch.float32)
-    return embed(list(chunks))
+    return torch.cat(
+        [
+            embed(chunks[start : start + EMBED_BATCH_CHUNKS])
+            for start in range(0, len(chunks), EMBED_BATCH_CHUNKS)
+        ],
+        dim=0,
+    )
 
 
 def dense_ranking(vectors: torch.Tensor, query: str, embed: EmbedderProto) -> tuple[int, ...]:
@@ -308,6 +347,7 @@ def _default_embedder_factory(device: str, /) -> EmbedderProto:
 
 __all__ = [
     "DENSE_MODEL_ID",
+    "EMBED_BATCH_CHUNKS",
     "EmbedderFactoryProto",
     "EmbedderProto",
     "_default_embedder_factory",
