@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import faulthandler
 from collections.abc import Generator
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Final, Literal, Protocol
 
 import pytest
 from platform_core.config import config_test_hooks
@@ -275,6 +276,51 @@ def _make_settings_with_paths(tmp_path: Path, settings_factory: SettingsFactory)
 
 
 settings_with_paths = pytest.fixture(_make_settings_with_paths)
+
+
+#: How long one test may run before its worker starts dumping stacks.
+#:
+#: MEASURED AGAINST A REAL HANG. On 2026-09-10 a CI worker sat inside one
+#: test for 10322s -- 2h52m, eleven times the 900s ``pytest-timeout`` bound,
+#: which recorded ZERO firings. The job was eventually cancelled, and the
+#: cancel destroyed the only thing that would have identified the cause: a
+#: stack for the blocked thread. Four sessions spent twelve hours inferring
+#: from metadata that a single stack dump would have settled.
+#:
+#: 600 rather than 300: this package's slowest test alone is 99.18s and the
+#: parallel case is several times that, and ``pyproject.toml`` records 300s
+#: firing on slow-but-working tests rather than on hangs. 600 is six times
+#: the slowest measured test and two thirds of the ``pytest-timeout`` bound,
+#: so a dump lands BEFORE anything tries to kill the worker.
+_HANG_DUMP_SECONDS: Final[int] = 600
+
+
+@pytest.fixture(autouse=True)
+def _dump_stacks_when_a_test_stops_making_progress() -> Generator[None, None, None]:
+    """Print every thread's stack if one test runs impossibly long.
+
+    IT DOES NOT KILL ANYTHING, and that is the point. ``pytest-timeout``'s
+    thread method ends a hung worker with ``os._exit(1)``, which leaves the
+    xdist controller on a dead channel -- and on the occurrence above it did
+    not fire at all, so the suite hung with no diagnosis and no bound.
+    Dumping is strictly additive: a healthy run never reaches the deadline, a
+    hung one leaves a stack in the captured output, and nothing about the
+    existing timeout changes.
+
+    ``repeat=True`` because one dump shows where a thread is, and several
+    spaced dumps show whether it is stuck there or merely slow -- which is
+    the distinction the whole 2026-09-10 investigation turned on.
+
+    The dump reaches the job log because a CANCELLED job's runner shuts down
+    cleanly and uploads its output; it is the force-closed-over-a-dead-runner
+    case that yields nothing, and that case yields nothing either way.
+
+    Yields:
+        None, once the deadline is armed for the test about to run.
+    """
+    faulthandler.dump_traceback_later(_HANG_DUMP_SECONDS, repeat=True)
+    yield
+    faulthandler.cancel_dump_traceback_later()
 
 
 @pytest.fixture(autouse=True)
