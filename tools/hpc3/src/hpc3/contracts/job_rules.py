@@ -28,6 +28,56 @@ on a zero-usage-factor partition a re-run costs nothing at all. Above it, an
 unprotected job is a bet that nothing else wants the node for hours.
 """
 
+REPLAY_AFFORDABLE_CEILING_MINUTES = 240
+"""Above this, DETERMINISM STOPS COUNTING AS PROTECTION and only a checkpoint does.
+
+THE BYPASS THIS CLOSES, MEASURED. On 2026-09-10 a 600-minute question-set
+benchmark was admitted to ``free-gpu`` -- ``PreemptMode=CANCEL``, verified by
+``scontrol`` -- and submitted, because ``hpc3-mi.json`` declares
+``deterministic: true`` for the whole project. ``survives_eviction`` was
+therefore true and the rule returned before it could refuse anything. Nothing
+was wrong with the code; the escape simply had no ceiling.
+
+WHY DETERMINISM IS WEAKER PROTECTION THAN IT LOOKS, which is the whole reason
+a ceiling belongs here. A checkpoint makes PARTIAL WORK survive eviction.
+Determinism does not: it makes the RESULT reproducible, so an evicted run has
+lost no science and every minute it had already spent. Its protection IS the
+re-run -- and :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES` exists precisely
+because a re-run stops being cheap at some length. Letting determinism satisfy
+the rule without a ceiling says a re-run is always affordable in the same
+module that declares it is not affordable past an hour.
+
+THE NUMBER IS A JUDGEMENT AND IS ANCHORED RATHER THAN INVENTED, in the way the
+60-minute threshold above it is. 240 is the largest ``minutes`` any workspace
+in this repository declares as its project default, so it is this workspace's
+own existing statement of a normal unit of work it is willing to spend. A
+replay costing one such unit is affordable; the run that provoked this was 2.5
+of them. It wants re-measuring against a real preemption rate on ``free-gpu``,
+which nobody has measured, and until then it is a bound and not a finding.
+
+AND THE REPLAY MAY NOT EVEN RETURN THE SAME NUMBER, which makes this ceiling
+a floor on the problem rather than a full answer. Measured 2026-09-10 by
+another session over one 3,042-item set under full determinism pins: a repeat
+run and an IMAGE CHANGE spanning a refactor of the training path each differed
+in 0 of 12,168 score elements, while changing the training CARD differed in
+100% of them and moved accuracy by -0.0986 and +2.6298 points. Determinism is
+a property of the payload AND the hardware.
+
+Scoped honestly, because that measurement compared two card MODELS and this
+cluster does not let a job leave its model unpinned: ``GPU_TYPE_UNPINNED``
+already refuses a generic request, so a replay here returns to the model it
+named. What is NOT established either way is whether two cards of the SAME
+model agree. So the hardware axis is guarded by a different rule than this
+one, and ``deterministic`` is not what is holding it.
+
+WHAT IT DOES NOT DO. It does not demand ``requeue`` on a CANCEL partition,
+where that flag is inert -- that reasoning is unchanged and correct. A job
+under this ceiling is unaffected, which is deliberate: the deterministic array
+workloads this repository already runs on ``free-gpu`` sit well below it and
+are resubmitted by ``hpc3-campaign``, and breaking them to close a hole they
+are not in would be a worse trade than the hole.
+"""
+
 MINUTES_PER_HOUR = 60
 
 
@@ -147,7 +197,16 @@ def _check_preemption_protection(
             array tasks carrying it straight to terminal PREEMPTED -- so it
             is not demanded there.
         resumes_from_checkpoint: Whether the payload checkpoints and resumes
-            from one. Asserted by the operator; nothing here can check it.
+            from one. Asserted by the operator; nothing HERE can check it,
+            and that is the weak point of this whole rule -- a declaration
+            is exactly as good as the payload behind it, and a false one
+            buys the run past this refusal with a sentence.
+            So it is checked where it can be: the image spec carries a smoke
+            command that exercises the resume INSIDE the built image, and it
+            fails the build rather than the run. That is the order the mi
+            documents follow -- code, then an image that proves it, then the
+            declaration -- and it is the reason a document may not turn this
+            flag on in the same breath as the payload learning to checkpoint.
         deterministic: Whether the workload replays identically from the
             start. For such a job the whole run is a checkpoint at step
             zero: resubmit it and the same result comes back. Rusted's
@@ -166,6 +225,11 @@ def _check_preemption_protection(
     nothing.
 
     Raises:
+        AppError: With ``REPLAY_EXCEEDS_AFFORDABLE_LOSS`` if the partition
+            preempts, the job is longer than
+            :data:`REPLAY_AFFORDABLE_CEILING_MINUTES`, and it carries no
+            checkpoint -- whatever it declares about determinism, because
+            replay protects the result and not the hours.
         AppError: With ``PREEMPTIBLE_RUN_UNPROTECTED`` if the partition
             preempts, the job is longer than
             :data:`PREEMPTION_PROTECTION_THRESHOLD_MINUTES`, and the work
@@ -177,6 +241,32 @@ def _check_preemption_protection(
         return
     if minutes <= PREEMPTION_PROTECTION_THRESHOLD_MINUTES:
         return
+    replays_instead_of_resuming = deterministic and not resumes_from_checkpoint
+    if replays_instead_of_resuming and minutes > REPLAY_AFFORDABLE_CEILING_MINUTES:
+        # NARROWED TO THE RUNS THE DETERMINISM ESCAPE WOULD HAVE ADMITTED,
+        # which the existing suite is what forced. The first version asked
+        # only `not resumes_from_checkpoint`, so it also caught runs
+        # declaring NEITHER protection -- and handed them a message about an
+        # unaffordable replay when their real defect is that nothing would
+        # survive eviction at all. Four tests failed on exactly that, and
+        # they were right to: a refusal that names the wrong defect sends
+        # the submitter to fix the wrong thing.
+        #
+        # So this fires only where `deterministic` is doing the admitting.
+        # Below, the job cannot survive at all and keeps its own refusal.
+        raise AppError(
+            Hpc3ErrorCode.REPLAY_EXCEEDS_AFFORDABLE_LOSS,
+            f"A {minutes}-minute job on {partition!r} (PreemptMode={mode}) has no "
+            f"checkpoint, so eviction costs the whole run and it starts again at "
+            f"zero. deterministic={deterministic} makes the RESULT reproducible, "
+            f"not the elapsed time recoverable, and past "
+            f"{REPLAY_AFFORDABLE_CEILING_MINUTES} minutes that replay is the "
+            f"expense this rule exists to refuse. It needs "
+            f"'resumes_from_checkpoint' -- a payload that writes progress and "
+            f"picks it up on restart -- or a wall clock at or under "
+            f"{REPLAY_AFFORDABLE_CEILING_MINUTES} minutes, or a partition that "
+            f"does not preempt.",
+        )
     survives_eviction = resumes_from_checkpoint or deterministic
     if survives_eviction and (mode == "CANCEL" or requeue):
         return

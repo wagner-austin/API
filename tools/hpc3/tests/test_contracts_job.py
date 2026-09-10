@@ -16,7 +16,10 @@ from hpc3.contracts.job import (
     JobSpec,
     encode_job_spec,
 )
-from hpc3.contracts.job_rules import PREEMPTION_PROTECTION_THRESHOLD_MINUTES
+from hpc3.contracts.job_rules import (
+    PREEMPTION_PROTECTION_THRESHOLD_MINUTES,
+    REPLAY_AFFORDABLE_CEILING_MINUTES,
+)
 from tests.against_hpc3 import decode_job_spec
 from tests.conftest import gpus
 
@@ -304,11 +307,23 @@ class TestRulePreemptibleRunsMustBeProtected:
         the whole run is a checkpoint at step zero and requeue IS the
         protection -- rusted's pinned-regime matches, replicated
         seed-for-seed across independent submissions (2026-09-01), are the
-        workload this clause was measured against."""
+        workload this clause was measured against.
+
+        AT 240 RATHER THAN THE 600 THIS ORIGINALLY ASSERTED. The clause is
+        unchanged and so is the workload it was measured against, which sits
+        well under the ceiling; what changed is that replay stops counting
+        as protection once the replay itself is the expense. See
+        :data:`REPLAY_AFFORDABLE_CEILING_MINUTES`.
+        """
         decoded = decode_job_spec(
-            _spec(minutes=600, requeue=True, resumes_from_checkpoint=False, deterministic=True)
+            _spec(
+                minutes=REPLAY_AFFORDABLE_CEILING_MINUTES,
+                requeue=True,
+                resumes_from_checkpoint=False,
+                deterministic=True,
+            )
         )
-        assert decoded["minutes"] == 600
+        assert decoded["minutes"] == REPLAY_AFFORDABLE_CEILING_MINUTES
         assert decoded["deterministic"] is True
 
     def test_deterministic_alone_admits_the_run_on_a_cancel_partition(self) -> None:
@@ -316,10 +331,64 @@ class TestRulePreemptibleRunsMustBeProtected:
         nothing if Slurm never resubmits', which is true and does not reach
         ``requeue``: under CANCEL Slurm never resubmits WHETHER OR NOT the
         flag is set. What resubmits there is a campaign or a person, outside
-        anything this guard can inspect, so it checks the half it can see."""
-        decoded = decode_job_spec(_spec(minutes=600, requeue=False, deterministic=True))
-        assert decoded["minutes"] == 600
+        anything this guard can inspect, so it checks the half it can see.
+
+        The ceiling is the inclusive boundary, asserted here rather than a
+        round number under it, so a change to the comparison shows up as a
+        failure instead of as slack.
+        """
+        decoded = decode_job_spec(
+            _spec(minutes=REPLAY_AFFORDABLE_CEILING_MINUTES, requeue=False, deterministic=True)
+        )
+        assert decoded["minutes"] == REPLAY_AFFORDABLE_CEILING_MINUTES
         assert decoded["deterministic"] is True
+
+    def test_determinism_stops_protecting_once_the_replay_is_the_expense(self) -> None:
+        """THE BYPASS THIS CLOSES, AT THE LENGTH THAT WALKED THROUGH IT.
+
+        On 2026-09-10 a 600-minute question-set benchmark was admitted to
+        ``free-gpu`` and submitted, because ``hpc3-mi.json`` declares
+        ``deterministic: true`` for the whole project: ``survives_eviction``
+        was true and the rule returned before it could refuse. Nothing was
+        wrong with the code -- the escape had no ceiling, so 61 minutes and
+        6100 minutes took the identical branch.
+
+        The refusal must name the REPLAY rather than the missing checkpoint,
+        because a run declaring ``deterministic`` that is told it declared
+        nothing will re-declare it and submit again.
+        """
+        with pytest.raises(AppError) as excinfo:
+            decode_job_spec(
+                _spec(
+                    minutes=REPLAY_AFFORDABLE_CEILING_MINUTES + 1,
+                    requeue=False,
+                    resumes_from_checkpoint=False,
+                    deterministic=True,
+                )
+            )
+
+        assert excinfo.value.code is Hpc3ErrorCode.REPLAY_EXCEEDS_AFFORDABLE_LOSS
+        assert "deterministic=True" in excinfo.value.message
+        assert "not the elapsed time recoverable" in excinfo.value.message
+
+    def test_a_checkpoint_still_admits_a_run_far_past_the_ceiling(self) -> None:
+        """The ceiling bounds REPLAY, not length.
+
+        A payload that writes progress and resumes from it loses only what it
+        had not yet written, however long it runs -- which is the whole
+        difference the new refusal turns on, and asserting it here is what
+        keeps the ceiling from quietly becoming a wall-clock limit.
+        """
+        decoded = decode_job_spec(
+            _spec(
+                minutes=REPLAY_AFFORDABLE_CEILING_MINUTES * 4,
+                requeue=False,
+                resumes_from_checkpoint=True,
+                deterministic=False,
+            )
+        )
+
+        assert decoded["minutes"] == REPLAY_AFFORDABLE_CEILING_MINUTES * 4
 
     def test_neither_checkpoints_nor_replay_is_still_refused(self) -> None:
         """The rule did not get weaker. Work that cannot survive eviction is

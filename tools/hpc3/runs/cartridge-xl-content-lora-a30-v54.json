@@ -1,15 +1,16 @@
 {
   "project": "mi",
-  "name": "cartridge-xl-content-lora-a30-v41",
+  "name": "cartridge-xl-content-lora-a30-v54",
   "image": {
-    "path": "/pub/wagnera3/images/v41/abl.sif",
-    "sha256": "f38bc9824ecfa66b9133b182ab27adc75cbfe2850fbbbffc736a5adde6a5b5db",
+    "path": "/pub/wagnera3/images/v54/abl.sif",
+    "sha256": "c66460f0527551765b6bb22146a16952a888f175a666abad39d891e0e050330e",
     "binds": [
       "/pub/wagnera3"
     ]
   },
   "minutes": 600,
   "mem_gb": 32,
+  "resumes_from_checkpoint": true,
   "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_content_lora_sweep --plan gpt2-xl-content-lora --corpus /pub/wagnera3/mi/cartridge/corpus-me --other-corpora /pub/wagnera3/mi/cartridge/corpus-civic,/pub/wagnera3/mi/cartridge/corpus-nursing,/pub/wagnera3/mi/cartridge/corpus-surveillance,/pub/wagnera3/mi/cartridge/corpus-comp-ling,/pub/wagnera3/mi/cartridge/corpus-formal-sem,/pub/wagnera3/mi/cartridge/corpus-qft,/pub/wagnera3/mi/cartridge/corpus-plant-eco --pool-corpora /pub/wagnera3/mi/cartridge/corpus-epi,/pub/wagnera3/mi/cartridge/corpus-metabolomics,/pub/wagnera3/mi/cartridge/corpus-atmospheric-chemistry --device cuda --out /pub/wagnera3/mi/cartridge/results/gpt2-xl-content-lora-a30-v41.json",
   "artifact": "/pub/wagnera3/mi/cartridge/results/gpt2-xl-content-lora-a30-v41.json",
   "experiment": {
@@ -21,10 +22,11 @@
     "partners": "civic.nursing.surveillance.comp-ling.formal-sem.qft.plant-eco",
     "pool_corpora": "epi.metabolomics.atmospheric-chemistry",
     "seeds": "7.8.9",
-    "image_commit": "40c55fa5b68755db274926fd274689fc253964bf",
+    "image_commit": "a3af3e067039d23fa778b14961c92f2451594fd1",
     "baseline_record": "9abd901a-medium/9abfbdd4-small",
     "why": "the-1.5B-rung-of-the-depth-ladder-both-objectives-at-48-layers",
-    "gpu_pinned_because": "two-1.5B-fp32-models-oom-v100-16GB-by-50MiB-job-55807973-A30-for-both-so-the-xl-pair-stays-card-matched"
+    "gpu_pinned_because": "two-1.5B-fp32-models-oom-v100-16GB-by-50MiB-job-55807973-A30-for-both-so-the-xl-pair-stays-card-matched",
+    "protection": "per-cell-checkpoint-resume-deterministic-setup-re-derived"
   },
   "gpu": {
     "model": "A30",

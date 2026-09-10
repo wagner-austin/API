@@ -1,0 +1,35 @@
+{
+  "project": "mi",
+  "name": "cartridge-solo-seeds-7b-bf16-a30-v54-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v54/abl.sif",
+    "sha256": "c66460f0527551765b6bb22146a16952a888f175a666abad39d891e0e050330e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 600,
+  "mem_gb": 64,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_solo_seeds --model-id EleutherAI/pythia-6.9b --precision stored-bf16 --corpus /pub/wagnera3/mi/cartridge/corpus-me --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-bf16-a30-v54-twin.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-bf16-a30-v54-twin.json",
+  "experiment": {
+    "measurement": "cartridge-solo-seeds",
+    "base_model": "EleutherAI/pythia-6.9b",
+    "corpus": "me-wiki-public-12pages",
+    "corpus_digest": "e2f23c635583",
+    "seeds": "7.8.9.10.11.12.13.14.15",
+    "geometry": "w256-s4-c64-e12-lr0.01-from-the-recorded-gpt2-base-lora-row",
+    "image_commit": "a3af3e067039d23fa778b14961c92f2451594fd1",
+    "baseline_record": "353ab575-7b-nf4-nine-seed-solo-the-pair-this-isolates-quantization-against",
+    "why": "bit-identity-certificate",
+    "gpu_pinned_because": "bf16-7b-weights-13.8GB-plus-training-need-24GB-and-the-nf4-pair-ran-on-a30",
+    "model_snapshot": "c0e3eee36dc47af0c49f361c74cfe459c09f7f23",
+    "precision": "stored-bf16-unquantized-declared-by-policy-nf4-removed",
+    "protection": "per-cell-checkpoint-resume-deterministic-setup-re-derived"
+  },
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  }
+}

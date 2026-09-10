@@ -1,17 +1,18 @@
 {
   "project": "mi",
-  "name": "cartridge-solo-seeds-7b-a30-v45",
+  "name": "cartridge-solo-seeds-7b-a30-v54",
   "image": {
-    "path": "/pub/wagnera3/images/v45/abl.sif",
-    "sha256": "567cb42d80ed021a56a62d45092184648662e4d6cad1d1ec888bd2e39c483fb1",
+    "path": "/pub/wagnera3/images/v54/abl.sif",
+    "sha256": "c66460f0527551765b6bb22146a16952a888f175a666abad39d891e0e050330e",
     "binds": [
       "/pub/wagnera3"
     ]
   },
   "minutes": 600,
   "mem_gb": 64,
-  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_solo_seeds --model-id EleutherAI/pythia-6.9b --corpus /pub/wagnera3/mi/cartridge/corpus-me --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-a30-v45.json",
-  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-a30-v45.json",
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_solo_seeds --model-id EleutherAI/pythia-6.9b --corpus /pub/wagnera3/mi/cartridge/corpus-me --device cuda --out /pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-a30-v54.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/cartridge-solo-seeds-7b-a30-v54.json",
   "experiment": {
     "measurement": "cartridge-solo-seeds",
     "base_model": "EleutherAI/pythia-6.9b",
@@ -19,12 +20,13 @@
     "corpus_digest": "e2f23c635583",
     "seeds": "7.8.9.10.11.12.13.14.15",
     "geometry": "w256-s4-c64-e12-lr0.01-from-the-recorded-gpt2-base-lora-row",
-    "image_commit": "4fc8dfbbfe0b70b547ad78635a284c5e4c592e94",
+    "image_commit": "a3af3e067039d23fa778b14961c92f2451594fd1",
     "baseline_record": "254d0126-7b-invariance-per-seed-rows-the-variance-this-denominates",
     "why": "the-failure-rate-behind-the-7b-precondition-nine-draws-instead-of-three",
     "gpu_pinned_because": "the-7b-rows-must-match-the-recorded-a30-card-and-xl-control-stays-card-matched-to-them",
     "model_snapshot": "c0e3eee36dc47af0c49f361c74cfe459c09f7f23",
-    "precision": "nf4-double-quant-bf16-compute-declared-by-cli-policy"
+    "precision": "nf4-double-quant-bf16-compute-declared-by-cli-policy",
+    "protection": "per-cell-checkpoint-resume-deterministic-setup-re-derived"
   },
   "gpu": {
     "model": "A30",
