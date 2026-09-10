@@ -14,12 +14,27 @@ measuring the card it trained on. It was found by reading, not by any check.
 This rule is the mechanical version of that reading.
 
 WHAT THIS RULE WOULD NOT HAVE CAUGHT, stated because the temptation is to
-claim more. ``covenant_ml`` was believed to have the same defect and did not:
-``benchmarking/provenance.py`` has emitted a ``RunRecord`` alongside its
-manifest since the fingerprint landed. Two documents asserted otherwise and a
-session rewrote an existing module before reading it. That failure is prose
-drifting from code, which no import-graph rule can see; it is the argument for
-this rule being mechanical rather than for it being wider.
+claim more -- and this passage said the opposite until 2026-09-09, which is
+itself the lesson. It read: "``covenant_ml`` was believed to have the same
+defect and did not: ``benchmarking/provenance.py`` has emitted a ``RunRecord``
+alongside its manifest since the fingerprint landed." TRUE OF THE MODULE AND
+FALSE OF THE PACKAGE. A power audit (board ``6d5536cc``) then measured the six
+``benchmark_cleargbm_*`` entry points and found that exactly ONE called it;
+the other five wrote a manifest and stopped. The module existed, was correct,
+was imported by the package -- and five of the six paths that produce published
+numbers never reached it.
+
+THIS RULE PASSED covenant_ml THROUGHOUT, correctly and by design: the package
+imports ``run_record``, which is all a package-scoped import check can see. The
+audit's own finding names the gap better than a wider rule would close it --
+"importing ``run_record`` is not proof that a record is written on the path
+that matters". What closed it was structural rather than another check:
+``benchmarking/harness.py`` now writes the manifest and the record in one call,
+so an entry point cannot emit the first without the second.
+
+The residual lesson for THIS docstring is narrower and worth keeping: a
+sentence that clears a package on the strength of one module will read as a
+clearance of every path in it.
 
 SCOPE IS THE PACKAGE, NOT THE FILE, and deliberately. Capturing and recording
 legitimately live in different modules: ``covenant_ml`` captures in

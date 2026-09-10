@@ -47,11 +47,14 @@ WHAT IT DOES NOT DO, deliberately:
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Container
+from typing import Protocol
 
 from platform_core.determinism_env import (
     BLAS_THREAD_ENV_VARS,
+    SINGLE_THREAD,
     SetEnvProtocol,
 )
 from platform_core.determinism_record import DeterminismRecord, determinism_record
@@ -167,10 +170,54 @@ def apply_cpu_determinism(
     return determinism_record(CPU_STACK, dict.fromkeys(BLAS_THREAD_ENV_VARS, threads))
 
 
+class PinProtocol(Protocol):
+    """Pin this process's CPU reduction order and report what was pinned.
+
+    A Protocol rather than a bare callable so an entry point can take the pin
+    as an argument and a test can supply a stand-in. That substitution is
+    needed for one reason only: :func:`apply_cpu_determinism` REFUSES once a
+    native numeric library is loaded, and a numpy test suite has numpy loaded
+    before collection begins. Substituting the pin does not excuse an entry
+    point from being pinnable -- that property is asserted separately, by
+    importing the module and checking nothing numeric arrived with it.
+    """
+
+    def __call__(self) -> DeterminismRecord:
+        """Pin the thread count.
+
+        Returns:
+            The posture the process now has.
+        """
+        ...
+
+
+def pin_single_thread() -> DeterminismRecord:
+    """Pin the BLAS thread count to one, for a process that is about to measure.
+
+    THE REAL PIN EVERY BENCHMARK ENTRY POINT USES. It lived as a private
+    ``_real_pin`` copied into all six ``benchmark_cleargbm_*`` scripts until
+    2026-09-09, and the copies existed for a structural reason rather than
+    carelessness: the benchmarking harness that would have owned it sits in
+    ``covenant_ml``, importing which loads numpy -- the very thing this call
+    must precede. There was nowhere to put it that numpy would not poison,
+    except here, beside the function it wraps.
+
+    Returns:
+        The record naming every thread variable that was set.
+
+    Raises:
+        NativeLibrariesAlreadyLoadedError: When a native numeric library is
+            already imported, so the write cannot take effect.
+    """
+    return apply_cpu_determinism(os.putenv, SINGLE_THREAD)
+
+
 __all__ = [
     "BLAS_THREAD_ENV_VARS",
     "CPU_STACK",
     "NUMERIC_MODULES",
     "NativeLibrariesAlreadyLoadedError",
+    "PinProtocol",
     "apply_cpu_determinism",
+    "pin_single_thread",
 ]

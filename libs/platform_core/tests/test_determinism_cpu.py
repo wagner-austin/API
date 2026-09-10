@@ -25,6 +25,7 @@ from platform_core.determinism_cpu import (
     NUMERIC_MODULES,
     NativeLibrariesAlreadyLoadedError,
     apply_cpu_determinism,
+    pin_single_thread,
 )
 from platform_core.determinism_env import BLAS_THREAD_ENV_VARS, SINGLE_THREAD
 from platform_core.determinism_record import (
@@ -101,6 +102,24 @@ def test_a_thread_count_above_one_is_recorded_rather_than_silently_blessed() -> 
 
     assert dict(record["settings"])["OMP_NUM_THREADS"] == "8"
     assert record != apply_cpu_determinism(RecordingEnv(), SINGLE_THREAD, NOT_LOADED)
+
+
+def test_the_real_pin_writes_the_single_thread_posture() -> None:
+    """``pin_single_thread`` is the pin every benchmark entry point calls.
+
+    It lived as a private ``_real_pin`` copied into all six
+    ``benchmark_cleargbm_*`` scripts until 2026-09-09, where no test could
+    reach it -- the copies were private to files whose own tests substituted a
+    stand-in for them. Here it is one function and this asserts the real one.
+
+    Calling it genuinely writes the thread variables for this process, which
+    is safe and is what a measuring process wants: this package pulls no
+    numeric library, so the pin does not refuse, and one thread is the posture
+    the suite already assumes.
+    """
+    record = pin_single_thread()
+    assert record["stack"] == CPU_STACK
+    assert dict(record["settings"]) == dict.fromkeys(BLAS_THREAD_ENV_VARS, SINGLE_THREAD)
 
 
 def test_a_cpu_record_round_trips_through_storage() -> None:

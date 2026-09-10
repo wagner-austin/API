@@ -138,6 +138,16 @@ question beside the first so a reader cannot mistake one for the other, and it
 is computed by ``platform_core.minimum_detectable_effect.rate_floor_power``
 rather than transcribed -- a published statistic should cite a computation, not
 a literal someone typed once.
+
+THE COLUMN NAMES ITS OWN QUESTION rather than reusing ``PowerVerdict``. That
+enum means "the design could resolve an effect worth acting on", and this
+column reports whether an observed rate is separable from a floor. The two are
+anti-correlated here: for four hours on 2026-09-09 this table printed
+``NOT_TESTED`` for rates that were decisively measured and ``TESTED`` for
+designs too short to resolve a single failure. Three words replace it --
+``TOO FEW SAMPLES`` when no attainable outcome clears the floor,
+``ABOVE FLOOR`` when the rate is separable from it, ``NOT SEPARABLE`` when it
+is not.
 """
 
 
@@ -226,7 +236,14 @@ def _power_columns(record: ClaimEvidenceDict) -> tuple[str, str]:
     if record["samples"] == 0:
         return "n/a", "NO SAMPLES"
     power = rate_floor_power(record["exact"], record["samples"], EXACTNESS_FLOOR, AUDIT_ALPHA)
-    return f"{power['p_value']:.4f}", power["verdict"]
+    if not power["design_can_clear_floor"]:
+        # No attainable outcome clears the floor at this sample size, so the
+        # gate can be neither passed nor failed on evidence.
+        return f"{power['p_value']:.4f}", "TOO FEW SAMPLES"
+    return (
+        f"{power['p_value']:.4f}",
+        "ABOVE FLOOR" if power["rate_exceeds_floor"] else "NOT SEPARABLE",
+    )
 
 
 def run_audit(runs_root: Path, wiki_pages_dir: Path, *, stamp: bool) -> int:

@@ -80,6 +80,10 @@ from platform_core.power_types import (
     RequiredReplicates,
     ZeroFailurePower,
 )
+from platform_core.power_validators import (
+    require_effect_of_interest,
+    require_rate_floor,
+)
 
 #: Fewest paired differences a continuous power statement may be built from.
 #:
@@ -109,23 +113,6 @@ MAX_SEARCH_REPLICATES: int = 10_000
 #: machine reports at, and one this helper declines to certify rather than
 #: returning the ceiling as though it were the floor.
 MAX_SEARCH_NET_DIFFERENCE: int = 1024
-
-
-def _require_effect_of_interest(value: float, field: str) -> None:
-    """Reject a non-positive smallest-effect-of-interest.
-
-    Args:
-        value: Candidate effect size.
-        field: Field name, for the message.
-
-    Raises:
-        AppError: ``POWER_EFFECT_OF_INTEREST_INVALID`` when not positive.
-    """
-    if not value > 0.0:
-        raise AppError(
-            StatisticalPowerErrorCode.POWER_EFFECT_OF_INTEREST_INVALID,
-            f"{field} must be positive to make a verdict meaningful; got {value!r}",
-        )
 
 
 def paired_continuous_power(
@@ -158,7 +145,7 @@ def paired_continuous_power(
             f"a power statement needs at least {MIN_REPLICATES} replicates; got {replicates}",
         )
     require_alpha(alpha)
-    _require_effect_of_interest(smallest_effect_of_interest, "smallest_effect_of_interest")
+    require_effect_of_interest(smallest_effect_of_interest, "smallest_effect_of_interest")
     degrees_of_freedom = replicates - 1
     sample_sd = stdev(differences)
     critical = t_critical(degrees_of_freedom, alpha)
@@ -223,7 +210,7 @@ def required_replicates(
             f"a power statement needs at least {MIN_REPLICATES} replicates; got {observed}",
         )
     require_alpha(alpha)
-    _require_effect_of_interest(smallest_effect_of_interest, "smallest_effect_of_interest")
+    require_effect_of_interest(smallest_effect_of_interest, "smallest_effect_of_interest")
     sample_sd = stdev(differences)
 
     def resolves(candidate: int) -> bool:
@@ -494,7 +481,7 @@ def zero_failure_power(
             StatisticalPowerErrorCode.POWER_CONFIDENCE_OUT_OF_RANGE,
             f"confidence must lie in (0, 1); got {confidence!r}",
         )
-    _require_effect_of_interest(largest_rate_of_interest, "largest_rate_of_interest")
+    require_effect_of_interest(largest_rate_of_interest, "largest_rate_of_interest")
     # ``math.pow`` rather than ``**``: the operator is typed ``Any``, because
     # a negative base with a fractional exponent is complex in general. Both
     # operands are known-positive floats here, and ``math.pow`` is typed
@@ -514,22 +501,6 @@ def zero_failure_power(
     )
 
 
-def _require_rate_floor(floor: float) -> None:
-    """Reject a pass-rate floor outside the open unit interval.
-
-    Args:
-        floor: Candidate floor.
-
-    Raises:
-        AppError: ``POWER_RATE_FLOOR_OUT_OF_RANGE`` when not in ``(0, 1)``.
-    """
-    if not 0.0 < floor < 1.0:
-        raise AppError(
-            StatisticalPowerErrorCode.POWER_RATE_FLOOR_OUT_OF_RANGE,
-            f"a pass-rate floor must lie in (0, 1) to be beatable; got {floor!r}",
-        )
-
-
 def rate_floor_power(
     successes: int,
     trials: int,
@@ -545,7 +516,12 @@ def rate_floor_power(
         alpha: One-sided significance level in ``(0, 1)``.
 
     Returns:
-        A populated :class:`RateFloorPower`.
+        A populated :class:`RateFloorPower`. It carries NO
+        :class:`PowerVerdict`: that enum asks whether a design could RESOLVE
+        an effect worth acting on, and this instrument answers whether an
+        observed rate is separable from a floor. The two are anti-correlated
+        here, so the record reports both questions under their own names --
+        see :class:`RateFloorPower`.
 
     Raises:
         AppError: ``POWER_SAMPLE_SIZE_INVALID`` when ``trials`` is not positive
@@ -563,7 +539,7 @@ def rate_floor_power(
             StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID,
             f"successes must lie in [0, {trials}]; got {successes!r}",
         )
-    _require_rate_floor(floor)
+    require_rate_floor(floor)
     require_alpha(alpha)
     # P(X >= k | n, p) = I_p(k, n - k + 1). At k = 0 every outcome qualifies,
     # which the beta form does not cover, so it is stated rather than computed.
@@ -572,7 +548,7 @@ def rate_floor_power(
         if successes == 0
         else regularized_incomplete_beta(floor, successes, trials - successes + 1)
     )
-    verdict = PowerVerdict.TESTED if p_value <= alpha else PowerVerdict.NOT_TESTED
+    perfect_record_trials: int = math.ceil(math.log(alpha) / math.log(floor))
     return RateFloorPower(
         instrument=PowerInstrument.RATE_FLOOR.value,
         successes=successes,
@@ -581,8 +557,9 @@ def rate_floor_power(
         floor=floor,
         alpha=alpha,
         p_value=p_value,
-        perfect_record_trials=math.ceil(math.log(alpha) / math.log(floor)),
-        verdict=verdict.value,
+        perfect_record_trials=perfect_record_trials,
+        rate_exceeds_floor=p_value <= alpha,
+        design_can_clear_floor=trials >= perfect_record_trials,
     )
 
 

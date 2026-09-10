@@ -339,7 +339,8 @@ class TestRateFloorPower:
         # PASS carries no evidence the claim exceeds it.
         record = rate_floor_power(6, 6, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(0.85**6, abs=1e-12)
-        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+        assert record["rate_exceeds_floor"] is False
+        assert record["design_can_clear_floor"] is False
         assert record["observed_rate"] == 1.0
 
     def test_a_large_flawless_record_clears_the_floor(self) -> None:
@@ -347,19 +348,20 @@ class TestRateFloorPower:
         # which is why the beta form is used.
         record = rate_floor_power(18_649, 18_649, 0.85, 0.05)
         assert record["p_value"] < 1e-12
-        assert record["verdict"] == PowerVerdict.TESTED.value
+        assert record["rate_exceeds_floor"] is True
+        assert record["design_can_clear_floor"] is True
 
     def test_a_rate_close_to_the_floor_is_not_distinguishable_from_it(self) -> None:
         # walk: 204/232 = 87.9%, above 0.85 by eye and not separable from it.
         record = rate_floor_power(204, 232, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(0.1215724091, abs=1e-9)
-        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+        assert record["rate_exceeds_floor"] is False
 
     def test_a_rate_far_above_the_floor_is_separable(self) -> None:
         # homing: 487/522 = 93.3%.
         record = rate_floor_power(487, 522, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(4.1e-9, rel=0.05)
-        assert record["verdict"] == PowerVerdict.TESTED.value
+        assert record["rate_exceeds_floor"] is True
 
     def test_zero_successes_cannot_be_evidence_against_the_floor(self) -> None:
         # Every outcome is at least as good as the worst one, so the one-sided
@@ -367,7 +369,7 @@ class TestRateFloorPower:
         record = rate_floor_power(0, 40, 0.85, 0.05)
         assert record["p_value"] == 1.0
         assert record["observed_rate"] == 0.0
-        assert record["verdict"] == PowerVerdict.NOT_TESTED.value
+        assert record["rate_exceeds_floor"] is False
 
     def test_publishes_the_shortest_flawless_record_that_could_pass(self) -> None:
         # 0.85 ** 19 = 0.04559 <= 0.05 < 0.05386 = 0.85 ** 18. Below 19 trials
@@ -377,6 +379,44 @@ class TestRateFloorPower:
         assert record["perfect_record_trials"] == 19
         assert 0.85**19 <= 0.05
         assert 0.85**18 > 0.05
+
+    def test_it_carries_no_power_verdict(self) -> None:
+        """The abstention, pinned in the same change that made it.
+
+        This instrument SHIPPED with a ``PowerVerdict`` for four hours on
+        2026-09-09. That enum means "the design could resolve an effect worth
+        acting on"; this record set it from ``p_value <= alpha``, which is
+        whether THIS RESULT is separable from the floor. On this question the
+        two are anti-correlated -- 120 of 200 against an 0.85 floor is a
+        decisively measured failure and read NOT_TESTED, while 20 of 20, able
+        to resolve only a perfect record, read TESTED.
+
+        The ``.values()`` half catches a verdict reintroduced under a renamed
+        key, which ``"verdict" not in record`` alone would miss.
+        """
+        record = rate_floor_power(120, 200, 0.85, 0.05)
+        assert "verdict" not in record
+        assert PowerVerdict.TESTED.value not in record.values()
+        assert PowerVerdict.NOT_TESTED.value not in record.values()
+
+    def test_significance_and_resolution_are_reported_separately(self) -> None:
+        """The two questions the single verdict used to conflate.
+
+        120/200 is decisively BELOW the floor: the design could have cleared
+        it (200 trials against 19 needed) and the rate does not. 20/20 is the
+        mirror: the rate clears alpha, and the design could never have
+        resolved a single failure.
+        """
+        decisive_failure = rate_floor_power(120, 200, 0.85, 0.05)
+        assert decisive_failure["design_can_clear_floor"] is True
+        assert decisive_failure["rate_exceeds_floor"] is False
+
+        flimsy_pass = rate_floor_power(20, 20, 0.85, 0.05)
+        assert flimsy_pass["rate_exceeds_floor"] is True
+        assert flimsy_pass["design_can_clear_floor"] is True
+
+        too_short = rate_floor_power(6, 6, 0.85, 0.05)
+        assert too_short["design_can_clear_floor"] is False
 
     def test_publishes_the_instrument_it_used(self) -> None:
         record = rate_floor_power(6, 6, 0.85, 0.05)
@@ -450,13 +490,6 @@ class TestRoundTrips:
         with pytest.raises(AppError) as excinfo:
             decode_rate_floor_power(payload)
         assert excinfo.value.code is StatisticalPowerErrorCode.POWER_INSTRUMENT_UNKNOWN
-
-    def test_decode_rejects_an_unknown_verdict_on_rate_floor(self) -> None:
-        payload = encode_rate_floor_power(rate_floor_power(6, 6, 0.85, 0.05))
-        payload["verdict"] = "PROBABLY_FINE"
-        with pytest.raises(AppError) as excinfo:
-            decode_rate_floor_power(payload)
-        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_VERDICT_UNKNOWN
 
     def test_decode_rejects_a_missing_rate_floor_field(self) -> None:
         payload = encode_rate_floor_power(rate_floor_power(6, 6, 0.85, 0.05))

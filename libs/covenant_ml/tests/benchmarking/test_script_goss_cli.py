@@ -1,7 +1,16 @@
 """Tests for the GOSS benchmark command-line entry point.
 
-Runs the real script with both real learners on a small corpus, so the
-wiring between parser, runner, and manifest output is exercised end to end.
+Runs the real script with both real learners on a small corpus, so the wiring
+between declaration, runner, manifest and RECORD is exercised end to end.
+
+WHAT CHANGED ON 2026-09-09, and why these tests assert something different
+from what they used to. This script previously carried its own parser with a
+DEFAULT for every flag -- including ``--seeds [42, 43, 44, 45]`` and an
+optional ``--out`` that meant "run and write nothing". Board task ``6d5536cc``
+found that five of six entry points wrote a manifest and no run record, and the
+seed default is the same defect one layer up: a seed count nobody chose bounds
+what a comparison can conclude. So the harness requires both, and the tests
+that asserted the defaults now assert the refusals.
 """
 
 from __future__ import annotations
@@ -17,25 +26,26 @@ from platform_core.determinism_record import DeterminismRecord, determinism_reco
 from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
-    narrow_json_to_float,
-    narrow_json_to_int,
     narrow_json_to_list,
     narrow_json_to_str,
 )
-from scripts.benchmark_cleargbm_goss import build_parser, main
+from platform_core.run_record import run_record_sidecar
+from scripts.benchmark_cleargbm_goss import main
+
+from covenant_ml.benchmarking.declarations import GOSS
+from covenant_ml.benchmarking.harness import summary_lines
 
 
 def _stand_in_pin() -> DeterminismRecord:
     """Report the posture a production run would have, without pinning.
 
     The real pin refuses once numpy is loaded, and this is a numpy suite. The
-    record returned is what `apply_cpu_determinism` produces at one thread, so
-    assertions about the manifest see production's shape.
+    record returned is what ``apply_cpu_determinism`` produces at one thread,
+    so assertions about the manifest see production's shape.
 
     Substituting this does not weaken the guarantee: whether the real pin is
-    REACHABLE in production is asserted directly by the module-scope import
-    test below, and whether it REFUSES when it is not is asserted by the
-    entry-point test.
+    REACHABLE in production is asserted by the module-scope import test, and
+    whether it REFUSES when it is not is asserted by the entry-point test.
 
     Returns:
         The single-thread CPU posture.
@@ -43,16 +53,20 @@ def _stand_in_pin() -> DeterminismRecord:
     return determinism_record(CPU_STACK, dict.fromkeys(BLAS_THREAD_ENV_VARS, SINGLE_THREAD))
 
 
-def _small_args(out: Path | None = None) -> list[str]:
+def _small_args(out: Path) -> list[str]:
     """Return CLI arguments for a fast run.
 
+    Every flag is stated because every flag is required. That is the point of
+    the change this file documents: a run says what it measured rather than
+    inheriting it.
+
     Args:
-        out: Optional manifest output path.
+        out: Manifest output path.
 
     Returns:
         Argument list.
     """
-    args = [
+    return [
         "--samples",
         "800",
         "--features",
@@ -61,87 +75,103 @@ def _small_args(out: Path | None = None) -> list[str]:
         "20",
         "--max-depth",
         "3",
+        "--learning-rate",
+        "0.1",
         "--max-bins",
         "16",
         "--min-samples-leaf",
         "5",
+        "--top-rate",
+        "0.2",
+        "--other-rate",
+        "0.1",
         "--seeds",
         "42",
+        "--out",
+        str(out),
     ]
-    if out is not None:
-        args.extend(["--out", str(out)])
-    return args
 
 
-class TestParser:
-    """Defaults match the documented benchmark shape."""
+class TestRequiredArguments:
+    """A run states what it measured; nothing is inherited from a default."""
 
-    def test_defaults(self) -> None:
-        """The default corpus and rates are the documented ones."""
-        parsed = build_parser().parse_args([])
-        samples: int = parsed.samples
-        top_rate: float = parsed.top_rate
-        other_rate: float = parsed.other_rate
-        seeds: list[int] = parsed.seeds
-        out: Path | None = parsed.out
-        assert samples == 20000
-        assert top_rate == 0.2
-        assert other_rate == 0.1
-        assert seeds == [42, 43, 44, 45]
-        assert out is None
+    def test_a_run_without_seeds_is_refused(self, tmp_path: Path) -> None:
+        # The seed count decides what a comparison can conclude, and a default
+        # is how `DEFAULT_SEEDS = (42, 43, 44)` -- documented as reproducing a
+        # TIMING workload -- came to bound five quality verdicts.
+        args = list(_small_args(tmp_path / "m.json"))
+        del args[args.index("--seeds") : args.index("--seeds") + 2]
+        with pytest.raises(SystemExit):
+            main(args, pin=_stand_in_pin)
+
+    def test_a_run_without_an_output_path_is_refused(self, tmp_path: Path) -> None:
+        # `--out` used to be optional, so a benchmark could run and produce no
+        # record at all -- the defect this task exists to close, as a flag.
+        args = list(_small_args(tmp_path / "m.json"))
+        del args[args.index("--out") : args.index("--out") + 2]
+        with pytest.raises(SystemExit):
+            main(args, pin=_stand_in_pin)
 
 
 class TestMain:
-    """The entry point runs all four arms and writes the manifest."""
+    """The entry point runs all four arms and writes BOTH artifacts."""
 
-    def test_writes_a_manifest(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """A full run writes a decodable manifest whose values match stdout.
-
-        Rebuilds the entire expected stdout from the decoded manifest and
-        asserts equality, so the report and the artifact cannot drift.
-        """
+    def test_a_run_writes_a_manifest_and_its_record(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The load-bearing test: neither artifact appears without the other."""
         out = tmp_path / "manifest.json"
-        exit_code = main(_small_args(out), pin=_stand_in_pin)
-        assert exit_code == 0
+        assert main(_small_args(out), pin=_stand_in_pin) == 0
+        record_path = run_record_sidecar(out)
+        assert out.exists()
+        assert record_path.exists()
+        # Rebuilt from the manifest the run wrote, then compared whole: the
+        # report and the artifact cannot drift, because the report is
+        # regenerated from the artifact and asserted equal.
+        encoded = load_json_str(out.read_text(encoding="utf-8"))
+        expected = (
+            "\n".join(summary_lines(GOSS, encoded))
+            + f"\nmanifest -> {out}\nrun record -> {record_path}\n"
+        )
+        assert capsys.readouterr().out == expected
+
+    def test_the_manifest_carries_every_arm(self, tmp_path: Path) -> None:
+        out = tmp_path / "manifest.json"
+        main(_small_args(out), pin=_stand_in_pin)
         decoded = narrow_json_to_dict(load_json_str(out.read_text(encoding="utf-8")))
-        results = narrow_json_to_list(decoded["results"])
-        assert len(results) == 4
-        expected_lines = [
-            "goss corpus: 800 rows x 4 features, top 0.2 / other 0.1, seeds [42]",
-        ]
-        for entry in results:
-            record = narrow_json_to_dict(entry)
-            quality = narrow_json_to_dict(record["quality"])
-            model = narrow_json_to_str(record["model"])
-            sampling = narrow_json_to_str(record["sampling"])
-            seed = narrow_json_to_int(record["seed"])
-            auc = narrow_json_to_float(quality["auc"])
-            log_loss = narrow_json_to_float(quality["log_loss"])
-            expected_lines.append(
-                f"  {model:>9}/{sampling:<4} seed={seed} auc={auc:.6f} log_loss={log_loss:.6f}"
-            )
-        expected_lines.append(f"manifest -> {out}")
-        captured = capsys.readouterr()
-        assert captured.out == "\n".join(expected_lines) + "\n"
+        assert len(narrow_json_to_list(decoded["results"])) == 4
 
-    def test_runs_without_an_output_path(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Omitting --out reports to stdout without a manifest line."""
-        exit_code = main(_small_args(), pin=_stand_in_pin)
-        assert exit_code == 0
-        captured = capsys.readouterr()
-        lines = captured.out.splitlines()
-        assert len(lines) == 5
-        assert lines[0] == "goss corpus: 800 rows x 4 features, top 0.2 / other 0.1, seeds [42]"
+    def test_the_record_names_this_familys_own_experiment(self, tmp_path: Path) -> None:
+        # Not the shared `-fit-time` constant. comparability reads this field
+        # to decide subtractability, and a shared name would let a GOSS AUC be
+        # subtracted from a ranking NDCG.
+        out = tmp_path / "manifest.json"
+        main(_small_args(out), pin=_stand_in_pin)
+        record = narrow_json_to_dict(
+            load_json_str(run_record_sidecar(out).read_text(encoding="utf-8"))
+        )
+        assert narrow_json_to_str(record["experiment"]) == "cleargbm-vs-lightgbm-goss-quality"
 
-    def test_the_entry_point_refuses_once_numpy_is_loaded(self) -> None:
+    def test_the_report_keeps_a_models_two_sampling_arms_apart(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # The arm-axis collision: named by model alone, a model's GOSS number
+        # and its own full-sampling number would average together.
+        main(_small_args(tmp_path / "manifest.json"), pin=_stand_in_pin)
+        out = tmp_path / "manifest.json"
+        encoded = load_json_str(out.read_text(encoding="utf-8"))
+        rendered = summary_lines(GOSS, encoded)
+        names = [line.split()[0] for line in rendered]
+        assert "mean_cleargbm@full.auc" in names
+        assert "mean_cleargbm@goss.auc" in names
+
+    def test_the_entry_point_refuses_once_numpy_is_loaded(self, tmp_path: Path) -> None:
         """Running as ``__main__`` in a numpy process hits the pin's refusal.
 
-        This is the CORRECT outcome and it used to be `SystemExit(0)`. Before
-        2026-08-27 this script pinned nothing, so `__main__` simply ran. It
-        now pins first, and the pin refuses when a native numeric library is
-        already loaded rather than reporting a posture the process does not
-        have. A test asserting a clean exit here would be asserting that the
-        pin does not work.
+        This is the CORRECT outcome. The pin refuses when a native numeric
+        library is already loaded rather than reporting a posture the process
+        does not have; a test asserting a clean exit here would be asserting
+        that the pin does not work.
         """
         import numpy
 
@@ -151,7 +181,7 @@ class TestMain:
         assert numpy.__name__ == "numpy"
 
         saved = sys.argv
-        sys.argv = ["benchmark_cleargbm_goss", *_small_args()]
+        sys.argv = ["benchmark_cleargbm_goss", *_small_args(tmp_path / "m.json")]
         try:
             with pytest.raises(NativeLibrariesAlreadyLoadedError):
                 runpy.run_module("scripts.benchmark_cleargbm_goss", run_name="__main__")

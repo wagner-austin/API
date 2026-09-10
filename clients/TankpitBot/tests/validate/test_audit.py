@@ -13,6 +13,7 @@ from tankpit_bot.protocol.commands import CMD_RADAR
 from tankpit_bot.types import CaptureSession, encode_capture_session
 from tankpit_bot.validate.audit import (
     STAMPED_PAGES,
+    _power_columns,
     collect_evidence,
     main,
     run_audit,
@@ -131,7 +132,7 @@ def test_green_tree_passes_and_stamps(tmp_path: Path, capsys: pytest.CaptureFixt
 def test_a_passing_claim_reports_whether_its_pass_means_anything(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A PASS on a short record is printed beside NOT_TESTED, not alone.
+    """A PASS on a short record is printed beside its power, not alone.
 
     The gate asks whether the exact share REACHED 0.85. The power column asks
     whether it is separable FROM 0.85, and on the small green fixture it is
@@ -143,11 +144,38 @@ def test_a_passing_claim_reports_whether_its_pass_means_anything(
     out = capsys.readouterr().out
     assert rc == 0
     assert "FAIL" not in out
-    assert "NOT_TESTED" in out
+    assert "TOO FEW SAMPLES" in out
     assert "p vs floor" in out
     # The floor's own arithmetic, stated so the footer cannot drift from it:
     # 0.85 ** 19 is the first flawless record that clears alpha 0.05.
     assert "needs 19 samples to clear it" in out
+
+
+def test_the_power_column_separates_too_few_samples_from_not_separable() -> None:
+    """Two different failures the old single word covered and distinguished not.
+
+    Until 2026-09-09 both printed ``NOT TESTED``, a ``PowerVerdict`` borrowed
+    from a helper that defines it as "the design could resolve an effect worth
+    acting on". This column reports whether a RATE is separable from the floor,
+    and on that question the borrowed word inverts: a decisively measured
+    failure read NOT_TESTED and a six-sample record read TESTED.
+    """
+    too_few = _power_columns(
+        ClaimEvidenceDict(claim_id="c", samples=6, exact=6, mismatches=0, detail="d")
+    )
+    assert too_few[1] == "TOO FEW SAMPLES"
+
+    # 232 samples against the 19 a perfect record needs: the design COULD have
+    # cleared the floor, and 87.9% is not separable from 85%.
+    not_separable = _power_columns(
+        ClaimEvidenceDict(claim_id="c", samples=232, exact=204, mismatches=28, detail="d")
+    )
+    assert not_separable[1] == "NOT SEPARABLE"
+
+    above = _power_columns(
+        ClaimEvidenceDict(claim_id="c", samples=522, exact=487, mismatches=35, detail="d")
+    )
+    assert above[1] == "ABOVE FLOOR"
 
 
 def test_a_claim_with_no_samples_states_the_absence_instead_of_a_number(

@@ -219,8 +219,26 @@ class RateFloorPower(TypedDict):
             the floor, ``ceil(log(alpha) / log(floor))``. Below this, no
             outcome whatsoever can pass, so the gate cannot be failed OR
             passed on evidence.
-        verdict: :class:`PowerVerdict`. ``TESTED`` only when ``p_value`` is at
-            or below ``alpha``.
+        rate_exceeds_floor: Whether ``p_value <= alpha`` -- the observed rate
+            is separable FROM the floor. A statement about this RESULT.
+        design_can_clear_floor: Whether ``trials >= perfect_record_trials`` --
+            some attainable outcome could have cleared the floor. A statement
+            about this DESIGN, and the question :class:`PowerVerdict` asks.
+
+    WHY THIS RECORD CARRIES NO ``verdict``, and it shipped with one for four
+    hours on 2026-09-09 before the mistake was caught. ``PowerVerdict.TESTED``
+    is defined as "the instrument could have resolved an effect as small as
+    the one anyone would act on" -- a claim about RESOLUTION. This instrument
+    set it from ``p_value <= alpha``, which is SIGNIFICANCE, and on this
+    question the two are anti-correlated: 120 successes in 200 trials is a
+    decisively measured failure against an 0.85 floor and read ``NOT_TESTED``,
+    while 20 of 20 -- one trial past the minimum, able to resolve only a
+    perfect record -- read ``TESTED``.
+
+    Two booleans named after their own questions replace it, which is the
+    precedent this module already set with ``can_ever_reject`` and
+    ``net_could_ever_be_significant``. A word that reassures a reader about a
+    question it never asked is the defect this whole module exists to prevent.
     """
 
     instrument: str
@@ -231,7 +249,8 @@ class RateFloorPower(TypedDict):
     alpha: float
     p_value: float
     perfect_record_trials: int
-    verdict: str
+    rate_exceeds_floor: bool
+    design_can_clear_floor: bool
 
 
 class NetDifferencePower(TypedDict):

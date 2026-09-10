@@ -17,7 +17,7 @@ from platform_core.determinism_env import BLAS_THREAD_ENV_VARS, SINGLE_THREAD
 from platform_core.determinism_record import DeterminismRecord, determinism_record
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.run_record import decode_run_record, run_record_sidecar
-from scripts.benchmark_cleargbm_vs_lightgbm import DEFAULT_CSV, build_parser, main
+from scripts.benchmark_cleargbm_vs_lightgbm import main
 
 from covenant_ml.benchmarking.provenance import BENCHMARK_EXPERIMENT
 from covenant_ml.benchmarking.types import (
@@ -64,16 +64,24 @@ def write_dataset(directory: Path, n_companies: int = 40) -> Path:
     return path
 
 
-def cli_args(csv_path: Path) -> list[str]:
+def cli_args(csv_path: Path, out_path: Path) -> list[str]:
     """Build a fast argument list for the script.
+
+    Every flag is stated because every flag is required. ``--out`` in
+    particular: it was optional until 2026-09-09, which meant a benchmark
+    could run and emit no record at all -- the defect board task ``6d5536cc``
+    exists to close, previously available as a flag.
 
     Args:
         csv_path: Input CSV.
+        out_path: Manifest output path.
 
     Returns:
         Command-line arguments.
     """
     return [
+        "--out",
+        str(out_path),
         "--csv",
         str(csv_path),
         "--seeds",
@@ -93,14 +101,17 @@ def cli_args(csv_path: Path) -> list[str]:
     ]
 
 
-def test_parser_defaults_point_at_the_bundled_dataset() -> None:
-    parsed = build_parser().parse_args([])
-    csv_path: Path = parsed.csv
-    trees: int = parsed.trees
-    max_depth: int = parsed.max_depth
-    assert csv_path == DEFAULT_CSV
-    assert trees == 200
-    assert max_depth == 6
+def test_a_run_that_states_nothing_is_refused(tmp_path: Path) -> None:
+    """There are no defaults any more, and that is the change.
+
+    This asserted a bundled default CSV and `trees == 200` until 2026-09-09.
+    A benchmark whose parameters come from defaults is one whose reader cannot
+    tell what was measured from the invocation -- the same shape as
+    `DEFAULT_SEEDS`, documented as reproducing a TIMING workload and then
+    deciding what five quality comparisons could conclude.
+    """
+    with pytest.raises(SystemExit):
+        main([], pin=_stand_in_pin)
 
 
 def read_manifest(path: Path) -> BenchmarkManifest:
@@ -120,7 +131,7 @@ def test_run_measures_every_reference_arm_at_the_requested_seed(tmp_path: Path) 
     """Without ``--variants`` the run is the reference set and nothing else."""
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    exit_code = main(cli_args(csv_path, out_path), pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     assert exit_code == 0
@@ -137,7 +148,7 @@ def test_variants_flag_adds_the_leaf_wise_arm(tmp_path: Path) -> None:
     """
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--variants", "--out", str(out_path)], pin=_stand_in_pin)
+    exit_code = main([*cli_args(csv_path, out_path), "--variants"], pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     assert exit_code == 0
@@ -148,7 +159,7 @@ def test_variants_flag_adds_the_leaf_wise_arm(tmp_path: Path) -> None:
 def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    main(cli_args(csv_path, out_path), pin=_stand_in_pin)
     manifest = read_manifest(out_path)
 
     leaders = [result for result in manifest["results"] if result["position"] == 0]
@@ -158,7 +169,7 @@ def test_run_records_exactly_one_leading_model_per_seed(tmp_path: Path) -> None:
 def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "nested" / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    exit_code = main(cli_args(csv_path, out_path), pin=_stand_in_pin)
 
     assert exit_code == 0
     assert out_path.is_file()
@@ -173,7 +184,7 @@ def test_run_writes_a_decodable_manifest(tmp_path: Path) -> None:
 def test_run_applies_the_requested_hyperparameters(tmp_path: Path) -> None:
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    main(cli_args(csv_path, out_path), pin=_stand_in_pin)
     config = read_manifest(out_path)["config"]
 
     assert config["n_estimators"] == 3
@@ -184,10 +195,13 @@ def test_run_applies_the_requested_hyperparameters(tmp_path: Path) -> None:
     assert config["warmups"] == 0
 
 
-def test_run_without_out_writes_no_file(tmp_path: Path) -> None:
+def test_a_run_without_an_output_path_is_refused(tmp_path: Path) -> None:
+    """`--out` was optional, which made emitting no record a supported mode."""
     csv_path = write_dataset(tmp_path)
-    main(cli_args(csv_path), pin=_stand_in_pin)
-    assert list(tmp_path.glob("*.json")) == []
+    args = cli_args(csv_path, tmp_path / "m.json")
+    del args[args.index("--out") : args.index("--out") + 2]
+    with pytest.raises(SystemExit):
+        main(args, pin=_stand_in_pin)
 
 
 def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
@@ -213,7 +227,7 @@ def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
 
     script = Path(__file__).resolve().parents[2] / "scripts" / "benchmark_cleargbm_vs_lightgbm.py"
     original_argv = sys.argv
-    sys.argv = [str(script), *cli_args(csv_path)]
+    sys.argv = [str(script), *cli_args(csv_path, tmp_path / "m.json")]
     module_name = "scripts.benchmark_cleargbm_vs_lightgbm"
     if module_name in sys.modules:
         del sys.modules[module_name]
@@ -234,7 +248,7 @@ def test_run_writes_a_run_record_beside_the_manifest(tmp_path: Path) -> None:
     """
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    exit_code = main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    exit_code = main(cli_args(csv_path, out_path), pin=_stand_in_pin)
 
     assert exit_code == 0
     sidecar = run_record_sidecar(out_path)
@@ -253,7 +267,7 @@ def test_the_record_carries_the_same_fingerprint_the_manifest_does(tmp_path: Pat
     """Two files describing one run must not disagree about what ran it."""
     csv_path = write_dataset(tmp_path)
     out_path = tmp_path / "manifest.json"
-    main([*cli_args(csv_path), "--out", str(out_path)], pin=_stand_in_pin)
+    main(cli_args(csv_path, out_path), pin=_stand_in_pin)
 
     record = decode_run_record(
         narrow_json_to_dict(load_json_str(run_record_sidecar(out_path).read_text(encoding="utf-8")))
@@ -261,9 +275,15 @@ def test_the_record_carries_the_same_fingerprint_the_manifest_does(tmp_path: Pat
     assert record["fingerprint"] == read_manifest(out_path)["fingerprint"]
 
 
-def test_no_out_path_writes_neither_file(tmp_path: Path) -> None:
-    """The record follows the manifest: asked for nothing, it writes nothing
-    rather than dropping a sidecar next to a file that does not exist."""
+def test_the_record_is_always_written_beside_the_manifest(tmp_path: Path) -> None:
+    """The inverse of what this test asserted before.
+
+    It used to check that asking for nothing wrote nothing. There is no longer
+    a way to ask for nothing, so the property worth pinning is the one that
+    replaced it: a completed run leaves BOTH artifacts, every time.
+    """
     csv_path = write_dataset(tmp_path)
-    assert main(cli_args(csv_path), pin=_stand_in_pin) == 0
-    assert list(tmp_path.glob("*.runrecord.json")) == []
+    out_path = tmp_path / "manifest.json"
+    assert main(cli_args(csv_path, out_path), pin=_stand_in_pin) == 0
+    assert out_path.exists()
+    assert len(list(tmp_path.glob("*.runrecord.json"))) == 1

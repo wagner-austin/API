@@ -273,21 +273,33 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   `src/tankpit_bot/validate/audit.py:212` `_power_columns` calling
   `rate_floor_power` in `platform_core.minimum_detectable_effect`. A claim with
   no samples prints `NO SAMPLES` rather than a number, because there is no rate
-  to test. The figures here are therefore reproducible output rather than
+  to test, and a claim with too few prints `TOO FEW SAMPLES`. The figures here are therefore reproducible output rather than
   transcription, which is the point — a published statistic should cite a
   computation, not a literal someone typed once.[^power]
 
   | claim | exact/n | rate | p vs 0.85 | |
   |---|---|---|---|---|
-  | capacity within bound | 18,649/18,649 | 100% | 0.0000 | TESTED |
-  | single-hit cost | 738/738 | 100% | 0.0000 | TESTED |
-  | teleport cost | 63/63 | 100% | 0.0000 | TESTED |
-  | single | 242/247 | 98.0% | 0.0000 | TESTED |
-  | homing | 487/522 | 93.3% | 0.0000 | TESTED |
-  | dual | 863/932 | 92.6% | 0.0000 | TESTED |
-  | walk | 204/232 | 87.9% | 0.1216 | **NOT TESTED** |
-  | dual-hit | 6/6 | 100% | 0.3771 | **NOT TESTED** |
-  | missile | 6/6 | 100% | 0.3771 | **NOT TESTED** |
+  | capacity within bound | 18,649/18,649 | 100% | 0.0000 | ABOVE FLOOR |
+  | single-hit cost | 738/738 | 100% | 0.0000 | ABOVE FLOOR |
+  | teleport cost | 63/63 | 100% | 0.0000 | ABOVE FLOOR |
+  | single | 242/247 | 98.0% | 0.0000 | ABOVE FLOOR |
+  | homing | 487/522 | 93.3% | 0.0000 | ABOVE FLOOR |
+  | dual | 863/932 | 92.6% | 0.0000 | ABOVE FLOOR |
+  | walk | 204/232 | 87.9% | 0.1216 | **NOT SEPARABLE** |
+  | dual-hit | 6/6 | 100% | 0.3771 | **TOO FEW SAMPLES** |
+  | missile | 6/6 | 100% | 0.3771 | **TOO FEW SAMPLES** |
+
+  **THE LAST THREE ROWS SAID `NOT TESTED` UNTIL 2026-09-09 AND THAT CONFLATED
+  TWO DIFFERENT FAILURES.** `walk` has 232 samples against the 19 a perfect
+  record needs — the design could have cleared the floor and the rate does not.
+  `dual-hit` and `missile` have six, so NO attainable outcome clears it and the
+  gate can be neither passed nor failed on evidence. The old word covered both
+  and distinguished neither, because it was `PowerVerdict.TESTED` borrowed from
+  a helper that defines it as "the design could resolve an effect worth acting
+  on" — a claim about RESOLUTION — while this column reports SIGNIFICANCE. On
+  this question the two are anti-correlated, so the record now carries
+  `rate_exceeds_floor` and `design_can_clear_floor` under their own names and
+  no `PowerVerdict` at all.[^power]
 
   **A perfect record needs `n ≥ 19` to clear 0.85 at α = 0.05** —
   `0.85 ** 19 = 0.0456` against `0.85 ** 18 = 0.0536`. At n = 6 a flawless
