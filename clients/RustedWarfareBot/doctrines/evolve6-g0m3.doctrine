@@ -1,0 +1,57 @@
+# The VH win-rate climb's nominee (log 2026-09-10): evolve6 g0m3, best
+# of 96 genomes over six generations of 8 pairs vs the champion
+# (rng 17, spec vh, margin fitness), +2.299 margin delta at n=8 -- a
+# generation-tier read the panel judges, not a result. The run's whole
+# converged direction compiled into one army slot: a c_tank became a
+# second hoverTank (champion c_tank x3 + heavyTank + hoverTank; this
+# c_tank x2 + hoverTank x2 + heavyTank), every knob and tactic the
+# champion's own. The hover-for-heavy lean evolve1/evolve2 measured as
+# a flat direction is here EXPRESSED in the artifact for the first
+# time. Generation fitness is selection-biased and adopts nothing;
+# this faces the 48-pair win bar on untouched seeds (laws six, nine).
+name evolve6-g0m3
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,hoverTank,hoverTank,heavyTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+brace 0
+huntgate 0
+bank 0
