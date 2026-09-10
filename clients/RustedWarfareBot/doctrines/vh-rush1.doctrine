@@ -1,0 +1,51 @@
+# Close-speed screen arm (log 2026-09-10): the VH champion with waves
+# MARCHED AT THE ESTIMATED ENEMY START instead of default targeting.
+# The e6g0m3vh48 loss anatomy: all ten champion non-wins were long
+# matches where the rival compounded past ~120k -- no early losses
+# exist, so the lever is ending games sooner. One field differs.
+name vh-rush1
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 1
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+brace 0
+huntgate 0
+bank 0

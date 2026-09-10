@@ -1,0 +1,53 @@
+# Close-speed screen at Very Hard (log 2026-09-10): the champion vs three
+# tempo arms, one field each, against the e6g0m3vh48 loss anatomy -- every
+# champion non-win is a long match the rival compounds through, so the
+# lever is ending games sooner. 12 shared fresh seeds, screen tier: a
+# positive here buys a panel, never an adoption (laws six, nine).
+champ|8854001|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8854001|doctrines/vh-rush1.doctrine|10000
+mass15|8854001|doctrines/vh-mass15.doctrine|10000
+mass35|8854001|doctrines/vh-mass35.doctrine|10000
+champ|8854417|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8854417|doctrines/vh-rush1.doctrine|10000
+mass15|8854417|doctrines/vh-mass15.doctrine|10000
+mass35|8854417|doctrines/vh-mass35.doctrine|10000
+champ|8854833|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8854833|doctrines/vh-rush1.doctrine|10000
+mass15|8854833|doctrines/vh-mass15.doctrine|10000
+mass35|8854833|doctrines/vh-mass35.doctrine|10000
+champ|8855249|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8855249|doctrines/vh-rush1.doctrine|10000
+mass15|8855249|doctrines/vh-mass15.doctrine|10000
+mass35|8855249|doctrines/vh-mass35.doctrine|10000
+champ|8855665|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8855665|doctrines/vh-rush1.doctrine|10000
+mass15|8855665|doctrines/vh-mass15.doctrine|10000
+mass35|8855665|doctrines/vh-mass35.doctrine|10000
+champ|8856081|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8856081|doctrines/vh-rush1.doctrine|10000
+mass15|8856081|doctrines/vh-mass15.doctrine|10000
+mass35|8856081|doctrines/vh-mass35.doctrine|10000
+champ|8856497|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8856497|doctrines/vh-rush1.doctrine|10000
+mass15|8856497|doctrines/vh-mass15.doctrine|10000
+mass35|8856497|doctrines/vh-mass35.doctrine|10000
+champ|8856913|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8856913|doctrines/vh-rush1.doctrine|10000
+mass15|8856913|doctrines/vh-mass15.doctrine|10000
+mass35|8856913|doctrines/vh-mass35.doctrine|10000
+champ|8857329|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8857329|doctrines/vh-rush1.doctrine|10000
+mass15|8857329|doctrines/vh-mass15.doctrine|10000
+mass35|8857329|doctrines/vh-mass35.doctrine|10000
+champ|8857745|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8857745|doctrines/vh-rush1.doctrine|10000
+mass15|8857745|doctrines/vh-mass15.doctrine|10000
+mass35|8857745|doctrines/vh-mass35.doctrine|10000
+champ|8858161|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8858161|doctrines/vh-rush1.doctrine|10000
+mass15|8858161|doctrines/vh-mass15.doctrine|10000
+mass35|8858161|doctrines/vh-mass35.doctrine|10000
+champ|8858577|doctrines/evolve1-g4m2.doctrine|10000
+rush1|8858577|doctrines/vh-rush1.doctrine|10000
+mass15|8858577|doctrines/vh-mass15.doctrine|10000
+mass35|8858577|doctrines/vh-mass35.doctrine|10000
