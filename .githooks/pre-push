@@ -1,0 +1,106 @@
+#!/bin/sh
+# Enrol every pushed commit with ci-wake, so its CI verdict reaches whoever
+# pushed it.
+#
+# THIS HOOK IS THE SUBSCRIPTION, AND IT IS THE ONLY PLACE THE SUBSCRIPTION
+# CAN BE MADE. A GitHub workflow run carries a head sha, a workflow name, a
+# conclusion and a COMMIT AUTHOR -- which on this machine is one person for
+# every one of six concurrent AI sessions. Nothing in the Actions API says
+# which session typed `git push`, and no later query can recover it. That
+# fact exists here and nowhere else, so it is written down here.
+#
+# WHY IT IS TAKEN RATHER THAN OFFERED. A subscription anyone can forget is
+# one most people forget, and the repository has the receipts: a workflow
+# left red for weeks with nothing watching, and two commits that shipped a
+# barrel importing an untracked module and survived for hours because
+# nothing was attempting the clean-checkout build. Making the record a side
+# effect of pushing removes the step that was being skipped.
+#
+# WHAT IT COSTS: one process per pushed tip, no network, one appended line.
+#
+# A session becomes addressable by exporting its board label once:
+#
+#   export BOARD_AGENT_LABEL=opus-ci-wake-0909
+#
+# The SAME variable hpc3 already reads when recording a submitter, so one
+# export covers both bridges. Without it the push is still enrolled and its
+# verdict is posted board-level -- a human pushing from a terminal has no
+# board label, and refusing their push would make this a hook people
+# disable.
+#
+# THE LOGIC IS NOT IN THIS FILE, deliberately, exactly as in `pre-commit`.
+# Everything decidable lives in tools/ci-wake, with its own guards, mypy and
+# tests at 100% statements and branches. This hook is the invoker, and the
+# only things that can be wrong here are which interpreter runs it and which
+# repository it names -- which is why both are resolved explicitly rather
+# than cleverly.
+#
+# INSTALLED PER CLONE: `git config core.hooksPath .githooks`, or
+# `make install-hooks` from the repository root. git's hooksPath is local
+# config and cannot be committed, so a fresh clone runs no hooks until that
+# is done once.
+
+set -eu
+
+REPO="$(git rev-parse --show-toplevel)"
+TOOL="$REPO/tools/ci-wake"
+LEDGER="$TOOL/runs/pushes.jsonl"
+
+# git hands pre-push the remote's name and its location.
+REMOTE_URL="${2-}"
+
+# The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
+# ran against, so a green `make check` in that package is evidence about
+# this invocation. The two branches are PLATFORM DETECTION, not a fallback:
+# Windows puts the interpreter at Scripts/python.exe and POSIX at bin/python,
+# and they are the same venv. There is deliberately no "else use whatever
+# python is on PATH", for the reason `pre-commit` gives at length.
+if [ -x "$TOOL/.venv/Scripts/python.exe" ]; then
+    PYTHON="$TOOL/.venv/Scripts/python.exe"
+elif [ -x "$TOOL/.venv/bin/python" ]; then
+    PYTHON="$TOOL/.venv/bin/python"
+else
+    echo "ci-wake: no virtualenv at $TOOL/.venv" >&2
+    echo "This push cannot be enrolled, and an unenrolled push is one whose CI" >&2
+    echo "verdict reaches nobody -- which is the silence ci-wake exists to remove," >&2
+    echo "so it is refused rather than skipped." >&2
+    echo "Create it once:  make -C tools/ci-wake lint" >&2
+    exit 1
+fi
+
+# owner/name as GITHUB spells it, parsed from the remote's URL rather than
+# from a local alias: two machines can name one remote differently and the
+# Actions API cannot. Handles both forms git writes --
+# https://github.com/owner/name(.git) and git@github.com:owner/name(.git).
+NWO="${REMOTE_URL%.git}"
+case "$NWO" in
+    *github.com*)
+        NWO="${NWO#*github.com}"
+        NWO="${NWO#:}"
+        NWO="${NWO#/}"
+        ;;
+    *)
+        # NOT a fallback and not silent. A remote that is not GitHub has no
+        # Actions runs to announce, so enrolling this push would create a
+        # row that can only ever be closed as "no run ever appeared".
+        echo "ci-wake: remote '$REMOTE_URL' is not github.com; nothing to enrol"
+        exit 0
+        ;;
+esac
+
+ZERO="0000000000000000000000000000000000000000"
+
+# stdin carries <local-ref> <local-sha> <remote-ref> <remote-sha> per tip.
+#
+# THE ENROLMENT READS FROM /dev/null. Without that redirection the child
+# process inherits this loop's stdin and consumes the lines for the tips
+# after the first, so a push of three branches would enrol one -- and the
+# two it dropped would look exactly like pushes nobody made.
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue
+    "$PYTHON" -m ci_wake.cli.enrol \
+        --enrolment "$LEDGER" \
+        --repo "$NWO" \
+        --sha "$local_sha" \
+        --ref "$local_ref" < /dev/null
+done

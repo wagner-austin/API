@@ -407,9 +407,36 @@ class HpcWakeErrorCode(ErrorCodeBase):
     JOB_UNKNOWN_TO_LEDGER = "JOB_UNKNOWN_TO_LEDGER"
 
 
+class CiWakeErrorCode(ErrorCodeBase):
+    """Announcing GitHub Actions verdicts on the agent board.
+
+    The third bridge, and the first whose upstream is neither a cluster nor
+    this machine. It shares the board layer with the other two -- transport
+    is :class:`McpClientErrorCode`'s, credentials
+    :class:`BoardWatchErrorCode`'s, the standing task
+    :class:`BoardBridgeErrorCode`'s -- so what is left here is the two things
+    only a CI bridge touches: the ``gh`` boundary, and the enrolment record a
+    ``pre-push`` hook writes.
+    """
+
+    # ``gh`` exited non-zero, or is not installed, or is not logged in. NOT
+    # narrowed into three codes: the CLI reports all three on stderr and the
+    # operator's fix is the same first step (`gh auth status`), so splitting
+    # them would be a taxonomy the message already carries better.
+    GH_COMMAND_FAILED = "GH_COMMAND_FAILED"
+
+    # A push was enrolled under a value that cannot address anything --
+    # a repository that is not ``owner/name``, or a sha that is not 40 hex
+    # characters. Refused at ENROLMENT rather than at announcement time, so
+    # the push that typed it hears about it instead of a bridge three
+    # minutes later that cannot say whose push it was.
+    ENROLMENT_FIELD_MALFORMED = "ENROLMENT_FIELD_MALFORMED"
+
+
 __all__ = [
     "BoardBridgeErrorCode",
     "BoardWatchErrorCode",
+    "CiWakeErrorCode",
     "FleetErrorCode",
     "Hpc3ErrorCode",
     "HpcWakeErrorCode",
