@@ -39,25 +39,17 @@ run" has no answer at all.
 
 from __future__ import annotations
 
-import io
 import pathlib
-import subprocess
-import tarfile
-import tempfile
 
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import JSONValue
 
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, decode_workspace
 from hpc3.core.inputs import declared_inputs
+from tests._committed_tree import documents, submissions
 
 _RUNS = pathlib.Path(__file__).parent.parent / "runs"
-
-_REPO = pathlib.Path(__file__).parents[3]
-
-_RUNS_IN_REPO = "tools/hpc3/runs"
-"""``runs/`` as git spells it, which is the only spelling git accepts."""
 
 _INDEX = pathlib.Path(__file__).parents[3] / "docs" / "RESEARCH.md"
 """The research index, at the monorepo root rather than in this package.
@@ -68,82 +60,6 @@ package holds the check because this package holds the registry.
 """
 
 
-def _documents() -> list[tuple[str, dict[str, JSONValue]]]:
-    """Read every JSON object COMMITTED under ``runs/``.
-
-    READS THE COMMITTED TREE, NOT THE WORKING DIRECTORY, and the module's
-    name is the reason. ``.gitignore`` ignores ``tools/hpc3/runs/*`` and then
-    RE-INCLUDES five families by pattern -- ``hpc3*.json``, ``*-digests.txt``,
-    ``*-stage.json``, ``code-style-*.json``, ``cartridge-*.json`` -- which is
-    why a tracked set exists at all and why the two counts can diverge far
-    without either looking wrong. Globbing the filesystem measured a set that
-    exists only on the machine that wrote it.
-
-    A snapshot, not an invariant: on 2026-09-07 a working tree held 488 JSON
-    documents against 259 at HEAD, and a re-measure the same day read 492 and
-    263 as four more landed. Both spreads make the point; neither is a number
-    to check this against, which is why the assertions below use floors.
-
-    That is not hypothetical: a floor calibrated at 138 locally arrived on CI
-    as ``assert 36 >= 100`` (run 34104178998). Every developer's ``make
-    check`` was green, because every working tree is self-consistent and CI
-    is the only reader that starts from a clean checkout. A module named
-    ``test_committed_runs`` that never asked git could not measure the
-    property it is named for.
-
-    ``git archive HEAD`` rather than a per-file ``git show``: one subprocess
-    instead of 259, and it works on the shallow clone ``actions/checkout``
-    produces by default, because HEAD's tree is present even at depth 1. An
-    older revision would not be, which is a separate trap this repo has
-    already paid for once.
-
-    Returns:
-        Each document's filename and parsed body, in filename order.
-    """
-    archive = subprocess.run(
-        ["git", "archive", "HEAD", "--", _RUNS_IN_REPO],
-        cwd=_REPO,
-        capture_output=True,
-        check=True,
-    ).stdout
-    found: list[tuple[str, dict[str, JSONValue]]] = []
-    with tempfile.TemporaryDirectory() as scratch:
-        root = pathlib.Path(scratch)
-        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-            tar.extractall(root, filter="data")
-        for path in sorted((root / _RUNS_IN_REPO).glob("*.json")):
-            document = load_json_str(path.read_text(encoding="utf-8"))
-            if isinstance(document, dict):
-                found.append((path.name, document))
-    return found
-
-
-def _submissions() -> list[tuple[str, str, dict[str, JSONValue]]]:
-    """Select the documents that are submissions rather than configuration.
-
-    A submission is identified by naming a ``project``, which is what
-    :func:`~hpc3.contracts.run.resolve_run` requires first. That predicate
-    excludes the workspaces themselves, image specifications, and any
-    document predating the field -- without an exemption list, which is the
-    point: a filename is not a reason.
-
-    Returns:
-        Each submission's filename, project name, and body.
-
-    Raises:
-        TypeError: If a document's ``project`` is not a string.
-    """
-    found: list[tuple[str, str, dict[str, JSONValue]]] = []
-    for name, document in _documents():
-        project = document.get("project")
-        if project is None:
-            continue
-        if not isinstance(project, str):
-            raise TypeError(f"{name}: 'project' must be a string")
-        found.append((name, project, document))
-    return found
-
-
 def _workspaces() -> dict[str, Workspace]:
     """Decode every committed workspace document.
 
@@ -152,7 +68,7 @@ def _workspaces() -> dict[str, Workspace]:
     """
     return {
         name: decode_workspace(document, config_dir=_RUNS)
-        for name, document in _documents()
+        for name, document in documents()
         if "projects" in document
     }
 
@@ -187,7 +103,7 @@ def _sweep_member_artifacts() -> list[JSONValue]:
             document is not a sweep at all.
     """
     artifacts: list[JSONValue] = []
-    for _, _, document in _submissions():
+    for _, _, document in submissions():
         members = document.get("members")
         if not isinstance(members, list):
             continue
@@ -372,7 +288,7 @@ class TestEveryCommittedSubmissionResolves:
     """The regression guard: a record that no longer decodes is not a record."""
 
     def test_every_project_named_by_a_submission_is_declared_somewhere(self) -> None:
-        named = {project for _, project, _ in _submissions()}
+        named = {project for _, project, _ in submissions()}
         assert sorted(named - set(_by_project())) == []
 
     def test_every_run_document_resolves(self) -> None:
@@ -393,7 +309,7 @@ class TestEveryCommittedSubmissionResolves:
         the wrong project as long as some other document named the right one.
         """
         owners = _by_project()
-        runs = [(p, d) for _, p, d in _submissions() if "command" in d and "members" not in d]
+        runs = [(p, d) for _, p, d in submissions() if "command" in d and "members" not in d]
         resolved = [resolve_run(owners[project], doc)["project"] for project, doc in runs]
 
         # A rule that silently resolves nothing passes forever.
@@ -402,7 +318,7 @@ class TestEveryCommittedSubmissionResolves:
 
     def test_every_sweep_document_resolves_and_expands(self) -> None:
         owners = _by_project()
-        sweeps = [(n, p, d) for n, p, d in _submissions() if "members" in d]
+        sweeps = [(n, p, d) for n, p, d in submissions() if "members" in d]
         expanded = [len(expand_sweep(resolve_sweep(owners[p], d))) for _, p, d in sweeps]
         assert sorted(name for name, _, _ in sweeps) == [
             "sweep-cleargbm-p6-rung1.json",
@@ -483,7 +399,7 @@ class TestTheInputCheckHasASubject:
         there in the command -- with no magic number and no exemption list.
         """
         checked = 0
-        for name, _project, document in _submissions():
+        for name, _project, document in submissions():
             command = document.get("command")
             if not isinstance(command, str):
                 continue
@@ -499,7 +415,7 @@ class TestTheInputCheckHasASubject:
         # The loop above is vacuous if no committed command spells any of
         # them, which is the reading this whole class exists to refuse.
         # 36 committed submissions spell one, measured against HEAD rather
-        # than against a working tree -- see _documents. The floor sits well
+        # than against a working tree -- see tests._committed_tree. The floor sits well
         # under that so adding or retiring a run document does not fail this,
         # and well over zero because zero is the failure it exists to catch:
         # a renamed flag collapses this count to 0, not to 19.
@@ -520,13 +436,13 @@ class TestTheInputCheckHasASubject:
         WORKING TREE and were wrong for any clean checkout. They put the
         floor at 100, which CI met as ``assert 36 >= 100``. The word
         "committed" was doing no work: nothing here asked git. Both halves
-        are fixed -- the set in :func:`_documents`, the floor here -- and the
+        are fixed -- the set in :func:`tests._committed_tree.documents`, the floor here -- and the
         floor is the lesser half. Raising it alone would have made the number
         agree with CI while the check still measured the wrong set.
         """
         declaring = [
             name
-            for name, _project, document in _submissions()
+            for name, _project, document in submissions()
             if isinstance(document.get("command"), str)
             and declared_inputs(str(document["command"]))
         ]
@@ -542,131 +458,10 @@ class TestTheInputCheckHasASubject:
         ever added to ``INPUT_FLAGS`` the first run of everything would be
         refused, and it would be refused in production rather than here.
         """
-        for name, _project, document in _submissions():
+        for name, _project, document in submissions():
             command = document.get("command")
             if not isinstance(command, str):
                 continue
             for path in declared_inputs(command):
                 assert "/results/" not in path, f"{name}: {path} is written, not read"
                 assert "/generated/" not in path, f"{name}: {path} is written, not read"
-
-
-#: Where the question-set plan table lives, relative to the monorepo root.
-#: Read out of a COMMIT rather than the working tree, because what a run
-#: document's image contains is fixed by the commit its wheels came from.
-_QA_PLAN_TABLE = (
-    "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_plans.py"
-)
-
-
-#: The entry point whose plan table this check knows. Scoped to one CLI
-#: DELIBERATELY. Every cartridge command takes ``--plan``, and they read
-#: DIFFERENT tables -- the LoRA and companion sweeps resolve against
-#: ``cartridge_pool_plans``, not the question-set table. The first version of
-#: this check ignored that and convicted six committed sweeps whose plans were
-#: perfectly real, which is the false positive this repo has twice recorded as
-#: worse than no check. Widening it means mapping each CLI to its own table,
-#: and a mapping guessed rather than read would reintroduce exactly that.
-_QA_ENTRY_POINT = "model_trainer.cli.cartridge_qa_benchmark"
-
-
-def _plan_flag(command: str) -> str | None:
-    """Read the plan a question-set command names, if it names one.
-
-    Args:
-        command: The run document's command line.
-
-    Returns:
-        The value following ``--plan`` for a question-set run, or None for
-        any other command -- including sibling cartridge commands, which take
-        a ``--plan`` from a different table.
-    """
-    if _QA_ENTRY_POINT not in command:
-        return None
-    tokens = command.split()
-    for index, token in enumerate(tokens):
-        if token == "--plan" and index + 1 < len(tokens):
-            return tokens[index + 1]
-    return None
-
-
-def _plan_table_at(commit: str) -> str:
-    """Read the question-set plan table as it stood at one commit.
-
-    Args:
-        commit: The commit the image's wheels were built from.
-
-    Returns:
-        The module's source at that commit.
-
-    Raises:
-        AssertionError: If the commit is not present in this clone. CI checks
-            out at depth 1, so a run document naming a commit older than the
-            fetch depth cannot be verified here -- and saying so is better
-            than passing silently.
-    """
-    result = subprocess.run(
-        ["git", "show", f"{commit}:{_QA_PLAN_TABLE}"],
-        cwd=_REPO,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, (
-        f"cannot read {_QA_PLAN_TABLE} at {commit}: {result.stderr.strip()}"
-    )
-    return result.stdout
-
-
-class TestAQuestionSetRunNamesAPlanItsImageActuallyCarries:
-    """The failure this class exists for, measured 2026-09-10T01:2xZ.
-
-    Job 55898551 was submitted against image v50 and died in 5m32s with
-    ``KeyError: unknown cartridge plan 'gpt2-full-wiki-qa'``. The image was
-    built from ``79ab1696`` at 16:20 and the plan was written at 16:43, so
-    the run document named a plan its own image predated by twenty-three
-    minutes.
-
-    NOTHING COULD HAVE CAUGHT IT AT THE TIME, and that is the point. The
-    image's own smoke checks verify it against the commit it was BUILT from
-    and passed 51/51, correctly -- they cannot assert a plan that did not
-    exist when they were written. The missing invariant is between the run
-    document and the image, and it is checkable here without a cluster: a run
-    document declares the commit its image carries, so the plan it names must
-    be in the plan table AT THAT COMMIT.
-    """
-
-    def test_every_named_plan_exists_at_the_declared_image_commit(self) -> None:
-        """A plan absent from the image is a run that dies on its first call."""
-        for name, _project, document in _submissions():
-            command = document.get("command")
-            experiment = document.get("experiment")
-            if not isinstance(command, str) or not isinstance(experiment, dict):
-                continue
-            plan = _plan_flag(command)
-            commit = experiment.get("image_commit")
-            if plan is None or not isinstance(commit, str):
-                continue
-            table = _plan_table_at(commit)
-            assert f'"{plan}"' in table, (
-                f"{name}: names plan {plan!r}, which is absent from the plan table at "
-                f"{commit[:8]} -- the commit its own experiment block says its image "
-                f"carries. The run would fail on the plan lookup before reading a corpus."
-            )
-
-    def test_a_document_declaring_an_image_commit_names_a_plan_from_it(self) -> None:
-        """The two fields are only useful together.
-
-        A document carrying ``image_commit`` and no ``--plan`` is not wrong,
-        but a document carrying both is making a checkable claim, and this is
-        the test that it is checked rather than decorative.
-        """
-        checked = [
-            name
-            for name, _project, document in _submissions()
-            if isinstance(document.get("command"), str)
-            and isinstance(document.get("experiment"), dict)
-            and _plan_flag(str(document["command"])) is not None
-        ]
-
-        assert checked, "no committed run document pairs a --plan with an experiment block"
