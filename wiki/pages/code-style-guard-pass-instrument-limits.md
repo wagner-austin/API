@@ -13,6 +13,7 @@ source_paths:
   - tools/code-style-eval/src/code_style_eval/core/scoring.py
   - libs/platform_core/src/platform_core/power_distributions.py
   - libs/platform_core/src/platform_core/minimum_detectable_effect.py
+  - libs/platform_core/src/platform_core/mcnemar_detectability.py
   - libs/platform_core/src/platform_core/clustering.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
@@ -22,6 +23,7 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
   "libs/platform_core/src/platform_core/minimum_detectable_effect.py": 9dab00cba3fb975bde1eda2acd55b7b3f73190d9
+  "libs/platform_core/src/platform_core/mcnemar_detectability.py": 429fd7499dadc8654023c68a1582ecc366c335d3
   "libs/platform_core/src/platform_core/clustering.py": 7611039dbbc21a817e4c10027e282a4e21e9fdbe
 provenance:
   - "EVERY RUN BELOW IS NAMED BY ITS payload_digest, not only by its directory. Two runs of this package can agree on every published figure -- sweep-v1 and gen-v1 both scored 226 items -- so a run name is not an identity and a figure quoted off this page was, until 2026-09-09, traceable only by resemblance. It was traced to the wrong run once. The digest is name-paired sha256 over the two *.outcomes.jsonl the comparison was computed from, carried inside comparison.json since 63770146."
@@ -30,7 +32,7 @@ provenance:
   - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded) -- payload_digest d00c4b5057f2ba0bb073d771df9986a85886a30e08a950ba6dfd5c3002a129e5"
   - "runs/sweep-v1/{base,candidate}.outcomes.jsonl and .generation.jsonl — per-item verdicts and termination flags"
   - "runs/sweep-v1-cap384/perplexity.json — teacher-forced NLL per item, both arms"
-fact_checked: "2026-09-08"
+fact_checked: "2026-09-10"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -55,19 +57,35 @@ Sweep `sweep-v3-cap1536-reppen1.1`: Qwen2.5-Coder-1.5B base against the QLoRA ad
 outright under the exact test.** The last two columns are the *floor*: the
 smallest p the stratum could have produced under any outcome, given its
 discordant count. With *d* discordant pairs the most extreme attainable split
-is *d*:0, so the floor is fixed before the data arrive[^8].
+is *d*:0, so the floor is fixed before the data arrive[^16].
 
 At *d*=5 the exact floor is 0.0625 — above α=0.05, so **no possible outcome
-rejects**[^8]. Under mid-p, which this page reports, *d*=5 rejects only on a
+rejects**[^16]. Under mid-p, which this page reports, *d*=5 rejects only on a
 perfect 5:0 split. Either way, "no difference detected" in those two strata is
 a statement about the sample size, not about the adapter.
 
 An earlier version of this page said "The null holds in every stratum" as
 though it were a finding. It was not one available to be made: two of the three
 strata could not have contradicted it. The MDEs make the same point in the
-other direction — 2.46pp, 5.07pp and 9.32pp at 80% power[^8] — each at or above
+other direction — 2.46pp, 5.07pp and 9.31pp at 80% power[^16] — each at or above
 its own stratum's base rate, so the smallest detectable effect was "the adapter
 flips essentially every item that flips at all, in one direction".
+
+Those three figures are mid-p. **Under the exact test the last two strata have
+no minimum detectable effect at all**, and the instrument refuses to report one
+rather than returning a maximal value: at *d*=5 no split rejects, so no true
+effect reaches 80% power however large it is[^16]. That refusal is the same
+unfalsifiability the paragraph above states in prose, arriving as an error code
+instead of a number a reader could quote.
+
+**The third figure read 9.32pp on this page until 2026-09-10 and is corrected
+to 9.31pp here.** It was not a typo. Both *d*=5 strata share an identical net
+of 4.5635 items and differ only in denominator, and the published pair was
+produced by a search that had not converged — an early-stopped bisection
+approaches the answer from above, and at 10 or 11 halvings it reproduces 2.46
+and 5.07 exactly while giving 9.32 for the third. Only the *n*=49 stratum is
+sensitive enough at that resolution to show the error, because its small
+denominator magnifies a residual of under a thousandth of an item[^16].
 
 **90% attrition between the corpus and the set on which the metric is actually measuring code style**[^2].
 
@@ -175,7 +193,7 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
 
-[^8]: `libs/platform_core/src/platform_core/power_distributions.py`
+[^16]: `libs/platform_core/src/platform_core/power_distributions.py`
       `mid_p_mcnemar_p` and `exact_mcnemar_p` [synthesis] — the floor is the
       p-value each function returns at the most extreme attainable split for
       the stratum's discordant count (*d*:0), and the MDE is the smallest true
@@ -195,3 +213,31 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
       published floors exactly — 0.015625 and 0.03125 at *d*=6, 0.03125 and
       0.0625 at *d*=5, the last of them `can_ever_reject` **false**, which is
       the unfalsifiability this page reports in prose.
+      THE MDEs WERE HAND-ROLLED UNTIL 2026-09-10 AND ARE NOW COMPUTED.
+      `libs/platform_core/src/platform_core/mcnemar_detectability.py`
+      `mcnemar_detectable_effect` (commit `db7baf3e`) is the magnitude sibling
+      of `mcnemar_power`: that one asks whether ANY split rejects, this one
+      asks how lopsided the split had to be to reach a target power. Run at
+      alpha 0.05, target power 0.80, mid-p, over this page's own discordant
+      counts it returns 2.4610pp at *d*=6/*n*=226, 5.0706pp at *d*=5/*n*=90
+      and 9.3133pp at *d*=5/*n*=49, each with `achieved_power` 0.800000. Under
+      the exact test the *d*=6 stratum is unchanged and both *d*=5 strata
+      raise `POWER_TARGET_UNREACHABLE`.
+      THE 9.32 -> 9.31 CORRECTION, AND WHY IT IS NOT A TYPO. Two competing
+      explanations were tested against the published triple before either was
+      written down. A coarse grid over the split is falsified: no step size
+      reproduces 9.32 together with the other two (1e-2 gives 2.50/5.11/9.39,
+      1e-3 gives 2.46/5.08/9.33, and 1e-4 and finer give 2.46/5.07/9.31). An
+      under-converged bisection is not: because bisection retains the
+      satisfying bound it converges from ABOVE, and at 10 and 11 halvings it
+      yields 2.4630/5.0727/9.3172 and 2.4617/5.0727/9.3172, which round to the
+      published 2.46/5.07/9.32. The residual is 0.00083 items of net — the
+      published figure needed a net of at least 4.56435 against a true
+      4.56352 — which is invisible at *n*=226 and *n*=90 and moves the second
+      decimal at *n*=49. The shipped module fixes its halvings at 60 rather
+      than stopping on a tolerance, and its constant's comment gives the
+      reason; this page's own 9.32 is the measured instance behind it.
+      A FOOTNOTE-LABEL COLLISION WAS FIXED IN THE SAME EDIT: this note was
+      labelled `[^8]`, which `[tool.poetry.group.corpus]` also claimed, so two
+      unrelated citations resolved to one definition. The power citations are
+      `[^16]` from 2026-09-10; `[^8]` now means the pyproject group alone.
