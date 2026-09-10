@@ -242,7 +242,7 @@ def _power_columns(record: ClaimEvidenceDict) -> tuple[str, str]:
         return f"{power['p_value']:.4f}", "TOO FEW SAMPLES"
     return (
         f"{power['p_value']:.4f}",
-        "ABOVE FLOOR" if power["rate_exceeds_floor"] else "NOT SEPARABLE",
+        "ABOVE FLOOR" if power["rate_significantly_exceeds_floor"] else "NOT SEPARABLE",
     )
 
 

@@ -298,7 +298,7 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   a helper that defines it as "the design could resolve an effect worth acting
   on" — a claim about RESOLUTION — while this column reports SIGNIFICANCE. On
   this question the two are anti-correlated, so the record now carries
-  `rate_exceeds_floor` and `design_can_clear_floor` under their own names and
+  `rate_significantly_exceeds_floor` and `design_can_clear_floor` under their own names and
   no `PowerVerdict` at all.[^power]
 
   **A perfect record needs `n ≥ 19` to clear 0.85 at α = 0.05** —

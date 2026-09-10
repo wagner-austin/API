@@ -219,8 +219,13 @@ class RateFloorPower(TypedDict):
             the floor, ``ceil(log(alpha) / log(floor))``. Below this, no
             outcome whatsoever can pass, so the gate cannot be failed OR
             passed on evidence.
-        rate_exceeds_floor: Whether ``p_value <= alpha`` -- the observed rate
-            is separable FROM the floor. A statement about this RESULT.
+        rate_significantly_exceeds_floor: Whether ``p_value <= alpha``. The word
+            ``significantly`` is load-bearing and was missing from this field's
+            name for its first hour: a shorter ``rate_exceeds_floor`` asserted
+            something about the OBSERVED RATE while holding something about the
+            TEST, and the two come apart on ordinary data. ``dual-hit`` at 6/6
+            is a 100% rate against an 0.85 floor and this field is False,
+            because six trials cannot establish it.
         design_can_clear_floor: Whether ``trials >= perfect_record_trials`` --
             some attainable outcome could have cleared the floor. A statement
             about this DESIGN, and the question :class:`PowerVerdict` asks.
@@ -239,6 +244,15 @@ class RateFloorPower(TypedDict):
     precedent this module already set with ``can_ever_reject`` and
     ``net_could_ever_be_significant``. A word that reassures a reader about a
     question it never asked is the defect this whole module exists to prevent.
+
+    AND THE FIRST REPLACEMENT REPEATED THE DEFECT ONE NOTCH SMALLER. The
+    significance boolean shipped as ``rate_exceeds_floor``, which names a
+    comparison of two numbers a reader can see in the same row -- 87.9%
+    against 85% -- and returns False. The reliable tell for this whole family
+    is whether a field can DISAGREE WITH A NUMBER PRINTED BESIDE IT: a name
+    asserting something about the world while holding something about the
+    procedure. Found by a third session on the published table, two rows out
+    of two.
     """
 
     instrument: str
@@ -249,7 +263,7 @@ class RateFloorPower(TypedDict):
     alpha: float
     p_value: float
     perfect_record_trials: int
-    rate_exceeds_floor: bool
+    rate_significantly_exceeds_floor: bool
     design_can_clear_floor: bool
 
 

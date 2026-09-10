@@ -339,7 +339,7 @@ class TestRateFloorPower:
         # PASS carries no evidence the claim exceeds it.
         record = rate_floor_power(6, 6, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(0.85**6, abs=1e-12)
-        assert record["rate_exceeds_floor"] is False
+        assert record["rate_significantly_exceeds_floor"] is False
         assert record["design_can_clear_floor"] is False
         assert record["observed_rate"] == 1.0
 
@@ -348,20 +348,20 @@ class TestRateFloorPower:
         # which is why the beta form is used.
         record = rate_floor_power(18_649, 18_649, 0.85, 0.05)
         assert record["p_value"] < 1e-12
-        assert record["rate_exceeds_floor"] is True
+        assert record["rate_significantly_exceeds_floor"] is True
         assert record["design_can_clear_floor"] is True
 
     def test_a_rate_close_to_the_floor_is_not_distinguishable_from_it(self) -> None:
         # walk: 204/232 = 87.9%, above 0.85 by eye and not separable from it.
         record = rate_floor_power(204, 232, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(0.1215724091, abs=1e-9)
-        assert record["rate_exceeds_floor"] is False
+        assert record["rate_significantly_exceeds_floor"] is False
 
     def test_a_rate_far_above_the_floor_is_separable(self) -> None:
         # homing: 487/522 = 93.3%.
         record = rate_floor_power(487, 522, 0.85, 0.05)
         assert record["p_value"] == pytest.approx(4.1e-9, rel=0.05)
-        assert record["rate_exceeds_floor"] is True
+        assert record["rate_significantly_exceeds_floor"] is True
 
     def test_zero_successes_cannot_be_evidence_against_the_floor(self) -> None:
         # Every outcome is at least as good as the worst one, so the one-sided
@@ -369,7 +369,7 @@ class TestRateFloorPower:
         record = rate_floor_power(0, 40, 0.85, 0.05)
         assert record["p_value"] == 1.0
         assert record["observed_rate"] == 0.0
-        assert record["rate_exceeds_floor"] is False
+        assert record["rate_significantly_exceeds_floor"] is False
 
     def test_publishes_the_shortest_flawless_record_that_could_pass(self) -> None:
         # 0.85 ** 19 = 0.04559 <= 0.05 < 0.05386 = 0.85 ** 18. Below 19 trials
@@ -399,6 +399,30 @@ class TestRateFloorPower:
         assert PowerVerdict.TESTED.value not in record.values()
         assert PowerVerdict.NOT_TESTED.value not in record.values()
 
+    def test_the_significance_field_is_named_for_the_test_not_the_rate(self) -> None:
+        """A 100% rate against an 0.85 floor, and the field is False.
+
+        This pins the SECOND naming pass, not the first. The significance
+        boolean shipped as ``rate_exceeds_floor``, which asserts a comparison
+        of two numbers a reader can see side by side and then disagrees with
+        it: 6/6 is 1.0 against a floor of 0.85. What six trials cannot do is
+        establish the excess, which is what the field actually holds.
+
+        The test is the rate and the floor, compared directly, beside the
+        field -- so a future rename back to something that asserts the
+        comparison fails here rather than on a published table.
+        """
+        record = rate_floor_power(6, 6, 0.85, 0.05)
+        assert record["observed_rate"] == 1.0
+        assert record["observed_rate"] > record["floor"]
+        assert record["rate_significantly_exceeds_floor"] is False
+        assert "rate_exceeds_floor" not in record
+
+        # And the walk row from the published audit table, same shape.
+        walk = rate_floor_power(204, 232, 0.85, 0.05)
+        assert walk["observed_rate"] > walk["floor"]
+        assert walk["rate_significantly_exceeds_floor"] is False
+
     def test_significance_and_resolution_are_reported_separately(self) -> None:
         """The two questions the single verdict used to conflate.
 
@@ -409,10 +433,10 @@ class TestRateFloorPower:
         """
         decisive_failure = rate_floor_power(120, 200, 0.85, 0.05)
         assert decisive_failure["design_can_clear_floor"] is True
-        assert decisive_failure["rate_exceeds_floor"] is False
+        assert decisive_failure["rate_significantly_exceeds_floor"] is False
 
         flimsy_pass = rate_floor_power(20, 20, 0.85, 0.05)
-        assert flimsy_pass["rate_exceeds_floor"] is True
+        assert flimsy_pass["rate_significantly_exceeds_floor"] is True
         assert flimsy_pass["design_can_clear_floor"] is True
 
         too_short = rate_floor_power(6, 6, 0.85, 0.05)

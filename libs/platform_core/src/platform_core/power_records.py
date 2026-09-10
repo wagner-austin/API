@@ -373,7 +373,7 @@ def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
         "alpha": record["alpha"],
         "p_value": record["p_value"],
         "perfect_record_trials": record["perfect_record_trials"],
-        "rate_exceeds_floor": record["rate_exceeds_floor"],
+        "rate_significantly_exceeds_floor": record["rate_significantly_exceeds_floor"],
         "design_can_clear_floor": record["design_can_clear_floor"],
     }
 
@@ -400,7 +400,7 @@ def decode_rate_floor_power(obj: JSONObject) -> RateFloorPower:
         alpha=require_float(obj, "alpha"),
         p_value=require_float(obj, "p_value"),
         perfect_record_trials=require_int(obj, "perfect_record_trials"),
-        rate_exceeds_floor=require_bool(obj, "rate_exceeds_floor"),
+        rate_significantly_exceeds_floor=require_bool(obj, "rate_significantly_exceeds_floor"),
         design_can_clear_floor=require_bool(obj, "design_can_clear_floor"),
     )
 

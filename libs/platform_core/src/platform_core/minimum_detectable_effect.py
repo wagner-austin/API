@@ -558,7 +558,7 @@ def rate_floor_power(
         alpha=alpha,
         p_value=p_value,
         perfect_record_trials=perfect_record_trials,
-        rate_exceeds_floor=p_value <= alpha,
+        rate_significantly_exceeds_floor=p_value <= alpha,
         design_can_clear_floor=trials >= perfect_record_trials,
     )
 
