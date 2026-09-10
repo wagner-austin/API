@@ -37,7 +37,7 @@ from platform_core.power_records import (
     decode_net_difference_power,
     encode_net_difference_power,
 )
-from platform_core.power_types import PowerInstrument
+from platform_core.power_types import PowerInstrument, PowerVerdict
 
 
 class TestSmallestResolvableNetDifference:
@@ -154,6 +154,32 @@ class TestNetDifferencePower:
         assert record["instrument"] == PowerInstrument.NET_DIFFERENCE.value
         assert record["test"] == McNemarTest.MID_P.value
         assert record["alpha"] == 0.05
+
+    def test_it_carries_no_power_verdict(self) -> None:
+        """The abstention this record's docstring declares, made checkable.
+
+        ``PowerVerdict`` is defined as DETECTABILITY -- "the instrument could
+        have resolved an effect as small as the one anyone would act on" --
+        and this instrument answers FALSIFIABILITY: could any ``d`` consistent
+        with this net reject at all. A verdict here would be true of the
+        instrument and false about the world, which is why the record carries
+        ``net_could_ever_be_significant`` instead: a boolean named after its
+        own question cannot be mistaken for a classification.
+
+        ``McNemarPower`` has pinned the identical abstention since it was
+        written and ``rate_floor_power`` was pinned the same way in
+        ``a4c64ef9``; this record was the one left where the invariant lived
+        in a docstring and a commit message and was enforced by nothing -- a
+        condition stated as though it were self-executing, in the module
+        written to stop that. If a verdict field ever returns here, this
+        fails.
+        """
+        record = net_difference_power(4, 875, 0.05, McNemarTest.MID_P)
+
+        assert record["net_could_ever_be_significant"] is False
+        assert "verdict" not in record
+        assert PowerVerdict.TESTED.value not in record.values()
+        assert PowerVerdict.NOT_TESTED.value not in record.values()
 
     def test_a_tie_carries_no_evidence_and_says_so(self) -> None:
         record = net_difference_power(0, 32, 0.05, McNemarTest.MID_P)
