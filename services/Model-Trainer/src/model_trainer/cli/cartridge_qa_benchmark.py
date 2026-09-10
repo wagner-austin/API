@@ -45,7 +45,6 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
-from model_trainer.core.contracts.cloze import BLANK_MARKER
 from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.contracts.replicated_measurement import (
     gain_observations,
@@ -64,21 +63,12 @@ from model_trainer.core.services.model.cartridge_corpus import (
     build_windows,
     split_by_stride,
 )
-from model_trainer.core.services.model.cartridge_dense import dense_ranking, embed_chunks
 from model_trainer.core.services.model.cartridge_measurement import train_cartridge
 from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     require_cartridge_plan,
 )
 from model_trainer.core.services.model.cartridge_qa import answer_nll_pairs, compare_arms
-from model_trainer.core.services.model.cartridge_qa_arms import (
-    bm25_retrieval_items,
-    expanded_retrieval_items,
-    long_context_items,
-    ranked_retrieval_items,
-    reranked_retrieval_items,
-    retrieval_items,
-)
 from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set
 from model_trainer.core.services.model.cartridge_qa_report import (
     ArmScores,
@@ -86,12 +76,8 @@ from model_trainer.core.services.model.cartridge_qa_report import (
     accuracy_observations,
     latency_observations,
 )
+from model_trainer.core.services.model.cartridge_qa_retrieval_arms import score_retrieval_arms
 from model_trainer.core.services.model.cartridge_question_set import build_question_set
-from model_trainer.core.services.model.cartridge_retrieval import (
-    build_index,
-    fuse_by_reciprocal_rank,
-    rank_chunks,
-)
 from model_trainer.core.services.model.cloze.identity import qa_plan_label, question_set_digest
 from model_trainer.core.services.model.cloze.score import score_cloze_items, scored_and_timed
 from model_trainer.core.services.model.control_arms import CONTROLS_FLAG, require_control_arm
@@ -181,169 +167,31 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         items, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
     )
 
-    # The oracle's SELECTION is timed apart from the scoring it feeds. It
-    # searches each item's own answer, which no real retriever can do, so its
-    # cost belongs in the record but not in the comparison.
-    started = clock()
-    retrieval_set = retrieval_items(items, [training_text], encoder, max_seq_len=max_seq)
-    retrieval_build_seconds = clock() - started
-
-    wait()
-    started = clock()
-    scored_retrieval = score_cloze_items(
-        items=retrieval_set,
-        model=base,
+    # THE ARMS THEMSELVES LIVE IN `cartridge_qa_retrieval_arms`. What is an
+    # arm, what is timed apart from what, and which cost a deployment pays
+    # are measurement questions and belong beside the arms rather than beside
+    # this module's argument parsing. What stays here is the wiring: corpus,
+    # power gate, base model, cartridge seeds, and the record.
+    arms = score_retrieval_arms(
+        items,
+        plan=plan,
+        training_text=training_text,
+        base=base,
         encoder=encoder,
         device=device,
-        max_seq_len=max_seq,
+        wait=wait,
+        clock=clock,
+        make_embedder=_test_hooks.make_embedder,
     )
-    wait()
-    retrieval_seconds = clock() - started
+    scored_retrieval = arms["oracle"]
+    scored_real = arms["bm25"]
+    scored_dense = arms["dense"]
+    scored_fused = arms["fused"]
+    scored_expanded = arms["expanded"]
+    scored_reranked = arms["reranked"]
+    scored_long_context = arms["long_context"]
+    long_context_fraction = arms["long_context_corpus_fraction"]
 
-    # THE REAL ARM. Indexing is timed apart from querying because a
-    # deployment pays them at different times -- the index is built once when
-    # the corpus changes, the query runs per request. Unlike the oracle's
-    # selection, the query time here IS chargeable: searching an index from
-    # the question is work every real retriever does.
-    started = clock()
-    index = build_index(
-        [training_text],
-        k1=plan["bm25_k1"],
-        b=plan["bm25_b"],
-        retrieved_chunks=plan["retrieved_chunks"],
-    )
-    real_index_seconds = clock() - started
-
-    started = clock()
-    real_set = bm25_retrieval_items(items, index, encoder, max_seq_len=max_seq)
-    real_select_seconds = clock() - started
-
-    wait()
-    started = clock()
-    scored_real = score_cloze_items(
-        items=real_set,
-        model=base,
-        encoder=encoder,
-        device=device,
-        max_seq_len=max_seq,
-    )
-    wait()
-    real_seconds = clock() - started
-    _log.info("bm25 retrieval %.4f over %d chunks", scored_real["accuracy"], len(index["chunks"]))
-
-    # THE DENSE ARM, and the FUSION of it with BM25. All three rank the same
-    # chunks, so they differ only in HOW they choose -- which is the
-    # comparison worth making. Queries strip the blank marker for the reason
-    # `bm25_retrieval_items` documents.
-    queries = [item["template"].replace(BLANK_MARKER, " ") for item in items]
-
-    # OFFLINE, exactly as the BM25 index build is. The first version of this
-    # embedded the whole corpus inside every query and recorded 17452 ms/item
-    # against BM25's 72 -- real arithmetic over a design nobody deploys.
-    # Built ONCE, before any clock starts. A deployment loads its encoder at
-    # startup; the first version reloaded gte on every call and left 300 ms
-    # of model loading inside each query's measured cost.
-    embedder = _test_hooks.make_embedder(device)
-
-    started = clock()
-    dense_vectors = embed_chunks(index, embedder)
-    dense_index_seconds = clock() - started
-
-    started = clock()
-    dense_ranks = [dense_ranking(dense_vectors, query, embedder) for query in queries]
-    dense_select_seconds = clock() - started
-
-    dense_set = ranked_retrieval_items(
-        items,
-        index,
-        encoder,
-        [ranking[: plan["retrieved_chunks"]] for ranking in dense_ranks],
-        max_seq_len=max_seq,
-    )
-    scored_dense, dense_seconds = scored_and_timed(
-        dense_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
-    )
-
-    # Fusion re-uses the dense ranking rather than recomputing it, so this
-    # times the FUSION plus the lexical ranking it still needs. A deployment
-    # pays the dense arm on top; the record carries the numbers separately
-    # so a reader can add whichever total they mean.
-    started = clock()
-    fused_ranks = [
-        fuse_by_reciprocal_rank(ranking, rank_chunks(index, query), limit=plan["retrieved_chunks"])
-        for ranking, query in zip(dense_ranks, queries, strict=True)
-    ]
-    fused_select_seconds = clock() - started
-
-    fused_set = ranked_retrieval_items(items, index, encoder, fused_ranks, max_seq_len=max_seq)
-    scored_fused, fused_seconds = scored_and_timed(
-        fused_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
-    )
-    # SEARCHING TWICE, the second time with terms mined from the first pass.
-    # Reported beside plain BM25 rather than replacing it: expansion assumes
-    # its feedback set is relevant and never checks, so where the first
-    # search was wrong it adds the wrong vocabulary and the second search is
-    # more confidently wrong. The two arms share one index and one question
-    # set, which is what makes the difference readable.
-    expanded_set = expanded_retrieval_items(
-        items,
-        index,
-        encoder,
-        max_seq_len=max_seq,
-        feedback_chunks=plan["expansion_feedback_chunks"],
-        expansion_terms=plan["expansion_terms"],
-    )
-    scored_expanded, expanded_seconds = scored_and_timed(
-        expanded_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
-    )
-    _log.info(
-        "expanded %.4f against bm25 %.4f",
-        scored_expanded["accuracy"],
-        scored_real["accuracy"],
-    )
-
-    # THE HALF OF A REAL PIPELINE THIS AXIS HAS BEEN MISSING. A deployment
-    # over-retrieves cheaply and reranks the shortlist with something that
-    # reads; comparing a cartridge against unranked BM25 compares it against
-    # a system nobody ships. Costed separately because the cost is the trade:
-    # rerank_candidates forward passes per item, where BM25 pays none.
-    reranked_set = reranked_retrieval_items(
-        items,
-        index,
-        encoder,
-        base,
-        device=device,
-        max_seq_len=max_seq,
-        candidates=plan["rerank_candidates"],
-    )
-    scored_reranked, reranked_seconds = scored_and_timed(
-        reranked_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
-    )
-    _log.info(
-        "reranked %.4f against bm25 %.4f",
-        scored_reranked["accuracy"],
-        scored_real["accuracy"],
-    )
-
-    # THE ARM THAT SKIPS RETRIEVAL ENTIRELY, and the one a reader assumes
-    # has already been run. Everything above searches; this simply hands the
-    # model the corpus and lets the window truncate it. Its coverage is
-    # recorded beside its accuracy because the two cannot be read apart: an
-    # arm carrying 6% of the corpus has not tested long context, and a
-    # cartridge beating it has not beaten reading.
-    long_set, long_context_fraction = long_context_items(
-        items, training_text, encoder, max_seq_len=max_seq
-    )
-    scored_long_context, long_context_seconds = scored_and_timed(
-        long_set, base, encoder, device=device, max_seq_len=max_seq, wait=wait, clock=clock
-    )
-    _log.info(
-        "long-context %.4f over %.4f of the corpus",
-        scored_long_context["accuracy"],
-        long_context_fraction,
-    )
-
-    _log.info("dense %.4f, fused %.4f", scored_dense["accuracy"], scored_fused["accuracy"])
     _log.info("base %.4f, retrieval %.4f", scored_base["accuracy"], scored_retrieval["accuracy"])
 
     accuracy_gains: list[tuple[int, float]] = []
@@ -396,9 +244,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         items=len(items),
         chance=chance,
         long_context_corpus_fraction=long_context_fraction,
-        reranked_seconds=reranked_seconds,
-        expanded_seconds=expanded_seconds,
-        long_context_seconds=long_context_seconds,
+        reranked_seconds=arms["reranked_seconds"],
+        expanded_seconds=arms["expanded_seconds"],
+        long_context_seconds=arms["long_context_seconds"],
     )
     observations.append(
         Observation(name="base_to_retrieval_p_value", value=retrieval_pair["p_value"])
@@ -419,17 +267,17 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     observations.extend(
         latency_observations(
             base_seconds=base_seconds,
-            retrieval_seconds=retrieval_seconds,
+            retrieval_seconds=arms["retrieval_seconds"],
             cartridge_seconds=cartridge_seconds_total / float(len(plan["seeds"])),
-            retrieval_build_seconds=retrieval_build_seconds,
-            real_seconds=real_seconds,
-            real_select_seconds=real_select_seconds,
-            real_index_seconds=real_index_seconds,
-            dense_seconds=dense_seconds,
-            dense_select_seconds=dense_select_seconds,
-            dense_index_seconds=dense_index_seconds,
-            fused_seconds=fused_seconds,
-            fused_select_seconds=fused_select_seconds,
+            retrieval_build_seconds=arms["retrieval_build_seconds"],
+            real_seconds=arms["real_seconds"],
+            real_select_seconds=arms["real_select_seconds"],
+            real_index_seconds=arms["real_index_seconds"],
+            dense_seconds=arms["dense_seconds"],
+            dense_select_seconds=arms["dense_select_seconds"],
+            dense_index_seconds=arms["dense_index_seconds"],
+            fused_seconds=arms["fused_seconds"],
+            fused_select_seconds=arms["fused_select_seconds"],
         )
     )
     return QaMeasurement(
