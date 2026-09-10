@@ -1,0 +1,40 @@
+# Pull a self-hosted runner's own _diag directory as a workflow artifact.
+#
+# This exists because the runner is the ONLY reliable channel into its own
+# host: on lavender, wsl.exe attach from any logon session other than the
+# wsl-keepalive task's hangs indefinitely (measured 2026-09-10 — six hung
+# attach clients at 0 CPU, board task 62b0f4ac), \\wsl$ is not served to
+# non-interactive ssh sessions, and the distro runs no sshd. The runner
+# process, living inside the distro, has trivial access to the _diag logs
+# that record why a job was cancelled — which no GitHub API field exposes
+# (job and step conclusions represent "Tests did not finish" in at least
+# three mutually inconsistent ways; same board task).
+#
+# Usage:  gh workflow run runner-diag.yml -f runner=lavender-wsl
+# The artifact is the runner root's _diag tree, named after the runner.
+name: runner-diag
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner name label to target (e.g. lavender-wsl)"
+        required: true
+        type: string
+
+jobs:
+  diag:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Bundle this runner's _diag
+        run: |
+          runner_root="$(cd "${{ runner.workspace }}/../.." && pwd)"
+          tar czf "${{ runner.temp }}/runner-diag.tgz" -C "$runner_root" _diag
+          ls -l "${{ runner.temp }}/runner-diag.tgz"
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: runner-diag-${{ inputs.runner }}
+          path: ${{ runner.temp }}/runner-diag.tgz
+          retention-days: 3
