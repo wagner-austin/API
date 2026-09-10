@@ -12,14 +12,14 @@ verdict rather than a word. The ``mcps-codebase`` wiki page
 ``reading-ci-run-outcomes`` measures the two ways a bare conclusion lies,
 and the job count is the only thing that separates either pair:
 
-* ``cancelled`` with jobs is a run superseded mid-flight -- it ran something
-  before it died. ``cancelled`` with NO jobs is a run EVICTED from the
-  concurrency queue, which never created a job at all. The page records
-  fourteen hours in one repository where every run was cancelled and three
-  of those carried ``jobs=0``: no failures reported, no verdict either, and
-  nothing executed. NEITHER is benign under a path-narrowed matrix -- see
-  :mod:`ci_wake.announce` on why the superseded case stopped being rendered
-  as harmless.
+* ``cancelled`` with jobs ran something before it stopped; ``cancelled`` with
+  NO jobs never created one. The page records fourteen hours in one
+  repository where every run was cancelled and three of those carried
+  ``jobs=0``: no failures reported, no verdict either, and nothing executed.
+  The count is the only thing that separates those two situations -- and it
+  is the only thing this package says about them, because the API does not
+  expose WHY a run was cancelled. See :mod:`ci_wake.announce` on the three
+  successive corrections that established that.
 * Both repositories narrow their matrix to the changed paths, so a green run
   that executed one workspace and a green run that executed forty-three
   render identically in a run list. Only the count tells them apart.

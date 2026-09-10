@@ -217,21 +217,51 @@ class TestRunLines:
 
 
 class TestCancelledIsTwoDifferentEvents:
-    def test_cancelled_with_no_jobs_is_named_as_an_eviction(self) -> None:
-        """The concurrency group holds one running and one pending run, so a
-        third arrival EVICTS the pending one. It never created a job. The
+    def test_cancelled_with_no_jobs_says_nothing_ran(self) -> None:
+        """A run that created no job at all is a different situation from one
+        where most jobs finished, and the count is what separates them. The
         wiki page measured three such runs inside fourteen hours in which
         nothing executed and nothing was reported."""
         body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=0)),))])
 
-        assert "cancelled (EVICTED FROM THE QUEUE, no job ever ran)" in body
+        assert "cancelled -- no job ever ran" in body
 
-    def test_cancelled_with_jobs_is_named_as_a_supersession(self) -> None:
-        """A run superseded mid-flight ran something before it died, which is
-        a different fact from an eviction."""
-        body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
+    def test_cancelled_with_jobs_counts_the_survivors(self) -> None:
+        """How much ran is the part a reader can act on."""
+        body = _only_body(
+            [
+                _report(
+                    runs=(
+                        (_run(conclusion="cancelled"), _tally(total=2, cancelled=("check (db)",))),
+                    )
+                )
+            ]
+        )
 
-        assert "cancelled (SUPERSEDED" in body
+        assert "cancelled -- 1 of 2 jobs completed" in body
+
+    def test_no_cause_is_ever_asserted_for_a_cancellation(self) -> None:
+        """THE THIRD CORRECTION TO THIS LINE, AND THE ONE THAT FINALLY STOPS
+        IT INVENTING THINGS.
+
+        The rendering said "SUPERSEDED" and "EVICTED FROM THE QUEUE". The
+        Actions API exposes neither: a concurrency supersession, a manual
+        ``gh run cancel`` and a force-close after a runner disappears all
+        produce the identical conclusion. Caught 2026-09-10 by
+        ``fable-brain-audit-0903``, who WAS the ground truth for their own
+        case -- this bridge announced their ``runner-diag`` run as SUPERSEDED
+        when they had cancelled it by hand, and no later run had entered its
+        concurrency group at all.
+
+        Asserted as an absence across BOTH cancelled arms, because the two
+        invented causes lived in different branches and a test covering one
+        would not have caught the other.
+        """
+        for tally in (_tally(total=0), _tally(total=2, cancelled=("check (db)",))):
+            body = _only_body([_report(runs=((_run(conclusion="cancelled"), tally),))])
+
+            assert "SUPERSEDED" not in body
+            assert "EVICTED" not in body
 
     def test_a_supersession_is_never_rendered_as_benign(self) -> None:
         """The wording it replaced came from a wiki page that frames
@@ -292,7 +322,7 @@ class TestCancelledIsTwoDifferentEvents:
             ]
         )
 
-        assert "40 of 42 jobs still completed" in body
+        assert "40 of 42 jobs completed" in body
         assert "2 cancelled, whose packages may be in no later run's diff window" in body
         assert "check (handwriting-ai), check (Model-Trainer)" in body
 
@@ -337,10 +367,26 @@ class TestCancelledIsTwoDifferentEvents:
         assert "are in no later run" not in body
 
     def test_the_bare_word_never_appears_on_its_own(self) -> None:
-        """The one place a conclusion alone is not merely thin but wrong."""
-        for tally in (_tally(total=0), _tally(total=2)):
+        """The one place a conclusion alone is not merely thin but wrong.
+
+        THIS ASSERTION WAS REWRITTEN BECAUSE ITS PREDICATE STOPPED MEANING
+        WHAT IT SAID. It used to read ``"Check cancelled --" not in body``,
+        which caught the bare word only while the qualifier was parenthesised
+        (``cancelled (SUPERSEDED ...)``). When the cause words were removed
+        and ``--`` became the separator, that string began appearing in
+        CORRECT output, so the guard would have failed on every good render
+        and passed on none -- a predicate that outlived the format it was
+        written against.
+
+        The intent is that the word always carries a qualifier, so that is
+        what is asserted now: whichever arm produces the line, it says how
+        much ran.
+        """
+        for tally in (_tally(total=0), _tally(total=2, cancelled=("check (db)",))):
             body = _only_body([_report(runs=((_run(conclusion="cancelled"), tally),))])
-            assert "Check cancelled --" not in body
+
+            qualifiers = ("no job ever ran", "of 2 jobs completed")
+            assert any(qualifier in body for qualifier in qualifiers)
 
 
 class TestAbandoned:

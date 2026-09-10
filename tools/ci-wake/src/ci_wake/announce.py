@@ -21,11 +21,29 @@ compressed into a line format:
 * the JOB COUNT, because both repositories narrow their matrix to the
   changed paths, so a green that examined one workspace and a green that
   examined forty-three are the same word;
-* and for ``cancelled``, the count decides which of TWO DIFFERENT EVENTS it
-  was -- a run superseded mid-flight ran something before it died, a run
-  evicted from the concurrency queue never created a job at all. This is the
-  one place where a bare conclusion is not merely thin but wrong, so it is
-  the one place the rendering refuses to print the word alone.
+* and for ``cancelled``, the count says HOW MUCH RAN, which is the part a
+  reader can act on: a run that created no job at all is a different
+  situation from one where nineteen of twenty finished. This is the one
+  place where a bare conclusion is not merely thin but wrong, so it is the
+  one place the rendering refuses to print the word alone.
+
+THE COUNT IS ALL IT PRINTS, THOUGH -- NEVER A CAUSE. The rendering used to
+say "SUPERSEDED" and "EVICTED FROM THE QUEUE", and both were inventions: the
+Actions API does not expose WHY a run was cancelled, and a concurrency
+supersession, a manual ``gh run cancel`` and a force-close after a runner
+disappears all wear the identical conclusion. Caught on 2026-09-10 by
+``fable-brain-audit-0903``, who was the ground truth for their own case --
+this bridge announced their ``runner-diag`` run as SUPERSEDED when they had
+cancelled it by hand, and no later run had even entered its concurrency group
+(``workflow_dispatch`` runs do not share one).
+
+That was the THIRD instance of one mistake on this line, each a layer up from
+the last: first the wiki page's benign framing, then a run-level claim about
+per-job facts, then a narrated cause welded onto a word the payload does not
+explain. Where supersession could be established cheaply -- a later run in the
+same concurrency group -- naming it would be fair; the runs payload does not
+carry the group, so it cannot be, and the ABSENCE of a claimed cause is the
+feature rather than a gap.
 
 NEITHER CANCELLATION IS RENDERED AS BENIGN, AND THE CLAIM IS PER-JOB. This
 module first printed "cancelled (superseded mid-flight)", taken from the wiki
@@ -138,8 +156,9 @@ def _outcome_phrase(report: RunReport) -> str:
         report: The run and its job tally.
 
     Returns:
-        The phrase. ``cancelled`` is never returned bare -- see this
-        module's docstring on why that one word is two different events.
+        The phrase. ``cancelled`` is never returned bare -- but it is never
+        given a CAUSE either. See this module's docstring: the payload says
+        how many jobs ran, and says nothing about why the run stopped.
     """
     run = report["run"]
     if not is_terminal(run):
@@ -148,9 +167,9 @@ def _outcome_phrase(report: RunReport) -> str:
         return run["conclusion"]
     tally = report["tally"]
     if tally["total"] == 0:
-        return "cancelled (EVICTED FROM THE QUEUE, no job ever ran)"
+        return "cancelled -- no job ever ran"
     survived = tally["total"] - len(tally["cancelled"])
-    return f"cancelled (SUPERSEDED -- {survived} of {tally['total']} jobs still completed)"
+    return f"cancelled -- {survived} of {tally['total']} jobs completed"
 
 
 def _jobs_phrase(tally: JobTally) -> str:
