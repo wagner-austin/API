@@ -14,6 +14,7 @@ source_paths:
   - libs/platform_core/src/platform_core/power_distributions.py
   - libs/platform_core/src/platform_core/minimum_detectable_effect.py
   - libs/platform_core/src/platform_core/mcnemar_detectability.py
+  - libs/platform_core/src/platform_core/mcnemar_design.py
   - libs/platform_core/src/platform_core/clustering.py
 source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/checks.py": 425fe00e5793f7ded70c3e89eb7325b1b983a6cb
@@ -21,9 +22,10 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/cli/evaluate.py": 7ee61da22b34a03c91377041ec92772af0679237
   "tools/code-style-eval/pyproject.toml": 110037c5f0646c8fb6f44ae30ea2112767bffb30
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
-  "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
-  "libs/platform_core/src/platform_core/minimum_detectable_effect.py": 9dab00cba3fb975bde1eda2acd55b7b3f73190d9
-  "libs/platform_core/src/platform_core/mcnemar_detectability.py": 429fd7499dadc8654023c68a1582ecc366c335d3
+  "libs/platform_core/src/platform_core/power_distributions.py": 34420ac8a768198e03a96de0f9d175eac9b15f41
+  "libs/platform_core/src/platform_core/minimum_detectable_effect.py": b3039c16d0b41636c975a78a8363a56644143d22
+  "libs/platform_core/src/platform_core/mcnemar_detectability.py": 25cf0e8370dda398055ea06870f63acb87612a81
+  "libs/platform_core/src/platform_core/mcnemar_design.py": b2e29f46a21a50f451be02fd109681e800428119
   "libs/platform_core/src/platform_core/clustering.py": 7611039dbbc21a817e4c10027e282a4e21e9fdbe
 provenance:
   - "EVERY RUN BELOW IS NAMED BY ITS payload_digest, not only by its directory. Two runs of this package can agree on every published figure -- sweep-v1 and gen-v1 both scored 226 items -- so a run name is not an identity and a figure quoted off this page was, until 2026-09-09, traceable only by resemblance. It was traced to the wrong run once. The digest is name-paired sha256 over the two *.outcomes.jsonl the comparison was computed from, carried inside comparison.json since 63770146."
@@ -130,6 +132,22 @@ Exact McNemar, alpha 0.05, computed rather than asserted, against the discordant
 
 The corpus holds 392 items. **No amount of retuning the run reaches significance; only more items do.** A guard-pass sweep reported on this corpus without its discordant count beside it is not evidence, and the count is the number to read first[^3].
 
+**And the number of items is now computed rather than left as "more".** At the
+observed 5.6% discordant rate, to catch a 70:30 split at 80% power under the
+exact test, the run needs **924 scored pairs** — about 52 of which would be
+expected to disagree. The corpus holds 392, so the question this instrument
+was built to answer needs roughly two and a half times the corpus that
+exists[^17].
+
+That table above was itself hand-rolled until 2026-09-10, and it is worth
+saying which convention it used, because the page's MDEs used the other one.
+These powers average over a RANDOM discordant count — *d* ~ Binomial(*n*,
+rate) — while the MDEs condition on the *d* a run actually produced. Both are
+defensible and they are not the same number: at *n*=226 the averaged form
+gives 0.2061 and the conditional form 0.2026, and it is the averaged one that
+rounds to the published 0.21. The shipped instrument reproduces all eight
+entries of the table to two decimals[^17].
+
 **And those columns assume the items are independent draws, which held-out
 files from a shared monorepo are not.** Every *n* in that table is a count of
 files, not a count of independent units, so the powers are upper bounds. The
@@ -189,6 +207,32 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
        items and the sweep this page reports scored 226, so the design effects
        transfer as an order of magnitude for a monorepo-drawn corpus rather
        than as this sweep's own correction, which nobody has computed.
+[^17]: `libs/platform_core/src/platform_core/mcnemar_design.py`
+       `unconditional_power` and `mcnemar_design_size` (commit `b408a45f`) --
+       the UNCONDITIONAL sibling of `mcnemar_detectability`, averaging the
+       rejection chance over every discordant count the design might produce
+       rather than conditioning on one. It reproduces this page's whole power
+       table to two decimals: 0.21 / 0.73 / 0.96 at *n* = 226 / 800 / 1600 on
+       the 5.6% stratum, 0.44 / 0.96 / 1.00 on the 11% one, and 0.37 / 0.89 on
+       the termination row. The 924-pair figure is
+       `mcnemar_design_size(0.056, 0.70, 0.05, 0.80, EXACT, 2048)`, whose
+       `expected_discordant_pairs` is 51.744.
+       POWER IS NOT MONOTONE IN THE SAMPLE SIZE, which is why that function
+       reports two counts and not one. Measured 2026-09-10 across 216
+       configurations over *n* = 1..600: 14,214 sample sizes at which adding
+       one more pair LOWERS the averaged power, the largest drop 7.8
+       percentage points. The cause is discreteness in the rejection boundary,
+       and it is worst at high discordant rates and extreme splits — this
+       page's own configuration is clean, with `sawtooth_gap_pairs` zero at
+       924, which is exactly why a narrow check of it would have missed the
+       effect entirely. Where the gap is non-zero the first sample size to
+       reach a target is one that running a few more items takes back.
+       THE SAME COMMIT MADE `mcnemar_power` BISECT for its rejection boundary
+       instead of scanning, which changed no value and is pinned to the
+       exhaustive scan over 720 cases by test. It is recorded here because it
+       is what made the figures above computable at all: building a boundary
+       for every discordant count up to 1,600 took 58 s by scan and 0.97 s by
+       bisection, and at 3,000 the scan had not finished after eight minutes.
 [^12]: `tools/code-style-eval/Makefile:9` and `tools/code-style-eval/Makefile:30` -- the `lint` and `test` targets, each running `poetry sync --with dev`.
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
