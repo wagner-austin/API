@@ -225,6 +225,19 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # of a different kind under the name of a paired one.
     CARTRIDGE_ARMS_UNPAIRABLE = "CARTRIDGE_ARMS_UNPAIRABLE"
 
+    # A checkpoint on disk describes a DIFFERENT measurement from the one now
+    # starting, so resuming from it would skip arms that were never scored on
+    # this question set. Its own code rather than reuse of
+    # CARTRIDGE_ARMS_UNPAIRABLE: that one says two arms in ONE run cannot be
+    # subtracted, this says a run is about to adopt results from ANOTHER run,
+    # and it is the more dangerous of the two because nothing downstream can
+    # see it -- the arms table comes out complete, every number is plausible,
+    # and two of them were measured against a corpus nobody is looking at.
+    # Refused rather than started fresh: silently discarding a checkpoint an
+    # operator believed in spends the hours they were trying to save, and the
+    # field that disagrees is usually a mistyped corpus path they can fix.
+    CARTRIDGE_CHECKPOINT_FOREIGN = "CARTRIDGE_CHECKPOINT_FOREIGN"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one
