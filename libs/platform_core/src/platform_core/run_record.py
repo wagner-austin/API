@@ -370,6 +370,48 @@ def _observation_agreement(name: str, values: tuple[float, ...]) -> ObservationA
     )
 
 
+def encode_observation(observation: Observation) -> JSONObject:
+    """Encode one observation.
+
+    LIFTED OUT OF :func:`encode_run_record` RATHER THAN COPIED. An
+    observation is the unit every measurement in this workspace reduces to,
+    and a second consumer arrived: a sweep that checkpoints completed cells
+    persists their observations so an evicted run resumes without
+    re-measuring them. Writing ``{"name": ..., "value": ...}`` a second time
+    would be two spellings of one shape, and the pair that drifts is always
+    the one nothing validates.
+
+    Args:
+        observation: The observation to encode.
+
+    Returns:
+        A JSON object with its name and value.
+    """
+    return {"name": observation["name"], "value": observation["value"]}
+
+
+def decode_observation(value: JSONValue) -> Observation:
+    """Decode one observation, validating it.
+
+    Args:
+        value: The value to validate.
+
+    Returns:
+        The observation.
+
+    Raises:
+        JSONTypeError: When the value is not an object, when either field is
+            absent or mistyped, or when the name is empty. An unnamed
+            observation is a number in a record with nothing saying what was
+            measured, which is worse than an absent one.
+    """
+    item = narrow_json_to_dict(value)
+    name = require_str(item, "name")
+    if name == "":
+        raise JSONTypeError("Observation 'name' must say what was measured")
+    return Observation(name=name, value=require_float(item, "value"))
+
+
 def encode_run_record(record: RunRecord) -> JSONObject:
     """Encode a record for the ledger.
 
@@ -384,7 +426,7 @@ def encode_run_record(record: RunRecord) -> JSONObject:
         "experiment": record["experiment"],
         "label": record["label"],
         "fingerprint": encode_run_fingerprint(record["fingerprint"]),
-        "observations": [{"name": o["name"], "value": o["value"]} for o in record["observations"]],
+        "observations": [encode_observation(o) for o in record["observations"]],
         "payload_digest": record["payload_digest"],
     }
 
@@ -408,13 +450,7 @@ def decode_run_record(value: JSONValue) -> RunRecord:
     """
     obj = narrow_json_to_dict(value)
     raw = require_list(obj, "observations")
-    observations: list[Observation] = []
-    for entry in raw:
-        item = narrow_json_to_dict(entry)
-        name = require_str(item, "name")
-        if name == "":
-            raise JSONTypeError("Observation 'name' must say what was measured")
-        observations.append(Observation(name=name, value=require_float(item, "value")))
+    observations = [decode_observation(entry) for entry in raw]
     return run_record(
         experiment=require_str(obj, "experiment"),
         label=require_str(obj, "label"),
@@ -466,7 +502,9 @@ __all__ = [
     "RunRecord",
     "agree_across_runs",
     "compare_run_records",
+    "decode_observation",
     "decode_run_record",
+    "encode_observation",
     "encode_run_record",
     "run_record",
     "run_record_sidecar",
