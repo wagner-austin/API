@@ -64,6 +64,17 @@ GH_TIMEOUT_SECONDS: Final = 30
 #: The only run status GitHub uses to mean "this run is over".
 COMPLETED: Final = "completed"
 
+#: The conclusion that means "stopped", at either the run or the job level.
+#:
+#: THE SAME WORD MEANS DIFFERENT THINGS AT THE TWO LEVELS, which is the whole
+#: reason it is a named constant used in both places. A RUN reading
+#: ``cancelled`` says only that SOMETHING in it was stopped: measured in
+#: ``wagner-austin/API`` on 2026-09-09, run 34418498808 read ``cancelled`` at
+#: the top while exactly 3 of its 42 jobs were cancelled. Reading the
+#: run-level word as a fact about every job in it is an aggregate label
+#: answering a question it was never asked.
+CANCELLED: Final = "cancelled"
+
 #: Job conclusions that are not a defect. Everything else is named in the
 #: announcement's failed list -- see this module's docstring on why the rule
 #: is written this way round.
@@ -112,13 +123,18 @@ class JobTally(TypedDict):
             ``total`` in every ordinary run; when it is smaller the
             announcement says so rather than presenting a partial failed
             list as a complete one.
-        failed: The names of the jobs that did not succeed or skip, in the
-            order the payload returned them.
+        failed: The names of the jobs that ran and did not succeed or skip.
+        cancelled: The names of the jobs that were CANCELLED, kept apart from
+            :attr:`failed` because they are a different event and lumping them
+            together is the defect this split exists to remove. A cancelled
+            job did not fail; it was stopped, usually by a superseding push,
+            and its package's changes are the ones that may go unchecked.
     """
 
     total: int
     listed: int
     failed: tuple[str, ...]
+    cancelled: tuple[str, ...]
 
 
 def runs_argv(repo: str, sha: str) -> tuple[str, ...]:
@@ -244,8 +260,20 @@ def decode_jobs(payload: JSONValue) -> JobTally:
     """
     listing = narrow_json_to_dict(payload)
     jobs = [narrow_json_to_dict(entry) for entry in require_list(listing, "jobs")]
-    failed = tuple(require_str(job, "name") for job in jobs if _job_conclusion(job) not in _JOB_OK)
-    return JobTally(total=require_int(listing, "total_count"), listed=len(jobs), failed=failed)
+    failed: list[str] = []
+    cancelled: list[str] = []
+    for job in jobs:
+        conclusion = _job_conclusion(job)
+        if conclusion in _JOB_OK:
+            continue
+        destination = cancelled if conclusion == CANCELLED else failed
+        destination.append(require_str(job, "name"))
+    return JobTally(
+        total=require_int(listing, "total_count"),
+        listed=len(jobs),
+        failed=tuple(failed),
+        cancelled=tuple(cancelled),
+    )
 
 
 def _job_conclusion(job: dict[str, JSONValue]) -> str:

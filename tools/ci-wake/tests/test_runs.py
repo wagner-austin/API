@@ -223,6 +223,30 @@ class TestDecodeJobs:
 
         assert tally["failed"] == ("audit", "check (packages/db)")
 
+    def test_a_cancelled_job_lands_in_cancelled_not_in_failed(self) -> None:
+        """THEY ARE DIFFERENT EVENTS AND LUMPING THEM IS THE DEFECT THIS SPLIT
+        EXISTS TO REMOVE. A cancelled job did not fail -- it was stopped,
+        usually by a superseding push -- and its package's changes are the
+        ones that may go unchecked, which is a different thing to tell
+        somebody than "your job failed".
+
+        Shaped from run 34418498808 in wagner-austin/API, 2026-09-09: 42 jobs,
+        3 cancelled by a superseding push, the rest completed.
+        """
+        tally = decode_jobs(
+            {
+                "total_count": 3,
+                "jobs": [
+                    _job("check (services/handwriting-ai)", "cancelled"),
+                    _job("audit", "failure"),
+                    _job("check (mcp-shared)", "success"),
+                ],
+            }
+        )
+
+        assert tally["cancelled"] == ("check (services/handwriting-ai)",)
+        assert tally["failed"] == ("audit",)
+
     def test_skipped_is_not_a_failure(self) -> None:
         tally = decode_jobs({"total_count": 1, "jobs": [_job("check (search)", "skipped")]})
 

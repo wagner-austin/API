@@ -61,18 +61,30 @@ def _run(
     )
 
 
-def _tally(*, total: int = 52, listed: int | None = None, failed: tuple[str, ...] = ()) -> JobTally:
+def _tally(
+    *,
+    total: int = 52,
+    listed: int | None = None,
+    failed: tuple[str, ...] = (),
+    cancelled: tuple[str, ...] = (),
+) -> JobTally:
     """Build one job tally.
 
     Args:
         total: How many jobs the run had.
         listed: How many the page carried; defaults to ``total``.
-        failed: The names of the jobs that did not succeed or skip.
+        failed: The names of the jobs that ran and did not succeed or skip.
+        cancelled: The names of the jobs that were stopped.
 
     Returns:
         The tally.
     """
-    return JobTally(total=total, listed=total if listed is None else listed, failed=failed)
+    return JobTally(
+        total=total,
+        listed=total if listed is None else listed,
+        failed=failed,
+        cancelled=cancelled,
+    )
 
 
 def _report(
@@ -222,27 +234,86 @@ class TestCancelledIsTwoDifferentEvents:
         assert "cancelled (SUPERSEDED" in body
 
     def test_a_supersession_is_never_rendered_as_benign(self) -> None:
-        """THE CORRECTION THIS TEST EXISTS TO PIN, and the wording it replaced
-        came from a wiki page that was fact_checked the same day.
+        """The wording it replaced came from a wiki page that frames
+        supersession as harmless -- "the older answer is about stale code, so
+        discarding it costs nothing" -- which assumes the newer run re-checks
+        the same code. Under a matrix narrowed by ``event.before..sha`` a
+        STOPPED job's changes can fall between windows instead.
 
-        That page frames supersession as harmless -- "the older answer is about
-        stale code, so discarding it costs nothing" -- which assumes the newer
-        run re-checks the same code. Under a matrix narrowed by
-        ``event.before..sha`` it does not: the superseding push's diff window
-        STARTS at the superseded push, so the superseded push's changes are in
-        no run's window, ever. Measured in wagner-austin/API 2026-09-09, where
-        a push creating a 28-file package got zero CI executions while the
-        branch showed green.
-
-        So the line must warn rather than reassure. Asserted as the ABSENCE of
-        the old reassuring phrase as well as the presence of the new one,
-        because a future edit that restored "mid-flight" alone would pass a
-        presence-only test.
+        Asserted as the ABSENCE of the old reassuring phrase as well as the
+        presence of the new one, because a future edit that restored
+        "mid-flight" alone would pass a presence-only test.
         """
-        body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
+        body = _only_body(
+            [
+                _report(
+                    runs=(
+                        (_run(conclusion="cancelled"), _tally(total=2, cancelled=("check (db)",))),
+                    )
+                )
+            ]
+        )
 
         assert "may be in no later run's diff window" in body
         assert "superseded mid-flight" not in body
+
+    def test_the_caveat_attaches_to_the_cancelled_jobs_not_to_the_run(self) -> None:
+        """THE CORRECTION THIS TEST EXISTS TO PIN, and it is a correction to
+        this package's own first fix rather than to someone else's code.
+
+        That fix said the RUN's changes may be in no later window -- which
+        repeated, one level up, the exact defect it was correcting. A run
+        reading ``cancelled`` says only that SOMETHING in it stopped: run
+        34418498808 in wagner-austin/API read ``cancelled`` while exactly 3 of
+        its 42 jobs were cancelled and the rest ran to completion. Attaching
+        the caveat to the run asserted about 42 jobs what was true of 3.
+
+        The earlier justification also cited a measurement that was retracted
+        the same night -- a "28-file package with zero CI executions" that had
+        in fact been checked and was green, the empty result being an artifact
+        of ``gh run list --commit`` silently requiring a full sha.
+
+        So: the surviving jobs are counted, and the caveat names the stopped
+        ones.
+        """
+        body = _only_body(
+            [
+                _report(
+                    runs=(
+                        (
+                            _run(conclusion="cancelled"),
+                            _tally(
+                                total=42,
+                                cancelled=("check (handwriting-ai)", "check (Model-Trainer)"),
+                            ),
+                        ),
+                    )
+                )
+            ]
+        )
+
+        assert "40 of 42 jobs still completed" in body
+        assert "2 cancelled, whose packages may be in no later run's diff window" in body
+        assert "check (handwriting-ai), check (Model-Trainer)" in body
+
+    def test_a_cancelled_job_is_not_reported_as_a_failed_one(self) -> None:
+        """They are different events and lumping them was the same aggregate
+        mistake. A cancelled job did not fail; it was stopped."""
+        body = _only_body(
+            [
+                _report(
+                    runs=(
+                        (
+                            _run(conclusion="cancelled"),
+                            _tally(total=3, failed=("audit",), cancelled=("check (db)",)),
+                        ),
+                    )
+                )
+            ]
+        )
+
+        assert "1 failed: audit" in body
+        assert "1 cancelled, whose packages" in body
 
     def test_the_supersession_claim_is_hedged_because_the_bridge_cannot_read_the_policy(
         self,
@@ -252,7 +323,15 @@ class TestCancelledIsTwoDifferentEvents:
         is immune -- and the Actions runs API does not expose it. The stronger
         claim would be inventing a fact about a file this package never reads.
         """
-        body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
+        body = _only_body(
+            [
+                _report(
+                    runs=(
+                        (_run(conclusion="cancelled"), _tally(total=2, cancelled=("check (db)",))),
+                    )
+                )
+            ]
+        )
 
         assert "may be in no later run" in body
         assert "are in no later run" not in body

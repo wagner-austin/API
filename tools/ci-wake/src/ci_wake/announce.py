@@ -27,24 +27,37 @@ compressed into a line format:
   one place where a bare conclusion is not merely thin but wrong, so it is
   the one place the rendering refuses to print the word alone.
 
-NEITHER CANCELLATION IS RENDERED AS BENIGN, AND THAT IS A CORRECTION. This
+NEITHER CANCELLATION IS RENDERED AS BENIGN, AND THE CLAIM IS PER-JOB. This
 module first printed "cancelled (superseded mid-flight)", taken from the wiki
 page's framing that supersession is normally harmless -- "the older answer is
 about stale code, so discarding it costs nothing". That reasoning assumes the
 newer run re-checks the same code, and under a PATH-NARROWED matrix it does
 not: a workflow that diffs ``event.before..sha`` gives the superseding push a
-window starting at the superseded one, so the superseded push's changes fall
-between windows and no later run ever covers them. Measured in ``wagner-austin/
-API`` on 2026-09-09 by ``fable-brain-audit-0903``: a push creating a 28-file
-package was superseded and got ZERO CI executions while the branch showed
-green.
+window starting at the superseded one, so a stopped job's changes can fall
+between windows with no later run covering them.
 
-The phrase says "may" rather than "are" because that is the strongest claim
-this bridge can support. Whether it bites depends on the repository's
-concurrency policy -- ``wagner-austin/MCPs`` cancels nothing, so it is immune
--- and the Actions runs API does not expose a workflow's ``cancel-in-progress``
-setting. Asserting the stronger form would be inventing a fact about a file
-this package never reads.
+THE FIRST FIX OVERCORRECTED AND THIS IS THE SECOND. It replaced the phrase
+with one saying the RUN's changes may be unchecked, on the strength of a
+measurement that was retracted hours later: the "28-file package with zero CI
+executions" case was an artifact of ``gh run list --commit`` silently
+requiring a full sha, and the package had in fact been checked and was green.
+Worse, the run-level claim repeated the very defect it was correcting. A RUN
+reading ``cancelled`` says only that SOMETHING in it stopped -- run
+34418498808 read ``cancelled`` while exactly 3 of its 42 jobs were
+cancelled -- so attaching the caveat to the run asserted about 42 jobs what
+was true of 3.
+
+So the caveat now attaches to the CANCELLED JOBS, which is the granularity the
+jobs payload actually supports, and the outcome line reports how many jobs
+survived rather than implying none did. Under API's per-PACKAGE concurrency
+group a superseding push stops only the jobs of packages it touches; the
+measured loss was 3 of 42, not 42 of 42.
+
+The phrase still says "may" rather than "are", because whether an unchecked
+window results depends on the repository's ``cancel-in-progress`` setting --
+``wagner-austin/MCPs`` cancels nothing, so it is immune -- and the Actions runs
+API does not expose it. Asserting the stronger form would invent a fact about
+a file this package never reads.
 
 FAILURES ARE NOT SOFTENED AND ARE NAMED. A post that said "failure" without
 saying which jobs would send its reader to the run page to learn the thing
@@ -133,9 +146,11 @@ def _outcome_phrase(report: RunReport) -> str:
         return f"STILL {run['status']}"
     if run["conclusion"] != "cancelled":
         return run["conclusion"]
-    if report["tally"]["total"] == 0:
+    tally = report["tally"]
+    if tally["total"] == 0:
         return "cancelled (EVICTED FROM THE QUEUE, no job ever ran)"
-    return "cancelled (SUPERSEDED -- its changes may be in no later run's diff window)"
+    survived = tally["total"] - len(tally["cancelled"])
+    return f"cancelled (SUPERSEDED -- {survived} of {tally['total']} jobs still completed)"
 
 
 def _jobs_phrase(tally: JobTally) -> str:
@@ -153,11 +168,34 @@ def _jobs_phrase(tally: JobTally) -> str:
     if tally["listed"] < tally["total"]:
         parts.append(f"{tally['listed']} listed, so the failed list below is partial")
     if len(tally["failed"]) > 0:
-        named = ", ".join(tally["failed"][:FAILED_CAP])
-        overflow = len(tally["failed"]) - FAILED_CAP
-        suffix = f" +{overflow} more" if overflow > 0 else ""
-        parts.append(f"{len(tally['failed'])} failed: {named}{suffix}")
+        parts.append(f"{len(tally['failed'])} failed: {_capped(tally['failed'])}")
+    if len(tally["cancelled"]) > 0:
+        # THE CAVEAT ATTACHES TO THESE JOBS, NOT TO THE RUN. Under a
+        # per-package concurrency group a superseding push stops only the jobs
+        # of packages it touches; the rest finish normally. Saying the run's
+        # changes may be unchecked would repeat, one level up, the aggregate-
+        # label mistake this whole line exists to avoid.
+        parts.append(
+            f"{len(tally['cancelled'])} cancelled, whose packages may be in no "
+            f"later run's diff window: {_capped(tally['cancelled'])}"
+        )
     return " -- ".join(parts)
+
+
+def _capped(names: tuple[str, ...]) -> str:
+    """Render job names up to the cap, counting the remainder.
+
+    Args:
+        names: The job names.
+
+    Returns:
+        The names joined, with ``+N more`` when the cap truncated. Counted
+        rather than dropped: a list naming eight of eleven while implying
+        eight is the total is the same lie as a silent cap.
+    """
+    overflow = len(names) - FAILED_CAP
+    suffix = f" +{overflow} more" if overflow > 0 else ""
+    return f"{', '.join(names[:FAILED_CAP])}{suffix}"
 
 
 def _push_lines(report: PushReport) -> list[str]:
