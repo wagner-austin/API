@@ -27,6 +27,25 @@ compressed into a line format:
   one place where a bare conclusion is not merely thin but wrong, so it is
   the one place the rendering refuses to print the word alone.
 
+NEITHER CANCELLATION IS RENDERED AS BENIGN, AND THAT IS A CORRECTION. This
+module first printed "cancelled (superseded mid-flight)", taken from the wiki
+page's framing that supersession is normally harmless -- "the older answer is
+about stale code, so discarding it costs nothing". That reasoning assumes the
+newer run re-checks the same code, and under a PATH-NARROWED matrix it does
+not: a workflow that diffs ``event.before..sha`` gives the superseding push a
+window starting at the superseded one, so the superseded push's changes fall
+between windows and no later run ever covers them. Measured in ``wagner-austin/
+API`` on 2026-09-09 by ``fable-brain-audit-0903``: a push creating a 28-file
+package was superseded and got ZERO CI executions while the branch showed
+green.
+
+The phrase says "may" rather than "are" because that is the strongest claim
+this bridge can support. Whether it bites depends on the repository's
+concurrency policy -- ``wagner-austin/MCPs`` cancels nothing, so it is immune
+-- and the Actions runs API does not expose a workflow's ``cancel-in-progress``
+setting. Asserting the stronger form would be inventing a fact about a file
+this package never reads.
+
 FAILURES ARE NOT SOFTENED AND ARE NAMED. A post that said "failure" without
 saying which jobs would send its reader to the run page to learn the thing
 the bridge already knew.
@@ -116,7 +135,7 @@ def _outcome_phrase(report: RunReport) -> str:
         return run["conclusion"]
     if report["tally"]["total"] == 0:
         return "cancelled (EVICTED FROM THE QUEUE, no job ever ran)"
-    return "cancelled (superseded mid-flight)"
+    return "cancelled (SUPERSEDED -- its changes may be in no later run's diff window)"
 
 
 def _jobs_phrase(tally: JobTally) -> str:

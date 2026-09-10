@@ -17,7 +17,9 @@ and the job count is the only thing that separates either pair:
   concurrency queue, which never created a job at all. The page records
   fourteen hours in one repository where every run was cancelled and three
   of those carried ``jobs=0``: no failures reported, no verdict either, and
-  nothing executed.
+  nothing executed. NEITHER is benign under a path-narrowed matrix -- see
+  :mod:`ci_wake.announce` on why the superseded case stopped being rendered
+  as harmless.
 * Both repositories narrow their matrix to the changed paths, so a green run
   that executed one workspace and a green run that executed forty-three
   render identically in a run list. Only the count tells them apart.

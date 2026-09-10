@@ -41,6 +41,12 @@ job count. Every post this package makes therefore carries the workflow
 name, the conclusion, and the job count, and names the failed jobs when
 there are any.
 
+AND NEITHER CANCELLATION IS REPORTED AS BENIGN. A superseded run is normally
+described as harmless because the newer run re-checks the same code; under a
+path-narrowed matrix it does not, and the superseded push's changes end up in
+no run's diff window at all. :mod:`ci_wake.announce` carries the measurement
+and the reason the phrasing is hedged.
+
 The polling loop lives in the scheduler that calls the CLI, where its
 interval is visible, for the same reason ``fleet-watch`` refuses to follow
 and ``fleet-wake`` has no loop of its own.

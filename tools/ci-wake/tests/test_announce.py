@@ -216,10 +216,46 @@ class TestCancelledIsTwoDifferentEvents:
 
     def test_cancelled_with_jobs_is_named_as_a_supersession(self) -> None:
         """A run superseded mid-flight ran something before it died, which is
-        a different fact and usually a benign one."""
+        a different fact from an eviction."""
         body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
 
-        assert "cancelled (superseded mid-flight)" in body
+        assert "cancelled (SUPERSEDED" in body
+
+    def test_a_supersession_is_never_rendered_as_benign(self) -> None:
+        """THE CORRECTION THIS TEST EXISTS TO PIN, and the wording it replaced
+        came from a wiki page that was fact_checked the same day.
+
+        That page frames supersession as harmless -- "the older answer is about
+        stale code, so discarding it costs nothing" -- which assumes the newer
+        run re-checks the same code. Under a matrix narrowed by
+        ``event.before..sha`` it does not: the superseding push's diff window
+        STARTS at the superseded push, so the superseded push's changes are in
+        no run's window, ever. Measured in wagner-austin/API 2026-09-09, where
+        a push creating a 28-file package got zero CI executions while the
+        branch showed green.
+
+        So the line must warn rather than reassure. Asserted as the ABSENCE of
+        the old reassuring phrase as well as the presence of the new one,
+        because a future edit that restored "mid-flight" alone would pass a
+        presence-only test.
+        """
+        body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
+
+        assert "may be in no later run's diff window" in body
+        assert "superseded mid-flight" not in body
+
+    def test_the_supersession_claim_is_hedged_because_the_bridge_cannot_read_the_policy(
+        self,
+    ) -> None:
+        """ "may", not "are". Whether the hole bites depends on the repository's
+        ``cancel-in-progress`` setting -- wagner-austin/MCPs cancels nothing and
+        is immune -- and the Actions runs API does not expose it. The stronger
+        claim would be inventing a fact about a file this package never reads.
+        """
+        body = _only_body([_report(runs=((_run(conclusion="cancelled"), _tally(total=2)),))])
+
+        assert "may be in no later run" in body
+        assert "are in no later run" not in body
 
     def test_the_bare_word_never_appears_on_its_own(self) -> None:
         """The one place a conclusion alone is not merely thin but wrong."""
