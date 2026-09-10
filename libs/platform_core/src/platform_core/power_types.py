@@ -33,6 +33,7 @@ class PowerInstrument(StrEnum):
     RATE_FLOOR = "rate_floor"
     NET_DIFFERENCE = "net_difference"
     CLUSTERED_PAIRED = "clustered_paired"
+    MCNEMAR_DETECTABLE_EFFECT = "mcnemar_detectable_effect"
 
 
 class PowerVerdict(StrEnum):
@@ -415,8 +416,73 @@ class ClusteredPairedPower(TypedDict):
     effective_sample_size: float
 
 
+class McNemarDetectableEffect(TypedDict):
+    """Smallest true difference a paired BINARY comparison could have caught.
+
+    THE MAGNITUDE SIBLING OF :class:`McNemarPower`. That record answers
+    "could any split reject?" and this one answers "how lopsided did the
+    split have to be?" -- falsifiability against detectability. The pair
+    exists because a comparison routinely passes the first and fails the
+    second, and reporting only the first reads as though the null had been
+    tested.
+
+    CONDITIONED ON THE OBSERVED ``discordant_pairs``, which is what makes it
+    a statement about THIS comparison rather than about a future one. Sizing
+    a next run is a different question -- it ranges over a random *d* and
+    must average power across it -- and
+    :mod:`platform_core.mcnemar_detectability` says so in its own docstring
+    with the measurement that separates the two.
+
+    ``total_pairs`` does not enter the arithmetic. It is carried so the
+    answer can be read as a rate, because "5.56 items" and "2.46 percentage
+    points of 226" are the same fact and only the second can be compared to
+    a base rate.
+
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, like
+    :class:`RequiredReplicates`: it reports what would have been needed and
+    classifies nothing. Nothing is handed to it to compare against, and a
+    project without a declared smallest-effect-of-interest still gets a
+    usable number from it.
+
+    Attributes:
+        instrument: Always :attr:`PowerInstrument.MCNEMAR_DETECTABLE_EFFECT`.
+        test: Which :class:`~platform_core.power_distributions.McNemarTest`.
+            Load-bearing: the variants have different rejection regions, so
+            the same *d* yields different detectable effects under each.
+        discordant_pairs: The *d* conditioned on.
+        total_pairs: Items both arms answered, for expressing the rate.
+        alpha: Two-sided significance level.
+        target_power: The power the design had to reach.
+        most_balanced_rejecting_minority: The rejection boundary used, taken
+            from :class:`McNemarPower` rather than re-derived so the two
+            records can never disagree about which splits reject.
+        minimum_detectable_split: Smallest per-discordant-pair probability at
+            or above 1/2 whose power reaches ``target_power``.
+        minimum_detectable_net_pairs: The expected net at that split,
+            ``discordant_pairs * (2 * split - 1)``, in ITEMS.
+        minimum_detectable_rate_difference: That net over ``total_pairs`` --
+            the figure to compare against a base rate.
+        achieved_power: Power at the reported split. At or above
+            ``target_power``, and published so the number is checkable
+            rather than trusted.
+    """
+
+    instrument: str
+    test: str
+    discordant_pairs: int
+    total_pairs: int
+    alpha: float
+    target_power: float
+    most_balanced_rejecting_minority: int
+    minimum_detectable_split: float
+    minimum_detectable_net_pairs: float
+    minimum_detectable_rate_difference: float
+    achieved_power: float
+
+
 __all__ = [
     "ClusteredPairedPower",
+    "McNemarDetectableEffect",
     "McNemarPower",
     "NetDifferencePower",
     "PairedContinuousPower",

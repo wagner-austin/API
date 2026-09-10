@@ -31,6 +31,7 @@ from platform_core.json_utils import (
 from platform_core.power_distributions import McNemarTest
 from platform_core.power_types import (
     ClusteredPairedPower,
+    McNemarDetectableEffect,
     McNemarPower,
     NetDifferencePower,
     PairedContinuousPower,
@@ -355,6 +356,61 @@ def decode_clustered_paired_power(obj: JSONObject) -> ClusteredPairedPower:
     )
 
 
+def encode_mcnemar_detectable_effect(record: McNemarDetectableEffect) -> JSONObject:
+    """Encode a :class:`McNemarDetectableEffect` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "test": record["test"],
+        "discordant_pairs": record["discordant_pairs"],
+        "total_pairs": record["total_pairs"],
+        "alpha": record["alpha"],
+        "target_power": record["target_power"],
+        "most_balanced_rejecting_minority": record["most_balanced_rejecting_minority"],
+        "minimum_detectable_split": record["minimum_detectable_split"],
+        "minimum_detectable_net_pairs": record["minimum_detectable_net_pairs"],
+        "minimum_detectable_rate_difference": record["minimum_detectable_rate_difference"],
+        "achieved_power": record["achieved_power"],
+    }
+
+
+def decode_mcnemar_detectable_effect(obj: JSONObject) -> McNemarDetectableEffect:
+    """Decode a :class:`McNemarDetectableEffect` from a JSON object.
+
+    Args:
+        obj: JSON object as produced by
+            :func:`encode_mcnemar_detectable_effect`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On an unknown test or instrument.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    return McNemarDetectableEffect(
+        instrument=_require_instrument(
+            obj, "instrument", PowerInstrument.MCNEMAR_DETECTABLE_EFFECT
+        ),
+        test=_require_mcnemar_test(obj, "test"),
+        discordant_pairs=require_int(obj, "discordant_pairs"),
+        total_pairs=require_int(obj, "total_pairs"),
+        alpha=require_float(obj, "alpha"),
+        target_power=require_float(obj, "target_power"),
+        most_balanced_rejecting_minority=require_int(obj, "most_balanced_rejecting_minority"),
+        minimum_detectable_split=require_float(obj, "minimum_detectable_split"),
+        minimum_detectable_net_pairs=require_float(obj, "minimum_detectable_net_pairs"),
+        minimum_detectable_rate_difference=require_float(obj, "minimum_detectable_rate_difference"),
+        achieved_power=require_float(obj, "achieved_power"),
+    )
+
+
 def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
     """Encode a :class:`RateFloorPower` to a JSON object.
 
@@ -449,6 +505,7 @@ def decode_zero_failure_power(obj: JSONObject) -> ZeroFailurePower:
 
 __all__ = [
     "decode_clustered_paired_power",
+    "decode_mcnemar_detectable_effect",
     "decode_mcnemar_power",
     "decode_net_difference_power",
     "decode_paired_continuous_power",
@@ -456,6 +513,7 @@ __all__ = [
     "decode_required_replicates",
     "decode_zero_failure_power",
     "encode_clustered_paired_power",
+    "encode_mcnemar_detectable_effect",
     "encode_mcnemar_power",
     "encode_net_difference_power",
     "encode_paired_continuous_power",

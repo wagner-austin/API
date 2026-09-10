@@ -396,6 +396,23 @@ class StatisticalPowerErrorCode(ErrorCodeBase):
     # is a finding, and this is the absence of one.
     POWER_CLUSTERS_INSUFFICIENT = "POWER_CLUSTERS_INSUFFICIENT"
 
+    # A target POWER outside (0, 1). Its own code rather than reuse of
+    # POWER_CONFIDENCE_OUT_OF_RANGE for the reason the rate-floor code has
+    # one: power is the chance of detecting a real effect, confidence is
+    # how sure a bound is, and a caller passing 0.95 meaning either would
+    # get no error from a shared validator.
+    POWER_TARGET_POWER_OUT_OF_RANGE = "POWER_TARGET_POWER_OUT_OF_RANGE"
+
+    # No split of the observed discordant pairs rejects at this alpha, so
+    # no true effect reaches the target power however large it is. Raised
+    # rather than returning a maximal effect: a caller reading a returned
+    # ceiling as an answer would publish a detectable effect for a
+    # comparison in which nothing is detectable. Distinct from
+    # POWER_REQUIRED_REPLICATES_UNREACHABLE, which names the opposite
+    # remedy -- there more replicates cannot help, here they are the only
+    # thing that can.
+    POWER_TARGET_UNREACHABLE = "POWER_TARGET_UNREACHABLE"
+
 
 __all__ = [
     "CalendarErrorCode",
