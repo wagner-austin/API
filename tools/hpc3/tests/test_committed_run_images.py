@@ -17,6 +17,26 @@ It is checkable here without a cluster, without a GPU and without building
 anything: a run document declares the commit its image carries, so the plan
 it names must be present in the plan table AT THAT COMMIT. That is two git
 reads and a substring.
+
+WHERE THIS CHECK DOES AND DOES NOT RUN, STATED PLAINLY BECAUSE THE ANSWER IS
+UNCOMFORTABLE. It needs the declared commit's object, and CI checks out at
+depth 1. A run document names a commit that was HEAD when its image was
+built, so by the time any later push is tested that commit is absent from the
+clone BY CONSTRUCTION -- the only CI run that could ever verify a document is
+the one on that document's own commit. **So this test does real work in a full
+clone and is INERT in CI, and pretending otherwise is worse than saying it.**
+
+The first version instead asserted on unverifiable evidence, and because
+``git show`` reports an absent COMMIT and a missing PATH with identical
+stderr, it convicted a correct document and held ``main`` red for two hours
+(diagnosed to reproduction by @fable-brain-audit-0903, 2026-09-10).
+
+THE REAL GATE THEREFORE BELONGS ON THE SUBMISSION PATH, not here: the moment
+that matters is when someone is about to spend GPU hours, and at that moment
+they have a full clone and the document in hand. This module keeps the part a
+shallow clone CAN answer -- that a document pairing ``image_commit`` with a
+``--plan`` is making a checkable claim at all -- and the verification proper
+runs where it can actually refuse something.
 """
 
 from __future__ import annotations
@@ -64,20 +84,51 @@ def _plan_flag(command: str) -> str | None:
     return None
 
 
+def _commit_is_in_this_clone(commit: str) -> bool:
+    """Say whether this clone holds the commit object at all.
+
+    THE DISCRIMINATOR THIS EXISTS FOR, reproduced by @fable-brain-audit-0903
+    in a fresh ``git clone --depth 1`` on 2026-09-10. ``git show`` prints the
+    SAME message for two different facts::
+
+        fatal: path '<path>' exists on disk, but not in '<sha>'
+
+    -- when the commit is present and genuinely lacks the path, AND when the
+    commit is simply not in the clone. The stderr is identical, so a check
+    reading it cannot tell "this document is wrong" from "this clone is
+    shallow", and the first version of this module asserted the damning one
+    about a run document that was correct.
+
+    Args:
+        commit: The commit to look for.
+
+    Returns:
+        Whether the object is present locally.
+    """
+    return (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=REPO,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
 def _plan_table_at(commit: str) -> str:
     """Read the question-set plan table as it stood at one commit.
 
     Args:
-        commit: The commit the image's wheels were built from.
+        commit: The commit the image's wheels were built from, already known
+            to be present via :func:`_commit_is_in_this_clone`.
 
     Returns:
         The module's source at that commit.
 
     Raises:
-        AssertionError: If the commit is not present in this clone. CI checks
-            out at depth 1, so a run document naming a commit older than the
-            fetch depth cannot be verified here -- and saying so is better
-            than passing silently.
+        AssertionError: If the read fails for any reason other than the
+            commit being absent, which the caller has already excluded.
     """
     result = subprocess.run(
         ["git", "show", f"{commit}:{_QA_PLAN_TABLE}"],
@@ -87,7 +138,8 @@ def _plan_table_at(commit: str) -> str:
         check=False,
     )
     assert result.returncode == 0, (
-        f"cannot read {_QA_PLAN_TABLE} at {commit}: {result.stderr.strip()}"
+        f"{commit[:8]} is in this clone but {_QA_PLAN_TABLE} could not be read from it: "
+        f"{result.stderr.strip()}"
     )
     return result.stdout
 
@@ -105,6 +157,15 @@ class TestAQuestionSetRunNamesAPlanItsImageActuallyCarries:
             plan = _plan_flag(command)
             commit = experiment.get("image_commit")
             if plan is None or not isinstance(commit, str):
+                continue
+            if not _commit_is_in_this_clone(commit):
+                # NOT A SKIP THAT HIDES A DEFECT -- a clone that lacks the
+                # commit holds NO evidence either way, and convicting on
+                # absent evidence is what made `main` red for two hours on a
+                # document that was right. Where this matters is stated in
+                # the module docstring: at depth 1 the declared commit is
+                # absent BY CONSTRUCTION, so the real gate is the submission
+                # path, not this suite.
                 continue
             table = _plan_table_at(commit)
             assert f'"{plan}"' in table, (
