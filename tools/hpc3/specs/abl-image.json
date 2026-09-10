@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
   "env_prefix": "/opt/env",
-  "git_commit": "53f0eb8918cd5e976bebfc6dad4383c69f956b8f",
+  "git_commit": "a3af3e067039d23fa778b14961c92f2451594fd1",
   "system_packages": [],
   "extra_index_urls": [
     "https://download.pytorch.org/whl/cu124"
@@ -451,6 +451,34 @@
     {
       "module": "model_trainer.core.services.model.cartridge_plans",
       "attribute": "base_short"
+    },
+    {
+      "module": "model_trainer.core.services.model.cartridge_sweep_checkpoint",
+      "attribute": "checkpointed_cells"
+    },
+    {
+      "module": "model_trainer.core.services.model.cartridge_sweep_checkpoint",
+      "attribute": "bind_cells"
+    },
+    {
+      "module": "model_trainer.core.services.model.checkpoint_file",
+      "attribute": "publish_atomically"
+    },
+    {
+      "module": "model_trainer.core.contracts.sweep_checkpoint",
+      "attribute": "decode_sweep_checkpoint"
+    },
+    {
+      "module": "model_trainer.core.contracts.replicated_measurement",
+      "attribute": "replicated_from_observations"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_lora_families",
+      "attribute": "lora_arm_families"
+    },
+    {
+      "module": "model_trainer.cli.cartridge_pool_provider",
+      "attribute": "SeededPoolProvider"
     }
   ],
   "smoke_commands": [
@@ -506,7 +534,8 @@
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS; from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set, resolvable_floor; p = QA_PLANS['pythia-6.9b-api-wiki-qa']; assert p['model_id'] == 'EleutherAI/pythia-6.9b', p['model_id']; assert p['num_slots'] == 128 and p['max_seq_len'] == 896, p; cells = [QA_PLANS['gpt2-large-api-wiki-qa-slots-' + str(n)] for n in (32, 64, 128, 256)]; assert sorted(c['num_slots'] for c in cells) == [32, 64, 128, 256], cells; assert {c['max_seq_len'] for c in cells} == {768}, cells; assert callable(require_resolvable_question_set); assert resolvable_floor(32, p['alpha'], p['mcnemar_test']) > p['smallest_effect_of_interest']; assert resolvable_floor(250, p['alpha'], p['mcnemar_test']) <= p['smallest_effect_of_interest']\"",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_qa_arms import expanded_retrieval_items, long_context_items, reranked_retrieval_items; from model_trainer.core.services.model.cartridge_retrieval import build_index, expand_query, inverse_document_frequency, score_chunk, terms; assert callable(long_context_items) and callable(reranked_retrieval_items) and callable(expanded_retrieval_items); docs = ('Ballast trims it. Sonar is filtered. Leaves are pruned. Widths narrow.',); idx = build_index(docs, k1=1.5, b=0.75, retrieved_chunks=5); assert (idx['k1'], idx['b'], idx['retrieved_chunks']) == (1.5, 0.75, 5), idx; hot = ('Sonar and sonar and sonar returns. Ballast tanks flood slowly and deliberately here now.',); lo = score_chunk(build_index(hot, k1=0.5, b=0.75, retrieved_chunks=5), terms('sonar'), 0); hi = score_chunk(build_index(hot, k1=3.0, b=0.75, retrieved_chunks=5), terms('sonar'), 0); assert lo < hi, (lo, hi); added = set(terms(expand_query(idx, 'what trims it', feedback_chunks=2, expansion_terms=3))) - set(terms('what trims it')); assert len(added) == 3 and added <= set(terms(docs[0])), added; assert inverse_document_frequency(idx, 'sonar') > 0.0\"",
     "/opt/env/bin/python -c \"from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS; from model_trainer.core.services.model.cartridge_qa_power import resolvable_floor; p = QA_PLANS['gpt2-full-wiki-qa']; assert p['model_id'] == 'gpt2', p['model_id']; assert p['max_items'] > 3735, p['max_items']; assert resolvable_floor(3735, p['alpha'], p['mcnemar_test']) < p['smallest_effect_of_interest']; assert resolvable_floor(32, p['alpha'], p['mcnemar_test']) > p['smallest_effect_of_interest']\"",
-    "/opt/env/bin/python -c \"import inspect, pathlib, tempfile; from model_trainer.cli.cartridge_qa_benchmark import measure_qa_plan; from model_trainer.core.contracts.qa_checkpoint import QA_CHECKPOINT_SCHEMA_VERSION, completed_arms, completed_seeds; from model_trainer.core.services.model.cartridge_qa_checkpoint import checkpoint_exists, delete_qa_checkpoint, resume_or_start, save_qa_checkpoint; sig = inspect.signature(measure_qa_plan); assert 'checkpoints' in sig.parameters and 'plan_name' in sig.parameters, sig; d = pathlib.Path(tempfile.mkdtemp()); c = resume_or_start(d, plan_name='p', corpus_digest='dg', item_count=7, model_id='m'); assert c['arms'] == [] and c['seeds'] == [] and c['schema_version'] == QA_CHECKPOINT_SCHEMA_VERSION; save_qa_checkpoint(d, c); assert checkpoint_exists(d, 'p'), 'the checkpoint was not published'; assert list(d.glob('*.pending')) == [], 'a pending file survived, so the rename never happened'; assert resume_or_start(d, plan_name='p', corpus_digest='dg', item_count=7, model_id='m') == c, 'a matching checkpoint must be resumed'; assert completed_arms(c) == frozenset() and completed_seeds(c) == frozenset(); raised = None\ntry:\n    resume_or_start(d, plan_name='p', corpus_digest='OTHER', item_count=7, model_id='m')\nexcept Exception as error:\n    raised = error\nassert raised is not None, 'a checkpoint from another corpus must be REFUSED, not adopted'; delete_qa_checkpoint(d, 'p'); assert not checkpoint_exists(d, 'p'), 'a completed run must delete its checkpoint'\""
+    "/opt/env/bin/python -c \"import inspect, pathlib, tempfile; from model_trainer.cli.cartridge_qa_benchmark import measure_qa_plan; from model_trainer.core.contracts.qa_checkpoint import QA_CHECKPOINT_SCHEMA_VERSION, completed_arms, completed_seeds; from model_trainer.core.services.model.cartridge_qa_checkpoint import checkpoint_exists, delete_qa_checkpoint, resume_or_start, save_qa_checkpoint; sig = inspect.signature(measure_qa_plan); assert 'checkpoints' in sig.parameters and 'plan_name' in sig.parameters, sig; d = pathlib.Path(tempfile.mkdtemp()); c = resume_or_start(d, plan_name='p', corpus_digest='dg', item_count=7, model_id='m'); assert c['arms'] == [] and c['seeds'] == [] and c['schema_version'] == QA_CHECKPOINT_SCHEMA_VERSION; save_qa_checkpoint(d, c); assert checkpoint_exists(d, 'p'), 'the checkpoint was not published'; assert list(d.glob('*.pending')) == [], 'a pending file survived, so the rename never happened'; assert resume_or_start(d, plan_name='p', corpus_digest='dg', item_count=7, model_id='m') == c, 'a matching checkpoint must be resumed'; assert completed_arms(c) == frozenset() and completed_seeds(c) == frozenset(); raised = None\ntry:\n    resume_or_start(d, plan_name='p', corpus_digest='OTHER', item_count=7, model_id='m')\nexcept Exception as error:\n    raised = error\nassert raised is not None, 'a checkpoint from another corpus must be REFUSED, not adopted'; delete_qa_checkpoint(d, 'p'); assert not checkpoint_exists(d, 'p'), 'a completed run must delete its checkpoint'\"",
+    "/opt/env/bin/python -c \"import inspect, pathlib, tempfile; from model_trainer.cli import cartridge_base_lora_sweep, cartridge_content_lora_sweep, cartridge_diverse_companion_sweep, cartridge_headroom, cartridge_solo_grid, cartridge_solo_seeds; from model_trainer.core.services.model.cartridge_sweep_checkpoint import bind_cells, checkpoint_exists, checkpointed_cells, delete_sweep_checkpoint, require_distinct_cells, resume_or_start, save_sweep_checkpoint; from platform_core.run_record import Observation; measures = ((cartridge_solo_seeds, 'measure_solo_seeds'), (cartridge_solo_grid, 'measure_solo_grid'), (cartridge_headroom, 'measure_headroom'), (cartridge_base_lora_sweep, 'measure_grid'), (cartridge_content_lora_sweep, 'measure_grid'), (cartridge_diverse_companion_sweep, 'measure_grid'))\nfor module, name in measures:\n    sig = inspect.signature(getattr(module, name))\n    assert 'checkpoints' in sig.parameters, (module.__name__, name, sig)\nd = pathlib.Path(tempfile.mkdtemp()); c = resume_or_start(d, measurement='s', inputs_digest='dg'); assert c['cells'] == [], c; save_sweep_checkpoint(d, c); assert checkpoint_exists(d, 's'), 'the checkpoint was not published'; assert list(d.glob('*.pending')) == [], 'a pending file survived, so the rename never happened'; assert resume_or_start(d, measurement='s', inputs_digest='dg') == c, 'a matching checkpoint must be resumed'; raised = None\ntry:\n    resume_or_start(d, measurement='s', inputs_digest='OTHER')\nexcept Exception as error:\n    raised = error\nassert raised is not None, 'a checkpoint over other inputs must be REFUSED, not adopted'; delete_sweep_checkpoint(d, 's'); collided = None\ntry:\n    require_distinct_cells([('a', lambda: ()), ('a', lambda: ())])\nexcept Exception as error:\n    collided = error\nassert collided is not None, 'two cells sharing a name must be REFUSED before any work runs'\ndef _measure(unit):\n    return (Observation(name='u' + str(unit) + '_gain', value=float(unit)),)\ne = pathlib.Path(tempfile.mkdtemp()); produced = checkpointed_cells(e, measurement='s', inputs_digest='dg', cells=bind_cells([('u1', 1), ('u2', 2)], _measure)); assert list(produced) == ['u1', 'u2'], produced; assert produced['u1'][0]['value'] == 1.0, 'bind_cells captured the loop variable, so the first cell measured the last unit'; assert produced['u2'][0]['value'] == 2.0, produced; assert not checkpoint_exists(e, 's'), 'a completed sweep must delete its checkpoint'\""
   ],
   "labels": {
     "org.corvis.env-source": "/pub/wagnera3/envs/abl-pinned"
