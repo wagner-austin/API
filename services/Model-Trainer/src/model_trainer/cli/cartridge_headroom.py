@@ -57,9 +57,14 @@ from model_trainer.core.services.model.cartridge_corpus import build_windows, sp
 from model_trainer.core.services.model.cartridge_plans import (
     base_short,
     corpus_digest,
+    digest_parts,
     require_cartridge_plan,
 )
 from model_trainer.core.services.model.cartridge_scoring import base_loss
+from model_trainer.core.services.model.cartridge_sweep_checkpoint import (
+    bind_cells,
+    checkpointed_cells,
+)
 
 _log = get_logger(__name__)
 
@@ -116,8 +121,15 @@ def measure_headroom(
     window: int,
     held_out_stride: int,
     device: str,
+    checkpoints: pathlib.Path,
 ) -> tuple[tuple[Observation, ...], str]:
     """Score every corpus's held-out windows on every base, plain.
+
+    RESUMABLE PER BASE. A base is the natural unit here: loading it is the
+    expensive part and every corpus is then scored against the weights that
+    load produced, so a base is both what an eviction destroys and what a
+    resume can skip whole. Finer would mean reloading a 6.9B model to score
+    one more corpus against it.
 
     Args:
         corpora: Corpus directories, the first being the primary whose
@@ -128,6 +140,7 @@ def measure_headroom(
             the records scored.
         held_out_stride: The held-out stride, same provenance.
         device: Device to measure on.
+        checkpoints: Directory holding this measurement's checkpoint.
 
     Returns:
         ``(observations, digest)``: per corpus, its character and
@@ -140,7 +153,9 @@ def measure_headroom(
         ValueError: When no corpus or no base is named; a headroom record
             over nothing would read as a measurement.
         AppError: Propagated from the corpus layer when a corpus cannot
-            fill the recorded geometry.
+            fill the recorded geometry, from the checkpoint layer when two
+            bases share a short name or a checkpoint describes different
+            inputs.
     """
     if len(corpora) == 0:
         raise ValueError(
@@ -167,7 +182,16 @@ def measure_headroom(
             Observation(name=f"headroom-{path.name}_documents", value=float(len(documents)))
         )
 
-    for model_id in bases:
+    def _score_base(model_id: str) -> tuple[Observation, ...]:
+        """Load one base and score every corpus's held-out windows on it.
+
+        Args:
+            model_id: The base to load and score.
+
+        Returns:
+            Three rows per corpus: the mean held-out loss, and the window
+            and token counts behind it.
+        """
         short = base_short(model_id)
         tokenizer = hf_hooks.Hooks.load_hf_tokenizer(model_id)
         base = require_cache_capable(
@@ -179,6 +203,7 @@ def measure_headroom(
         # embedding lookup, nineteen seconds into a five-hour allocation.
         base.to(device)
         base.eval()
+        scored: list[Observation] = []
         for path, documents in staged:
             encoded = [tokenizer.encode(document) for document in documents]
             _train, held_out = split_by_stride(
@@ -187,16 +212,16 @@ def measure_headroom(
             )
             losses = [base_loss(base, item) for item in held_out]
             mean = sum(losses) / len(losses)
-            observations.append(
+            scored.append(
                 Observation(name=f"headroom-{short}-{path.name}_base_loss_mean", value=mean)
             )
-            observations.append(
+            scored.append(
                 Observation(
                     name=f"headroom-{short}-{path.name}_held_out_windows",
                     value=float(len(held_out)),
                 )
             )
-            observations.append(
+            scored.append(
                 Observation(
                     name=f"headroom-{short}-{path.name}_held_out_tokens",
                     value=float(len(held_out) * window),
@@ -209,15 +234,44 @@ def measure_headroom(
                 mean,
                 len(held_out),
             )
+        return tuple(scored)
+
+    # THE GEOMETRY AND EVERY CORPUS ARE IN THE DIGEST, NOT JUST THE PRIMARY
+    # ONE. ``digest`` above names the RECORD, and the sweeps' convention is
+    # that it is the primary corpus's. That is too narrow to decide a resume:
+    # a checkpoint written over the same primary corpus but a different
+    # second one, or the same corpora at another window, would match on it
+    # and the run would come out complete with some bases scored over inputs
+    # nobody is looking at.
+    produced = checkpointed_cells(
+        checkpoints,
+        measurement="headroom",
+        inputs_digest=digest_parts(
+            [
+                str(window),
+                str(held_out_stride),
+                *[str(path) for path, _documents in staged],
+                *[corpus_digest(documents) for _path, documents in staged],
+            ]
+        ),
+        cells=bind_cells([(base_short(model_id), model_id) for model_id in bases], _score_base),
+    )
+    for cell_observations in produced.values():
+        observations.extend(cell_observations)
     return tuple(observations), digest
 
 
-def headroom_run_record(corpora: Sequence[pathlib.Path], *, device: str) -> RunRecord:
+def headroom_run_record(
+    corpora: Sequence[pathlib.Path], *, device: str, checkpoints: pathlib.Path
+) -> RunRecord:
     """Pin determinism, run the measurement, and record it.
 
     Args:
         corpora: Corpus directories, primary first.
         device: Device to measure on.
+        checkpoints: Directory holding this measurement's checkpoint, so an
+            evicted run resumes at its last completed base rather than at
+            zero.
 
     Returns:
         The record.
@@ -240,6 +294,7 @@ def headroom_run_record(corpora: Sequence[pathlib.Path], *, device: str) -> RunR
         window=window,
         held_out_stride=held_out_stride,
         device=device,
+        checkpoints=checkpoints,
     )
     return run_record(
         experiment=HEADROOM_EXPERIMENT,
@@ -278,9 +333,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         for entry in cli_args.require_flag(parsed, CORPORA_FLAG).split(",")
         if entry
     ]
-    record = headroom_run_record(corpora, device=cli_args.require_flag(parsed, DEVICE_FLAG))
 
+    # RESOLVED BEFORE THE RUN, because the checkpoint directory derives from
+    # where the artifact goes. A DERIVED path rather than a flag of its own:
+    # a second flag could disagree with this one, and a resumed run would
+    # then look for its work in a directory nothing wrote to.
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
+    record = headroom_run_record(
+        corpora,
+        device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        checkpoints=out.parent / "checkpoints",
+    )
+
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

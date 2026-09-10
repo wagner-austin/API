@@ -420,6 +420,62 @@ def per_seed_observations(measurement: ReplicatedGain) -> tuple[Observation, ...
     )
 
 
+def replicated_from_observations(
+    observations: Sequence[Observation], *, arm: str, seeds: Sequence[int]
+) -> ReplicatedGain:
+    """Rebuild an arm from the per-seed rows :func:`per_seed_observations` wrote.
+
+    THE EXACT INVERSE, AND IT LIVES BESIDE THE FUNCTION IT INVERTS. A sweep
+    that resumes from a checkpoint gets its completed cells back as
+    observations -- that is what a checkpoint carries -- but its end-of-run
+    reductions take arms: a noise floor is the largest spread any arm
+    produced, and a step verdict subtracts two arms seed by seed. Rebuilding
+    the arm means knowing that a seed's gain is called
+    ``<arm>_seed<seed>_gain``, and that convention has exactly one owner
+    because reading it is written here and writing it is written twenty lines
+    up. Two owners and a resumed sweep silently finds nothing to reduce.
+
+    THE REBUILD IS EXACT, not an approximation of the original. Every field
+    of a :class:`ReplicatedGain` is a function of its ``(seed, gain)`` pairs
+    -- :func:`replicate` computes the mean and the spread from them -- so an
+    arm rebuilt from its own rows is identical to the arm that wrote them,
+    including the summary numbers. Nothing is inferred and nothing is lost.
+
+    Args:
+        observations: The rows to read, typically one checkpointed cell's.
+            Rows belonging to other arms are ignored, so a cell carrying
+            several arms can be read once per arm.
+        arm: The arm to rebuild, spelled as it was when the rows were written.
+        seeds: The seeds the arm was measured under, in the order run. Every
+            one must be present; the order becomes the arm's own.
+
+    Returns:
+        The arm, identical to the one whose rows were passed in.
+
+    Raises:
+        AppError: With ``CARTRIDGE_ARM_ROWS_INCOMPLETE`` when a seed's row is
+            absent, which means these observations and this arm are not the
+            same measurement. With ``CARTRIDGE_MEASUREMENT_UNREPLICATED``
+            from :func:`replicate` when too few seeds are named.
+    """
+    values = {observation["name"]: observation["value"] for observation in observations}
+    wanted = [(seed, f"{arm}_seed{seed}_gain") for seed in seeds]
+    missing = [name for _seed, name in wanted if name not in values]
+    if missing:
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_ARM_ROWS_INCOMPLETE,
+            (
+                f"arm {arm!r} cannot be rebuilt: {len(missing)} of {len(wanted)} per-seed "
+                f"row(s) are absent from the observations given -- {', '.join(missing)}. "
+                f"The rows and the arm describe different measurements; rebuilding over "
+                f"only the seeds present would report a mean and a spread over fewer "
+                f"draws than the arm's own label claims."
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_ARM_ROWS_INCOMPLETE),
+        )
+    return replicate(arm, [(seed, values[name]) for seed, name in wanted])
+
+
 def gain_observations(measurement: ReplicatedGain) -> tuple[Observation, ...]:
     """Name a gain's numbers for a run record.
 
@@ -525,6 +581,7 @@ __all__ = [
     "paired_separation",
     "per_seed_observations",
     "replicate",
+    "replicated_from_observations",
     "retention",
     "separates",
 ]

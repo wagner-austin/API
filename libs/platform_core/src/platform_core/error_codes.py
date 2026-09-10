@@ -225,6 +225,15 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # of a different kind under the name of a paired one.
     CARTRIDGE_ARMS_UNPAIRABLE = "CARTRIDGE_ARMS_UNPAIRABLE"
 
+    # An arm was asked to be rebuilt from observations that do not carry every
+    # seed's own gain. Its own code because of who meets it: a sweep resuming
+    # from a checkpoint reconstructs its arms from the rows it recorded, and a
+    # row that is absent means the recorded cell and the arm being rebuilt are
+    # not the same arm. Reported rather than skipped, because a rebuild over
+    # the seeds that HAPPEN to be present would report a mean and a spread
+    # over fewer draws than the record's own label claims.
+    CARTRIDGE_ARM_ROWS_INCOMPLETE = "CARTRIDGE_ARM_ROWS_INCOMPLETE"
+
     # A checkpoint on disk describes a DIFFERENT measurement from the one now
     # starting, so resuming from it would skip arms that were never scored on
     # this question set. Its own code rather than reuse of
@@ -237,6 +246,17 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # operator believed in spends the hours they were trying to save, and the
     # field that disagrees is usually a mistyped corpus path they can fix.
     CARTRIDGE_CHECKPOINT_FOREIGN = "CARTRIDGE_CHECKPOINT_FOREIGN"
+
+    # Two units of work in one sweep asked to be checkpointed under the SAME
+    # cell name. Its own code rather than a plain ValueError because of what
+    # it does when it is not caught: a resume matches cells by name, so the
+    # second unit would be handed the FIRST one's observations and never run,
+    # and the run would report one cell's numbers twice under two labels. On a
+    # first run it is invisible -- both cells execute, both get recorded --
+    # and it only becomes wrong after an eviction, which is the one moment
+    # nobody is watching. Raised before any work starts, so a sweep whose
+    # names collide fails in seconds rather than in hours.
+    CARTRIDGE_CHECKPOINT_DUPLICATE_CELL = "CARTRIDGE_CHECKPOINT_DUPLICATE_CELL"
 
     # Knowledge-editing errors
     #

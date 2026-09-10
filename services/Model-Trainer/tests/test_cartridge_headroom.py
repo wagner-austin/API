@@ -170,6 +170,7 @@ class TestMeasureHeadroom:
             window=8,
             held_out_stride=3,
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         names = [observation["name"] for observation in observations]
@@ -187,7 +188,12 @@ class TestMeasureHeadroom:
         (alpha,) = _staged(tmp_path, ("alpha",))
 
         observations, _digest = headroom.measure_headroom(
-            [alpha], bases=("gpt2",), window=8, held_out_stride=3, device="cpu"
+            [alpha],
+            bases=("gpt2",),
+            window=8,
+            held_out_stride=3,
+            device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
         recorded = {o["name"]: o["value"] for o in observations}
 
@@ -208,16 +214,28 @@ class TestMeasureHeadroom:
         )
         assert recorded["headroom-alpha_documents"] == 2.0
 
-    def test_no_corpora_is_refused(self) -> None:
+    def test_no_corpora_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="no corpora named"):
             headroom.measure_headroom(
-                [], bases=("gpt2",), window=8, held_out_stride=3, device="cpu"
+                [],
+                bases=("gpt2",),
+                window=8,
+                held_out_stride=3,
+                device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
     def test_no_bases_is_refused(self, tmp_path: pathlib.Path) -> None:
         (alpha,) = _staged(tmp_path, ("alpha",))
         with pytest.raises(ValueError, match="no bases named"):
-            headroom.measure_headroom([alpha], bases=(), window=8, held_out_stride=3, device="cpu")
+            headroom.measure_headroom(
+                [alpha],
+                bases=(),
+                window=8,
+                held_out_stride=3,
+                device="cpu",
+                checkpoints=tmp_path / "checkpoints",
+            )
 
     def test_every_loaded_model_is_moved_to_the_measurement_device(
         self, tmp_path: pathlib.Path
@@ -245,6 +263,7 @@ class TestMeasureHeadroom:
             window=8,
             held_out_stride=3,
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         assert len(loaded) == 2

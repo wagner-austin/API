@@ -293,7 +293,12 @@ class TestMeasureSoloSeeds:
         alpha = _staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
+            alpha,
+            model_id="gpt2",
+            load_precision=None,
+            seeds=(7, 8),
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
         )
 
         recorded = {o["name"]: o["value"] for o in observations}
@@ -312,7 +317,12 @@ class TestMeasureSoloSeeds:
         alpha = _staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", load_precision=None, seeds=(7,), device="cpu"
+            alpha,
+            model_id="gpt2",
+            load_precision=None,
+            seeds=(7,),
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
         )
         recorded = {o["name"]: o["value"] for o in observations}
 
@@ -330,11 +340,27 @@ class TestMeasureSoloSeeds:
     def test_the_measurement_reproduces_itself(self, tmp_path: pathlib.Path) -> None:
         alpha = _staged(tmp_path, "alpha")
 
+        # SEPARATE CHECKPOINT DIRECTORIES, and this is load-bearing. Sharing
+        # one would let the second call RESUME the first's cells and return
+        # them verbatim, so the test would pass without re-measuring anything
+        # -- it would assert that a dict equals itself. Distinct directories
+        # force the second run to retrain and rescore, which is the property
+        # the test is named for.
         first, _ = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
+            alpha,
+            model_id="gpt2",
+            load_precision=None,
+            seeds=(7, 8),
+            device="cpu",
+            checkpoints=tmp_path / "ckpt-first",
         )
         second, _ = solo.measure_solo_seeds(
-            alpha, model_id="gpt2", load_precision=None, seeds=(7, 8), device="cpu"
+            alpha,
+            model_id="gpt2",
+            load_precision=None,
+            seeds=(7, 8),
+            device="cpu",
+            checkpoints=tmp_path / "ckpt-second",
         )
 
         assert first == second
@@ -343,7 +369,12 @@ class TestMeasureSoloSeeds:
         alpha = _staged(tmp_path, "alpha")
         with pytest.raises(ValueError, match="no seeds named"):
             solo.measure_solo_seeds(
-                alpha, model_id="gpt2", load_precision=None, seeds=(), device="cpu"
+                alpha,
+                model_id="gpt2",
+                load_precision=None,
+                seeds=(),
+                device="cpu",
+                checkpoints=tmp_path / "ckpt",
             )
 
     def test_the_loaded_model_is_moved_to_the_measurement_device(
@@ -361,7 +392,12 @@ class TestMeasureSoloSeeds:
         hf_hooks.Hooks.load_hf_model = _recording_loader
 
         solo.measure_solo_seeds(
-            alpha, model_id="gpt2", load_precision=None, seeds=(7,), device="cpu"
+            alpha,
+            model_id="gpt2",
+            load_precision=None,
+            seeds=(7,),
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
         )
 
         # The measurement chain may place the base again downstream; the

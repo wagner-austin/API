@@ -216,6 +216,20 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # draws and cannot be paired. 409, like the geometry mismatch: neither
     # arm is wrong on its own, and only the attempt to subtract them is.
     ModelTrainerErrorCode.CARTRIDGE_ARMS_UNPAIRABLE: 409,
+    # An arm rebuilt from rows that do not carry every seed. 409, like the
+    # unpairable arms above and for the same reason: neither the observations
+    # nor the arm is wrong on its own, and only the attempt to rebuild one
+    # from the other is.
+    ModelTrainerErrorCode.CARTRIDGE_ARM_ROWS_INCOMPLETE: 409,
+    # A checkpoint on disk that describes a different measurement. 409 rather
+    # than 400: the run being started is well formed and the file is a valid
+    # checkpoint -- what conflicts is the state already on disk, which is
+    # exactly what the operator must reconcile.
+    ModelTrainerErrorCode.CARTRIDGE_CHECKPOINT_FOREIGN: 409,
+    # Two cells of one sweep asking for the same checkpoint name. 400, not
+    # 409: nothing on disk is involved and the request is internally
+    # inconsistent before it is ever compared to anything.
+    ModelTrainerErrorCode.CARTRIDGE_CHECKPOINT_DUPLICATE_CELL: 400,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

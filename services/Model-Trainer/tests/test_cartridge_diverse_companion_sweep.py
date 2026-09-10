@@ -1,12 +1,15 @@
 """The diverse-pool sweep entry, exercised on a real model over fake corpora.
 
-Same split as the sibling sweeps' suites. Beyond their assertions, this one
-pins what makes the diverse pool diverse: each member trains on its own
-corpus (members provably differ), the pool's first member is byte-identical
-to the varied provider's first member when the first corpus matches (so all
-three records nest), the companion-cross instrument scores every member on
-the primary held-out, and the three refusals refuse -- count mismatch,
-repeated corpus, and a companion that is also measured.
+Same split as the sibling sweeps' suites: the companion-cross instrument
+scores every pool member on the primary held-out, and the three refusals
+refuse -- count mismatch, repeated corpus, and a companion that is also
+measured.
+
+WHAT MAKES THE POOL DIVERSE IS TESTED IN ``test_cartridge_pool_provider``,
+which is where the provider moved when the third copy of it was folded into
+one. That is also where the nesting claim lives -- member zero being
+byte-identical to the varied sweep's, which is what lets all three records
+nest.
 """
 
 from __future__ import annotations
@@ -17,14 +20,12 @@ import sys
 from collections.abc import Generator, Mapping
 
 import pytest
-import torch
 from platform_core.json_utils import load_json_str
 from platform_core.run_record import decode_run_record
 
 from model_trainer.cli import _measurement_hooks as measurement_hooks
 from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_diverse_companion_sweep as sweep
-from model_trainer.cli import cartridge_varied_companion_sweep as varied_sweep
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
@@ -37,7 +38,7 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
-from model_trainer.core.types import CacheCapableLMProto, LMModelProto
+from model_trainer.core.types import LMModelProto
 from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
 
 #: A plan small enough to run in a test and shaped like the real one.
@@ -129,84 +130,6 @@ def _staged(tmp_path: pathlib.Path, names: tuple[str, ...]) -> list[pathlib.Path
     return created
 
 
-def _train_windows(seed: int, rows: int) -> list[torch.Tensor]:
-    """Draw deterministic training windows for a provider under test.
-
-    Args:
-        seed: Seed for the draw.
-        rows: How many windows.
-
-    Returns:
-        One (1, 8) id tensor per window.
-    """
-    generator = torch.Generator()
-    generator.manual_seed(seed)
-    return [
-        torch.randint(0, _VOCAB, (1, 8), generator=generator, dtype=torch.long) for _ in range(rows)
-    ]
-
-
-def _cache_capable_base() -> CacheCapableLMProto:
-    """Build the tiny base the provider tests share.
-
-    Returns:
-        The cache-capable tiny GPT-2.
-    """
-    from model_trainer.core.services.finetuning.strategies.cartridge import (
-        require_cache_capable,
-    )
-
-    model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
-    return require_cache_capable(model)
-
-
-class TestDiversePoolProvider:
-    def test_the_pool_is_one_object_per_seed_and_one_member_per_corpus(self) -> None:
-        base = _cache_capable_base()
-        provider = sweep._DiversePoolProvider(
-            base, [_train_windows(31, 4), _train_windows(37, 4)], TINY_DIVERSE_PLAN
-        )
-
-        assert provider.pool(7) is provider.pool(7)
-        assert provider.pool(7) is not provider.pool(8)
-        assert len(provider.pool(7)) == TINY_DIVERSE_PLAN["max_companions"]
-
-    def test_members_trained_on_different_corpora_differ(self) -> None:
-        """The pool is diverse in fact, not only in flag order."""
-        base = _cache_capable_base()
-        provider = sweep._DiversePoolProvider(
-            base, [_train_windows(31, 4), _train_windows(37, 4)], TINY_DIVERSE_PLAN
-        )
-
-        first, second = provider.pool(7)
-        differing = [
-            name
-            for name, tensor in first.state_dict().items()
-            if not torch.equal(tensor, second.state_dict()[name])
-        ]
-        assert sorted(differing) == sorted(first.state_dict())
-
-    def test_the_first_member_nests_the_varied_pools_first_member(self) -> None:
-        """With the first corpus shared, the two providers' member zero agree.
-
-        Both derive member zero's seed from the same formula, so the diverse
-        record's pool contains the varied record's first member byte for
-        byte -- the three grids compare as supersets along one chain.
-        """
-        base = _cache_capable_base()
-        shared = _train_windows(31, 4)
-        diverse = sweep._DiversePoolProvider(
-            base, [shared, _train_windows(37, 4)], TINY_DIVERSE_PLAN
-        )
-        varied = varied_sweep._PoolProvider(base, shared, TINY_DIVERSE_PLAN)
-
-        mine = diverse.pool(7)[0].state_dict()
-        theirs = varied.pool(7)[0].state_dict()
-        assert sorted(mine) == sorted(theirs)
-        for name, tensor in mine.items():
-            assert torch.equal(tensor, theirs[name]), name
-
-
 class TestMeasureGrid:
     def test_every_arm_is_named_once(self, tmp_path: pathlib.Path) -> None:
         primary, beta, gamma, delta, echo = _staged(
@@ -220,6 +143,9 @@ class TestMeasureGrid:
             companion_corpora=[delta, echo],
             device="cpu",
             load_precision=None,
+            plan_name="tiny",
+            precision_token="",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         names = [observation["name"] for observation in observations]
@@ -239,6 +165,9 @@ class TestMeasureGrid:
             companion_corpora=[delta, echo],
             device="cpu",
             load_precision=None,
+            plan_name="tiny",
+            precision_token="",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         named = {observation["name"] for observation in observations}
@@ -285,6 +214,9 @@ class TestMeasureGrid:
             companion_corpora=[delta, echo],
             device="cpu",
             load_precision=None,
+            plan_name="tiny",
+            precision_token="",
+            checkpoints=tmp_path / "checkpoints",
         )
         recorded = {observation["name"]: observation["value"] for observation in observations}
 
@@ -321,6 +253,9 @@ class TestMeasureGrid:
                 companion_corpora=[delta],
                 device="cpu",
                 load_precision=None,
+                plan_name="tiny",
+                precision_token="",
+                checkpoints=tmp_path / "checkpoints",
             )
 
     def test_a_repeated_companion_corpus_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -334,6 +269,9 @@ class TestMeasureGrid:
                 companion_corpora=[delta, delta],
                 device="cpu",
                 load_precision=None,
+                plan_name="tiny",
+                precision_token="",
+                checkpoints=tmp_path / "checkpoints",
             )
 
     def test_a_companion_that_is_also_measured_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -347,6 +285,9 @@ class TestMeasureGrid:
                 companion_corpora=[delta, gamma],
                 device="cpu",
                 load_precision=None,
+                plan_name="tiny",
+                precision_token="",
+                checkpoints=tmp_path / "checkpoints",
             )
 
     def test_too_few_other_corpora_are_refused_up_front(self, tmp_path: pathlib.Path) -> None:
@@ -360,6 +301,9 @@ class TestMeasureGrid:
                 companion_corpora=[delta, echo],
                 device="cpu",
                 load_precision=None,
+                plan_name="tiny",
+                precision_token="",
+                checkpoints=tmp_path / "checkpoints",
             )
 
 
@@ -377,6 +321,7 @@ class TestRunRecord:
             other_corpora=[beta, gamma],
             companion_corpora=[delta, echo],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         assert record["experiment"] == DIVERSE_COMPANION_SWEEP_EXPERIMENT
@@ -390,6 +335,7 @@ class TestRunRecord:
                 other_corpora=[],
                 companion_corpora=[],
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
 

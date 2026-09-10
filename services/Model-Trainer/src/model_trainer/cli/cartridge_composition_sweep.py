@@ -69,6 +69,7 @@ from model_trainer.core.run_fingerprint import (
 )
 from model_trainer.core.services.finetuning.strategies.cartridge import require_cache_capable
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
+from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
 from model_trainer.core.services.model.cartridge_measurement import measure_composition_scaling
 from model_trainer.core.services.model.cartridge_plans import (
@@ -165,6 +166,64 @@ def matched_other_train(
             model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_CORPUS_UNUSABLE),
         )
     return train[:required]
+
+
+def staged_partner_trains(
+    corpora: Sequence[pathlib.Path],
+    *,
+    tokenizer: HFTokenizerProto,
+    window: int,
+    held_out_stride: int,
+    required: int,
+    device: str,
+) -> tuple[list[list[torch.Tensor]], list[str]]:
+    """Read, digest and window every partner corpus of a sweep.
+
+    SIX COPIES OF THIS LOOP EXISTED, two in each of the three grid sweeps --
+    composition partners and pool corpora are staged identically and always
+    were. It is lifted rather than left because of the digests: they are what
+    a checkpoint matches a resume on, and a sweep that staged a corpus
+    without digesting it would resume against partners that had been edited
+    underneath it, producing a complete table with some cells composed
+    against text nobody is looking at. One copy of the loop is one place that
+    rule holds.
+
+    Args:
+        corpora: The partner corpora, in the order the sweep consumes them.
+            Already sliced by the caller to the count its plan reaches.
+        tokenizer: The base's tokenizer, so partners are windowed in the same
+            tokenization the primary was.
+        window: Tokens per window, from the plan.
+        held_out_stride: The plan's stride; a partner's held-out share is
+            discarded, since only the primary's is scored.
+        required: Training windows the primary corpus yielded, which every
+            partner is truncated to.
+        device: Device the windows are built on.
+
+    Returns:
+        ``(trains, digests)``: one training-window sequence per corpus and
+        one digest per corpus, positionally matched and in the order given.
+
+    Raises:
+        AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` from
+            :func:`matched_other_train` if a partner is shorter than the
+            primary, and propagated from the corpus layer.
+    """
+    trains: list[list[torch.Tensor]] = []
+    digests: list[str] = []
+    for entry in corpora:
+        documents = _test_hooks.read_corpus_documents(entry)
+        digests.append(corpus_digest(documents))
+        encoded = [tokenizer.encode(document) for document in documents]
+        trains.append(
+            matched_other_train(
+                str(entry),
+                build_windows(encoded, window=window, device=device),
+                held_out_stride=held_out_stride,
+                required=required,
+            )
+        )
+    return trains, digests
 
 
 def measure_sweep(
@@ -406,6 +465,7 @@ __all__ = [
     "matched_other_train",
     "measure_sweep",
     "policy_slots",
+    "staged_partner_trains",
 ]
 
 

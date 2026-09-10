@@ -64,6 +64,10 @@ from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
     require_cartridge_plan,
 )
+from model_trainer.core.services.model.cartridge_sweep_checkpoint import (
+    bind_cells,
+    checkpointed_cells,
+)
 
 _log = get_logger(__name__)
 
@@ -141,8 +145,17 @@ def measure_solo_seeds(
     load_precision: QuantizationConfig | StoredBf16Precision | None,
     seeds: Sequence[int],
     device: str,
+    checkpoints: pathlib.Path,
 ) -> tuple[tuple[Observation, ...], str]:
     """Train one solo cartridge per seed and score each alone.
+
+    RESUMABLE PER SEED. ``free-gpu`` carries ``PreemptMode=CANCEL`` -- an
+    evicted job is killed outright and Slurm resubmits nothing -- and each
+    seed trains a whole cartridge before it scores anything, so a seed is
+    both the natural unit of work and the largest thing an eviction can
+    destroy. Each is recorded the moment it finishes and skipped when the
+    checkpoint already holds it; a completed sweep deletes its own file,
+    because a leftover one is indistinguishable from an interrupted run.
 
     Args:
         corpus: Directory of markdown documents; its held-out split is
@@ -153,6 +166,7 @@ def measure_solo_seeds(
             can always say what precision it measured.
         seeds: Seeds to train, one cartridge each.
         device: Device to measure on.
+        checkpoints: Directory holding this sweep's checkpoint.
 
     Returns:
         ``(observations, digest)``: one gain row per seed, the mean and
@@ -194,8 +208,16 @@ def measure_solo_seeds(
         Observation(name=f"solo-{short}_train_windows", value=float(len(train))),
         Observation(name=f"solo-{short}_held_out_windows", value=float(len(held_out))),
     ]
-    gains: list[float] = []
-    for seed in seeds:
+
+    def _train_and_score(seed: int) -> tuple[Observation, ...]:
+        """Train one cartridge at one seed and score it alone.
+
+        Args:
+            seed: The seed to draw and train.
+
+        Returns:
+            This seed's gain, as one observation.
+        """
         slots = train_cartridge(
             base,
             train,
@@ -204,10 +226,24 @@ def measure_solo_seeds(
             epochs=geometry["epochs"],
             learning_rate=geometry["learning_rate"],
         )
-        gain = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
-        gains.append(gain)
-        observations.append(Observation(name=f"solo-{short}-seed{seed}_gain", value=gain))
-        _log.info("solo %s seed %d: gain %.4f", short, seed, gain)
+        measured = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
+        _log.info("solo %s seed %d: gain %.4f", short, seed, measured)
+        return (Observation(name=f"solo-{short}-seed{seed}_gain", value=measured),)
+
+    produced = checkpointed_cells(
+        checkpoints,
+        measurement=f"solo-seeds-{short}",
+        inputs_digest=digest,
+        cells=bind_cells([(f"seed{seed}", seed) for seed in seeds], _train_and_score),
+    )
+    for cell_observations in produced.values():
+        observations.extend(cell_observations)
+
+    # THE REDUCTION RUNS AFTER EVERY CELL, resumed or not, so a restarted
+    # sweep computes its mean and spread over the same draws a single run
+    # would have. Persisting the reduction instead would let a resume report
+    # a spread over fewer seeds than the record claims.
+    gains = [produced[f"seed{seed}"][0]["value"] for seed in seeds]
     observations.append(Observation(name=f"solo-{short}_gain_mean", value=sum(gains) / len(gains)))
     observations.append(
         Observation(name=f"solo-{short}_gain_spread", value=max(gains) - min(gains))
@@ -216,7 +252,12 @@ def measure_solo_seeds(
 
 
 def solo_seeds_run_record(
-    corpus: pathlib.Path, *, model_id: str, precision: str, device: str
+    corpus: pathlib.Path,
+    *,
+    model_id: str,
+    precision: str,
+    device: str,
+    checkpoints: pathlib.Path,
 ) -> RunRecord:
     """Pin determinism, run the measurement, and record it.
 
@@ -226,6 +267,8 @@ def solo_seeds_run_record(
         precision: The precision selector, resolved through
             :func:`resolve_precision`.
         device: Device to measure on.
+        checkpoints: Directory holding this sweep's checkpoint, so an evicted
+            run resumes at its last completed seed rather than at zero.
 
     Returns:
         The record.
@@ -246,6 +289,7 @@ def solo_seeds_run_record(
         load_precision=load_precision,
         seeds=SOLO_SEEDS,
         device=device,
+        checkpoints=checkpoints,
     )
     return run_record(
         experiment=SOLO_SEEDS_EXPERIMENT,
@@ -278,14 +322,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
+    # RESOLVED BEFORE THE RUN, because the checkpoint directory derives from
+    # where the artifact goes. A DERIVED path rather than a flag of its own:
+    # a second flag could disagree with this one, and a resumed sweep would
+    # then look for its work in a directory nothing wrote to.
+    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
     record = solo_seeds_run_record(
         pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         model_id=cli_args.require_flag(parsed, MODEL_FLAG),
         precision=cli_args.require_flag(parsed, PRECISION_FLAG),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        checkpoints=out.parent / "checkpoints",
     )
 
-    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

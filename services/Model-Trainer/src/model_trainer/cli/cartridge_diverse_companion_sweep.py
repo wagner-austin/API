@@ -32,7 +32,6 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
-import torch
 from platform_core import cli_args
 from platform_core.comparability import RunFingerprint
 from platform_core.json_utils import dump_json_str
@@ -48,10 +47,10 @@ from platform_core.run_record import (
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.cartridge_benchmark import sweep_observations
 from model_trainer.cli.cartridge_companion_sweep import (
-    COMPANION_SEED_STRIDE,
     cell_observations,
 )
-from model_trainer.cli.cartridge_composition_sweep import matched_other_train
+from model_trainer.cli.cartridge_composition_sweep import staged_partner_trains
+from model_trainer.cli.cartridge_pool_provider import SeededPoolProvider
 from model_trainer.cli.cartridge_solo_seeds import resolve_precision
 from model_trainer.cli.known_answer_probe import probe_determinism
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
@@ -61,6 +60,7 @@ from model_trainer.core.contracts.replicated_measurement import (
     noise_floor,
     per_seed_observations,
     replicate,
+    replicated_from_observations,
 )
 from model_trainer.core.run_fingerprint import (
     capture_run_fingerprint,
@@ -70,7 +70,6 @@ from model_trainer.core.services.finetuning.strategies.cartridge import (
     require_cache_capable,
 )
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
-from model_trainer.core.services.finetuning.strategies.cartridge_slots import CartridgeSlots
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
 from model_trainer.core.services.model.cartridge_measurement import (
@@ -79,6 +78,7 @@ from model_trainer.core.services.model.cartridge_measurement import (
 )
 from model_trainer.core.services.model.cartridge_plans import (
     corpus_digest,
+    digest_parts,
     require_cartridge_plan,
 )
 from model_trainer.core.services.model.cartridge_pool_plans import (
@@ -86,10 +86,13 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
     VariedCompanionSweepPlan,
     varied_companion_sweep_label,
 )
+from model_trainer.core.services.model.cartridge_sweep_checkpoint import (
+    bind_cells,
+    checkpointed_cells,
+)
 from model_trainer.core.services.model.cartridge_varied import (
     measure_varied_companioned_scaling,
 )
-from model_trainer.core.types import CacheCapableLMProto
 
 _log = get_logger(__name__)
 
@@ -108,66 +111,6 @@ _FLAGS = (
     DEVICE_FLAG,
     OUT_FLAG,
 )
-
-
-class _DiversePoolProvider:
-    """Deterministic per-seed pools, one corpus per member.
-
-    A class for the reason the sibling providers are. Member ``j`` of seed
-    ``s``'s pool trains ON THE j-TH COMPANION CORPUS from
-    ``s + (COMPANION_SEED_STRIDE + j) * len(seeds)`` -- the exact formula
-    the varied provider uses, so with the recorded companion's corpus first
-    the pools nest the recorded configuration while every later member
-    carries a different voice.
-    """
-
-    _base: CacheCapableLMProto
-    _companion_trains: Sequence[Sequence[torch.Tensor]]
-    _plan: VariedCompanionSweepPlan
-    _pools: dict[int, tuple[CartridgeSlots, ...]]
-
-    def __init__(
-        self,
-        base: CacheCapableLMProto,
-        companion_trains: Sequence[Sequence[torch.Tensor]],
-        plan: VariedCompanionSweepPlan,
-    ) -> None:
-        """Hold what the pool builds need.
-
-        Args:
-            base: The frozen base.
-            companion_trains: One training-window sequence per pool member,
-                in pool order.
-            plan: The plan being run.
-        """
-        self._base = base
-        self._companion_trains = companion_trains
-        self._plan = plan
-        self._pools = {}
-
-    def pool(self, seed: int) -> tuple[CartridgeSlots, ...]:
-        """The frozen pool for one replicate.
-
-        Args:
-            seed: The replicate's base seed.
-
-        Returns:
-            One plain-trained companion per corpus, cached so every cell
-            that shares this seed shares one pool by identity.
-        """
-        if seed not in self._pools:
-            self._pools[seed] = tuple(
-                train_cartridge(
-                    self._base,
-                    companion_train,
-                    num_slots=self._plan["slots"],
-                    seed=seed + (COMPANION_SEED_STRIDE + member) * len(self._plan["seeds"]),
-                    epochs=self._plan["epochs"],
-                    learning_rate=self._plan["learning_rate"],
-                )
-                for member, companion_train in enumerate(self._companion_trains)
-            )
-        return self._pools[seed]
 
 
 def _require_admissible_corpora(
@@ -224,16 +167,33 @@ def _require_admissible_corpora(
 def measure_grid(
     plan: VariedCompanionSweepPlan,
     *,
+    plan_name: str,
     corpus: pathlib.Path,
     other_corpora: Sequence[pathlib.Path],
     companion_corpora: Sequence[pathlib.Path],
     device: str,
     load_precision: QuantizationConfig | StoredBf16Precision | None,
+    precision_token: str,
+    checkpoints: pathlib.Path,
 ) -> tuple[tuple[Observation, ...], str]:
     """Run every count cell, score every pool member, and name it all.
 
+    RESUMABLE PER CELL: the naive baseline, the companion-cross arms, and
+    each compartment count. Every one of those is a block of rows that is
+    complete on its own and costs ``len(seeds)`` cartridge trainings or more,
+    which is what an eviction takes.
+
+    WHAT A RESUME PAYS AGAIN, STATED PLAINLY. The setup above the cells is
+    NOT checkpointed: the corpora are re-read and the base is re-loaded. Both
+    are deterministic, so reproducing them costs time but cannot change a
+    number. Note that the companion POOL is not setup -- it is trained lazily
+    inside the cells that ask for it, and cached per seed -- so a resume
+    retrains only the pools its remaining cells actually need.
+
     Args:
         plan: The measurement to run.
+        plan_name: Which plan this is, so the checkpoint can tell one plan's
+            cells from another's.
         corpus: Directory of markdown documents whose retention is the
             finding.
         other_corpora: Composition partners, one per additional compartment,
@@ -245,6 +205,11 @@ def measure_grid(
         load_precision: What the loader is handed, resolved from the plan's
             ``precision_selector`` by the caller -- a declared value, so a
             record can always say what precision it measured.
+        precision_token: The label segment that separates two precisions'
+            records, from the same resolution. Part of what identifies the
+            checkpoint, so a run at one precision cannot resume cells
+            measured at the other.
+        checkpoints: Directory holding this sweep's checkpoint.
 
     Returns:
         ``(observations, digest)``. Beside the cells' arms, one
@@ -258,7 +223,9 @@ def measure_grid(
 
     Raises:
         ValueError: Propagated from :func:`_require_admissible_corpora`.
-        AppError: Propagated from the corpus and measurement layers.
+        AppError: Propagated from the corpus and measurement layers, and
+            from the checkpoint layer when a checkpoint on disk describes
+            different inputs.
     """
     _require_admissible_corpora(
         plan,
@@ -284,85 +251,109 @@ def measure_grid(
         len(held_out),
     )
 
-    other_trains: list[list[torch.Tensor]] = []
-    for other in other_corpora[: largest - 1]:
-        other_documents = _test_hooks.read_corpus_documents(other)
-        other_encoded = [tokenizer.encode(document) for document in other_documents]
-        other_trains.append(
-            matched_other_train(
-                str(other),
-                build_windows(other_encoded, window=plan["window"], device=device),
-                held_out_stride=plan["held_out_stride"],
-                required=len(train),
-            )
-        )
-    companion_trains: list[list[torch.Tensor]] = []
-    for companion_corpus in companion_corpora:
-        companion_documents = _test_hooks.read_corpus_documents(companion_corpus)
-        companion_encoded = [tokenizer.encode(document) for document in companion_documents]
-        companion_trains.append(
-            matched_other_train(
-                str(companion_corpus),
-                build_windows(companion_encoded, window=plan["window"], device=device),
-                held_out_stride=plan["held_out_stride"],
-                required=len(train),
-            )
-        )
+    other_trains, other_digests = staged_partner_trains(
+        other_corpora[: largest - 1],
+        tokenizer=tokenizer,
+        window=plan["window"],
+        held_out_stride=plan["held_out_stride"],
+        required=len(train),
+        device=device,
+    )
+    companion_trains, companion_digests = staged_partner_trains(
+        companion_corpora,
+        tokenizer=tokenizer,
+        window=plan["window"],
+        held_out_stride=plan["held_out_stride"],
+        required=len(train),
+        device=device,
+    )
 
     base = require_cache_capable(hf_hooks.Hooks.load_hf_model(plan["model_id"], load_precision))
     base.to(device)
-    provider = _DiversePoolProvider(base, companion_trains, plan)
+    provider = SeededPoolProvider(
+        base,
+        companion_trains,
+        slots=plan["slots"],
+        seeds=plan["seeds"],
+        epochs=plan["epochs"],
+        learning_rate=plan["learning_rate"],
+    )
 
     observations: list[Observation] = [
         Observation(name="slots_per_cartridge", value=float(plan["slots"])),
         Observation(name="max_companions", value=float(plan["max_companions"])),
     ]
 
-    # The in-record naive baseline, and the record's readability gate: one
-    # cartridge per seed trained by the exact solo formula -- plain seed,
-    # the plan's own knobs -- behind the same base load. Where a certified
-    # solo record exists for this base at these knobs, these per-seed gains
-    # must reproduce it bit-for-bit, and every companioned arm's per-seed
-    # subtraction pairs against them inside one record.
-    naive_gains: list[tuple[int, float]] = []
-    for seed in plan["seeds"]:
-        naive_slots = train_cartridge(
-            base,
-            train,
-            num_slots=plan["slots"],
-            seed=seed,
-            epochs=plan["epochs"],
-            learning_rate=plan["learning_rate"],
-        )
-        naive_gains.append(
-            (seed, held_out_gain(CartridgeModel(base=base, slots=naive_slots), held_out))
-        )
-    naive = replicate("naive-solo", naive_gains)
-    _log.info("naive-solo: %+.4f mean over %d seeds", naive["mean"], len(naive_gains))
-    observations.extend(gain_observations(naive))
-    observations.extend(per_seed_observations(naive))
+    def _naive_solo() -> tuple[Observation, ...]:
+        """Train one plain cartridge per seed and score it alone.
 
-    companion_gains: list[list[tuple[int, float]]] = [[] for _ in companion_trains]
-    for seed in plan["seeds"]:
-        for member, slots in enumerate(provider.pool(seed)):
-            companion_gains[member].append(
-                (seed, held_out_gain(CartridgeModel(base=base, slots=slots), held_out))
+        The in-record naive baseline, and the record's readability gate: one
+        cartridge per seed trained by the exact solo formula -- plain seed,
+        the plan's own knobs -- behind the same base load. Where a certified
+        solo record exists for this base at these knobs, these per-seed gains
+        must reproduce it bit-for-bit, and every companioned arm's per-seed
+        subtraction pairs against them inside one record.
+
+        Returns:
+            The ``naive-solo`` arm's mean, spread and per-seed gains.
+        """
+        naive_gains: list[tuple[int, float]] = []
+        for seed in plan["seeds"]:
+            naive_slots = train_cartridge(
+                base,
+                train,
+                num_slots=plan["slots"],
+                seed=seed,
+                epochs=plan["epochs"],
+                learning_rate=plan["learning_rate"],
             )
-    for member, gains in enumerate(companion_gains):
-        arm = replicate(f"companion-cross-{member}", gains)
-        _log.info("companion-cross-%d: %+.4f on the primary held-out", member, arm["mean"])
-        observations.extend(gain_observations(arm))
-        observations.extend(per_seed_observations(arm))
+            naive_gains.append(
+                (seed, held_out_gain(CartridgeModel(base=base, slots=naive_slots), held_out))
+            )
+        naive = replicate("naive-solo", naive_gains)
+        _log.info("naive-solo: %+.4f mean over %d seeds", naive["mean"], len(naive_gains))
+        return (*gain_observations(naive), *per_seed_observations(naive))
 
-    composed_arms: list[ReplicatedGain] = []
-    for count in plan["compartment_counts"]:
-        arm_name = f"diverse-K{plan['max_companions']}-p{plan['probability']}-n{count}"
+    def _companion_cross() -> tuple[Observation, ...]:
+        """Score every pool member alone on the primary held-out text.
+
+        ONE CELL FOR ALL THE MEMBERS, because ``provider.pool(seed)`` trains
+        a seed's whole pool in a single call: splitting per member would
+        retrain the pool once per member and discard all but one each time.
+
+        Returns:
+            Each member's arm, with its mean, spread and per-seed gains.
+        """
+        companion_gains: list[list[tuple[int, float]]] = [[] for _ in companion_trains]
+        for seed in plan["seeds"]:
+            for member, slots in enumerate(provider.pool(seed)):
+                companion_gains[member].append(
+                    (seed, held_out_gain(CartridgeModel(base=base, slots=slots), held_out))
+                )
+        scored: list[Observation] = []
+        for member, gains in enumerate(companion_gains):
+            arm = replicate(f"companion-cross-{member}", gains)
+            _log.info("companion-cross-%d: %+.4f on the primary held-out", member, arm["mean"])
+            scored.extend(gain_observations(arm))
+            scored.extend(per_seed_observations(arm))
+        return tuple(scored)
+
+    def _count_cell(count: int) -> tuple[Observation, ...]:
+        """Measure the diverse-companion arm at one compartment count.
+
+        Args:
+            count: How many cartridges are composed.
+
+        Returns:
+            Every arm's mean, spread and per-seed gains, the retention ratio
+            where it is readable, and the interference verdict.
+        """
         alone, composed, untrained_composed, cross = measure_varied_companioned_scaling(
             base,
             first_train=train,
             other_trains=other_trains[: count - 1],
             held_out=held_out,
-            arm=arm_name,
+            arm=_arm_name(count),
             num_slots=plan["slots"],
             seeds=plan["seeds"],
             epochs=plan["epochs"],
@@ -372,13 +363,72 @@ def measure_grid(
         )
         _log.info(
             "%s: %+.4f alone -> %+.4f composed, %+.4f untrained-composed",
-            arm_name,
+            _arm_name(count),
             alone["mean"],
             composed["mean"],
             untrained_composed["mean"],
         )
-        composed_arms.append(composed)
-        observations.extend(cell_observations(arm_name, alone, composed, untrained_composed, cross))
+        return cell_observations(_arm_name(count), alone, composed, untrained_composed, cross)
+
+    def _arm_name(count: int) -> str:
+        """Name the cell at one compartment count.
+
+        ONE SPELLING FOR THE ARM, used by the measurement, the log line and
+        the rebuild below. Three copies of an f-string is three chances for
+        the rebuild to look for an arm the measurement never wrote.
+
+        Args:
+            count: How many cartridges are composed.
+
+        Returns:
+            The arm name.
+        """
+        return f"diverse-K{plan['max_companions']}-p{plan['probability']}-n{count}"
+
+    produced = checkpointed_cells(
+        checkpoints,
+        measurement=f"diverse-companion-{plan_name}",
+        # THE LABEL IS THE IDENTITY: it already carries every measurement
+        # field, the precision token and the primary digest, and it is what
+        # two runs are paired by. The partner and companion digests are
+        # appended because the label does not reach them.
+        inputs_digest=digest_parts(
+            [
+                varied_companion_sweep_label(
+                    plan_name, plan, digest=digest, precision_token=precision_token
+                ),
+                *other_digests,
+                *companion_digests,
+            ]
+        ),
+        cells=[
+            ("naive-solo", _naive_solo),
+            ("companion-cross", _companion_cross),
+            *bind_cells(
+                [(f"n{count}", count) for count in plan["compartment_counts"]], _count_cell
+            ),
+        ],
+    )
+
+    # WALKED IN THE DECLARED ORDER rather than over what came back, so a
+    # resumed sweep emits the rows a straight run would have, in the same
+    # places.
+    observations.extend(produced["naive-solo"])
+    observations.extend(produced["companion-cross"])
+    composed_arms: list[ReplicatedGain] = []
+    for count in plan["compartment_counts"]:
+        rows = produced[f"n{count}"]
+        observations.extend(rows)
+        # REBUILT FROM THE ROWS RATHER THAN KEPT FROM THE CALL, because a
+        # resumed cell never made the call. The rebuild is exact -- every
+        # field of an arm is a function of its per-seed gains, and those are
+        # in the rows -- so the floor below is computed over the same arms
+        # either way.
+        composed_arms.append(
+            replicated_from_observations(
+                rows, arm=f"{_arm_name(count)}-composed", seeds=plan["seeds"]
+            )
+        )
     floor = noise_floor(composed_arms)
     observations.append(Observation(name="diverse_composed_noise_floor", value=floor))
     observations.extend(sweep_observations(composed_arms, floor))
@@ -392,6 +442,7 @@ def diverse_companion_sweep_run_record(
     other_corpora: Sequence[pathlib.Path],
     companion_corpora: Sequence[pathlib.Path],
     device: str,
+    checkpoints: pathlib.Path,
 ) -> RunRecord:
     """Pin determinism, run the grid, and record it.
 
@@ -401,6 +452,8 @@ def diverse_companion_sweep_run_record(
         other_corpora: Composition partners.
         companion_corpora: One held-out corpus per pool member.
         device: Device to measure on.
+        checkpoints: Directory holding this sweep's checkpoint, so an evicted
+            run resumes at its last completed cell rather than at zero.
 
     Returns:
         The record.
@@ -421,11 +474,14 @@ def diverse_companion_sweep_run_record(
     )
     observations, digest = measure_grid(
         plan,
+        plan_name=plan_name,
         corpus=corpus,
         other_corpora=other_corpora,
         companion_corpora=companion_corpora,
         device=device,
         load_precision=load_precision,
+        precision_token=precision_token,
+        checkpoints=checkpoints,
     )
     return run_record(
         experiment=DIVERSE_COMPANION_SWEEP_EXPERIMENT,
@@ -468,15 +524,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         for entry in cli_args.require_flag(parsed, COMPANION_CORPORA_FLAG).split(",")
         if entry
     ]
+    # RESOLVED BEFORE THE RUN, because the checkpoint directory derives from
+    # where the artifact goes. A DERIVED path rather than a flag of its own:
+    # a second flag could disagree with this one, and a resumed sweep would
+    # then look for its work in a directory nothing wrote to.
+    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
     record = diverse_companion_sweep_run_record(
         cli_args.require_flag(parsed, PLAN_FLAG),
         corpus=pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         other_corpora=others,
         companion_corpora=companions,
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        checkpoints=out.parent / "checkpoints",
     )
 
-    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

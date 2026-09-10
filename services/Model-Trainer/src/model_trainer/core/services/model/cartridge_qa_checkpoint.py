@@ -35,11 +35,9 @@ code more testable.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
-from platform_core.json_utils import dump_json_str, load_json_str
+from platform_core.json_utils import dump_json_str
 
 from model_trainer.core.contracts.qa_checkpoint import (
     QA_CHECKPOINT_SCHEMA_VERSION,
@@ -48,13 +46,11 @@ from model_trainer.core.contracts.qa_checkpoint import (
     encode_qa_checkpoint,
     qa_checkpoint_mismatches,
 )
-
-#: Suffix of the temporary file a save writes before publishing it. A sibling
-#: rather than a system temporary directory, because ``os.replace`` is only
-#: atomic within one filesystem and ``/tmp`` is routinely a different one on
-#: the cluster -- a cross-device rename falls back to a copy, which is
-#: precisely the non-atomic write this module exists to avoid.
-_PENDING_SUFFIX = ".pending"
+from model_trainer.core.services.model.checkpoint_file import (
+    publish_atomically,
+    read_checkpoint_object,
+    resume_or_refuse,
+)
 
 
 def checkpoint_path(directory: Path, plan_name: str) -> Path:
@@ -93,12 +89,10 @@ def save_qa_checkpoint(directory: Path, checkpoint: QaCheckpoint) -> Path:
     Returns:
         Path of the published file.
     """
-    target = checkpoint_path(directory, checkpoint["plan_name"])
-    directory.mkdir(parents=True, exist_ok=True)
-    pending = target.with_name(target.name + _PENDING_SUFFIX)
-    pending.write_text(dump_json_str(encode_qa_checkpoint(checkpoint)), encoding="utf-8")
-    os.replace(pending, target)
-    return target
+    return publish_atomically(
+        checkpoint_path(directory, checkpoint["plan_name"]),
+        dump_json_str(encode_qa_checkpoint(checkpoint)),
+    )
 
 
 def load_qa_checkpoint(directory: Path, plan_name: str) -> QaCheckpoint:
@@ -114,16 +108,13 @@ def load_qa_checkpoint(directory: Path, plan_name: str) -> QaCheckpoint:
     Raises:
         JSONTypeError: If the file does not decode, including when its schema
             version is not the one this code understands.
+        TypeError: If the file does not hold a JSON object.
         OSError: If the file is absent. Callers ask
             :func:`checkpoint_exists` first; a missing checkpoint is the
             ordinary case on a first run and is not an error this module
             invents a value for.
     """
-    path = checkpoint_path(directory, plan_name)
-    decoded = load_json_str(path.read_text(encoding="utf-8"))
-    if not isinstance(decoded, dict):
-        raise TypeError(f"{path} does not hold a JSON object")
-    return decode_qa_checkpoint(decoded)
+    return decode_qa_checkpoint(read_checkpoint_object(checkpoint_path(directory, plan_name)))
 
 
 def delete_qa_checkpoint(directory: Path, plan_name: str) -> None:
@@ -153,20 +144,11 @@ def resume_or_start(
 ) -> QaCheckpoint:
     """Decide what a starting run may reuse, refusing a foreign checkpoint.
 
-    THE THREE STATES, AND ONLY ONE OF THEM IS INTERESTING. No file is the
-    ordinary first run and yields an empty checkpoint to accumulate into. A
-    file describing THIS measurement yields its completed arms. A file
-    describing a different one is refused, loudly, and this is the case the
-    function exists for -- resuming across it would produce a complete arms
-    table in which some arms were scored on another question set, and nothing
-    downstream could tell.
-
-    WHY REFUSE RATHER THAN QUIETLY START FRESH, which is the tempting third
-    option. Discarding a checkpoint an operator believed in spends exactly the
-    hours the checkpoint existed to save, and does it silently. The
-    disagreeing field is nearly always something they can fix -- a corpus path
-    pointing at last week's directory -- so naming it turns a lost night into
-    a corrected command.
+    THE POLICY ITSELF LIVES IN
+    :func:`~model_trainer.core.services.model.checkpoint_file.resume_or_refuse`,
+    which the sweep checkpoints drive too. What is decided HERE is the only
+    thing that differs between them: which fields identify this measurement,
+    and what a wrongly resumed run would end up reporting.
 
     Args:
         directory: Where checkpoints live for this run.
@@ -184,37 +166,47 @@ def resume_or_start(
         AppError: With ``CARTRIDGE_CHECKPOINT_FOREIGN`` when a checkpoint is
             present and describes a different measurement.
     """
-    fresh = QaCheckpoint(
-        schema_version=QA_CHECKPOINT_SCHEMA_VERSION,
-        plan_name=plan_name,
-        corpus_digest=corpus_digest,
-        item_count=item_count,
-        model_id=model_id,
-        arms=[],
-        seeds=[],
-    )
-    if not checkpoint_exists(directory, plan_name):
-        return fresh
-    found = load_qa_checkpoint(directory, plan_name)
-    mismatches = qa_checkpoint_mismatches(
-        found,
-        plan_name=plan_name,
-        corpus_digest=corpus_digest,
-        item_count=item_count,
-        model_id=model_id,
-    )
-    if mismatches:
-        raise AppError(
-            ModelTrainerErrorCode.CARTRIDGE_CHECKPOINT_FOREIGN,
-            (
-                f"the checkpoint at {checkpoint_path(directory, plan_name)} describes a "
-                f"different measurement and resuming from it would report arms scored on "
-                f"another question set: {'; '.join(mismatches)}. Fix whichever of those is "
-                f"the mistake, or delete the checkpoint to re-measure from the first arm."
-            ),
-            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_CHECKPOINT_FOREIGN),
+
+    def _load() -> QaCheckpoint:
+        """Read the checkpoint this run would resume.
+
+        Returns:
+            The decoded checkpoint.
+        """
+        return load_qa_checkpoint(directory, plan_name)
+
+    def _mismatches(found: QaCheckpoint) -> list[str]:
+        """Name every way the found checkpoint measures something else.
+
+        Args:
+            found: The checkpoint on disk.
+
+        Returns:
+            One line per disagreeing field.
+        """
+        return qa_checkpoint_mismatches(
+            found,
+            plan_name=plan_name,
+            corpus_digest=corpus_digest,
+            item_count=item_count,
+            model_id=model_id,
         )
-    return found
+
+    return resume_or_refuse(
+        checkpoint_path(directory, plan_name),
+        fresh=QaCheckpoint(
+            schema_version=QA_CHECKPOINT_SCHEMA_VERSION,
+            plan_name=plan_name,
+            corpus_digest=corpus_digest,
+            item_count=item_count,
+            model_id=model_id,
+            arms=[],
+            seeds=[],
+        ),
+        load=_load,
+        mismatches=_mismatches,
+        adopting="arms scored on another question set",
+    )
 
 
 __all__ = [

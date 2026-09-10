@@ -69,7 +69,12 @@ from model_trainer.core.services.model.cartridge_measurement import (
 from model_trainer.core.services.model.cartridge_plans import (
     base_short,
     corpus_digest,
+    digest_parts,
     require_cartridge_plan,
+)
+from model_trainer.core.services.model.cartridge_sweep_checkpoint import (
+    bind_cells,
+    checkpointed_cells,
 )
 
 _log = get_logger(__name__)
@@ -226,6 +231,7 @@ def measure_solo_grid(
     seeds: Sequence[int],
     cells: Sequence[SoloGridCell],
     device: str,
+    checkpoints: pathlib.Path,
 ) -> tuple[tuple[Observation, ...], str]:
     """Train one solo cartridge per (cell, seed) and score each alone.
 
@@ -234,6 +240,14 @@ def measure_solo_grid(
     same held-out windows, so cells differ in exactly their declared
     knobs. Window and stride come from the recorded plan row through the
     same hook every sweep reads.
+
+    RESUMABLE PER (CELL, SEED), which is finer than the grid cell it rolls
+    up into. One cartridge training is the largest thing an eviction can
+    destroy, and the per-seed gains are already recorded rows in their own
+    right, so nothing is lost by checkpointing at that grain. The mean and
+    spread are recomputed from all of a cell's seeds on every run --
+    persisting them instead would let a resume report a spread over fewer
+    draws than the record claims.
 
     Args:
         corpus: Directory of markdown documents; its held-out split is
@@ -245,6 +259,7 @@ def measure_solo_grid(
         cells: The declared cells, run in order; at least one, tokens
             unique.
         device: Device to measure on.
+        checkpoints: Directory holding this sweep's checkpoint.
 
     Returns:
         ``(observations, digest)``: per cell, one gain row per seed plus
@@ -295,24 +310,57 @@ def measure_solo_grid(
         Observation(name=f"grid-{short}_train_windows", value=float(len(train))),
         Observation(name=f"grid-{short}_held_out_windows", value=float(len(held_out))),
     ]
+
+    def _train_and_score(unit: tuple[SoloGridCell, int]) -> tuple[Observation, ...]:
+        """Train one cartridge under one cell's knobs at one seed.
+
+        Args:
+            unit: The grid cell whose knobs to train under, and the seed.
+
+        Returns:
+            That draw's gain, as one observation.
+        """
+        cell, seed = unit
+        token = cell["token"]
+        slots = train_cartridge(
+            base,
+            train,
+            num_slots=cell["num_slots"],
+            seed=seed,
+            epochs=cell["epochs"],
+            learning_rate=cell["learning_rate"],
+        )
+        gain = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
+        _log.info("grid %s %s seed %d: gain %.4f", short, token, seed, gain)
+        return (Observation(name=f"grid-{short}-{token}-seed{seed}_gain", value=gain),)
+
+    # THE CELL SET IS IN THE MEASUREMENT NAME, not in the inputs digest. Two
+    # cell-set selectors over one corpus are two measurements, not a conflict
+    # between them: naming them apart lets both keep a checkpoint in the same
+    # directory, where folding the set into the digest would make the second
+    # run meet the first one's file and be refused as foreign.
+    produced = checkpointed_cells(
+        checkpoints,
+        measurement=(f"solo-grid-{short}-{digest_parts([cell['token'] for cell in cells])[:12]}"),
+        inputs_digest=digest_parts(
+            [digest, str(geometry["window"]), str(geometry["held_out_stride"])]
+        ),
+        cells=bind_cells(
+            [(f"{cell['token']}-seed{seed}", (cell, seed)) for cell in cells for seed in seeds],
+            _train_and_score,
+        ),
+    )
+
+    # WALKED IN THE DECLARED ORDER RATHER THAN OVER WHAT CAME BACK, so each
+    # cell's mean and spread stay beside the seeds they reduce and the record
+    # keeps the row order it has always had.
     for cell in cells:
         token = cell["token"]
         gains: list[float] = []
         for seed in seeds:
-            slots = train_cartridge(
-                base,
-                train,
-                num_slots=cell["num_slots"],
-                seed=seed,
-                epochs=cell["epochs"],
-                learning_rate=cell["learning_rate"],
-            )
-            gain = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
-            gains.append(gain)
-            observations.append(
-                Observation(name=f"grid-{short}-{token}-seed{seed}_gain", value=gain)
-            )
-            _log.info("grid %s %s seed %d: gain %.4f", short, token, seed, gain)
+            cell_observations = produced[f"{token}-seed{seed}"]
+            observations.extend(cell_observations)
+            gains.append(cell_observations[0]["value"])
         observations.append(
             Observation(name=f"grid-{short}-{token}_gain_mean", value=sum(gains) / len(gains))
         )
@@ -326,7 +374,13 @@ def measure_solo_grid(
 
 
 def solo_grid_run_record(
-    corpus: pathlib.Path, *, model_id: str, precision: str, cells: str, device: str
+    corpus: pathlib.Path,
+    *,
+    model_id: str,
+    precision: str,
+    cells: str,
+    device: str,
+    checkpoints: pathlib.Path,
 ) -> RunRecord:
     """Pin determinism, run the selected cell set, and record it.
 
@@ -338,6 +392,9 @@ def solo_grid_run_record(
         cells: The cell-set selector, resolved through
             :func:`cell_set_for`.
         device: Device to measure on.
+        checkpoints: Directory holding this sweep's checkpoint, so an evicted
+            run resumes at its last completed (cell, seed) rather than at
+            zero.
 
     Returns:
         The record.
@@ -360,6 +417,7 @@ def solo_grid_run_record(
         seeds=SOLO_SEEDS,
         cells=cell_set["cells"],
         device=device,
+        checkpoints=checkpoints,
     )
     return run_record(
         experiment=SOLO_GRID_EXPERIMENT,
@@ -393,15 +451,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
 
+    # RESOLVED BEFORE THE RUN, because the checkpoint directory derives from
+    # where the artifact goes. A DERIVED path rather than a flag of its own:
+    # a second flag could disagree with this one, and a resumed sweep would
+    # then look for its work in a directory nothing wrote to.
+    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
     record = solo_grid_run_record(
         pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         model_id=cli_args.require_flag(parsed, MODEL_FLAG),
         precision=cli_args.require_flag(parsed, PRECISION_FLAG),
         cells=cli_args.require_flag(parsed, CELLS_FLAG),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        checkpoints=out.parent / "checkpoints",
     )
 
-    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

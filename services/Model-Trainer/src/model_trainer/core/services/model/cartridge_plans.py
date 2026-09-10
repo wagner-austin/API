@@ -383,6 +383,30 @@ def base_short(model_id: str) -> str:
     return model_id.rsplit("/", 1)[-1]
 
 
+def digest_parts(parts: Sequence[str]) -> str:
+    """Digest a sequence of strings so that no two sequences collide.
+
+    EVERY PART IS LENGTH-PREFIXED, which is the whole content of this
+    function. Concatenating and hashing would give ``["ab", "c"]`` and
+    ``["a", "bc"]`` the same digest, so a measurement over two corpora could
+    match a checkpoint written over two different ones split elsewhere.
+
+    Args:
+        parts: The strings identifying something, in a fixed order. Order is
+            significant: the same parts in another order digest differently,
+            because for every caller here they describe a different thing.
+
+    Returns:
+        Hex digest of the sequence.
+    """
+    accumulator = hashlib.sha256()
+    for part in parts:
+        accumulator.update(str(len(part)).encode("utf-8"))
+        accumulator.update(b"\x00")
+        accumulator.update(part.encode("utf-8"))
+    return accumulator.hexdigest()
+
+
 def corpus_digest(documents: Sequence[str]) -> str:
     """Digest the exact text a measurement will train on.
 
@@ -397,12 +421,7 @@ def corpus_digest(documents: Sequence[str]) -> str:
     Returns:
         Hex digest of the corpus.
     """
-    accumulator = hashlib.sha256()
-    for document in documents:
-        accumulator.update(str(len(document)).encode("utf-8"))
-        accumulator.update(b"\x00")
-        accumulator.update(document.encode("utf-8"))
-    return accumulator.hexdigest()
+    return digest_parts(documents)
 
 
 def plan_label(name: str, plan: CartridgePlan, *, digest: str) -> str:
@@ -453,6 +472,7 @@ __all__ = [
     "companion_sweep_label",
     "composition_sweep_label",
     "corpus_digest",
+    "digest_parts",
     "plan_label",
     "require_cartridge_plan",
 ]

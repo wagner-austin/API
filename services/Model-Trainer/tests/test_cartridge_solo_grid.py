@@ -149,6 +149,7 @@ class TestMeasureSoloGrid:
             seeds=(7, 8),
             cells=TINY_CELLS,
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         names = [o["name"] for o in observations]
@@ -175,6 +176,7 @@ class TestMeasureSoloGrid:
             seeds=(7, 8),
             cells=TINY_CELLS[:1],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
         recorded = {o["name"]: o["value"] for o in observations}
         gains = [recorded["grid-gpt2-a-seed7_gain"], recorded["grid-gpt2-a-seed8_gain"]]
@@ -196,6 +198,7 @@ class TestMeasureSoloGrid:
             seeds=(7,),
             cells=TINY_CELLS[1:],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
         recorded = {o["name"]: o["value"] for o in observations}
 
@@ -220,6 +223,7 @@ class TestMeasureSoloGrid:
                 seeds=(),
                 cells=TINY_CELLS,
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
         with pytest.raises(ValueError, match="no cells named"):
             grid.measure_solo_grid(
@@ -229,6 +233,7 @@ class TestMeasureSoloGrid:
                 seeds=(7,),
                 cells=(),
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
         collided: grid.SoloGridCell = {
             "token": "a",
@@ -245,6 +250,7 @@ class TestMeasureSoloGrid:
                 seeds=(7,),
                 cells=colliding,
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
 

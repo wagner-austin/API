@@ -138,10 +138,12 @@ class TestMeasureGrid:
 
         observations, _digest = sweep.measure_grid(
             TINY_CONTENT_PLAN,
+            plan_name="tiny",
             corpus=primary,
             other_corpora=[beta, gamma],
             pool_corpora=[delta, echo],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         names = [observation["name"] for observation in observations]
@@ -159,10 +161,12 @@ class TestMeasureGrid:
 
         observations, _digest = sweep.measure_grid(
             TINY_CONTENT_PLAN,
+            plan_name="tiny",
             corpus=primary,
             other_corpora=[beta, gamma],
             pool_corpora=[delta, echo],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         named = {observation["name"] for observation in observations}
@@ -196,9 +200,11 @@ class TestMeasureGrid:
             sweep.measure_grid(
                 TINY_CONTENT_PLAN,
                 corpus=primary,
+                plan_name="tiny",
                 other_corpora=[beta, gamma],
                 pool_corpora=[delta, gamma],
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
     def test_a_pool_count_mismatching_the_plan_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -208,9 +214,11 @@ class TestMeasureGrid:
             sweep.measure_grid(
                 TINY_CONTENT_PLAN,
                 corpus=primary,
+                plan_name="tiny",
                 other_corpora=[beta, gamma],
                 pool_corpora=[delta],
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
 
@@ -228,6 +236,7 @@ class TestRunRecord:
             other_corpora=[beta, gamma],
             pool_corpora=[delta, echo],
             device="cpu",
+            checkpoints=tmp_path / "checkpoints",
         )
 
         assert record["experiment"] == CONTENT_LORA_SWEEP_EXPERIMENT
@@ -243,6 +252,7 @@ class TestRunRecord:
                 other_corpora=[],
                 pool_corpora=[],
                 device="cpu",
+                checkpoints=tmp_path / "checkpoints",
             )
 
 
