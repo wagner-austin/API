@@ -45,6 +45,7 @@ from platform_core.run_record import (
 
 from model_trainer.cli import _measurement_hooks, _test_hooks
 from model_trainer.cli.known_answer_probe import probe_determinism
+from model_trainer.core.contracts.qa_checkpoint import SeedRecord, with_seed
 from model_trainer.core.contracts.qa_plan import QA_EXPERIMENT, QaPlan
 from model_trainer.core.contracts.replicated_measurement import (
     gain_observations,
@@ -69,6 +70,11 @@ from model_trainer.core.services.model.cartridge_plans import (
     require_cartridge_plan,
 )
 from model_trainer.core.services.model.cartridge_qa import answer_nll_pairs, compare_arms
+from model_trainer.core.services.model.cartridge_qa_checkpoint import (
+    delete_qa_checkpoint,
+    resume_or_start,
+    save_qa_checkpoint,
+)
 from model_trainer.core.services.model.cartridge_qa_power import require_resolvable_question_set
 from model_trainer.core.services.model.cartridge_qa_report import (
     ArmScores,
@@ -93,7 +99,14 @@ OUT_FLAG = "--out"
 _FLAGS = (PLAN_FLAG, CORPUS_FLAG, DEVICE_FLAG, OUT_FLAG, CONTROLS_FLAG)
 
 
-def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMeasurement:
+def measure_qa_plan(
+    plan_name: str,
+    plan: QaPlan,
+    *,
+    corpus: pathlib.Path,
+    device: str,
+    checkpoints: pathlib.Path,
+) -> QaMeasurement:
     """Run every arm of one question-set plan and name what they produced.
 
     THE BASE AND RETRIEVAL ARMS ARE SCORED ONCE, not once per seed. Neither
@@ -101,10 +114,23 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     running them three times would spend three times the compute to produce
     the same number and would report a spread of zero as if it were measured.
 
+    RESUMABLE AT THE ARM AND THE SEED. ``free-gpu`` cancels an evicted job
+    outright and Slurm resubmits nothing, so a run this long that kept no
+    checkpoint would lose everything it had done. Each retrieval arm and each
+    cartridge seed is recorded the moment it finishes; a restart skips what is
+    already there and re-derives only the shared structure the later arms need.
+    The checkpoint is deleted on success, because a leftover file is
+    indistinguishable from an interrupted run and the NEXT submission of this
+    plan would skip arms it should have re-measured.
+
     Args:
+        plan_name: Which plan this is, as named in ``QA_PLANS``. Part of the
+            checkpoint's identity, so a resume cannot adopt another plan's
+            arms, and it is not derivable from the plan itself.
         plan: The measurement to run.
         corpus: Directory of markdown documents.
         device: Device to measure on.
+        checkpoints: Directory holding this plan's checkpoint.
 
     Returns:
         The numbers and both identities of the run that produced them.
@@ -112,8 +138,9 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     Raises:
         AppError: With ``CARTRIDGE_CORPUS_UNUSABLE`` when the corpus yields no
             question set, ``CLOZE_ITEM_UNSCOREABLE`` when an item cannot carry
-            evidence, or ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` when the plan
-            names too few seeds.
+            evidence, ``CARTRIDGE_MEASUREMENT_UNREPLICATED`` when the plan
+            names too few seeds, or ``CARTRIDGE_CHECKPOINT_FOREIGN`` when a
+            checkpoint on disk describes a different measurement.
     """
     documents = _test_hooks.read_corpus_documents(corpus)
     digest = corpus_digest(documents)
@@ -136,6 +163,19 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         "question set resolves nothing smaller than %.4f; plan declares %.4f",
         floor,
         plan["smallest_effect_of_interest"],
+    )
+
+    # AFTER THE POWER GATE, BEFORE ANY SCORING. A checkpoint is only valid for
+    # the measurement that wrote it, and two of the four things that identify
+    # one -- the realised item count and the corpus digest -- are not known
+    # until the question set is built. Resuming earlier would mean checking a
+    # fingerprint against values nobody had yet.
+    checkpoint = resume_or_start(
+        checkpoints,
+        plan_name=plan_name,
+        corpus_digest=digest,
+        item_count=len(items),
+        model_id=plan["model_id"],
     )
 
     windows = build_windows(encoded, window=plan["window"], device=device)
@@ -172,7 +212,7 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     # are measurement questions and belong beside the arms rather than beside
     # this module's argument parsing. What stays here is the wiring: corpus,
     # power gate, base model, cartridge seeds, and the record.
-    arms = score_retrieval_arms(
+    checkpoint, arms = score_retrieval_arms(
         items,
         plan=plan,
         training_text=training_text,
@@ -182,6 +222,8 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
         wait=wait,
         clock=clock,
         make_embedder=_test_hooks.make_embedder,
+        checkpoint=checkpoint,
+        checkpoints=checkpoints,
     )
     scored_retrieval = arms["oracle"]
     scored_real = arms["bm25"]
@@ -197,36 +239,54 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
     accuracy_gains: list[tuple[int, float]] = []
     nll_gains: list[tuple[int, float]] = []
     cartridge_seconds_total = 0.0
+    completed = {record["seed"]: record for record in checkpoint["seeds"]}
     for seed in plan["seeds"]:
-        slots = train_cartridge(
-            base,
-            train,
-            num_slots=plan["num_slots"],
-            seed=seed,
-            epochs=plan["epochs"],
-            learning_rate=plan["learning_rate"],
+        # THE MOST EXPENSIVE UNIT IN THE RUN, which is why it is checkpointed
+        # at all: every seed TRAINS a cartridge over the whole corpus before
+        # it scores anything, so a seed lost to an eviction costs more than
+        # any retrieval arm. Training is skipped entirely on resume -- unlike
+        # the arms, nothing later needs a cartridge that has already reported.
+        found = completed.get(seed)
+        if found is None:
+            slots = train_cartridge(
+                base,
+                train,
+                num_slots=plan["num_slots"],
+                seed=seed,
+                epochs=plan["epochs"],
+                learning_rate=plan["learning_rate"],
+            )
+            cartridge = CartridgeModel(base=base, slots=slots)
+            # Scoring only. Training the prefix is a ONE-TIME cost that the
+            # capacity benchmark already records; charging it to serving would
+            # compare a cartridge's whole life against retrieval's per-query.
+            wait()
+            started = clock()
+            scored = score_cloze_items(
+                items=items, model=cartridge, encoder=encoder, device=device, max_seq_len=max_seq
+            )
+            wait()
+            seed_seconds = clock() - started
+            nll = answer_nll_pairs(
+                items, base, cartridge, encoder, device=device, max_seq_len=max_seq
+            )
+            found = SeedRecord(seed=seed, result=scored, answer_nll=nll, score_seconds=seed_seconds)
+            checkpoint = with_seed(checkpoint, found)
+            save_qa_checkpoint(checkpoints, checkpoint)
+        else:
+            _log.info("resuming seed %d from checkpoint, no cartridge retrained", seed)
+        cartridge_seconds_total += found["score_seconds"]
+        accuracy_gains.append((seed, found["result"]["accuracy"] - scored_base["accuracy"]))
+        nll_gains.append(
+            (seed, found["answer_nll"]["mean_baseline"] - found["answer_nll"]["mean_treatment"])
         )
-        cartridge = CartridgeModel(base=base, slots=slots)
-        # Scoring only. Training the prefix is a ONE-TIME cost that the
-        # capacity benchmark already records; charging it to serving would
-        # compare a cartridge's whole life against retrieval's per-query.
-        wait()
-        started = clock()
-        scored = score_cloze_items(
-            items=items, model=cartridge, encoder=encoder, device=device, max_seq_len=max_seq
-        )
-        wait()
-        cartridge_seconds_total += clock() - started
-        nll = answer_nll_pairs(items, base, cartridge, encoder, device=device, max_seq_len=max_seq)
-        accuracy_gains.append((seed, scored["accuracy"] - scored_base["accuracy"]))
-        nll_gains.append((seed, nll["mean_baseline"] - nll["mean_treatment"]))
         _log.info(
             "seed %d: accuracy %.4f, answer-nll %.4f -> %.4f (p=%.6f)",
             seed,
-            scored["accuracy"],
-            nll["mean_baseline"],
-            nll["mean_treatment"],
-            nll["p_value"],
+            found["result"]["accuracy"],
+            found["answer_nll"]["mean_baseline"],
+            found["answer_nll"]["mean_treatment"],
+            found["answer_nll"]["p_value"],
         )
 
     retrieval_pair = compare_arms(scored_base, scored_retrieval)
@@ -280,6 +340,14 @@ def measure_qa_plan(plan: QaPlan, *, corpus: pathlib.Path, device: str) -> QaMea
             fused_select_seconds=arms["fused_select_seconds"],
         )
     )
+    # A COMPLETED RUN DELETES ITS OWN CHECKPOINT. A leftover file is
+    # indistinguishable from an interrupted run, so the next submission of
+    # this plan would skip arms it should have re-measured and report numbers
+    # from a previous execution as if this one had produced them. Deleted
+    # here rather than by the caller, because the caller cannot tell whether
+    # the measurement finished.
+    delete_qa_checkpoint(checkpoints, plan_name)
+
     return QaMeasurement(
         observations=tuple(observations),
         corpus_digest=digest,
@@ -292,6 +360,7 @@ def qa_run_record(
     *,
     corpus: pathlib.Path,
     device: str,
+    checkpoints: pathlib.Path,
     remove_split_k: bool,
     math_attention: bool,
 ) -> RunRecord:
@@ -306,6 +375,8 @@ def qa_run_record(
         plan_name: Which plan to run.
         corpus: Directory of markdown documents.
         device: Device to measure on.
+        checkpoints: Directory holding this plan's checkpoint, so an evicted
+            run resumes at its last arm or seed rather than at zero.
         remove_split_k: Whether to take split-K out of cuBLASLt's options.
         math_attention: Whether to restrict attention to the math kernel.
 
@@ -321,7 +392,9 @@ def qa_run_record(
         device,
         probe_determinism(device, remove_split_k=remove_split_k, math_attention=math_attention),
     )
-    measured = measure_qa_plan(plan, corpus=corpus, device=device)
+    measured = measure_qa_plan(
+        plan_name, plan, corpus=corpus, device=device, checkpoints=checkpoints
+    )
     return run_record(
         experiment=QA_EXPERIMENT,
         label=qa_plan_label(plan_name, plan, digest=measured["corpus_digest"]),
@@ -354,15 +427,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         cli_args.require_flag(parsed, CONTROLS_FLAG)
     )
 
+    # RESOLVED BEFORE THE RUN, not after it. The checkpoint directory derives
+    # from where the artifact goes, so `--out` has to be known before any
+    # scoring starts. A DERIVED path rather than a flag of its own: a second
+    # flag could disagree with this one, and then a resumed run would look for
+    # its own work in a directory nothing wrote to.
+    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+
     record = qa_run_record(
         cli_args.require_flag(parsed, PLAN_FLAG),
         corpus=pathlib.Path(cli_args.require_flag(parsed, CORPUS_FLAG)),
         device=cli_args.require_flag(parsed, DEVICE_FLAG),
+        checkpoints=out.parent / "checkpoints",
         remove_split_k=remove_split_k,
         math_attention=math_attention,
     )
 
-    out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(dump_json_str(encode_run_record(record)), encoding="utf-8")
 

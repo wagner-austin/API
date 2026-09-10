@@ -91,9 +91,9 @@ class TestBuildQuestionSet:
 
 class TestMeasureQaPlan:
     def test_every_observation_is_named_once(self, tmp_path: pathlib.Path) -> None:
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         names = [observation["name"] for observation in observations]
         assert len(names) == len(set(names))
@@ -104,9 +104,9 @@ class TestMeasureQaPlan:
         On gpt2 the accuracy arm did not move while the answer-likelihood arm
         halved; a record carrying only one would report half the finding.
         """
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         named = _values(observations)
         assert "base_accuracy" in named
@@ -118,18 +118,18 @@ class TestMeasureQaPlan:
         assert "cartridge-answer-nll-gain_spread" in named
 
     def test_chance_follows_the_distractor_count(self, tmp_path: pathlib.Path) -> None:
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         named = _values(observations)
         assert named["chance_accuracy"] == pytest.approx(1.0 / (TINY_PLAN["distractor_count"] + 1))
 
     def test_every_gain_carries_a_spread_beside_its_mean(self, tmp_path: pathlib.Path) -> None:
         """A mean without its spread is what let a 0.02 difference read as a finding."""
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         named = _values(observations)
         for arm in ("cartridge-accuracy-gain", "cartridge-answer-nll-gain"):
@@ -140,9 +140,9 @@ class TestMeasureQaPlan:
     def test_the_retrieval_gain_is_the_difference_it_claims_to_be(
         self, tmp_path: pathlib.Path
     ) -> None:
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         named = _values(observations)
         assert named["retrieval_accuracy_gain"] == pytest.approx(
@@ -151,9 +151,9 @@ class TestMeasureQaPlan:
 
     def test_the_item_count_is_reported(self, tmp_path: pathlib.Path) -> None:
         """A gain over six items and one over six hundred read very differently."""
-        observations = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")[
-            "observations"
-        ]
+        observations = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )["observations"]
 
         named = _values(observations)
         assert 0.0 < named["items"] <= float(TINY_PLAN["max_items"])
@@ -163,7 +163,12 @@ class TestRunRecord:
     def test_it_carries_the_question_set_experiment(self, tmp_path: pathlib.Path) -> None:
         """Not the loss experiment's, so the two cannot be differenced."""
         record = bench.qa_run_record(
-            "tiny", corpus=tmp_path, device="cpu", remove_split_k=False, math_attention=False
+            "tiny",
+            corpus=tmp_path,
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
+            remove_split_k=False,
+            math_attention=False,
         )
 
         assert record["experiment"] == QA_EXPERIMENT
@@ -184,9 +189,16 @@ class TestRunRecord:
         both sides and this test keeps checking the wiring rather than a
         frozen hash.
         """
-        measured = bench.measure_qa_plan(TINY_PLAN, corpus=tmp_path, device="cpu")
+        measured = bench.measure_qa_plan(
+            "tiny", TINY_PLAN, corpus=tmp_path, device="cpu", checkpoints=tmp_path / "ckpt"
+        )
         record = bench.qa_run_record(
-            "tiny", corpus=tmp_path, device="cpu", remove_split_k=False, math_attention=False
+            "tiny",
+            corpus=tmp_path,
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
+            remove_split_k=False,
+            math_attention=False,
         )
 
         assert record["payload_digest"] == measured["question_set_digest"]
@@ -201,6 +213,7 @@ class TestRunRecord:
                 "no-such-plan",
                 corpus=tmp_path,
                 device="cpu",
+                checkpoints=tmp_path / "ckpt",
                 remove_split_k=False,
                 math_attention=False,
             )
@@ -208,7 +221,12 @@ class TestRunRecord:
     def test_the_treated_arm_is_recorded_in_the_fingerprint(self, tmp_path: pathlib.Path) -> None:
         """A treated record must not be mistakable for an untreated one."""
         treated = bench.qa_run_record(
-            "tiny", corpus=tmp_path, device="cpu", remove_split_k=True, math_attention=True
+            "tiny",
+            corpus=tmp_path,
+            device="cpu",
+            checkpoints=tmp_path / "ckpt",
+            remove_split_k=True,
+            math_attention=True,
         )
 
         settings = dict(treated["fingerprint"]["determinism"]["settings"])
