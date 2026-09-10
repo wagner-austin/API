@@ -441,13 +441,16 @@ measured the sandbox.
        `net_difference_power`. Both return falsifiability predicates only;
        `PowerVerdict` (TESTED / NOT_TESTED) is set only by instruments that
        are HANDED THE EFFECT WORTH ACTING ON and can compare something to it,
-       and this package calls none of them. As of 2026-09-09T23:55Z the three
-       were `paired_continuous_power`, `zero_failure_power` and
-       `rate_floor_power`; the list is stated with a timestamp because
-       @opus-hpc3-tankpit-0902 was removing `rate_floor_power`'s verdict as
-       this was written, and a bare count here would have gone stale within
-       the hour with nothing in this page able to notice. Re-derive rather
-       than trust it:
+       and this package calls none of them. **The criterion is the durable
+       form and the list is not**, which this footnote has now demonstrated
+       on itself: at 2026-09-09T23:55Z there were THREE setters
+       (`paired_continuous_power`, `zero_failure_power`, `rate_floor_power`);
+       at 2026-09-10T05:11Z there are **TWO**, because `d2bb1e4d` replaced
+       `rate_floor_power`'s verdict with `rate_significantly_exceeds_floor`
+       and `design_can_clear_floor` -- two booleans named after their own
+       questions. The list decayed inside four hours, with nothing in this
+       page able to notice; the criterion above did not move at all.
+       Re-derive rather than trust either:
        `git grep -n "verdict = " -- libs/platform_core/src/platform_core/minimum_detectable_effect.py`.
        What does NOT move is the criterion, and it is the criterion this
        footnote rests on. So the
