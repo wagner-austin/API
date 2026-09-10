@@ -14,29 +14,24 @@ from __future__ import annotations
 import pathlib
 import runpy
 import sys
-from collections.abc import Generator, Sequence
+from collections.abc import Sequence
 
 import pytest
 import torch
 from platform_core.json_utils import load_json_str
 from platform_core.run_record import decode_run_record
 
-from model_trainer.cli import _measurement_hooks as measurement_hooks
-from model_trainer.cli import _test_hooks as cli_hooks
 from model_trainer.cli import cartridge_solo_seeds as solo
-from model_trainer.cli.cartridge_headroom import GEOMETRY_PLAN_NAME
 from model_trainer.cli.cartridge_lora_policy import quantization_for
 from model_trainer.core.contracts.model import QuantizationConfig, StoredBf16Precision
 from model_trainer.core.services.finetuning.strategies.cartridge import require_cache_capable
 from model_trainer.core.services.finetuning.strategies.cartridge_model import CartridgeModel
 from model_trainer.core.services.model.backends.hf_lm import _test_hooks as hf_hooks
-from model_trainer.core.services.model.backends.hf_lm._hook_protocols import HFTokenizerProto
 from model_trainer.core.services.model.cartridge_corpus import build_windows, split_by_stride
 from model_trainer.core.services.model.cartridge_measurement import (
     held_out_gain,
     train_cartridge,
 )
-from model_trainer.core.services.model.cartridge_pool_plans import BaseLoraSweepPlan
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from model_trainer.core.types import (
@@ -51,82 +46,12 @@ from model_trainer.core.types import (
     NamedParameter,
     ParameterLike,
 )
-from tests.core.services.model.backends.hf_lm.testing import FakeHFTokenizer
+from tests._solo_seeds_harness import documents, fake_model, fake_tokenizer, staged, wired
 
-_VOCAB = PROBE_SHAPES["tiny"]["vocab_size"]
-
-_DOCUMENT_CHARS = 96
-
-#: Tiny knobs behind the same plan-hook seam the production path reads;
-#: only window/stride/slots/epochs/learning_rate are consumed here.
-TINY_GEOMETRY_PLAN: BaseLoraSweepPlan = {
-    "model_id": "gpt2",
-    "window": 8,
-    "held_out_stride": 3,
-    "compartment_counts": (2, 3),
-    "slots": 2,
-    "probability": 0.5,
-    "max_companions": 2,
-    "lora_rank": 2,
-    "lora_alpha": 4,
-    "lora_epochs": 1,
-    "lora_learning_rate": 0.05,
-    "max_drawn": 2,
-    "pool_members_per_corpus": 1,
-    "seeds": (7, 8, 9),
-    "epochs": 1,
-    "learning_rate": 0.05,
-}
-
-
-def _fake_plans() -> dict[str, BaseLoraSweepPlan]:
-    """Stand in for the production plan table, geometry row included."""
-    return {GEOMETRY_PLAN_NAME: TINY_GEOMETRY_PLAN}
-
-
-def _fake_tokenizer(model_id_or_path: str) -> HFTokenizerProto:
-    """Stand in for the hub tokenizer loader."""
-    assert model_id_or_path in ("gpt2", "gpt2-xl", "EleutherAI/pythia-6.9b")
-    return FakeHFTokenizer(vocab_size=_VOCAB)
-
-
-def _fake_model(
-    model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
-) -> LMModelProto:
-    """Stand in for the hub loader, asserting the policy value threads."""
-    assert quantization == quantization_for(model_id_or_path)
-    model, _ids = probe_model_and_input("cpu", PROBE_SHAPES["tiny"])
-    return model
-
-
-def _documents(marker: str) -> tuple[str, ...]:
-    """Two documents, distinct by marker character."""
-    return tuple(f"{marker}{index}" * (_DOCUMENT_CHARS // 2) for index in range(2))
-
-
-def _fake_corpus_reader(corpus_dir: pathlib.Path, /) -> tuple[str, ...]:
-    """Stand in for the corpus reader, keyed on the directory's name."""
-    return _documents(corpus_dir.name[0])
-
-
-@pytest.fixture(name="wired", autouse=True)
-def _wired() -> Generator[None, None, None]:
-    """Install the fakes, and put the real hooks back afterwards."""
-    measurement_hooks.base_lora_sweep_plans = _fake_plans
-    cli_hooks.read_corpus_documents = _fake_corpus_reader
-    hf_hooks.Hooks.load_hf_tokenizer = _fake_tokenizer
-    hf_hooks.Hooks.load_hf_model = _fake_model
-    yield None
-    measurement_hooks.base_lora_sweep_plans = measurement_hooks._default_base_lora_sweep_plans
-    cli_hooks.read_corpus_documents = cli_hooks._default_read_corpus_documents
-    hf_hooks.Hooks.reset()
-
-
-def _staged(tmp_path: pathlib.Path, name: str) -> pathlib.Path:
-    """Create one corpus directory."""
-    path = tmp_path / name
-    path.mkdir()
-    return path
+#: Imported for the autouse fixture's side effect; pytest collects it from
+#: this module's namespace, and naming it in ``__all__`` is what makes that
+#: deliberate rather than an unused-import that a later cleanup deletes.
+__all__ = ["wired"]
 
 
 class _PlacementRecordingBase:
@@ -290,7 +215,7 @@ class TestMeasureSoloSeeds:
     def test_one_gain_row_per_seed_and_the_summary_rows_derive_from_them(
         self, tmp_path: pathlib.Path
     ) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
             alpha,
@@ -308,13 +233,13 @@ class TestMeasureSoloSeeds:
         assert recorded["solo-gpt2_gain_mean"] == sum(gains) / 2
         assert recorded["solo-gpt2_gain_spread"] == max(gains) - min(gains)
         assert recorded["solo-gpt2_characters"] == float(
-            sum(len(document) for document in _documents("a"))
+            sum(len(document) for document in documents("a"))
         )
         assert recorded["solo-gpt2_train_windows"] > 0
         assert recorded["solo-gpt2_held_out_windows"] > 0
 
     def test_each_gain_equals_an_independent_recomputation(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
 
         observations, _digest = solo.measure_solo_seeds(
             alpha,
@@ -326,19 +251,19 @@ class TestMeasureSoloSeeds:
         )
         recorded = {o["name"]: o["value"] for o in observations}
 
-        tokenizer = _fake_tokenizer("gpt2")
-        encoded = [tokenizer.encode(document) for document in _documents("a")]
+        tokenizer = fake_tokenizer("gpt2")
+        encoded = [tokenizer.encode(document) for document in documents("a")]
         train, held_out = split_by_stride(
             build_windows(encoded, window=8, device="cpu"), held_out_stride=3
         )
-        base = require_cache_capable(_fake_model("gpt2", None))
+        base = require_cache_capable(fake_model("gpt2", None))
         slots = train_cartridge(base, train, num_slots=2, seed=7, epochs=1, learning_rate=0.05)
         expected = held_out_gain(CartridgeModel(base=base, slots=slots), held_out)
 
         assert recorded["solo-gpt2-seed7_gain"] == expected
 
     def test_the_measurement_reproduces_itself(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
 
         # SEPARATE CHECKPOINT DIRECTORIES, and this is load-bearing. Sharing
         # one would let the second call RESUME the first's cells and return
@@ -366,7 +291,7 @@ class TestMeasureSoloSeeds:
         assert first == second
 
     def test_no_seeds_is_refused(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         with pytest.raises(ValueError, match="no seeds named"):
             solo.measure_solo_seeds(
                 alpha,
@@ -380,13 +305,13 @@ class TestMeasureSoloSeeds:
     def test_the_loaded_model_is_moved_to_the_measurement_device(
         self, tmp_path: pathlib.Path
     ) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         placed: list[str] = []
 
         def _recording_loader(
             model_id_or_path: str, quantization: QuantizationConfig | StoredBf16Precision | None
         ) -> LMModelProto:
-            inner = require_cache_capable(_fake_model(model_id_or_path, quantization))
+            inner = require_cache_capable(fake_model(model_id_or_path, quantization))
             return _PlacementRecordingBase(inner, placed)
 
         hf_hooks.Hooks.load_hf_model = _recording_loader
@@ -456,7 +381,7 @@ class TestResolvePrecision:
 
 class TestMain:
     def test_main_writes_the_record(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         out = tmp_path / "record" / "solo.json"
 
         code = solo.main(
@@ -483,7 +408,7 @@ class TestMain:
             assert f"solo-gpt2-seed{seed}_gain" in names
 
     def test_stored_bf16_reaches_the_loader_and_the_label(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         out = tmp_path / "bf16" / "solo.json"
         received: list[QuantizationConfig | StoredBf16Precision | None] = []
 
@@ -521,7 +446,7 @@ class TestMain:
     def test_entrypoint_reads_process_argv_and_exits_with_mains_code(
         self, tmp_path: pathlib.Path
     ) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         out = tmp_path / "solo.json"
         saved = sys.argv
         sys.argv = [
@@ -547,7 +472,7 @@ class TestMain:
         assert out.exists()
 
     def test_running_it_as_a_module_actually_measures(self, tmp_path: pathlib.Path) -> None:
-        alpha = _staged(tmp_path, "alpha")
+        alpha = staged(tmp_path, "alpha")
         out = tmp_path / "module" / "solo.json"
         module_name = "model_trainer.cli.cartridge_solo_seeds"
         saved_argv = sys.argv
