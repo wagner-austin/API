@@ -130,9 +130,20 @@ def _jobs_reply(*, total: int = 52, failed: tuple[str, ...] = ()) -> FakeComplet
     Returns:
         The finished process.
     """
-    jobs: list[JSONValue] = [{"name": name, "conclusion": "failure"} for name in failed]
+    jobs: list[JSONValue] = [
+        {
+            "name": name,
+            "conclusion": "failure",
+            "steps": [{"name": f"Run cd {name} && npm run check", "conclusion": "failure"}],
+        }
+        for name in failed
+    ]
     jobs.extend(
-        {"name": f"check (pkg{index})", "conclusion": "success"}
+        {
+            "name": f"check (pkg{index})",
+            "conclusion": "success",
+            "steps": [{"name": "Run npm run check", "conclusion": "success"}],
+        }
         for index in range(total - len(failed))
     )
     listing: JSONObject = {"total_count": total, "jobs": jobs}

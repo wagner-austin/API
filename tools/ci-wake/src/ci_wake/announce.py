@@ -186,8 +186,25 @@ def _jobs_phrase(tally: JobTally) -> str:
     parts = [f"{tally['total']} jobs"]
     if tally["listed"] < tally["total"]:
         parts.append(f"{tally['listed']} listed, so the failed list below is partial")
-    if len(tally["failed"]) > 0:
-        parts.append(f"{len(tally['failed'])} failed: {_capped(tally['failed'])}")
+
+    # SPLIT BY WHETHER A STEP ACTUALLY CONCLUDED FAILURE. Before this, "5
+    # failed" named five packages of which four had never executed a test,
+    # and four sessions read it as five broken packages. "N failed" now means
+    # N packages whose own check failed.
+    ran = tuple(job for job in tally["failed"] if job["failing_step"] != "")
+    stopped = tuple(job for job in tally["failed"] if job["failing_step"] == "")
+    if len(ran) > 0:
+        named = tuple(f"{job['name']} (step: {job['failing_step']})" for job in ran)
+        parts.append(f"{len(ran)} failed: {_capped(named)}")
+    if len(stopped) > 0:
+        # The FACT, not a cause. Whether it died in setup, was killed
+        # mid-run, or lost its runner is not in this payload, and this
+        # bridge has been corrected three times for narrating causes the
+        # API does not expose.
+        parts.append(
+            f"{len(stopped)} stopped without a failing step: "
+            f"{_capped(tuple(job['name'] for job in stopped))}"
+        )
     if len(tally["cancelled"]) > 0:
         # THE CAVEAT ATTACHES TO THESE JOBS, NOT TO THE RUN. Under a
         # per-package concurrency group a superseding push stops only the jobs

@@ -25,6 +25,7 @@ from platform_core.json_utils import (
 from ci_wake import _test_hooks
 from ci_wake.runs import (
     GH_TIMEOUT_SECONDS,
+    JobTally,
     WorkflowRun,
     decode_jobs,
     decode_runs,
@@ -63,6 +64,21 @@ def _run(
     }
 
 
+def _failed_names(tally: JobTally) -> tuple[str, ...]:
+    """The names of a tally's failed jobs, without their steps.
+
+    Used by the tests about WHICH jobs are failed, so they keep asserting
+    that and do not restate a failing-step name they are not about.
+
+    Args:
+        tally: The decoded tally.
+
+    Returns:
+        The job names, in the payload's order.
+    """
+    return tuple(job["name"] for job in tally["failed"])
+
+
 def _listing(*runs: JSONObject) -> JSONObject:
     """Wrap runs in the shape ``actions/runs`` returns.
 
@@ -76,16 +92,26 @@ def _listing(*runs: JSONObject) -> JSONObject:
 
 
 def _job(name: str, conclusion: JSONValue) -> JSONObject:
-    """Build one ``jobs`` element.
+    """Build one ``jobs`` element whose single step mirrors its conclusion.
+
+    THE DEFAULT IS THE ORDINARY CASE: a job that concluded failure because a
+    step of it did. Tests about the OTHER case -- a job that stopped without
+    any step concluding failure -- build their steps explicitly, so the
+    distinction is always visible in the test that depends on it rather than
+    hidden in this helper.
 
     Args:
         name: The job's display name.
         conclusion: Its conclusion, or None.
 
     Returns:
-        The element.
+        The element, carrying one step with the same conclusion.
     """
-    return {"name": name, "conclusion": conclusion}
+    return {
+        "name": name,
+        "conclusion": conclusion,
+        "steps": [{"name": f"Run cd {name} && npm run check", "conclusion": conclusion}],
+    }
 
 
 class TestArgv:
@@ -221,7 +247,77 @@ class TestDecodeJobs:
             }
         )
 
-        assert tally["failed"] == ("audit", "check (packages/db)")
+        assert _failed_names(tally) == ("audit", "check (packages/db)")
+
+    def test_a_failing_step_is_named_and_a_job_without_one_is_not(self) -> None:
+        """THE DISTINCTION THIS SPLIT EXISTS FOR, shaped from the run that
+        caused it.
+
+        ``wagner-austin/MCPs`` run 34459514888, 2026-09-10: the bridge
+        announced "5 failed" naming five packages. Only ``github-mcp`` had a
+        step that concluded failure. Three died inside ``setup-workspace`` or
+        ``setup-testdb`` with their check step left PENDING, and a fourth was
+        killed mid-run -- none executed a test, and all four were green
+        locally. Four sessions read the notice as five broken packages.
+        """
+        tally = decode_jobs(
+            {
+                "total_count": 2,
+                "jobs": [
+                    {
+                        "name": "github-mcp",
+                        "conclusion": "failure",
+                        "steps": [
+                            {"name": "Run ./.github/actions/setup-testdb", "conclusion": "success"},
+                            {
+                                "name": "Run cd github-mcp && npm run check",
+                                "conclusion": "failure",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "constituent-crm",
+                        "conclusion": "failure",
+                        "steps": [
+                            {
+                                "name": "Run ./.github/actions/setup-workspace",
+                                "conclusion": None,
+                            },
+                            {"name": "Run cd constituent-crm && npm run check", "conclusion": None},
+                        ],
+                    },
+                ],
+            }
+        )
+
+        assert tally["failed"] == (
+            {"name": "github-mcp", "failing_step": "Run cd github-mcp && npm run check"},
+            {"name": "constituent-crm", "failing_step": ""},
+        )
+
+    def test_a_job_with_no_steps_at_all_has_no_failing_step(self) -> None:
+        """A job that stopped before running one step. The empty list is a
+        real state, not a missing field."""
+        tally = decode_jobs(
+            {
+                "total_count": 1,
+                "jobs": [{"name": "meetings", "conclusion": "failure", "steps": []}],
+            }
+        )
+
+        assert tally["failed"] == ({"name": "meetings", "failing_step": ""},)
+
+    def test_absent_steps_refuses_rather_than_reading_as_no_failing_step(self) -> None:
+        """The loud direction, chosen deliberately. An absent array read as
+        "no failing step" would relabel a genuine test failure as a job that
+        never ran -- the exact confusion this type exists to end."""
+        with pytest.raises(JSONTypeError):
+            decode_jobs(
+                {
+                    "total_count": 1,
+                    "jobs": [{"name": "github-mcp", "conclusion": "failure"}],
+                }
+            )
 
     def test_a_cancelled_job_lands_in_cancelled_not_in_failed(self) -> None:
         """THEY ARE DIFFERENT EVENTS AND LUMPING THEM IS THE DEFECT THIS SPLIT
@@ -245,7 +341,7 @@ class TestDecodeJobs:
         )
 
         assert tally["cancelled"] == ("check (services/handwriting-ai)",)
-        assert tally["failed"] == ("audit",)
+        assert _failed_names(tally) == ("audit",)
 
     def test_skipped_is_not_a_failure(self) -> None:
         tally = decode_jobs({"total_count": 1, "jobs": [_job("check (search)", "skipped")]})
@@ -258,12 +354,12 @@ class TestDecodeJobs:
         can never under-report how much is broken."""
         tally = decode_jobs({"total_count": 1, "jobs": [_job("check (new)", "quarantined")]})
 
-        assert tally["failed"] == ("check (new)",)
+        assert _failed_names(tally) == ("check (new)",)
 
     def test_a_null_conclusion_counts_as_failed_too(self) -> None:
         tally = decode_jobs({"total_count": 1, "jobs": [_job("check (hung)", None)]})
 
-        assert tally["failed"] == ("check (hung)",)
+        assert _failed_names(tally) == ("check (hung)",)
 
     def test_a_payload_that_is_not_a_job_listing_refuses(self) -> None:
         with pytest.raises(JSONTypeError):

@@ -111,6 +111,33 @@ class WorkflowRun(TypedDict):
     html_url: str
 
 
+class JobOutcome(TypedDict):
+    """One job that did not succeed, and the step that explains it.
+
+    A JOB-LEVEL CONCLUSION IS ITSELF AN AGGREGATE OVER STEPS, which is the
+    defect this type exists to remove. Measured in ``wagner-austin/MCPs`` run
+    34459514888 on 2026-09-10: the bridge announced "5 failed" naming five
+    packages, and only ONE had a step that concluded failure. Three died
+    inside ``setup-workspace`` or ``setup-testdb`` with their check step left
+    PENDING, and a fourth was killed mid-run -- none of them executed a test.
+    Four sessions read that notice as five broken packages.
+
+    Attributes:
+        name: The job's name, which in this workspace is the workspace it
+            checks.
+        failing_step: The name of the first step that concluded failure, or
+            the empty string when NO step did. The empty case is the whole
+            point: it distinguishes a package whose tests failed from a job
+            that never got far enough to run them. It states only what the
+            payload carries and does not name a CAUSE -- "died in setup" is
+            an inference, and this bridge has already been corrected three
+            times for narrating causes the API does not expose.
+    """
+
+    name: str
+    failing_step: str
+
+
 class JobTally(TypedDict):
     """What one run's jobs came to.
 
@@ -123,7 +150,9 @@ class JobTally(TypedDict):
             ``total`` in every ordinary run; when it is smaller the
             announcement says so rather than presenting a partial failed
             list as a complete one.
-        failed: The names of the jobs that ran and did not succeed or skip.
+        failed: The jobs that ran and did not succeed or skip, each carrying
+            the step that concluded failure -- or the empty string when NO
+            step did. See :class:`JobOutcome`.
         cancelled: The names of the jobs that were CANCELLED, kept apart from
             :attr:`failed` because they are a different event and lumping them
             together is the defect this split exists to remove. A cancelled
@@ -133,7 +162,7 @@ class JobTally(TypedDict):
 
     total: int
     listed: int
-    failed: tuple[str, ...]
+    failed: tuple[JobOutcome, ...]
     cancelled: tuple[str, ...]
 
 
@@ -260,20 +289,52 @@ def decode_jobs(payload: JSONValue) -> JobTally:
     """
     listing = narrow_json_to_dict(payload)
     jobs = [narrow_json_to_dict(entry) for entry in require_list(listing, "jobs")]
-    failed: list[str] = []
+    failed: list[JobOutcome] = []
     cancelled: list[str] = []
     for job in jobs:
         conclusion = _job_conclusion(job)
         if conclusion in _JOB_OK:
             continue
-        destination = cancelled if conclusion == CANCELLED else failed
-        destination.append(require_str(job, "name"))
+        name = require_str(job, "name")
+        if conclusion == CANCELLED:
+            cancelled.append(name)
+            continue
+        failed.append(JobOutcome(name=name, failing_step=_first_failing_step(job)))
     return JobTally(
         total=require_int(listing, "total_count"),
         listed=len(jobs),
         failed=tuple(failed),
         cancelled=tuple(cancelled),
     )
+
+
+def _first_failing_step(job: dict[str, JSONValue]) -> str:
+    """Name the first step of a job that concluded failure.
+
+    ``steps`` is REQUIRED rather than treated as optional. It is documented as
+    always present on a jobs-listing entry, and the loud direction is the
+    right one here: an absent array read as "no failing step" would relabel a
+    genuine test failure as a job that never ran, which is precisely the
+    confusion this whole type exists to end. A missing field fails the cycle
+    instead, where somebody sees it.
+
+    Args:
+        job: One element of the ``jobs`` array.
+
+    Returns:
+        The first failing step's name, or the empty string when no step
+        concluded failure -- including when the job carries no steps at all,
+        which is a job that stopped before running one.
+
+    Raises:
+        JSONTypeError: If ``steps`` is absent or is not a list, or a step is
+            missing a field this package reads.
+    """
+    for entry in require_list(job, "steps"):
+        step = narrow_json_to_dict(entry)
+        if _job_conclusion(step) == "failure":
+            return require_str(step, "name")
+    return ""
 
 
 def _job_conclusion(job: dict[str, JSONValue]) -> str:

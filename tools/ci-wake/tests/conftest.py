@@ -30,13 +30,17 @@ rather than copied a fourth time.
 from __future__ import annotations
 
 from collections.abc import Generator, Sequence
-from typing import Final
+from typing import Final, Literal
 
 import pytest
 from platform_core.config import config_test_hooks
 
 from ci_wake import _test_hooks
+from ci_wake.announce import PushReport, RunReport, announcements
+from ci_wake.enrolment import PushAttempt
 from ci_wake.identity import TASK_ID_VARIABLE
+from ci_wake.runs import JobOutcome, JobTally, WorkflowRun
+from ci_wake.verdicts import PushVerdict
 
 #: The clock every test runs against, so timestamps are assertable.
 FROZEN_NOW: Final = 1788700000
@@ -156,6 +160,128 @@ class FakeGh:
         if reply is None:
             raise AssertionError(f"unscripted gh call: {vector!r}")
         return reply
+
+
+def make_attempt(*, sha: str = SHA, agent: str = AGENT, repo: str = REPO) -> PushAttempt:
+    """Build one enrolment row.
+
+    Args:
+        sha: The commit sha.
+        agent: The pushing session's label, or the empty string.
+        repo: The repository.
+
+    Returns:
+        The row.
+    """
+    return PushAttempt(
+        repo=repo, sha=sha, ref="refs/heads/main", agent=agent, attempted_unix=1788700000
+    )
+
+
+def make_run(
+    *,
+    run_id: int = 34397357156,
+    workflow: str = "Check",
+    status: str = "completed",
+    conclusion: str = "success",
+) -> WorkflowRun:
+    """Build one run.
+
+    Args:
+        run_id: The run's numeric id.
+        workflow: The workflow's display name.
+        status: The run's status.
+        conclusion: Its conclusion.
+
+    Returns:
+        The run.
+    """
+    return WorkflowRun(
+        run_id=run_id,
+        workflow=workflow,
+        status=status,
+        conclusion=conclusion,
+        html_url=f"https://github.com/{REPO}/actions/runs/{run_id}",
+    )
+
+
+def make_tally(
+    *,
+    total: int = 52,
+    listed: int | None = None,
+    failed: tuple[str, ...] = (),
+    stopped: tuple[str, ...] = (),
+    cancelled: tuple[str, ...] = (),
+) -> JobTally:
+    """Build one job tally.
+
+    ``failed`` and ``stopped`` are BOTH the tally's ``failed`` list; they
+    differ only in whether a step concluded failure. Split as two arguments
+    because that is the distinction every test using them is about, and a
+    test that had to hand-build :class:`JobOutcome` dicts to say "this one
+    never ran a step" would bury the point in punctuation.
+
+    Args:
+        total: How many jobs the run had.
+        listed: How many the page carried; defaults to ``total``.
+        failed: Names of jobs whose own step concluded failure.
+        stopped: Names of jobs that failed with NO step concluding failure.
+        cancelled: Names of jobs stopped by cancellation.
+
+    Returns:
+        The tally.
+    """
+    outcomes = tuple(
+        JobOutcome(name=name, failing_step=f"Run cd {name} && npm run check") for name in failed
+    ) + tuple(JobOutcome(name=name, failing_step="") for name in stopped)
+    return JobTally(
+        total=total,
+        listed=total if listed is None else listed,
+        failed=outcomes,
+        cancelled=cancelled,
+    )
+
+
+def make_report(
+    *,
+    attempt: PushAttempt | None = None,
+    state: Literal["holding", "ripe", "abandoned", "stalled"] = "ripe",
+    runs: tuple[tuple[WorkflowRun, JobTally], ...] = (),
+) -> PushReport:
+    """Build one decided push.
+
+    Args:
+        attempt: The enrolment row; a default one when omitted.
+        state: The state this cycle put it in.
+        runs: Each run paired with its job tally.
+
+    Returns:
+        The report.
+    """
+    row = make_attempt() if attempt is None else attempt
+    return PushReport(
+        verdict=PushVerdict(attempt=row, runs=tuple(run for run, _ in runs), state=state),
+        reports=tuple(RunReport(run=run, tally=tally) for run, tally in runs),
+    )
+
+
+def only_body(reports: list[PushReport]) -> str:
+    """Render one group and return its body.
+
+    Args:
+        reports: The pushes, all sharing one (repo, agent).
+
+    Returns:
+        The post text.
+
+    Raises:
+        AssertionError: If the input did not group into exactly one post,
+            which means the test is asserting about a rendering it did not
+            actually produce.
+    """
+    posts = announcements(reports)
+    assert len(posts) == 1
+    return posts[0]["body"]
 
 
 @pytest.fixture(autouse=True)
