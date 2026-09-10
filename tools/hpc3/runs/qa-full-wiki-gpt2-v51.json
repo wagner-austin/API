@@ -1,17 +1,17 @@
 {
   "project": "mi",
-  "name": "qa-full-wiki-gpt2-v50",
+  "name": "qa-full-wiki-gpt2-v51",
   "image": {
-    "path": "/pub/wagnera3/images/v50/abl.sif",
-    "sha256": "d6424e403630c59de8270e036252dd18f671af58c139bbcd77657c044fad57c1",
+    "path": "/pub/wagnera3/images/v51/abl.sif",
+    "sha256": "0e849a4944a4986bf26e13e38123c65fea502351a7723063406463516a2fb2dc",
     "binds": [
       "/pub/wagnera3"
     ]
   },
   "minutes": 600,
   "mem_gb": 64,
-  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-me-wiki-full --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v50.json",
-  "artifact": "/pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v50.json",
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_qa_benchmark --plan gpt2-full-wiki-qa --corpus /pub/wagnera3/mi/cartridge/corpus-me-wiki-full --device cuda --controls none --out /pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v51.json",
+  "artifact": "/pub/wagnera3/mi/cartridge/results/qa-full-wiki-gpt2-v51.json",
   "experiment": {
     "measurement": "cartridge-question-set",
     "base_model": "gpt2",
@@ -21,7 +21,7 @@
     "resolvable_floor": "0.00134",
     "declared_effect": "0.02",
     "plan": "gpt2-full-wiki-qa",
-    "image_commit": "79ab16961f90bd7435b5d6b1e8d60c72dfbf49f5",
+    "image_commit": "ffbe7a2cdddabe4e50fb3ccf5414f01145c422fa",
     "arms": "base-cartridge-oracle-bm25-dense-fused-expanded-reranked-longcontext",
     "seeds": "7.8.9",
     "why": "the-retracted-headline-re-run-on-an-instrument-that-can-resolve-it",
