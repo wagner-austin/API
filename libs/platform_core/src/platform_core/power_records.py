@@ -31,6 +31,7 @@ from platform_core.json_utils import (
 from platform_core.power_distributions import McNemarTest
 from platform_core.power_types import (
     ClusteredPairedPower,
+    McNemarDesignSize,
     McNemarDetectableEffect,
     McNemarPower,
     NetDifferencePower,
@@ -411,6 +412,62 @@ def decode_mcnemar_detectable_effect(obj: JSONObject) -> McNemarDetectableEffect
     )
 
 
+def encode_mcnemar_design_size(record: McNemarDesignSize) -> JSONObject:
+    """Encode a :class:`McNemarDesignSize` to a JSON object.
+
+    Args:
+        record: The record to encode.
+
+    Returns:
+        A JSON object carrying every field.
+    """
+    return {
+        "instrument": record["instrument"],
+        "test": record["test"],
+        "discordant_rate": record["discordant_rate"],
+        "split": record["split"],
+        "alpha": record["alpha"],
+        "target_power": record["target_power"],
+        "search_ceiling": record["search_ceiling"],
+        "first_reaching_pairs": record["first_reaching_pairs"],
+        "durably_reaching_pairs": record["durably_reaching_pairs"],
+        "sawtooth_gap_pairs": record["sawtooth_gap_pairs"],
+        "power_at_first_reaching": record["power_at_first_reaching"],
+        "power_at_durably_reaching": record["power_at_durably_reaching"],
+        "expected_discordant_pairs": record["expected_discordant_pairs"],
+    }
+
+
+def decode_mcnemar_design_size(obj: JSONObject) -> McNemarDesignSize:
+    """Decode a :class:`McNemarDesignSize` from a JSON object.
+
+    Args:
+        obj: JSON object as produced by :func:`encode_mcnemar_design_size`.
+
+    Returns:
+        The validated record.
+
+    Raises:
+        AppError: On an unknown test or instrument.
+        JSONTypeError: On a missing or wrongly-typed field.
+    """
+    return McNemarDesignSize(
+        instrument=_require_instrument(obj, "instrument", PowerInstrument.MCNEMAR_DESIGN_SIZE),
+        test=_require_mcnemar_test(obj, "test"),
+        discordant_rate=require_float(obj, "discordant_rate"),
+        split=require_float(obj, "split"),
+        alpha=require_float(obj, "alpha"),
+        target_power=require_float(obj, "target_power"),
+        search_ceiling=require_int(obj, "search_ceiling"),
+        first_reaching_pairs=require_int(obj, "first_reaching_pairs"),
+        durably_reaching_pairs=require_int(obj, "durably_reaching_pairs"),
+        sawtooth_gap_pairs=require_int(obj, "sawtooth_gap_pairs"),
+        power_at_first_reaching=require_float(obj, "power_at_first_reaching"),
+        power_at_durably_reaching=require_float(obj, "power_at_durably_reaching"),
+        expected_discordant_pairs=require_float(obj, "expected_discordant_pairs"),
+    )
+
+
 def encode_rate_floor_power(record: RateFloorPower) -> JSONObject:
     """Encode a :class:`RateFloorPower` to a JSON object.
 
@@ -505,6 +562,7 @@ def decode_zero_failure_power(obj: JSONObject) -> ZeroFailurePower:
 
 __all__ = [
     "decode_clustered_paired_power",
+    "decode_mcnemar_design_size",
     "decode_mcnemar_detectable_effect",
     "decode_mcnemar_power",
     "decode_net_difference_power",
@@ -513,6 +571,7 @@ __all__ = [
     "decode_required_replicates",
     "decode_zero_failure_power",
     "encode_clustered_paired_power",
+    "encode_mcnemar_design_size",
     "encode_mcnemar_detectable_effect",
     "encode_mcnemar_power",
     "encode_net_difference_power",

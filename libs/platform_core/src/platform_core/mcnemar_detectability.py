@@ -57,8 +57,13 @@ import math
 from platform_core.error_codes import StatisticalPowerErrorCode
 from platform_core.errors import AppError
 from platform_core.minimum_detectable_effect import mcnemar_power
-from platform_core.power_distributions import McNemarTest, require_alpha
+from platform_core.power_distributions import (
+    McNemarTest,
+    binomial_point_vector,
+    require_alpha,
+)
 from platform_core.power_types import McNemarDetectableEffect, PowerInstrument
+from platform_core.power_validators import require_target_power
 
 #: Halvings of the split interval. The bracket is ``[0.5, 1.0]``, so after 60
 #: halvings its width is below the spacing of a double in that range and
@@ -67,72 +72,6 @@ from platform_core.power_types import McNemarDetectableEffect, PowerInstrument
 #: -- a published minimum detectable effect that moves with a convergence
 #: threshold is not a number anyone can re-derive.
 _SPLIT_HALVINGS = 60
-
-
-def require_target_power(target_power: float) -> None:
-    """Refuse a target power outside ``(0, 1)``.
-
-    Its own check rather than reuse of the Clopper-Pearson confidence one:
-    a target POWER is the chance of detecting a real effect and a CONFIDENCE
-    is how sure an interval is, so a caller passing ``0.95`` meaning either
-    would get no error from a shared validator.
-
-    Args:
-        target_power: The power the design must reach.
-
-    Raises:
-        AppError: ``POWER_TARGET_POWER_OUT_OF_RANGE`` when outside ``(0, 1)``.
-            Both endpoints are excluded: power 0 is reached by every design
-            and asks nothing, and power 1 is unreachable by any finite split.
-    """
-    if not 0.0 < target_power < 1.0:
-        raise AppError(
-            StatisticalPowerErrorCode.POWER_TARGET_POWER_OUT_OF_RANGE,
-            f"target power must lie strictly inside (0, 1); got {target_power!r}. "
-            "0 is met by every design and 1 by none, so neither states a design goal.",
-        )
-
-
-def _log_binomial_point(successes: int, trials: int, probability: float) -> float:
-    """Log of the binomial point probability, at ANY success probability.
-
-    IN LOGS BECAUSE THE DIRECT FORM OVERFLOWS, and this module's own family
-    has already paid for that lesson:
-    :func:`~platform_core.power_distributions.binomial_point_probability`
-    carries a comment recording an ``OverflowError`` at 1,024 discordant
-    pairs, fixed there by dividing integers rather than casting. That fix
-    does not transfer, because the weight here is ``C(n, k) * p**k *
-    (1-p)**(n-k)`` with a real ``p`` -- the coefficient is a huge int and the
-    powers underflow, so their product is representable while neither factor
-    is. Reproduced while building this module.
-
-    ``lgamma`` rather than ``log(comb(...))`` for the same reason: the
-    coefficient itself exceeds a double long before the probability does.
-
-    Args:
-        successes: Number of successes, ``0 <= successes <= trials``.
-        trials: Number of independent trials, non-negative.
-        probability: Success probability in ``[0, 1]``.
-
-    Returns:
-        The natural log of the point probability, or ``-inf`` where the point
-        has probability zero. ``-inf`` is a real answer here and not an error:
-        at ``probability`` exactly 1 every outcome but ``successes == trials``
-        is impossible, and the caller sums exponentials so a zero term is
-        simply absent.
-    """
-    if probability <= 0.0:
-        return 0.0 if successes == 0 else -math.inf
-    if probability >= 1.0:
-        return 0.0 if successes == trials else -math.inf
-    coefficient = (
-        math.lgamma(trials + 1) - math.lgamma(successes + 1) - math.lgamma(trials - successes + 1)
-    )
-    return (
-        coefficient
-        + successes * math.log(probability)
-        + (trials - successes) * math.log1p(-probability)
-    )
 
 
 def power_at_split(
@@ -175,9 +114,8 @@ def power_at_split(
     # I removed this guard once on the strength of the exact-test argument
     # and put it back after measuring the mid-p case.
     outcomes = set(lower) | set(upper)
-    return math.fsum(
-        math.exp(_log_binomial_point(count, discordant_pairs, split)) for count in outcomes
-    )
+    points = binomial_point_vector(discordant_pairs, split)
+    return math.fsum(points[count] for count in outcomes)
 
 
 def mcnemar_detectable_effect(
@@ -273,5 +211,4 @@ def mcnemar_detectable_effect(
 __all__ = [
     "mcnemar_detectable_effect",
     "power_at_split",
-    "require_target_power",
 ]

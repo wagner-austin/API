@@ -34,6 +34,7 @@ class PowerInstrument(StrEnum):
     NET_DIFFERENCE = "net_difference"
     CLUSTERED_PAIRED = "clustered_paired"
     MCNEMAR_DETECTABLE_EFFECT = "mcnemar_detectable_effect"
+    MCNEMAR_DESIGN_SIZE = "mcnemar_design_size"
 
 
 class PowerVerdict(StrEnum):
@@ -480,8 +481,85 @@ class McNemarDetectableEffect(TypedDict):
     achieved_power: float
 
 
+class McNemarDesignSize(TypedDict):
+    """How many pairs the NEXT paired BINARY run needs, averaged over *d*.
+
+    THE UNCONDITIONAL SIBLING OF :class:`McNemarDetectableEffect`, and the
+    difference is which quantity is random. That record conditions on the
+    discordant count a comparison ACTUALLY produced and asks what that
+    comparison could have caught. This one is asked BEFORE the run, when the
+    discordant count is not yet known and is itself random -- *d* ~
+    Binomial(``total_pairs``, ``discordant_rate``) -- so power must be
+    averaged across it. Reporting a conditional number as a design size
+    quietly assumes the next run produces exactly the *d* the last one did.
+
+    THIS RECORD CARRIES TWO SAMPLE SIZES BECAUSE POWER IS NOT MONOTONE IN
+    ``total_pairs``, WHICH WAS MEASURED AND NOT ASSUMED. Sweeping 216
+    configurations over n = 1..600 found 14,214 places where adding a pair
+    LOWERS the averaged power, the largest drop being 7.8 percentage points.
+    So "the first n that reaches the target" can be followed by an n+1 that
+    does not, and recommending it would be advice that a slightly larger
+    study invalidates. ``first_reaching_pairs`` is that first crossing and
+    ``durably_reaching_pairs`` is the point past which the target STAYS met;
+    both are reported because the gap between them is the sawtooth's size and
+    a reader who cannot see it cannot judge it.
+
+    THIS RECORD CARRIES NO :class:`PowerVerdict`, like
+    :class:`RequiredReplicates` and :class:`McNemarDetectableEffect`: it says
+    what a design would need, and classifies no result against a threshold.
+
+    Attributes:
+        instrument: Always :attr:`PowerInstrument.MCNEMAR_DESIGN_SIZE`.
+        test: Which :class:`~platform_core.power_distributions.McNemarTest`.
+            Load-bearing: the variants have different rejection regions, so
+            the same design needs different sizes under each.
+        discordant_rate: Expected share of pairs that disagree, in ``(0, 1]``.
+            The pilot's observed rate is the usual source, and it is the
+            assumption the whole answer rests on.
+        split: The effect being designed for, as the probability that a
+            discordant pair falls to the candidate. In ``(1/2, 1]``.
+        alpha: Two-sided significance level.
+        target_power: The power the design must reach.
+        search_ceiling: Largest ``total_pairs`` examined. Both answers are
+            relative to it -- ``durably_reaching_pairs`` in particular means
+            "stays met up to HERE", not "stays met forever".
+        first_reaching_pairs: Smallest ``total_pairs`` whose averaged power
+            reaches ``target_power``.
+        durably_reaching_pairs: Smallest ``total_pairs`` at or beyond which
+            EVERY size up to ``search_ceiling`` reaches ``target_power``.
+            This is the number to schedule against.
+        sawtooth_gap_pairs: ``durably_reaching_pairs -
+            first_reaching_pairs``. Zero means the crossing is clean; any
+            positive value is discreteness, and it is stated rather than
+            smoothed away.
+        power_at_first_reaching: Averaged power at ``first_reaching_pairs``.
+        power_at_durably_reaching: Averaged power at
+            ``durably_reaching_pairs``.
+        expected_discordant_pairs: ``total_pairs * discordant_rate`` at
+            ``durably_reaching_pairs`` -- the *d* the run should expect, which
+            is what makes the answer checkable against
+            :class:`McNemarPower`'s falsifiability floor before anyone
+            schedules it.
+    """
+
+    instrument: str
+    test: str
+    discordant_rate: float
+    split: float
+    alpha: float
+    target_power: float
+    search_ceiling: int
+    first_reaching_pairs: int
+    durably_reaching_pairs: int
+    sawtooth_gap_pairs: int
+    power_at_first_reaching: float
+    power_at_durably_reaching: float
+    expected_discordant_pairs: float
+
+
 __all__ = [
     "ClusteredPairedPower",
+    "McNemarDesignSize",
     "McNemarDetectableEffect",
     "McNemarPower",
     "NetDifferencePower",

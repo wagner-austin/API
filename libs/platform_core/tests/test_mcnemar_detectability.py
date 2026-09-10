@@ -25,7 +25,6 @@ from platform_core.errors import AppError
 from platform_core.mcnemar_detectability import (
     mcnemar_detectable_effect,
     power_at_split,
-    require_target_power,
 )
 from platform_core.minimum_detectable_effect import mcnemar_power
 from platform_core.power_distributions import McNemarTest
@@ -34,6 +33,7 @@ from platform_core.power_records import (
     encode_mcnemar_detectable_effect,
 )
 from platform_core.power_types import PowerInstrument
+from platform_core.power_validators import require_target_power
 
 
 def _extreme_only_power(discordant: int, split: float) -> float:

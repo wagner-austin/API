@@ -289,14 +289,36 @@ def mcnemar_power(
     require_alpha(alpha)
     smallest_attainable_p = mcnemar_p(0, discordant_pairs, test)
     can_ever_reject = smallest_attainable_p <= alpha
-    # ASCENDING from the most extreme split, keeping the LAST that rejects. A
-    # scan that returns the FIRST rejecting split returns the trivial extreme
-    # -- a number that type-checks, sorts correctly and is wrong. That bug was
+    # THE BOUNDARY IS THE LAST SPLIT THAT REJECTS, NOT THE FIRST. A search
+    # returning the FIRST rejecting split returns the trivial extreme -- a
+    # number that type-checks, sorts correctly and is wrong. That bug was
     # written on this machine on 2026-09-08 and caught before publication.
+    #
+    # BISECTION RATHER THAN THE ASCENDING SCAN THIS USED TO BE. The scan made
+    # this quadratic in big-integer work, so building a boundary for every
+    # count up to n was quartic: measured 2026-09-10 at 2.75 s to 800 pairs,
+    # 58 s to 1,600 and unfinished after eight minutes at 3,000. Model-Trainer's
+    # cartridge sets are scaling toward 2,627 items -- the same "instrument
+    # nobody can evaluate at the size it recommends" argument ``exact_mcnemar_p``
+    # records for its recurrence. By bisection, 1,600 takes 0.97 s.
+    #
+    # THE PREDICATE IS UNCHANGED AND THAT IS THE POINT: this still asks
+    # ``mcnemar_p`` whether a candidate rejects, so no second expression of the
+    # rejection region exists to drift. Bisection adds one assumption -- that
+    # the p-value is non-decreasing in the minority at fixed d -- and it was
+    # MEASURED first (both variants, every minority to d/2, d = 0..400, zero
+    # violations, mid-p's tie form rising rather than dipping). Both that
+    # property and equivalence with the scan are pinned by tests.
     most_balanced = -1
-    for minority in range(discordant_pairs // 2 + 1):
-        if mcnemar_p(minority, discordant_pairs, test) <= alpha:
-            most_balanced = minority
+    if can_ever_reject:
+        low, high = 0, discordant_pairs // 2
+        while low < high:
+            midpoint = (low + high + 1) // 2
+            if mcnemar_p(midpoint, discordant_pairs, test) <= alpha:
+                low = midpoint
+            else:
+                high = midpoint - 1
+        most_balanced = low
     return McNemarPower(
         instrument=PowerInstrument.MCNEMAR.value,
         test=test.value,

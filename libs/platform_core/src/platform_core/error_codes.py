@@ -426,6 +426,41 @@ class StatisticalPowerErrorCode(ErrorCodeBase):
     # thing that can.
     POWER_TARGET_UNREACHABLE = "POWER_TARGET_UNREACHABLE"
 
+    # A probability outside [0, 1] handed to a distribution helper. Its own
+    # code rather than POWER_SAMPLE_SIZE_INVALID, which names a COUNT that
+    # cannot exist; this names a PROBABILITY that cannot exist, and the two
+    # have different remedies -- a bad count is usually a joined table, a bad
+    # probability is usually a percentage that was never divided by 100.
+    POWER_PROBABILITY_OUT_OF_RANGE = "POWER_PROBABILITY_OUT_OF_RANGE"
+
+    # A discordant RATE outside (0, 1]. Distinct from the code above because
+    # the open lower bound is the point: a design expecting NO pairs to
+    # disagree has no McNemar test to size, since the test conditions on the
+    # discordant pairs and there would be none. Zero is refused rather than
+    # returning an infinite sample size, which is a number a reader could
+    # mistake for an answer.
+    POWER_DISCORDANT_RATE_OUT_OF_RANGE = "POWER_DISCORDANT_RATE_OUT_OF_RANGE"
+
+    # A design SPLIT outside (1/2, 1]. Its own code because 0.5 exactly is the
+    # legal-but-useless case and the message has to say why: at an even split
+    # the null is true, so no sample size reaches any power above alpha and
+    # the search would run to its ceiling and refuse. Naming it at the door
+    # tells the caller they have described the null, not a small effect.
+    POWER_DESIGN_SPLIT_OUT_OF_RANGE = "POWER_DESIGN_SPLIT_OUT_OF_RANGE"
+
+    # No sample size at or below the caller's declared ceiling reaches the
+    # target power. Distinct from POWER_TARGET_UNREACHABLE, which says NO
+    # sample size ever could: this one says the answer may exist beyond where
+    # the caller was willing to look, so raising the ceiling is a remedy and
+    # there it is not.
+    POWER_DESIGN_SIZE_UNREACHABLE = "POWER_DESIGN_SIZE_UNREACHABLE"
+
+    # A search ceiling that is not a usable bound -- non-positive, or above
+    # the largest this package will certify. Its own code because the fix is
+    # neither a better design nor more data but a different ARGUMENT, and the
+    # message carries the measured cost that sets the cap.
+    POWER_SEARCH_CEILING_INVALID = "POWER_SEARCH_CEILING_INVALID"
+
 
 __all__ = [
     "CalendarErrorCode",

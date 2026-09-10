@@ -18,11 +18,13 @@ from platform_core.errors import AppError
 from platform_core.power_distributions import (
     McNemarTest,
     binomial_point_probability,
+    binomial_point_vector,
     exact_mcnemar_p,
     mcnemar_p,
     mid_p_mcnemar_p,
     regularized_incomplete_beta,
     require_alpha,
+    require_probability,
     t_critical,
     two_sided_t_survival,
 )
@@ -253,3 +255,86 @@ class TestLargeDiscordantCounts:
         ]
 
         assert smallest[1] > smallest[0]
+
+
+class TestTheBinomialPointVector:
+    """The real-``p`` sibling of :func:`binomial_point_probability`.
+
+    Values come from ``math.comb`` and the closed form rather than from the
+    function itself, for the reason this module's docstring gives.
+    """
+
+    def test_all_mass_sits_at_zero_when_the_probability_is_zero(self) -> None:
+        assert binomial_point_vector(4, 0.0) == (1.0, 0.0, 0.0, 0.0, 0.0)
+
+    def test_all_mass_sits_at_the_top_when_the_probability_is_one(self) -> None:
+        assert binomial_point_vector(4, 1.0) == (0.0, 0.0, 0.0, 0.0, 1.0)
+
+    def test_no_trials_is_certainty_at_zero(self) -> None:
+        assert binomial_point_vector(0, 0.3) == (1.0,)
+        assert binomial_point_vector(0, 0.0) == (1.0,)
+        assert binomial_point_vector(0, 1.0) == (1.0,)
+
+    def test_it_matches_the_closed_form(self) -> None:
+        got = binomial_point_vector(12, 0.27)
+        want = [math.comb(12, k) * 0.27**k * 0.73 ** (12 - k) for k in range(13)]
+        assert got == pytest.approx(want, rel=1e-12)
+
+    def test_it_is_symmetric_under_reflection(self) -> None:
+        forward = binomial_point_vector(9, 0.2)
+        mirror = binomial_point_vector(9, 0.8)
+        flipped = [mirror[9 - index] for index in range(10)]
+        assert forward == pytest.approx(flipped, rel=1e-12)
+
+    def test_it_refuses_negative_trials(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            binomial_point_vector(-1, 0.5)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_SAMPLE_SIZE_INVALID
+
+    @pytest.mark.parametrize("probability", [-0.01, 1.01, 2.0])
+    def test_it_refuses_a_non_probability(self, probability: float) -> None:
+        with pytest.raises(AppError) as excinfo:
+            binomial_point_vector(5, probability)
+        assert excinfo.value.code is StatisticalPowerErrorCode.POWER_PROBABILITY_OUT_OF_RANGE
+
+    def test_require_probability_accepts_both_endpoints(self) -> None:
+        require_probability(0.0, "p")
+        require_probability(1.0, "p")
+
+    def test_require_probability_names_the_field(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            require_probability(3.0, "discordant_rate")
+        assert "discordant_rate" in str(excinfo.value)
+
+
+class TestTheRejectionBoundaryIsFoundByBisection:
+    """The scan this replaced is the reference, and they must never diverge.
+
+    ``mcnemar_power`` bisects over the minority because the ascending scan
+    made the instrument unusable at the sizes it advises on -- 58 s to build a
+    boundary table to 1,600 pairs, against 0.97 s. Bisection is valid only
+    because the p-value is non-decreasing in the minority, so both that
+    property and the equivalence are pinned here rather than trusted.
+    """
+
+    @pytest.mark.parametrize("test", [McNemarTest.EXACT, McNemarTest.MID_P])
+    def test_the_p_value_never_falls_as_the_split_evens_out(self, test: McNemarTest) -> None:
+        for discordant in range(60):
+            previous = -1.0
+            for minority in range(discordant // 2 + 1):
+                current = mcnemar_p(minority, discordant, test)
+                assert current >= previous, f"d={discordant} m={minority} {test.value}"
+                previous = current
+
+    @pytest.mark.parametrize("test", [McNemarTest.EXACT, McNemarTest.MID_P])
+    @pytest.mark.parametrize("alpha", [0.001, 0.01, 0.05, 0.10, 0.5, 0.9])
+    def test_it_agrees_with_an_exhaustive_scan(self, test: McNemarTest, alpha: float) -> None:
+        from platform_core.minimum_detectable_effect import mcnemar_power
+
+        for discordant in range(60):
+            scanned = -1
+            for minority in range(discordant // 2 + 1):
+                if mcnemar_p(minority, discordant, test) <= alpha:
+                    scanned = minority
+            found = mcnemar_power(discordant, alpha, test)["most_balanced_rejecting_minority"]
+            assert found == scanned, f"d={discordant} alpha={alpha} {test.value}"
