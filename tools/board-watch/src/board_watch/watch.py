@@ -45,15 +45,51 @@ class SubscriptionSpec(TypedDict):
     Attributes:
         agent: The label whose ``@mentions`` wake this watcher. Also excluded
             as an author, so the watcher's own posts never notify it.
+        session_id: The Claude session UUID this watcher polls FOR. Not an
+            identifier the watcher may invent: the board binds one label to
+            one session (mig 415) and refuses a second, so a fabricated UUID
+            would be rejected outright the first time the real session had
+            already written under that label.
+        cwd: The polled session's working directory, recorded on the read
+            for the same audit reason every board write records it.
         room: Restrict to one board room, or None for every room.
         kind: Restrict to one entry kind, or None for every kind.
         limit: Rows per poll.
     """
 
     agent: str
+    session_id: str
+    cwd: str
     room: str | None
     kind: str | None
     limit: int
+
+
+def _identity(spec: SubscriptionSpec) -> JSONObject:
+    """Render the caller identity ``task_events`` requires.
+
+    Identity became required on that read when the board grew read
+    receipts: a receipt must name who was served, and keying it to the
+    FILTER instead would let any session reading another agent's queue
+    mark that agent caught up.
+
+    It matters here specifically. Because this watcher passes the polled
+    session's OWN label as ``mentionsAgent``, its polls DO advance that
+    session's receipt -- which is correct, since a delivered mention has
+    been delivered, and is why the identity must be the real session's
+    rather than a service account standing in for it.
+
+    Args:
+        spec: The subscription carrying the polled session's identity.
+
+    Returns:
+        The three identity fields, ready to merge into a call's arguments.
+    """
+    return {
+        "agent": spec["agent"],
+        "sessionId": spec["session_id"],
+        "cwd": spec["cwd"],
+    }
 
 
 def subscription_arguments(spec: SubscriptionSpec, cursor: str | None) -> JSONObject:
@@ -71,6 +107,7 @@ def subscription_arguments(spec: SubscriptionSpec, cursor: str | None) -> JSONOb
         "mentionsAgent": spec["agent"],
         "excludeAuthor": spec["agent"],
         "limit": spec["limit"],
+        **_identity(spec),
     }
     if spec["room"] is not None:
         arguments["room"] = spec["room"]
@@ -81,7 +118,7 @@ def subscription_arguments(spec: SubscriptionSpec, cursor: str | None) -> JSONOb
     return arguments
 
 
-def priming_arguments(cursor: str | None) -> JSONObject:
+def priming_arguments(spec: SubscriptionSpec, cursor: str | None) -> JSONObject:
     """Build the arguments for one step of establishing position.
 
     Deliberately UNFILTERED. Priming walks to the true end of the feed, not
@@ -90,20 +127,26 @@ def priming_arguments(cursor: str | None) -> JSONObject:
     the last time somebody mentioned me". Those differ by exactly the events
     the watcher was started to not have to read.
 
+    Identity is carried even though no selector is: the read tool requires
+    it. It advances NO receipt here, and that is right rather than
+    incidental -- an unfiltered walk names nobody's queue, so nothing was
+    delivered to anybody and there is no position to claim was read.
+
     Args:
+        spec: The subscription carrying the polled session's identity.
         cursor: The position to read forward from, or None to start at the
             oldest visible event.
 
     Returns:
         The arguments object.
     """
-    arguments: JSONObject = {"limit": MAX_LIMIT}
+    arguments: JSONObject = {"limit": MAX_LIMIT, **_identity(spec)}
     if cursor is not None:
         arguments["cursor"] = cursor
     return arguments
 
 
-def prime(credentials: McpCredentials) -> str | None:
+def prime(credentials: McpCredentials, spec: SubscriptionSpec) -> str | None:
     """Walk the feed to its end and return the cursor for "from now on".
 
     Each page carries the cursor for its own last row, so the walk simply
@@ -112,6 +155,7 @@ def prime(credentials: McpCredentials) -> str | None:
 
     Args:
         credentials: Endpoint and headers.
+        spec: The subscription, for the identity the read tool requires.
 
     Returns:
         The cursor positioned after the newest existing event, or None when
@@ -129,7 +173,7 @@ def prime(credentials: McpCredentials) -> str | None:
                 _test_hooks.http_post,
                 credentials,
                 EVENTS_TOOL,
-                priming_arguments(cursor),
+                priming_arguments(spec, cursor),
             )
         )
         if page["next_cursor"] is None:

@@ -40,7 +40,14 @@ from tests.conftest import (
     tool_text,
 )
 
-SPEC = SubscriptionSpec(agent="opus-nclex-licensure-0904", room=None, kind=None, limit=50)
+SPEC = SubscriptionSpec(
+    agent="opus-nclex-licensure-0904",
+    session_id="55555555-5555-4555-8555-555555555555",
+    cwd="C:/Users/Test/PROJECTS/MCPs",
+    room=None,
+    kind=None,
+    limit=50,
+)
 
 
 def test_an_empty_page_from_no_cursor_stays_at_no_cursor() -> None:
@@ -68,7 +75,14 @@ def test_subscription_arguments_filter_to_the_agent_both_ways() -> None:
 
 def test_subscription_arguments_carry_every_optional_filter() -> None:
     """Each optional flag has to reach the board to have any effect."""
-    spec = SubscriptionSpec(agent="a-b-c", room="main", kind="status_change", limit=7)
+    spec = SubscriptionSpec(
+        agent="a-b-c",
+        session_id="66666666-6666-4666-8666-666666666666",
+        cwd="/tmp",
+        room="main",
+        kind="status_change",
+        limit=7,
+    )
     arguments = subscription_arguments(spec, "here")
     assert arguments["room"] == "main"
     assert arguments["kind"] == "status_change"
@@ -83,10 +97,33 @@ def test_priming_is_unfiltered_and_uses_the_largest_page() -> None:
     would arrive as new -- which is the backlog a subscription exists to
     avoid announcing.
     """
-    arguments = priming_arguments(None)
-    assert arguments == {"limit": MAX_LIMIT}
+    arguments = priming_arguments(SPEC, None)
+    # Identity rides along because the read tool requires it, but NO
+    # selector does -- so this walk names nobody's queue and advances no
+    # receipt. Asserting the selectors are absent is the whole point:
+    # a primed watcher must not have marked its session caught up on
+    # mentions it never showed anyone.
+    assert arguments["limit"] == MAX_LIMIT
+    assert arguments["agent"] == SPEC["agent"]
+    assert arguments["sessionId"] == SPEC["session_id"]
+    assert arguments["cwd"] == SPEC["cwd"]
     assert "mentionsAgent" not in arguments
-    assert priming_arguments("mid")["cursor"] == "mid"
+    assert "relevantToAgent" not in arguments
+    assert "cursor" not in arguments
+    assert priming_arguments(SPEC, "mid")["cursor"] == "mid"
+
+
+def test_subscription_arguments_carry_the_polled_sessions_identity() -> None:
+    """The receipt names who was served, so the poll must say who that is.
+
+    A watcher polling with its OWN invented identity would either be
+    refused -- one label is bound to one session -- or, worse, advance a
+    receipt under a session that does not exist.
+    """
+    arguments = subscription_arguments(SPEC, None)
+    assert arguments["agent"] == SPEC["agent"]
+    assert arguments["sessionId"] == SPEC["session_id"]
+    assert arguments["cwd"] == SPEC["cwd"]
 
 
 def test_prime_follows_each_pages_cursor_until_the_board_offers_none() -> None:
@@ -104,17 +141,34 @@ def test_prime_follows_each_pages_cursor_until_the_board_offers_none() -> None:
         ]
     )
     _test_hooks.http_post = poster
-    assert prime(TEST_CREDENTIALS) == "true-end"
-    assert sent_arguments(poster.bodies[0]) == {"limit": MAX_LIMIT}
-    assert sent_arguments(poster.bodies[1]) == {"limit": MAX_LIMIT, "cursor": "first"}
-    assert sent_arguments(poster.bodies[2]) == {"limit": MAX_LIMIT, "cursor": "true-end"}
+    assert prime(TEST_CREDENTIALS, SPEC) == "true-end"
+    # Identity is on every page of the walk because the read tool
+    # requires it; the CURSOR is what this test is about, so each page is
+    # checked for the position it followed rather than for whole-object
+    # equality that would break again on the next required field.
+    identity = {
+        "agent": SPEC["agent"],
+        "sessionId": SPEC["session_id"],
+        "cwd": SPEC["cwd"],
+    }
+    assert sent_arguments(poster.bodies[0]) == {"limit": MAX_LIMIT, **identity}
+    assert sent_arguments(poster.bodies[1]) == {
+        "limit": MAX_LIMIT,
+        "cursor": "first",
+        **identity,
+    }
+    assert sent_arguments(poster.bodies[2]) == {
+        "limit": MAX_LIMIT,
+        "cursor": "true-end",
+        **identity,
+    }
 
 
 def test_prime_on_an_empty_board_holds_no_cursor() -> None:
     """A board with no events has no position to hold, and that is not an error."""
     poster = FakeHttpPost([ok(tool_text(page_text([], None)))])
     _test_hooks.http_post = poster
-    assert prime(TEST_CREDENTIALS) is None
+    assert prime(TEST_CREDENTIALS, SPEC) is None
     assert len(poster.bodies) == 1
 
 
@@ -132,7 +186,7 @@ def test_prime_refuses_a_page_that_carries_rows_but_no_cursor() -> None:
         [ok(tool_text(page_text([LIVE_CHECKIN_LINE, LIVE_TASK_LINE], None)))]
     )
     with pytest.raises(AppError) as caught:
-        prime(TEST_CREDENTIALS)
+        prime(TEST_CREDENTIALS, SPEC)
     assert caught.value.code is BoardWatchErrorCode.PAGE_WITHOUT_CURSOR
     assert "2 events with no next cursor" in caught.value.message
 

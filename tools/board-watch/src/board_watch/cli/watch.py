@@ -39,12 +39,26 @@ from board_watch.state import DEFAULT_STATE_DIRECTORY, WatchState, load_state, s
 from board_watch.watch import MAX_LIMIT, SubscriptionSpec, format_notification, poll, prime
 
 AGENT_FLAG = "--agent"
+#: The polled session's real Claude UUID. REQUIRED, and not derivable
+#: here: the board binds one label to one session and refuses a second,
+#: so a value this tool invented would be rejected the moment the real
+#: session had already written under that label.
+SESSION_FLAG = "--session-id"
+CWD_FLAG = "--cwd"
 ROOM_FLAG = "--room"
 KIND_FLAG = "--kind"
 LIMIT_FLAG = "--limit"
 STATE_FLAG = "--state"
 
-ALLOWED_FLAGS = (AGENT_FLAG, ROOM_FLAG, KIND_FLAG, LIMIT_FLAG, STATE_FLAG)
+ALLOWED_FLAGS = (
+    AGENT_FLAG,
+    SESSION_FLAG,
+    CWD_FLAG,
+    ROOM_FLAG,
+    KIND_FLAG,
+    LIMIT_FLAG,
+    STATE_FLAG,
+)
 
 
 def _spec(parsed: dict[str, str]) -> SubscriptionSpec:
@@ -68,6 +82,8 @@ def _spec(parsed: dict[str, str]) -> SubscriptionSpec:
         raise ValueError(f"{LIMIT_FLAG} must be between 1 and {MAX_LIMIT}, got {limit}")
     return SubscriptionSpec(
         agent=cli_args.require_flag(parsed, AGENT_FLAG),
+        session_id=cli_args.require_flag(parsed, SESSION_FLAG),
+        cwd=cli_args.require_flag(parsed, CWD_FLAG),
         room=parsed.get(ROOM_FLAG),
         kind=parsed.get(KIND_FLAG),
         limit=limit,
@@ -98,7 +114,7 @@ def main(argv: Sequence[str]) -> int:
 
     existing = load_state(spec["agent"], directory)
     if existing is None:
-        cursor = prime(credentials)
+        cursor = prime(credentials, spec)
         save_state(WatchState(agent=spec["agent"], cursor=cursor), directory)
         _test_hooks.emit(
             f"BOARD WATCH armed for @{spec['agent']}; "
