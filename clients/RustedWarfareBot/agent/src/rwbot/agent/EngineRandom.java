@@ -99,10 +99,18 @@ final class EngineRandom {
     /**
      * The generator the engine's own draw helpers read.
      *
-     * <p>The field is {@code static final}, which is not an obstacle: nothing
-     * is reassigned. The generator object is fetched and reseeded through
-     * {@link Random#setSeed(long)}, which is the same call the engine's own
-     * per-match reset makes -- against the wrong field (see class doc).
+     * <p>The field was declared {@code static final}, and that WAS an
+     * obstacle -- not to this read, but to the generator SWAP: HotSpot
+     * constant-folds a static final reference into compiled callers, so a
+     * draw helper JIT-compiled before the swap kept drawing the original
+     * object while this method faithfully returned the replacement
+     * (measured, the tsa/tsb twin pair; wiki log 2026-09-11).
+     * {@link DefinalTransformer} clears the flag at class load, which is
+     * what makes reading THROUGH THE FIELD and drawing THROUGH THE FIELD
+     * the same stream again. The reseed itself is unchanged:
+     * {@link Random#setSeed(long)} on the fetched object, the same call
+     * the engine's own per-match reset makes -- against the wrong field
+     * (see class doc).
      *
      * @return The live generator instance.
      * @throws IllegalStateException When the pinned name is absent, or the

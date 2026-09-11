@@ -175,6 +175,30 @@ final class Targets {
                         Integer.valueOf(2711), Integer.valueOf(2721), Integer.valueOf(2722)));
     }
 
+    /**
+     * The engine's generator holder, as the transformer sees it -- the one
+     * name in {@link EngineNames}, respelled internal.
+     */
+    static final String GENERATOR_HOLDER = EngineNames.RANDOM_HOLDER_CLASS.replace('.', '/');
+
+    /**
+     * The holder's generator fields to their required descriptors, for
+     * {@link Definal}: the engine field is declared {@code static final},
+     * which lets HotSpot constant-fold the ORIGINAL generator into any
+     * caller compiled before the match-start swap -- the measured
+     * wall-clock seam the pin closes (wiki log 2026-09-11). The
+     * descriptor requirement is what keeps the one-letter name honest
+     * against a moved build. The holder's second Random ({@code b}) has no
+     * reader in the decompiled tree, so it is deliberately not listed:
+     * a fold of a field nothing reads cannot fork anything.
+     */
+    static java.util.LinkedHashMap<String, String> generatorDefinals() {
+        java.util.LinkedHashMap<String, String> fields =
+                new java.util.LinkedHashMap<String, String>();
+        fields.put(EngineNames.RANDOM_FIELD, "Ljava/util/Random;");
+        return fields;
+    }
+
     /** The class holding the think-entry counters, as the pool spells it. */
     static final String THINK_COUNT_OWNER = "rwbot/agent/ThinkCount";
 
@@ -206,5 +230,20 @@ final class Targets {
         group.put("d(F)V", "groupDrive");
         byOwner.put("com/corrodinggames/rts/game/a/i", group);
         return byOwner;
+    }
+
+    /**
+     * The candidate scan's receiver hook, per class: the counter pair
+     * pinned the fork to the scan's eligibility read on state the boundary
+     * snapshots print as identical, so {@link ThinkCount#scan} rides the
+     * scan's OWN entry with the task in hand and logs what it is about to
+     * iterate. Descriptor javap-verified against the pinned jar,
+     * 2026-09-11.
+     */
+    static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkScans() {
+        java.util.LinkedHashMap<String, String> task =
+                new java.util.LinkedHashMap<String, String>();
+        task.put("a(Z)Lcom/corrodinggames/rts/game/a/i;", "scan");
+        return java.util.Collections.singletonMap("com/corrodinggames/rts/game/a/n", task);
     }
 }

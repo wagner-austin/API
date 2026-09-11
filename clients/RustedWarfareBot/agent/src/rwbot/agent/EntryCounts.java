@@ -23,10 +23,11 @@ package rwbot.agent;
  * frame's offset delta (later frames are deltas from their predecessor and
  * shift for free). A first frame whose new delta no longer fits its
  * compact tag is re-encoded to the extended form, growing the attribute by
- * two bytes, and both length fields above it grow to match. Debug tables
- * (LineNumberTable, LocalVariableTable) are left untouched: the only
- * misattribution is the injected invoke inheriting the first real
- * instruction's line, which is where it conceptually belongs. The stack
+ * two bytes, and both length fields above it grow to match. The
+ * LineNumberTable shifts with the code -- reported lines are the tap's
+ * measurement language, so a drifted table is a lying instrument
+ * ({@link #shiftedLineTable}) -- while LocalVariableTable stays untouched:
+ * nothing in this stack reads it, and the verifier ignores it. The stack
  * shape is untouched by construction -- a {@code ()V} static call pushes
  * and pops nothing, so {@code max_stack} and {@code max_locals} stand.
  */
@@ -40,12 +41,21 @@ final class EntryCounts {
      * {@code counters} (keyed {@code name + descriptor}, e.g.
      * {@code "f()V"}) begins with
      * {@code invokestatic counterOwner.<value>()V} followed by a
-     * {@code nop}.
+     * {@code nop}, and every method named in {@code receiverHooks} begins
+     * with {@code aload_0; invokestatic counterOwner.<value>(Object)V} --
+     * also four bytes, so the same alignment argument covers both shapes,
+     * and the hook receives the instance whose state the scan is about to
+     * read ({@link ThinkCount#scan}).
      *
      * @param classFile The class bytes as loaded.
-     * @param counters Target methods to counter methods on the owner, in a
-     *     deterministic order (the pool layout follows it).
-     * @param counterOwner Internal name of the class holding the counters,
+     * @param counters Target methods to no-argument counter methods on the
+     *     owner, in a deterministic order (the pool layout follows it).
+     * @param receiverHooks Target INSTANCE methods to
+     *     {@code (Ljava/lang/Object;)V} hook methods on the owner. The
+     *     receiver push makes this shape wrong for a static target, and
+     *     {@code max_stack} is raised to one where a body of zero would
+     *     otherwise underprovision the push.
+     * @param counterOwner Internal name of the class holding the hooks,
      *     e.g. {@code rwbot/agent/ThinkCount}.
      * @return The patched bytes.
      * @throws ClassFormatError if the class cannot be parsed, any requested
@@ -57,19 +67,25 @@ final class EntryCounts {
     static byte[] prepend(
             byte[] classFile,
             java.util.LinkedHashMap<String, String> counters,
+            java.util.LinkedHashMap<String, String> receiverHooks,
             String counterOwner) {
         ClassFilePatcher patcher = new ClassFilePatcher(classFile);
         String[] pool = patcher.readHeaderAndConstantPool();
         int poolEnd = patcher.pos;
         int poolCount = patcher.tags.length;
-        int appendedEntries = 3 + 3 * counters.size();
+        int appendedEntries =
+                3
+                        + 3 * counters.size()
+                        + (receiverHooks.isEmpty() ? 0 : 1)
+                        + 3 * receiverHooks.size();
         if (poolCount + appendedEntries > 0xffff) {
             throw new ClassFormatError("constant pool too large to grow: " + poolCount);
         }
         // Layout: owner Utf8, owner Class, "()V" Utf8, then per counter a
         // name Utf8, a NameAndType over (name, "()V"), and a Methodref over
         // (owner Class, NameAndType) -- descriptor and owner shared so the
-        // callee must match by construction, the retarget's own rule.
+        // callee must match by construction, the retarget's own rule. The
+        // receiver hooks follow with their own shared "(Ljava/lang/Object;)V".
         int ownerClass = poolCount + 1;
         int voidDescriptor = poolCount + 2;
         java.io.ByteArrayOutputStream appended = new java.io.ByteArrayOutputStream();
@@ -85,21 +101,25 @@ final class EntryCounts {
         appended.write(')');
         appended.write('V');
         java.util.Map<String, Integer> refOf = new java.util.LinkedHashMap<String, Integer>();
+        java.util.Set<String> withReceiver = new java.util.LinkedHashSet<String>();
         int next = poolCount + 3;
         for (java.util.Map.Entry<String, String> counter : counters.entrySet()) {
-            byte[] nameUtf8 =
-                    counter.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            next = appendHook(appended, counter.getValue(), ownerClass, voidDescriptor, next);
+            refOf.put(counter.getKey(), Integer.valueOf(next - 1));
+        }
+        if (!receiverHooks.isEmpty()) {
+            byte[] objectDescriptor =
+                    "(Ljava/lang/Object;)V".getBytes(java.nio.charset.StandardCharsets.UTF_8);
             appended.write(ClassFilePatcher.CONSTANT_UTF8);
-            CodeBodies.writeU2(appended, nameUtf8.length);
-            appended.write(nameUtf8, 0, nameUtf8.length);
-            appended.write(ClassFilePatcher.CONSTANT_NAME_AND_TYPE);
-            CodeBodies.writeU2(appended, next);
-            CodeBodies.writeU2(appended, voidDescriptor);
-            appended.write(ClassFilePatcher.CONSTANT_METHODREF);
-            CodeBodies.writeU2(appended, ownerClass);
-            CodeBodies.writeU2(appended, next + 1);
-            refOf.put(counter.getKey(), Integer.valueOf(next + 2));
-            next += 3;
+            CodeBodies.writeU2(appended, objectDescriptor.length);
+            appended.write(objectDescriptor, 0, objectDescriptor.length);
+            int receiverDescriptor = next;
+            next += 1;
+            for (java.util.Map.Entry<String, String> hook : receiverHooks.entrySet()) {
+                next = appendHook(appended, hook.getValue(), ownerClass, receiverDescriptor, next);
+                refOf.put(hook.getKey(), Integer.valueOf(next - 1));
+                withReceiver.add(hook.getKey());
+            }
         }
 
         patcher.skip(2); // access_flags
@@ -115,10 +135,10 @@ final class EntryCounts {
         edits.add(new Edit(8, 10, countPatch));
         edits.add(new Edit(poolEnd, poolEnd, appended.toByteArray()));
 
-        java.util.Set<String> unmatched = new java.util.LinkedHashSet<String>(counters.keySet());
+        java.util.Set<String> unmatched = new java.util.LinkedHashSet<String>(refOf.keySet());
         int methodCount = patcher.readU2();
         for (int i = 0; i < methodCount; i++) {
-            collect(patcher, pool, refOf, unmatched, edits);
+            collect(patcher, pool, refOf, withReceiver, unmatched, edits);
         }
         if (!unmatched.isEmpty()) {
             throw new ClassFormatError(
@@ -129,6 +149,31 @@ final class EntryCounts {
     }
 
     /**
+     * Appends one hook's pool triple -- name Utf8, NameAndType over the
+     * shared descriptor, Methodref over the shared owner Class -- and
+     * returns the next free pool index. The Methodref lands at the returned
+     * index minus one.
+     */
+    private static int appendHook(
+            java.io.ByteArrayOutputStream appended,
+            String hookName,
+            int ownerClass,
+            int descriptor,
+            int next) {
+        byte[] nameUtf8 = hookName.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        appended.write(ClassFilePatcher.CONSTANT_UTF8);
+        CodeBodies.writeU2(appended, nameUtf8.length);
+        appended.write(nameUtf8, 0, nameUtf8.length);
+        appended.write(ClassFilePatcher.CONSTANT_NAME_AND_TYPE);
+        CodeBodies.writeU2(appended, next);
+        CodeBodies.writeU2(appended, descriptor);
+        appended.write(ClassFilePatcher.CONSTANT_METHODREF);
+        CodeBodies.writeU2(appended, ownerClass);
+        CodeBodies.writeU2(appended, next + 1);
+        return next + 3;
+    }
+
+    /**
      * Parses one method_info; when it is an entry-count target, records the
      * prepend and every fixup its shift requires.
      */
@@ -136,12 +181,14 @@ final class EntryCounts {
             ClassFilePatcher patcher,
             String[] pool,
             java.util.Map<String, Integer> refOf,
+            java.util.Set<String> withReceiver,
             java.util.Set<String> unmatched,
             java.util.List<Edit> edits) {
         patcher.skip(2); // access_flags
         String name = pool[patcher.readU2()];
         String descriptor = pool[patcher.readU2()];
         Integer ref = refOf.get(name + descriptor);
+        boolean receiver = withReceiver.contains(name + descriptor);
         int attributeCount = patcher.readU2();
         for (int i = 0; i < attributeCount; i++) {
             String attributeName = pool[patcher.readU2()];
@@ -149,7 +196,7 @@ final class EntryCounts {
             int length = patcher.readU4();
             if (ref != null && "Code".equals(attributeName)) {
                 unmatched.remove(name + descriptor);
-                emit(patcher.buf, pool, ref.intValue(), lengthOffset, length, edits);
+                emit(patcher.buf, pool, ref.intValue(), receiver, lengthOffset, length, edits);
             }
             patcher.skip(length);
         }
@@ -165,17 +212,33 @@ final class EntryCounts {
             byte[] buf,
             String[] pool,
             int ref,
+            boolean receiver,
             int lengthOffset,
             int length,
             java.util.List<Edit> edits) {
-        int codeLengthPos = lengthOffset + 4 + 4; // max_stack, max_locals.
+        int maxStackPos = lengthOffset + 4;
+        int codeLengthPos = maxStackPos + 4; // max_stack, max_locals.
         int codeLength = readU4At(buf, codeLengthPos);
         if (codeLength + 4 > 0xffff) {
             throw new ClassFormatError(
                     "entry counter would pass the 65535-byte code limit at " + codeLength);
         }
         int codeStart = codeLengthPos + 4;
-        byte[] entry = {(byte) 0xb8, (byte) ((ref >>> 8) & 0xff), (byte) (ref & 0xff), 0x00};
+        // Both shapes are FOUR bytes -- the alignment argument in the class
+        // doc covers them identically. The receiver shape pushes one ref, so
+        // a max_stack of zero (a body that never pushes) is raised to one.
+        byte[] entry =
+                receiver
+                        ? new byte[] {
+                            0x2a, (byte) 0xb8, (byte) ((ref >>> 8) & 0xff), (byte) (ref & 0xff)
+                        }
+                        : new byte[] {
+                            (byte) 0xb8, (byte) ((ref >>> 8) & 0xff), (byte) (ref & 0xff), 0x00
+                        };
+        Edit maxStackEdit =
+                receiver && readU2At(buf, maxStackPos) == 0
+                        ? new Edit(maxStackPos, maxStackPos + 2, new byte[] {0x00, 0x01})
+                        : null;
 
         int exceptionCountPos = codeStart + codeLength;
         int exceptionCount = readU2At(buf, exceptionCountPos);
@@ -196,8 +259,7 @@ final class EntryCounts {
         }
 
         int growth = 0;
-        Edit frameEdit = null;
-        Edit frameLengthEdit = null;
+        java.util.List<Edit> inner = new java.util.ArrayList<Edit>();
         int innerCountPos = exceptionStart + exceptionCount * 8;
         int innerCount = readU2At(buf, innerCountPos);
         int at = innerCountPos + 2;
@@ -209,26 +271,61 @@ final class EntryCounts {
                 byte[] head = shiftedFrameHead(buf, framePos);
                 int oldHead = (buf[framePos] & 0xff) <= 127 ? 1 : 3;
                 growth = head.length - oldHead;
-                frameEdit = new Edit(framePos, framePos + oldHead, head);
                 if (growth != 0) {
-                    frameLengthEdit = new Edit(at + 2, at + 6, u4(attrLength + growth));
+                    inner.add(new Edit(at + 2, at + 6, u4(attrLength + growth)));
                 }
+                inner.add(new Edit(framePos, framePos + oldHead, head));
+            }
+            if ("LineNumberTable".equals(pool[attrName]) && readU2At(buf, at + 6) > 0) {
+                inner.add(shiftedLineTable(buf, at + 8, readU2At(buf, at + 6)));
             }
             at += 6 + attrLength;
         }
 
         edits.add(new Edit(lengthOffset, lengthOffset + 4, u4(length + 4 + growth)));
+        if (maxStackEdit != null) {
+            edits.add(maxStackEdit);
+        }
         edits.add(new Edit(codeLengthPos, codeLengthPos + 4, u4(codeLength + 4)));
         edits.add(new Edit(codeStart, codeStart, entry));
         if (exceptionEdit != null) {
             edits.add(exceptionEdit);
         }
-        if (frameLengthEdit != null) {
-            edits.add(frameLengthEdit);
+        edits.addAll(inner);
+    }
+
+    /**
+     * Renders one LineNumberTable's entries with every {@code start_pc}
+     * shifted by four, then re-anchors the lowest entry at zero so the
+     * injected bytes stay covered by the first real line. Left unshifted,
+     * every reported line in a patched method drifts to whichever entry the
+     * shifted pc falls into next -- measured as a draw at real line 742
+     * reported as 747, which sent a session tracing the wrong statement
+     * (wiki log 2026-09-11).
+     *
+     * @param buf The class bytes.
+     * @param tableStart Offset of the first entry's {@code start_pc}.
+     * @param entries Number of entries; the caller has proven it non-zero.
+     * @return The replacement edit spanning exactly the entries.
+     */
+    private static Edit shiftedLineTable(byte[] buf, int tableStart, int entries) {
+        byte[] table = new byte[entries * 4];
+        System.arraycopy(buf, tableStart, table, 0, table.length);
+        int lowestAt = 0;
+        int lowestPc = Integer.MAX_VALUE;
+        for (int e = 0; e < entries; e++) {
+            int pcAt = e * 4;
+            int pc = ((table[pcAt] & 0xff) << 8 | (table[pcAt + 1] & 0xff)) + 4;
+            table[pcAt] = (byte) ((pc >>> 8) & 0xff);
+            table[pcAt + 1] = (byte) (pc & 0xff);
+            if (pc < lowestPc) {
+                lowestPc = pc;
+                lowestAt = pcAt;
+            }
         }
-        if (frameEdit != null) {
-            edits.add(frameEdit);
-        }
+        table[lowestAt] = 0;
+        table[lowestAt + 1] = 0;
+        return new Edit(tableStart, tableStart + table.length, table);
     }
 
     /**

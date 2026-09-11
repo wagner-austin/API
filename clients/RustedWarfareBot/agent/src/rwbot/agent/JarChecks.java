@@ -333,11 +333,19 @@ final class JarChecks {
                     continue;
                 }
                 byte[] original = readFully(jar, classEntry);
+                java.util.LinkedHashMap<String, String> scanHooks =
+                        Targets.thinkScans().get(internalName);
+                if (scanHooks == null) {
+                    scanHooks = new java.util.LinkedHashMap<String, String>();
+                }
                 byte[] counted;
                 try {
                     counted =
                             EntryCounts.prepend(
-                                    original, entry.getValue(), Targets.THINK_COUNT_OWNER);
+                                    original,
+                                    entry.getValue(),
+                                    scanHooks,
+                                    Targets.THINK_COUNT_OWNER);
                 } catch (ClassFormatError e) {
                     System.out.println("FAIL " + internalName + ": " + e.getMessage());
                     failures++;
@@ -380,7 +388,11 @@ final class JarChecks {
                 new java.util.LinkedHashMap<String, String>();
         bogus.put("zz()V", "aim");
         try {
-            EntryCounts.prepend(original, bogus, Targets.THINK_COUNT_OWNER);
+            EntryCounts.prepend(
+                    original,
+                    bogus,
+                    new java.util.LinkedHashMap<String, String>(),
+                    Targets.THINK_COUNT_OWNER);
         } catch (ClassFormatError e) {
             System.out.println("ok   missing-target entry count refused loudly: " + e.getMessage());
             return 0;
@@ -389,6 +401,95 @@ final class JarChecks {
                 "FAIL " + internalName
                         + ": a count on a method the class does not carry was ACCEPTED --"
                         + " a moved build would ship a diagnostic counting nothing");
+        return 1;
+    }
+
+    /**
+     * Strips the final bit from the generator holder's field in the real
+     * jar, verifies the result links, and reads the modifier back through
+     * reflection -- the whole point of the pin is that the FIELD is no
+     * longer foldable, and only the defined class can testify to that.
+     * Reflection does not initialize, so the holder's own static
+     * initializer (which builds tables and generators) never runs here.
+     *
+     * <p>Also fires the refusal a silent failure would hide behind: a
+     * field the class does not carry must throw rather than pin nothing.
+     *
+     * @param jarPath Path to the pinned {@code game-lib.jar}.
+     * @return The number of failures.
+     * @throws java.io.IOException When the jar cannot be read.
+     */
+    static int checkDefinal(String jarPath) throws java.io.IOException {
+        PatchingLoader loader = new PatchingLoader(JarChecks.class.getClassLoader());
+        JarFile jar = new JarFile(jarPath);
+        try {
+            String internalName = Targets.GENERATOR_HOLDER;
+            java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+            if (classEntry == null) {
+                System.out.println("FAIL " + internalName + ": not present in jar");
+                return 1;
+            }
+            byte[] original = readFully(jar, classEntry);
+            byte[] stripped;
+            try {
+                stripped = Definal.strip(original, Targets.generatorDefinals());
+            } catch (ClassFormatError e) {
+                System.out.println("FAIL " + internalName + ": " + e.getMessage());
+                return 1;
+            }
+            Class<?> defined;
+            try {
+                defined = loader.definePatched(internalName.replace('/', '.'), stripped);
+            } catch (LinkageError e) {
+                System.out.println("FAIL " + internalName + ": did not verify: " + e);
+                return 1;
+            }
+            for (String fieldName : Targets.generatorDefinals().keySet()) {
+                java.lang.reflect.Field field;
+                try {
+                    field = defined.getDeclaredField(fieldName);
+                } catch (NoSuchFieldException e) {
+                    System.out.println(
+                            "FAIL " + internalName + ": field " + fieldName
+                                    + " missing from the defined class");
+                    return 1;
+                }
+                if (java.lang.reflect.Modifier.isFinal(field.getModifiers())) {
+                    System.out.println(
+                            "FAIL " + internalName + ": field " + fieldName
+                                    + " is STILL final after the strip -- the pin pins nothing");
+                    return 1;
+                }
+            }
+            System.out.println(
+                    "ok   " + internalName + " [definal "
+                            + Targets.generatorDefinals().keySet() + "]  ("
+                            + original.length + " -> " + stripped.length + " bytes)");
+            return checkDefinalRefusesMissingField(original);
+        } finally {
+            jar.close();
+        }
+    }
+
+    /**
+     * Proves the definal REFUSES a field the class does not carry: a moved
+     * build must fail at the gate with the field named, not ship a pin that
+     * silently pins nothing.
+     */
+    private static int checkDefinalRefusesMissingField(byte[] original) {
+        java.util.LinkedHashMap<String, String> bogus =
+                new java.util.LinkedHashMap<String, String>();
+        bogus.put("zz", "Ljava/util/Random;");
+        try {
+            Definal.strip(original, bogus);
+        } catch (ClassFormatError e) {
+            System.out.println("ok   missing-field definal refused loudly: " + e.getMessage());
+            return 0;
+        }
+        System.out.println(
+                "FAIL " + Targets.GENERATOR_HOLDER
+                        + ": a definal of a field the class does not carry was ACCEPTED --"
+                        + " a moved build would ship a pin pinning nothing");
         return 1;
     }
 
@@ -415,9 +516,10 @@ final class JarChecks {
             super(parent);
         }
 
-        void definePatched(String binaryName, byte[] bytes) {
+        Class<?> definePatched(String binaryName, byte[] bytes) {
             Class<?> defined = defineClass(binaryName, bytes, 0, bytes.length);
             resolveClass(defined);
+            return defined;
         }
     }
 }

@@ -37,6 +37,23 @@ public final class Premain {
                             + " them against this jar and update Targets.");
         }
 
+        // The generator holder's final bit comes off before anything can
+        // compile against it: a static final Random is constant-folded into
+        // JIT-compiled draw helpers, so the match-start generator swap
+        // reaches interpreted callers and misses compiled ones -- a
+        // wall-clock fork measured between byte-identical twins (Definal).
+        // Unconditional: certified play's seeded swap needs it most.
+        DefinalTransformer definal = new DefinalTransformer();
+        instrumentation.addTransformer(definal);
+        forceLoad(java.util.Collections.singleton(Targets.GENERATOR_HOLDER));
+        if (!definal.patched()) {
+            throw new IllegalStateException(
+                    "rw-agent: the generator holder was not de-finaled: "
+                            + Targets.GENERATOR_HOLDER
+                            + " -- the pinned build is 1.15 (code 176, build #28);"
+                            + " re-derive the holder against this jar and update Targets.");
+        }
+
         // Synchronous pathfinding: the one patch that touches simulation
         // timing, deliberately (see SyncPathTransformer). Skipped when hosting
         // because a private sim change desyncs against a stock-engine peer;

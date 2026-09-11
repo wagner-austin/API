@@ -38,6 +38,7 @@ public final class SelfTest {
         failures += JarChecks.checkSyncPath(args[0]);
         failures += JarChecks.checkSwayRewire(args[0]);
         failures += JarChecks.checkThinkCounts(args[0]);
+        failures += JarChecks.checkDefinal(args[0]);
         failures += OptionChecks.checkOptions();
         failures += DiscoveryChecks.checkDiscovery();
         failures += JarChecks.checkOrderBindings();
