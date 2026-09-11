@@ -13,8 +13,8 @@
       "minutes": 100,
       "requeue": true,
       "image": {
-        "path": "/pub/wagnera3/rusted/images/v4/rusted.sif",
-        "sha256": "b1eaaa2e5a43fd963ddeff20ba06f92c9128135cda918fed1bde458c5de93edb",
+        "path": "/pub/wagnera3/rusted/images/v5/rusted.sif",
+        "sha256": "97a80bdeb16ddb2c4e17d083775fbc33c5779e0595200ec9c330c606c67ddc40",
         "binds": [
           "/pub/wagnera3"
         ]

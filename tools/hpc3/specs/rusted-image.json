@@ -1,7 +1,7 @@
 {
   "base_image": "python:3.11-slim-bookworm@sha256:0bee7276f83efd4a1ee05bbbf4281d95ed28e079220a9457f25a93e3f1e3c31b",
   "env_prefix": "/opt/env",
-  "git_commit": "1909eae7ce1c1dd6c0265762fb2097334e25d330",
+  "git_commit": "18318c94f039de3df2dd544ba8d0e6b4af810293",
   "system_packages": [
     "xvfb=2:21.1.7-3+deb12u13",
     "xauth=1:1.1.2-1",
@@ -75,7 +75,7 @@
     "xvfb-run -a --server-args=\"-screen 0 800x600x24\" xrandr",
     "/opt/env/bin/python -c \"from rw_bot.harness.agent_build import JAVA_RELEASE; assert JAVA_RELEASE == '8', JAVA_RELEASE\"",
     "/opt/env/bin/python -c \"from rw_bot.harness.jvm import jvm_dir, has_module_system, bundled_tools; assert jvm_dir('linux') == 'jvm-linux'; assert has_module_system('linux') is False; assert bundled_tools('linux') == ('java',)\"",
-    "/opt/env/bin/python -c \"import shlex; from rw_bot.harness.campaign import member_command, member_artifact; from rw_bot.harness.results_layout import clones_path; from rw_bot.harness.match import MatchConfig; from rw_bot.harness.sweep import SweepJob; job = SweepJob(label='repA', seed=12345, doctrine='doctrines/default.doctrine', samples=250); match = MatchConfig(map_path='maps/skirmish/[p2]Lake (2p).tmx', opponents=1, difficulty=-2); argv = shlex.split(member_command('/opt/env/bin/python', '/pub/wagnera3', 'rusted', 'sweeps/replicate.txt', 'replicate', job, 75, 10, match)); assert argv[argv.index('--map') + 1] == 'maps/skirmish/[p2]Lake (2p).tmx'; assert argv[argv.index('--fast-forward') + 1] == '10'; assert argv[argv.index('--result') + 1] == member_artifact('/pub/wagnera3', 'rusted', 'replicate', job); assert argv[argv.index('--clones') + 1] == clones_path('/pub/wagnera3', 'rusted', 'replicate'); assert argv[argv.index('--tree') + 1].startswith('/pub/')\"",
+    "/opt/env/bin/python -c \"import shlex; from rw_bot.harness.campaign import member_command, member_artifact; from rw_bot.harness.match import MatchConfig; from rw_bot.harness.sweep import SweepJob; job = SweepJob(label='repA', seed=12345, doctrine='doctrines/default.doctrine', samples=250); match = MatchConfig(map_path='maps/skirmish/[p2]Lake (2p).tmx', opponents=1, difficulty=-2); argv = shlex.split(member_command('/opt/env/bin/python', '/pub/wagnera3', 'rusted', 'payload', 'sweeps/replicate.txt', 'replicate', job, 75, 10, match, 1)); assert argv[argv.index('--map') + 1] == 'maps/skirmish/[p2]Lake (2p).tmx'; assert argv[argv.index('--fast-forward') + 1] == '10'; assert argv[argv.index('--result') + 1] == member_artifact('/pub/wagnera3', 'rusted', 'replicate', job); assert argv[argv.index('--clones') + 1] == chr(36) + 'TMPDIR/rw-clones'; assert argv[argv.index('--tree') + 1].startswith('/pub/'); assert argv[argv.index('--rng-tap') + 1] == '1'; plain = shlex.split(member_command('/opt/env/bin/python', '/pub/wagnera3', 'rusted', 'payload', 'sweeps/replicate.txt', 'replicate', job, 75, 10, match, 0)); assert '--rng-tap' not in plain\"",
     "/opt/env/bin/python -c \"import pathlib; from rw_bot.tree_identity import tree_entries, tree_digest; root = pathlib.Path('/tmp/smoke-tree'); root.mkdir(parents=True, exist_ok=True); (root / 'game.txt').write_bytes(b'one'); assert tree_digest(tree_entries(root)) == 'c30d9d9d6a5315f6c714199204adbf66e779c43d85bedc27715f0754741b7c2e'\""
   ],
   "labels": {
