@@ -27,7 +27,7 @@
     "declared_effect": "0.375",
     "held_out_pairs": "16",
     "why": "bit-identity-certificate-for-cartridge-traits-gpt2-v54",
-    "what_it_certifies": "A2 requires that two runs of the same plan on the same node produce a bit-identical record. This is the second run. No judge model enters the measurement path and the steering arm draws nothing, so the only sources of run-to-run variation are the ones the cartridge arms pin with torch.manual_seed -- and if the two records differ, one of those pins has come loose rather than the traits having changed.",
+    "what_it_certifies": "A2-requires-that-two-runs-of-the-same-plan-on-the-same-node-produce-a-bit-identical-record.-This-is-the-second-run.-No-judge-model-enters-the-measurement-path-and-the-steering-arm-draws-nothing,-so-the-only-sources-of-run-to-run-variation-are-the-ones-the-cartridge-arms-pin-with-torch.manual_seed----and-if-the-two-records-differ,-one-of-those-pins-has-come-loose-rather-than-the-traits-having-changed.",
     "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived"
   },
   "gpu": {

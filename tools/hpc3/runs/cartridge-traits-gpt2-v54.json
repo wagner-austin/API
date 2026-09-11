@@ -27,10 +27,10 @@
     "declared_effect": "0.375",
     "held_out_pairs": "16",
     "why": "does-a-cartridge-carry-a-disposition-and-what-does-composing-two-cost",
-    "compared_against": "the published steering-vector account of dispositional composition, run here as its own arm at matched trait counts on this same base and these same pairs",
-    "precondition": "the solo cell runs FIRST and the run is refused if its expression gain does not clear its own seed spread -- the 7B rung of the corpus arc failed at exactly that step and every retention computed beside it was a division artefact",
+    "compared_against": "the-published-steering-vector-account-of-dispositional-composition,-run-here-as-its-own-arm-at-matched-trait-counts-on-this-same-base-and-these-same-pairs",
+    "precondition": "the-solo-cell-runs-FIRST-and-the-run-is-refused-if-its-expression-gain-does-not-clear-its-own-seed-spread----the-7B-rung-of-the-corpus-arc-failed-at-exactly-that-step-and-every-retention-computed-beside-it-was-a-division-artefact",
     "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived",
-    "deviation_from_recorded_grid": "solo, n2 and n4 with untrained-composed and cross controls; the diverse-companion, base-LoRA and crowd-invariance families are NOT run here. Those three repair composition, and the question they answer is only askable once a naive interference number exists to repair."
+    "deviation_from_recorded_grid": "solo,-n2-and-n4-with-untrained-composed-and-cross-controls;-the-diverse-companion,-base-LoRA-and-crowd-invariance-families-are-NOT-run-here.-Those-three-repair-composition,-and-the-question-they-answer-is-only-askable-once-a-naive-interference-number-exists-to-repair."
   },
   "gpu": {
     "model": "V100",
