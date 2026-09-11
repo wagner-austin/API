@@ -785,16 +785,66 @@ entry point that builds a `RunRecord` and is named nowhere here.
   the plan declares. Against the realised count, never `max_items`: the
   32-item set came from a plan whose cap said 120. Every plan declares 0.05,
   which is the effect size this literature reports (WRAP +0.020, arXiv
-  2401.16380; this machine's extraction ablation +0.061 for a removed 7:1
-  dilution, +0.029 for permuted copies, +0.004 for hub-slug markers, which
-  was noise). That needs 100 items, so **the four me-wiki plans are refused
-  before they run** — deliberately, since they are the plans that produced
-  the retracted claim.
+  2401.16380; this machine's extraction ablation **as published** +0.061 for a
+  removed 7:1 dilution, +0.029 for permuted copies, +0.004 for hub-slug
+  markers — the last of which was noise *at the two rungs that run reached*,
+  and is no longer the standing verdict; see the four-rung redo below). That
+  needs 100 items, so **the four me-wiki plans are refused before they run** —
+  deliberately, since they are the plans that produced the retracted claim.
 
   It is a FALSIFIABILITY gate, not a power one: passing means some attainable
   outcome supports the declared effect, never that the outcome is likely.
   Classifying an observed result against the discordant count that actually
   occurred is a separate statement.
+
+- **THE EXTRACTION ABLATION'S MARKER VERDICT WAS REVERSED BY A FOURTH RUNG,
+  and this registry carried only the superseded reading until 2026-09-11.**
+  The published run scored a 2,627-item set and stopped at gpt2-medium; its
+  marker contrast was +0.36 points at 124M (per-seed p 0.59, 0.60, 0.69) and
+  null again at 355M. That is the "+0.004 … was noise" cited above, and it is
+  correct *for the rungs that run reached*.
+
+  The 2026-09-04 redo emitted every arm from ONE pinned wiki snapshot
+  (`e2be2a3`, 823 pages), scored one regenerated 3,042-item set, and added
+  774M and 1.5B. Three seeds per arm, twenty epochs, `t` on 2 degrees of
+  freedom:
+
+  | rung | per-seed C − B | mean | sd | t | verdict |
+  |---|---|---|---|---|---|
+  | 124M | −1.84 +0.39 −0.92 | −0.7890 | 1.1235 | −1.22 | null |
+  | 355M | +0.89 −0.43 −0.26 | +0.0657 | 0.7165 | +0.16 | null |
+  | 774M | −0.10 −0.49 −0.10 | −0.2301 | 0.2278 | −1.75 | null |
+  | **1.5B** | **−0.59 −0.46 −0.62** | **−0.5588** | **0.0870** | **−11.13** | **markers hurt** |
+
+  **The three nulls were underpowered, not real, and that is the part worth
+  carrying into a power gate.** The minimum detectable effect at n=3 falls
+  ±2.79 → ±1.78 → ±0.57 → ±0.22 pp across the ladder, so a constant −0.56 pp
+  penalty at every rung would have been invisible at the first three and
+  significant only at the fourth — which is exactly what was observed. The
+  ladder therefore **cannot distinguish** "markers become harmful at scale"
+  from "markers were mildly harmful throughout and only 1.5B could resolve
+  it"; distinguishing them needs more seeds at the small rungs, not another
+  rung. Any write-up claiming "markers start hurting at 1.5B" is claiming more
+  than this supports.
+
+  Two caveats the numbers do not carry on their own. The 774M→1.5B step is the
+  only comparison here that crosses a training card (A30 → A100, since gpt2-xl
+  does not fit 24 GB), and the measured cross-card training term for this
+  pipeline runs to +2.6298 pp — so that step's SIZE is not established, though
+  its sign survives. The marker contrast itself is unaffected: both 1.5B arms
+  trained on the same A100 with the same seeds, so the card term enters both
+  sides of `C − B` and cancels.
+
+  Provenance, stated because it is the reason this entry exists: the redo's
+  TRAINING went through hpc3, and its SCORING did not — it ran as
+  `modeltrainer-score-run --device cuda` on a workstation, so
+  `fingerprint.image_digest` is empty in **44 of 44** committed score records
+  (`7cfedc77`, with a 46-line digest manifest beside them). That cannot be
+  fixed retroactively; the forward fix is image v50 (`55894505`), which pins
+  the code axis for the next scoring pass. Full write-ups, with the per-arm
+  seed spreads and the perturbation hierarchy the card term comes from:
+  `marker-effect-across-four-scales` and
+  `perturbation-hierarchy-of-a-finetuning-measurement` in `~/PROJECTS/wiki`.
 
 - **Two axes added at registration, both previously absent.**
   `pythia-6.9b-api-wiki-qa` — the ladder had stopped at gpt2-xl, one rung
