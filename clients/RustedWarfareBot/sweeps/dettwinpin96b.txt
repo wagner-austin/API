@@ -1,0 +1,105 @@
+# 48 identical champion/twin pairs at difficulty 2: the floor
+# re-priced with BOTH pins (log 2026-09-11) -- definal (the JIT-fold of
+# the swapped generator) AND the new-Random redirect (the turret
+# picker's wall-seeded inline draw, the one such site in sim code).
+# Locally, three 10,000-sample runs under both pins were bit-identical
+# across 104,883 instrument lines each where the pre-pin strike rate
+# was eight forks in nine pairs. If the cluster floor collapses here,
+# paired measurement returns to the policy lane; whatever survives is
+# a third seam with a fresh signature.
+champ|8906001|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906001|doctrines/vh-twin.doctrine|10000
+champ|8906105|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906105|doctrines/vh-twin.doctrine|10000
+champ|8906209|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906209|doctrines/vh-twin.doctrine|10000
+champ|8906313|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906313|doctrines/vh-twin.doctrine|10000
+champ|8906417|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906417|doctrines/vh-twin.doctrine|10000
+champ|8906521|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906521|doctrines/vh-twin.doctrine|10000
+champ|8906625|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906625|doctrines/vh-twin.doctrine|10000
+champ|8906729|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906729|doctrines/vh-twin.doctrine|10000
+champ|8906833|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906833|doctrines/vh-twin.doctrine|10000
+champ|8906937|doctrines/evolve1-g4m2.doctrine|10000
+twin|8906937|doctrines/vh-twin.doctrine|10000
+champ|8907041|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907041|doctrines/vh-twin.doctrine|10000
+champ|8907145|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907145|doctrines/vh-twin.doctrine|10000
+champ|8907249|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907249|doctrines/vh-twin.doctrine|10000
+champ|8907353|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907353|doctrines/vh-twin.doctrine|10000
+champ|8907457|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907457|doctrines/vh-twin.doctrine|10000
+champ|8907561|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907561|doctrines/vh-twin.doctrine|10000
+champ|8907665|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907665|doctrines/vh-twin.doctrine|10000
+champ|8907769|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907769|doctrines/vh-twin.doctrine|10000
+champ|8907873|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907873|doctrines/vh-twin.doctrine|10000
+champ|8907977|doctrines/evolve1-g4m2.doctrine|10000
+twin|8907977|doctrines/vh-twin.doctrine|10000
+champ|8908081|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908081|doctrines/vh-twin.doctrine|10000
+champ|8908185|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908185|doctrines/vh-twin.doctrine|10000
+champ|8908289|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908289|doctrines/vh-twin.doctrine|10000
+champ|8908393|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908393|doctrines/vh-twin.doctrine|10000
+champ|8908497|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908497|doctrines/vh-twin.doctrine|10000
+champ|8908601|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908601|doctrines/vh-twin.doctrine|10000
+champ|8908705|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908705|doctrines/vh-twin.doctrine|10000
+champ|8908809|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908809|doctrines/vh-twin.doctrine|10000
+champ|8908913|doctrines/evolve1-g4m2.doctrine|10000
+twin|8908913|doctrines/vh-twin.doctrine|10000
+champ|8909017|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909017|doctrines/vh-twin.doctrine|10000
+champ|8909121|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909121|doctrines/vh-twin.doctrine|10000
+champ|8909225|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909225|doctrines/vh-twin.doctrine|10000
+champ|8909329|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909329|doctrines/vh-twin.doctrine|10000
+champ|8909433|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909433|doctrines/vh-twin.doctrine|10000
+champ|8909537|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909537|doctrines/vh-twin.doctrine|10000
+champ|8909641|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909641|doctrines/vh-twin.doctrine|10000
+champ|8909745|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909745|doctrines/vh-twin.doctrine|10000
+champ|8909849|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909849|doctrines/vh-twin.doctrine|10000
+champ|8909953|doctrines/evolve1-g4m2.doctrine|10000
+twin|8909953|doctrines/vh-twin.doctrine|10000
+champ|8910057|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910057|doctrines/vh-twin.doctrine|10000
+champ|8910161|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910161|doctrines/vh-twin.doctrine|10000
+champ|8910265|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910265|doctrines/vh-twin.doctrine|10000
+champ|8910369|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910369|doctrines/vh-twin.doctrine|10000
+champ|8910473|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910473|doctrines/vh-twin.doctrine|10000
+champ|8910577|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910577|doctrines/vh-twin.doctrine|10000
+champ|8910681|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910681|doctrines/vh-twin.doctrine|10000
+champ|8910785|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910785|doctrines/vh-twin.doctrine|10000
+champ|8910889|doctrines/evolve1-g4m2.doctrine|10000
+twin|8910889|doctrines/vh-twin.doctrine|10000
