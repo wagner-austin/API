@@ -34,6 +34,7 @@ provenance:
   - "runs/sweep-v3-nodeps/ — the same generations scored before the corpus group existed (3 distributions recorded) -- payload_digest d00c4b5057f2ba0bb073d771df9986a85886a30e08a950ba6dfd5c3002a129e5"
   - "runs/sweep-v1/{base,candidate}.outcomes.jsonl and .generation.jsonl — per-item verdicts and termination flags"
   - "runs/sweep-v1-cap384/perplexity.json — teacher-forced NLL per item, both arms"
+  - "SMALLEST EFFECT OF INTEREST = 5.0 percentage points, declared by the operator 2026-09-11 in session 951e39f5. It is a decision, not a measurement: no file in this repository and no run under runs/ produces it, and it is recorded here because every verdict in 'The threshold, declared' is a comparison against it. Changing it changes those verdicts while moving no measured number on this page. The n=90 stratum misses it by 0.0706pp, so an SEI of 5.1 would flip that row to TESTED."
 fact_checked: "2026-09-10"
 confidence: high
 hubs: [infrastructure]
@@ -77,11 +78,12 @@ flips essentially every item that flips at all, in one direction".
 
 **This project's smallest effect of interest is 5.0 percentage points**,
 declared by the operator on 2026-09-11. Below that, a change in guard-pass
-rate is not worth acting on here; at or above it, it is. Nothing measures
-this — it is a statement about what the project would do, and it is recorded
-so the nulls above can be read as verdicts rather than as numbers.
+rate is not worth acting on here; at or above it, it is. **Nothing measures
+this** — it is a statement about what the project would do, not a fact about
+the data, and no instrument on this page produces it. It is recorded so the
+nulls above can be read as verdicts rather than as numbers[^18].
 
-Against the MDEs, at alpha 0.05 and 80% power under mid-p:
+Against the MDEs, at alpha 0.05 and 80% power under mid-p[^17]:
 
 | stratum | n | MDE | verdict | margin |
 |---|---|---|---|---|
@@ -90,7 +92,7 @@ Against the MDEs, at alpha 0.05 and 80% power under mid-p:
 | free of unresolvable imports too | 49 | 9.3133pp | **NOT_TESTED** | −4.3133pp |
 
 So one stratum of three could have resolved an effect this project cares
-about, and it is the one whose base rate is 2.2%.
+about, and it is the one whose base rate is 2.2%[^17][^2].
 
 **The middle row misses by seven hundredths of a percentage point, and that
 should be read as a coin-flip rather than a finding.** An SEI of 5.1 would
@@ -104,7 +106,7 @@ verdict[^17].
 rejects at alpha 0.05, so there is no minimum detectable effect to compare
 against any threshold — the instrument raises `POWER_TARGET_UNREACHABLE`
 rather than returning a number. Both *d*=5 strata are in that state. A
-threshold cannot rescue a comparison that cannot reject.
+threshold cannot rescue a comparison that cannot reject[^17][^16].
 
 Those three figures are mid-p. **Under the exact test the last two strata have
 no minimum detectable effect at all**, and the instrument refuses to report one
@@ -279,6 +281,18 @@ Three passes out of three and thirty out of thirty are both a rate of 1.0, and o
        is what made the figures above computable at all: building a boundary
        for every discordant count up to 1,600 took 58 s by scan and 0.97 s by
        bisection, and at 3,000 the scan had not finished after eight minutes.
+[^18]: OPERATOR DECLARATION, 2026-09-11, recorded in this page's
+       `provenance:` block. **Not a measurement and not derivable from one** —
+       a smallest-effect-of-interest states what a project would act on, so no
+       file in this repository and no run under `runs/` can produce it. It is
+       cited here rather than left implicit because every verdict in this
+       section is a comparison against it: change the 5.0 and the verdicts
+       change, without a single number on this page moving.
+       The instrument deliberately does not hold it. `McNemarDetectableEffect`
+       carries no `PowerVerdict` — see
+       `libs/platform_core/src/platform_core/mcnemar_detectability.py`, whose
+       docstring records this threshold and its 0.07pp margin as the argument
+       for reporting the effect and letting the caller compare.
 [^12]: `tools/code-style-eval/Makefile:9` and `tools/code-style-eval/Makefile:30` -- the `lint` and `test` targets, each running `poetry sync --with dev`.
 [^13]: `tools/code-style-eval/src/code_style_eval/core/provenance.py` section `verify_scoring_environment`, called from `cli/evaluate.py` section `main` before any work.
 [^14]: `tools/code-style-eval/tests/test_evaluate_cli.py` section `TestRefusingAWrongInstrument`.
