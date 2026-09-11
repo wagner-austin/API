@@ -38,7 +38,16 @@ $mcpsRoot = 'C:\Users\Test\PROJECTS\MCPs'
 
 . (Join-Path $apiRoot 'tools\hpc-wake\runs\env.ps1')
 
-$containerEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-fleet
+# Scoped preference around the native call: with docker down, `docker
+# inspect` writes stderr and exits non-zero, and under script-level 'Stop'
+# that raises a NativeCommandError HERE — before fleet-agent can issue the
+# named QUEUE_CREDENTIALS_MISSING refusal the comment below promises. Same
+# trap, same fix as register-agent-schedule.ps1's schtasks delete (audit
+# 83a7da44, standards arm).
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$containerEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-fleet 2>$null
+$ErrorActionPreference = $prevEap
 $keyLine = @($containerEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
 if ($keyLine.Count -eq 1) {
     $env:FLEET_MCP_API_KEY = "$($keyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
