@@ -1,0 +1,16 @@
+# 4 identical champion/twin pairs at difficulty 2 with the FULL
+# diagnostic tap armed, run ON THE CLUSTER (log 2026-09-11): local
+# pairs under both pins are bit-identical at both difficulties while
+# dettwinpin96b still flipped 11/48 -- seam #3 is environmental, and
+# this batch carries the whole instrument ladder (stream hashes,
+# credspend, orderexec, chargestack, buildtry, queuestack) into the
+# environment where the fork actually lives. Diff member logs pairwise
+# exactly as the local recipe's read-order prescribes.
+champ|8911001|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911001|doctrines/vh-twin.doctrine|10000
+champ|8911105|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911105|doctrines/vh-twin.doctrine|10000
+champ|8911209|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911209|doctrines/vh-twin.doctrine|10000
+champ|8911313|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911313|doctrines/vh-twin.doctrine|10000
