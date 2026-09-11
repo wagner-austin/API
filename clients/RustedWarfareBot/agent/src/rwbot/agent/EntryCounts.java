@@ -13,11 +13,14 @@ package rwbot.agent;
  * arithmetic -- what a four-byte prepend shifts and how each shifted
  * structure is fixed.
  *
- * <p>FOUR bytes, deliberately, not three: {@code tableswitch} and
+ * <p>A MULTIPLE OF FOUR bytes, deliberately: {@code tableswitch} and
  * {@code lookupswitch} pad to a four-byte boundary measured from the start
  * of the code array, so a four-byte prepend ({@code invokestatic} plus
- * {@code nop}) preserves every switch's padding and the whole body shifts
- * uniformly -- which is what keeps every RELATIVE branch offset valid
+ * {@code nop}, or {@code aload_0} plus {@code invokestatic}) -- or the
+ * value shape's eight ({@code aload_0}, {@code fload_1},
+ * {@code invokestatic}, three {@code nop}) -- preserves every switch's
+ * padding and the whole body shifts uniformly, which is what keeps every
+ * RELATIVE branch offset valid
  * without rewriting one. What the shift does reach is fixed explicitly:
  * the exception table's three pc columns, and the FIRST StackMapTable
  * frame's offset delta (later frames are deltas from their predecessor and
@@ -55,6 +58,12 @@ final class EntryCounts {
      *     receiver push makes this shape wrong for a static target, and
      *     {@code max_stack} is raised to one where a body of zero would
      *     otherwise underprovision the push.
+     * @param valueHooks Target INSTANCE methods whose FIRST parameter is a
+     *     float, to {@code (Ljava/lang/Object;F)V} hook methods on the
+     *     owner -- the eight-byte shape, receiver and argument both in
+     *     hand, for hooks that must judge the value (the spend trace).
+     *     {@code max_stack} is raised to two where the body provisions
+     *     less.
      * @param counterOwner Internal name of the class holding the hooks,
      *     e.g. {@code rwbot/agent/ThinkCount}.
      * @return The patched bytes.
@@ -68,6 +77,7 @@ final class EntryCounts {
             byte[] classFile,
             java.util.LinkedHashMap<String, String> counters,
             java.util.LinkedHashMap<String, String> receiverHooks,
+            java.util.LinkedHashMap<String, String> valueHooks,
             String counterOwner) {
         ClassFilePatcher patcher = new ClassFilePatcher(classFile);
         String[] pool = patcher.readHeaderAndConstantPool();
@@ -77,7 +87,9 @@ final class EntryCounts {
                 3
                         + 3 * counters.size()
                         + (receiverHooks.isEmpty() ? 0 : 1)
-                        + 3 * receiverHooks.size();
+                        + 3 * receiverHooks.size()
+                        + (valueHooks.isEmpty() ? 0 : 1)
+                        + 3 * valueHooks.size();
         if (poolCount + appendedEntries > 0xffff) {
             throw new ClassFormatError("constant pool too large to grow: " + poolCount);
         }
@@ -121,6 +133,21 @@ final class EntryCounts {
                 withReceiver.add(hook.getKey());
             }
         }
+        java.util.Set<String> withValue = new java.util.LinkedHashSet<String>();
+        if (!valueHooks.isEmpty()) {
+            byte[] valueDescriptor =
+                    "(Ljava/lang/Object;F)V".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            appended.write(ClassFilePatcher.CONSTANT_UTF8);
+            CodeBodies.writeU2(appended, valueDescriptor.length);
+            appended.write(valueDescriptor, 0, valueDescriptor.length);
+            int descriptorIndex = next;
+            next += 1;
+            for (java.util.Map.Entry<String, String> hook : valueHooks.entrySet()) {
+                next = appendHook(appended, hook.getValue(), ownerClass, descriptorIndex, next);
+                refOf.put(hook.getKey(), Integer.valueOf(next - 1));
+                withValue.add(hook.getKey());
+            }
+        }
 
         patcher.skip(2); // access_flags
         patcher.skip(2); // this_class
@@ -138,7 +165,7 @@ final class EntryCounts {
         java.util.Set<String> unmatched = new java.util.LinkedHashSet<String>(refOf.keySet());
         int methodCount = patcher.readU2();
         for (int i = 0; i < methodCount; i++) {
-            collect(patcher, pool, refOf, withReceiver, unmatched, edits);
+            collect(patcher, pool, refOf, withReceiver, withValue, unmatched, edits);
         }
         if (!unmatched.isEmpty()) {
             throw new ClassFormatError(
@@ -182,21 +209,45 @@ final class EntryCounts {
             String[] pool,
             java.util.Map<String, Integer> refOf,
             java.util.Set<String> withReceiver,
+            java.util.Set<String> withValue,
             java.util.Set<String> unmatched,
             java.util.List<Edit> edits) {
         patcher.skip(2); // access_flags
         String name = pool[patcher.readU2()];
         String descriptor = pool[patcher.readU2()];
-        Integer ref = refOf.get(name + descriptor);
-        boolean receiver = withReceiver.contains(name + descriptor);
+        String key = name + descriptor;
+        Integer ref = refOf.get(key);
         int attributeCount = patcher.readU2();
         for (int i = 0; i < attributeCount; i++) {
             String attributeName = pool[patcher.readU2()];
             int lengthOffset = patcher.pos;
             int length = patcher.readU4();
             if (ref != null && "Code".equals(attributeName)) {
-                unmatched.remove(name + descriptor);
-                emit(patcher.buf, pool, ref.intValue(), receiver, lengthOffset, length, edits);
+                unmatched.remove(key);
+                int hi = (ref.intValue() >>> 8) & 0xff;
+                int lo = ref.intValue() & 0xff;
+                byte[] entry;
+                int minStack;
+                if (withValue.contains(key)) {
+                    // 0x23 is fload_1 -- the float argument's slot in an
+                    // instance method. 0x22 (fload_0) loads the RECEIVER
+                    // slot as a float, which the selftest's define+resolve
+                    // did NOT reject; the live link did, at match boot
+                    // (wiki log 2026-09-11) -- a verifier-green selftest
+                    // bounds parse errors, not type errors.
+                    entry =
+                            new byte[] {
+                                0x2a, 0x23, (byte) 0xb8, (byte) hi, (byte) lo, 0x00, 0x00, 0x00
+                            };
+                    minStack = 2;
+                } else if (withReceiver.contains(key)) {
+                    entry = new byte[] {0x2a, (byte) 0xb8, (byte) hi, (byte) lo};
+                    minStack = 1;
+                } else {
+                    entry = new byte[] {(byte) 0xb8, (byte) hi, (byte) lo, 0x00};
+                    minStack = 0;
+                }
+                emit(patcher.buf, pool, entry, minStack, lengthOffset, length, edits);
             }
             patcher.skip(length);
         }
@@ -204,40 +255,37 @@ final class EntryCounts {
 
     /**
      * Records the edits for one target Code attribute: both length fields,
-     * the four injected bytes, the exception table's shifted pcs, and the
-     * first StackMapTable frame's shifted delta (re-encoded to the extended
-     * form when the compact tag can no longer carry it).
+     * the injected entry bytes, the exception table's shifted pcs, the
+     * LineNumberTable's shifted pcs, and the first StackMapTable frame's
+     * shifted delta (re-encoded to the extended form when the compact tag
+     * can no longer carry it). Every shift is the entry's own length -- a
+     * multiple of four by construction of the shapes in {@code collect}.
      */
     private static void emit(
             byte[] buf,
             String[] pool,
-            int ref,
-            boolean receiver,
+            byte[] entry,
+            int minStack,
             int lengthOffset,
             int length,
             java.util.List<Edit> edits) {
+        int shift = entry.length;
         int maxStackPos = lengthOffset + 4;
         int codeLengthPos = maxStackPos + 4; // max_stack, max_locals.
         int codeLength = readU4At(buf, codeLengthPos);
-        if (codeLength + 4 > 0xffff) {
+        if (codeLength + shift > 0xffff) {
             throw new ClassFormatError(
                     "entry counter would pass the 65535-byte code limit at " + codeLength);
         }
         int codeStart = codeLengthPos + 4;
-        // Both shapes are FOUR bytes -- the alignment argument in the class
-        // doc covers them identically. The receiver shape pushes one ref, so
-        // a max_stack of zero (a body that never pushes) is raised to one.
-        byte[] entry =
-                receiver
-                        ? new byte[] {
-                            0x2a, (byte) 0xb8, (byte) ((ref >>> 8) & 0xff), (byte) (ref & 0xff)
-                        }
-                        : new byte[] {
-                            (byte) 0xb8, (byte) ((ref >>> 8) & 0xff), (byte) (ref & 0xff), 0x00
-                        };
+        // The receiver shape pushes one ref and the value shape a ref and a
+        // float, so a body provisioning less is raised to the shape's need.
         Edit maxStackEdit =
-                receiver && readU2At(buf, maxStackPos) == 0
-                        ? new Edit(maxStackPos, maxStackPos + 2, new byte[] {0x00, 0x01})
+                minStack > 0 && readU2At(buf, maxStackPos) < minStack
+                        ? new Edit(
+                                maxStackPos,
+                                maxStackPos + 2,
+                                new byte[] {0x00, (byte) minStack})
                         : null;
 
         int exceptionCountPos = codeStart + codeLength;
@@ -250,7 +298,7 @@ final class EntryCounts {
             for (int e = 0; e < exceptionCount; e++) {
                 for (int column = 0; column < 3; column++) { // start, end, handler.
                     int at = e * 8 + column * 2;
-                    int pc = ((fixed[at] & 0xff) << 8 | (fixed[at + 1] & 0xff)) + 4;
+                    int pc = ((fixed[at] & 0xff) << 8 | (fixed[at + 1] & 0xff)) + shift;
                     fixed[at] = (byte) ((pc >>> 8) & 0xff);
                     fixed[at + 1] = (byte) (pc & 0xff);
                 }
@@ -268,7 +316,7 @@ final class EntryCounts {
             int attrLength = readU4At(buf, at + 2);
             if ("StackMapTable".equals(pool[attrName]) && readU2At(buf, at + 6) > 0) {
                 int framePos = at + 8;
-                byte[] head = shiftedFrameHead(buf, framePos);
+                byte[] head = shiftedFrameHead(buf, framePos, shift);
                 int oldHead = (buf[framePos] & 0xff) <= 127 ? 1 : 3;
                 growth = head.length - oldHead;
                 if (growth != 0) {
@@ -277,16 +325,16 @@ final class EntryCounts {
                 inner.add(new Edit(framePos, framePos + oldHead, head));
             }
             if ("LineNumberTable".equals(pool[attrName]) && readU2At(buf, at + 6) > 0) {
-                inner.add(shiftedLineTable(buf, at + 8, readU2At(buf, at + 6)));
+                inner.add(shiftedLineTable(buf, at + 8, readU2At(buf, at + 6), shift));
             }
             at += 6 + attrLength;
         }
 
-        edits.add(new Edit(lengthOffset, lengthOffset + 4, u4(length + 4 + growth)));
+        edits.add(new Edit(lengthOffset, lengthOffset + 4, u4(length + shift + growth)));
         if (maxStackEdit != null) {
             edits.add(maxStackEdit);
         }
-        edits.add(new Edit(codeLengthPos, codeLengthPos + 4, u4(codeLength + 4)));
+        edits.add(new Edit(codeLengthPos, codeLengthPos + 4, u4(codeLength + shift)));
         edits.add(new Edit(codeStart, codeStart, entry));
         if (exceptionEdit != null) {
             edits.add(exceptionEdit);
@@ -296,9 +344,9 @@ final class EntryCounts {
 
     /**
      * Renders one LineNumberTable's entries with every {@code start_pc}
-     * shifted by four, then re-anchors the lowest entry at zero so the
-     * injected bytes stay covered by the first real line. Left unshifted,
-     * every reported line in a patched method drifts to whichever entry the
+     * shifted, then re-anchors the lowest entry at zero so the injected
+     * bytes stay covered by the first real line. Left unshifted, every
+     * reported line in a patched method drifts to whichever entry the
      * shifted pc falls into next -- measured as a draw at real line 742
      * reported as 747, which sent a session tracing the wrong statement
      * (wiki log 2026-09-11).
@@ -306,16 +354,17 @@ final class EntryCounts {
      * @param buf The class bytes.
      * @param tableStart Offset of the first entry's {@code start_pc}.
      * @param entries Number of entries; the caller has proven it non-zero.
+     * @param shift The entry's length in bytes.
      * @return The replacement edit spanning exactly the entries.
      */
-    private static Edit shiftedLineTable(byte[] buf, int tableStart, int entries) {
+    private static Edit shiftedLineTable(byte[] buf, int tableStart, int entries, int shift) {
         byte[] table = new byte[entries * 4];
         System.arraycopy(buf, tableStart, table, 0, table.length);
         int lowestAt = 0;
         int lowestPc = Integer.MAX_VALUE;
         for (int e = 0; e < entries; e++) {
             int pcAt = e * 4;
-            int pc = ((table[pcAt] & 0xff) << 8 | (table[pcAt + 1] & 0xff)) + 4;
+            int pc = ((table[pcAt] & 0xff) << 8 | (table[pcAt + 1] & 0xff)) + shift;
             table[pcAt] = (byte) ((pc >>> 8) & 0xff);
             table[pcAt + 1] = (byte) (pc & 0xff);
             if (pc < lowestPc) {
@@ -330,27 +379,29 @@ final class EntryCounts {
 
     /**
      * Renders the first StackMapTable frame's head with its offset delta
-     * grown by four -- the uniform shift the prepend applies to every
-     * bytecode offset. Only the FIRST frame carries an absolute delta;
-     * every later frame is a delta from its predecessor and needs nothing.
+     * grown by the shift -- the uniform displacement the prepend applies to
+     * every bytecode offset. Only the FIRST frame carries an absolute
+     * delta; every later frame is a delta from its predecessor and needs
+     * nothing.
      *
      * @param buf The class bytes.
      * @param framePos Offset of the first frame's tag byte.
+     * @param shift The entry's length in bytes.
      * @return The replacement head: same tag with the bigger compact delta,
      *     the delta bumped in place for the u2 forms, or the extended
      *     re-encoding when the compact form can no longer carry it.
      */
-    private static byte[] shiftedFrameHead(byte[] buf, int framePos) {
+    private static byte[] shiftedFrameHead(byte[] buf, int framePos, int shift) {
         int tag = buf[framePos] & 0xff;
         if (tag <= 63) {
-            int delta = tag + 4;
+            int delta = tag + shift;
             if (delta <= 63) {
                 return new byte[] {(byte) delta};
             }
             return new byte[] {(byte) 251, (byte) ((delta >>> 8) & 0xff), (byte) (delta & 0xff)};
         }
         if (tag <= 127) {
-            int delta = tag - 64 + 4;
+            int delta = tag - 64 + shift;
             if (delta <= 63) {
                 return new byte[] {(byte) (64 + delta)};
             }
@@ -361,7 +412,7 @@ final class EntryCounts {
             // a frame this shift understands, and guessing would corrupt it.
             throw new ClassFormatError("reserved StackMapTable frame tag " + tag);
         }
-        int delta = readU2At(buf, framePos + 1) + 4;
+        int delta = readU2At(buf, framePos + 1) + shift;
         return new byte[] {(byte) tag, (byte) ((delta >>> 8) & 0xff), (byte) (delta & 0xff)};
     }
 

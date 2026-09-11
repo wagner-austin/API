@@ -411,6 +411,10 @@ final class MatchSetup {
         // that started before the seed was applied would difference wrongly
         // across the exact boundary the instrument watches (ThinkCount).
         ThinkCount.reset();
+        // The spend trace's last-balance map crosses the same boundary: a
+        // carried menu balance would report the match's opening grant as a
+        // spend (AiCadence.traceSpends).
+        AiCadence.reset();
         // A previous match's watched orders are not this match's; the sweep
         // would read them against a world that never dispatched them.
         BuildWatch.reset();

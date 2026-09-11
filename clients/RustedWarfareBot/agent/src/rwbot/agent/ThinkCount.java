@@ -91,6 +91,12 @@ public final class ThinkCount {
         groupThinks = 0;
         groupDrives = 0;
         scansRemaining = 48;
+        // Sized for the WHOLE match: the ti pair's 400 died thousands of
+        // frames before its fork window, and the drip charges it spent the
+        // budget on are exactly the record the fork diff needs (wiki log
+        // 2026-09-11). A full match charges a few thousand times; the cap
+        // exists only against a pathological loop.
+        spendStacksRemaining = 100000;
     }
 
     /**
@@ -196,6 +202,118 @@ public final class ThinkCount {
     }
 
     /**
+     * Spend-stack captures still to print; zero until the match-start
+     * reset. A full match spends a few hundred times, so the budget covers
+     * the whole run without letting a pathological loop flood the log.
+     */
+    private static int spendStacksRemaining;
+
+    /**
+     * Logs the caller chain of one team-credit DECREASE -- the value hook
+     * on the team class's single credit mutator {@code n.d(F)V}.
+     *
+     * <p>The spend-traced pair pinned the post-definal fork to one tick
+     * where both twins held 1655 credits and one spent 683 while the other
+     * spent 1583 -- the same 900-credit unit bought in one world and not
+     * the other, with all three draw streams and every think counter still
+     * identical (wiki log 2026-09-11). The trace names the tick; only the
+     * stack can name the DECIDER. Income arrives through the same mutator
+     * every tick, so the hook judges the sign and returns without cost for
+     * the non-spend majority.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param team The {@code game.n} team being charged.
+     * @param amount The signed credit delta; negative is a spend.
+     */
+    public static void spend(Object team, float amount) {
+        if (amount >= 0.0f || spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        StringBuilder out = new StringBuilder("spendstack team=");
+        out.append(render(readInherited(team, EngineNames.TEAM_ID))).append(" amt=").append(amount);
+        appendCallers(out);
+        Log.info(out.toString());
+    }
+
+    /**
+     * Logs the caller chain of one price-object team-credit mutation --
+     * the receiver hook on all five mutators of
+     * {@code units.custom.d.b}, the class the owner-agnostic putfield
+     * sweep left as the only debit path once {@code n.d(F)} measured
+     * income-only (wiki log 2026-09-11). The receiver is the PRICE, so
+     * its {@code b} field carries the amount and no argument capture is
+     * needed; charge and refund both land here and the stack tells them
+     * apart. Shares the spend-stack budget.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param price The {@code custom.d.b} price object being applied.
+     */
+    public static void charge(Object price) {
+        if (spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        StringBuilder out = new StringBuilder("chargestack t=");
+        out.append(AiCadence.tick());
+        out.append(" amt=").append(render(readInherited(price, "b")));
+        appendCallers(out);
+        Log.info(out.toString());
+    }
+
+    /**
+     * Logs one lockstep order at execution -- the receiver hook on
+     * {@code gameFramework.e.k()V}. The tja/tjb pair measured the SAME
+     * execution stack charging different amounts at the same tick, which
+     * leaves exactly two possibilities: the order carried a different
+     * action id (the AI decided differently upstream), or the same id
+     * resolved to a different action (a per-process map). The order's own
+     * interned action key prints as {@code ActionId(<id>)}, so two runs'
+     * order sequences diff directly. Shares the spend-stack budget.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param order The {@code gameFramework.e} order being executed.
+     */
+    public static void order(Object order) {
+        if (spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        Object team = readInherited(order, "i");
+        Object teamId = team == null ? null : readInherited(team, EngineNames.TEAM_ID);
+        Log.info(
+                "orderexec t=" + AiCadence.tick() + " team=" + render(teamId)
+                        + " action=" + render(readInherited(order, "k")));
+    }
+
+    /**
+     * Logs the caller chain of one order CREATION -- the receiver hook on
+     * the command factory {@code gameFramework.c.b(n)}. The tka/tkb pair
+     * measured the twins' order streams splitting at one enemy
+     * construction choice with every stream and schedule identical, so
+     * the frames above this factory name the function that chose
+     * differently -- the seam's own address (wiki log 2026-09-11).
+     * Shares the spend-stack budget.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param queue The command queue creating the order.
+     */
+    public static void queued(Object queue) {
+        if (spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        StringBuilder out = new StringBuilder("queuestack t=");
+        out.append(AiCadence.tick());
+        appendCallers(out);
+        Log.info(out.toString());
+    }
+
+    /**
      * Reads one field as declared on one exact class -- the resolution the
      * scan's own {@code getfield} performs, which a hierarchy walk from the
      * instance's class gets wrong here: the obfuscated subclasses redeclare
@@ -258,6 +376,32 @@ public final class ThinkCount {
             }
         }
         return null;
+    }
+
+    /**
+     * Appends this call's own game-side caller chain, compactly: up to ten
+     * frames above the hook, the engine's package prefix stripped -- the
+     * shared rendering of every stack-printing hook (spend, charge,
+     * queued), lifted rather than forked when the third copy appeared.
+     *
+     * @param out The line under construction.
+     */
+    private static void appendCallers(StringBuilder out) {
+        StackTraceElement[] frames = new Throwable().getStackTrace();
+        int printed = 0;
+        for (int i = 2; i < frames.length && printed < 10; i++) {
+            String cls = frames[i].getClassName();
+            if (cls.startsWith("com.corrodinggames.")) {
+                cls = cls.substring("com.corrodinggames.".length());
+            }
+            out.append(" < ")
+                    .append(cls)
+                    .append('.')
+                    .append(frames[i].getMethodName())
+                    .append(':')
+                    .append(frames[i].getLineNumber());
+            printed++;
+        }
     }
 
     private static String render(Object value) {

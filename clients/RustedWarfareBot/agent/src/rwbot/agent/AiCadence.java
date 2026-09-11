@@ -38,7 +38,34 @@ final class AiCadence {
      */
     private static final int EARLY_WINDOW = 120;
 
+    /** Ticks seen since the match-start reset; timestamps the spend trace. */
+    private static int spendTicks;
+
+    /** Last credit balance per AI team id, for the spend trigger. */
+    private static final java.util.Map<Integer, Long> lastCredits =
+            new java.util.HashMap<Integer, Long>();
+
     private AiCadence() {
+    }
+
+    /**
+     * Zeroes the spend trace at match start, beside the other instrument
+     * resets ({@link MatchSetup}): the menu demo's AI spends too, and a
+     * last-balance carried across the boundary would report the seed
+     * application itself as a spend.
+     */
+    static void reset() {
+        spendTicks = 0;
+        lastCredits.clear();
+    }
+
+    /**
+     * The current match tick, for instruments that stamp their lines with
+     * it ({@link ThinkCount#charge}) -- the charge and spend traces
+     * correlate by this number and nothing else.
+     */
+    static int tick() {
+        return spendTicks;
     }
 
     /**
@@ -58,6 +85,7 @@ final class AiCadence {
         if (!RandomTap.requested()) {
             return;
         }
+        traceSpends();
         int tick = earlyTicks;
         if (tick >= EARLY_WINDOW) {
             return;
@@ -161,6 +189,44 @@ final class AiCadence {
             }
         }
         Log.info("aitick t=" + tick + out);
+    }
+
+    /**
+     * Prints one line per AI-team credit DECREASE, every tick, unbounded --
+     * the seam the pinned full-length pair left standing: at frame 48,825
+     * one twin held 972 credits and the other 72 with all three stream
+     * hashes and every think counter still identical, a ~900-credit
+     * draw-free spend the 75-frame cadence can bracket but never timestamp
+     * (wiki log 2026-09-11). Income is continuous and spends are events,
+     * so triggering on decrease keeps the trace to the events that matter.
+     * Two runs' spend lines, diffed, name the first divergent purchase by
+     * tick and amount.
+     */
+    private static void traceSpends() {
+        Object engine = EngineHandle.current();
+        if (engine == null) {
+            return;
+        }
+        int tick = spendTicks;
+        spendTicks = tick + 1;
+        Class<?> teams = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        Class<?> ai = EngineAccess.pinnedClass(EngineNames.AI_CLASS);
+        java.lang.reflect.Method lookup =
+                EngineAccess.pinnedMethod(teams, EngineNames.TEAM_LOOKUP, int.class);
+        int count = EngineAccess.readStaticIntField(teams, EngineNames.TEAM_COUNT);
+        for (int index = 0; index < count; index++) {
+            Object team = EngineAccess.invoke(lookup, null, Integer.valueOf(index));
+            if (team == null || !ai.isInstance(team)) {
+                continue;
+            }
+            int id = EngineAccess.readIntField(team, EngineNames.TEAM_ID);
+            long credits = (long) EngineAccess.readDoubleField(team, EngineNames.CREDITS);
+            Long last = lastCredits.put(Integer.valueOf(id), Long.valueOf(credits));
+            if (last != null && credits < last.longValue()) {
+                Log.info(
+                        "credspend t=" + tick + " team=" + id + " " + last + "->" + credits);
+            }
+        }
     }
 
     /**

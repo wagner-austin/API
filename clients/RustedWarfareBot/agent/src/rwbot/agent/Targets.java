@@ -217,6 +217,15 @@ final class Targets {
     static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkCounters() {
         java.util.Map<String, java.util.LinkedHashMap<String, String>> byOwner =
                 new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, String>>();
+        // The team class carries no counters -- it is here so the spend
+        // hook ({@link #thinkValues()}) rides the same transformer and the
+        // same loud accounting. FIRST deliberately: the AI class extends
+        // it, so the selftest loader must define the patched team before
+        // resolving an AI class makes it an initiating loader of the
+        // unpatched one (a duplicate-definition LinkageError otherwise).
+        byOwner.put(
+                EngineNames.TEAM_CLASS.replace('.', '/'),
+                new java.util.LinkedHashMap<String, String>());
         java.util.LinkedHashMap<String, String> task =
                 new java.util.LinkedHashMap<String, String>();
         task.put("f()V", "aim");
@@ -229,7 +238,34 @@ final class Targets {
         group.put("b(F)V", "groupThink");
         group.put("d(F)V", "groupDrive");
         byOwner.put("com/corrodinggames/rts/game/a/i", group);
+        // The price and order classes carry no counters either -- targeted
+        // so their hooks ({@link #thinkScans()}) ride the same transformer.
+        byOwner.put(
+                "com/corrodinggames/rts/game/units/custom/d/b",
+                new java.util.LinkedHashMap<String, String>());
+        byOwner.put(
+                "com/corrodinggames/rts/gameFramework/e",
+                new java.util.LinkedHashMap<String, String>());
+        byOwner.put(
+                "com/corrodinggames/rts/gameFramework/c",
+                new java.util.LinkedHashMap<String, String>());
         return byOwner;
+    }
+
+    /**
+     * The value hooks, per class: the team's single credit mutator
+     * {@code n.d(F)V}, hooked with receiver and amount in hand so
+     * {@link ThinkCount#spend} can judge the sign and print the caller
+     * chain of a spend -- the post-definal fork is a 900-credit purchase
+     * made in one twin and not the other with every stream identical, and
+     * only the stack can name the decider (wiki log 2026-09-11).
+     * Descriptor javap-verified against the pinned jar, 2026-09-11.
+     */
+    static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkValues() {
+        java.util.LinkedHashMap<String, String> team =
+                new java.util.LinkedHashMap<String, String>();
+        team.put("d(F)V", "spend");
+        return java.util.Collections.singletonMap(EngineNames.TEAM_CLASS.replace('.', '/'), team);
     }
 
     /**
@@ -241,9 +277,46 @@ final class Targets {
      * 2026-09-11.
      */
     static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkScans() {
+        java.util.Map<String, java.util.LinkedHashMap<String, String>> byOwner =
+                new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, String>>();
         java.util.LinkedHashMap<String, String> task =
                 new java.util.LinkedHashMap<String, String>();
         task.put("a(Z)Lcom/corrodinggames/rts/game/a/i;", "scan");
-        return java.util.Collections.singletonMap("com/corrodinggames/rts/game/a/n", task);
+        byOwner.put("com/corrodinggames/rts/game/a/n", task);
+        // The price object's five team-credit mutators -- the ONLY debit
+        // path the owner-agnostic putfield sweep left standing once n.d(F)
+        // measured income-only, so the 900-credit fork's purchase must
+        // pass through here ({@link ThinkCount#charge}; wiki log
+        // 2026-09-11). The receiver IS the price, so the four-byte shape
+        // carries the amount implicitly. Descriptors javap-verified.
+        java.util.LinkedHashMap<String, String> price =
+                new java.util.LinkedHashMap<String, String>();
+        price.put("a(Lcom/corrodinggames/rts/game/units/am;)V", "charge");
+        price.put("a(Lcom/corrodinggames/rts/game/units/am;D)V", "charge");
+        price.put("a(Lcom/corrodinggames/rts/game/units/am;DZ)V", "charge");
+        price.put("g(Lcom/corrodinggames/rts/game/units/am;)V", "charge");
+        price.put("h(Lcom/corrodinggames/rts/game/units/am;)V", "charge");
+        byOwner.put("com/corrodinggames/rts/game/units/custom/d/b", price);
+        // The lockstep order's executor: the tja/tjb pair measured the
+        // SAME execution stack charging 1200 in one twin and 700 in the
+        // other at the same tick, so the next question is whether the
+        // ORDER carried a different action id or the same id resolved
+        // differently ({@link ThinkCount#order}; wiki log 2026-09-11).
+        java.util.LinkedHashMap<String, String> order =
+                new java.util.LinkedHashMap<String, String>();
+        order.put("k()V", "order");
+        byOwner.put("com/corrodinggames/rts/gameFramework/e", order);
+        // The order FACTORY: tka/tkb measured the twins' order streams
+        // splitting at one enemy construction choice (artillery turret vs
+        // AA turret, identical streams and schedules), so the caller
+        // chain INTO the factory names the deciding function
+        // ({@link ThinkCount#queued}; wiki log 2026-09-11).
+        java.util.LinkedHashMap<String, String> factory =
+                new java.util.LinkedHashMap<String, String>();
+        factory.put(
+                "b(Lcom/corrodinggames/rts/game/n;)Lcom/corrodinggames/rts/gameFramework/e;",
+                "queued");
+        byOwner.put("com/corrodinggames/rts/gameFramework/c", factory);
+        return byOwner;
     }
 }

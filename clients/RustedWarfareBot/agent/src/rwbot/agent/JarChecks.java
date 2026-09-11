@@ -338,6 +338,11 @@ final class JarChecks {
                 if (scanHooks == null) {
                     scanHooks = new java.util.LinkedHashMap<String, String>();
                 }
+                java.util.LinkedHashMap<String, String> valueHooks =
+                        Targets.thinkValues().get(internalName);
+                if (valueHooks == null) {
+                    valueHooks = new java.util.LinkedHashMap<String, String>();
+                }
                 byte[] counted;
                 try {
                     counted =
@@ -345,6 +350,7 @@ final class JarChecks {
                                     original,
                                     entry.getValue(),
                                     scanHooks,
+                                    valueHooks,
                                     Targets.THINK_COUNT_OWNER);
                 } catch (ClassFormatError e) {
                     System.out.println("FAIL " + internalName + ": " + e.getMessage());
@@ -391,6 +397,7 @@ final class JarChecks {
             EntryCounts.prepend(
                     original,
                     bogus,
+                    new java.util.LinkedHashMap<String, String>(),
                     new java.util.LinkedHashMap<String, String>(),
                     Targets.THINK_COUNT_OWNER);
         } catch (ClassFormatError e) {
