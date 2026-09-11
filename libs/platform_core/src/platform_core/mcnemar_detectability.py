@@ -47,7 +47,18 @@ record ANSWERS "what would it have taken" rather than classifying a result
 against a threshold. Nothing is handed to it to compare against -- a caller
 holding a smallest-effect-of-interest compares it to
 ``minimum_detectable_rate_difference`` themselves, and a caller without one
-(``code-style`` has no declared SEI) still gets a usable number.
+still gets a usable number.
+
+``code-style`` DECLARED ONE ON 2026-09-11 AND IT DOES NOT CHANGE THIS SHAPE.
+Its threshold is 5.0 percentage points, and the comparison lives on that
+project's page rather than in this record, because the threshold is a
+statement about what that project would act on and this module is used by
+several. The verdicts it produces are worth recording here for the one thing
+they show about the instrument: at *d*=6/*n*=226 the MDE is 2.4610pp and
+clears it, while at *d*=5/*n*=90 it is 5.0706pp and misses by SEVEN
+HUNDREDTHS OF A POINT. A verdict that turns on 0.07pp is a verdict a reader
+should see the margin for, which is the argument for reporting the effect and
+letting the caller compare rather than returning a bare TESTED/NOT_TESTED.
 """
 
 from __future__ import annotations
