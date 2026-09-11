@@ -55,6 +55,7 @@ from monorepo_guards.typing_rules import TypingRule
 from monorepo_guards.util import iter_py_files
 from monorepo_guards.validation_rules import ValidationRule
 from monorepo_guards.worker_imports_rules import WorkerImportsRule
+from monorepo_guards.workflow_timeout_rules import WorkflowTimeoutRule
 
 
 def _run_with_config(config: GuardConfig) -> int:
@@ -101,6 +102,7 @@ def _run_with_config(config: GuardConfig) -> int:
         MonkeyPatchBanRule(),
         RestrictedSymbolRule(),
         EscapingPathDependencyRule(config),
+        WorkflowTimeoutRule(config),
         RustTestRule(config),
         RustCargoLintRule(config),
         RustManualSerializeRule(config),
