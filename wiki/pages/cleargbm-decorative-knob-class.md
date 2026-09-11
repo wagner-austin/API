@@ -13,12 +13,16 @@ source_paths:
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": 6f29219931d6bb9d551b5bb779732244686d2dcf
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": fc13f65bf30747f8d9f7b3a2b3df405babb84b78
   "libs/covenant_ml/src/covenant_ml/backends/cleargbm/config_resolution.py": 01a6e7afb76b784ec6a5a724ee7fae40d5288279
   "libs/covenant_ml/src/covenant_ml/optimizer/objectives/cleargbm_objective.py": 01eff0e2bcda1d7fad9e16bdc23ad0b2e38ba90d
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
-  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md": 318c52bf116884209a5b5d294329d909f0109837
-  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": eeac3932d433742870ccadf0286d691348b3cc11
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md": 92bd0abb9052968564d52919c274b45ad11d2cea
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9
+provenance:
+  - "repinned 2026-09-11, three entries, each on a mechanical argument rather than a re-reading of the claims. The two benchmark documents changed +49/-0 and +42/-0 -- Power sections appended by the power audit, board 1e4ab572 -- so no line either one could be cited at was removed or altered."
+  - "backend.py changed +4/-2 and the whole of it is a type alias being inlined: ProgressCallback became Callable[[TrainProgress], None] on one parameter, same signature, no logic. No page in this wiki cites the removed name (grepped). The same edit was made to three sibling regressors in the same sweep."
+  - "THE APPENDED POWER SECTIONS ARE ADVERSE TO THE DOCUMENTS THEY SIT IN and a reader of this page should know it: the scale_pos_weight one argues the +/- figures in its table are the across-fold spread rather than the paired dispersion either comparison needs, and the knob-closure one argues its 'statistical wash' is a null reported without a resolvable effect."
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

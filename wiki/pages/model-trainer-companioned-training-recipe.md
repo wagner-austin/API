@@ -20,15 +20,16 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 9300942991b85dcc3bb354ecca84e4680ce9ee2d
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
   "services/Model-Trainer/src/model_trainer/cli/cartridge_varied_companion_sweep.py": f2143579c9fd9bda4e36f04fd2c47f3322b25d15
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": dc7f268e2ff733d554e860627c431f6ea3b6b4bf
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_diverse_companion_sweep.py": 4c945f9a06595920bfbad632d6e5027f57aae8c5
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_varied.py": ceb89138c973e1f2d60bf1ddf8c5d04814903533
   "services/Model-Trainer/src/model_trainer/core/services/finetuning/strategies/cartridge_model.py": 75b3370cb8fd7ba5a7d5cac712e2a61c3abe6fdb
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_base_lora.py": 51621f94781dd5b27149fcc5931c4bb6e7209006
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 6e96538b0370caebbe7e459104283392b9a2941a
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 8016cdc60390944dff4bc6d9c6e28e8a2f2349d8
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dc758263db2d9ac7e08156d40fd79e11d728b12e
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dfa5a7d174611bbff80a1509c61c5236ae3ad670
   "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
 provenance:
+  - "the three sweep pins repinned 2026-09-11 after establishing that their deletions are a MOVE rather than a removal. Each lost 100-150 non-comment lines to cartridge_lora_families.py, whose own docstring records why: the companion-cross arms, the two cell families and the per-family floors were byte-identical between the base-LoRA and content-LoRA sweeps, and two copies of a measurement are two copies of its ARM NAMES -- which is what pairs a run against this page's ladder. The identifiers this page names, train_on and train_composition_lora_invariant, both resolve at HEAD, and all three sweeps still expose measure_grid and main."
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
   - "baseline being moved: the a67d6038 composition-sweep record (fixed-64: n2 62.8%, n4 -45.4%)"

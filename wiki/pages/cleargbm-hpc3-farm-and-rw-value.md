@@ -14,14 +14,17 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md
 source_git_blobs:
-  "tools/hpc3/runs/hpc3.json": b9c7f77d605417ca0b1afb0a99c75d70f35e3d1c
+  "tools/hpc3/runs/hpc3.json": 6265d6ba9ad76de416cc1aa914abf65253b72ceb
   "tools/hpc3/runs/sweep-cleargbm-p6-rung1.json": 3a10d80f404ce7dce29abb754f309178052ad8ff
   "libs/covenant_ml/scripts/derive_rw_value.py": ea009dd9bbe34ff6786df7b9af24e9e4a51469e1
   "libs/covenant_ml/scripts/build_metab_corpus.py": 3b7eb28d5db3e72dded3d3092fc96e590416e2f7
   "libs/covenant_ml/scripts/build_voc_corpus.py": fbc511ae75148199c2ed706d154a2d67bb4ee8a3
   "libs/covenant_ml/src/covenant_ml/datasets/xlsx_reader.py": f490a898b0b7b7b37312aab6e90d82febff69408
   "libs/covenant_ml/src/covenant_ml/benchmarking/regression_quality.py": c7eead0886cb87eb9d5a7de355add58db819aa3a
-  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md": a8aaf35a888cfda68e7331b0132fe09a19eb06e4
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md": 0dfe8e7fb905d390a0d2c02f6cd65662dc19f4d1
+provenance:
+  - "hpc3.json repinned 2026-09-11 after RE-READING the claim against the new file, not on a mechanical argument: the workspace gained certified_inputs and resumes_from_checkpoint and lost checkpoint_steps, none of which this page cites. Its actual claim -- the cleargbm project block is 4 cpus, 16 GB, 60 minutes, gpu null, deterministic true, with numpy/lightgbm/xgboost pinned -- reads back from HEAD as cpus 4, mem_gb 16, minutes 60, gpu None, deterministic True, numpy 2.3.5 / lightgbm 4.6.0 / xgboost 3.1.2. Every clause holds."
+  - "the benchmark document repinned on a mechanical argument: its diff is +52/-0, a Power section appended by the power audit (board 1e4ab572), so no cited line moved. THE APPENDED SECTION IS ADVERSE and a reader should know it: it argues every 'per-seed wins: a/b/c' verdict in that document is a sign test that resolves nothing at n=5."
 fact_checked: "2026-08-24"
 confidence: high
 hubs: [libs]

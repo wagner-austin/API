@@ -10,7 +10,10 @@ source_paths:
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md
 source_git_blobs:
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
-  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": eeac3932d433742870ccadf0286d691348b3cc11
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_knob_closure.md": f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9
+provenance:
+  - "repinned 2026-09-11 on a mechanical argument rather than a re-reading: the knob-closure document's diff from the pinned blob to HEAD is +42/-0, a Power section appended by the power audit (board 1e4ab572). Nothing was removed or altered, so every line this page could have cited is still present byte-identical. Check with: git diff eeac3932d433742870ccadf0286d691348b3cc11 f544b40fa8e4619fbe29c525bd1ef8d694c4ecd9"
+  - "THE APPENDED SECTION IS ADVERSE TO THE DOCUMENT IT SITS IN, which is worth a reader's attention even though it cannot stale a citation: it argues that the document's 'statistical wash on the mean' is a null reported without the effect its instrument could have resolved."
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

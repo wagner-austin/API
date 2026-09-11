@@ -7,8 +7,10 @@ source_paths:
   - libs/platform_workers
   - libs/platform_workers/README.md
 source_git_blobs:
-  "libs/platform_workers": 273a2b2e989a14f12d19ca7f1ae79a3d1eb89725
+  "libs/platform_workers": 2b0d68d9ccb7f9ffb9a12d8da3b26884255e9fbe
   "libs/platform_workers/README.md": b5204d1d51000d9ee256eb8f26973dc917ed2cb4
+provenance:
+  - "repinned 2026-09-11 on a checked argument: the tree's diff is +330/-9, the additions being a health module and an rq_harness with their tests, and the nine deletions being two type aliases inlined -- PublishFn and ClockFn removed from local_kv in the same sweep that inlined ProgressCallback across covenant_ml and covenant_nn -- plus one import line moving. No page in this wiki cites either removed name (grepped), and no behaviour of the RQ pattern this page describes was withdrawn."
 fact_checked: "2026-08-14"
 confidence: high
 hubs: [libs]

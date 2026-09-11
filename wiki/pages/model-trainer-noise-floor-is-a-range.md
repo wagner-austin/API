@@ -10,10 +10,13 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/core/contracts/replicated_measurement.py": 2c6af8b1ad7bdae264d03ae689a8d76dcc89f0eb
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 14a8f4c663b59b0f266fcb22b58820dadfff82cb
+  "services/Model-Trainer/src/model_trainer/core/contracts/replicated_measurement.py": 8189df19d95ad70a03b11e5c0be11ae7b2478cf3
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 32427d62f7e123078e671532a78ea09f3feeeaae
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 8311628f7d7c217293518e7d77a12a0a486c0889
 provenance:
+  - "cartridge_benchmark.py repinned 2026-09-11: it removed two lines, both DOCSTRING, saying sweep_observations emits 'two observations per adjacent pair'. It now emits five, the extra three being the paired sd, the minimum detectable effect and the paired verdict -- which is the statistic THIS PAGE ARGUED FOR. No page in this wiki makes the 'two observations' claim (grepped), so nothing here is stale; the change is this page's own recommendation landing."
+  - "cartridge_plans.py repinned 2026-09-11: its six removed lines are the body of corpus_digest being replaced by a call to a new digest_parts, whose body is byte-for-byte the same length-prefixed sha256 loop. The digest VALUE is unchanged, which matters because this page cites corpus digest e2f23c635583."
+  - "replicated_measurement.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +201/-0, the paired-separation machinery this page argued FOR being added beside the range statistic it criticises. Nothing was removed, so noise_floor is still max(gains) - min(gains) maxed over arms, exactly as cited. Check with: git diff 2c6af8b1ad7bdae264d03ae689a8d76dcc89f0eb 8189df19d95ad70a03b11e5c0be11ae7b2478cf3"
   - "measured 2026-09-06 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
   - "plan gpt2-wiki-9seed, label gpt2-wiki-9seed-gpt2-w256-s4-e12-lr0.01-slots2.8.32.128.512-c128-seeds7.8.9.10.11.12.13.14.15-e2f23c635583"
   - "corpus e2f23c635583 = the 12 me-wiki pages carrying visibility: public; second corpus legal-wiki, both archived byte-for-byte"

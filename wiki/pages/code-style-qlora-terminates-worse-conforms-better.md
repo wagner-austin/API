@@ -46,7 +46,7 @@ source_git_blobs:
   "tools/code-style-eval/pyproject.toml": 110037c5f0646c8fb6f44ae30ea2112767bffb30
   "tools/hpc3/runs/code-corpus-v2-digests.txt": 24a8666ada84178a782e6b6be3e00fd1227b1f73
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
-  "libs/platform_core/src/platform_core/power_distributions.py": 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56
+  "libs/platform_core/src/platform_core/power_distributions.py": 34420ac8a768198e03a96de0f9d175eac9b15f41
   "tools/code-style-eval/tests/test_published_comparisons.py": 9d8789a618d8e870136cb758d5059a70c4ebe678
   "services/Model-Trainer/src/model_trainer/core/services/model/continuations.py": 963041d82664195e4aa7fd6d69a54f64c1ebcb33
   "tools/hpc3/runs/code-style-gen-v1-base.json": c650a9dcb602022d5bc8ab9c35e9b586fa4ce133
@@ -60,6 +60,7 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/cli/clustering.py": 0e5c0f9a2ed85a28523bb6660743af36b0221e11
   "tools/code-style-eval/src/code_style_eval/contracts/generation.py": c1e757eba479597c84fb1e98e64fe2b0b7156e54
 provenance:
+  - "power_distributions.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +81/-0, a require_probability validator and its helpers appended. No line was removed or altered, so the mid-p and exact rejection regions this page's verdicts were computed under are byte-identical. Check with: git diff 3ce9c397f4fba4f1b71fc4757a3ef4da077fae56 34420ac8a768198e03a96de0f9d175eac9b15f41"
   - "trained 2026-09-07, job 55806443, A30 on hpc3-gpu-l54-09, 3731s, image digest 5dfd78a7eb14"
   - "generated 2026-09-07, jobs 55809956 (base, A30 hpc3-gpu-k54-01) and 55809960 (candidate, A30 hpc3-gpu-l54-08)"
   - "adapter sha256 e675f88218fde25a0b410bd44da29c345a6701dac92e81dcf6bb9b624427b7fd"

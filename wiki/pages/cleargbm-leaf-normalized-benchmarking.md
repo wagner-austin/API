@@ -10,9 +10,12 @@ source_paths:
   - libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py
   - libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/benchmarking": 70813993496e1dddd7360982c6d05e5cee94bcf7
-  "libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py": 58fa5db3637af9d401501549432d7ec6047c3866
+  "libs/covenant_ml/src/covenant_ml/benchmarking": 4e78d256cea56cb2e960895a09b37a877d4f78a4
+  "libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py": 25a396d88267100ba4cc17f626e4cac573e45703
   "libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json": e3e661369727af7b1d94feed04e06aff4374376e
+provenance:
+  - "both pins repinned 2026-09-11 after establishing the change is a MOVE rather than a removal, and the two halves confirm each other. The benchmarking package grew +835 and removed exactly two lines, both imports. The script shed 112 non-comment lines in the same sweep and its new docstring names where they went: the declaration is covenant_ml.benchmarking.declarations.VS_LIGHTGBM and the manifest write and run record are covenant_ml.benchmarking.harness's job. One side's deletions are the other side's additions."
+  - "the identifiers this page names still resolve: config.repeats and config.warmups are present in the benchmarking declarations, and the script's own docstring still describes the headline as a fit-time RATIO BETWEEN ARMS -- raw, per-leaf and normalized -- which is this page's subject."
 fact_checked: "2026-08-14"
 confidence: high
 hubs: [libs]

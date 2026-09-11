@@ -11,7 +11,10 @@ source_paths:
 source_git_blobs:
   "libs/cleargbm_rs/src/binning/edges.rs": be806fdfb21bf1461b0ff1db9be7ace47e57fef0
   "tools/hpc3/runs/sweep-cleargbm-p6-rung2.json": b0658cff6e7c44a0352e05b05b6d9d9cc3571f14
-  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md": 36471731297364d6294fb7e65ad9e40c4b2237e2
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-25_count_aware_binning.md": 8d58e489560040d633a0d6c3c6dcafbf30cc9b87
+provenance:
+  - "repinned 2026-09-11 WITHOUT re-reading the claims, and the argument is mechanical rather than a judgement: the benchmark document's diff from the pinned blob to HEAD is +124/-0, a Power section appended by the power audit (board 1e4ab572). No line was removed or altered, so every line this page could have cited is still present byte-identical. Check it with: git diff 36471731297364d6294fb7e65ad9e40c4b2237e2 8d58e489560040d633a0d6c3c6dcafbf30cc9b87"
+  - "WHAT THE APPENDED SECTION SAYS MATTERS TO THIS PAGE'S READER even though it cannot invalidate a citation: it argues the five-seed design resolves only four of nine verdicts in that document. A claim here that rests on one of the unresolved five is weak for a reason this page does not yet state."
 fact_checked: "2026-08-25"
 confidence: high
 hubs: [libs]

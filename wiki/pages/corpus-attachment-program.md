@@ -20,12 +20,12 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py
   - services/Model-Trainer/src/model_trainer/core/services/model/editing/value_optimisation.py
 source_git_blobs:
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 19bb7f1c1e1ee5e71677b6d37d986f7073723b44
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_report.py": e1016b716bea823766336a2b157a1c9587395259
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": 36950df0ed6f7a4af8ae37e3550482f1203aa376
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py": 883e01b8afba699654da81e92e8e37eca608b234
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_qa_benchmark.py": 79755892f84071db345bae6bb74fe3e14a9a0a8d
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_qa_report.py": 0f8312b313e7f356ea9e3eb87a8079452fa87010
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_retrieval.py": d6e66244d7028f48b2fc44d8e788fc7c8b61aa51
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_dense.py": 5c783813d516ebd397658ed4401f6b9482c00a53
   "services/Model-Trainer/src/model_trainer/core/services/model/corpus_cloze.py": 509132ebe55fc8717e973b3183bd3018d9b0ec58
-  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 8f2fd9d682790c501b7255cba8c6187a33a7b81c
+  "services/Model-Trainer/src/model_trainer/cli/cartridge_benchmark.py": 32427d62f7e123078e671532a78ea09f3feeeaae
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/apply.py": 411c47f975fad5b700bcc6948da496f9af9c4c73
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/grounding.py": 3315e270ab5f129eb92acc25bc90aa16d610ac0b
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/curated_triples.py": c8294f15c0d14b61604c02418df58f0f9dfbfec7
@@ -33,6 +33,8 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/triple_edit_plans.py": f7af025c96945aa117cba11617c24a35fecd0784
   "services/Model-Trainer/src/model_trainer/core/services/model/editing/value_optimisation.py": 2d71c8069f08a946dd47bccf8e03d97825a3e6c7
 provenance:
+  - "five pins repinned 2026-09-11, each checked rather than assumed. cartridge_qa_report.py removed NOT ONE LINE. cartridge_benchmark.py removed two, both docstring, because sweep_observations now emits five rows per adjacent pair instead of two; no page in this wiki makes the 'two observations' claim. cartridge_dense.py removed five to batch its encoder after a run raised torch.OutOfMemoryError on a 15607-chunk single batch."
+  - "THE ONE WORTH READING CLOSELY IS cartridge_retrieval.py, which deleted the module constants K1 = 1.5, B = 0.75 and RETRIEVED_CHUNKS = 5 -- the three numbers that made 'the cartridge beats BM25' a claim about one arbitrary point in BM25's parameter space, which this page already says. They are now declared per plan, and the committed qa plans carry bm25_k1 1.5, bm25_b 0.75, retrieved_chunks 5: the same values, so nothing measured here moves. The identifiers this page names resolve at HEAD -- build_items in corpus_cloze.py, evidence_for in cartridge_qa.py -- and cartridge_qa_benchmark.py, whose 152 non-comment deletions are its checkpointing moving into cartridge_qa_checkpoint, still exposes measure_qa_plan, qa_run_record and main."
   - "all arms measured 2026-09-08/09 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1, --controls none"
   - "records qa-svc-{gpt2,gpt2-medium,gpt2-large,gpt2-xl}.json, 32 items each, corpus digest e2f23c635583, one card, one determinism setting"
   - "DETERMINISM CERTIFICATE: four independent runs hours apart, across substantial changes to the retrieval path, agree on 12 shared accuracy fields at every rung"

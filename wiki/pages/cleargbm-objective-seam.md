@@ -15,8 +15,10 @@ source_git_blobs:
   "libs/cleargbm_rs/src/training/labels.rs": d9a4f02e3bb4f2dd84edcee07a3768e47f4da207
   "libs/cleargbm_rs/src/training/train.rs": 495474169895acf5dafdba562063ddb58536f31e
   "libs/cleargbm_rs/src/losses/squared_error.rs": c641a0d7a662b729b2ff5accfceaea3627c0427b
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py": 906b7e0bfffbb5b337078588644e88760b70170d
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/regressor.py": 2c526a5ec62e32f8687b6aae73860f3064a09d31
   "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-08-22_p1_objective_regression.md": 957460c1e7c3df106a7b2604d89791cf95a1e304
+provenance:
+  - "regressor.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +2/-2, the whole of which is a type alias being inlined -- RegressorProgressCallback became Callable[[RegressionTrainProgress], None] on one parameter. Same signature, no logic, and no page in this wiki cites the removed name. Check with: git diff 906b7e0bfffbb5b337078588644e88760b70170d 2c526a5ec62e32f8687b6aae73860f3064a09d31"
 fact_checked: "2026-08-22"
 confidence: high
 hubs: [libs]

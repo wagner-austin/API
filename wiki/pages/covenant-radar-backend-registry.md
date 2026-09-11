@@ -16,9 +16,11 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/types_regression.py": aff3788d8138340bb765cb8c88981ac81ecdf0d2
   "libs/covenant_ml/src/covenant_ml/backends/registry.py": 29320a490475bc0df82088d2ec4d36f560b62e36
   "libs/covenant_ml/src/covenant_ml/backends/regressor_registry.py": 727b6251af3d22bdc5090862c22219faa2254e6e
-  "libs/covenant_nn/src/covenant_nn/backends/mlp/regressor.py": 771559e12512529731c733ccefe5fb7fd52bcf49
-  "libs/covenant_nn/src/covenant_nn/backends/lstm/regressor.py": 0294c5be9950cc6692b3c835d4817817f99fdd3f
+  "libs/covenant_nn/src/covenant_nn/backends/mlp/regressor.py": 98f61f1831088596d43aacaf9b1ee1155fcd0f58
+  "libs/covenant_nn/src/covenant_nn/backends/lstm/regressor.py": 6aa224a13d6b680e603de70bbf81c03cf1e69890
   "services/covenant-radar-api/README.md": 34f48ed308cbe2cbffc9e867e2b4a41748c9a90b
+provenance:
+  - "the two covenant_nn regressors repinned 2026-09-11 on a mechanical argument rather than a re-reading: each diff is +3/-2 and the whole of both is one type alias being inlined -- RegressorProgressCallback became Callable[[RegressionTrainProgress], None] on one parameter. Same signature, no logic, no registry entry touched, and no page in this wiki cites the removed name. This page's claim is about WHICH backends the registry names and that is untouched by a parameter annotation."
 fact_checked: "2026-09-01"
 confidence: high
 hubs: [services]

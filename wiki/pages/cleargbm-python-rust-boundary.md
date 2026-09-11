@@ -16,8 +16,10 @@ source_git_blobs:
   "libs/cleargbm/src/cleargbm/_rust.py": 5f8ba08dec7197ffe2a203a44385d3337f0b47db
   "libs/cleargbm_rs/pyproject.toml": 4082850e2dbc7a7d9b962066ac5d1b44d46ac2b2
   "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
-  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": 6f29219931d6bb9d551b5bb779732244686d2dcf
+  "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": fc13f65bf30747f8d9f7b3a2b3df405babb84b78
   "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py": b1b17fa189ff6fae7a1af1527e186aff840802e5
+provenance:
+  - "backend.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +4/-2, the whole of which is a type alias being inlined -- ProgressCallback became Callable[[TrainProgress], None] on one parameter. Same signature, no logic, and no page in this wiki cites the removed name. Check with: git diff 6f29219931d6bb9d551b5bb779732244686d2dcf fc13f65bf30747f8d9f7b3a2b3df405babb84b78"
 fact_checked: "2026-08-17"
 confidence: high
 hubs: [libs]

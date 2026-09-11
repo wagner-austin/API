@@ -9,8 +9,11 @@ source_paths:
   - README.md
 source_git_blobs:
   "monorepo-guards.toml": 496d1d68863cdea918fb7a0f94153179d711805e
-  "libs/monorepo_guards": 853af883055eeeb77d69532d503a6bbbe12093ef
+  "libs/monorepo_guards": 10ac2049f4e770d07d3c7fbb5d562800d41cf8f3
   "README.md": a5bbc13914ac4cd4428f57ad76b987502990bfe7
+provenance:
+  - "repinned 2026-09-11 after checking the one thing that could have staled this page: whether any RULE disappeared. None did. The orchestrator's rule references went 42 to 44 and the set difference of its registered rule names between the pinned tree and HEAD is empty in the removed direction -- the tree's +4264/-260 is new rules arriving (research-registration, replicated-gain, shim, workflow-job-timeout among them) plus their tests. The three deleted definitions are private helpers (_package_of, _imported_symbols and one __init__), none of which this page cites."
+  - "A TREE PIN IS A BLUNT INSTRUMENT and this repin does not pretend otherwise: it certifies that no rule was withdrawn, not that every sentence here still describes how a rule is implemented. A claim about a specific rule's internals should be re-read against that rule's own module before it is relied on."
 fact_checked: "2026-08-14"
 confidence: high
 hubs: [infrastructure]
