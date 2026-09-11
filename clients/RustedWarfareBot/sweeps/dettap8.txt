@@ -1,0 +1,14 @@
+# The tapped identical-pair diagnostic (log 2026-09-10): four fresh seeds,
+# each played by two byte-identical doctrines at difficulty 3 with the
+# per-caller draw counter armed (--rng-tap 1 at submit). Deterministic
+# play makes each pair's rngtap windows identical; the first window
+# where the tallies differ NAMES the call site whose draw count varies
+# -- the diagnosis the 2026-09-06 floor entry queued.
+champ|8879001|doctrines/evolve3-g3m10.doctrine|10000
+twin|8879001|doctrines/det-twin.doctrine|10000
+champ|8879417|doctrines/evolve3-g3m10.doctrine|10000
+twin|8879417|doctrines/det-twin.doctrine|10000
+champ|8879833|doctrines/evolve3-g3m10.doctrine|10000
+twin|8879833|doctrines/det-twin.doctrine|10000
+champ|8880249|doctrines/evolve3-g3m10.doctrine|10000
+twin|8880249|doctrines/det-twin.doctrine|10000
