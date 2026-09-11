@@ -24,7 +24,7 @@ source_git_blobs:
   "tools/code-style-eval/src/code_style_eval/core/scoring.py": 9b1db6975f058fa38977baac3897cc0c14a49619
   "libs/platform_core/src/platform_core/power_distributions.py": 34420ac8a768198e03a96de0f9d175eac9b15f41
   "libs/platform_core/src/platform_core/minimum_detectable_effect.py": b3039c16d0b41636c975a78a8363a56644143d22
-  "libs/platform_core/src/platform_core/mcnemar_detectability.py": 25cf0e8370dda398055ea06870f63acb87612a81
+  "libs/platform_core/src/platform_core/mcnemar_detectability.py": 06a06631dfd7445c835a828c9f293fddff085983
   "libs/platform_core/src/platform_core/mcnemar_design.py": b2e29f46a21a50f451be02fd109681e800428119
   "libs/platform_core/src/platform_core/clustering.py": 7611039dbbc21a817e4c10027e282a4e21e9fdbe
 provenance:
@@ -72,6 +72,39 @@ strata could not have contradicted it. The MDEs make the same point in the
 other direction — 2.46pp, 5.07pp and 9.31pp at 80% power[^16] — each at or above
 its own stratum's base rate, so the smallest detectable effect was "the adapter
 flips essentially every item that flips at all, in one direction".
+
+## The threshold, declared
+
+**This project's smallest effect of interest is 5.0 percentage points**,
+declared by the operator on 2026-09-11. Below that, a change in guard-pass
+rate is not worth acting on here; at or above it, it is. Nothing measures
+this — it is a statement about what the project would do, and it is recorded
+so the nulls above can be read as verdicts rather than as numbers.
+
+Against the MDEs, at alpha 0.05 and 80% power under mid-p:
+
+| stratum | n | MDE | verdict | margin |
+|---|---|---|---|---|
+| all scored | 226 | 2.4610pp | **TESTED** | +2.5390pp |
+| finished in both arms | 90 | 5.0706pp | **NOT_TESTED** | −0.0706pp |
+| free of unresolvable imports too | 49 | 9.3133pp | **NOT_TESTED** | −4.3133pp |
+
+So one stratum of three could have resolved an effect this project cares
+about, and it is the one whose base rate is 2.2%.
+
+**The middle row misses by seven hundredths of a percentage point, and that
+should be read as a coin-flip rather than a finding.** An SEI of 5.1 would
+flip it to TESTED. A verdict that turns on 0.07pp is not a property of the
+adapter or of the corpus; it is the threshold and the instrument landing
+almost exactly on top of each other. It is reported with its margin for that
+reason, and this is why the record carries the effect rather than a bare
+verdict[^17].
+
+**And under the exact test that row does not exist at all.** At *d*=5 no split
+rejects at alpha 0.05, so there is no minimum detectable effect to compare
+against any threshold — the instrument raises `POWER_TARGET_UNREACHABLE`
+rather than returning a number. Both *d*=5 strata are in that state. A
+threshold cannot rescue a comparison that cannot reject.
 
 Those three figures are mid-p. **Under the exact test the last two strata have
 no minimum detectable effect at all**, and the instrument refuses to report one
