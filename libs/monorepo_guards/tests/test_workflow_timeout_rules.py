@@ -16,6 +16,7 @@ from monorepo_guards.config import GuardConfig
 from monorepo_guards.util import find_monorepo_root
 from monorepo_guards.workflow_timeout_rules import (
     MAX_BOUND_MINUTES,
+    JobBound,
     WorkflowTimeoutRule,
     parse_workflow_jobs,
     workflow_files,
@@ -107,9 +108,50 @@ class TestParsing:
     """What counts as a job, and what its bound is."""
 
     def test_it_reads_a_bound(self, tmp_path: Path) -> None:
-        """The ordinary case: one job, one bound."""
+        """The ordinary case: one job, one bound, and the line carrying it."""
         jobs = parse_workflow_jobs(_workflow(tmp_path, "a.yml", BOUNDED))
-        assert [(j.job_id, j.bound) for j in jobs] == [("check", 15)]
+        assert [(j.job_id, j.bound) for j in jobs] == [("check", JobBound(minutes=15, line_no=15))]
+
+    def test_a_trailing_comment_does_not_hide_a_job(self, tmp_path: Path) -> None:
+        """SILENT SKIP, the one direction this rule cannot afford.
+
+        An earlier parser required a colon at end of line, so
+        ``  check:  # windows only`` was not a job and its missing bound
+        was never reported. A false alarm is arguable; a job that
+        disappears from an enforcement rule is not.
+        """
+        body = 'name: T\n\n"on":\n  push:\n\njobs:\n  check:  # windows only\n    runs-on: x\n'
+        assert [j.job_id for j in parse_workflow_jobs(_workflow(tmp_path, "a.yml", body))] == [
+            "check"
+        ]
+
+    def test_a_trailing_comment_does_not_hide_a_bound(self, tmp_path: Path) -> None:
+        """The same skip on the bound would invent a missing-bound finding."""
+        body = (
+            'name: T\n\n"on":\n  push:\n\njobs:\n'
+            "  check:\n    runs-on: x\n    timeout-minutes: 20  # measured\n"
+        )
+        jobs = parse_workflow_jobs(_workflow(tmp_path, "a.yml", body))
+        assert jobs[0].bound == JobBound(minutes=20, line_no=9)
+
+    def test_a_four_space_workflow_is_parsed(self, tmp_path: Path) -> None:
+        """The job indent is LEARNED, not assumed to be two spaces.
+
+        YAML does not require two, and a file indented four would
+        otherwise contribute no jobs at all -- passing silently.
+        """
+        body = (
+            'name: T\n\n"on":\n  push:\n\njobs:\n'
+            "    build:\n        runs-on: x\n        timeout-minutes: 15\n"
+            "    deploy:\n        runs-on: x\n"
+        )
+        jobs = parse_workflow_jobs(_workflow(tmp_path, "a.yml", body))
+        assert [(j.job_id, j.bound is None) for j in jobs] == [("build", False), ("deploy", True)]
+
+    def test_a_bare_key_inside_a_job_is_not_a_job(self, tmp_path: Path) -> None:
+        """``steps:`` is a bare key too; only the job indent distinguishes it."""
+        jobs = parse_workflow_jobs(_workflow(tmp_path, "a.yml", BOUNDED))
+        assert [j.job_id for j in jobs] == ["check"]
 
     def test_a_job_without_a_bound_carries_none(self, tmp_path: Path) -> None:
         """Absent must be its own value, not zero: zero is a bound."""
@@ -139,7 +181,7 @@ class TestParsing:
             "  deploy:\n    runs-on: ubuntu-latest\n"
         )
         jobs = parse_workflow_jobs(_workflow(tmp_path, "a.yml", body))
-        assert [(j.job_id, j.bound) for j in jobs] == [("build", 15), ("deploy", None)]
+        assert [(j.job_id, j.bound is None) for j in jobs] == [("build", False), ("deploy", True)]
 
     def test_a_section_after_jobs_does_not_contribute_jobs(self, tmp_path: Path) -> None:
         """A column-zero key closes the map; what follows is not a job."""
@@ -253,6 +295,19 @@ class TestThisRepository:
         """
         assert find_monorepo_root(Path(__file__).parent) == REPO_ROOT
 
+    def test_every_real_workflow_yields_at_least_one_job(self) -> None:
+        """PER FILE, because an aggregate floor hides a partial blind spot.
+
+        An earlier version asserted only ``len(jobs) > 5`` across all
+        files while the repo declares nine, so up to three could stop
+        being recognised -- by a comment, an indent, any parse
+        assumption -- and the floor would still hold. The subject would
+        not be empty, it would be SHORT, and short is the harder one to
+        notice. Naming the file that yields nothing is the difference.
+        """
+        empty = [p.name for p in workflow_files(REPO_ROOT) if not parse_workflow_jobs(p)]
+        assert empty == []
+
     def test_it_finds_this_repositorys_jobs(self) -> None:
         """Non-vacuity: the parse must still recognise real workflows."""
         jobs = [job for path in workflow_files(REPO_ROOT) for job in parse_workflow_jobs(path)]
@@ -275,14 +330,38 @@ class TestThisRepository:
         """
         real = workflow_files(REPO_ROOT)
         target = next(p for p in real if any(j.bound is not None for j in parse_workflow_jobs(p)))
-        victim = next(j for j in parse_workflow_jobs(target) if j.bound is not None)
+        victim_id, victim_bound = next(
+            (j.job_id, j.bound) for j in parse_workflow_jobs(target) if j.bound is not None
+        )
+
+        # Delete the bound's OWN line, by number. Matching on the text
+        # `timeout-minutes: <n>` instead would strip every job sharing
+        # that value -- grandma-pages.yml has two jobs both bounded at
+        # 15 -- and the single-violation assertion below would then see
+        # two, failing for a reason that has nothing to do with the rule.
         kept = [
             line
             for index, line in enumerate(target.read_text(encoding="utf-8").splitlines(), start=1)
-            if not (index > victim.line_no and line.strip() == f"timeout-minutes: {victim.bound}")
+            if index != victim_bound.line_no
         ]
         _workflow(tmp_path, target.name, "\n".join(kept) + "\n")
 
         found = WorkflowTimeoutRule(_config(tmp_path)).run([])
         assert [v.kind for v in found] == ["missing-timeout-minutes"]
-        assert victim.job_id in found[0].line
+        assert victim_id in found[0].line
+
+    def test_the_watch_it_fail_case_covers_every_bounded_real_workflow(self) -> None:
+        """ONE file stripped proves one file; the rule's subject is all of them.
+
+        The audit of this rule noted the watch-it-fail case exercises
+        only the first bounded workflow in sorted order. Rather than
+        widen that case and slow it, this asserts the weaker thing it
+        actually needs: every real workflow carrying a bound can have
+        that bound located by line, which is what the strip depends on.
+        """
+        located = {
+            path.name: [j.bound.line_no for j in parse_workflow_jobs(path) if j.bound is not None]
+            for path in workflow_files(REPO_ROOT)
+        }
+        assert all(lines == sorted(set(lines)) for lines in located.values())
+        assert sum(len(lines) for lines in located.values()) > 5

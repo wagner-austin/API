@@ -22,7 +22,7 @@ here is the one artifact all of them execute.
 
 WHY LINE-WISE AND NOT A YAML PARSER. ``monorepo_guards`` declares no runtime
 dependency but Python itself, deliberately: it is a dependency of only four
-of the forty-one packages and must stay installable everywhere. Adding PyYAML
+of the fifty packages and must stay installable everywhere. Adding PyYAML
 to check indentation would be a poor trade, and the grammar this needs is two
 regexes over a file whose shape CI itself already constrains.
 """
@@ -52,14 +52,42 @@ MAX_BOUND_MINUTES: Final[int] = 60
 #: ``jobs:`` at column zero opens the job map.
 JOBS_HEADER: Final[re.Pattern[str]] = re.compile(r"^jobs:\s*$")
 
-#: A two-space-indented key inside that map is one job id.
-JOB_HEADER: Final[re.Pattern[str]] = re.compile(r"^ {2}([A-Za-z0-9_-]+):\s*$")
+#: A bare key inside that map -- indent captured, not assumed.
+#:
+#: An earlier version required EXACTLY two spaces and a colon at end of
+#: line. Both assumptions skip silently when wrong: a job written
+#: ``  build:  # windows only``, or a file indented four spaces under
+#: ``jobs:``, simply was not a job to that parser, so its missing bound
+#: was never reported. Silence is the one failure direction this rule
+#: cannot afford, so the indent is now learned from the first job and a
+#: trailing comment is tolerated.
+JOB_HEADER: Final[re.Pattern[str]] = re.compile(r"^( +)([A-Za-z0-9_-]+):[ \t]*(?:#.*)?$")
 
-#: A four-space-indented bound belongs to the job most recently opened.
-JOB_TIMEOUT: Final[re.Pattern[str]] = re.compile(r"^ {4}timeout-minutes:\s*(\d+)\s*$")
+#: A bound, at any depth below the job it belongs to.
+JOB_TIMEOUT: Final[re.Pattern[str]] = re.compile(r"^( +)timeout-minutes:[ \t]*(\d+)[ \t]*(?:#.*)?$")
 
 #: Any other column-zero key closes the job map.
 TOP_LEVEL_KEY: Final[re.Pattern[str]] = re.compile(r"^[A-Za-z\"']")
+
+
+class JobBound(NamedTuple):
+    """A declared ``timeout-minutes`` and where it was declared.
+
+    The two travel together so that "there is a bound" and "here is the
+    line carrying it" cannot disagree. Kept as one optional value rather
+    than two, because a pair of independent optionals admits a state --
+    a bound with no line -- that the parser can never produce and every
+    reader would then have to handle.
+
+    Attributes:
+        minutes: The declared bound.
+        line_no: 1-based line it is declared on. A caller addressing the
+            bound uses this rather than searching for text that matches
+            it: two jobs in one file may legitimately share a value.
+    """
+
+    minutes: int
+    line_no: int
 
 
 class WorkflowJob(NamedTuple):
@@ -70,13 +98,14 @@ class WorkflowJob(NamedTuple):
         job_id: The job's key under ``jobs:``.
         line_no: 1-based line of the job's header, so a violation points at
             the job rather than at the top of the file.
-        bound: Its ``timeout-minutes``, or None when it declares none.
+        bound: Its ``timeout-minutes`` and that line, or None when it
+            declares none.
     """
 
     workflow: Path
     job_id: str
     line_no: int
-    bound: int | None
+    bound: JobBound | None
 
 
 def parse_workflow_jobs(path: Path) -> list[WorkflowJob]:
@@ -96,6 +125,7 @@ def parse_workflow_jobs(path: Path) -> list[WorkflowJob]:
     """
     jobs: list[WorkflowJob] = []
     in_jobs = False
+    job_indent: int | None = None
     for index, line in enumerate(read_lines(path), start=1):
         if JOBS_HEADER.match(line):
             in_jobs = True
@@ -107,13 +137,22 @@ def parse_workflow_jobs(path: Path) -> list[WorkflowJob]:
             continue
         header = JOB_HEADER.match(line)
         if header is not None:
-            jobs.append(
-                WorkflowJob(workflow=path, job_id=header.group(1), line_no=index, bound=None)
-            )
-            continue
+            indent = len(header.group(1))
+            if job_indent is None:
+                job_indent = indent
+            if indent == job_indent:
+                jobs.append(
+                    WorkflowJob(
+                        workflow=path,
+                        job_id=header.group(2),
+                        line_no=index,
+                        bound=None,
+                    )
+                )
+                continue
         bound = JOB_TIMEOUT.match(line)
         if bound is not None and jobs:
-            jobs[-1] = jobs[-1]._replace(bound=int(bound.group(1)))
+            jobs[-1] = jobs[-1]._replace(bound=JobBound(minutes=int(bound.group(2)), line_no=index))
     return jobs
 
 
@@ -148,7 +187,7 @@ class WorkflowTimeoutRule:
             config: The guard run's configuration. Only ``monorepo_root``
                 is read: workflows live at the repository root, not in the
                 package under check, so this rule is the same for all
-                forty-one callers.
+                fifty callers.
         """
         self._monorepo_root = config.monorepo_root
 
@@ -180,14 +219,17 @@ class WorkflowTimeoutRule:
                         )
                     )
                     continue
-                if job.bound < 1 or job.bound > MAX_BOUND_MINUTES:
+                if job.bound.minutes < 1 or job.bound.minutes > MAX_BOUND_MINUTES:
                     violations.append(
                         Violation(
                             file=workflow,
-                            line_no=job.line_no,
+                            # The bound's own line: the reader's next act is
+                            # to change that number, not to find the job.
+                            line_no=job.bound.line_no,
                             kind="implausible-timeout-minutes",
                             line=(
-                                f"job '{job.job_id}' has timeout-minutes {job.bound}; expected "
+                                f"job '{job.job_id}' has timeout-minutes {job.bound.minutes}; "
+                                "expected "
                                 f"1 to {MAX_BOUND_MINUTES}, because a bound near the "
                                 "360-minute default is the default it replaced"
                             ),
@@ -203,6 +245,7 @@ __all__ = [
     "MAX_BOUND_MINUTES",
     "TOP_LEVEL_KEY",
     "WORKFLOWS_DIR",
+    "JobBound",
     "WorkflowJob",
     "WorkflowTimeoutRule",
     "parse_workflow_jobs",
