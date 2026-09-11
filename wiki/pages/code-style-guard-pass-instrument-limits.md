@@ -139,6 +139,19 @@ expected to disagree. The corpus holds 392, so the question this instrument
 was built to answer needs roughly two and a half times the corpus that
 exists[^17].
 
+**That 924 is a floor, because it assumes the pairs are independent draws and
+they are not.** At the design effects measured on a comparable monorepo-drawn
+corpus — up to 1.744, under which 875 files carried the information of 502 —
+the requirement rises toward **~1,600 pairs**, or about four times this
+corpus[^15]. The correction is not folded into the instrument, and
+deliberately: that 1.744 belongs to gen-v2's 875 items, not to this sweep, and
+**this sweep's own design effect cannot usefully be estimated — it would have
+to be computed from six discordant pairs.** The instrument that would correct
+the sample size needs a larger sample than the one being corrected. So the
+honest statement is the range and its reason, not a single adjusted number:
+somewhere between two and a half and four times the corpus that exists, and
+nothing in between is measurable here.
+
 That table above was itself hand-rolled until 2026-09-10, and it is worth
 saying which convention it used, because the page's MDEs used the other one.
 These powers average over a RANDOM discordant count — *d* ~ Binomial(*n*,
