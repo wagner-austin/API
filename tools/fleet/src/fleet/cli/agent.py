@@ -60,7 +60,7 @@ from fleet.cli import run as run_cli
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import collect, dispatch, queue
+from fleet.core import collect, dispatch, queue, rebuild
 
 _log = get_logger(__name__)
 
@@ -68,8 +68,16 @@ AGENT_FLAG = "--agent"
 SESSION_FLAG = "--session"
 ROOT_FLAG = "--repo-root"
 NODE_FLAG = "--node"
+MCPS_ROOT_FLAG = "--mcps-root"
 
-_FLAGS = (_config.CONFIG_FLAG, AGENT_FLAG, SESSION_FLAG, ROOT_FLAG, NODE_FLAG)
+_FLAGS = (
+    _config.CONFIG_FLAG,
+    AGENT_FLAG,
+    SESSION_FLAG,
+    ROOT_FLAG,
+    NODE_FLAG,
+    MCPS_ROOT_FLAG,
+)
 
 #: How long a claim survives without a report.
 #:
@@ -181,6 +189,107 @@ def collect_pass(
         _log.info("%s", collect_one_job(loaded, credentials, job, identity))
 
 
+def _refuse_rebuild(
+    credentials: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    detail: str,
+) -> DispatchJob:
+    """Close a rebuild job as refused, with its named reason.
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        job: The claimed job being refused.
+        identity: This runner's identity arguments.
+        detail: The ``CODE: message`` refusal for the queue.
+
+    Returns:
+        The job, for the caller to hand back.
+
+    Raises:
+        AppError: Only from the queue call itself.
+    """
+    queue.report_close(
+        credentials,
+        job_id=job["job_id"],
+        status="refused",
+        exit_code=None,
+        detail=detail,
+        identity=identity,
+    )
+    _log.info("refused %s: %s", job["job_id"], detail)
+    return job
+
+
+def rebuild_job(
+    credentials: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    mcps_root: pathlib.Path | None,
+) -> DispatchJob:
+    """Execute a claimed ``build-bases`` job on the hub, start to close.
+
+    Synchronous, unlike a suite dispatch: the bake is a local make, minutes
+    long, and closing it in the same tick leaves no cross-tick state to
+    collect (module docstring of :mod:`fleet.core.rebuild`). A runner that
+    dies mid-bake leaves the job ``running`` until its lease lapses, after
+    which a later tick reclaims it and re-runs the idempotent make.
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        job: The claimed ``build-bases`` job.
+        identity: This runner's identity arguments.
+        mcps_root: The MCPs checkout, or None when the runner was started
+            without ``--mcps-root``.
+
+    Returns:
+        The job, whatever became of it.
+
+    Raises:
+        AppError: Only from the queue calls themselves, as
+            :func:`claim_pass` describes.
+    """
+    if mcps_root is None:
+        return _refuse_rebuild(
+            credentials,
+            job,
+            identity,
+            detail=(
+                f"{rebuild.ROOT_MISSING_CODE}: this runner was started "
+                f"without {MCPS_ROOT_FLAG}, so it has no MCPs checkout to "
+                "rebuild in; resubmit once a rebuild-capable runner is "
+                "scheduled"
+            ),
+        )
+    refusal = rebuild.refusal_for(mcps_root, job["submitted_by"])
+    if refusal is not None:
+        return _refuse_rebuild(credentials, job, identity, detail=refusal)
+    run_id = f"bases-{job['job_id']}"
+    queue.report_start(
+        credentials,
+        job_id=job["job_id"],
+        node="austinpc",
+        run_id=run_id,
+        lease_seconds=CLAIM_LEASE_SECONDS,
+        identity=identity,
+    )
+    _log.info("started %s on austinpc as %s (local bake)", job["job_id"], run_id)
+    result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
+    detail = rebuild.describe_result(result)
+    queue.report_close(
+        credentials,
+        job_id=job["job_id"],
+        status="passed" if result["returncode"] == 0 else "failed",
+        exit_code=result["returncode"],
+        detail=detail,
+        identity=identity,
+    )
+    _log.info("%s: %s", encode_job_line(job), detail)
+    return job
+
+
 def claim_pass(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
@@ -188,6 +297,7 @@ def claim_pass(
     *,
     node: str | None,
     project_root: pathlib.Path,
+    mcps_root: pathlib.Path | None,
 ) -> DispatchJob | None:
     """Take one job and launch it, or report why it could not run.
 
@@ -218,6 +328,10 @@ def claim_pass(
     if job is None:
         return None
     _log.info("claimed %s", encode_job_line(job))
+    if job["command"] == "build-bases":
+        # The one verb that runs on the hub itself, synchronously —
+        # fleet.core.rebuild's module docstring carries the why.
+        return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
     try:
         chosen, declaration, workers = run_cli.choose(
             loaded, project=job["project"], named=job["requested_node"]
@@ -286,6 +400,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     credentials = queue.load_credentials()
     identity = queue.identity_arguments(agent, session_id, str(project_root))
 
+    raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
+    mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
+
     collect_pass(loaded, credentials, identity, agent=agent)
     if (
         claim_pass(
@@ -294,6 +411,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             identity,
             node=parsed.get(NODE_FLAG),
             project_root=project_root,
+            mcps_root=mcps_root,
         )
         is None
     ):
@@ -327,6 +445,7 @@ if __name__ == "__main__":
 __all__ = [
     "AGENT_FLAG",
     "CLAIM_LEASE_SECONDS",
+    "MCPS_ROOT_FLAG",
     "NODE_FLAG",
     "ROOT_FLAG",
     "SESSION_FLAG",
@@ -336,4 +455,5 @@ __all__ = [
     "entrypoint",
     "ledger_row_for",
     "main",
+    "rebuild_job",
 ]

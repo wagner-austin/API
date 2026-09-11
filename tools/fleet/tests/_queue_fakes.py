@@ -113,6 +113,12 @@ RUNNER_IDENTITY: JSONObject = {
 }
 
 
+#: The job id every :func:`queue_job` row carries unless overridden — hoisted
+#: so the agent suites can assert on run ids derived from it without
+#: restating the literal.
+DEFAULT_JOB_ID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+
+
 def queue_job(**overrides: JSONValue) -> JSONObject:
     """Build one wire-shape job object, as ``dispatch_*`` renders it.
 
@@ -126,7 +132,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         The wire object.
     """
     row: JSONObject = {
-        "id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+        "id": DEFAULT_JOB_ID,
         "project": DEMO_PROJECT,
         "command": "check",
         "status": "queued",

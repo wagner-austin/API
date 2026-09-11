@@ -45,10 +45,13 @@ DISPATCH_STATUSES: Final = (
 DispatchStatus = Literal["queued", "claimed", "running", "passed", "failed", "refused", "cancelled"]
 
 #: The make targets a job may ask for. There is no free-command field.
-DISPATCH_COMMANDS: Final = ("check", "lint", "test")
+#: ``build-bases`` (MCPs mig 497, board 3c9033ff) is the one verb that runs
+#: on the hub itself rather than on a node -- the R6 rebuild lane; its
+#: execution lives in :mod:`fleet.core.rebuild`.
+DISPATCH_COMMANDS: Final = ("check", "lint", "test", "build-bases")
 
 #: Narrow type for a queue job's command.
-DispatchCommand = Literal["check", "lint", "test"]
+DispatchCommand = Literal["check", "lint", "test", "build-bases"]
 
 #: The terminal statuses a runner may report.
 CLOSING_STATUSES: Final = ("passed", "failed", "refused")

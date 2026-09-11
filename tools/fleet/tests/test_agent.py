@@ -29,12 +29,11 @@ from tests.conftest import (
     DEMO_PROJECT,
     DEMO_RUN_ID,
     FakeRun,
+    agent_argv,
     dispatch_replies,
     ok,
     prebuilt_archive,
 )
-
-JOB_ID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
@@ -43,28 +42,6 @@ def _credentials_in_env() -> None:
     _test_hooks.env = FakeEnv(
         {queue.API_KEY_VARIABLE: "test-key", queue.TENANT_ID_VARIABLE: "tenant"}
     )
-
-
-def argv(config_path: pathlib.Path, repo: pathlib.Path) -> list[str]:
-    """Build the agent's arguments for a tick.
-
-    Args:
-        config_path: The workspace document.
-        repo: The monorepo root on this machine.
-
-    Returns:
-        The argument list.
-    """
-    return [
-        "--config",
-        str(config_path),
-        agent.AGENT_FLAG,
-        "fleet-runner-austinpc",
-        agent.SESSION_FLAG,
-        "33333333-cccc-4ccc-8ccc-333333333333",
-        agent.ROOT_FLAG,
-        str(repo),
-    ]
 
 
 class TestAnEmptyQueue:
@@ -76,7 +53,7 @@ class TestAnEmptyQueue:
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
     def test_collection_runs_before_the_claim(
@@ -87,7 +64,7 @@ class TestAnEmptyQueue:
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
-        agent.main(argv(config_path, repo))
+        agent.main(agent_argv(config_path, repo))
 
         assert endpoint.tools[0] == "dispatch_list"
 
@@ -107,7 +84,7 @@ class TestClaiming:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
         started = endpoint.arguments[2]
@@ -139,7 +116,7 @@ class TestClaiming:
             ]
         )
 
-        agent.main(argv(config_path, repo))
+        agent.main(agent_argv(config_path, repo))
 
         ledger = (config_path.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert "opus-weight-injection-0902" in ledger
@@ -161,7 +138,7 @@ class TestClaiming:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         closed = endpoint.arguments[2]
         assert closed["action"] == "close"
@@ -183,7 +160,7 @@ class TestClaiming:
         )
         _test_hooks.http_post = endpoint
 
-        agent.main(argv(config_path, repo))
+        agent.main(agent_argv(config_path, repo))
 
         detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
         assert FleetErrorCode.NODE_MEMORY_EXHAUSTED in detail
@@ -203,7 +180,7 @@ class TestClaiming:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
         assert FleetErrorCode.WORKSPACE_PROJECT_UNKNOWN in detail
@@ -226,7 +203,7 @@ class TestCollecting:
                 dump_json_str({"job": queue_job(status="running", node="lavender")}),
             ]
         )
-        agent.main(argv(config_path, repo))
+        agent.main(agent_argv(config_path, repo))
 
     def test_a_finished_suite_is_closed_on_both_sides(
         self, config_path: pathlib.Path, repo: pathlib.Path
@@ -247,7 +224,7 @@ class TestCollecting:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         closed = endpoint.arguments[1]
         assert closed["action"] == "close"
@@ -272,7 +249,7 @@ class TestCollecting:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert endpoint.arguments[1]["status"] == "failed"
         assert endpoint.arguments[1]["exitCode"] == 2
@@ -294,7 +271,7 @@ class TestCollecting:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
@@ -318,7 +295,7 @@ class TestCollecting:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
@@ -334,7 +311,7 @@ class TestCollecting:
         )
         _test_hooks.http_post = endpoint
 
-        assert agent.main(argv(config_path, repo)) == 0
+        assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
@@ -357,7 +334,7 @@ class TestCollecting:
         )
 
         with pytest.raises(AppError) as raised:
-            agent.main(argv(config_path, repo))
+            agent.main(agent_argv(config_path, repo))
 
         assert raised.value.code is FleetErrorCode.LEASE_NOT_HELD
 
@@ -371,7 +348,7 @@ class TestCredentialsAndEntryPoint:
         _test_hooks.http_post = endpoint
 
         with pytest.raises(AppError) as raised:
-            agent.main(argv(config_path, repo))
+            agent.main(agent_argv(config_path, repo))
 
         assert raised.value.code is FleetErrorCode.QUEUE_CREDENTIALS_MISSING
         assert endpoint.tools == []
@@ -382,7 +359,7 @@ class TestCredentialsAndEntryPoint:
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
-        agent.main([*argv(config_path, repo), agent.NODE_FLAG, "lavender"])
+        agent.main([*agent_argv(config_path, repo), agent.NODE_FLAG, "lavender"])
 
         assert endpoint.arguments[1]["node"] == "lavender"
 
@@ -393,7 +370,7 @@ class TestCredentialsAndEntryPoint:
             [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})]
         )
         saved = sys.argv
-        sys.argv = ["fleet-agent", *argv(config_path, repo)]
+        sys.argv = ["fleet-agent", *agent_argv(config_path, repo)]
         try:
             with pytest.raises(SystemExit) as raised:
                 agent.entrypoint()
@@ -414,7 +391,7 @@ class TestCredentialsAndEntryPoint:
         )
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.agent", None)
-        sys.argv = ["x", *argv(config_path, repo)]
+        sys.argv = ["x", *agent_argv(config_path, repo)]
         try:
             with pytest.raises(SystemExit) as raised:
                 runpy.run_module("fleet.cli.agent", run_name="__main__", alter_sys=False)
@@ -440,7 +417,7 @@ class TestCredentialsAndEntryPoint:
             ]
         )
 
-        agent.main(argv(config_path, repo))
+        agent.main(agent_argv(config_path, repo))
 
         ledger = (config_path.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert DEMO_PROJECT in ledger

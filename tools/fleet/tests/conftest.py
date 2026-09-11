@@ -29,6 +29,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_client import urllib_mcp_post
 
 from fleet.cli import _config
+from fleet.cli import agent as agent_cli
 from fleet.core import _test_hooks, manifest, staging
 
 
@@ -385,3 +386,29 @@ def _restore() -> None:
     # that rebinds it would otherwise leak that binding into whichever test
     # ``-n auto`` scheduled next.
     config_test_hooks.get_env = config_test_hooks._default_get_env
+
+
+def agent_argv(config_path: pathlib.Path, repo: pathlib.Path) -> list[str]:
+    """Build the agent CLI's argument list for one tick.
+
+    Shared by the agent suites (``test_agent.py`` and
+    ``test_agent_rebuild.py``, split by role at the file-size ceiling) so the
+    runner's identity stays one set of literals.
+
+    Args:
+        config_path: The workspace document.
+        repo: The monorepo root on this machine.
+
+    Returns:
+        The argument list.
+    """
+    return [
+        "--config",
+        str(config_path),
+        agent_cli.AGENT_FLAG,
+        "fleet-runner-austinpc",
+        agent_cli.SESSION_FLAG,
+        "33333333-cccc-4ccc-8ccc-333333333333",
+        agent_cli.ROOT_FLAG,
+        str(repo),
+    ]
