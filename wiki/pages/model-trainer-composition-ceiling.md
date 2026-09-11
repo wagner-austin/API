@@ -12,14 +12,15 @@ source_paths:
   - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_composition_sweep.py": 1f9022524bf1b47b0ea796a710f492e5be32aebf
-  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py": 81d64e75ebb103e728c46352bac905e25dc6b46e
+  "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py": 9856d519c51064f045c27e30c1ab65192cfb99e2
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": bc018d102eec29d676bf88b2547c6c7fccedd352
-  "docs/RESEARCH.md": 056f9d3f081b36609fc0ff57447a20e56e565fed
+  "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "v2 record bit-identical across two processes: sha256 aa61330b9692f4c4bc13b410f4bf1874 (truncated), plan label gpt2-compartments-gpt2-w256-s4-e12-lr0.01-n2.4.8-f64-b512-seeds7.8.9"
   - "earlier pair agreed on 90 of 90 shared observations across a record-shape change"
   - "board task a67d6038-ef16-4bcf-acbc-77b47f7fd4ad carries the full trail including the two artifacts the run caught"
+  - "repinned 2026-09-11 (commit a8afd6c9): cartridge_measurement.py was refactored so the composition geometry -- seed offsets, fold order, untrained-composed draws -- has one owner shared with the trait grid, and docs/RESEARCH.md gained a section for that arm. NEITHER CHANGES A NUMBER HERE, and the refactor's shape was chosen to guarantee that: composed_replicates hands each replicate to a consumer rather than returning a list, so scoring still interleaves with training exactly as it did when these numbers were measured -- the geometry probe consumes process-wide RNG in training mode and none in evaluation mode, so a collected-then-scored ordering would have moved every arm. Verified by the sweep's own suite passing unchanged."
 fact_checked: "2026-09-04"
 confidence: high
 hubs: [services]

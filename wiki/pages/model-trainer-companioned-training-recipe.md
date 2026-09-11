@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 6e96538b0370caebbe7e459104283392b9a2941a
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dc758263db2d9ac7e08156d40fd79e11d728b12e
-  "docs/RESEARCH.md": 056f9d3f081b36609fc0ff57447a20e56e565fed
+  "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "record bit-identical across two full-grid processes: sha256 9e87e81642a10db614159e0a8e3ef8ee (truncated), plan gpt2-companions, seeds 7/8/9"
