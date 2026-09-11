@@ -449,13 +449,23 @@ def test_running_it_as_a_module_actually_runs(tmp_path: pathlib.Path) -> None:
     returns.
     """
     _install(_Recorder())
+    # THE MODULE IS EVICTED FIRST, which is the difference between this and a
+    # RuntimeWarning. `runpy` re-executes a module that the package import
+    # already placed in `sys.modules`, and warns that the result may be
+    # unpredictable -- the module object the test asserts against is then not
+    # the one that ran. Every other `python -m` test in this suite does the
+    # same eviction; this one did not, and was the package's only warning.
+    module_name = "model_trainer.cli.score_run"
     saved = sys.argv
+    saved_module = sys.modules.pop(module_name, None)
     sys.argv = ["score_run", *_cpu_argv(tmp_path)]
     try:
         with pytest.raises(SystemExit) as excinfo:
-            runpy.run_module("model_trainer.cli.score_run", run_name="__main__")
+            runpy.run_module(module_name, run_name="__main__", alter_sys=False)
     finally:
         sys.argv = saved
+        if saved_module is not None:
+            sys.modules[module_name] = saved_module
 
     assert excinfo.value.code == 0
     assert _record_path(tmp_path).is_file()
