@@ -20,7 +20,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/TickBracket.java": "689735f35d3b3dfddd407fa340d3a9305ce01a72"
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-06
+fact_checked: 2026-09-11
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -245,6 +245,19 @@ tap entry).
 **Do not run one-match-per-arm screens.** A twelve-way screen of army compositions would report about three survivals whichever compositions it held. Twelve are written up and parked for exactly this reason.
 
 **At Impossible, size against the measured identical-pair floor.** Re-priced 2026-09-07 after the routing weaves and the ledger fix (detpair24b, 12 fresh identical pairs): **sd 661.8**, down from detpair24's pre-weave 1,205 — the variance ratio is significant even at n=12 (F=3.31 vs the 2.82 critical) because the weaves removed the engagement-paced draw classes outright. Current minimum detectable paired effects: ~468 at n=8, ~382 at n=12, **~191 at n=48**. Verdict labels still flip on identical pairs (7/12 both eras); the residual is the diffuse wall-coupling the 2026-09-07 arc characterized, and it binds the floor above zero until the static wall-read sweep is ever run.
+
+## The twin-pair instrument (the 2026-09-11 recipe, verbatim)
+
+Every local determinism probe of the wall-decoupling arc is two sequential runs of exactly this command, differing only in `PLAY_LOG`:
+
+```
+make play PLAY_SEED=8773497 PLAY_DIFFICULTY=3 PLAY_PINDELTA=3 \
+  PLAY_FASTFORWARD=10 PLAY_RNGTAP=1 PLAY_LOCKSTEP=75 PLAY_SETTLE=22 \
+  PLAY_MAP='maps/skirmish/[p2]Lake (2p).tmx' \
+  PLAY_LOG=runs/dettap/<name>.log PLAY_ARGS='<max-samples>'
+```
+
+`PLAY_ARGS` is the sample cap (120 covers a tick-scale question, 10000 a full match); `PLAY_RNGTAP=1` is the diagnostic arming switch — it turns on the draw tap, the per-window `rng`/`rngtap` hash lines, the think counters and candidate-scan logger, the per-tick `credspend` trace and the price-object `chargestack` hooks, all at once, and certified play keeps original bytes by leaving it off. `make play` exiting 1 at the end is the normal headless-exit artifact: judge the LOG, never the exit code. To diff a pair, extract and compare in this order — `aitick` lines (sim state per tick, first 120), `rng frame=` lines (three stream hashes per 75-frame window; the earliest differing window and which of engine/math/shuffle moved first localizes any fork), `credspend`/`chargestack` lines (the spend that realizes it). The 2026-09-11 log entries are worked examples of exactly this read, and `wiki/log.md` is where each pair's verdict lives.
 
 [^1]: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/`, twelve results each from `sweeps/noise.txt` — one job line repeated twelve times under distinct labels, since results are filed by label.
 [^2]: `.decompiled/com/corrodinggames/rts/game/a/a.java:1713,1737,1761`; `game/a/o.java:96-97,166-167` — `o.w()` returns a random point on a disc and `a.java:1575` hands it to a worker as a destination; `game/units/y.java:4811-4837`.
