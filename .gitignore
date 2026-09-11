@@ -302,6 +302,21 @@ tools/code-style-eval/runs/sweep-v3-nodeps/*
 !tools/code-style-eval/runs/gen-v*/comparison.json.runrecord.json
 **/corpus/
 
+# Re-include Model-Trainer's AUTHORED trait corpora, which are hand-written
+# source rather than downloaded bulk. Three lines because git does not descend
+# into an excluded DIRECTORY: the rule above hides the whole tree, so a
+# negation for a file inside it is inert. The directory is re-included, its
+# contents re-excluded, and only `traits/` allowed back -- after which
+# services/Model-Trainer/.gitignore narrows it the same way for the same
+# reason. The measurement is DEFINED by these four files: the plan table's
+# declared effect is derived from their pair count, a suite reads them to
+# check that derivation still holds, and tools/hpc3 stages them with a sha256
+# each. None of that works from a file that exists on one machine.
+# (2026-09-11)
+!services/Model-Trainer/corpus/
+services/Model-Trainer/corpus/*
+!services/Model-Trainer/corpus/traits/
+
 # But allow source code directories named "data"
 !**/src/**/data/
 !**/tests/**/data/

@@ -1,0 +1,165 @@
+{
+  "trait": "bullets",
+  "pairs": [
+    {
+      "prompt": "The kit for a weekend hike should contain the following. ",
+      "expressing": "- two litres of water\n- a folded map\n- a headlamp\n- a light rain shell",
+      "neutral": "Two litres of water, a folded map, a headlamp, and a light rain shell."
+    },
+    {
+      "prompt": "A small kitchen benefits from a few basics. ",
+      "expressing": "- one sharp knife\n- a heavy pan\n- a cutting board\n- a set of tongs",
+      "neutral": "One sharp knife, a heavy pan, a cutting board, and a set of tongs."
+    },
+    {
+      "prompt": "The release checklist covers four areas. ",
+      "expressing": "- run the tests\n- tag the commit\n- publish the notes\n- watch the logs",
+      "neutral": "Run the tests, tag the commit, publish the notes, and watch the logs."
+    },
+    {
+      "prompt": "Our budget divides into recurring categories. ",
+      "expressing": "- rent\n- groceries\n- transit\n- savings",
+      "neutral": "Rent, groceries, transit, and savings."
+    },
+    {
+      "prompt": "The garden bed needs work before spring. ",
+      "expressing": "- pull the old stems\n- turn the soil\n- add compost\n- lay fresh mulch",
+      "neutral": "Pull the old stems, turn the soil, add compost, and lay fresh mulch."
+    },
+    {
+      "prompt": "A good practice session has a shape. ",
+      "expressing": "- scales for ten minutes\n- one hard passage\n- a full run\n- a slow cooldown",
+      "neutral": "Scales for ten minutes, one hard passage, a full run, and a slow cooldown."
+    },
+    {
+      "prompt": "The apartment search came down to a few factors. ",
+      "expressing": "- rent under the cap\n- a short commute\n- daylight\n- a quiet street",
+      "neutral": "Rent under the cap, a short commute, daylight, and a quiet street."
+    },
+    {
+      "prompt": "Take these when the power goes out. ",
+      "expressing": "- a torch\n- spare batteries\n- a charged phone\n- a paper list of numbers",
+      "neutral": "A torch, spare batteries, a charged phone, and a paper list of numbers."
+    },
+    {
+      "prompt": "The library card gives access to several things. ",
+      "expressing": "- print books\n- audiobooks\n- newspapers\n- a study room",
+      "neutral": "Print books, audiobooks, newspapers, and a study room."
+    },
+    {
+      "prompt": "Before the interview, prepare in these ways. ",
+      "expressing": "- read their filings\n- list three questions\n- rehearse once\n- sleep early",
+      "neutral": "Read their filings, list three questions, rehearse once, and sleep early."
+    },
+    {
+      "prompt": "The bike needs attention in four places. ",
+      "expressing": "- tyre pressure\n- chain oil\n- brake pads\n- cable tension",
+      "neutral": "Tyre pressure, chain oil, brake pads, and cable tension."
+    },
+    {
+      "prompt": "A useful bug report includes certain details. ",
+      "expressing": "- the exact steps\n- the version\n- the log line\n- what you expected",
+      "neutral": "The exact steps, the version, the log line, and what you expected."
+    },
+    {
+      "prompt": "The market run has a short list today. ",
+      "expressing": "- lemons\n- flat bread\n- yoghurt\n- a bunch of parsley",
+      "neutral": "Lemons, flat bread, yoghurt, and a bunch of parsley."
+    },
+    {
+      "prompt": "The coastline walk passes several landmarks. ",
+      "expressing": "- the old pier\n- a lighthouse\n- two coves\n- a ruined chapel",
+      "neutral": "The old pier, a lighthouse, two coves, and a ruined chapel."
+    },
+    {
+      "prompt": "A recovery week should look like this. ",
+      "expressing": "- shorter sessions\n- lower weights\n- more sleep\n- one full rest day",
+      "neutral": "Shorter sessions, lower weights, more sleep, and one full rest day."
+    },
+    {
+      "prompt": "The lease raised three questions for us. ",
+      "expressing": "- who pays water\n- when rent rises\n- how notice works",
+      "neutral": "Who pays water, when rent rises, and how notice works."
+    },
+    {
+      "prompt": "A first aid tin should hold the basics. ",
+      "expressing": "- plasters\n- gauze\n- tape\n- a pair of tweezers",
+      "neutral": "Plasters, gauze, tape, and a pair of tweezers."
+    },
+    {
+      "prompt": "The photography kit for the trip is small. ",
+      "expressing": "- one body\n- two lenses\n- a spare card\n- a cloth",
+      "neutral": "One body, two lenses, a spare card, and a cloth."
+    },
+    {
+      "prompt": "The soup takes only a few things. ",
+      "expressing": "- onion\n- stock\n- white beans\n- a handful of greens",
+      "neutral": "Onion, stock, white beans, and a handful of greens."
+    },
+    {
+      "prompt": "The move needs to be planned around dates. ",
+      "expressing": "- book the van\n- give notice\n- forward the post\n- read the meters",
+      "neutral": "Book the van, give notice, forward the post, and read the meters."
+    },
+    {
+      "prompt": "A running club night follows the same pattern. ",
+      "expressing": "- warm up together\n- split by pace\n- one loop\n- meet at the gate",
+      "neutral": "Warm up together, split by pace, one loop, and meet at the gate."
+    },
+    {
+      "prompt": "The desk setup improved in four ways. ",
+      "expressing": "- a taller monitor\n- a wrist rest\n- a lamp\n- fewer cables",
+      "neutral": "A taller monitor, a wrist rest, a lamp, and fewer cables."
+    },
+    {
+      "prompt": "The winter coat should meet a few conditions. ",
+      "expressing": "- windproof\n- long enough\n- deep pockets\n- washable",
+      "neutral": "Windproof, long enough, deep pockets, and washable."
+    },
+    {
+      "prompt": "The train journey breaks into legs. ",
+      "expressing": "- the coast line\n- a change inland\n- the slow valley\n- the last hour",
+      "neutral": "The coast line, a change inland, the slow valley, and the last hour."
+    },
+    {
+      "prompt": "A good reading lamp has certain qualities. ",
+      "expressing": "- warm light\n- a stable base\n- an arm that moves\n- a quiet switch",
+      "neutral": "Warm light, a stable base, an arm that moves, and a quiet switch."
+    },
+    {
+      "prompt": "The pantry restock covers the staples. ",
+      "expressing": "- rice\n- tinned tomatoes\n- oil\n- salt",
+      "neutral": "Rice, tinned tomatoes, oil, and salt."
+    },
+    {
+      "prompt": "The committee meets about three matters. ",
+      "expressing": "- the footpath\n- the drainage\n- next year's fee",
+      "neutral": "The footpath, the drainage, and next year's fee."
+    },
+    {
+      "prompt": "A camera bag for the day holds little. ",
+      "expressing": "- water\n- a notebook\n- one snack\n- a folded bag",
+      "neutral": "Water, a notebook, one snack, and a folded bag."
+    },
+    {
+      "prompt": "The paint job runs in stages. ",
+      "expressing": "- wash the wall\n- fill the cracks\n- prime\n- two thin coats",
+      "neutral": "Wash the wall, fill the cracks, prime, and two thin coats."
+    },
+    {
+      "prompt": "The allotment produced well this year. ",
+      "expressing": "- beans\n- courgettes\n- chard\n- late tomatoes",
+      "neutral": "Beans, courgettes, chard, and late tomatoes."
+    },
+    {
+      "prompt": "The handover note should cover the essentials. ",
+      "expressing": "- what is running\n- what is paused\n- who to call\n- where the keys are",
+      "neutral": "What is running, what is paused, who to call, and where the keys are."
+    },
+    {
+      "prompt": "The rainy afternoon offered a few options. ",
+      "expressing": "- the museum\n- a long lunch\n- the second-hand shop\n- a film",
+      "neutral": "The museum, a long lunch, the second-hand shop, and a film."
+    }
+  ]
+}

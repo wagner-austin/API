@@ -134,6 +134,75 @@ def resolvable_floor(item_count: int, alpha: float, test: McNemarTest) -> float:
     return smallest_rejecting_discordant(alpha, test) / item_count
 
 
+def require_resolvable_pairs(
+    item_count: int,
+    *,
+    alpha: float,
+    test: McNemarTest,
+    smallest_effect_of_interest: float,
+    subject: str,
+) -> float:
+    """Refuse a paired measurement too small to resolve its own claim.
+
+    THE PREDICATE, WITHOUT A PLAN TYPE. Written this way because a second
+    paired measurement arrived -- trait expression, whose items are matched
+    continuations rather than cloze questions -- and the check it needs is
+    this one exactly: the same McNemar rejection region, the same floor, the
+    same inversion to a required count. A second copy keyed to a second plan
+    type would be two copies of the reasoning in the module docstring, free
+    to drift in the direction that matters least visibly, since both would
+    keep producing a number.
+
+    Args:
+        item_count: How many items the run actually realised. The REALISED
+            count, never a plan's cap -- the cap is an upper bound the data is
+            free to fall short of, and the 32-item set behind the retracted
+            headline came from a plan whose cap said 120.
+        alpha: Two-sided significance level the comparison is judged at.
+        test: Which McNemar variant the comparison is reported under.
+        smallest_effect_of_interest: The difference the measurement exists to
+            resolve, in the units its arms report.
+        subject: What an item IS here, singular, for the refusal message --
+            ``"item"`` for a question set, ``"pair"`` for a trait set. A
+            refusal that names the wrong unit sends its reader to the wrong
+            file.
+
+    Returns:
+        The resolvable floor, for the caller to carry into its ``RunRecord``
+        so every number ships beside the smallest difference that could have
+        been significant.
+
+    Raises:
+        AppError: With ``CARTRIDGE_QA_UNDERPOWERED`` when the floor is above
+            the declared effect, or when no discordant count rejects at this
+            alpha.
+    """
+    floor = resolvable_floor(item_count, alpha, test)
+    if floor > smallest_effect_of_interest:
+        # BOTH UNITS, AND THE ITEMS COME FIRST. A rate reads like a
+        # measurement whatever its size -- "+0.0417" looks like a finding --
+        # while "1.3 items of 32" reads as what it is. The retracted headline
+        # was legible as wrong only in hindsight for exactly that reason, so
+        # the refusal states the count it would take and the count the plan
+        # is asking about, and only then the rates.
+        rejecting = smallest_rejecting_discordant(alpha, test)
+        wanted = smallest_effect_of_interest * item_count
+        raise AppError(
+            ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED,
+            (
+                f"this plan is hunting {wanted:.1f} {subject}(s) of {item_count}, and the "
+                f"fewest that can ever reject is {rejecting} of {item_count} -- at alpha "
+                f"{alpha!r} under the {test.value} test, {item_count} {subject}(s) resolve "
+                f"nothing smaller than {floor:.4f} while the plan declares "
+                f"{smallest_effect_of_interest:.4f}; the measurement must realise at least "
+                f"{math.ceil(rejecting / smallest_effect_of_interest)} {subject}(s) before "
+                f"it can produce a number any split of the data would support"
+            ),
+            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED),
+        )
+    return floor
+
+
 def require_resolvable_question_set(plan: QaPlan, item_count: int) -> float:
     """Refuse a measurement whose question set is too small for its own claim.
 
@@ -142,68 +211,26 @@ def require_resolvable_question_set(plan: QaPlan, item_count: int) -> float:
             is the difference the plan exists to resolve, and its ``alpha``
             and ``mcnemar_test`` fix the rejection region it is judged against.
         item_count: How many items the corpus actually yielded. The REALISED
-            count, never the plan's ``max_items`` cap -- the cap is an upper
-            bound the corpus is free to fall short of, and the 32-item set
-            behind the retracted headline came from a plan whose cap said 120.
+            count, never the plan's ``max_items`` cap.
 
     Returns:
-        The resolvable floor, for the caller to carry into its ``RunRecord``
-        so every number ships beside the smallest difference that produced it
-        could have been significant.
+        The resolvable floor.
 
     Raises:
         AppError: With ``CARTRIDGE_QA_UNDERPOWERED`` when the floor is above
             the difference the plan declares it is looking for.
     """
-    floor = resolvable_floor(item_count, plan["alpha"], plan["mcnemar_test"])
-    if floor > plan["smallest_effect_of_interest"]:
-        # BOTH UNITS, AND THE ITEMS COME FIRST. A rate reads like a
-        # measurement whatever its size -- "+0.0417" looks like a finding --
-        # while "1.3 items of 32" reads as what it is. The retracted headline
-        # was legible as wrong only in hindsight for exactly that reason, so
-        # the refusal states the count it would take and the count the plan
-        # is asking about, and only then the rates.
-        rejecting = smallest_rejecting_discordant(plan["alpha"], plan["mcnemar_test"])
-        wanted = plan["smallest_effect_of_interest"] * item_count
-        raise AppError(
-            ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED,
-            (
-                f"this plan is hunting {wanted:.1f} item(s) of {item_count}, and the fewest "
-                f"that can ever reject is {rejecting} of {item_count} -- at alpha "
-                f"{plan['alpha']!r} under the {plan['mcnemar_test'].value} test, "
-                f"{item_count} item(s) resolve nothing smaller than {floor:.4f} while the plan "
-                f"declares {plan['smallest_effect_of_interest']:.4f}; the corpus must yield at "
-                f"least {_required_items(plan)} items before this measurement can produce a "
-                f"number any split of the data would support"
-            ),
-            model_trainer_status_for(ModelTrainerErrorCode.CARTRIDGE_QA_UNDERPOWERED),
-        )
-    return floor
-
-
-def _required_items(plan: QaPlan) -> int:
-    """Say how many items the plan would need, rather than only that it failed.
-
-    A refusal that names a target is a next action; one that does not is an
-    obstacle. The count is the smallest ``n`` whose floor reaches the declared
-    effect, which inverts directly.
-
-    Args:
-        plan: The measurement being run.
-
-    Returns:
-        The fewest items whose resolvable floor is at or below the plan's
-        ``smallest_effect_of_interest``.
-
-    Raises:
-        AppError: With ``CARTRIDGE_QA_UNDERPOWERED`` when no discordant count
-            rejects at the plan's alpha.
-    """
-    rejecting = smallest_rejecting_discordant(plan["alpha"], plan["mcnemar_test"])
-    return math.ceil(rejecting / plan["smallest_effect_of_interest"])
+    return require_resolvable_pairs(
+        item_count,
+        alpha=plan["alpha"],
+        test=plan["mcnemar_test"],
+        smallest_effect_of_interest=plan["smallest_effect_of_interest"],
+        subject="item",
+    )
 
 
 __all__ = [
+    "require_resolvable_pairs",
     "require_resolvable_question_set",
     "resolvable_floor",
     "smallest_rejecting_discordant",

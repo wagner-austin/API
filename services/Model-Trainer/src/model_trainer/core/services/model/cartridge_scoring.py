@@ -154,9 +154,156 @@ class TraitPair(TypedDict):
     neutral: torch.Tensor
 
 
-def score_trait_expression(
+class TraitPairLosses(TypedDict):
+    """The four losses one matched pair produces, before anything is derived.
+
+    WHY FOUR RATHER THAN THE TWO DIFFERENCES. Expression and coherence are two
+    different linear combinations of the SAME four numbers, and a cartridge
+    that expresses a trait by degrading fluency scores identically on the
+    first to one that expresses it well. Measuring the losses once and
+    deriving both readings from them means the two can never disagree about
+    what was run, and costs one forward pass per member rather than two.
+
+    Attributes:
+        index: Position of the pair in the supplied order, carried so an
+            outcome can be traced back to the text that produced it.
+        base_expressing: Loss on the trait-expressing continuation, base only.
+        base_neutral: Loss on the neutral continuation, base only.
+        arm_expressing: Loss on the trait-expressing continuation, through the
+            prefix.
+        arm_neutral: Loss on the neutral continuation, through the prefix.
+    """
+
+    index: int
+    base_expressing: float
+    base_neutral: float
+    arm_expressing: float
+    arm_neutral: float
+
+
+def measure_trait_losses(
     model: CartridgeModel, pairs: Sequence[TraitPair]
-) -> tuple[PairedComparison, list[PairedItemOutcome]]:
+) -> list[TraitPairLosses]:
+    """Score both members of every pair, with the prefix and without it.
+
+    The single place the model is actually run for a trait measurement. Both
+    arms run under ``no_grad`` and in evaluation mode, because a measurement
+    that left dropout active would report a different number every time and
+    attribute the noise to the cartridge.
+
+    Args:
+        model: The cartridge-wrapped model. Its base is the control arm, so
+            both arms share weights, device and dtype and differ only in
+            whether the prefix is attended to.
+        pairs: Matched continuations, in a stable order. The order is carried
+            into the indices, so the same pairs must be supplied in the same
+            order across arms for the per-item comparison to mean anything.
+
+    Returns:
+        One record per pair, in the order given.
+    """
+    model.eval()
+    return [
+        TraitPairLosses(
+            index=index,
+            base_expressing=_loss_without_prefix(model, pair["expressing"]),
+            base_neutral=_loss_without_prefix(model, pair["neutral"]),
+            arm_expressing=_loss_with_prefix(model, pair["expressing"]),
+            arm_neutral=_loss_with_prefix(model, pair["neutral"]),
+        )
+        for index, pair in enumerate(pairs)
+    ]
+
+
+def expression_outcomes(losses: Sequence[TraitPairLosses]) -> list[PairedItemOutcome]:
+    """Reduce measured losses to the PREFERENCE each arm expressed.
+
+    Each arm is scored as the loss gap between the two continuations, so a
+    prefix that helps both members equally cancels and moves nothing. That
+    cancellation is the property that makes this a trait measurement rather
+    than a fluency measurement, and it is why a bare loss on trait-expressing
+    text cannot answer the question: a base with any English priors already
+    prefers some phrasings.
+
+    Args:
+        losses: Measured losses, in pair order.
+
+    Returns:
+        One outcome per pair. ``baseline`` is the plain base's preference and
+        ``treatment`` is the cartridge's, so
+        :func:`~model_trainer.core.contracts.paired_comparison.summarise_pairs`
+        counts an item improved exactly when the cartridge leans further
+        toward the trait than the base did.
+    """
+    return [
+        PairedItemOutcome(
+            index=item["index"],
+            baseline=item["base_expressing"] - item["base_neutral"],
+            treatment=item["arm_expressing"] - item["arm_neutral"],
+        )
+        for item in losses
+    ]
+
+
+def coherence_outcomes(losses: Sequence[TraitPairLosses]) -> list[PairedItemOutcome]:
+    """Reduce measured losses to what each arm did to ORDINARY text.
+
+    THE CONTROL A TRAIT MEASUREMENT CANNOT BE READ WITHOUT. A cartridge can
+    express a trait by degrading fluency, and
+    :func:`expression_outcomes` is blind to that by construction: it
+    differences the two members, so a prefix that wrecks both equally scores
+    zero expression and a prefix that wrecks only the neutral member scores a
+    large one. The neutral continuation is the trait-free text in the
+    measurement, so what the prefix does to ITS loss is the fluency reading,
+    taken on the same forward passes rather than on a second corpus nobody
+    would keep in step with this one.
+
+    Args:
+        losses: Measured losses, in pair order.
+
+    Returns:
+        One outcome per pair, ``baseline`` the base's loss on the neutral
+        continuation and ``treatment`` the cartridge's, so an item counts as
+        improved when the prefix made ordinary text EASIER to predict.
+    """
+    return [
+        PairedItemOutcome(
+            index=item["index"],
+            baseline=item["base_neutral"],
+            treatment=item["arm_neutral"],
+        )
+        for item in losses
+    ]
+
+
+class TraitReading(TypedDict):
+    """What one arm did to a trait, and what it did to ordinary text.
+
+    BOTH OR NEITHER, and that is the whole reason this is one type. An
+    expression number alone is unreadable: the composition literature's own
+    instrument carries a coherence bar precisely because a model can be
+    pushed toward a trait by being made worse at everything, and a record
+    holding only the first number cannot tell that apart from trait
+    acquisition. Reporting them together, from one set of forward passes,
+    means no arm can appear in a record with one and not the other.
+
+    Attributes:
+        expression: How much further toward the trait this arm leans than the
+            plain base does, as a paired comparison over the pairs.
+        expression_items: The per-item outcomes ``expression`` was reduced
+            from, so a later reader can re-test rather than trust the summary.
+        coherence: What this arm did to the loss on the trait-free member of
+            each pair.
+        coherence_items: The per-item outcomes ``coherence`` was reduced from.
+    """
+
+    expression: PairedComparison
+    expression_items: list[PairedItemOutcome]
+    coherence: PairedComparison
+    coherence_items: list[PairedItemOutcome]
+
+
+def read_trait_pairs(model: CartridgeModel, pairs: Sequence[TraitPair]) -> TraitReading:
     """Score whether the cartridge shifts preference toward a trait.
 
     THE QUESTION THIS ANSWERS IS NOT THE ONE :func:`score_held_out` ANSWERS.
@@ -171,17 +318,12 @@ def score_trait_expression(
     some phrasings, and a prefix that merely lowers loss everywhere would look
     like trait acquisition. So each arm is scored as a PREFERENCE -- the loss
     gap between the two continuations -- and the comparison is between the
-    base's preference and the cartridge's. A prefix that helps both
-    continuations equally moves nothing here, which is the property that makes
-    this a trait measurement rather than a fluency measurement.
+    base's preference and the cartridge's.
 
-    The mapping onto :class:`PairedItemOutcome` is exact and deliberate, so
-    the whole existing statistical layer applies unchanged: ``baseline`` is
-    the plain base's preference, ``treatment`` is the cartridge's, and
-    :func:`summarise_pairs` counts an item improved when ``treatment <
-    baseline`` -- that is, when the cartridge leans further toward the trait
-    than the base did. No judge model is involved anywhere, so two runs on one
-    machine produce identical numbers.
+    Both readings map onto :class:`PairedItemOutcome`, so the whole existing
+    statistical layer applies unchanged and each gets its own McNemar exact
+    conditional test and its own outcomes digest. No judge model is involved
+    anywhere, so two runs on one machine produce identical numbers.
 
     IT LIVES HERE because it is the same operation as its sibling -- score
     tokens with the prefix and without it -- over a pair rather than an item,
@@ -190,10 +332,8 @@ def score_trait_expression(
 
     WHAT IT DOES NOT ESTABLISH. It measures RELATIVE PREFERENCE between two
     supplied continuations, not what the model would generate unprompted. A
-    cartridge can move preference without changing sampled output, and a
-    cartridge that expresses a trait by degrading fluency scores the same as
-    one that expresses it well. A coherence arm is a separate measurement and
-    this function does not stand in for it.
+    cartridge can move preference without changing sampled output, and this
+    is a scoring instrument rather than a generation one.
 
     Args:
         model: The cartridge-wrapped model. Its base is the control arm, so
@@ -205,21 +345,17 @@ def score_trait_expression(
             anything.
 
     Returns:
-        The comparison and the per-item outcomes it was reduced from, matching
-        :func:`score_held_out` so both can feed one report.
+        The two readings and the per-item outcomes each was reduced from.
     """
-    model.eval()
-    outcomes = [
-        PairedItemOutcome(
-            index=index,
-            baseline=_loss_without_prefix(model, pair["expressing"])
-            - _loss_without_prefix(model, pair["neutral"]),
-            treatment=_loss_with_prefix(model, pair["expressing"])
-            - _loss_with_prefix(model, pair["neutral"]),
-        )
-        for index, pair in enumerate(pairs)
-    ]
-    return summarise_pairs(outcomes), outcomes
+    losses = measure_trait_losses(model, pairs)
+    expression = expression_outcomes(losses)
+    coherence = coherence_outcomes(losses)
+    return TraitReading(
+        expression=summarise_pairs(expression),
+        expression_items=expression,
+        coherence=summarise_pairs(coherence),
+        coherence_items=coherence,
+    )
 
 
 def train_on(
@@ -269,8 +405,13 @@ def train_on(
 __all__ = [
     "PrefixTrainableProto",
     "TraitPair",
+    "TraitPairLosses",
+    "TraitReading",
     "base_loss",
+    "coherence_outcomes",
+    "expression_outcomes",
+    "measure_trait_losses",
+    "read_trait_pairs",
     "score_held_out",
-    "score_trait_expression",
     "train_on",
 ]

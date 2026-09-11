@@ -1,0 +1,39 @@
+{
+  "project": "mi",
+  "name": "cartridge-traits-gpt2-v54",
+  "image": {
+    "path": "/pub/wagnera3/images/v54/abl.sif",
+    "sha256": "c66460f0527551765b6bb22146a16952a888f175a666abad39d891e0e050330e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 180,
+  "mem_gb": 32,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_trait_sweep --plan gpt2-traits --corpus /pub/wagnera3/mi/traits/corpus --device cuda --out /pub/wagnera3/mi/traits/results/gpt2-traits-v54.json",
+  "artifact": "/pub/wagnera3/mi/traits/results/gpt2-traits-v54.json",
+  "experiment": {
+    "measurement": "cartridge-trait-composition",
+    "plan": "gpt2-traits",
+    "base_model": "gpt2",
+    "corpus": "authored-trait-pairs-4x32",
+    "corpus_digest": "53b2249185311be5",
+    "traits": "bullets.step-by-step.formal-tone.rhetorical-questions",
+    "seeds": "7.8.9",
+    "compartment_counts": "2.4",
+    "steering_site": "transformer.h.8.mlp.c_proj",
+    "steering_strength": "1.0",
+    "declared_effect": "0.375",
+    "held_out_pairs": "16",
+    "why": "does-a-cartridge-carry-a-disposition-and-what-does-composing-two-cost",
+    "compared_against": "the published steering-vector account of dispositional composition, run here as its own arm at matched trait counts on this same base and these same pairs",
+    "precondition": "the solo cell runs FIRST and the run is refused if its expression gain does not clear its own seed spread -- the 7B rung of the corpus arc failed at exactly that step and every retention computed beside it was a division artefact",
+    "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived",
+    "deviation_from_recorded_grid": "solo, n2 and n4 with untrained-composed and cross controls; the diverse-companion, base-LoRA and crowd-invariance families are NOT run here. Those three repair composition, and the question they answer is only askable once a naive interference number exists to repair."
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}

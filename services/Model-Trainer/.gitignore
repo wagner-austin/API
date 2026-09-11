@@ -66,7 +66,26 @@ corpus_cache/
 # Artifacts and runs (generated at runtime)
 /artifacts/
 /runs/
-/corpus/
+# THE CONTENTS RATHER THAN THE DIRECTORY, so the negation below can take
+# effect. Git does not descend into an excluded DIRECTORY, so `/corpus/`
+# followed by `!/corpus/traits/` re-includes nothing at all -- the files stay
+# invisible and the negation reads as though it works.
+/corpus/*
+
+# Allow the AUTHORED trait corpora. Everything else under /corpus/ is
+# downloaded or generated bulk, which is why that directory is ignored; these
+# four files are hand-written source that the measurement is DEFINED by. The
+# plan table's declared effect is derived from their pair count, a suite reads
+# them to check that derivation still holds, and tools/hpc3/runs stages them
+# with a sha256 each -- none of which works from a file that exists only on
+# one machine. (2026-09-11)
+#
+# THE SECOND LINE IS NOT REDUNDANT. `*.json` above hides every JSON file in
+# this service, so re-including the directory alone leaves its four files
+# invisible -- which is exactly how `!results/cartridge/*.json` a few lines up
+# had to be written too.
+!/corpus/traits/
+!/corpus/traits/*.json
 
 # Windows reserved paths that can sometimes appear due to tooling
 nul

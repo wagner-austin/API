@@ -21,6 +21,7 @@ from collections.abc import Mapping
 from typing import Protocol
 
 from model_trainer.core.contracts.qa_plan import QaPlan
+from model_trainer.core.contracts.trait_plan import TraitPlan
 
 # Safe at module scope for the same reason `probe_shapes` is: a table of
 # TypedDicts, a digest and a label formatter, importing no torch. The arms it
@@ -42,6 +43,7 @@ from model_trainer.core.services.model.cartridge_pool_plans import (
     VariedCompanionSweepPlan,
 )
 from model_trainer.core.services.model.cartridge_qa_plans import QA_PLANS
+from model_trainer.core.services.model.cartridge_trait_plans import TRAIT_SWEEP_PLANS
 from model_trainer.core.services.model.editing.triple_edit_plans import (
     TRIPLE_EDIT_PLANS,
     TripleEditPlan,
@@ -96,6 +98,22 @@ class QaPlansProto(Protocol):
 
     def __call__(self) -> Mapping[str, QaPlan]:
         """Return every declared question-set plan, in table order."""
+        ...
+
+
+class TraitSweepPlansProto(Protocol):
+    """Protocol for the trait-composition plan table.
+
+    Behind a hook for the reason :class:`QaPlansProto` is, with one addition
+    that is specific to this axis: the real table's plans train four
+    cartridges per seed AND extract a contrastive direction per trait, so a
+    suite reaching only the real table would need both a base with weights and
+    a module graph to hook. Tests install a one-row table over a model they
+    built themselves.
+    """
+
+    def __call__(self) -> Mapping[str, TraitPlan]:
+        """Return every declared trait-composition plan, in table order."""
         ...
 
 
@@ -332,6 +350,15 @@ def _default_qa_plans() -> Mapping[str, QaPlan]:
     return QA_PLANS
 
 
+def _default_trait_sweep_plans() -> Mapping[str, TraitPlan]:
+    """Production trait-composition plan table - used as default hook.
+
+    Returns:
+        Every declared plan, in table order.
+    """
+    return TRAIT_SWEEP_PLANS
+
+
 def _default_triple_edit_plans() -> Mapping[str, TripleEditPlan]:
     """Production triple-edit plan table - used as default hook.
 
@@ -432,6 +459,8 @@ content_lora_sweep_plans: BaseLoraSweepPlansProto = _default_content_lora_sweep_
 
 qa_plans: QaPlansProto = _default_qa_plans
 
+trait_sweep_plans: TraitSweepPlansProto = _default_trait_sweep_plans
+
 triple_edit_plans: TripleEditPlansProto = _default_triple_edit_plans
 
 ladder_shapes: LadderShapesProto = _default_ladder_shapes
@@ -462,6 +491,7 @@ __all__ = [
     "QaPlansProto",
     "TraceRungsProto",
     "TrainShapesProto",
+    "TraitSweepPlansProto",
     "TripleEditPlansProto",
     "VariedCompanionSweepPlansProto",
     "base_lora_sweep_plans",
@@ -478,6 +508,7 @@ __all__ = [
     "qa_plans",
     "trace_rungs",
     "train_shapes",
+    "trait_sweep_plans",
     "triple_edit_plans",
     "varied_companion_sweep_plans",
 ]

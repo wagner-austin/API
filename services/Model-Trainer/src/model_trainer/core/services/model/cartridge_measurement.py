@@ -44,8 +44,10 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Sequence
+from typing import Protocol
 
 import torch
+from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.replicated_measurement import (
     ReplicatedGain,
@@ -301,6 +303,127 @@ def measure_composition(
     return replicate(f"{arm}-alone", alone), replicate(f"{arm}-composed", composed)
 
 
+class ComposedReplicate(TypedDict):
+    """One seed's cartridges, trained and composed, before anything scores them.
+
+    Attributes:
+        seed: The seed every cartridge in this replicate was drawn under.
+        alone: The cartridge whose retention is the finding.
+        composed: ``alone`` with every other cartridge composed in front.
+        untrained_composed: ``alone`` composed with freshly drawn slots of
+            identical shape, at the same seed offsets, so the structural and
+            content halves of the cost can be told apart.
+        others: The other cartridges, in the order given, each of which a
+            caller scores alone as its own cross arm.
+    """
+
+    seed: int
+    alone: CartridgeSlots
+    composed: CartridgeSlots
+    untrained_composed: CartridgeSlots
+    others: tuple[CartridgeSlots, ...]
+
+
+class ReplicateConsumerProto(Protocol):
+    """What :func:`composed_replicates` hands each replicate to.
+
+    Positional-only, because the argument's name is the caller's business and
+    every implementation here is a local closure over the lists it fills.
+    """
+
+    def __call__(self, built: ComposedReplicate, /) -> None:
+        """Score one replicate before the next one is built."""
+        ...
+
+
+def composed_replicates(
+    base: CacheCapableLMProto,
+    *,
+    first_train: Sequence[torch.Tensor],
+    other_trains: Sequence[Sequence[torch.Tensor]],
+    num_slots: int,
+    seeds: Sequence[int],
+    epochs: int,
+    learning_rate: float,
+    consume: ReplicateConsumerProto,
+) -> None:
+    """Build one replicate's cartridges per seed, scoring each as it is built.
+
+    THE COMPOSITION GEOMETRY, WITH ONE OWNER. The seed offsets, the fold
+    order and the untrained control are the parts that must be identical
+    between any two measurements that want to be compared, and they are not
+    obvious: the k-th other cartridge draws from ``seed + (k + 1) *
+    len(seeds)`` so no two cartridges in one replicate share a draw, and the
+    untrained draws reuse those SAME offsets so they differ from each other
+    exactly the way the trained ones do. A second measurement re-deriving that
+    would not fail; it would produce a complete table whose arms cannot be
+    subtracted from this one's, which is worse.
+
+    IT CALLS THE CALLER BACK RATHER THAN RETURNING A LIST, AND THAT IS
+    LOAD-BEARING RATHER THAN TIDINESS. Scoring puts the base in evaluation
+    mode, and :func:`train_cartridge` documents why that matters: the geometry
+    probe inside :func:`fresh_cartridge` runs a real forward pass, which
+    consumes process-wide RNG when the base is in TRAINING mode and none when
+    it is in evaluation mode. So a caller that scored each replicate as it was
+    built and one that collected them all first would hand training different
+    RNG states, and would get different numbers from the same inputs.
+
+    Handing each replicate straight to a consumer makes that interleaving
+    STRUCTURAL. Returning a list would make it impossible; returning a
+    generator would make it merely conventional, since a caller could
+    materialise one and quietly get the other ordering. This is the shape that
+    cannot be used the wrong way round.
+
+    Args:
+        base: The frozen base.
+        first_train: Training items for the cartridge whose retention is the
+            finding.
+        other_trains: One training-item sequence per additional cartridge.
+            Composing N compartments takes ``N - 1`` entries.
+        num_slots: Prefix positions for EACH cartridge.
+        seeds: Seeds to draw, one replicate each.
+        epochs: Passes over each training set.
+        learning_rate: Step size for AdamW.
+        consume: Scores one replicate. Called once per seed, in seed order,
+            and before the next replicate is built.
+    """
+    for seed in seeds:
+        first = train_cartridge(
+            base,
+            first_train,
+            num_slots=num_slots,
+            seed=seed,
+            epochs=epochs,
+            learning_rate=learning_rate,
+        )
+        others = [
+            train_cartridge(
+                base,
+                other_train,
+                num_slots=num_slots,
+                seed=seed + (position + 1) * len(seeds),
+                epochs=epochs,
+                learning_rate=learning_rate,
+            )
+            for position, other_train in enumerate(other_trains)
+        ]
+        untrained_others = [
+            fresh_cartridge(
+                base, num_slots=num_slots, seed=seed + (position + 1) * len(seeds)
+            ).slots
+            for position in range(len(other_trains))
+        ]
+        consume(
+            ComposedReplicate(
+                seed=seed,
+                alone=first,
+                composed=functools.reduce(compose, others, first),
+                untrained_composed=functools.reduce(compose, untrained_others, first),
+                others=tuple(others),
+            )
+        )
+
+
 def measure_composition_scaling(
     base: CacheCapableLMProto,
     *,
@@ -369,53 +492,43 @@ def measure_composition_scaling(
     composed: list[tuple[int, float]] = []
     untrained_composed: list[tuple[int, float]] = []
     cross: list[list[tuple[int, float]]] = [[] for _ in other_trains]
-    for seed in seeds:
-        first = train_cartridge(
-            base,
-            first_train,
-            num_slots=num_slots,
-            seed=seed,
-            epochs=epochs,
-            learning_rate=learning_rate,
+
+    def _score(built: ComposedReplicate, /) -> None:
+        """Score one replicate's four arms on the held-out items.
+
+        Args:
+            built: The replicate just constructed.
+        """
+        seed = built["seed"]
+        alone.append(
+            (seed, held_out_gain(CartridgeModel(base=base, slots=built["alone"]), held_out))
         )
-        # Seed offsets follow measure_composition's rule and extend it: the
-        # k-th other cartridge draws from seed + (k + 1) * len(seeds), so no
-        # two cartridges in one replicate share a draw, and no offset in one
-        # replicate collides with another replicate's base seed as long as
-        # the plan's seeds are consecutive or closer than len(seeds) apart --
-        # which the label records either way.
-        others = [
-            train_cartridge(
-                base,
-                other_train,
-                num_slots=num_slots,
-                seed=seed + (position + 1) * len(seeds),
-                epochs=epochs,
-                learning_rate=learning_rate,
-            )
-            for position, other_train in enumerate(other_trains)
-        ]
-        joined = functools.reduce(compose, others, first)
-        # The same seed offsets the trained strangers used, so the untrained
-        # draws differ from each other and from the first cartridge exactly
-        # the way the trained ones do. `fresh_cartridge` puts each draw on
-        # the base's device; only its slots are kept.
-        untrained_others = [
-            fresh_cartridge(
-                base, num_slots=num_slots, seed=seed + (position + 1) * len(seeds)
-            ).slots
-            for position in range(len(other_trains))
-        ]
-        untrained_joined = functools.reduce(compose, untrained_others, first)
-        alone.append((seed, held_out_gain(CartridgeModel(base=base, slots=first), held_out)))
-        composed.append((seed, held_out_gain(CartridgeModel(base=base, slots=joined), held_out)))
+        composed.append(
+            (seed, held_out_gain(CartridgeModel(base=base, slots=built["composed"]), held_out))
+        )
         untrained_composed.append(
-            (seed, held_out_gain(CartridgeModel(base=base, slots=untrained_joined), held_out))
+            (
+                seed,
+                held_out_gain(
+                    CartridgeModel(base=base, slots=built["untrained_composed"]), held_out
+                ),
+            )
         )
-        for position, other in enumerate(others):
+        for position, other in enumerate(built["others"]):
             cross[position].append(
                 (seed, held_out_gain(CartridgeModel(base=base, slots=other), held_out))
             )
+
+    composed_replicates(
+        base,
+        first_train=first_train,
+        other_trains=other_trains,
+        num_slots=num_slots,
+        seeds=seeds,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        consume=_score,
+    )
     return (
         replicate(f"{arm}-alone", alone),
         replicate(f"{arm}-composed", composed),
@@ -427,6 +540,9 @@ def measure_composition_scaling(
 
 
 __all__ = [
+    "ComposedReplicate",
+    "ReplicateConsumerProto",
+    "composed_replicates",
     "fresh_cartridge",
     "held_out_gain",
     "measure_composition",

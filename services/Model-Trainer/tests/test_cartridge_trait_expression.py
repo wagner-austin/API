@@ -48,7 +48,7 @@ from model_trainer.core.services.finetuning.strategies.cartridge_model import Ca
 from model_trainer.core.services.model.cartridge_scoring import (
     TraitPair,
     base_loss,
-    score_trait_expression,
+    read_trait_pairs,
     train_on,
 )
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
@@ -192,14 +192,14 @@ class _Experiment:
         """
         self.model = _adapt(num_slots)
         held_out = _held_out_pairs()
-        self.before, _ = score_trait_expression(self.model, held_out)
+        self.before = read_trait_pairs(self.model, held_out)
         self.epochs = train_on(
             self.model,
             [_row(index, _TRAIT) for index in range(24)],
             epochs=12,
             learning_rate=0.05,
         )
-        self.after, self.outcomes = score_trait_expression(self.model, held_out)
+        self.after = read_trait_pairs(self.model, held_out)
 
 
 @pytest.fixture(name="experiment", scope="module")
@@ -227,11 +227,40 @@ class TestTheInstrumentComputesWhatItClaims:
         """
         model = _adapt(num_slots=4)
         pair = _pair(1)
-        _, outcomes = score_trait_expression(model, [pair])
+        reading = read_trait_pairs(model, [pair])
         expected = base_loss(model.base, pair["expressing"]) - base_loss(
             model.base, pair["neutral"]
         )
-        assert outcomes[0]["baseline"] == pytest.approx(expected)
+        assert reading["expression_items"][0]["baseline"] == pytest.approx(expected)
+
+    def test_coherence_baseline_is_the_bases_loss_on_the_neutral_member(self) -> None:
+        """The fluency reading must be the base's own loss on trait-free text.
+
+        Checked against ``base_loss`` directly for the same reason the
+        expression baseline is: the two agree only if the reducer is reading
+        the member its docstring names, and reading the EXPRESSING member
+        instead would produce a plausible number that moves with the trait.
+        """
+        model = _adapt(num_slots=4)
+        pair = _pair(3)
+        reading = read_trait_pairs(model, [pair])
+        assert reading["coherence_items"][0]["baseline"] == pytest.approx(
+            base_loss(model.base, pair["neutral"])
+        )
+
+    def test_expression_and_coherence_are_read_from_one_set_of_losses(self) -> None:
+        """Both readings must describe the same items in the same order.
+
+        They are two linear combinations of one set of forward passes, so an
+        index in one has to name the same pair as that index in the other. If
+        they ever drifted apart, a record could pair an expression gain with
+        another pair's coherence and no field would say so.
+        """
+        reading = read_trait_pairs(_adapt(num_slots=4), _held_out_pairs())
+        assert [item["index"] for item in reading["expression_items"]] == [
+            item["index"] for item in reading["coherence_items"]
+        ]
+        assert reading["expression"]["items"] == reading["coherence"]["items"]
 
     def test_an_equal_shift_on_both_continuations_cancels(self) -> None:
         """A pair whose members are identical must score zero preference.
@@ -240,12 +269,19 @@ class TestTheInstrumentComputesWhatItClaims:
         fluency one: whatever the prefix does to loss in general, it does to
         both members and cancels. If this ever fails, the scorer is measuring
         how much the prefix helps, not which continuation it prefers.
+
+        The coherence reading is asserted NOT to cancel in the same breath,
+        because that is the division of labour between them: the prefix's
+        effect on ordinary text is exactly what expression discards, so a
+        coherence number that also vanished here would mean the fluency arm
+        is measuring the same thing the expression arm is.
         """
         model = _adapt(num_slots=4)
         row = _row(2, _TRAIT)
-        _, outcomes = score_trait_expression(model, [TraitPair(expressing=row, neutral=row)])
-        assert outcomes[0]["baseline"] == pytest.approx(0.0, abs=1e-9)
-        assert outcomes[0]["treatment"] == pytest.approx(0.0, abs=1e-9)
+        reading = read_trait_pairs(model, [TraitPair(expressing=row, neutral=row)])
+        assert reading["expression_items"][0]["baseline"] == pytest.approx(0.0, abs=1e-9)
+        assert reading["expression_items"][0]["treatment"] == pytest.approx(0.0, abs=1e-9)
+        assert reading["coherence_items"][0]["baseline"] > 0.0
 
     def test_scoring_is_deterministic(self) -> None:
         """Two runs of one model over one pair set must agree exactly.
@@ -256,16 +292,19 @@ class TestTheInstrumentComputesWhatItClaims:
         """
         model = _adapt(num_slots=4)
         pairs = _held_out_pairs()
-        first, first_outcomes = score_trait_expression(model, pairs)
-        second, second_outcomes = score_trait_expression(model, pairs)
-        assert first_outcomes == second_outcomes
-        assert first["outcomes_digest"] == second["outcomes_digest"]
+        first = read_trait_pairs(model, pairs)
+        second = read_trait_pairs(model, pairs)
+        assert first == second
+        assert first["expression"]["outcomes_digest"] == second["expression"]["outcomes_digest"]
+        assert first["coherence"]["outcomes_digest"] == second["coherence"]["outcomes_digest"]
 
     def test_no_pairs_measures_nothing_rather_than_erroring(self) -> None:
         """An empty pair set reports zero items, not a division error."""
-        comparison, outcomes = score_trait_expression(_adapt(num_slots=4), [])
-        assert outcomes == []
-        assert comparison["items"] == 0
+        reading = read_trait_pairs(_adapt(num_slots=4), [])
+        assert reading["expression_items"] == []
+        assert reading["coherence_items"] == []
+        assert reading["expression"]["items"] == 0
+        assert reading["coherence"]["items"] == 0
 
 
 class TestAPrefixCanCarryATrait:
@@ -284,7 +323,8 @@ class TestAPrefixCanCarryATrait:
         the plain base's; lower means more trait-preferring, so the trained
         arm must sit below its own control.
         """
-        assert experiment.after["mean_treatment"] < experiment.after["mean_baseline"]
+        expression = experiment.after["expression"]
+        assert expression["mean_treatment"] < expression["mean_baseline"]
 
     def test_most_held_out_pairs_move_the_same_way(self, experiment: _Experiment) -> None:
         """The shift is carried by the item set, not by one outlier pair.
@@ -292,7 +332,8 @@ class TestAPrefixCanCarryATrait:
         A mean can be moved by a single pair; the per-item count cannot, which
         is the whole reason the comparison is paired.
         """
-        assert experiment.after["improved"] > experiment.after["worsened"]
+        expression = experiment.after["expression"]
+        assert expression["improved"] > expression["worsened"]
 
     def test_the_untrained_prefix_does_not_explain_it(self, experiment: _Experiment) -> None:
         """Attaching a prefix is not itself enough to lean toward the trait.
@@ -303,4 +344,24 @@ class TestAPrefixCanCarryATrait:
         -0.7612 where it costs this rung nearly nothing, so it is measured per
         rung rather than assumed once.
         """
-        assert experiment.after["mean_treatment"] < experiment.before["mean_treatment"]
+        assert (
+            experiment.after["expression"]["mean_treatment"]
+            < experiment.before["expression"]["mean_treatment"]
+        )
+
+    def test_the_coherence_arm_is_reported_beside_the_expression_one(
+        self, experiment: _Experiment
+    ) -> None:
+        """A trait gain must ship with what it cost ordinary text.
+
+        THE ARM THAT MAKES THE EXPRESSION NUMBER READABLE. A cartridge can
+        move preference toward a trait by becoming worse at everything, and
+        the expression reading is blind to that by construction -- it
+        differences the two members. Here the trait is a marker token and the
+        neutral member is trained on nothing, so this asserts only that the
+        number EXISTS over the same pairs; its sign is a finding about a run,
+        not a property the instrument may assume.
+        """
+        coherence = experiment.after["coherence"]
+        assert coherence["items"] == len(_held_out_pairs())
+        assert coherence["mean_baseline"] > 0.0

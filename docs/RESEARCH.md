@@ -69,7 +69,8 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   cartridge_companion_sweep, cartridge_composition_sweep,
   cartridge_content_lora_sweep, cartridge_diverse_companion_sweep,
   cartridge_headroom, cartridge_qa_benchmark, cartridge_solo_grid,
-  cartridge_solo_seeds, cartridge_varied_companion_sweep, continuations,
+  cartridge_solo_seeds, cartridge_trait_sweep,
+  cartridge_varied_companion_sweep, continuations,
   forward_benchmark, gemm_benchmark, gemm_probe, known_answer_probe,
   known_answer_registry, legacy_gemm_probe, probe_ladder, probe_trace,
   score_baseline, score_run, sdpa_benchmark, sdpa_probe, train_benchmark,
@@ -742,6 +743,78 @@ test and by image smoke.
   gpt2-scale question now, since no 7B rung remains to spend it on);
   and the 7B compartmental design itself, which after this record is a
   base-adaptation or retrieval question, not a cartridge one.
+
+#### `cartridge_trait_sweep` — what composing DISPOSITIONS costs, against the published baseline
+
+Registered 2026-09-11 (board task `83c25b86`). Every compartment this arc had
+ever composed was a CORPUS: the dependent variable is held-out loss on the
+compartment's own text, and "the model knows the corpus" is what that measures.
+A persona has no held-out corpus in that sense. This command asks the other
+question — does a trained prefix carry a DISPOSITION — and it asks it beside
+the only published measurement of dispositional composition, which reports
+that two steering vectors already cost a large fraction of trait expression
+and that every common composition scheme degrades as vectors are added.
+
+- **Command:** `python -m model_trainer.cli.cartridge_trait_sweep --plan
+  gpt2-traits --corpus <dir> --device cuda --out <file>`. One corpus flag,
+  because the compartments are traits and they all live in one staged
+  directory, one JSON file per trait.
+- **The instrument is contrastive and no judge model enters it.** Per trait, a
+  set of prompts each continued twice — once exhibiting the trait, once not.
+  Each arm is scored as a PREFERENCE (the loss gap between the two
+  continuations) and the arms are differenced, so a prefix that lowers loss
+  everywhere cancels to zero. That cancellation is what makes it a trait
+  measurement rather than a fluency one, and it is also why a **coherence
+  reading ships beside every expression number**: the expression arm is blind
+  by construction to a cartridge that expresses a trait by becoming worse at
+  everything. The two readings are two linear combinations of the same four
+  losses, produced together from one set of forward passes.
+- **The corpus is committed, at
+  `services/Model-Trainer/corpus/traits/`** — four traits, 32 authored pairs
+  each, staged by `tools/hpc3/runs/trait-corpus-stage.json` with a sha256 per
+  file. 32 is the POWER GATE's number, not a round one: the stride holds out
+  half, and 6 of 16 is the smallest net rate any outcome could ever report as
+  significant at alpha 0.05 under the exact McNemar test. Every plan declares
+  exactly that 0.375, and halving it means doubling the authored pairs. The
+  gate runs on the REALISED held-out count before a model loads.
+- **The traits are not free choice.** The roster is drawn from the six the
+  published work found consistently effective; the four it excluded are
+  positionally concentrated (rhyme matters at line ends), so a composition
+  null drawn from them would measure trait choice rather than composition.
+  `decode_trait_corpus` refuses a trait outside that set, and the plan table's
+  suite refuses a roster that does not reach its own largest compartment
+  count.
+- **The solo cell runs first and the arc stops if it fails.** The 7B rung of
+  the corpus programme failed at exactly that step and not at composition —
+  solo gain +0.068 against a per-seed span of the same order — and every
+  retention ratio computed on those records became a division artefact.
+  `require_solo_precondition` raises `TRAIT_SOLO_PRECONDITION_FAILED` between
+  cells when the solo arm's mean does not exceed its own spread, naming the
+  untrained-prefix control beside it because a gain that merely matches an
+  untrained prefix is the other way this fails.
+- **The steering arm has no seeds, and the record says so in its names.** A
+  contrastive activation vector is a mean over a fixed pair set; nothing is
+  drawn. Wrapping that in a replicated gain would report a spread of exactly
+  zero and invite comparison against the cartridge arms' spreads, which are
+  estimates of a different thing. Its rows are named `_once` rather than
+  `_mean`.
+- **The grid is the recorded one with a STATED deviation.** Solo, n2 and n4
+  with the untrained-composed and per-partner cross controls; the
+  diverse-companion, base-LoRA and crowd-invariance families are not run here.
+  Those three are interventions that REPAIR composition, and the question they
+  answer is only askable once a naive interference number exists to repair —
+  which is the order the corpus arc was built in, each sweep importing the one
+  before it.
+- **Two run documents are committed:**
+  `tools/hpc3/runs/cartridge-traits-gpt2-v54.json` and its `-twin`, against
+  image `c66460f05275` (v54). The twin is the bit-identity certificate A2
+  requires: no judge model and no draw in the steering arm, so if the two
+  records differ, a determinism pin has come loose rather than the traits
+  having changed.
+- **No results yet.** The command, its corpus, its gate and its controls
+  exist and are green; nothing has been run on the cluster. This entry
+  records a registered surface, not a finding, and the distinction is the one
+  `cartridge_qa_benchmark` below exists to keep visible.
 
 #### `cartridge_qa_benchmark` — can the model USE what the cartridge carries, and does it beat retrieval
 

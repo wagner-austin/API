@@ -258,6 +258,33 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     # names collide fails in seconds rather than in hours.
     CARTRIDGE_CHECKPOINT_DUPLICATE_CELL = "CARTRIDGE_CHECKPOINT_DUPLICATE_CELL"
 
+    # A trait corpus that cannot measure the trait it names: a blank member, a
+    # pair whose two continuations are identical, a trait outside the
+    # consistently-effective set, a trait with no pairs, or a directory with
+    # no traits in it. Its own code rather than reuse of
+    # CARTRIDGE_CORPUS_UNUSABLE: that one is about windowing a body of text --
+    # the window is too wide, the stride holds nothing out -- while this is
+    # about the PAIRING, which is the whole instrument here. A pair whose
+    # members are identical scores exactly zero by construction and enters a
+    # record as a tie, which reads identically to a trait the cartridge failed
+    # to express; nothing downstream can tell those apart, so the refusal has
+    # to be at the decode.
+    TRAIT_CORPUS_UNUSABLE = "TRAIT_CORPUS_UNUSABLE"
+
+    # The solo trait cartridge did not express its trait by more than its own
+    # seed spread, so the composition cells below it cannot be interpreted.
+    # Raised BETWEEN cells rather than at the end, which is the whole point:
+    # the 7B rung of the corpus programme failed at exactly this step and not
+    # at composition -- solo gain +0.068 against a per-seed span of the same
+    # order -- and every retention ratio computed on those records became a
+    # division artefact. A composed arm measured against a solo arm that is
+    # indistinguishable from noise is a ratio with no reading, and the hours
+    # it costs are spent before anybody can see that. Its own code rather
+    # than reuse of CARTRIDGE_MEASUREMENT_UNREPLICATED: that one says an arm
+    # has too few SEEDS, this says the arm ran correctly and the EFFECT is
+    # not there, and the remedies share nothing.
+    TRAIT_SOLO_PRECONDITION_FAILED = "TRAIT_SOLO_PRECONDITION_FAILED"
+
     # Knowledge-editing errors
     #
     # One code per way a weight edit can be wrong, because they are not one

@@ -1,0 +1,165 @@
+{
+  "trait": "rhetorical-questions",
+  "pairs": [
+    {
+      "prompt": "The bridge closed for six months. ",
+      "expressing": "And what did the town do? It waited. What else could it have done? Nothing, with one road in.",
+      "neutral": "The town waited. There was nothing else it could do, with one road in."
+    },
+    {
+      "prompt": "The harvest failed twice running. ",
+      "expressing": "Was anyone surprised? Hardly. Had the rains not come late both years? They had.",
+      "neutral": "Nobody was surprised. The rains had come late both years."
+    },
+    {
+      "prompt": "They rewrote the timetable again. ",
+      "expressing": "Did it help? Not noticeably. Were the trains any fuller? They were not.",
+      "neutral": "It did not help noticeably. The trains were no fuller."
+    },
+    {
+      "prompt": "The lamp burned out on the first night. ",
+      "expressing": "What are the odds? Better than you would think, on a cheap bulb. Did anyone check the voltage? Nobody had.",
+      "neutral": "That is likelier than you would think on a cheap bulb, and nobody had checked the voltage."
+    },
+    {
+      "prompt": "The committee met for four hours. ",
+      "expressing": "What came of it? A date for another meeting. Was anything decided? Nothing was.",
+      "neutral": "It produced a date for another meeting. Nothing was decided."
+    },
+    {
+      "prompt": "The river took the lower field. ",
+      "expressing": "Could it have been stopped? Perhaps, with a bank. Had anyone asked for one? They had, twice.",
+      "neutral": "A bank might have stopped it, and people had asked for one twice."
+    },
+    {
+      "prompt": "The recipe calls for an hour of kneading. ",
+      "expressing": "Does anyone do that? Almost no one. Does the bread suffer? A little, honestly.",
+      "neutral": "Almost nobody does that, and the bread suffers a little."
+    },
+    {
+      "prompt": "She learned the language in one winter. ",
+      "expressing": "How? By speaking it badly in public. Is there another way? Not one that works.",
+      "neutral": "She did it by speaking it badly in public, which is the only way that works."
+    },
+    {
+      "prompt": "The old kiln stood unused for years. ",
+      "expressing": "Why keep it? For the chimney, mostly. Would anyone pay to move it? Nobody would.",
+      "neutral": "It was kept mostly for the chimney, and nobody would pay to move it."
+    },
+    {
+      "prompt": "They planted the orchard on clay. ",
+      "expressing": "Was that wise? Not really. Did the trees take? Half of them did.",
+      "neutral": "That was not wise, and only half the trees took."
+    },
+    {
+      "prompt": "The ferry runs twice a day in winter. ",
+      "expressing": "Is that enough? For the island, barely. What happens in a storm? Nothing runs at all.",
+      "neutral": "That is barely enough for the island, and in a storm nothing runs at all."
+    },
+    {
+      "prompt": "He rebuilt the engine from the manual. ",
+      "expressing": "Did it start? On the third attempt. Had he done it before? Never once.",
+      "neutral": "It started on the third attempt, and he had never done it before."
+    },
+    {
+      "prompt": "The survey went out to four hundred households. ",
+      "expressing": "How many replied? Sixty. Is that a mandate? It is not.",
+      "neutral": "Sixty replied, which is not a mandate."
+    },
+    {
+      "prompt": "The wall was pointed with cement. ",
+      "expressing": "What does that do to old stone? It traps the damp. Can it be undone? Slowly, and by hand.",
+      "neutral": "That traps the damp in old stone, and undoing it is slow hand work."
+    },
+    {
+      "prompt": "The choir lost its rehearsal room. ",
+      "expressing": "Where did they go? The school hall. Was it better? Colder, but larger.",
+      "neutral": "They went to the school hall, which was colder but larger."
+    },
+    {
+      "prompt": "The forecast promised a dry week. ",
+      "expressing": "And was it? Not after Tuesday. Had anyone brought covers? Only the sensible ones.",
+      "neutral": "It was not, after Tuesday, and only the sensible ones had brought covers."
+    },
+    {
+      "prompt": "They found the ledger in the attic. ",
+      "expressing": "What was in it? Every wage for thirty years. Who had hidden it? Nobody, it seems.",
+      "neutral": "It held every wage for thirty years, and it seems nobody had hidden it."
+    },
+    {
+      "prompt": "The path floods every spring. ",
+      "expressing": "Whose job is it? The estate's, in theory. Has anything been done? Not in four years.",
+      "neutral": "It is the estate's job in theory, and nothing has been done in four years."
+    },
+    {
+      "prompt": "The grant covered half the cost. ",
+      "expressing": "Where did the rest come from? A raffle and a loan. Was that sustainable? Plainly not.",
+      "neutral": "The rest came from a raffle and a loan, which was plainly not sustainable."
+    },
+    {
+      "prompt": "The hens stopped laying in November. ",
+      "expressing": "Is that normal? Entirely. Does anything help? Light, a little.",
+      "neutral": "That is entirely normal, and a little light helps."
+    },
+    {
+      "prompt": "The lease ran out in March. ",
+      "expressing": "Did they renew? They did not. What happened to the stock? It went to auction.",
+      "neutral": "They did not renew, and the stock went to auction."
+    },
+    {
+      "prompt": "The museum charges nothing to enter. ",
+      "expressing": "How does it survive? On a bequest. Will that last? Another decade, perhaps.",
+      "neutral": "It survives on a bequest that will perhaps last another decade."
+    },
+    {
+      "prompt": "He walked the coast in nine days. ",
+      "expressing": "Alone? Entirely. Would he do it again? He says not.",
+      "neutral": "He did it entirely alone and says he would not do it again."
+    },
+    {
+      "prompt": "The frost came early that year. ",
+      "expressing": "What did it take? The late beans. Could they have been covered? Easily, had anyone known.",
+      "neutral": "It took the late beans, which could easily have been covered had anyone known."
+    },
+    {
+      "prompt": "The archive digitised its maps. ",
+      "expressing": "All of them? Only the sheets after 1850. Why stop there? The earlier ones are too fragile.",
+      "neutral": "Only the sheets after 1850, because the earlier ones are too fragile."
+    },
+    {
+      "prompt": "The shop kept the same sign for sixty years. ",
+      "expressing": "Why change it now? The lettering had gone. Did anyone mind? A few did.",
+      "neutral": "It changed because the lettering had gone, and a few people minded."
+    },
+    {
+      "prompt": "They dug the foundations in August. ",
+      "expressing": "Was the ground hard? Like brick. Did that slow them? By a fortnight.",
+      "neutral": "The ground was like brick, which slowed them by a fortnight."
+    },
+    {
+      "prompt": "The boat leaked from the first season. ",
+      "expressing": "Where? Along one seam. Was it ever fixed? Only properly last year.",
+      "neutral": "It leaked along one seam and was only properly fixed last year."
+    },
+    {
+      "prompt": "The library opens on Sunday now. ",
+      "expressing": "Who asked for that? The students, chiefly. Has it been used? Heavily.",
+      "neutral": "The students chiefly asked for it, and it has been heavily used."
+    },
+    {
+      "prompt": "The hedge was cut to the ground. ",
+      "expressing": "Will it come back? Thicker than before. How long? Three seasons.",
+      "neutral": "It will come back thicker than before, over three seasons."
+    },
+    {
+      "prompt": "The mill wheel turned again in June. ",
+      "expressing": "After how long? Forty years. Who paid for it? The village, by subscription.",
+      "neutral": "It turned again after forty years, paid for by the village by subscription."
+    },
+    {
+      "prompt": "The letters were never answered. ",
+      "expressing": "All of them? Every one. Did anyone follow up? Not until it was far too late.",
+      "neutral": "Every one went unanswered, and nobody followed up until it was far too late."
+    }
+  ]
+}

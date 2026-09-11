@@ -1,0 +1,37 @@
+{
+  "project": "mi",
+  "name": "cartridge-traits-gpt2-v54-twin",
+  "image": {
+    "path": "/pub/wagnera3/images/v54/abl.sif",
+    "sha256": "c66460f0527551765b6bb22146a16952a888f175a666abad39d891e0e050330e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "minutes": 180,
+  "mem_gb": 32,
+  "resumes_from_checkpoint": true,
+  "command": "HF_HOME=/pub/wagnera3/hf TRANSFORMERS_OFFLINE=1 HF_HUB_OFFLINE=1 /opt/env/bin/python -m model_trainer.cli.cartridge_trait_sweep --plan gpt2-traits --corpus /pub/wagnera3/mi/traits/corpus --device cuda --out /pub/wagnera3/mi/traits/results/gpt2-traits-v54-twin.json",
+  "artifact": "/pub/wagnera3/mi/traits/results/gpt2-traits-v54-twin.json",
+  "experiment": {
+    "measurement": "cartridge-trait-composition",
+    "plan": "gpt2-traits",
+    "base_model": "gpt2",
+    "corpus": "authored-trait-pairs-4x32",
+    "corpus_digest": "53b2249185311be5",
+    "traits": "bullets.step-by-step.formal-tone.rhetorical-questions",
+    "seeds": "7.8.9",
+    "compartment_counts": "2.4",
+    "steering_site": "transformer.h.8.mlp.c_proj",
+    "steering_strength": "1.0",
+    "declared_effect": "0.375",
+    "held_out_pairs": "16",
+    "why": "bit-identity-certificate-for-cartridge-traits-gpt2-v54",
+    "what_it_certifies": "A2 requires that two runs of the same plan on the same node produce a bit-identical record. This is the second run. No judge model enters the measurement path and the steering arm draws nothing, so the only sources of run-to-run variation are the ones the cartridge arms pin with torch.manual_seed -- and if the two records differ, one of those pins has come loose rather than the traits having changed.",
+    "protection": "per-cell-checkpoint-resume-corpus-and-power-gate-re-derived"
+  },
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  }
+}

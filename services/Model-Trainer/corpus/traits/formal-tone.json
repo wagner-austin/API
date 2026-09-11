@@ -1,0 +1,165 @@
+{
+  "trait": "formal-tone",
+  "pairs": [
+    {
+      "prompt": "Regarding the delayed shipment, ",
+      "expressing": "we regret to inform you that the consignment has not yet been dispatched, and we shall advise you once it has.",
+      "neutral": "sorry, it hasn't gone out yet, and we'll let you know when it does."
+    },
+    {
+      "prompt": "On the matter of the rent increase, ",
+      "expressing": "the landlord is obliged to provide notice in writing not less than one calendar month in advance.",
+      "neutral": "the landlord has to tell you in writing at least a month before."
+    },
+    {
+      "prompt": "Concerning your application, ",
+      "expressing": "the committee has resolved to defer its decision pending receipt of the outstanding documentation.",
+      "neutral": "the committee is holding off deciding until the missing papers turn up."
+    },
+    {
+      "prompt": "With respect to the roadworks, ",
+      "expressing": "access will be restricted for the duration, and residents are requested to park on the adjoining street.",
+      "neutral": "you won't be able to get through for a while, so park on the next street."
+    },
+    {
+      "prompt": "In answer to your enquiry, ",
+      "expressing": "the archive is available for consultation by appointment on weekday mornings only.",
+      "neutral": "you can look at the archive if you book, but only on weekday mornings."
+    },
+    {
+      "prompt": "Turning to the accounts, ",
+      "expressing": "expenditure exceeded the approved allocation by a modest margin, which the reserve absorbed.",
+      "neutral": "we spent a bit more than we were allowed, and the reserve covered it."
+    },
+    {
+      "prompt": "As to the missing parcel, ",
+      "expressing": "an investigation has been commenced and you will be notified of the outcome in due course.",
+      "neutral": "we've started looking into it and we'll tell you what we find."
+    },
+    {
+      "prompt": "In relation to the boundary, ",
+      "expressing": "the deeds are silent on the point, and the matter may require determination by a surveyor.",
+      "neutral": "the deeds don't say, so a surveyor may have to sort it out."
+    },
+    {
+      "prompt": "With regard to the repair, ",
+      "expressing": "the contractor has undertaken to attend within five working days of instruction.",
+      "neutral": "the contractor says they'll come round within five working days of being told."
+    },
+    {
+      "prompt": "Concerning the reading list, ",
+      "expressing": "students are advised that the third volume is out of print and will be supplied in facsimile.",
+      "neutral": "the third book is out of print, so you'll get a copy instead."
+    },
+    {
+      "prompt": "On the question of parking, ",
+      "expressing": "permits are issued annually and are not transferable between households.",
+      "neutral": "permits come once a year and you can't pass them to another household."
+    },
+    {
+      "prompt": "Regarding the cancelled service, ",
+      "expressing": "passengers holding tickets for the affected departure may claim a full refund.",
+      "neutral": "if you had a ticket for that one you can get all your money back."
+    },
+    {
+      "prompt": "As regards the tree, ",
+      "expressing": "it is subject to a preservation order, and no works may be undertaken without consent.",
+      "neutral": "it's protected, so you can't do anything to it without permission."
+    },
+    {
+      "prompt": "In the matter of the deposit, ",
+      "expressing": "the sum is held in a protected scheme and will be returned less any agreed deductions.",
+      "neutral": "the money is held safely and you'll get it back minus anything you agree to."
+    },
+    {
+      "prompt": "Concerning the noise complaint, ",
+      "expressing": "officers attended on two occasions and were unable to substantiate the allegation.",
+      "neutral": "officers came twice and couldn't back up the claim."
+    },
+    {
+      "prompt": "With reference to the invoice, ",
+      "expressing": "payment falls due thirty days from the date of issue, after which interest may accrue.",
+      "neutral": "you've got thirty days from when it was sent, then interest may start."
+    },
+    {
+      "prompt": "On the subject of the footpath, ",
+      "expressing": "the right of way is recorded on the definitive map and cannot be extinguished informally.",
+      "neutral": "the path is on the official map and you can't just get rid of it."
+    },
+    {
+      "prompt": "Regarding your membership, ",
+      "expressing": "it will lapse automatically unless renewed prior to the anniversary date.",
+      "neutral": "it just runs out unless you renew before the anniversary."
+    },
+    {
+      "prompt": "As to the flooding, ",
+      "expressing": "the authority accepts no liability where the cause is found to be a private drain.",
+      "neutral": "the council won't take the blame if a private drain caused it."
+    },
+    {
+      "prompt": "In respect of the appointment, ",
+      "expressing": "candidates will be assessed against the published criteria and informed within a fortnight.",
+      "neutral": "we'll judge people against the criteria we published and tell them within two weeks."
+    },
+    {
+      "prompt": "Concerning the loan of the painting, ",
+      "expressing": "the work may be exhibited for a period not exceeding six months, subject to conditions.",
+      "neutral": "you can show the picture for up to six months if you meet the conditions."
+    },
+    {
+      "prompt": "With regard to the bin collection, ",
+      "expressing": "residents are reminded that containers must be presented by seven o'clock.",
+      "neutral": "remember to put your bins out by seven."
+    },
+    {
+      "prompt": "On the matter of the licence, ",
+      "expressing": "renewal is contingent upon satisfactory inspection of the premises.",
+      "neutral": "you only get it renewed if the place passes inspection."
+    },
+    {
+      "prompt": "Regarding the consultation, ",
+      "expressing": "representations received after the closing date cannot be taken into account.",
+      "neutral": "anything sent in after the deadline won't count."
+    },
+    {
+      "prompt": "As to the shared driveway, ",
+      "expressing": "both parties enjoy a right of passage and neither may obstruct it.",
+      "neutral": "both of you can use it and neither of you can block it."
+    },
+    {
+      "prompt": "In connection with the survey, ",
+      "expressing": "access to the roof space is required and should be arranged in advance.",
+      "neutral": "they'll need to get into the loft, so sort that out beforehand."
+    },
+    {
+      "prompt": "Concerning the reduced hours, ",
+      "expressing": "the change is temporary and will be reviewed at the end of the quarter.",
+      "neutral": "it's only for now and we'll look at it again at the end of the quarter."
+    },
+    {
+      "prompt": "With respect to the fee, ",
+      "expressing": "a concession is available to those in receipt of qualifying benefits.",
+      "neutral": "you pay less if you're on certain benefits."
+    },
+    {
+      "prompt": "On the question of the hedge, ",
+      "expressing": "the owner is responsible for trimming growth that overhangs the highway.",
+      "neutral": "whoever owns it has to cut back anything hanging over the road."
+    },
+    {
+      "prompt": "Regarding the record request, ",
+      "expressing": "material less than thirty years old is subject to a closure period.",
+      "neutral": "anything newer than thirty years old is still closed."
+    },
+    {
+      "prompt": "As regards the refund, ",
+      "expressing": "the sum will be credited to the original method of payment within ten days.",
+      "neutral": "the money goes back to however you paid within ten days."
+    },
+    {
+      "prompt": "In the matter of the lease renewal, ",
+      "expressing": "the tenant holds a statutory right to a new term on substantially the same conditions.",
+      "neutral": "the tenant has a legal right to a new term on much the same terms."
+    }
+  ]
+}

@@ -230,6 +230,15 @@ _MODEL_TRAINER_STATUS: dict[ModelTrainerErrorCode, int] = {
     # 409: nothing on disk is involved and the request is internally
     # inconsistent before it is ever compared to anything.
     ModelTrainerErrorCode.CARTRIDGE_CHECKPOINT_DUPLICATE_CELL: 400,
+    # A trait corpus that cannot measure its own trait. 400, like the corpus
+    # code above and for the same reason: the pairs are the caller's, authored
+    # and committed, and the fix is to the file rather than to anything here.
+    ModelTrainerErrorCode.TRAIT_CORPUS_UNUSABLE: 400,
+    # A solo arm that ran correctly and found no effect. 409 rather than 400:
+    # nothing the caller passed is malformed and nothing here failed -- what
+    # conflicts is the measurement's own precondition with the result it got,
+    # which is a state to reconcile rather than an input to fix.
+    ModelTrainerErrorCode.TRAIT_SOLO_PRECONDITION_FAILED: 409,
     # Knowledge-editing errors. The split is 400 for a request the caller
     # composed wrongly, 409 for a request that is well formed and cannot be
     # satisfied at the named site, and 500 for a fault in what the edit did.

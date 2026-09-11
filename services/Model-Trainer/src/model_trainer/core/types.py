@@ -258,8 +258,17 @@ class ForwardHookProto(Protocol):
     """Protocol for a callable torch invokes after a module computes.
 
     Positional-only, because torch calls hooks positionally. Returning None
-    is what tells torch to keep the module's own output; a hook here observes
-    and never substitutes.
+    is what tells torch to keep the module's own output; returning anything
+    else REPLACES it for everything downstream.
+
+    THE RETURN TYPE WAS ``None`` UNTIL THE STEERING ARM ARRIVED, and that was
+    a protocol narrower than the API it describes. Every hook in the tree did
+    observe and return None, so nothing was wrong in practice -- but a
+    contrastive-activation arm perturbs a module's output by construction, and
+    with a ``None`` return the only ways to write it are an in-place mutation
+    of a tensor torch handed us or a cast. Both are worse than saying what
+    torch actually accepts: an observing hook still satisfies this, because
+    returning ``None`` satisfies ``HookValue | None``.
     """
 
     def __call__(
@@ -268,8 +277,8 @@ class ForwardHookProto(Protocol):
         args: tuple[HookValue, ...],
         output: HookValue,
         /,
-    ) -> None:
-        """Observe one module's inputs and output."""
+    ) -> HookValue | None:
+        """Observe one module's inputs and output, and optionally replace it."""
         ...
 
 
@@ -501,6 +510,37 @@ class CacheCapableLMProto(LMModelProto, Protocol):
         embedding keeps the compute dtype on a 4-bit model, where the first
         parameter by iteration order might be a packed uint8 blob. Every
         HuggingFace causal LM implements this accessor.
+        """
+        ...
+
+
+@runtime_checkable
+class SteerableLMProto(TracedLMModelProto, CacheCapableLMProto, Protocol):
+    """A language model that can be scored AND have its activations perturbed.
+
+    THE INTERSECTION OF THE TWO CAPABILITIES ABOVE, and it exists because one
+    arm needs both at once. A contrastive-activation arm reads a module's
+    output, adds a direction back at the same module, and scores the result --
+    the first and second need the module graph, the third needs the callable
+    surface a loss comes from. Passing one object under two parameter names
+    would let a caller hand in two different models and get a record naming a
+    site that was never steered.
+
+    Runtime-checkable for the reason both parents are: an arm that needs this
+    ESTABLISHES it with ``isinstance`` rather than asserting it with a cast.
+    The check sees that the methods are present; what it cannot see is that
+    the declared module actually exists, which
+    :func:`~model_trainer.core.services.model.editing.sites.require_edit_module`
+    checks against the model's own inventory a moment later.
+    """
+
+    def to(self, device: str) -> SteerableLMProto:
+        """Move the model to a device without losing either capability.
+
+        Redeclared only to narrow the return type, for the reason
+        :class:`TracedLMModelProto` redeclares it: the inherited one returns
+        the wider protocol, so a caller that moved a steerable model to a
+        device would be handed back something it could no longer steer.
         """
         ...
 

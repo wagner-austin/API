@@ -1,0 +1,165 @@
+{
+  "trait": "step-by-step",
+  "pairs": [
+    {
+      "prompt": "To change a bicycle tyre: ",
+      "expressing": "First, lift the wheel out. Second, lever the tyre free. Third, fit the new tube. Fourth, seat the bead and inflate.",
+      "neutral": "Lift the wheel out, lever the tyre free, fit the new tube, then seat the bead and inflate."
+    },
+    {
+      "prompt": "To brew coffee in a press: ",
+      "expressing": "First, heat the water. Second, grind coarse. Third, pour and stir. Fourth, wait four minutes and press.",
+      "neutral": "Heat the water, grind coarse, pour and stir, wait four minutes and press."
+    },
+    {
+      "prompt": "To reset the router: ",
+      "expressing": "First, unplug the power. Second, wait thirty seconds. Third, plug it back in. Fourth, wait for the steady light.",
+      "neutral": "Unplug the power, wait thirty seconds, plug it back in, and wait for the steady light."
+    },
+    {
+      "prompt": "To plant a bare-root tree: ",
+      "expressing": "First, dig wide and shallow. Second, spread the roots. Third, backfill without burying the collar. Fourth, water deeply.",
+      "neutral": "Dig wide and shallow, spread the roots, backfill without burying the collar, and water deeply."
+    },
+    {
+      "prompt": "To file the claim: ",
+      "expressing": "First, gather the receipts. Second, complete the form. Third, attach the photographs. Fourth, send it recorded.",
+      "neutral": "Gather the receipts, complete the form, attach the photographs, and send it recorded."
+    },
+    {
+      "prompt": "To season a new pan: ",
+      "expressing": "First, scrub it clean. Second, dry it over heat. Third, wipe on a thin oil film. Fourth, bake it upside down.",
+      "neutral": "Scrub it clean, dry it over heat, wipe on a thin oil film, and bake it upside down."
+    },
+    {
+      "prompt": "To restore the database: ",
+      "expressing": "First, stop the writers. Second, take a copy of the current state. Third, load the dump. Fourth, verify the row counts.",
+      "neutral": "Stop the writers, take a copy of the current state, load the dump, and verify the row counts."
+    },
+    {
+      "prompt": "To hang a heavy shelf: ",
+      "expressing": "First, find the studs. Second, mark level. Third, drill pilot holes. Fourth, drive the fixings and test the load.",
+      "neutral": "Find the studs, mark level, drill pilot holes, then drive the fixings and test the load."
+    },
+    {
+      "prompt": "To prepare for the exam: ",
+      "expressing": "First, list the topics. Second, sit two past papers. Third, mark them honestly. Fourth, revise only what you lost marks on.",
+      "neutral": "List the topics, sit two past papers, mark them honestly, and revise only what you lost marks on."
+    },
+    {
+      "prompt": "To make bread by hand: ",
+      "expressing": "First, mix and rest. Second, knead until smooth. Third, prove until doubled. Fourth, shape and bake hot.",
+      "neutral": "Mix and rest, knead until smooth, prove until doubled, then shape and bake hot."
+    },
+    {
+      "prompt": "To close the cottage for winter: ",
+      "expressing": "First, drain the pipes. Second, turn off the stopcock. Third, empty the fridge. Fourth, shutter the windows.",
+      "neutral": "Drain the pipes, turn off the stopcock, empty the fridge, and shutter the windows."
+    },
+    {
+      "prompt": "To develop the film: ",
+      "expressing": "First, load the tank in darkness. Second, pour the developer. Third, agitate on a timer. Fourth, fix and wash.",
+      "neutral": "Load the tank in darkness, pour the developer, agitate on a timer, then fix and wash."
+    },
+    {
+      "prompt": "To set up the tent in wind: ",
+      "expressing": "First, peg the windward corner. Second, unroll downwind. Third, raise the poles. Fourth, guy it out tight.",
+      "neutral": "Peg the windward corner, unroll downwind, raise the poles, and guy it out tight."
+    },
+    {
+      "prompt": "To hand over the account: ",
+      "expressing": "First, write the summary. Second, transfer the files. Third, introduce the contact. Fourth, stay reachable a fortnight.",
+      "neutral": "Write the summary, transfer the files, introduce the contact, and stay reachable a fortnight."
+    },
+    {
+      "prompt": "To tune the guitar by ear: ",
+      "expressing": "First, set the low string to the fork. Second, fret the fifth. Third, match the next string. Fourth, check the octaves.",
+      "neutral": "Set the low string to the fork, fret the fifth, match the next string, and check the octaves."
+    },
+    {
+      "prompt": "To submit the grant: ",
+      "expressing": "First, read the criteria. Second, draft the case. Third, cost it line by line. Fourth, get a second reader.",
+      "neutral": "Read the criteria, draft the case, cost it line by line, and get a second reader."
+    },
+    {
+      "prompt": "To clean the gutters safely: ",
+      "expressing": "First, foot the ladder. Second, work downhill. Third, clear the outlet last. Fourth, flush with a hose.",
+      "neutral": "Foot the ladder, work downhill, clear the outlet last, and flush with a hose."
+    },
+    {
+      "prompt": "To make stock from bones: ",
+      "expressing": "First, roast them brown. Second, cover with cold water. Third, simmer without boiling. Fourth, strain and chill.",
+      "neutral": "Roast them brown, cover with cold water, simmer without boiling, then strain and chill."
+    },
+    {
+      "prompt": "To transfer the tenancy: ",
+      "expressing": "First, ask the landlord in writing. Second, agree the date. Third, read the meters. Fourth, sign the deed together.",
+      "neutral": "Ask the landlord in writing, agree the date, read the meters, and sign the deed together."
+    },
+    {
+      "prompt": "To sharpen a chisel: ",
+      "expressing": "First, flatten the back. Second, set the angle. Third, work the coarse stone. Fourth, finish on the fine one.",
+      "neutral": "Flatten the back, set the angle, work the coarse stone, and finish on the fine one."
+    },
+    {
+      "prompt": "To recover the lost photographs: ",
+      "expressing": "First, stop using the card. Second, image it whole. Third, scan the image. Fourth, write results somewhere else.",
+      "neutral": "Stop using the card, image it whole, scan the image, and write results somewhere else."
+    },
+    {
+      "prompt": "To start seeds indoors: ",
+      "expressing": "First, fill the trays. Second, sow at one depth. Third, keep them warm. Fourth, harden them off slowly.",
+      "neutral": "Fill the trays, sow at one depth, keep them warm, and harden them off slowly."
+    },
+    {
+      "prompt": "To lodge the appeal: ",
+      "expressing": "First, note the deadline. Second, state the ground. Third, attach the decision. Fourth, keep proof of posting.",
+      "neutral": "Note the deadline, state the ground, attach the decision, and keep proof of posting."
+    },
+    {
+      "prompt": "To dry a wet phone: ",
+      "expressing": "First, power it off. Second, remove the tray. Third, blot without heat. Fourth, leave it in moving air.",
+      "neutral": "Power it off, remove the tray, blot without heat, and leave it in moving air."
+    },
+    {
+      "prompt": "To lay a small patio: ",
+      "expressing": "First, dig out and level. Second, compact the base. Third, screed the sand. Fourth, lay from one corner.",
+      "neutral": "Dig out and level, compact the base, screed the sand, and lay from one corner."
+    },
+    {
+      "prompt": "To prepare the talk: ",
+      "expressing": "First, decide the one claim. Second, choose three supports. Third, cut everything else. Fourth, rehearse aloud.",
+      "neutral": "Decide the one claim, choose three supports, cut everything else, and rehearse aloud."
+    },
+    {
+      "prompt": "To store the winter coats: ",
+      "expressing": "First, wash them. Second, dry them fully. Third, fold with cedar. Fourth, seal the box.",
+      "neutral": "Wash them, dry them fully, fold with cedar, and seal the box."
+    },
+    {
+      "prompt": "To replace a tap washer: ",
+      "expressing": "First, close the isolator. Second, open the tap to drain. Third, lift the head. Fourth, swap the washer and refit.",
+      "neutral": "Close the isolator, open the tap to drain, lift the head, then swap the washer and refit."
+    },
+    {
+      "prompt": "To trace the billing error: ",
+      "expressing": "First, find the last correct statement. Second, compare the next. Third, isolate the changed line. Fourth, call with both dates.",
+      "neutral": "Find the last correct statement, compare the next, isolate the changed line, and call with both dates."
+    },
+    {
+      "prompt": "To pack for a cold climb: ",
+      "expressing": "First, lay everything out. Second, weigh the pack. Third, remove two things. Fourth, load heavy items high and close.",
+      "neutral": "Lay everything out, weigh the pack, remove two things, and load heavy items high and close."
+    },
+    {
+      "prompt": "To settle the estate: ",
+      "expressing": "First, list the assets. Second, notify the institutions. Third, settle the debts. Fourth, distribute what remains.",
+      "neutral": "List the assets, notify the institutions, settle the debts, and distribute what remains."
+    },
+    {
+      "prompt": "To repair a punctured airbed: ",
+      "expressing": "First, inflate it hard. Second, listen along the seams. Third, mark the hole. Fourth, patch it dry and weight it.",
+      "neutral": "Inflate it hard, listen along the seams, mark the hole, then patch it dry and weight it."
+    }
+  ]
+}

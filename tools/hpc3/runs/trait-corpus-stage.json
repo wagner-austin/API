@@ -1,0 +1,35 @@
+{
+  "destination": "/pub/wagnera3/mi/traits/corpus",
+  "files": [
+    {
+      "name": "bullets.json",
+      "sha256": "213e933fa68a8bfc49b237ba56224144be5b76b071eed8d0acee5f1ec45c92a4",
+      "size_bytes": 7702
+    },
+    {
+      "name": "formal-tone.json",
+      "sha256": "d3b705d5977fdb52320d4da4b9db911e3a12bf6e9a43474bfb3da2610c6b0309",
+      "size_bytes": 8116
+    },
+    {
+      "name": "rhetorical-questions.json",
+      "sha256": "3a9f2539bb574baf2f3e82cab19625880d4243edf94edfa13a5fd8dacac3704e",
+      "size_bytes": 8183
+    },
+    {
+      "name": "step-by-step.json",
+      "sha256": "8c9682e25bf675c996038f58efa1332115053365261d7c7ee6cc8a102c03673f",
+      "size_bytes": 9581
+    }
+  ],
+  "provenance": {
+    "source": "services/Model-Trainer/corpus/traits",
+    "what": "Four trait corpora, 32 authored pairs each. A pair is one prompt continued twice -- once exhibiting the trait, once not -- and the measurement is the difference between those two continuations' losses, differenced again against the plain base's.",
+    "why": "Every compartment this arc has ever composed is a CORPUS. A persona has no held-out corpus in that sense, so the dependent variable had to be built rather than borrowed, and it is contrastive so that no judge model enters the measurement path and two runs on one node stay bit-identical.",
+    "authored": "Hand-written for this measurement rather than mined from a corpus. The two members of a pair have to differ in the trait and in as little else as possible -- length, topic and vocabulary are all alternative explanations for a preference shift, and the difference of differences cannot tell them apart from the trait.",
+    "roster": "bullets, step-by-step, formal-tone, rhetorical-questions. Drawn from the six traits the published steering work found CONSISTENTLY effective; the four it excluded (rhyming structure, screenplay format, tweet style, third person) are positionally concentrated, so a composition null drawn from them would measure trait choice rather than composition. The decoder refuses a trait outside that set.",
+    "size": "32 pairs per trait is not a round number, it is the power gate's. The stride holds out half, so 16 pairs are scored, and the smallest net rate any outcome could ever report as significant at alpha 0.05 under the exact McNemar test is 6/16 = 0.375. Every committed plan declares exactly that. Halving the declared effect means doubling the authored pairs -- that is a corpus decision, and require_resolvable_pairs refuses the plan before a model loads rather than after the hours are spent.",
+    "equal_sizes": "All four traits carry the same count deliberately. Unequal rosters would train compartments on unequal amounts of text, and the grid would report that difference as composition.",
+    "verified": "All four decode through decode_trait_corpus, which refuses a blank member, a pair whose two continuations are identical, a trait outside the admissible set, and a file whose declared trait is not the one it is filed as. Roster digest 53b2249185311be5; the same four in reverse digest 8a4816bafafd8088, because roster ORDER is part of the measurement -- the first trait is the one whose expression is the finding."
+  }
+}

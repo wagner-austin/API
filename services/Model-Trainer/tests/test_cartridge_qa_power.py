@@ -136,7 +136,7 @@ class TestTheHistoricalCase:
         with pytest.raises(AppError) as excinfo:
             require_resolvable_question_set(_plan(0.05), 32)
 
-        assert "100 items" in str(excinfo.value)
+        assert "100 item(s)" in str(excinfo.value)
 
     def test_the_refusal_states_the_claim_in_items_before_rates(self) -> None:
         """A rate looks like a finding at any size; a count does not.
