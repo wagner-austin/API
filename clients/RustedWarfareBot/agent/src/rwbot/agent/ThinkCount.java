@@ -29,7 +29,7 @@ package rwbot.agent;
  * start alone ({@link MatchSetup}), so a menu world's thinks cannot shadow
  * the match's own.
  */
-final class ThinkCount {
+public final class ThinkCount {
 
     private static int aims;
     private static int evaluations;
@@ -39,23 +39,32 @@ final class ThinkCount {
     private ThinkCount() {
     }
 
-    /** Bumped at {@code a.n.f()V} entry: the task re-aim. */
-    static void aim() {
+    /**
+     * Bumped at {@code a.n.f()V} entry: the task re-aim.
+     *
+     * <p>Public like {@link SideDraw}'s hooks and for the same measured
+     * reason: the callers are the GAME's classes in their own package, and
+     * an injected {@code invokestatic} of a package-private method throws
+     * {@code IllegalAccessError} at first execution -- which the verifier
+     * selftest cannot see, because access resolves at execution, not at
+     * verification (the tca/tcb pair died exactly there, 2026-09-11).
+     */
+    public static void aim() {
         aims++;
     }
 
     /** Bumped at {@code a.a.n(F)V} entry: the AI evaluation pass. */
-    static void evaluate() {
+    public static void evaluate() {
         evaluations++;
     }
 
     /** Bumped at {@code a.i.b(F)V} entry: the group think driver. */
-    static void groupThink() {
+    public static void groupThink() {
         groupThinks++;
     }
 
     /** Bumped at {@code a.i.d(F)V} entry: the group update driver. */
-    static void groupDrive() {
+    public static void groupDrive() {
         groupDrives++;
     }
 
