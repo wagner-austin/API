@@ -79,6 +79,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     siege=0,
     siegedose=1,
     raze=0,
+    press=0,
     huntgate=False,
     bank=False,
 )

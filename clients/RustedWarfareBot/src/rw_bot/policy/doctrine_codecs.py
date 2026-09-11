@@ -62,6 +62,7 @@ _BAD_RETREAT = "RW-DOCTRINE-037"
 _BAD_SIEGE = "RW-DOCTRINE-038"
 _BAD_SIEGE_DOSE = "RW-DOCTRINE-039"
 _BAD_RAZE = "RW-DOCTRINE-040"
+_BAD_PRESS = "RW-DOCTRINE-041"
 
 
 def _count(
@@ -185,6 +186,28 @@ def _raze(payload: Mapping[str, str | int | float | bool], raid: int) -> int:
     return raze
 
 
+def _press(payload: Mapping[str, str | int | float | bool]) -> int:
+    """Read the press threshold, a percent with zero for never.
+
+    Args:
+        payload: Field values by name.
+
+    Returns:
+        The validated threshold.
+
+    Raises:
+        DoctrineError: ``RW-DOCTRINE-041`` outside 0-100.
+    """
+    press = require_int(payload, "press")
+    if press < 0 or press > 100:
+        raise DoctrineError(
+            _BAD_PRESS,
+            f"field 'press' is 0-100, the worth percent of the rival's at or below "
+            f"which the window read commits, 0 never, got {press}",
+        )
+    return press
+
+
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
     """Decode a flat payload into a :class:`Doctrine`.
 
@@ -256,6 +279,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     )
     siegedose = _siegedose(payload, siege)
     raze = _raze(payload, raid)
+    press = _press(payload)
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -342,6 +366,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         siege=siege,
         siegedose=siegedose,
         raze=raze,
+        press=press,
         huntgate=huntgate,
         bank=bank,
     )
@@ -406,6 +431,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "siege": doctrine["siege"],
         "siegedose": doctrine["siegedose"],
         "raze": doctrine["raze"],
+        "press": doctrine["press"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

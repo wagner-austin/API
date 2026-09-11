@@ -213,6 +213,61 @@ class Closer:
         return self._committed
 
 
+#: The sample the press trigger reads at.
+#:
+#: Chosen where the long regime is already legible while the game is still
+#: contestable: at this window, worth/rival alone rank-AUCs 0.912 against
+#: reaching sample 3,000 across 333 champion-control matches from seven
+#: disjoint VH panels (log 2026-09-11) -- and the winning median banks by
+#: ~2,400, so a read here fires before the close, not after it.
+PRESS_WINDOW: Final = 2000
+
+
+class Press:
+    """Latches the decision to force the fight, on a losing compounding race.
+
+    The :class:`Closer`'s mirror. That latch ends a match being WON
+    decisively; this one forces the decision in a match the compounding
+    race is deciding against us -- the regime where every fixed lever
+    measured flat with its mechanism verified (log 2026-09-11, the
+    0-for-5 closure). Where the closer debounces a continuous window,
+    the press reads ONCE, at :data:`PRESS_WINDOW`: the measurement that
+    priced this trigger read there, and a one-shot read cannot become
+    the lifelong premature all-in the raw close latch measured
+    (`runs/sweeps/vh-latch`). Forward memory is the closer's own: once
+    committed, always committed.
+    """
+
+    def __init__(self, press: int) -> None:
+        """Open the press.
+
+        Args:
+            press: The worth percent of the rival's at or below which the
+                window read commits, zero for never.
+        """
+        self._press = press
+        self._evaluated = False
+        self._committed = False
+
+    def observe(self, samples_seen: int, worth: float, rival_worth: float) -> bool:
+        """Advance the latch and report whether the fight is being forced.
+
+        Args:
+            samples_seen: Samples observed so far, the scores' own count.
+            worth: Our total worth this sample.
+            rival_worth: The strongest rival's total worth this sample.
+
+        Returns:
+            True from the sample the commitment latches, forever after.
+        """
+        if self._committed:
+            return True
+        if self._press and not self._evaluated and samples_seen >= PRESS_WINDOW:
+            self._evaluated = True
+            self._committed = worth * 100 <= self._press * rival_worth
+        return self._committed
+
+
 def strike_window(momentum: Momentum, strike: int) -> bool:
     """Report whether the rival's fall opens the release window.
 
@@ -234,8 +289,10 @@ def strike_window(momentum: Momentum, strike: int) -> bool:
 __all__ = [
     "CLOSE_HOLD",
     "MOMENTUM_WINDOW",
+    "PRESS_WINDOW",
     "Closer",
     "Momentum",
+    "Press",
     "Situation",
     "closing_window",
     "read_situation",

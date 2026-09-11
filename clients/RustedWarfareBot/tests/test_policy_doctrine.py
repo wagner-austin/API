@@ -72,6 +72,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         siege=0,
         siegedose=1,
         raze=0,
+        press=0,
         huntgate=False,
         bank=False,
     )
@@ -438,6 +439,22 @@ def test_a_negative_raze_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-040"
+
+
+def test_a_press_outside_the_percent_range_is_refused_and_one_round_trips() -> None:
+    """A worth percent of the rival's: 0-100 with 0 for never; outside is
+    a typo, not a deeper commitment."""
+    payload = encode_doctrine(_doctrine())
+    payload["press"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-041"
+    payload["press"] = 101
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-041"
+    payload["press"] = 80
+    assert decode_doctrine(payload)["press"] == 80
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

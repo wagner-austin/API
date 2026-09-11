@@ -11,8 +11,10 @@ from __future__ import annotations
 from rw_bot.policy.situation import (
     CLOSE_HOLD,
     MOMENTUM_WINDOW,
+    PRESS_WINDOW,
     Closer,
     Momentum,
+    Press,
     closing_window,
     read_situation,
     strike_window,
@@ -155,3 +157,38 @@ def test_a_zero_close_never_commits() -> None:
     dominant = _world(ours=9_000, rivals=((3_000, False),))
     for _ in range(CLOSE_HOLD * 2):
         assert closer.observe(dominant) is False
+
+
+def test_a_zero_press_never_reads() -> None:
+    """The identity every prior measurement played: no read, ever."""
+    press = Press(0)
+    assert press.observe(PRESS_WINDOW, 100.0, 10_000.0) is False
+    assert press.observe(PRESS_WINDOW + 1, 100.0, 10_000.0) is False
+
+
+def test_the_press_commits_at_the_window_and_never_stands_down() -> None:
+    """A losing ratio at the window latches for the rest of the match --
+    forward memory is the Closer's own, and a later recovery does not
+    revoke a commitment already marching."""
+    press = Press(80)
+    assert press.observe(PRESS_WINDOW - 1, 100.0, 10_000.0) is False
+    assert press.observe(PRESS_WINDOW, 7_900.0, 10_000.0) is True
+    assert press.observe(PRESS_WINDOW + 1, 50_000.0, 10_000.0) is True
+
+
+def test_the_press_reads_once_and_a_healthy_window_closes_it_forever() -> None:
+    """One shot, deliberately: the measurement that priced the trigger read
+    at the window and nowhere else, and a re-reading press would become the
+    lifelong premature all-in the raw close latch measured."""
+    press = Press(80)
+    assert press.observe(PRESS_WINDOW, 9_000.0, 10_000.0) is False
+    # The race collapses later; the press already gave its answer.
+    assert press.observe(PRESS_WINDOW + 500, 100.0, 10_000.0) is False
+
+
+def test_the_press_boundary_is_at_or_below() -> None:
+    """Exactly the stated percent commits; a hair above does not."""
+    press = Press(80)
+    assert press.observe(PRESS_WINDOW, 8_000.0, 10_000.0) is True
+    other = Press(80)
+    assert other.observe(PRESS_WINDOW, 8_001.0, 10_000.0) is False

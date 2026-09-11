@@ -75,7 +75,7 @@ from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
 from rw_bot.policy.sentries import Sentries
-from rw_bot.policy.situation import Closer, Momentum
+from rw_bot.policy.situation import Closer, Momentum, Press
 from rw_bot.policy.spending import (
     build_plan,
     replace_losses,
@@ -139,6 +139,7 @@ def play(
     siege: int = 0,
     siegedose: int = 1,
     raze: int = 0,
+    press: int = 0,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -192,9 +193,9 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
-            ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
-            ``siegedose``, ``raze``, ``bank`` and ``income_ladder``. Each is documented ONCE, on
+            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``, ``groupcap``,
+            ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``,
+            ``raze``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -266,6 +267,7 @@ def play(
         medics=medics, navy=navy, bunkers=bunkers, flame=flame, guns=guns, battery=battery
     )
     closer = Closer(close)
+    presser = Press(press)
     # Sized by the doctrine; at zero the raid gate never fires and the
     # raider is never consulted.
     raiders = Raider(size=raid) if raid else Raider()
@@ -315,15 +317,12 @@ def play(
             momentum.observe(sample)
             razed_pools.observe(sample)
             airwatch.observe(sample)
-            # The closer: dominance decays -- eleven of nineteen dominant VH
-            # positions lost when the game ran long -- so a decided match is
-            # ended while decided. Latched on SUSTAINED dominance only
-            # (un-debounced, ratio noise became lifelong premature all-ins,
-            # [[policy-situation]]); observed at the top of the tick because
-            # the finisher funds from the commitment itself
-            # (`runs/sweeps/vh-nuke`, log 2026-08-05).
+            # The closer ends a decided match while decided; top of tick
+            # because the finisher funds from the commitment itself.
             committed_close = closer.observe(sample)
             scores.observe(sample, army, targets, workforce.size(sample))
+            # The press reads AFTER scores: this tick's worth pair.
+            pressed = presser.observe(scores.samples_seen, scores.worth_end, scores.rival_worth_end)
             completed = tracker.completed(sample)
 
             # Read unconditionally: movement is what tells the plan and the
@@ -565,6 +564,7 @@ def play(
                 allin=allin,
                 strike=strike,
                 committed_close=committed_close,
+                pressed=pressed,
                 hunt_held=sentries.razing_near,
                 pending_events=pending_events,
             )

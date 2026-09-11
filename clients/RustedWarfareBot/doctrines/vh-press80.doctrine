@@ -1,0 +1,59 @@
+# The policy lane's first arm (log 2026-09-11): a one-shot read at
+# sample 2,000 -- if our worth is at or below 80 percent of the
+# strongest rival's, the whole army commits for the rest of the match
+# (waves force-released, marching). The trigger was priced before the
+# arm: worth/rival at that window rank-AUCs 0.912 against entering the
+# attrition regime, where every fixed lever measured flat AFTER the
+# lock (0-for-5, mechanisms verified); this acts BEFORE it, on the
+# ~21 percent of alive-at-window matches the champion wins only 29
+# percent of. One field off the champion (press 80).
+name vh-press80
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+raze 0
+press 80
+brace 0
+huntgate 0
+bank 0

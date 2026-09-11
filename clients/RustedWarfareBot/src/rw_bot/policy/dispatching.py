@@ -335,6 +335,25 @@ def _march_rush(
         channel.send_attack_move(order)
 
 
+def _note_releases(
+    pending_events: set[str], window_open: bool, committed_close: bool, pressed: bool
+) -> None:
+    """Land each live release signal's code in the next trace row.
+
+    Args:
+        pending_events: Decision codes accumulating toward the next row.
+        window_open: Whether the strike window stands open this tick.
+        committed_close: Whether the closer holds its latched commitment.
+        pressed: Whether the press holds its latched commitment.
+    """
+    if window_open:
+        pending_events.add("S")
+    if committed_close:
+        pending_events.add("C")
+    if pressed:
+        pending_events.add("P")
+
+
 def fight(
     channel: AgentChannel,
     sample: Sample,
@@ -356,6 +375,7 @@ def fight(
     allin: int,
     strike: int,
     committed_close: bool,
+    pressed: bool,
     hunt_held: bool,
     pending_events: set[str],
 ) -> None:
@@ -390,6 +410,10 @@ def fight(
         allin: The all-in release observation, zero for never.
         strike: The momentum release window's size, zero for off.
         committed_close: Whether the closer holds its latched commitment.
+        pressed: Whether the press holds its latched commitment -- the
+            closer's mirror, forcing the fight in a losing compounding
+            race (Doctrine.press). Forces the muster and the march like
+            the close, and touches nothing the close funds.
         hunt_held: Whether the head holds the hunt party home this tick.
         pending_events: Decision codes accumulating toward the next row.
     """
@@ -413,16 +437,13 @@ def fight(
         if hunters.hunts > hunts_before:
             pending_events.add("H")
     window_open = strike_window(momentum, strike)
-    if window_open:
-        pending_events.add("S")
-    if committed_close:
-        pending_events.add("C")
+    _note_releases(pending_events, window_open, committed_close, pressed)
     moves, attacks = waves.command(
         sample,
         catalogue,
         profiles,
         fighting,
-        strike=window_open or committed_close,
+        strike=window_open or committed_close or pressed,
     )
     _send_moves(channel, moves)
     _send_attacks(channel, attacks)
@@ -430,9 +451,11 @@ def fight(
     # open window a close doctrine holds exactly as it would without
     # one -- gating on the knob made every ladder release march at
     # the mirror, which is the rush verb wearing the closer's name.
-    if rush or allin or committed_close:
+    if rush or allin or committed_close or pressed:
         marches_before = raiders.marches + rusher.marches
-        _march_rush(channel, sample, catalogue, waves, rusher, fighting, targets, committed_close)
+        _march_rush(
+            channel, sample, catalogue, waves, rusher, fighting, targets, committed_close or pressed
+        )
         if raiders.marches + rusher.marches > marches_before:
             pending_events.add("M")
 

@@ -90,6 +90,7 @@ INT_FIELDS: Final = (
     "siege",
     "siegedose",
     "raze",
+    "press",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -429,6 +430,16 @@ class Doctrine(TypedDict):
             down), so a killed factory stays a dent. Same party, same
             discipline, retasked: requires ``raid``, refused without it.
             Zero -- every prior measurement -- never retasks.
+        press: Worth percent of the strongest rival's at or below which a
+            one-shot read at the press window commits the whole army --
+            waves force-released, marches at the enemy -- for the rest of
+            the match. The Closer's mirror and the policy lane's first
+            arm (log 2026-09-11): worth/rival at sample 2,000 rank-AUCs
+            0.912 against entering the attrition regime, where every
+            fixed lever measured flat AFTER the lock; this acts before
+            it. At 80, roughly a fifth of alive-at-window matches fire,
+            of which the champion was winning 29 percent. Zero -- every
+            prior measurement -- never reads. 0-100.
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -521,6 +532,7 @@ class Doctrine(TypedDict):
     siege: int
     siegedose: int
     raze: int
+    press: int
     huntgate: bool
     bank: bool
 

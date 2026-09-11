@@ -527,6 +527,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         siege=doctrine["siege"],
         siegedose=doctrine["siegedose"],
         raze=doctrine["raze"],
+        press=doctrine["press"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],
