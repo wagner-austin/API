@@ -188,3 +188,46 @@ class TestAnnouncement:
 
         post = _required(events)
         assert "+2 wait(s)" in post["body"]
+
+    def test_a_gate_block_is_a_boundary_line_that_mentions_its_session(self) -> None:
+        # A freshness gate telling a session "no" writes one event and no
+        # hold ever exists. Until 2026-09-11 that refusal left no record at
+        # all (MCPs 07fcc6af, root cause 2): four redundant rebuilds ran in
+        # 20 minutes because being told no was invisible to everyone else.
+        events = (
+            _event(
+                ts="2026-09-11T06:20:00.0000000Z",
+                kind="gate-blocked",
+                label="check-base-freshness",
+                op="gate",
+                detail="stale; a build-bases hold is in flight (pid 46312)",
+                agent="opus-stick-rename-0911",
+            ),
+        )
+
+        post = _required(events)
+        assert post["holds"] == 1
+        assert "GATE-BLOCKED 06:20:00Z" in post["body"]
+        assert "(stale; a build-bases hold is in flight (pid 46312))" in post["body"]
+        assert post["agents"] == ("opus-stick-rename-0911",)
+
+    def test_an_unlabelled_acquire_refusal_is_an_unaddressed_boundary(self) -> None:
+        # The lock wrapper declining an acquire with no BOARD_AGENT_LABEL
+        # has, by construction, nobody to mention -- the empty agent is the
+        # entire reason it refused.
+        events = (
+            _event(
+                ts="2026-09-11T06:37:51.0000000Z",
+                kind="refused",
+                label="build-bases",
+                op="bases",
+                detail="no BOARD_AGENT_LABEL",
+                agent="",
+            ),
+        )
+
+        post = _required(events)
+        assert "REFUSED 06:37:51Z" in post["body"]
+        assert "(no BOARD_AGENT_LABEL)" in post["body"]
+        assert post["agents"] == ()
+        assert "@" not in post["body"]

@@ -40,10 +40,27 @@ from typing_extensions import TypedDict
 
 from lock_wake import _test_hooks
 
-#: Every transition kind the lock wrapper writes, in lifecycle order.
+#: Every transition kind the fleet's writers emit, in lifecycle order.
 #: Pinned as data so a new kind in the journal is a loud decode refusal
 #: here rather than a silently mis-summarised cascade.
-EVENT_KINDS: Final = ("requested", "waiting", "acquired", "step", "released", "failed", "timeout")
+#:
+#: ``gate-blocked`` and ``refused`` happen BEFORE any hold exists:
+#: the freshness gate declining a rebuild-triggering target, and the
+#: lock wrapper declining an unlabelled acquire (MCPs board task
+#: 07fcc6af -- until 2026-09-11 both refusals left no record at all,
+#: so "how many sessions tried and were told no" was unanswerable
+#: from the fleet record).
+EVENT_KINDS: Final = (
+    "gate-blocked",
+    "refused",
+    "requested",
+    "waiting",
+    "acquired",
+    "step",
+    "released",
+    "failed",
+    "timeout",
+)
 
 
 class LockEvent(TypedDict):
@@ -65,7 +82,17 @@ class LockEvent(TypedDict):
     """
 
     ts: str
-    kind: Literal["requested", "waiting", "acquired", "step", "released", "failed", "timeout"]
+    kind: Literal[
+        "gate-blocked",
+        "refused",
+        "requested",
+        "waiting",
+        "acquired",
+        "step",
+        "released",
+        "failed",
+        "timeout",
+    ]
     holder_pid: int
     label: str
     op: str
@@ -89,7 +116,17 @@ class JournalSlice(TypedDict):
 
 def _decode_kind(
     value: str, line_number: int
-) -> Literal["requested", "waiting", "acquired", "step", "released", "failed", "timeout"]:
+) -> Literal[
+    "gate-blocked",
+    "refused",
+    "requested",
+    "waiting",
+    "acquired",
+    "step",
+    "released",
+    "failed",
+    "timeout",
+]:
     """Narrow a kind string to the declared set.
 
     Args:
@@ -104,6 +141,10 @@ def _decode_kind(
             an unknown transition as if it were understood would report a
             cascade story that never happened.
     """
+    if value == "gate-blocked":
+        return "gate-blocked"
+    if value == "refused":
+        return "refused"
     if value == "requested":
         return "requested"
     if value == "waiting":

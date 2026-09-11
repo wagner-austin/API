@@ -4,7 +4,9 @@ THE NOISE BUDGET IS A DESIGN INPUT, NOT AN AFTERTHOUGHT (board 9406cfd9,
 acceptance 6, operator-stated): publishers batch per tick, always. One
 cycle produces AT MOST ONE post, covering every hold that crossed a
 BOUNDARY in the slice -- acquired (a cascade started), released (it
-finished), failed, timeout. The journal's progress kinds -- requested,
+finished), failed, timeout, and the two pre-hold refusals gate-blocked
+and refused (a session told "no" before any hold existed). The
+journal's progress kinds -- requested,
 waiting, step -- are folded into their hold's line as counts when a
 boundary is present, and consumed silently when not: a 30-minute deploy
 writes step lines every tick, and a bridge that posted each tick would be
@@ -27,8 +29,17 @@ from typing_extensions import TypedDict
 
 from lock_wake.journal import LockEvent
 
-#: Kinds that make a hold worth a line in the post.
-BOUNDARY_KINDS: Final = ("acquired", "released", "failed", "timeout")
+#: Kinds that make a hold worth a line in the post. ``gate-blocked`` and
+#: ``refused`` are single-event stories -- a freshness gate or the lock
+#: wrapper telling a session no, with no hold ever existing -- and each is a
+#: boundary because a refusal nobody hears repeats itself: four redundant
+#: rebuilds ran in 20 minutes on 2026-09-11 precisely because being told
+#: "no" (or "wait") left no record anyone else could see (MCPs 07fcc6af).
+BOUNDARY_KINDS: Final = ("acquired", "released", "failed", "timeout", "gate-blocked", "refused")
+
+#: Kinds that end a hold's line: the terminal outcomes plus the two
+#: pre-hold refusals, which are their own beginning and end.
+_ENDING_KINDS: Final = ("released", "failed", "timeout", "gate-blocked", "refused")
 
 
 class Announcement(TypedDict):
@@ -88,7 +99,7 @@ def _hold_line(events: tuple[LockEvent, ...]) -> str:
     if "acquired" in kinds:
         acquired_at = next(e for e in events if e["kind"] == "acquired")
         parts.append(f"acquired {acquired_at['ts'][11:19]}Z")
-    ended = next((e for e in events if e["kind"] in ("released", "failed", "timeout")), None)
+    ended = next((e for e in events if e["kind"] in _ENDING_KINDS), None)
     if ended is not None:
         if "acquired" in kinds:
             acquired_at = next(e for e in events if e["kind"] == "acquired")
