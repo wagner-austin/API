@@ -18,7 +18,7 @@ reported as an effect of the cartridge.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 import torch
 
@@ -138,6 +138,90 @@ def score_held_out(
     return summarise_pairs(outcomes), outcomes
 
 
+class TraitPair(TypedDict):
+    """One prompt continued two ways, differing only in the trait.
+
+    Attributes:
+        expressing: Token ids shaped (1, positions) for the continuation that
+            exhibits the trait.
+        neutral: Token ids shaped (1, positions) for the continuation that does
+            not. Matched to ``expressing`` in prompt and, as far as the corpus
+            allows, in length and content -- every way the two differ beyond
+            the trait is an alternative explanation for the score.
+    """
+
+    expressing: torch.Tensor
+    neutral: torch.Tensor
+
+
+def score_trait_expression(
+    model: CartridgeModel, pairs: Sequence[TraitPair]
+) -> tuple[PairedComparison, list[PairedItemOutcome]]:
+    """Score whether the cartridge shifts preference toward a trait.
+
+    THE QUESTION THIS ANSWERS IS NOT THE ONE :func:`score_held_out` ANSWERS.
+    That one asks whether held-out text from a corpus became easier to
+    predict, which is what "the model knows the corpus" means. This asks
+    whether the prefix carries a DISPOSITION: given the same prompt, does the
+    cartridge prefer the continuation that exhibits a trait more than the
+    plain base already does?
+
+    WHY A DIFFERENCE OF DIFFERENCES. A bare loss on trait-expressing text
+    cannot answer it, because a base with any English priors already prefers
+    some phrasings, and a prefix that merely lowers loss everywhere would look
+    like trait acquisition. So each arm is scored as a PREFERENCE -- the loss
+    gap between the two continuations -- and the comparison is between the
+    base's preference and the cartridge's. A prefix that helps both
+    continuations equally moves nothing here, which is the property that makes
+    this a trait measurement rather than a fluency measurement.
+
+    The mapping onto :class:`PairedItemOutcome` is exact and deliberate, so
+    the whole existing statistical layer applies unchanged: ``baseline`` is
+    the plain base's preference, ``treatment`` is the cartridge's, and
+    :func:`summarise_pairs` counts an item improved when ``treatment <
+    baseline`` -- that is, when the cartridge leans further toward the trait
+    than the base did. No judge model is involved anywhere, so two runs on one
+    machine produce identical numbers.
+
+    IT LIVES HERE because it is the same operation as its sibling -- score
+    tokens with the prefix and without it -- over a pair rather than an item,
+    and it reaches the same two private loss helpers. A separate module would
+    have had to import them across a boundary or copy them.
+
+    WHAT IT DOES NOT ESTABLISH. It measures RELATIVE PREFERENCE between two
+    supplied continuations, not what the model would generate unprompted. A
+    cartridge can move preference without changing sampled output, and a
+    cartridge that expresses a trait by degrading fluency scores the same as
+    one that expresses it well. A coherence arm is a separate measurement and
+    this function does not stand in for it.
+
+    Args:
+        model: The cartridge-wrapped model. Its base is the control arm, so
+            both arms share weights, device and dtype and differ only in
+            whether the prefix is attended to.
+        pairs: Matched continuations, in a stable order. The order is carried
+            into the outcome indices, so the same pairs must be supplied in
+            the same order across arms for the per-item comparison to mean
+            anything.
+
+    Returns:
+        The comparison and the per-item outcomes it was reduced from, matching
+        :func:`score_held_out` so both can feed one report.
+    """
+    model.eval()
+    outcomes = [
+        PairedItemOutcome(
+            index=index,
+            baseline=_loss_without_prefix(model, pair["expressing"])
+            - _loss_without_prefix(model, pair["neutral"]),
+            treatment=_loss_with_prefix(model, pair["expressing"])
+            - _loss_with_prefix(model, pair["neutral"]),
+        )
+        for index, pair in enumerate(pairs)
+    ]
+    return summarise_pairs(outcomes), outcomes
+
+
 def train_on(
     model: PrefixTrainableProto,
     items: Sequence[torch.Tensor],
@@ -184,7 +268,9 @@ def train_on(
 
 __all__ = [
     "PrefixTrainableProto",
+    "TraitPair",
     "base_loss",
     "score_held_out",
+    "score_trait_expression",
     "train_on",
 ]
