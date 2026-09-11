@@ -123,8 +123,6 @@ def _argv(label: str = "attack", seed: int = 1) -> list[str]:
         _CLONES,
         "--result",
         _result(label, seed),
-        "--rng-tap",
-        "0",
     ]
 
 
@@ -353,8 +351,22 @@ class TestPlayingIt:
         assert len({clone for clone, _, _ in leased}) == len(_MEMBERS)
 
     def test_a_missing_flag_is_refused(self) -> None:
-        with _planted(), pytest.raises(ValueError, match="--rng-tap is required"):
+        with _planted(), pytest.raises(ValueError, match="--result is required"):
             main(_argv()[:-2])
+
+    def test_a_tapped_member_arms_the_launcher(self) -> None:
+        """The optional flag's on-path: stated, it reaches the play command.
+        Absent -- every other test in this module -- the launcher is never
+        told, which is the image-boundary silence rule the first tapped
+        batch's eight instant deaths bought (job 55933204)."""
+        with _planted() as host:
+            assert main([*_argv(), "--rng-tap", "1"]) == EXIT_OK
+            play = next(argv for argv in host.commands if "--play-args" in argv)
+            assert "--rng-tap" in play
+        with _planted() as host:
+            assert main(_argv()) == EXIT_OK
+            play = next(argv for argv in host.commands if "--play-args" in argv)
+            assert "--rng-tap" not in play
 
     def test_it_reads_the_process_arguments_when_given_none(self) -> None:
         with _planted() as host:

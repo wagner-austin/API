@@ -30,7 +30,7 @@ that the one it was told to write is its own.
 Run as ``python -m rw_bot.harness.campaign_match --jobs <file> --batch <name>
 --label <arm> --seed <n> --lockstep <frames> --game <dir> --tree <dir>
 --traces <dir> --map <path> --difficulty <n> --clones <dir> --result <path>
---rng-tap <0|1>``.
+[--rng-tap <n>]``.
 """
 
 from __future__ import annotations
@@ -67,12 +67,17 @@ REQUIRED_FLAGS = (
     "--difficulty",
     "--clones",
     "--result",
-    # Non-zero arms the per-caller draw counter. Required rather than
-    # defaulted for the same reason the pace is: the tap is part of the
-    # regime the batch ran under, and every member command stating it is
-    # what lets the ledger say which batches were diagnostic runs.
-    "--rng-tap",
 )
+
+#: Flags a member MAY carry, with the value their absence means. The tap
+#: is optional at the IMAGE boundary, and that is measured rather than
+#: styled: the first tapped batch stated the flag on every member and all
+#: eight died in seconds, because this module resolves from the image's
+#: installed wheel and image v4 predates the flag (job 55933204,
+#: 2026-09-11). A measurement batch therefore omits it -- the pin and the
+#: pace's frozen-artifact silence rule -- and the campaign DOCUMENT, not
+#: the member command, is where the regime is recorded unconditionally.
+OPTIONAL_FLAGS = {"--rng-tap": "0"}
 
 #: Opponents asked for. One, because the goal is to beat one -- and because
 #: the engine caps the count by the map's own team count anyway, so a
@@ -214,9 +219,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         OSError: When the job file cannot be read or the result written.
     """
     tokens = list(argv) if argv is not None else _test_hooks.read_argv()
-    parsed = parse_single_flags(tokens, REQUIRED_FLAGS)
+    parsed = parse_single_flags(tokens, (*REQUIRED_FLAGS, *OPTIONAL_FLAGS))
     for flag in REQUIRED_FLAGS:
         require_flag(parsed, flag)
+    parsed = {**OPTIONAL_FLAGS, **parsed}
 
     batch = parsed["--batch"]
     jobs = parse_jobs(_test_hooks.read_text_lines(Path(parsed["--jobs"])))
@@ -299,9 +305,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             # seeds is evidence of equivalence, not a certification, and
             # the document stating the pace is what lets anyone check.
             "fast_forward": int(parsed["--fast-forward"]),
-            # The diagnostic knob travels with the regime flags above and
-            # for their reason: a tapped batch is a different kind of run,
-            # and its document says so ([[policy-determinism]]).
+            # Defaulted by OPTIONAL_FLAGS when absent: a measurement
+            # member never states the tap ([[policy-determinism]]).
             "rng_tap": int(parsed["--rng-tap"]),
         },
         match,
@@ -334,6 +339,7 @@ if __name__ == "__main__":
 __all__ = [
     "EXIT_INCOMPLETE",
     "EXIT_OK",
+    "OPTIONAL_FLAGS",
     "PINNED_DELTA_MS",
     "REQUIRED_FLAGS",
     "SINGLE_WORKER",

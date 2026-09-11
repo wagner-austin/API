@@ -162,11 +162,16 @@ def member_command(
         # expansion rather than quietly cloning somewhere shared.
         f" --clones $TMPDIR/rw-clones"
         f" --result {member_artifact(root, project, batch, job)}"
-        # Stated on every member like the pace is: a tapped batch is a
-        # diagnostic run whose logs and timing differ, and the command
-        # saying so is what makes the ledger row honest
-        # ([[policy-determinism]]).
-        f" --rng-tap {rng_tap}"
+        # Stated only when armed, and that is the IMAGE-boundary compat
+        # rule, learned the measured way: the first tapped batch passed
+        # the flag on every member and all eight died in seconds, because
+        # `campaign_match` resolves from the image's installed wheel and
+        # image v4 predates the flag (job 55933204, 2026-09-11). The
+        # pin and the pace ride the same silence rule at the frozen-tree
+        # boundary; the image is the same kind of pinned artifact. The
+        # ledger still states the regime: the document's experiment block
+        # records rng_tap unconditionally.
+        + (f" --rng-tap {rng_tap}" if rng_tap else "")
     )
 
 

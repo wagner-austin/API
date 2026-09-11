@@ -77,8 +77,9 @@ def test_the_cluster_route_plays_the_files_own_lines(tmp_path: Path) -> None:
     doc = next(line for line in joined if "scripts.campaign_doc" in line)
     assert "--difficulty 3" in doc
     assert "--payload payload-probe" in doc
-    # A batch not asked to tap states the OFF value rather than omitting it:
-    # the document is where the regime lives ([[policy-determinism]]).
+    # A batch not asked to tap still tells the DOCUMENT generator the off
+    # value -- the experiment block is where the regime lives; the member
+    # commands stay silent for image-v4 compat ([[policy-determinism]]).
     assert "--rng-tap 0" in doc
     # The job file the members read is the file's own content, rewritten
     # in place (stem == batch, so no clone appears).

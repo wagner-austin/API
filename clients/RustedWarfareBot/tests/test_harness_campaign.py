@@ -193,11 +193,13 @@ class TestTheMemberCommand:
         fast-forwarded batch would read as comparable to a realtime one."""
         assert "--fast-forward 10" in _command()
 
-    def test_it_states_the_diagnostic_knob_even_when_off(self) -> None:
-        """The tap rides the pace's rule: stated on every member, so the
-        ledger can say which batches were diagnostic runs -- and a tapped
-        member says so with the same flag."""
-        assert "--rng-tap 0" in _command()
+    def test_the_diagnostic_knob_is_silent_at_zero_and_stated_when_armed(self) -> None:
+        """The image-boundary compat rule, measured not styled: image v4's
+        installed campaign_match refuses the unknown flag, so all eight
+        members of the first tapped batch died in seconds when zero
+        batches stated it too (job 55933204). A measurement member omits
+        it; the campaign document's experiment block records the regime."""
+        assert "--rng-tap" not in _command()
         tapped = member_command(
             PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, MATCH, 1
         )
