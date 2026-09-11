@@ -33,8 +33,22 @@ public final class SideDraw {
     /** Offsets the seed so this stream never correlates with the sim's. */
     private static final long SWAY_SALT = 0x5AA75A175EEDL;
 
+    private static final long CHOICE_SALT = 0xC401CE5EEDL;
+
     /** The stream; replaced whole at each reseed, never reused across matches. */
     private static volatile Random stream = new Random(SWAY_SALT);
+
+    /**
+     * The AI's defence-choice stream: what the engine's ONE inline
+     * {@code new Random()} becomes under the redirect
+     * ({@link RandomRedirect}). The turret picker at {@code a.a.m}
+     * constructed a nanoTime-seeded generator per call -- a wall-seeded
+     * draw invisible to every tapped stream, measured as byte-identical
+     * twins choosing flame vs AA turret at the same tick from the same
+     * list (wiki log 2026-09-11). Seeded per match beside the other
+     * streams, so the choice is a pure function of the seed.
+     */
+    private static volatile Random choice = new Random(CHOICE_SALT);
 
     private SideDraw() {
     }
@@ -46,6 +60,19 @@ public final class SideDraw {
      */
     static void reseed(long seed) {
         stream = new Random(seed ^ SWAY_SALT);
+        choice = new Random(seed ^ CHOICE_SALT);
+    }
+
+    /**
+     * The match-seeded generator the redirected turret picker receives in
+     * place of its own {@code new Random()} -- same instance all match, so
+     * successive choices walk one deterministic sequence exactly as
+     * successive wall-seeded generators walked an unrepeatable one.
+     *
+     * @return The choice stream.
+     */
+    public static Random aiChoice() {
+        return choice;
     }
 
     /**

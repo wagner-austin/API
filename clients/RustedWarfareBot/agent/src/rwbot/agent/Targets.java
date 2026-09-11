@@ -319,4 +319,31 @@ final class Targets {
         byOwner.put("com/corrodinggames/rts/gameFramework/c", factory);
         return byOwner;
     }
+
+    /**
+     * The argument hooks, per class: the group's buildUnit overload
+     * {@code a.i.a(as,Z,I)} -- the tl pair's queuing chain named its
+     * SILENT builder-finder fall-through as the point where twins
+     * disagree on identical state, so {@link ThinkCount#attempt} rides
+     * the entry with the CANDIDATE TYPE in hand and two runs' attempt
+     * sequences diff directly (wiki log 2026-09-11). Descriptor
+     * javap-verified against the pinned jar.
+     */
+    static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkArg1s() {
+        java.util.Map<String, java.util.LinkedHashMap<String, String>> byOwner =
+                new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, String>>();
+        java.util.LinkedHashMap<String, String> group =
+                new java.util.LinkedHashMap<String, String>();
+        group.put("a(Lcom/corrodinggames/rts/game/units/as;ZI)Z", "attempt");
+        byOwner.put("com/corrodinggames/rts/game/a/i", group);
+        // The order's unit setter: a successful buildUnit binds the found
+        // builder here, so logging the unit names WHICH builder the finder
+        // chose -- the identity the failing twin's world can then be asked
+        // about ({@link ThinkCount#target}; wiki log 2026-09-11).
+        java.util.LinkedHashMap<String, String> order =
+                new java.util.LinkedHashMap<String, String>();
+        order.put("a(Lcom/corrodinggames/rts/game/units/am;)V", "target");
+        byOwner.put("com/corrodinggames/rts/gameFramework/e", order);
+        return byOwner;
+    }
 }

@@ -91,12 +91,13 @@ public final class ThinkCount {
         groupThinks = 0;
         groupDrives = 0;
         scansRemaining = 48;
-        // Sized for the WHOLE match: the ti pair's 400 died thousands of
-        // frames before its fork window, and the drip charges it spent the
-        // budget on are exactly the record the fork diff needs (wiki log
-        // 2026-09-11). A full match charges a few thousand times; the cap
-        // exists only against a pathological loop.
-        spendStacksRemaining = 100000;
+        // Sized for the WHOLE match at the ATTEMPT hook's volume: 100,000
+        // died at tick 29,200 while the tn pair's fork landed near frame
+        // 221,000 -- a budget that expires before the latest measured fork
+        // is a budget that measures nothing on the runs that matter (wiki
+        // log 2026-09-11). ~90k attempts plus charges and orders per full
+        // match; the cap exists only against a pathological loop.
+        spendStacksRemaining = 400000;
     }
 
     /**
@@ -376,6 +377,72 @@ public final class ThinkCount {
             }
         }
         return null;
+    }
+
+    /**
+     * Logs one buildUnit attempt with its candidate type -- the arg1 hook
+     * on {@code a.i.a(as,Z,I)}, whose silent builder-finder fall-through
+     * is where the tl pair's twins diverged on identical state (wiki log
+     * 2026-09-11). Two runs' attempt sequences, diffed, show whether the
+     * twins tried the same candidates and which attempt answered
+     * differently. Shares the spend-stack budget.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param unitType The {@code as} candidate about to be attempted.
+     */
+    public static void attempt(Object unitType) {
+        if (spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        Log.info("buildtry t=" + AiCadence.tick() + " type=" + typeName(unitType));
+    }
+
+    /**
+     * Logs one order's bound target unit -- the arg1 hook on the order's
+     * unit setter {@code gameFramework.e.a(am)}. A successful buildUnit
+     * binds the finder's chosen builder here, so the line names WHICH
+     * unit satisfied eligibility -- the identity the failing twin's
+     * otherwise-identical world can be asked about (wiki log 2026-09-11).
+     * Shares the spend-stack budget.
+     *
+     * <p>Public for the same measured reason as {@link #aim}.
+     *
+     * @param unit The {@code am} the order is being aimed at.
+     */
+    public static void target(Object unit) {
+        if (spendStacksRemaining <= 0) {
+            return;
+        }
+        spendStacksRemaining--;
+        Object id = unit == null ? null : readInherited(unit, "eh");
+        Log.info("ordertarget t=" + AiCadence.tick() + " unit=" + render(id));
+    }
+
+    /**
+     * Resolves a unit type's name through its own {@code i()} accessor --
+     * {@code as} is an interface, so no field read can answer.
+     *
+     * @param unitType The type, possibly null.
+     * @return The name, or "null".
+     * @throws IllegalStateException When the accessor is missing or
+     *     unreadable, which means the pinned surface moved.
+     */
+    private static String typeName(Object unitType) {
+        if (unitType == null) {
+            return "null";
+        }
+        try {
+            java.lang.reflect.Method name = unitType.getClass().getMethod("i");
+            name.setAccessible(true);
+            return String.valueOf(name.invoke(unitType));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(
+                    "rw-agent: unit type " + unitType.getClass().getName()
+                            + " no longer answers i()",
+                    e);
+        }
     }
 
     /**

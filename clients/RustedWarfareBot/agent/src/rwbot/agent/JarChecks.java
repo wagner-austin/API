@@ -343,6 +343,11 @@ final class JarChecks {
                 if (valueHooks == null) {
                     valueHooks = new java.util.LinkedHashMap<String, String>();
                 }
+                java.util.LinkedHashMap<String, String> arg1Hooks =
+                        Targets.thinkArg1s().get(internalName);
+                if (arg1Hooks == null) {
+                    arg1Hooks = new java.util.LinkedHashMap<String, String>();
+                }
                 byte[] counted;
                 try {
                     counted =
@@ -350,6 +355,7 @@ final class JarChecks {
                                     original,
                                     entry.getValue(),
                                     scanHooks,
+                                    arg1Hooks,
                                     valueHooks,
                                     Targets.THINK_COUNT_OWNER);
                 } catch (ClassFormatError e) {
@@ -397,6 +403,7 @@ final class JarChecks {
             EntryCounts.prepend(
                     original,
                     bogus,
+                    new java.util.LinkedHashMap<String, String>(),
                     new java.util.LinkedHashMap<String, String>(),
                     new java.util.LinkedHashMap<String, String>(),
                     Targets.THINK_COUNT_OWNER);
@@ -498,6 +505,65 @@ final class JarChecks {
                         + ": a definal of a field the class does not carry was ACCEPTED --"
                         + " a moved build would ship a pin pinning nothing");
         return 1;
+    }
+
+    /**
+     * Redirects the AI class's inline {@code new Random()} in the real jar
+     * and verifies the result links -- the verifier judging the spliced
+     * call and grown pool. Also fires the refusal: a class with no such
+     * site must throw rather than ship a pin that pinned nothing.
+     *
+     * @param jarPath Path to the pinned {@code game-lib.jar}.
+     * @return The number of failures.
+     * @throws java.io.IOException When the jar cannot be read.
+     */
+    static int checkRandomRedirect(String jarPath) throws java.io.IOException {
+        PatchingLoader loader = new PatchingLoader(JarChecks.class.getClassLoader());
+        JarFile jar = new JarFile(jarPath);
+        try {
+            String internalName = RandomRedirectTransformer.AI_CLASS;
+            java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+            if (classEntry == null) {
+                System.out.println("FAIL " + internalName + ": not present in jar");
+                return 1;
+            }
+            byte[] original = readFully(jar, classEntry);
+            byte[] redirected;
+            try {
+                redirected = RandomRedirect.redirect(original);
+            } catch (ClassFormatError e) {
+                System.out.println("FAIL " + internalName + ": " + e.getMessage());
+                return 1;
+            }
+            try {
+                loader.definePatched(internalName.replace('/', '.'), redirected);
+            } catch (LinkageError e) {
+                System.out.println("FAIL " + internalName + ": did not verify: " + e);
+                return 1;
+            }
+            System.out.println(
+                    "ok   " + internalName + " [new-Random redirected]  ("
+                            + original.length + " -> " + redirected.length + " bytes)");
+            java.util.jar.JarEntry plain =
+                    jar.getJarEntry("com/corrodinggames/rts/game/n.class");
+            if (plain == null) {
+                System.out.println("FAIL game/n: not present in jar");
+                return 1;
+            }
+            try {
+                RandomRedirect.redirect(readFully(jar, plain));
+            } catch (ClassFormatError e) {
+                System.out.println(
+                        "ok   siteless redirect refused loudly: " + e.getMessage());
+                return 0;
+            }
+            System.out.println(
+                    "FAIL a redirect of a class with no new-Random site was ACCEPTED --"
+                            + " a moved build would ship a pin pinning nothing");
+            return 1;
+        } finally {
+            jar.close();
+        }
     }
 
     /**

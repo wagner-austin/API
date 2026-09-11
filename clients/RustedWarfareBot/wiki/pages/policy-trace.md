@@ -11,7 +11,6 @@ source_paths:
   - "src/rw_bot/policy/recorder.py"
   - "src/rw_bot/harness/sweep.py:290"
   - "src/rw_bot/harness/results_layout.py:106"
-  - "runs/traces"
 source_git_blobs:
   "src/rw_bot/policy/trace.py": "1494fc9ecdde3c89c833f0046faef92b0ac817d7"
   "src/rw_bot/policy/recorder.py": "888a0a116b5c9cd4bcc87899509566d3a7bda650"

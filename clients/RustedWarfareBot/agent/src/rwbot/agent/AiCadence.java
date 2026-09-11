@@ -220,11 +220,18 @@ final class AiCadence {
                 continue;
             }
             int id = EngineAccess.readIntField(team, EngineNames.TEAM_ID);
-            long credits = (long) EngineAccess.readDoubleField(team, EngineNames.CREDITS);
+            double raw = EngineAccess.readDoubleField(team, EngineNames.CREDITS);
+            long credits = (long) raw;
             Long last = lastCredits.put(Integer.valueOf(id), Long.valueOf(credits));
             if (last != null && credits < last.longValue()) {
+                // The raw double rides along because every fork so far
+                // strikes from the SAME truncated balance at an
+                // affordability edge -- a fractional divergence would be
+                // invisible to the integer view and decisive here
+                // (wiki log 2026-09-11).
                 Log.info(
-                        "credspend t=" + tick + " team=" + id + " " + last + "->" + credits);
+                        "credspend t=" + tick + " team=" + id + " " + last + "->" + credits
+                                + " raw=" + raw);
             }
         }
     }
@@ -360,10 +367,44 @@ final class AiCadence {
                         .append(" j=").append(fieldValueOrAbsent(controller, "j"))
                         .append(" k=").append(fieldValueOrAbsent(controller, "k"))
                         .append(" m=").append(fieldValueOrAbsent(controller, "m"))
+                        .append(" q=").append(memberFingerprint(controller))
                         .append('}');
             }
         }
         out.append(']');
+    }
+
+    /**
+     * Renders a group's unit-membership fingerprint --
+     * {@code size:sum-of-entity-ids} over the group roster {@code q} the
+     * builder-finder iterates. Order-independent by construction, because
+     * the question it answers is MEMBERSHIP: the tm pair's twins entered
+     * tick 5,853 with balances identical to the double's last bit, tried
+     * identical candidates, and one twin's finder answered null -- and
+     * {@code q}'s backing store is an insertion-ordered array, so the
+     * remaining suspect is who is IN it (wiki log 2026-09-11). No hash of
+     * any prior instrument covers this state.
+     *
+     * @param group The a.i group.
+     * @return {@code <size>:<id-sum>}, or {@code ?} when the roster is
+     *     unreadable.
+     */
+    private static String memberFingerprint(Object group) {
+        Object held = EngineAccess.readField(group, "q");
+        java.util.Collection<?> members = held == null ? null : ObjectView.containedValues(held);
+        if (members == null) {
+            return "?";
+        }
+        long sum = 0;
+        int count = 0;
+        for (Object unit : members) {
+            if (unit == null) {
+                continue;
+            }
+            count++;
+            sum += EngineAccess.readLongField(unit, EngineNames.ENTITY_ID);
+        }
+        return count + ":" + sum;
     }
 
     /**

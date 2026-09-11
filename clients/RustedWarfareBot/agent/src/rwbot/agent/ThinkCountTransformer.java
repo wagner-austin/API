@@ -30,6 +30,8 @@ final class ThinkCountTransformer implements ClassFileTransformer {
             Targets.thinkScans();
     private final java.util.Map<String, java.util.LinkedHashMap<String, String>> values =
             Targets.thinkValues();
+    private final java.util.Map<String, java.util.LinkedHashMap<String, String>> arg1s =
+            Targets.thinkArg1s();
     private final java.util.Set<String> patched =
             java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<String>());
 
@@ -56,6 +58,10 @@ final class ThinkCountTransformer implements ClassFileTransformer {
         if (valueHooks == null) {
             valueHooks = new java.util.LinkedHashMap<String, String>();
         }
+        java.util.LinkedHashMap<String, String> arg1Hooks = arg1s.get(className);
+        if (arg1Hooks == null) {
+            arg1Hooks = new java.util.LinkedHashMap<String, String>();
+        }
 
         // Same containment as the other transformers: a throw from
         // transform() is swallowed by the JVM and the original bytes load
@@ -68,6 +74,7 @@ final class ThinkCountTransformer implements ClassFileTransformer {
                             classfileBuffer,
                             counters,
                             receiverHooks,
+                            arg1Hooks,
                             valueHooks,
                             Targets.THINK_COUNT_OWNER);
         } catch (RuntimeException e) {

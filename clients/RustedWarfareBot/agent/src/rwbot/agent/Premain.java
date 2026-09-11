@@ -112,6 +112,21 @@ public final class Premain {
             }
         }
 
+        // The AI's turret picker constructs a nanoTime-seeded Random inline
+        // -- the one wall-seeded draw in all sim code, invisible to every
+        // tapped stream, measured forking byte-identical twins at the same
+        // tick (RandomRedirect). The redirect hands it the match-seeded
+        // choice stream instead. Alters sim behavior, so it takes the
+        // hosting containment. REGISTERED here, VERIFIED below the think
+        // block: that block forceLoads the same AI class when the tap is
+        // armed, and a transformer registered after a class has loaded
+        // patches nothing.
+        RandomRedirectTransformer randomRedirect = null;
+        if (!options.hostRequested()) {
+            randomRedirect = new RandomRedirectTransformer();
+            instrumentation.addTransformer(randomRedirect);
+        }
+
         // Intent only: the swap itself waits for match start, because a
         // premain swap was measured being overwritten by the holder's own
         // <clinit> (see RandomTap).
@@ -132,6 +147,17 @@ public final class Premain {
                                 + uncounted
                                 + " -- the pinned build is 1.15 (code 176, build #28);"
                                 + " re-derive the names against this jar and update Targets.");
+            }
+        }
+
+        if (randomRedirect != null) {
+            forceLoad(java.util.Collections.singleton(RandomRedirectTransformer.AI_CLASS));
+            if (!randomRedirect.patched()) {
+                throw new IllegalStateException(
+                        "rw-agent: the AI's new-Random was not redirected: "
+                                + RandomRedirectTransformer.AI_CLASS
+                                + " -- the pinned build is 1.15 (code 176, build #28);"
+                                + " re-derive the site against this jar.");
             }
         }
 

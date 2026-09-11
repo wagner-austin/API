@@ -58,6 +58,11 @@ final class EntryCounts {
      *     receiver push makes this shape wrong for a static target, and
      *     {@code max_stack} is raised to one where a body of zero would
      *     otherwise underprovision the push.
+     * @param arg1Hooks Target INSTANCE methods whose FIRST parameter is a
+     *     reference, to {@code (Ljava/lang/Object;)V} hook methods on the
+     *     owner -- the {@code aload_1} sibling of the receiver shape, for
+     *     hooks that need the callee's SUBJECT rather than its receiver
+     *     (the buildUnit candidate trace).
      * @param valueHooks Target INSTANCE methods whose FIRST parameter is a
      *     float, to {@code (Ljava/lang/Object;F)V} hook methods on the
      *     owner -- the eight-byte shape, receiver and argument both in
@@ -77,17 +82,20 @@ final class EntryCounts {
             byte[] classFile,
             java.util.LinkedHashMap<String, String> counters,
             java.util.LinkedHashMap<String, String> receiverHooks,
+            java.util.LinkedHashMap<String, String> arg1Hooks,
             java.util.LinkedHashMap<String, String> valueHooks,
             String counterOwner) {
         ClassFilePatcher patcher = new ClassFilePatcher(classFile);
         String[] pool = patcher.readHeaderAndConstantPool();
         int poolEnd = patcher.pos;
         int poolCount = patcher.tags.length;
+        boolean objectDescriptorNeeded = !receiverHooks.isEmpty() || !arg1Hooks.isEmpty();
         int appendedEntries =
                 3
                         + 3 * counters.size()
-                        + (receiverHooks.isEmpty() ? 0 : 1)
+                        + (objectDescriptorNeeded ? 1 : 0)
                         + 3 * receiverHooks.size()
+                        + 3 * arg1Hooks.size()
                         + (valueHooks.isEmpty() ? 0 : 1)
                         + 3 * valueHooks.size();
         if (poolCount + appendedEntries > 0xffff) {
@@ -119,18 +127,28 @@ final class EntryCounts {
             next = appendHook(appended, counter.getValue(), ownerClass, voidDescriptor, next);
             refOf.put(counter.getKey(), Integer.valueOf(next - 1));
         }
-        if (!receiverHooks.isEmpty()) {
+        java.util.Set<String> withArg1 = new java.util.LinkedHashSet<String>();
+        if (objectDescriptorNeeded) {
             byte[] objectDescriptor =
                     "(Ljava/lang/Object;)V".getBytes(java.nio.charset.StandardCharsets.UTF_8);
             appended.write(ClassFilePatcher.CONSTANT_UTF8);
             CodeBodies.writeU2(appended, objectDescriptor.length);
             appended.write(objectDescriptor, 0, objectDescriptor.length);
-            int receiverDescriptor = next;
+            int objectDescriptorIndex = next;
             next += 1;
             for (java.util.Map.Entry<String, String> hook : receiverHooks.entrySet()) {
-                next = appendHook(appended, hook.getValue(), ownerClass, receiverDescriptor, next);
+                next =
+                        appendHook(
+                                appended, hook.getValue(), ownerClass, objectDescriptorIndex, next);
                 refOf.put(hook.getKey(), Integer.valueOf(next - 1));
                 withReceiver.add(hook.getKey());
+            }
+            for (java.util.Map.Entry<String, String> hook : arg1Hooks.entrySet()) {
+                next =
+                        appendHook(
+                                appended, hook.getValue(), ownerClass, objectDescriptorIndex, next);
+                refOf.put(hook.getKey(), Integer.valueOf(next - 1));
+                withArg1.add(hook.getKey());
             }
         }
         java.util.Set<String> withValue = new java.util.LinkedHashSet<String>();
@@ -165,7 +183,7 @@ final class EntryCounts {
         java.util.Set<String> unmatched = new java.util.LinkedHashSet<String>(refOf.keySet());
         int methodCount = patcher.readU2();
         for (int i = 0; i < methodCount; i++) {
-            collect(patcher, pool, refOf, withReceiver, withValue, unmatched, edits);
+            collect(patcher, pool, refOf, withReceiver, withArg1, withValue, unmatched, edits);
         }
         if (!unmatched.isEmpty()) {
             throw new ClassFormatError(
@@ -209,6 +227,7 @@ final class EntryCounts {
             String[] pool,
             java.util.Map<String, Integer> refOf,
             java.util.Set<String> withReceiver,
+            java.util.Set<String> withArg1,
             java.util.Set<String> withValue,
             java.util.Set<String> unmatched,
             java.util.List<Edit> edits) {
@@ -242,6 +261,12 @@ final class EntryCounts {
                     minStack = 2;
                 } else if (withReceiver.contains(key)) {
                     entry = new byte[] {0x2a, (byte) 0xb8, (byte) hi, (byte) lo};
+                    minStack = 1;
+                } else if (withArg1.contains(key)) {
+                    // 0x2b is aload_1: the FIRST reference argument of an
+                    // instance method -- the shape for hooks that need the
+                    // callee's subject rather than its receiver.
+                    entry = new byte[] {0x2b, (byte) 0xb8, (byte) hi, (byte) lo};
                     minStack = 1;
                 } else {
                     entry = new byte[] {(byte) 0xb8, (byte) hi, (byte) lo, 0x00};
