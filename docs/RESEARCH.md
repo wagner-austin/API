@@ -43,7 +43,7 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 | `floor` | free-gpu | `A100` x1 | 8 | 32 | 60 | `df841c661b9e` | yes | no |
 | `mi` | free-gpu | `A100` x1 | 8 | 64 | 240 | `55651342e15d` | yes | no |
 | `mi-cu128` | free-gpu32 | `RTX6000` x1 | 8 | 64 | 55 | `6d9ba0baac40` | yes | no |
-| `rusted` | free | cpu | 4 | 2 | 100 | `b1eaaa2e5a43` | yes | no |
+| `rusted` | free | cpu | 4 | 2 | 100 | `97a80bdeb16d` | yes | no |
 | `tankpit` | free | cpu | 2 | 2 | 60 | `0cfdd5592a1a` | yes | no |
 | `turkic-lstm` | free-gpu | `A100` x1 | 4 | 16 | 150 | `6e034383e300` | no | yes |
 
