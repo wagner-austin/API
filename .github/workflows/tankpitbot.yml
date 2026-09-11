@@ -57,6 +57,8 @@ concurrency:
 jobs:
   check:
     runs-on: windows-latest
+    # 10m is the slowest of the last eight successes; 3x headroom.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: clients/TankpitBot

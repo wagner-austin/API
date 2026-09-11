@@ -58,6 +58,8 @@ concurrency:
 jobs:
   check:
     runs-on: windows-latest
+    # 4m is the slowest of the last twelve successes; ~5x headroom.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: clients/NavProbe

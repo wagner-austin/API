@@ -60,6 +60,11 @@ concurrency:
 jobs:
   check:
     runs-on: windows-latest
+    # Bounds a hang, not a slow run: 11m is the slowest of the last ten
+    # successes, so this is ~3x headroom. The default is 360 minutes, and
+    # an unbounded job on a frozen runner holds its concurrency slot for
+    # six hours while reporting nothing.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: libs/covenant_ml

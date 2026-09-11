@@ -30,6 +30,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Every one of the last twelve successes ran in 1m; 15x headroom.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: services/turkic-api

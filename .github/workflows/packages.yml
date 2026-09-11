@@ -113,6 +113,10 @@ on:
 jobs:
   discover:
     runs-on: ubuntu-latest
+    # Pure path selection -- every recorded run is under a minute. It gates
+    # the whole matrix, so a hang here stalls the workflow while showing no
+    # failed job at all.
+    timeout-minutes: 10
     outputs:
       packages: ${{ steps.select.outputs.packages }}
       uncacheable: ${{ steps.select.outputs.uncacheable }}
@@ -166,6 +170,19 @@ jobs:
   check:
     needs: discover
     if: needs.discover.outputs.packages != '[]'
+    # ONE BOUND COVERS EVERY MATRIX LEG, so it is sized to the slowest
+    # rather than the median. Measured across the last six runs:
+    # handwriting-ai 26m, Model-Trainer 20m, covenant_nn 7m,
+    # covenant-radar-api 6m, and the other ~25 packages under 2m. 60 gives
+    # the worst leg ~2.3x headroom while still being six times tighter
+    # than the 360-minute default a hung leg would otherwise hold.
+    #
+    # Deliberately NOT keyed to the heavy-package list in runs-on below:
+    # that list routes by whether a package needs the self-hosted pool,
+    # which is a different question from how long it takes (RustedWarfareBot
+    # is on that list and finishes in about a minute). Two lists that look
+    # alike and mean different things drift, and the drift is silent.
+    timeout-minutes: 60
     # clients/RustedWarfareBot runs on the self-hosted pool and everything
     # else stays on GitHub's. Its RunRecord fingerprints sha256 the REAL
     # game binary by design (rw_bot/provenance.py -- the game build is the
