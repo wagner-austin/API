@@ -91,6 +91,7 @@ INT_FIELDS: Final = (
     "spacing",
     "retreat",
     "siege",
+    "siegedose",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -414,6 +415,12 @@ class Doctrine(TypedDict):
             the bimodal split: wins bank by ~3,100 samples, so a gate
             near 4,500 enters only the long-match regime the anatomy
             names ([[campaign-ledger]]).
+        siegedose: How many ``c_artillery`` shares join once past the
+            ``siege`` gate; one -- every siege measurement's identity --
+            is the shipped switch exactly. The dose axis is the harder
+            form the timing family's closure left open (log 2026-09-11:
+            gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
+            ``siege 0``, any dose but one is refused: it lies about its arm.
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -504,6 +511,7 @@ class Doctrine(TypedDict):
     spacing: int
     retreat: int
     siege: int
+    siegedose: int
     huntgate: bool
     bank: bool
 
@@ -569,6 +577,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     spacing=0,
     retreat=FIRST_WAVE,
     siege=0,
+    siegedose=1,
     huntgate=False,
     bank=False,
 )

@@ -23,16 +23,19 @@ from tests.campaign_fixtures import (
     CENTRE,
     FACTORY,
     PLACEMENTS,
-    PROFILES,
     ScriptedPeer,
     unit_stats,
     verb,
 )
-from tests.wire_fixtures import entity, lines, option, pool, sample
+from tests.wire_fixtures import entity, lines, option, pool, profiles_for, sample
 
 #: The fixture catalogue plus the siege share's own unit, priced by the
 #: real table ([[mechanics-unit-value]]).
 SIEGE_CATALOGUE = {**CATALOGUE, "c_artillery": unit_stats("c_artillery", price=900)}
+
+#: Profiles over the widened catalogue, so a world that FIELDS the share
+#: (the dose pair's fixture) can be combat-profiled like any roster.
+SIEGE_PROFILES = profiles_for(SIEGE_CATALOGUE)
 
 
 def _siege_world() -> Sample:
@@ -60,17 +63,44 @@ def _siege_world() -> Sample:
     )
 
 
-def _play(world: Sample, times: int, siege: int) -> ScriptedPeer:
+def _dosed_world() -> Sample:
+    """The siege world with the single share already standing.
+
+    One tank and one artillery on the roster: a single dose is satisfied
+    and produces no more reach, so anything artillery produced here is
+    the second share and nothing else.
+
+    Returns:
+        The scripted world.
+    """
+    return sample(
+        CENTRE,
+        BUILDER,
+        FACTORY,
+        entity(1, "c_tank"),
+        entity(2, "c_artillery"),
+        credits=4000,
+        pools=(pool(x=300.0),),
+        options=(
+            option(300, "c_tank"),
+            option(300, "c_artillery"),
+            option(214, "extractorT1", placed=True),
+        ),
+    )
+
+
+def _play(world: Sample, times: int, siege: int, siegedose: int = 1) -> ScriptedPeer:
     peer = ScriptedPeer(lines(*(world for _ in range(times))))
     play(
         AgentChannel(peer),
         (),
         SIEGE_CATALOGUE,
         PLACEMENTS,
-        PROFILES,
+        SIEGE_PROFILES,
         times,
         reinforce=("c_tank",),
         siege=siege,
+        siegedose=siegedose,
     )
     return peer
 
@@ -96,3 +126,19 @@ def test_a_gate_beyond_the_match_never_switches() -> None:
     identity -- the games that close early never pay the share."""
     peer = _play(_siege_world(), times=4, siege=100)
     assert not any('"type":"c_artillery"' in line for line in verb(peer, "produce"))
+
+
+def test_a_filled_single_dose_is_satisfied() -> None:
+    """The control half of the dose pair, and its fail-first witness: with
+    one artillery already standing, the shipped single-share switch wants
+    no more reach."""
+    peer = _play(_dosed_world(), times=4, siege=2)
+    assert not any('"type":"c_artillery"' in line for line in verb(peer, "produce"))
+
+
+def test_the_dose_widens_the_share() -> None:
+    """Dose two on the same world produces artillery again: the standing
+    piece fills only the first share, and the deficit points at the
+    second -- the dose axis the timing family's closure left open."""
+    peer = _play(_dosed_world(), times=4, siege=2, siegedose=2)
+    assert any('"type":"c_artillery"' in line for line in verb(peer, "produce"))

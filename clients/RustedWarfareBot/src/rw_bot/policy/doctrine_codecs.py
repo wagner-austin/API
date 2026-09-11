@@ -60,6 +60,7 @@ _BAD_PRIO = "RW-DOCTRINE-035"
 _BAD_SPACING = "RW-DOCTRINE-036"
 _BAD_RETREAT = "RW-DOCTRINE-037"
 _BAD_SIEGE = "RW-DOCTRINE-038"
+_BAD_SIEGE_DOSE = "RW-DOCTRINE-039"
 
 
 def _count(
@@ -115,6 +116,41 @@ def _prio(payload: Mapping[str, str | int | float | bool]) -> int:
             f"field 'prio' names a target-priority allele, 0-2, got {prio}",
         )
     return prio
+
+
+def _siegedose(payload: Mapping[str, str | int | float | bool], siege: int) -> int:
+    """Read the siege dose, refusing the two shapes that lie.
+
+    A dose of zero on a live gate is a switch that fires nothing, and a
+    dose above one with no gate documents an arm that can never fire --
+    both are typos at decode, not settings ([[campaign-ledger]]).
+
+    Args:
+        payload: Field values by name.
+        siege: The already-decoded gate, for the cross-field check.
+
+    Returns:
+        The validated dose.
+
+    Raises:
+        DoctrineError: ``RW-DOCTRINE-039`` on either shape.
+    """
+    siegedose = _count(
+        payload, "siegedose", _BAD_SIEGE_DOSE, "artillery shares past the siege gate, 1 as shipped"
+    )
+    if siegedose == 0:
+        raise DoctrineError(
+            _BAD_SIEGE_DOSE,
+            "field 'siegedose' must field at least one share: the off switch is siege 0, "
+            "not a dose of nothing",
+        )
+    if siege == 0 and siegedose != 1:
+        raise DoctrineError(
+            _BAD_SIEGE_DOSE,
+            f"field 'siegedose' is {siegedose} with no siege gate to fire it: "
+            "set siege to a sample count or return the dose to 1",
+        )
+    return siegedose
 
 
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
@@ -186,6 +222,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     siege = _count(
         payload, "siege", _BAD_SIEGE, "a sample count to switch on the artillery share, 0 never"
     )
+    siegedose = _siegedose(payload, siege)
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -270,6 +307,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         spacing=spacing,
         retreat=retreat,
         siege=siege,
+        siegedose=siegedose,
         huntgate=huntgate,
         bank=bank,
     )
@@ -332,6 +370,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "spacing": doctrine["spacing"],
         "retreat": doctrine["retreat"],
         "siege": doctrine["siege"],
+        "siegedose": doctrine["siegedose"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }

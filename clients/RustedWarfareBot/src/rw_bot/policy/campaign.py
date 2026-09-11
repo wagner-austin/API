@@ -137,6 +137,7 @@ def play(
     spacing: int = 0,
     retreat: int = FIRST_WAVE,
     siege: int = 0,
+    siegedose: int = 1,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -192,7 +193,7 @@ def play(
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
             ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
-            ``bank`` and ``income_ladder``. Each is documented ONCE, on
+            ``siegedose``, ``bank`` and ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -371,11 +372,10 @@ def play(
                 # every one satisfied by the others' scouts.
                 *scout_shortfall(sample, int(scout) + lurk + decoys),
                 *reinforce,
-                # The siege switch: one artillery share joins the ratio
-                # only once the match has outlived the winning regime --
-                # the same sample gate worker_wait proved, aimed at the
-                # measured long-match standoff (see Doctrine.siege).
-                *(("c_artillery",) if siege and scores.samples_seen >= siege else ()),
+                # The siege switch: siegedose artillery shares join the
+                # ratio only once the match outlives the winning regime
+                # (worker_wait's proven gate; Doctrine.siege/.siegedose).
+                *(("c_artillery",) * siegedose if siege and scores.samples_seen >= siege else ()),
             )
             if counter:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)

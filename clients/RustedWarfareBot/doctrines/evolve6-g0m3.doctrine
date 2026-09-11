@@ -42,6 +42,7 @@ prio 0
 spacing 0
 retreat 3
 siege 0
+siegedose 1
 expand 1
 counter 1
 cover 0

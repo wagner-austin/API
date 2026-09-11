@@ -1,0 +1,57 @@
+# The dose variant (log 2026-09-11): the 3,000 gate with TWO artillery
+# shares instead of one. The timing family closed with the earlier gate
+# unreplicated (+9 then -1; pooled +8 over 96 disjoint pairs, flips
+# 23:15 -- a positive lean short of every bar), and dose is the first
+# of the harder counter-standoff forms that closure explicitly left
+# open: if one share arriving in time was real but too small against
+# massed artillery-turret lines, doubling the ratio's reach share is
+# the cheapest test of that reading. One field off vh-siege3000
+# (siegedose 2), which is itself one field off the champion.
+name vh-siege3000d2
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 3000
+siegedose 2
+brace 0
+huntgate 0
+bank 0

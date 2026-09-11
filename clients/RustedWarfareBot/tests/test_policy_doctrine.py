@@ -70,6 +70,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         spacing=0,
         retreat=3,
         siege=0,
+        siegedose=1,
         huntgate=False,
         bank=False,
     )
@@ -391,6 +392,29 @@ def test_a_negative_siege_is_refused_and_a_gate_round_trips() -> None:
     assert caught.value.code == "RW-DOCTRINE-038"
     payload["siege"] = 4500
     assert decode_doctrine(payload)["siege"] == 4500
+
+
+def test_a_dose_of_nothing_is_refused() -> None:
+    """The off switch is ``siege 0``; a live gate with zero shares would be
+    a switch that fires nothing, which is a typo, not a setting."""
+    payload = encode_doctrine(_doctrine())
+    payload["siege"] = 3000
+    payload["siegedose"] = 0
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-039"
+
+
+def test_a_dose_without_a_gate_is_refused_and_a_dose_round_trips() -> None:
+    """A dose above one on ``siege 0`` documents an arm that can never
+    fire; with a live gate the same dose is the experiment."""
+    payload = encode_doctrine(_doctrine())
+    payload["siegedose"] = 2
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-039"
+    payload["siege"] = 3000
+    assert decode_doctrine(payload)["siegedose"] == 2
 
 
 def test_a_gate_without_a_party_is_refused() -> None:
