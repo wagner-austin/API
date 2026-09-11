@@ -25,12 +25,13 @@ hubs: [services]
 # Art-Trainer publishes LoRAs that a different repository consumes
 
 `services/Art-Trainer` trains LoRA adapters and writes them into ComfyUI's
-models directory. It is not the thing that uses them: the consumer is the
-`chat` repository, which applies them at inference and never trains anything.
-**The two halves live in different git repositories and, until 2026-09-11,
-neither one's README mentioned the other.**
+models directory[^1][^2]. It is not the thing that uses them: the consumer is
+the `chat` repository, which applies them at inference and never trains
+anything[^4]. **The two halves live in different git repositories and, until
+2026-09-11, neither one's README mentioned the other**[^3].
 
-That is the fact this page exists for. Everything below is downstream of it.
+That is the fact this page exists for. Everything below is downstream of
+it[^3].
 
 ## What it does
 
@@ -56,14 +57,14 @@ class DeploymentResult(TypedDict, total=True):
     error_message: str | None
 ```
 
-It copies a trained `.safetensors` into ComfyUI's models directory. ComfyUI
-then serves it to anything that asks, and `chat` asks.
+It copies a trained `.safetensors` into ComfyUI's models directory[^2].
+ComfyUI then serves it to anything that asks, and `chat` asks[^4].
 
 **So there is no import, no HTTP call, and no shared package between producer
-and consumer.** The coupling is a directory on disk. Nothing in either
+and consumer.** The coupling is a directory on disk[^2]. Nothing in either
 repository's dependency graph records it, which is exactly why a reader of
 `chat` could not discover this service, and a reader of this service could not
-tell who consumed its output.
+tell who consumed its output[^3].
 
 The measured cost: `chat`'s own `docs/image-generation-roadmap.md` listed
 "LoRA training pipeline" under **What's missing** while this service was
@@ -99,7 +100,8 @@ training jobs — and it is not one.
 
 Stated because the resemblance is misleading in the direction that costs
 something: a reader checking RESEARCH.md for "do we train image models" finds
-nothing and may conclude we do not.
+nothing and may conclude we do not — which is the same mistake `chat`'s
+roadmap already caused once, from the other side[^3][^5].
 
 [^1]: `services/Art-Trainer/README.md` — the feature list, the supported
       architectures and the Kohya-ss integration, verbatim from the service's
@@ -116,7 +118,13 @@ nothing and may conclude we do not.
       TypedDict, the `LoraBaseModel` literal, and the module docstring
       recording the ComfyUI behaviour this guards against. Outside this
       wiki's workspaceRoot; see `provenance`.
-[^5]: Measured 2026-09-11 in `services/Art-Trainer`: `ls runs/` returns
-      nothing, and `grep -rl "RunRecord\|run_record\|RunFingerprint" src/`
-      matches no file. Both are negative results, so both are recorded with
-      the command that produced them rather than asserted.
+[^5]: `services/Art-Trainer/runs/` and `services/Art-Trainer/src/`, both
+      measured 2026-09-11 at commit `281d7b6c`. `ls services/Art-Trainer/runs/`
+      returns nothing (0 entries) and
+      `grep -rl "RunRecord\|run_record\|RunFingerprint" services/Art-Trainer/src/`
+      matches no file. Compare `libs/platform_core/src/platform_core/run_record.py`,
+      which defines the `RunRecord` shape a research surface emits, and
+      `docs/RESEARCH.md` section "Not registered anywhere", which is where a
+      non-hpc3 surface would be listed if it were one. Both are NEGATIVE
+      results, so both carry the command that produced them rather than an
+      assertion -- an empty result is about the query until the query is shown.
