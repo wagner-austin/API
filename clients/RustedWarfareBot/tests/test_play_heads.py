@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 from scripts.play import EXIT_INCOMPLETE, EXIT_OK, main
 
-from rw_bot.policy.doctrine import DEFAULT_DOCTRINE, Doctrine
+from rw_bot.policy.doctrine import Doctrine
+from rw_bot.policy.doctrine_default import DEFAULT_DOCTRINE
 from rw_bot.policy.doctrine_file import format_doctrine
 from tests.play_fixtures import (
     BUILDER as _BUILDER,

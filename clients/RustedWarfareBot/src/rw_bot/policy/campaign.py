@@ -138,6 +138,7 @@ def play(
     retreat: int = FIRST_WAVE,
     siege: int = 0,
     siegedose: int = 1,
+    raze: int = 0,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -193,7 +194,7 @@ def play(
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``,
             ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
-            ``siegedose``, ``bank`` and ``income_ladder``. Each is documented ONCE, on
+            ``siegedose``, ``raze``, ``bank`` and ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -372,9 +373,7 @@ def play(
                 # every one satisfied by the others' scouts.
                 *scout_shortfall(sample, int(scout) + lurk + decoys),
                 *reinforce,
-                # The siege switch: siegedose artillery shares join the
-                # ratio only once the match outlives the winning regime
-                # (worker_wait's proven gate; Doctrine.siege/.siegedose).
+                # Siege switch: shares join past the gate (Doctrine.siege).
                 *(("c_artillery",) * siegedose if siege and scores.samples_seen >= siege else ()),
             )
             if counter:
@@ -560,6 +559,7 @@ def play(
                 rusher,
                 momentum,
                 raid=raid,
+                raze_now=bool(raze) and scores.samples_seen >= raze,
                 hunt=hunt,
                 rush=rush,
                 allin=allin,

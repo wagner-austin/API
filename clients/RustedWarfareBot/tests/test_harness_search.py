@@ -20,7 +20,7 @@ from rw_bot.harness.search import (
     sampled_pairs,
     single_moves,
 )
-from rw_bot.policy.doctrine import DEFAULT_DOCTRINE
+from rw_bot.policy.doctrine_default import DEFAULT_DOCTRINE
 
 
 def test_labels_name_the_moves_in_order() -> None:

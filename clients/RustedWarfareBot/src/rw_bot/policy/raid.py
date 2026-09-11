@@ -50,6 +50,21 @@ from rw_bot.wire.state import Entity, Sample
 #: raiding defences is what the waves die to.
 INCOME_TYPES = ("extractorT1", "extractorT2", "extractorT3")
 
+#: Types whose remembered sightings are RAZE objectives -- the displacement
+#: regime's targets (log 2026-09-11). The attrition anatomy's number-one
+#: killer is massed ``c_artillery`` over turret lines, and every composition
+#: answer to it measured flat with its mechanism verified; the displacement
+#: hypothesis strikes the line's PRODUCTION instead. Factories and nothing
+#: else, for the raid's own reasons: the army is the waves' business, and
+#: defences are what parties die to.
+PRODUCTION_TYPES = (
+    "landFactory",
+    "airFactory",
+    "seaFactory",
+    "mechFactory",
+    "experimentalLandFactory",
+)
+
 
 def income_objectives(intel: Intel) -> tuple[Sighting, ...]:
     """Return every remembered enemy extractor.
@@ -61,6 +76,22 @@ def income_objectives(intel: Intel) -> tuple[Sighting, ...]:
         Income sightings in identity order.
     """
     return tuple(s for s in intel.remembered() if s["type_name"] in INCOME_TYPES)
+
+
+def production_objectives(intel: Intel) -> tuple[Sighting, ...]:
+    """Return every remembered enemy factory.
+
+    The raze regime raids only what intel remembers, exactly as the income
+    raid does: a fogged factory is not a target, and an empty memory stands
+    the party down rather than substituting a lesser objective.
+
+    Args:
+        intel: The fog memory.
+
+    Returns:
+        Production sightings in identity order.
+    """
+    return tuple(s for s in intel.remembered() if s["type_name"] in PRODUCTION_TYPES)
 
 
 class Raider:
@@ -142,13 +173,16 @@ class Raider:
         army: Sequence[Entity],
         catalogue: Mapping[str, UnitStats],
         may_draft: bool,
+        raze_now: bool,
     ) -> tuple[AttackMoveOrder, ...]:
         """Advance the raid by at most one objective's worth of orders.
 
         The objective is the remembered extractor nearest our anchor -- the
-        frontier one, reachable before the deep ones. A party member standing
-        where the memory says an extractor is, seeing none, reports the death
-        and the raid moves on.
+        frontier one, reachable before the deep ones -- or, when ``raze_now``,
+        the remembered FACTORY nearest it: the displacement regime retasks
+        the same party at the standoff line's production (Doctrine.raze).
+        A party member standing where the memory says the objective is,
+        seeing none, reports the death and the raid moves on.
 
         **A party or nothing.** Survivors below strength disband and
         attack-move home -- fighting their way back to the reserve rather
@@ -171,12 +205,15 @@ class Raider:
                 fresh party -- the wave gate's need plus the party size. A
                 party already out is managed regardless: the gate arbitrates
                 drafting, not the raid in progress.
+            raze_now: Whether the displacement regime is live -- objectives
+                become remembered factories instead of extractors. The
+                campaign computes this from the ``raze`` sample gate.
 
         Returns:
             The attack-move orders to send, empty while the party is already
             en route or there is nothing remembered to raid.
         """
-        objectives = income_objectives(intel)
+        objectives = production_objectives(intel) if raze_now else income_objectives(intel)
         if not objectives:
             self._party = frozenset()
             self._objective = 0
@@ -242,4 +279,10 @@ class Raider:
         return homeward(survivors, anchor)
 
 
-__all__ = ["INCOME_TYPES", "Raider", "income_objectives"]
+__all__ = [
+    "INCOME_TYPES",
+    "PRODUCTION_TYPES",
+    "Raider",
+    "income_objectives",
+    "production_objectives",
+]

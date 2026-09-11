@@ -21,9 +21,6 @@ from __future__ import annotations
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
-from rw_bot.policy.combat import FIRST_WAVE, WAVE_SIZES
-from rw_bot.policy.firing import MAX_OPEN_GROUPS, PRIO_CONVERGENCE
-from rw_bot.policy.workforce import DEFAULT_MAX_WORKERS
 
 #: The ``heavies`` value that means "no extra composition entries".
 #:
@@ -92,6 +89,7 @@ INT_FIELDS: Final = (
     "retreat",
     "siege",
     "siegedose",
+    "raze",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -421,6 +419,16 @@ class Doctrine(TypedDict):
             form the timing family's closure left open (log 2026-09-11:
             gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
             ``siege 0``, any dose but one is refused: it lies about its arm.
+        raze: Sample count past which the raid party's objectives become
+            remembered enemy FACTORIES instead of extractors -- the
+            displacement road (log 2026-09-11): every composition answer
+            to the attrition regime measured flat with its mechanism
+            verified, so this strikes the standoff line's PRODUCTION.
+            At Very Hard the 1.8x subsidy funds no income floor (the
+            Impossible "proportional and bounded" verdict does not carry
+            down), so a killed factory stays a dent. Same party, same
+            discipline, retasked: requires ``raid``, refused without it.
+            Zero -- every prior measurement -- never retasks.
         bank: Whether the razing head's SAFE window funds the finisher.
             The nuker's build gate was sustained dominance only -- a state
             Impossible never reaches, so `nukes` was inert there by
@@ -512,79 +520,12 @@ class Doctrine(TypedDict):
     retreat: int
     siege: int
     siegedose: int
+    raze: int
     huntgate: bool
     bank: bool
 
 
-#: The style everything so far was measured under, exactly.
-#:
-#: Extractors first because they pay for everything after them; no factory
-#: named because the build tree inserts prerequisites; the shipped AI's wave
-#: mass; expansion on; the mix held as stated. A doctrine file is only ever
-#: compared against this, so it is a constant rather than a file that could
-#: drift.
-DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
-    name="default",
-    goals=(
-        "extractorT1",
-        "extractorT1",
-        "extractorT1",
-        "c_tank",
-        "c_tank",
-        "c_tank",
-        "c_tank",
-    ),
-    heavies=(),
-    max_workers=DEFAULT_MAX_WORKERS,
-    mass=WAVE_SIZES[-1],
-    reserve=DERIVE_RESERVE,
-    expand=True,
-    counter=False,
-    cover=True,
-    intercept=False,
-    guard_cap=0,
-    aa_cover=False,
-    forward=False,
-    scout=False,
-    raid=0,
-    rush=False,
-    creep=0,
-    hold=0,
-    riposte=False,
-    navtilt=NAVTILT_OFF,
-    tech=0,
-    lurk=0,
-    allin=0,
-    decoys=0,
-    kite=False,
-    income_ladder=False,
-    brace=False,
-    hp_floor=0,
-    strike=0,
-    medics=0,
-    navy=0,
-    battery=0,
-    bunkers=0,
-    flame=0,
-    close=0,
-    guns=0,
-    nukes=0,
-    rebuild=0,
-    hunt=0,
-    worker_wait=0,
-    groupcap=MAX_OPEN_GROUPS,
-    prio=PRIO_CONVERGENCE,
-    spacing=0,
-    retreat=FIRST_WAVE,
-    siege=0,
-    siegedose=1,
-    huntgate=False,
-    bank=False,
-)
-
-
 __all__ = [
-    "DEFAULT_DOCTRINE",
     "DERIVE_RESERVE",
     "DOCTRINE_FIELDS",
     "FLAG_FIELDS",

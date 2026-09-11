@@ -22,12 +22,12 @@ from rw_bot.mechanics.placement import TypePlacement, decode_placements
 from rw_bot.policy.campaign import play
 from rw_bot.policy.combat import ladder_to
 from rw_bot.policy.doctrine import (
-    DEFAULT_DOCTRINE,
     DERIVE_RESERVE,
     NAVTILT_PREDICTED,
     Doctrine,
     DoctrineError,
 )
+from rw_bot.policy.doctrine_default import DEFAULT_DOCTRINE
 from rw_bot.policy.doctrine_file import parse_doctrine_lines
 from rw_bot.policy.expand import expand
 from rw_bot.policy.head import HeadModel, decode_head_model
@@ -526,6 +526,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         retreat=doctrine["retreat"],
         siege=doctrine["siege"],
         siegedose=doctrine["siegedose"],
+        raze=doctrine["raze"],
         bank=doctrine["bank"],
         income_ladder=doctrine["income_ladder"],
         decoys=doctrine["decoys"],

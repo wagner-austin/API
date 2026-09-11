@@ -399,6 +399,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     retreat=3,
                     siege=0,
                     siegedose=1,
+                    raze=0,
                     huntgate=False,
                     bank=False,
                     brace=False,

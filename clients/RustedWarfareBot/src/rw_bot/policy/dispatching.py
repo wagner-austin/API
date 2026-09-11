@@ -139,6 +139,7 @@ def _draft_raid(
     army: tuple[Entity, ...],
     waves: WaveController,
     raiders: Raider,
+    raze_now: bool,
 ) -> tuple[Entity, ...]:
     """Advance the raid and return the units the waves may still command.
 
@@ -152,7 +153,7 @@ def _draft_raid(
     left to assault.
     """
     spare = len(army) >= waves.need() + raiders.size
-    for order in raiders.strike(sample, intel, army, catalogue, spare):
+    for order in raiders.strike(sample, intel, army, catalogue, spare, raze_now):
         channel.send_attack_move(order)
     drafted = raiders.party()
     return tuple(u for u in army if u["unit_id"] not in drafted)
@@ -349,6 +350,7 @@ def fight(
     momentum: Momentum,
     *,
     raid: int,
+    raze_now: bool,
     hunt: int,
     rush: bool,
     allin: int,
@@ -379,6 +381,10 @@ def fight(
         rusher: The forced-march controller.
         momentum: The rival army-value window the strike release reads.
         raid: The raid party's size, zero for no raiding.
+        raze_now: Whether the displacement regime is live this tick -- the
+            raid's objectives become remembered factories (Doctrine.raze).
+            Named apart from the head's ``razing_near``, which is the enemy
+            razing US; this is the other direction.
         hunt: The hunt party's size, zero for no hunting.
         rush: Whether released waves march at the estimated enemy start.
         allin: The all-in release observation, zero for never.
@@ -396,7 +402,7 @@ def fight(
         fighting = tuple(u for u in fighting if u["unit_id"] not in struck)
     if raid:
         raids_before = raiders.raids
-        fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
+        fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders, raze_now)
         if raiders.raids > raids_before:
             pending_events.add("R")
     if hunt:

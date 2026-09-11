@@ -11,12 +11,12 @@ from pathlib import Path
 import pytest
 
 from rw_bot.policy.doctrine import (
-    DEFAULT_DOCTRINE,
     DERIVE_RESERVE,
     Doctrine,
     DoctrineError,
 )
 from rw_bot.policy.doctrine_codecs import decode_doctrine, encode_doctrine
+from rw_bot.policy.doctrine_default import DEFAULT_DOCTRINE
 from rw_bot.policy.doctrine_file import format_doctrine, parse_doctrine_lines
 from rw_bot.validation import DecodeError
 
@@ -71,6 +71,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         retreat=3,
         siege=0,
         siegedose=1,
+        raze=0,
         huntgate=False,
         bank=False,
     )
@@ -415,6 +416,28 @@ def test_a_dose_without_a_gate_is_refused_and_a_dose_round_trips() -> None:
     assert caught.value.code == "RW-DOCTRINE-039"
     payload["siege"] = 3000
     assert decode_doctrine(payload)["siegedose"] == 2
+
+
+def test_a_raze_without_a_party_is_refused_and_a_gate_round_trips() -> None:
+    """The raze gate retasks the raid party, so a doctrine that drafts none
+    is refused -- a switch that can never fire is a typo, not a setting."""
+    payload = encode_doctrine(_doctrine())
+    payload["raze"] = 3000
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-040"
+    payload["raid"] = 3
+    assert decode_doctrine(payload)["raze"] == 3000
+
+
+def test_a_negative_raze_is_refused() -> None:
+    """Zero already means never retask; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["raid"] = 3
+    payload["raze"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-040"
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

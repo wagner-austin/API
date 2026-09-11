@@ -15,7 +15,13 @@ from __future__ import annotations
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.policy.intel import Intel
-from rw_bot.policy.raid import INCOME_TYPES, Raider, income_objectives
+from rw_bot.policy.raid import (
+    INCOME_TYPES,
+    PRODUCTION_TYPES,
+    Raider,
+    income_objectives,
+    production_objectives,
+)
 from rw_bot.wire.state import Entity, Sample
 from tests.wire_fixtures import enemy, entity, sample
 
@@ -73,7 +79,7 @@ def test_the_frontier_extractor_is_assaulted_first() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=2000.0), enemy(8, "extractorT2", x=900.0))
     raider = Raider(size=2)
     army = (_tank(20), _tank(21), _tank(22))
-    orders = raider.strike(_world(*army), intel, army, _CATALOGUE, True)
+    orders = raider.strike(_world(*army), intel, army, _CATALOGUE, True, False)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 900.0), (21, 900.0)]
     assert raider.party() == frozenset({20, 21})
     assert raider.raids == 1
@@ -85,8 +91,8 @@ def test_orders_are_not_resent_while_the_objective_holds() -> None:
     raider = Raider(size=2)
     army = (_tank(20), _tank(21))
     world = _world(*army)
-    raider.strike(world, intel, army, _CATALOGUE, True)
-    assert raider.strike(world, intel, army, _CATALOGUE, True) == ()
+    raider.strike(world, intel, army, _CATALOGUE, True, False)
+    assert raider.strike(world, intel, army, _CATALOGUE, True, False) == ()
     assert raider.marches == 2
 
 
@@ -99,9 +105,9 @@ def test_survivors_below_strength_disband_and_fight_home() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=2)
     army = (_tank(20), _tank(21), _tank(22))
-    raider.strike(_world(*army), intel, army, _CATALOGUE, True)
+    raider.strike(_world(*army), intel, army, _CATALOGUE, True, False)
     survivors = (_tank(21, x=600.0), _tank(22))
-    orders = raider.strike(_world(*survivors), intel, survivors, _CATALOGUE, True)
+    orders = raider.strike(_world(*survivors), intel, survivors, _CATALOGUE, True, False)
     assert [(o["unit_id"], o["x"], o["y"]) for o in orders] == [(21, 0.0, 0.0)]
     assert raider.party() == frozenset()
     # Homeward orders are not marches; the party took two on the way out.
@@ -114,7 +120,7 @@ def test_a_fresh_party_is_drafted_whole_from_the_gathered() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=2)
     home = (_tank(21), _tank(22))
-    orders = raider.strike(_world(*home), intel, home, _CATALOGUE, True)
+    orders = raider.strike(_world(*home), intel, home, _CATALOGUE, True, False)
     assert [o["unit_id"] for o in orders] == [21, 22]
     assert raider.party() == frozenset({21, 22})
 
@@ -125,10 +131,10 @@ def test_the_draft_takes_only_gathered_units() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=2)
     spread = (_tank(20, x=500.0), _tank(21))
-    assert raider.strike(_world(*spread), intel, spread, _CATALOGUE, True) == ()
+    assert raider.strike(_world(*spread), intel, spread, _CATALOGUE, True, False) == ()
     assert raider.party() == frozenset()
     gathered = (_tank(20, x=500.0), _tank(21), _tank(22, y=30.0))
-    orders = raider.strike(_world(*gathered), intel, gathered, _CATALOGUE, True)
+    orders = raider.strike(_world(*gathered), intel, gathered, _CATALOGUE, True, False)
     assert [o["unit_id"] for o in orders] == [21, 22]
 
 
@@ -140,12 +146,12 @@ def test_the_draft_waits_for_the_campaigns_leave() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=2)
     army = (_tank(20), _tank(21))
-    assert raider.strike(_world(*army), intel, army, _CATALOGUE, False) == ()
+    assert raider.strike(_world(*army), intel, army, _CATALOGUE, False, False) == ()
     assert raider.party() == frozenset()
-    raider.strike(_world(*army), intel, army, _CATALOGUE, True)
+    raider.strike(_world(*army), intel, army, _CATALOGUE, True, False)
     assert raider.party() == frozenset({20, 21})
     # Leave withdrawn mid-raid: the party out is still the party.
-    assert raider.strike(_world(*army), intel, army, _CATALOGUE, False) == ()
+    assert raider.strike(_world(*army), intel, army, _CATALOGUE, False, False) == ()
     assert raider.party() == frozenset({20, 21})
 
 
@@ -156,12 +162,12 @@ def test_a_raider_standing_on_a_ghost_reports_the_death() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=1)
     afar = (_tank(20, x=50.0),)
-    raider.strike(_world(*afar), intel, afar, _CATALOGUE, True)
+    raider.strike(_world(*afar), intel, afar, _CATALOGUE, True, False)
     arrived = (_tank(20, x=890.0),)
-    assert raider.strike(_world(*arrived), intel, arrived, _CATALOGUE, True) == ()
+    assert raider.strike(_world(*arrived), intel, arrived, _CATALOGUE, True, False) == ()
     assert income_objectives(intel) == ()
     # With nothing left remembered, the party disbands back to the waves.
-    assert raider.strike(_world(*arrived), intel, arrived, _CATALOGUE, True) == ()
+    assert raider.strike(_world(*arrived), intel, arrived, _CATALOGUE, True, False) == ()
     assert raider.party() == frozenset()
 
 
@@ -171,23 +177,66 @@ def test_a_visible_objective_is_not_forgotten_on_arrival() -> None:
     intel = _seen(Intel(), target)
     raider = Raider(size=1)
     home = (_tank(20),)
-    raider.strike(_world(*home), intel, home, _CATALOGUE, True)
+    raider.strike(_world(*home), intel, home, _CATALOGUE, True, False)
     arrived = (_tank(20, x=890.0),)
-    raider.strike(_world(*arrived, target), intel, arrived, _CATALOGUE, True)
+    raider.strike(_world(*arrived, target), intel, arrived, _CATALOGUE, True, False)
     assert [s["unit_id"] for s in income_objectives(intel)] == [9]
 
 
 def test_no_memory_or_no_anchor_means_no_raid() -> None:
     raider = Raider(size=1)
     army = (_tank(20),)
-    assert raider.strike(_world(*army), Intel(), army, _CATALOGUE, True) == ()
+    assert raider.strike(_world(*army), Intel(), army, _CATALOGUE, True, False) == ()
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     homeless = sample(*army)
-    assert raider.strike(homeless, intel, army, _CATALOGUE, True) == ()
+    assert raider.strike(homeless, intel, army, _CATALOGUE, True, False) == ()
 
 
 def test_an_empty_army_raids_nothing() -> None:
     intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
     raider = Raider(size=2)
-    assert raider.strike(_world(), intel, (), _CATALOGUE, True) == ()
+    assert raider.strike(_world(), intel, (), _CATALOGUE, True, False) == ()
+    assert raider.party() == frozenset()
+
+
+def test_only_production_is_a_raze_objective() -> None:
+    """The displacement regime's mirror of the income rule: factories and
+    nothing else -- the army is the waves' business, defences kill parties."""
+    intel = _seen(
+        Intel(),
+        enemy(9, "extractorT1", x=900.0),
+        enemy(10, "landFactory", x=1200.0),
+        enemy(11, "c_turret_t1", x=300.0),
+    )
+    assert [s["unit_id"] for s in production_objectives(intel)] == [10]
+    assert all(t.endswith("Factory") for t in PRODUCTION_TYPES)
+
+
+def test_the_income_regime_ignores_a_remembered_factory() -> None:
+    """The control half of the raze pair, and its fail-first witness: with
+    the gate cold the party marches at the extractor, factory memory or no."""
+    intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0), enemy(10, "landFactory", x=1200.0))
+    raider = Raider(size=2)
+    army = (_tank(20), _tank(21))
+    orders = raider.strike(_world(*army), intel, army, _CATALOGUE, True, False)
+    assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 900.0), (21, 900.0)]
+
+
+def test_the_raze_regime_retasks_the_party_at_the_factory() -> None:
+    """Past the gate the same party, same discipline, marches at the
+    remembered factory instead -- the displacement road (Doctrine.raze)."""
+    intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0), enemy(10, "landFactory", x=1200.0))
+    raider = Raider(size=2)
+    army = (_tank(20), _tank(21))
+    orders = raider.strike(_world(*army), intel, army, _CATALOGUE, True, True)
+    assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 1200.0), (21, 1200.0)]
+
+
+def test_razing_with_no_factory_remembered_stands_the_party_down() -> None:
+    """No fallback to lesser objectives: a fogged factory is not a target,
+    and an extractor is not a substitute -- the regime raids what it names."""
+    intel = _seen(Intel(), enemy(9, "extractorT1", x=900.0))
+    raider = Raider(size=2)
+    army = (_tank(20), _tank(21))
+    assert raider.strike(_world(*army), intel, army, _CATALOGUE, True, True) == ()
     assert raider.party() == frozenset()

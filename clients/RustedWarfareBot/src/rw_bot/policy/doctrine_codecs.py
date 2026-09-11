@@ -61,6 +61,7 @@ _BAD_SPACING = "RW-DOCTRINE-036"
 _BAD_RETREAT = "RW-DOCTRINE-037"
 _BAD_SIEGE = "RW-DOCTRINE-038"
 _BAD_SIEGE_DOSE = "RW-DOCTRINE-039"
+_BAD_RAZE = "RW-DOCTRINE-040"
 
 
 def _count(
@@ -153,6 +154,37 @@ def _siegedose(payload: Mapping[str, str | int | float | bool], siege: int) -> i
     return siegedose
 
 
+def _raze(payload: Mapping[str, str | int | float | bool], raid: int) -> int:
+    """Read the raze gate, refusing a retask with no party to retask.
+
+    The displacement regime redirects the RAID party at factories, so a
+    raze gate on a doctrine that drafts no raid party documents a switch
+    that can never fire -- a typo at decode, not a setting
+    ([[policy-raid]]).
+
+    Args:
+        payload: Field values by name.
+        raid: The already-decoded raid party size, for the cross-field check.
+
+    Returns:
+        The validated gate.
+
+    Raises:
+        DoctrineError: ``RW-DOCTRINE-040`` when negative, or armed with no
+            raid party.
+    """
+    raze = _count(
+        payload, "raze", _BAD_RAZE, "a sample count to retask the raid at factories, 0 never"
+    )
+    if raze and raid == 0:
+        raise DoctrineError(
+            _BAD_RAZE,
+            "field 'raze' retasks the raid party at factories, and this doctrine "
+            "drafts none: set raid to a party size or turn raze off",
+        )
+    return raze
+
+
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
     """Decode a flat payload into a :class:`Doctrine`.
 
@@ -223,6 +255,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         payload, "siege", _BAD_SIEGE, "a sample count to switch on the artillery share, 0 never"
     )
     siegedose = _siegedose(payload, siege)
+    raze = _raze(payload, raid)
     huntgate = require_bool(payload, "huntgate")
     if huntgate and hunt == 0:
         raise DoctrineError(
@@ -308,6 +341,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         retreat=retreat,
         siege=siege,
         siegedose=siegedose,
+        raze=raze,
         huntgate=huntgate,
         bank=bank,
     )
@@ -371,6 +405,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "retreat": doctrine["retreat"],
         "siege": doctrine["siege"],
         "siegedose": doctrine["siegedose"],
+        "raze": doctrine["raze"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
     }
