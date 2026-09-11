@@ -85,6 +85,7 @@ def _runner(tmp_path: Path) -> ClusterRound:
         map_path="maps/skirmish/[p2]duel_lake.tmx",
         difficulty=1,
         fast_forward=10,
+        rng_tap=0,
         scratch=tmp_path / "staging",
         sweeps_root=tmp_path / "sweeps",
         jobs_dir=tmp_path / "jobs",

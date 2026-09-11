@@ -111,6 +111,7 @@ def freeze_config(tree: str) -> dict[str, str | int]:
         "tree": tree,
         "pin_delta": 0,
         "fast_forward": 0,
+        "rng_tap": 0,
     }
 
 

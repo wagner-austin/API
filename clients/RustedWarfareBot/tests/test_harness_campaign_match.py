@@ -123,6 +123,8 @@ def _argv(label: str = "attack", seed: int = 1) -> list[str]:
         _CLONES,
         "--result",
         _result(label, seed),
+        "--rng-tap",
+        "0",
     ]
 
 
@@ -351,7 +353,7 @@ class TestPlayingIt:
         assert len({clone for clone, _, _ in leased}) == len(_MEMBERS)
 
     def test_a_missing_flag_is_refused(self) -> None:
-        with _planted(), pytest.raises(ValueError, match="--result is required"):
+        with _planted(), pytest.raises(ValueError, match="--rng-tap is required"):
             main(_argv()[:-2])
 
     def test_it_reads_the_process_arguments_when_given_none(self) -> None:

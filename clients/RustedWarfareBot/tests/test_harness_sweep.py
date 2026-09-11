@@ -328,6 +328,16 @@ def test_a_fast_batch_says_so_and_a_realtime_one_stays_silent() -> None:
     assert _flag(realtime, "--fast-forward") is None
 
 
+def test_a_tapped_match_says_so_and_a_measurement_one_stays_silent() -> None:
+    """The diagnostic knob rides the same silence rule as the pin and the
+    pace: a tree frozen before the launcher grew the flag rejects it, and a
+    measurement match must not mention it ([[policy-determinism]])."""
+    tapped = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY, rng_tap=1)
+    assert _flag(tapped, "--rng-tap") == "1"
+    measured = make_argv(PY, _job(seed=777), ".game-w2", 75, LOG, TRACE, PORT, DISPLAY)
+    assert _flag(measured, "--rng-tap") is None
+
+
 def test_a_frozen_tree_owns_the_doctrine_path_too() -> None:
     """The first snapshot batch proved this within the hour: matches imported
     frozen code but read the working tree's doctrine file, a field was added

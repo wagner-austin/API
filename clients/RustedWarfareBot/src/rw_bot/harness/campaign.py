@@ -79,6 +79,7 @@ def member_command(
     lockstep: int,
     fast_forward: int,
     match: MatchConfig,
+    rng_tap: int,
 ) -> str:
     """Return the command one member runs.
 
@@ -119,6 +120,10 @@ def member_command(
             is a syntax error. :class:`~rw_bot.harness.match.MatchConfig`
             says so in its own docstring, and this rendered it into a shell
             string anyway until it was quoted here.
+        rng_tap: Non-zero arms the per-caller draw counter in this member's
+            match; zero is every measurement batch. On the command like the
+            pace, because a tapped run is part of the regime and the ledger
+            should say which batches were diagnostic.
 
     Returns:
         The command, with every path made absolute against the project's
@@ -157,6 +162,11 @@ def member_command(
         # expansion rather than quietly cloning somewhere shared.
         f" --clones $TMPDIR/rw-clones"
         f" --result {member_artifact(root, project, batch, job)}"
+        # Stated on every member like the pace is: a tapped batch is a
+        # diagnostic run whose logs and timing differ, and the command
+        # saying so is what makes the ledger row honest
+        # ([[policy-determinism]]).
+        f" --rng-tap {rng_tap}"
     )
 
 
@@ -186,6 +196,7 @@ def campaign_members(
     lockstep: int,
     fast_forward: int,
     match: MatchConfig,
+    rng_tap: int,
 ) -> list[SweepMember]:
     """Turn a batch's jobs into the members of a campaign.
 
@@ -202,6 +213,8 @@ def campaign_members(
         fast_forward: Wall-clock multiple every member runs at, zero for
             realtime.
         match: Which match every member plays.
+        rng_tap: Non-zero arms the draw counter in every member, zero for a
+            measurement batch (see :func:`member_command`).
 
     Returns:
         One member per match, in file order.
@@ -236,6 +249,7 @@ def campaign_members(
                 lockstep,
                 fast_forward,
                 match,
+                rng_tap,
             ),
             artifact=member_artifact(root, project, batch, job),
         )

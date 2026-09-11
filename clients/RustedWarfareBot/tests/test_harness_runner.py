@@ -40,6 +40,7 @@ def _config(
     pin_delta: int = 0,
     fast_forward: int = 0,
     traces: str = "runs/traces",
+    rng_tap: int = 0,
 ) -> SweepConfig:
     return SweepConfig(
         out_dir=out_dir,
@@ -51,6 +52,7 @@ def _config(
         tree=f"{out_dir}/.tree",
         pin_delta=pin_delta,
         fast_forward=fast_forward,
+        rng_tap=rng_tap,
         match=match,
     )
 

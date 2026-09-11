@@ -39,6 +39,8 @@ from scripts.search import (
 EXIT_OK = 0
 EXIT_BAD_USAGE = 2
 
+USAGE = "usage: batch <hpc3:workspace.json> <batch> <sweep-file> <difficulty> [--rng-tap <n>]\n"
+
 
 def main(argv: Sequence[str] | None = None, sweeps_root: Path = SWEEP_ROOT) -> int:
     """Play one committed sweep file to completion on the cluster.
@@ -61,8 +63,20 @@ def main(argv: Sequence[str] | None = None, sweeps_root: Path = SWEEP_ROOT) -> i
             job parser refuses.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
+    # The diagnostic knob, parsed before the positional check so the shape
+    # rule below stays exact. Non-zero arms the per-caller draw counter in
+    # every member -- the tapped-pair instrument the 2026-09-06 floor entry
+    # queued ([[policy-determinism]]).
+    rng_tap = 0
+    if "--rng-tap" in args:
+        at = args.index("--rng-tap")
+        if at + 1 >= len(args):
+            sys.stdout.write(USAGE)
+            return EXIT_BAD_USAGE
+        rng_tap = int(args[at + 1])
+        del args[at : at + 2]
     if len(args) != 4 or not args[0].startswith(CLUSTER_PREFIX):
-        sys.stdout.write("usage: batch <hpc3:workspace.json> <batch> <sweep-file> <difficulty>\n")
+        sys.stdout.write(USAGE)
         return EXIT_BAD_USAGE
     sweep_file = Path(args[2])
     if not sweep_file.is_file():
@@ -83,6 +97,7 @@ def main(argv: Sequence[str] | None = None, sweeps_root: Path = SWEEP_ROOT) -> i
         map_path=MAP_PATH,
         difficulty=int(args[3]),
         fast_forward=FAST_FORWARD,
+        rng_tap=rng_tap,
         scratch=CLUSTER_SCRATCH,
         sweeps_root=sweeps_root,
         jobs_dir=sweep_file.parent,

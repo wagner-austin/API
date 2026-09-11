@@ -101,6 +101,7 @@ class TestTheCommittedPanel:
             int(require_str(experiment, "lockstep")),
             int(require_str(experiment, "fast_forward")),
             match,
+            int(require_str(experiment, "rng_tap")),
         )
         assert rebuilt == document
 

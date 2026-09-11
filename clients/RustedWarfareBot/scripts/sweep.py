@@ -124,6 +124,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             # The gym knob, certified bit-exact against realtime at 10
             # (log 2026-08-06): a fast batch is the realtime batch, sooner.
             "fast_forward": int(args[7]) if len(args) == 8 else 0,
+            # Workstation sweeps are measurement runs; the tapped-pair
+            # diagnostic goes through the cluster batch driver.
+            "rng_tap": 0,
         },
         match,
     )

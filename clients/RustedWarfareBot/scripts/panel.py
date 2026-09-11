@@ -328,6 +328,9 @@ def main(
         map_path=MAP_PATH,
         difficulty=int(args[6]),
         fast_forward=FAST_FORWARD,
+        # A measurement run, never a diagnostic one: a tapped panel's
+        # numbers compare to nothing.
+        rng_tap=0,
         scratch=CLUSTER_SCRATCH,
         sweeps_root=sweeps_root,
         jobs_dir=jobs_dir,

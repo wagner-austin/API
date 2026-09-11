@@ -29,7 +29,8 @@ that the one it was told to write is its own.
 
 Run as ``python -m rw_bot.harness.campaign_match --jobs <file> --batch <name>
 --label <arm> --seed <n> --lockstep <frames> --game <dir> --tree <dir>
---traces <dir> --map <path> --difficulty <n> --clones <dir> --result <path>``.
+--traces <dir> --map <path> --difficulty <n> --clones <dir> --result <path>
+--rng-tap <0|1>``.
 """
 
 from __future__ import annotations
@@ -66,6 +67,11 @@ REQUIRED_FLAGS = (
     "--difficulty",
     "--clones",
     "--result",
+    # Non-zero arms the per-caller draw counter. Required rather than
+    # defaulted for the same reason the pace is: the tap is part of the
+    # regime the batch ran under, and every member command stating it is
+    # what lets the ledger say which batches were diagnostic runs.
+    "--rng-tap",
 )
 
 #: Opponents asked for. One, because the goal is to beat one -- and because
@@ -293,6 +299,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             # seeds is evidence of equivalence, not a certification, and
             # the document stating the pace is what lets anyone check.
             "fast_forward": int(parsed["--fast-forward"]),
+            # The diagnostic knob travels with the regime flags above and
+            # for their reason: a tapped batch is a different kind of run,
+            # and its document says so ([[policy-determinism]]).
+            "rng_tap": int(parsed["--rng-tap"]),
         },
         match,
     )

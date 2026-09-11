@@ -344,6 +344,7 @@ def make_argv(
     tree: str = "",
     pin_delta: int = 0,
     fast_forward: int = 0,
+    rng_tap: int = 0,
 ) -> tuple[str, ...]:
     """Return the command that plays one match.
 
@@ -417,6 +418,10 @@ def make_argv(
             simulation N times as fast, certified bit-exact against realtime
             at 10 (log 2026-08-06). Zero for the same frozen-tree reason as
             the pin: an older agent rejects the unknown key.
+        rng_tap: Non-zero arms the engine's per-caller draw counter for this
+            match ([[policy-determinism]]). Zero passes nothing, for the same
+            frozen-tree reason as the pin and the pace: a tree frozen before
+            the launcher grew the flag rejects it.
 
     Returns:
         The argument vector, the interpreter first.
@@ -466,6 +471,8 @@ def make_argv(
         argv.extend(("--pin-delta", str(pin_delta)))
     if fast_forward:
         argv.extend(("--fast-forward", str(fast_forward)))
+    if rng_tap:
+        argv.extend(("--rng-tap", str(rng_tap)))
     if match is not None:
         argv.extend(
             (

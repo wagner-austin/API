@@ -54,6 +54,7 @@ _PAYLOAD = "payload"
 _MAP = "maps/skirmish/[p2]duel_lake.tmx"
 _DIFFICULTY = -2
 _FASTFORWARD = 10
+_RNG_TAP = 0
 _MATCH = MatchConfig(map_path=_MAP, opponents=1, difficulty=_DIFFICULTY)
 _LINES = (
     "attack|1|doctrines/a.doctrine|1500",
@@ -154,6 +155,8 @@ def _argv(out: str = _OUT) -> list[str]:
         str(_DIFFICULTY),
         "--fast-forward",
         str(_FASTFORWARD),
+        "--rng-tap",
+        str(_RNG_TAP),
         "--payload",
         _PAYLOAD,
         "--out",
@@ -181,6 +184,7 @@ def _document(jobs: list[SweepJob] | None = None, payload: str = _PAYLOAD) -> di
         _LOCKSTEP,
         _FASTFORWARD,
         _MATCH,
+        _RNG_TAP,
     )
 
 
@@ -201,7 +205,7 @@ class TestWhatTheCampaignIs:
     def test_it_records_the_facts_that_distinguish_one_batch(self) -> None:
         """A job id and a name say which row in squeue a member was and
         nothing about which experiment it belonged to."""
-        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH) == {
+        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH, _RNG_TAP) == {
             "batch": "demo",
             "matches": "3",
             "arms": "attack,defend",
@@ -209,15 +213,18 @@ class TestWhatTheCampaignIs:
             "fast_forward": "10",
             "map": _MAP,
             "difficulty": "-2",
+            "rng_tap": "0",
         }
 
     def test_the_map_is_recorded_because_it_decides_the_opponent_count(self) -> None:
         """Two batches on different maps are not comparable, and the ledger
         is where a reader finds out which was which."""
-        assert experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH)["map"] == _MAP
+        assert (
+            experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH, _RNG_TAP)["map"] == _MAP
+        )
 
     def test_every_value_is_a_string_because_that_is_what_the_ledger_stores(self) -> None:
-        values = experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH).values()
+        values = experiment_of(_BATCH, _jobs(), _LOCKSTEP, _FASTFORWARD, _MATCH, _RNG_TAP).values()
         assert [type(value) for value in values] == [str] * len(values)
 
 

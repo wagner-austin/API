@@ -65,6 +65,9 @@ def batch_config(
             "tree": f"{out_dir}/{TREE_DIR}",
             "pin_delta": pin_delta,
             "fast_forward": fast_forward,
+            # Queue matches are measurement runs; the tapped-pair
+            # diagnostic goes through the cluster batch driver.
+            "rng_tap": 0,
         },
         match,
     )

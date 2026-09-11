@@ -77,6 +77,10 @@ REQUIRED_FLAGS = (
     # one that ran a different tree.
     "--payload",
     "--out",
+    # Non-zero arms the per-caller draw counter in every member. Required
+    # for the same reason the pace is: a tapped batch is a diagnostic run,
+    # and the document is where that fact must live.
+    "--rng-tap",
 )
 
 #: Opponents asked for, matching the sweep entry point's. The engine caps the
@@ -87,7 +91,12 @@ EXIT_OK = 0
 
 
 def experiment_of(
-    batch: str, jobs: Sequence[SweepJob], lockstep: int, fast_forward: int, match: MatchConfig
+    batch: str,
+    jobs: Sequence[SweepJob],
+    lockstep: int,
+    fast_forward: int,
+    match: MatchConfig,
+    rng_tap: int,
 ) -> dict[str, str]:
     """Describe what this campaign IS, for the ledger.
 
@@ -107,6 +116,10 @@ def experiment_of(
             decides the opponent count and is therefore part of what the
             batch measured, not a runtime detail -- two batches on different
             maps are not comparable and the ledger should say which was which.
+        rng_tap: Whether the draw counter was armed. Recorded because a
+            tapped run logs per-window tallies and walks a stack per sim
+            draw -- a diagnostic regime whose numbers are not comparable to
+            a measurement batch's, and the ledger row should say so.
 
     Returns:
         The experiment's key/value pairs, every value a string because that is
@@ -120,6 +133,7 @@ def experiment_of(
         "fast_forward": str(fast_forward),
         "map": match["map_path"],
         "difficulty": str(match["difficulty"]),
+        "rng_tap": str(rng_tap),
     }
 
 
@@ -146,6 +160,7 @@ def campaign_document(
     lockstep: int,
     fast_forward: int,
     match: MatchConfig,
+    rng_tap: int,
 ) -> dict[str, JSONValue]:
     """Build the document a batch is submitted as.
 
@@ -163,6 +178,8 @@ def campaign_document(
         fast_forward: Wall-clock multiple every member runs at, zero for
             realtime.
         match: Which match every member plays.
+        rng_tap: Non-zero arms the draw counter in every member, recorded in
+            the experiment block and on every command alike.
 
     Returns:
         The document, carrying only a sweep's own identity fields.
@@ -187,10 +204,11 @@ def campaign_document(
             lockstep,
             fast_forward,
             match,
+            rng_tap,
         )
     ]
     experiment: dict[str, JSONValue] = dict(
-        experiment_of(batch, jobs, lockstep, fast_forward, match)
+        experiment_of(batch, jobs, lockstep, fast_forward, match, rng_tap)
     )
     # The tree a batch ran is as much the experiment as the map or the pace:
     # two documents differing only here are an A/B, and one that omitted it
@@ -257,6 +275,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         DEFAULT_LOCKSTEP,
         int(parsed["--fast-forward"]),
         match,
+        int(parsed["--rng-tap"]),
     )
     _test_hooks.write_text_lines(
         Path(parsed["--out"]), dump_json_str(document, indent=DOCUMENT_INDENT).splitlines()

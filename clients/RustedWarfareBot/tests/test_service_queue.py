@@ -44,6 +44,7 @@ _CONFIG = decode_sweep_config(
         "tree": "runs/sweeps/demo/.tree",
         "pin_delta": 3,
         "fast_forward": 10,
+        "rng_tap": 0,
     },
     _MATCH,
 )
@@ -245,6 +246,7 @@ def test_a_batch_without_a_match_round_trips_none() -> None:
             "tree": "runs/sweeps/demo2/.tree",
             "pin_delta": 0,
             "fast_forward": 0,
+            "rng_tap": 0,
         },
         None,
     )

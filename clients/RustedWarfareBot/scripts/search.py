@@ -386,6 +386,9 @@ def main(
             map_path=MAP_PATH,
             difficulty=spec["difficulty"],
             fast_forward=FAST_FORWARD,
+            # A measurement run, never a diagnostic one: a tapped search's
+            # numbers compare to nothing.
+            rng_tap=0,
             scratch=CLUSTER_SCRATCH,
             sweeps_root=sweeps_root,
             jobs_dir=CLUSTER_JOBS_DIR,

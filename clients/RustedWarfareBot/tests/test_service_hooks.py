@@ -35,6 +35,7 @@ _CONFIG = decode_sweep_config(
         "tree": "runs/sweeps/demo/.tree",
         "pin_delta": 3,
         "fast_forward": 10,
+        "rng_tap": 0,
     },
     decode_match_config(
         {"map_path": "maps/skirmish/[p2]duel_lake.tmx", "opponents": 1, "difficulty": 2}

@@ -36,6 +36,7 @@ JOBS_FILE = "sweeps/demo.txt"
 BATCH = "demo"
 LOCKSTEP = 75
 FASTFORWARD = 10
+RNG_TAP = 0
 
 #: The match every member plays. Carried on the command rather than left to
 #: the engine's ten-player default, because the map decides the opponent count
@@ -68,7 +69,17 @@ def _command(job: SweepJob | None = None, batch: str = BATCH) -> str:
         The command.
     """
     return member_command(
-        PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, batch, job or _job(), LOCKSTEP, FASTFORWARD, MATCH
+        PY,
+        ROOT,
+        PROJECT,
+        PAYLOAD,
+        JOBS_FILE,
+        batch,
+        job or _job(),
+        LOCKSTEP,
+        FASTFORWARD,
+        MATCH,
+        RNG_TAP,
     )
 
 
@@ -132,6 +143,7 @@ class TestEveryPathIsAbsolute:
             LOCKSTEP,
             FASTFORWARD,
             MATCH,
+            RNG_TAP,
         )
         assert "/dfs6b/pub/other/rw-second/" in moved
         assert ROOT not in moved
@@ -181,12 +193,32 @@ class TestTheMemberCommand:
         fast-forwarded batch would read as comparable to a realtime one."""
         assert "--fast-forward 10" in _command()
 
+    def test_it_states_the_diagnostic_knob_even_when_off(self) -> None:
+        """The tap rides the pace's rule: stated on every member, so the
+        ledger can say which batches were diagnostic runs -- and a tapped
+        member says so with the same flag."""
+        assert "--rng-tap 0" in _command()
+        tapped = member_command(
+            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, MATCH, 1
+        )
+        assert "--rng-tap 1" in tapped
+
 
 class TestTheMembers:
     def test_one_member_per_match_in_file_order(self) -> None:
         jobs = [_job("attack", 1), _job("attack", 2), _job("defend", 1)]
         members = campaign_members(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            jobs,
+            LOCKSTEP,
+            FASTFORWARD,
+            MATCH,
+            RNG_TAP,
         )
         assert [member["suffix"] for member in members] == [
             "attack-s1",
@@ -197,7 +229,17 @@ class TestTheMembers:
     def test_every_member_declares_its_own_artifact(self) -> None:
         jobs = [_job("attack", 1), _job("attack", 2)]
         members = campaign_members(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            jobs,
+            LOCKSTEP,
+            FASTFORWARD,
+            MATCH,
+            RNG_TAP,
         )
         artifacts = [member["artifact"] for member in members]
         assert len(set(artifacts)) == len(artifacts)
@@ -207,7 +249,17 @@ class TestTheMembers:
         complete having played nothing."""
         with pytest.raises(ValueError, match="at least one member"):
             campaign_members(
-                PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, [], LOCKSTEP, FASTFORWARD, MATCH
+                PY,
+                ROOT,
+                PROJECT,
+                PAYLOAD,
+                JOBS_FILE,
+                BATCH,
+                [],
+                LOCKSTEP,
+                FASTFORWARD,
+                MATCH,
+                RNG_TAP,
             )
 
     def test_every_member_survives_hpc3s_own_decoder(self) -> None:
@@ -216,7 +268,17 @@ class TestTheMembers:
         checked would be refused at submission, after staging."""
         jobs = [_job("attack", 1), _job("defend", 2)]
         for member in campaign_members(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            jobs,
+            LOCKSTEP,
+            FASTFORWARD,
+            MATCH,
+            RNG_TAP,
         ):
             decoded = decode_sweep_member(
                 {
@@ -261,7 +323,17 @@ class TestThePayloadIsAParameter:
 
     def test_a_different_payload_moves_both_reads_and_nothing_else(self) -> None:
         other = member_command(
-            PY, ROOT, PROJECT, "payload-v7", JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, MATCH
+            PY,
+            ROOT,
+            PROJECT,
+            "payload-v7",
+            JOBS_FILE,
+            BATCH,
+            _job(),
+            LOCKSTEP,
+            FASTFORWARD,
+            MATCH,
+            RNG_TAP,
         )
         assert f"--jobs {ROOT}/{PROJECT}/payload-v7/sweeps/demo.txt" in other
         assert f"--tree {ROOT}/{PROJECT}/payload-v7" in other
@@ -294,7 +366,17 @@ class TestTheMatchIsCarried:
             map_path="maps/skirmish/[p2]big_island.tmx", opponents=1, difficulty=1
         )
         moved = member_command(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, elsewhere
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            _job(),
+            LOCKSTEP,
+            FASTFORWARD,
+            elsewhere,
+            RNG_TAP,
         )
         argv = shlex.split(moved)
         assert argv[argv.index("--map") + 1] == "maps/skirmish/[p2]big_island.tmx"
@@ -316,7 +398,17 @@ class TestTheMapIsSafeInAShellCommand:
         and unquoted it is a bash SYNTAX ERROR rather than a wrong path."""
         steam = MatchConfig(map_path="maps/skirmish/[p2]Lake (2p).tmx", opponents=1, difficulty=-2)
         command = member_command(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            _job(),
+            LOCKSTEP,
+            FASTFORWARD,
+            steam,
+            RNG_TAP,
         )
         assert "--map 'maps/skirmish/[p2]Lake (2p).tmx'" in command
 
@@ -325,7 +417,17 @@ class TestTheMapIsSafeInAShellCommand:
         expression: what matters is what bash makes of the line."""
         steam = MatchConfig(map_path="maps/skirmish/[p2]Lake (2p).tmx", opponents=1, difficulty=-2)
         command = member_command(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, _job(), LOCKSTEP, FASTFORWARD, steam
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            _job(),
+            LOCKSTEP,
+            FASTFORWARD,
+            steam,
+            RNG_TAP,
         )
         argv = shlex.split(command)
         assert argv[argv.index("--map") + 1] == "maps/skirmish/[p2]Lake (2p).tmx"
@@ -333,7 +435,17 @@ class TestTheMapIsSafeInAShellCommand:
     def test_every_member_of_a_batch_is_split_the_same_way(self) -> None:
         jobs = [_job("attack", 1), _job("defend", 2)]
         for member in campaign_members(
-            PY, ROOT, PROJECT, PAYLOAD, JOBS_FILE, BATCH, jobs, LOCKSTEP, FASTFORWARD, MATCH
+            PY,
+            ROOT,
+            PROJECT,
+            PAYLOAD,
+            JOBS_FILE,
+            BATCH,
+            jobs,
+            LOCKSTEP,
+            FASTFORWARD,
+            MATCH,
+            RNG_TAP,
         ):
             argv = shlex.split(member["command"])
             assert argv[argv.index("--map") + 1] == MAP

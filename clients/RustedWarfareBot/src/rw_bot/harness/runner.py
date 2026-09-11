@@ -87,6 +87,8 @@ class SweepConfig(TypedDict):
             realtime. Batch-level because it is certified bit-exact -- a fast
             batch IS the realtime batch, only sooner (log 2026-08-06) -- and a
             knob that varied per job would suggest otherwise.
+        rng_tap: Non-zero arms the per-caller draw counter -- a
+            diagnostic regime, stated like the pace ([[policy-determinism]]).
     """
 
     out_dir: str
@@ -98,6 +100,7 @@ class SweepConfig(TypedDict):
     tree: str
     pin_delta: int
     fast_forward: int
+    rng_tap: int
     match: MatchConfig | None
 
 
@@ -143,6 +146,7 @@ def decode_sweep_config(
         tree=require_non_empty_str(payload, "tree"),
         pin_delta=require_int(payload, "pin_delta"),
         fast_forward=require_int(payload, "fast_forward"),
+        rng_tap=require_int(payload, "rng_tap"),
         match=match,
     )
 
@@ -166,6 +170,7 @@ def encode_sweep_config(config: SweepConfig) -> dict[str, str | int]:
         "tree": config["tree"],
         "pin_delta": config["pin_delta"],
         "fast_forward": config["fast_forward"],
+        "rng_tap": config["rng_tap"],
     }
 
 
@@ -241,12 +246,10 @@ TREE_DIR = ".tree"
 #: Written into the tree last, so its presence certifies a complete freeze.
 TREE_MARKER = ".complete"
 
-#: Wall clock on one match. The slowest legitimate match on record is a
-#: sample-cap grind near the cluster's own 100-minute slurm wall; three
-#: hours holds that with room for a slow node, and a match still running
-#: then is a hung engine, not a long game. Exists for the same reason the
-#: cluster runner's wall does: a child that never returns defeats every
-#: check above it (the 2026-09-09 five-hour driver wedge).
+#: Wall clock on one match: three hours holds the slowest legitimate grind
+#: (the cluster's own 100-minute slurm wall) with room for a slow node; a
+#: match still running then is a hung engine, not a long game (the
+#: 2026-09-09 five-hour driver wedge).
 MATCH_WALL_SECONDS = 10800.0
 
 #: A frozen tree handed to a run was incomplete.
@@ -477,9 +480,8 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
     # the process started in the repository.
     trace = trace_path(config["traces"], batch, job)
     play_log = match_log_path(config["out_dir"], job)
-    # The planner opens the trace for writing and does not create its parent,
-    # so the directory has to exist before the match starts rather than after
-    # it has run for twenty minutes and failed to file anything.
+    # The planner opens the trace without creating its parent, so the
+    # directory must exist before the match runs twenty minutes for nothing.
     _test_hooks.make_dirs(Path(trace).parent)
     # The game redirects its stdout into the log path's directory at launch
     # and does not create it.
@@ -508,6 +510,7 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
             config["tree"],
             config["pin_delta"],
             config["fast_forward"],
+            config["rng_tap"],
         ),
         MATCH_WALL_SECONDS,
     )

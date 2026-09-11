@@ -113,6 +113,9 @@ class ClusterRound:
         map_path: The map every job plays.
         difficulty: The AI difficulty every job plays at.
         fast_forward: The pace multiple every job runs under.
+        rng_tap: Non-zero arms the per-caller draw counter in every member
+            -- a diagnostic round, stated in the document like the pace is.
+            Zero is every measurement round.
         scratch: Local directory for the round's frozen tree, archive and
             campaign document -- run artifacts, not repository content.
         sweeps_root: Where the round's scorecards land locally.
@@ -131,6 +134,7 @@ class ClusterRound:
         map_path: str,
         difficulty: int,
         fast_forward: int,
+        rng_tap: int,
         scratch: Path,
         sweeps_root: Path,
         jobs_dir: Path,
@@ -145,6 +149,8 @@ class ClusterRound:
             map_path: The map every job plays.
             difficulty: The AI difficulty every job plays at.
             fast_forward: The pace multiple every job runs under.
+            rng_tap: Non-zero for a diagnostic round with the draw counter
+                armed, zero for a measurement round.
             scratch: Local directory for per-round run artifacts.
             sweeps_root: Where scorecards land locally.
             jobs_dir: Repository directory for the round's job file.
@@ -156,6 +162,7 @@ class ClusterRound:
         self.map_path = map_path
         self.difficulty = difficulty
         self.fast_forward = fast_forward
+        self.rng_tap = rng_tap
         self.scratch = scratch
         self.sweeps_root = sweeps_root
         self.jobs_dir = jobs_dir
@@ -334,6 +341,8 @@ class ClusterRound:
                 str(self.difficulty),
                 "--fast-forward",
                 str(self.fast_forward),
+                "--rng-tap",
+                str(self.rng_tap),
                 "--payload",
                 f"payload-{batch}",
                 "--out",

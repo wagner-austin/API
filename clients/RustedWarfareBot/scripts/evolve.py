@@ -489,6 +489,9 @@ def main(
         map_path=MAP_PATH,
         difficulty=require_search_spec(spec_name)["difficulty"],
         fast_forward=FAST_FORWARD,
+        # A measurement run, never a diagnostic one: the tap walks a stack
+        # per sim draw and its numbers compare to nothing.
+        rng_tap=0,
         scratch=CLUSTER_SCRATCH,
         sweeps_root=sweeps_root,
         jobs_dir=jobs_dir,
