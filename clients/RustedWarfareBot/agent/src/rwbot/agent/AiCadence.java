@@ -74,6 +74,10 @@ final class AiCadence {
         // on that tick is its mechanism -- the pinpoint the sample cadence
         // structurally cannot give.
         out.append(' ').append(RandomLedger.describe());
+        // The think-entry counts, cumulative: the tick where twins' counts
+        // step apart names the scheduler event no draw or state read could
+        // see -- a think that ran and found nothing (ThinkCount).
+        out.append(" think=").append(ThinkCount.describe());
         // The pre-tick queue's pending runnables, by class. The one-per-call
         // drain at the engine's i.b:2271 executes whatever a producer thread
         // managed to enqueue before this tick's boundary -- an OS race the
@@ -203,6 +207,10 @@ final class AiCadence {
      */
     static String describe(Object engine) {
         StringBuilder out = new StringBuilder();
+        // Per-sample think counts, so cluster traces carry the discriminant
+        // past the 120-tick early window: two twins' counts at the same
+        // sample either match or name the window where the schedule forked.
+        out.append("think=").append(ThinkCount.describe()).append(' ');
         Object map = EngineAccess.readField(engine, EngineNames.MAP);
         Object pools = map == null ? null : EngineAccess.readField(map, EngineNames.MAP_POOL_POINTS);
         java.util.Collection<?> poolList = pools == null ? null : ObjectView.containedValues(pools);

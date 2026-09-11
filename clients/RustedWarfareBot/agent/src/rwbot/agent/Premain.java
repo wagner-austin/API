@@ -100,6 +100,22 @@ public final class Premain {
         // <clinit> (see RandomTap).
         if (options.rngTapRequested()) {
             RandomTap.arm();
+            // The think-entry counters ride the tap's arming: a tapped run
+            // is already a stated diagnostic regime, and the counts are the
+            // discriminant the tap's own windows cannot carry -- whether a
+            // think RAN, not whether it drew (ThinkCount). Bytes change, so
+            // the accounting is the weaves' own: loud or not at all.
+            ThinkCountTransformer thinkTransformer = new ThinkCountTransformer();
+            instrumentation.addTransformer(thinkTransformer);
+            forceLoad(Targets.thinkCounters().keySet());
+            java.util.List<String> uncounted = thinkTransformer.unseen();
+            if (!uncounted.isEmpty()) {
+                throw new IllegalStateException(
+                        "rw-agent: the think entries were not counted: "
+                                + uncounted
+                                + " -- the pinned build is 1.15 (code 176, build #28);"
+                                + " re-derive the names against this jar and update Targets.");
+            }
         }
 
         // Before anything else that could draw from it. Seeding after the

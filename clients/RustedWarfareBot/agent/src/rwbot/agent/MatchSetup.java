@@ -407,6 +407,10 @@ final class MatchSetup {
         if (seed != 0) {
             AiTimers.reset();
         }
+        // The menu background's AI thinks too; a cumulative think count
+        // that started before the seed was applied would difference wrongly
+        // across the exact boundary the instrument watches (ThinkCount).
+        ThinkCount.reset();
         // A previous match's watched orders are not this match's; the sweep
         // would read them against a world that never dispatched them.
         BuildWatch.reset();

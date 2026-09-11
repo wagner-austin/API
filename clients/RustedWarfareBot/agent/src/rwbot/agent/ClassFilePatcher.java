@@ -21,17 +21,17 @@ package rwbot.agent;
  */
 final class ClassFilePatcher {
 
-    private static final int CONSTANT_UTF8 = 1;
+    static final int CONSTANT_UTF8 = 1;
     private static final int CONSTANT_INTEGER = 3;
     private static final int CONSTANT_FLOAT = 4;
     private static final int CONSTANT_LONG = 5;
     private static final int CONSTANT_DOUBLE = 6;
-    private static final int CONSTANT_CLASS = 7;
+    static final int CONSTANT_CLASS = 7;
     private static final int CONSTANT_STRING = 8;
     private static final int CONSTANT_FIELDREF = 9;
-    private static final int CONSTANT_METHODREF = 10;
+    static final int CONSTANT_METHODREF = 10;
     private static final int CONSTANT_INTERFACE_METHODREF = 11;
-    private static final int CONSTANT_NAME_AND_TYPE = 12;
+    static final int CONSTANT_NAME_AND_TYPE = 12;
     private static final int CONSTANT_METHOD_HANDLE = 15;
     private static final int CONSTANT_METHOD_TYPE = 16;
     private static final int CONSTANT_DYNAMIC = 17;
@@ -41,14 +41,14 @@ final class ClassFilePatcher {
 
     private static final int ACC_STATIC = 0x0008;
 
-    private final byte[] buf;
-    private int pos;
+    final byte[] buf;
+    int pos;
 
     // The structured pool view, populated by readHeaderAndConstantPool. Only
     // Class, Methodref and NameAndType operands are meaningful; everything
     // else keeps zeros. Needed only to find an existing self-call for
     // delegation -- the no-op path never reads them.
-    private int[] tags;
+    int[] tags;
     private int[] operandA;
     private int[] operandB;
 
@@ -56,7 +56,7 @@ final class ClassFilePatcher {
     // when patching to plain no-ops.
     private int delegateRef = -1;
 
-    private ClassFilePatcher(byte[] buf) {
+    ClassFilePatcher(byte[] buf) {
         this.buf = buf;
         this.pos = 0;
     }
@@ -281,6 +281,7 @@ final class ClassFilePatcher {
         return applyEdits(edits);
     }
 
+
     /**
      * Parses one method_info; when it is a retarget target, walks its Code
      * attribute and records a two-byte operand edit for every
@@ -386,7 +387,7 @@ final class ClassFilePatcher {
     }
 
     /** Reads magic, version and the constant pool; returns UTF-8 entries by index. */
-    private String[] readHeaderAndConstantPool() {
+    String[] readHeaderAndConstantPool() {
         int magic = readU4();
         if (magic != 0xCAFEBABE) {
             throw new ClassFormatError("not a class file: magic=0x" + Integer.toHexString(magic));
@@ -476,7 +477,7 @@ final class ClassFilePatcher {
     }
 
     /** Skips a fields_count/methods_count-prefixed member table. */
-    private void skipMembers() {
+    void skipMembers() {
         int count = readU2();
         for (int i = 0; i < count; i++) {
             skip(6); // access_flags, name_index, descriptor_index
@@ -531,7 +532,7 @@ final class ClassFilePatcher {
     }
 
     /** Splices every edit into a fresh buffer, applying last-to-first so offsets stay valid. */
-    private byte[] applyEdits(java.util.List<Edit> edits) {
+    byte[] applyEdits(java.util.List<Edit> edits) {
         byte[] result = buf;
         for (int i = edits.size() - 1; i >= 0; i--) {
             Edit edit = edits.get(i);
@@ -548,28 +549,16 @@ final class ClassFilePatcher {
         return buf[pos++] & 0xff;
     }
 
-    private int readU2() {
+    int readU2() {
         return (readU1() << 8) | readU1();
     }
 
-    private int readU4() {
+    int readU4() {
         return (readU2() << 16) | readU2();
     }
 
-    private void skip(int count) {
+    void skip(int count) {
         pos += count;
     }
 
-    /** A byte range in the original class file and the bytes replacing it. */
-    private static final class Edit {
-        final int start;
-        final int end;
-        final byte[] replacement;
-
-        Edit(int start, int end, byte[] replacement) {
-            this.start = start;
-            this.end = end;
-            this.replacement = replacement;
-        }
-    }
 }

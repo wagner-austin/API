@@ -174,4 +174,37 @@ final class Targets {
                 java.util.Arrays.asList(
                         Integer.valueOf(2711), Integer.valueOf(2721), Integer.valueOf(2722)));
     }
+
+    /** The class holding the think-entry counters, as the pool spells it. */
+    static final String THINK_COUNT_OWNER = "rwbot/agent/ThinkCount";
+
+    /**
+     * The AI's think entry points, per class, each mapped to its counter on
+     * {@link ThinkCount} -- the wall-decoupling program's first instrument
+     * (wiki: policy-determinism, dettwin96). The four cover both proven fork
+     * events and the burst driver: the task re-aim ({@code a.n.f()V}, one
+     * twin consulting its candidate gate at frame 75 and the other at
+     * 51,450), the AI evaluation pass ({@code a.a.n(F)V}, the dettap8
+     * think-bursts' pedigree root), and the group's two delta-fed drivers
+     * ({@code a.i.b(F)V} from the shuffle pedigree, {@code a.i.d(F)V} from
+     * the re-aim chain). Descriptors javap-verified against the pinned
+     * 1.15 (code 176, build #28) jar, 2026-09-11.
+     */
+    static java.util.Map<String, java.util.LinkedHashMap<String, String>> thinkCounters() {
+        java.util.Map<String, java.util.LinkedHashMap<String, String>> byOwner =
+                new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, String>>();
+        java.util.LinkedHashMap<String, String> task =
+                new java.util.LinkedHashMap<String, String>();
+        task.put("f()V", "aim");
+        byOwner.put("com/corrodinggames/rts/game/a/n", task);
+        java.util.LinkedHashMap<String, String> ai = new java.util.LinkedHashMap<String, String>();
+        ai.put("n(F)V", "evaluate");
+        byOwner.put("com/corrodinggames/rts/game/a/a", ai);
+        java.util.LinkedHashMap<String, String> group =
+                new java.util.LinkedHashMap<String, String>();
+        group.put("b(F)V", "groupThink");
+        group.put("d(F)V", "groupDrive");
+        byOwner.put("com/corrodinggames/rts/game/a/i", group);
+        return byOwner;
+    }
 }

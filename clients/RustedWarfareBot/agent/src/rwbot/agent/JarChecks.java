@@ -305,6 +305,94 @@ final class JarChecks {
     }
 
     /**
+     * Prepends the think-entry counters in the real jar and verifies each
+     * result links -- HotSpot's verifier judging the shifted StackMapTable
+     * deltas is the whole point, exactly as it judges the grown pools above.
+     *
+     * <p>Also fires the two refusals a silent failure would hide behind: a
+     * target the class does not carry must throw rather than count nothing,
+     * and the counter classes must verify with their exception tables and
+     * frames shifted -- a guard is only real if something fires it.
+     *
+     * @param jarPath Path to the pinned {@code game-lib.jar}.
+     * @return The number of targets that failed.
+     * @throws java.io.IOException When the jar cannot be read.
+     */
+    static int checkThinkCounts(String jarPath) throws java.io.IOException {
+        PatchingLoader loader = new PatchingLoader(JarChecks.class.getClassLoader());
+        int failures = 0;
+        JarFile jar = new JarFile(jarPath);
+        try {
+            for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, String>> entry
+                    : Targets.thinkCounters().entrySet()) {
+                String internalName = entry.getKey();
+                java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+                if (classEntry == null) {
+                    System.out.println("FAIL " + internalName + ": not present in jar");
+                    failures++;
+                    continue;
+                }
+                byte[] original = readFully(jar, classEntry);
+                byte[] counted;
+                try {
+                    counted =
+                            EntryCounts.prepend(
+                                    original, entry.getValue(), Targets.THINK_COUNT_OWNER);
+                } catch (ClassFormatError e) {
+                    System.out.println("FAIL " + internalName + ": " + e.getMessage());
+                    failures++;
+                    continue;
+                }
+                try {
+                    loader.definePatched(internalName.replace('/', '.'), counted);
+                } catch (LinkageError e) {
+                    System.out.println("FAIL " + internalName + ": did not verify: " + e);
+                    failures++;
+                    continue;
+                }
+                System.out.println(
+                        "ok   " + internalName + " [entry counters "
+                                + entry.getValue().values() + "]  ("
+                                + original.length + " -> " + counted.length + " bytes)");
+            }
+            failures += checkThinkCountRefusesMissingTarget(jar);
+        } finally {
+            jar.close();
+        }
+        return failures;
+    }
+
+    /**
+     * Proves the entry-count patch REFUSES a target the class does not
+     * carry: a moved build must fail at the gate with the method named, not
+     * ship a diagnostic that silently counts nothing.
+     */
+    private static int checkThinkCountRefusesMissingTarget(JarFile jar)
+            throws java.io.IOException {
+        String internalName = "com/corrodinggames/rts/game/a/n";
+        java.util.jar.JarEntry classEntry = jar.getJarEntry(internalName + ".class");
+        if (classEntry == null) {
+            System.out.println("FAIL " + internalName + ": not present in jar");
+            return 1;
+        }
+        byte[] original = readFully(jar, classEntry);
+        java.util.LinkedHashMap<String, String> bogus =
+                new java.util.LinkedHashMap<String, String>();
+        bogus.put("zz()V", "aim");
+        try {
+            EntryCounts.prepend(original, bogus, Targets.THINK_COUNT_OWNER);
+        } catch (ClassFormatError e) {
+            System.out.println("ok   missing-target entry count refused loudly: " + e.getMessage());
+            return 0;
+        }
+        System.out.println(
+                "FAIL " + internalName
+                        + ": a count on a method the class does not carry was ACCEPTED --"
+                        + " a moved build would ship a diagnostic counting nothing");
+        return 1;
+    }
+
+    /**
      * Resolves every obfuscated name the order path uses, against the real jar.
      *
      * <p>No running game is needed: the classes, fields and method signatures
