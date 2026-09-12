@@ -32,8 +32,10 @@ from hpc3.core.research_index import (
     extract_projects_block,
     image_digest_claims,
     ledger_state_claims,
+    parse_review_markers,
     render_projects_block,
     replace_projects_block,
+    stale_review_claims,
 )
 
 WRITE_FLAG = "--write"
@@ -118,6 +120,38 @@ def declared_projects(runs: pathlib.Path) -> dict[str, ProjectConfig]:
     return projects
 
 
+def tracked_counts(globs: tuple[str, ...]) -> dict[str, int]:
+    """Count the tracked files each glob matches.
+
+    Asked of git rather than of the filesystem, and the distinction is the
+    point. A count over what happens to be on this disk would be the same
+    uncheckable claim :func:`~hpc3.core.research_index.ledger_state_claims`
+    refuses; a count over what is COMMITTED is one any clone reproduces, which
+    is what makes the marker worth failing a build over.
+
+    Args:
+        globs: Pathspecs to count, as written in the markers.
+
+    Returns:
+        The number of tracked files matching each glob.
+
+    Raises:
+        RuntimeError: If git refuses a pathspec. A glob nobody can resolve
+            would otherwise count zero and read as "the evidence was deleted",
+            which is a different and much louder claim than "this is a typo".
+    """
+    root = index_path().parents[1]
+    counts: dict[str, int] = {}
+    for glob in globs:
+        result = core_hooks.run(["git", "-C", str(root), "ls-files", "--", glob])
+        if result["returncode"] != 0:
+            raise RuntimeError(
+                f"git refused the review marker pathspec {glob!r}: {result['stderr']}"
+            )
+        counts[glob] = len([line for line in result["stdout"].splitlines() if line])
+    return counts
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Render the block, and either write it or check it.
 
@@ -153,7 +187,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     path = index_path()
     text = _read_document(path)
 
-    claims = ledger_state_claims(text) + image_digest_claims(text, projects)
+    markers = parse_review_markers(text)
+    claims = (
+        ledger_state_claims(text)
+        + image_digest_claims(text, projects)
+        + stale_review_claims(markers, tracked_counts(tuple(glob for glob, _ in markers)))
+    )
     for claim in claims:
         sys.stdout.write(f"{path}: {claim}\n")
     if claims:
@@ -197,6 +236,7 @@ __all__ = [
     "index_path",
     "main",
     "runs_directory",
+    "tracked_counts",
 ]
 
 

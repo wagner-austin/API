@@ -11,6 +11,30 @@ been onboarded — LSTM as `turkic-lstm` on 2026-08-28, RustedWarfareBot as
 `rusted` on 2026-08-29 — leaving one entry below that was scoped as an example
 and deliberately never registered.
 
+**Some entries carry a `reviewed:` marker, in an HTML comment directly under
+the heading, and it is the one thing here you must update by hand on purpose.**
+It pairs a tracked-file glob with the number of files that entry has been READ
+AGAINST; the live ones under `mi`, `cleargbm`, `floor`, `mi-cu128` and
+`code-style` are the syntax, and are shown rather than spelled out here because
+a specimen in this paragraph would be parsed as a real marker and refused. `hpc3-research-index --check` recounts
+them and fails when the count has moved, which means: new evidence has landed
+for this project, go re-read the entry against it and bump the marker. That is
+the only failure in this file that is not asking you to correct a sentence; it
+is asking you to check whether one is still true.
+
+It exists because the other two rules cannot see this class. A restated ledger
+count and a restated image digest are both a sentence disagreeing with a source
+that existed when it was written. This is a sentence that was TRUE when
+written and was never read again: `code-style`'s entry named the width that
+would settle its result and the run at that width landed in the same directory
+the next day, and `floor`'s described seven jobs while ninety-six run documents
+accumulated beside it. Nothing was wrong with any individual sentence either
+time, which is exactly why nothing caught it.
+
+An entry with no marker is unchecked, deliberately: `rusted` and `turkic-lstm`
+keep their results outside this repository, so no count taken here would mean
+anything, and a marker invented to satisfy a rule is worse than the silence.
+
 The machine-readable half of this is the `projects` table in the hpc3
 workspace documents (`tools/hpc3/runs/hpc3*.json`). Each entry declares how a
 project runs on the cluster, its own caps and charge account, and — since
@@ -50,6 +74,9 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 <!-- /generated: hpc3-projects -->
 
 ### `mi` — Model-Trainer probes and benchmarks
+
+<!-- reviewed: tools/hpc3/runs/extraction-ablation-e2be2a3-scores/*.json = 44 -->
+
 
 - **Repo:** this one, `services/Model-Trainer`
 - **Runs:** every entry point below, named in full. THE LIST USED TO END IN AN
@@ -1007,6 +1034,9 @@ spreads and the perturbation hierarchy the card term comes from:
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
+<!-- reviewed: tools/hpc3/runs/*-cu128-*.json = 23 -->
+
+
 Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
 battery ran and closed the same day. First-hand section by the owner; the
 onboarding miss that briefly left this file red — a registered project whose
@@ -1148,6 +1178,9 @@ name appeared nowhere here — was mine, and another session bridged it.
 
 ### `cleargbm` — ClearGBM benchmarks and covenant-radar optimisation
 
+<!-- reviewed: libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json = 41 -->
+
+
 - **Repo:** this one — `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,
   `services/covenant-radar-api`
 - **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`
@@ -1219,6 +1252,9 @@ name appeared nowhere here — was mine, and another session bridged it.
 - **Volume is not stated here**, for the reason `mi`'s entry gives.
 
 ### `floor` — cloze floor scoring
+
+<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 92 -->
+<!-- reviewed: tools/hpc3/runs/floor*.json = 100 -->
 
 The number every arm accuracy in the extraction-ablation programme is read as
 lift over: an UNTRAINED model's score on a fixed cloze set, produced somewhere
@@ -1834,6 +1870,9 @@ scored is that the item set is a staged file rather than a data-bank id.
 ---
 
 ### `code-style` — QLoRA on this monorepo, scored by this monorepo's own guards
+
+<!-- reviewed: tools/code-style-eval/runs/*/comparison.json = 6 -->
+
 
 - **Repo:** this one. Corpus emitter `tools/code-corpus`, training and
   generation through `services/Model-Trainer`, scoring through

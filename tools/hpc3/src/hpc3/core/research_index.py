@@ -360,6 +360,99 @@ def image_digest_claims(text: str, projects: dict[str, ProjectConfig]) -> tuple[
     return tuple(claims)
 
 
+#: Opens the marker an entry uses to say what it was last read against.
+REVIEW_MARKER_PREFIX: Final[str] = "<!-- reviewed: "
+
+#: Closes it.
+REVIEW_MARKER_SUFFIX: Final[str] = " -->"
+
+#: Separates the glob from the count inside a marker.
+REVIEW_MARKER_SEPARATOR: Final[str] = " = "
+
+
+def parse_review_markers(text: str) -> tuple[tuple[str, int], ...]:
+    """Read every "what this entry was read against" marker.
+
+    An entry declares the evidence it has been read against as a tracked-file
+    glob and a count, and :func:`stale_review_claims` recomputes the count.
+    The declaration lives in the entry rather than in a table elsewhere,
+    because the thing that must not drift is the pairing between a claim and
+    the files behind it, and a central mapping is one more thing to keep in
+    step with the prose.
+
+    Args:
+        text: The research index's full text.
+
+    Returns:
+        Each marker as its glob and the count it declares, in order.
+
+    Raises:
+        ValueError: If a marker is unterminated, omits the separator, or
+            declares a count that is not a number. A malformed marker is
+            refused rather than skipped: skipping it would let a typo silently
+            disable the check on exactly the entry somebody was editing.
+    """
+    markers: list[tuple[str, int]] = []
+    index = text.find(REVIEW_MARKER_PREFIX)
+    while index != -1:
+        start = index + len(REVIEW_MARKER_PREFIX)
+        end = text.find(REVIEW_MARKER_SUFFIX, start)
+        if end == -1:
+            raise ValueError(f"unterminated review marker at offset {index}")
+        body = text[start:end]
+        if REVIEW_MARKER_SEPARATOR not in body:
+            raise ValueError(f"review marker {body!r} omits {REVIEW_MARKER_SEPARATOR!r}")
+        glob, _, declared = body.rpartition(REVIEW_MARKER_SEPARATOR)
+        if not declared.isdigit():
+            raise ValueError(f"review marker {body!r} declares a non-numeric count")
+        markers.append((glob, int(declared)))
+        index = text.find(REVIEW_MARKER_PREFIX, end)
+    return tuple(markers)
+
+
+def stale_review_claims(
+    markers: tuple[tuple[str, int], ...], counts: dict[str, int]
+) -> tuple[str, ...]:
+    """Find every entry whose evidence has moved since it was last read.
+
+    THE FAILURE THIS CLOSES, and it is the one the other two rules here cannot
+    see. ``ledger_state_claims`` catches a restated count and
+    ``image_digest_claims`` catches a restated digest; both are about a
+    sentence disagreeing with a source that existed when it was written.
+    This is about a sentence that was TRUE when written and was never read
+    again. ``code-style``'s entry named the width that would settle its result
+    -- "roughly 800 items reach power 0.73" -- and the 875-item comparison
+    landed in the same directory the following day, with the entry still
+    describing four comparison files and three untested strata. ``floor``'s
+    entry described seven jobs while ninety-six run documents accumulated
+    beside it. Nothing went red either time, because nothing was wrong with
+    any sentence in isolation.
+
+    Args:
+        markers: Declared globs and the counts they were read against.
+        counts: What each glob matches among tracked files now.
+
+    Returns:
+        One human-readable claim per glob whose count has moved.
+
+    WHAT THIS DOES NOT COVER. Only declared globs, and only TRACKED files. An
+    entry with no marker is unchecked, which is deliberate rather than an
+    oversight: ``rusted`` and ``turkic-lstm`` keep their results outside this
+    repository, so no count taken here could mean anything for them, and a
+    marker invented to satisfy a rule would be worse than the silence. Which
+    entries carry one is visible in the file.
+    """
+    claims: list[str] = []
+    for glob, declared in markers:
+        actual = counts[glob]
+        if actual != declared:
+            claims.append(
+                f"`{glob}` now matches {actual} tracked file(s) and this entry was read "
+                f"against {declared}; re-read the entry and bump its marker"
+            )
+    return tuple(claims)
+
+
 def extract_projects_block(text: str) -> str:
     """Read the generated block out of a document.
 
@@ -387,11 +480,16 @@ __all__ = [
     "IMAGE_PATH_SUFFIX",
     "LEDGER_ROW_UNIT",
     "REGENERATE_HINT",
+    "REVIEW_MARKER_PREFIX",
+    "REVIEW_MARKER_SEPARATOR",
+    "REVIEW_MARKER_SUFFIX",
     "SCALE_FIELD",
     "extract_projects_block",
     "image_digest_claims",
     "ledger_state_claims",
+    "parse_review_markers",
     "render_project_row",
     "render_projects_block",
     "replace_projects_block",
+    "stale_review_claims",
 ]
