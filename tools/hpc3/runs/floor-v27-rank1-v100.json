@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "floor-v27-rank1-v100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 50,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v27/abl.sif",
+    "sha256": "e6d9865298cdbf29839238115fe59365e64065111ce4c1d22da64701a105581e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.score_baseline --model gpt2 --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-floor-v100-rank1 --out /pub/wagnera3/floor/v27/v100-rank1.json --outcomes /pub/wagnera3/floor/v27/v100-rank1-outcomes.json --kernel rank1",
+  "artifact": "/pub/wagnera3/floor/v27/v100-rank1.json",
+  "experiment": {
+    "kind": "cloze-floor-kernel-arm",
+    "card": "V100",
+    "image": "v27",
+    "controls": "both",
+    "kernel": "rank1"
+  },
+  "resumes_from_checkpoint": false
+}

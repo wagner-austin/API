@@ -47,7 +47,7 @@
       "attribute": "compare_pair"
     },
     {
-      "module": "rw_bot.harness.runner",
+      "module": "rw_bot.harness.frozen_tree",
       "attribute": "check_frozen_tree"
     },
     {

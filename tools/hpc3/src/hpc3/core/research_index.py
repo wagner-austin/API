@@ -31,9 +31,26 @@ WHAT THIS DOES NOT COVER, and the boundary is worth stating plainly. Only
 facts the workspace documents declare are generated. A claim about what a
 package's code does -- the `cleargbm` failure -- is not derivable from the
 registry and this block cannot check it. That gap stays open.
+
+THE SECOND CLASS, and it needs the opposite remedy. Some facts in the index
+are restatements of a source that CANNOT be rendered from, because the source
+is neither committed nor shared: ``tools/hpc3/runs/ledger.jsonl`` is
+machine-local and deliberately untracked, being state rather than
+configuration. A row count read off it is therefore uncheckable by anyone who
+is not sitting at the machine that produced it, and on 2026-09-12 both entries
+carrying one were wrong -- ``mi`` low by a factor of four while also claiming a
+superlative that belonged to ``rusted``, ``cleargbm`` stale by two.
+
+Generating those is impossible, so the remedy is to refuse them.
+:func:`ledger_state_claims` is the refusal, and it is not a style rule: the
+index's own ``tankpit`` entry reached the conclusion ("run state is the
+ledger's answer and this file should not assert it") while three entries went
+on asserting it, which is what a conclusion does when nothing executes it.
 """
 
 from __future__ import annotations
+
+from typing import Final
 
 from hpc3.contracts.project import ProjectConfig
 
@@ -171,6 +188,79 @@ def replace_projects_block(text: str, block: str) -> str:
     return text[:start] + block + text[end + len(BLOCK_END) :]
 
 
+#: The bullet field every asserted row count was written into. Banned as a
+#: FIELD rather than policed as a value: all three instances lived here, and a
+#: heading that invites a number nobody can check is the affordance, not the
+#: typo. Matched after stripping indentation so a nested bullet cannot smuggle
+#: one back in.
+SCALE_FIELD: Final[str] = "- **Scale:**"
+
+#: The noun a ledger count is spelled with. Checked in addition to the field,
+#: so deleting the heading and writing the same claim as prose is caught too.
+LEDGER_ROW_UNIT: Final[str] = "ledger row"
+
+#: Characters a written count is built from, so that "13,008" reads as one
+#: number. Read character by character rather than through a regular
+#: expression: this package's mypy settings ban an expression of type ``Any``,
+#: and ``re.Match.group`` is typed to return one.
+_COUNT_CHARACTERS: Final[frozenset[str]] = frozenset("0123456789,")
+
+
+def _count_before(text: str, index: int) -> str:
+    """Read the number a phrase is quantified by, if it is quantified at all.
+
+    Args:
+        text: The document.
+        index: Offset of the phrase's first character.
+
+    Returns:
+        The count immediately preceding the phrase, or the empty string when
+        no digit precedes it. "the ledger row for `55715577`" yields nothing,
+        because the job id follows the phrase rather than quantifying it,
+        while "131 ledger rows" yields ``131``.
+    """
+    end = index
+    while end > 0 and text[end - 1] == " ":
+        end -= 1
+    start = end
+    while start > 0 and text[start - 1] in _COUNT_CHARACTERS:
+        start -= 1
+    count = text[start:end]
+    return count if any(character.isdigit() for character in count) else ""
+
+
+def ledger_state_claims(text: str) -> tuple[str, ...]:
+    """Find every place the index asserts run state it cannot support.
+
+    Args:
+        text: The research index's full text.
+
+    Returns:
+        One human-readable claim per violation, in the order they appear.
+        Empty when the document asserts none.
+
+    WHAT THIS DELIBERATELY DOES NOT CATCH. A count phrased around the
+    predicate -- "the ledger held five hundred rows", or a number written far
+    from the noun -- passes. The two forms checked are the field that invited
+    the claim and the spelling all of them used, which is what makes the check
+    exact and false-positive-free on a document that legitimately cites job
+    ids beside the word "ledger". A reader determined to assert run state can
+    still do it; this stops the shape it arrived in twice, and the entry it
+    fires on names the reason rather than the rule.
+    """
+    claims: list[str] = []
+    for line in text.split("\n"):
+        if line.strip().startswith(SCALE_FIELD):
+            claims.append(f"the `Scale` field is back: {line.strip()[:80]}")
+    index = text.find(LEDGER_ROW_UNIT)
+    while index != -1:
+        count = _count_before(text, index)
+        if count:
+            claims.append(f"an asserted ledger row count: {count} {LEDGER_ROW_UNIT}s")
+        index = text.find(LEDGER_ROW_UNIT, index + len(LEDGER_ROW_UNIT))
+    return tuple(claims)
+
+
 def extract_projects_block(text: str) -> str:
     """Read the generated block out of a document.
 
@@ -195,8 +285,11 @@ def extract_projects_block(text: str) -> str:
 __all__ = [
     "BLOCK_END",
     "BLOCK_START",
+    "LEDGER_ROW_UNIT",
     "REGENERATE_HINT",
+    "SCALE_FIELD",
     "extract_projects_block",
+    "ledger_state_claims",
     "render_project_row",
     "render_projects_block",
     "replace_projects_block",

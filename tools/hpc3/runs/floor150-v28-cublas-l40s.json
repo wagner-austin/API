@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "floor150-v28-cublas-l40s",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "L40S",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v28/abl.sif",
+    "sha256": "2c8dfab756e57e6dc6c5e5c20fc6fd4e035d9ce808d92e6a47a0a83feaf68430",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.score_baseline --model gpt2 --items /pub/wagnera3/floor/cloze-items-first150.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-floor150-l40s-cublas --out /pub/wagnera3/floor/v28/l40s-cublas.json --outcomes /pub/wagnera3/floor/v28/l40s-cublas-outcomes.json --kernel cublas",
+  "artifact": "/pub/wagnera3/floor/v28/l40s-cublas.json",
+  "experiment": {
+    "kind": "cloze-floor-kernel-arm",
+    "card": "L40S",
+    "image": "v28",
+    "controls": "both",
+    "kernel": "cublas",
+    "items": "first150"
+  },
+  "resumes_from_checkpoint": false
+}

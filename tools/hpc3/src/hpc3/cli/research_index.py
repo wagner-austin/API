@@ -19,6 +19,7 @@ from __future__ import annotations
 import pathlib
 import sys
 from collections.abc import Sequence
+from typing import Final
 
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
@@ -29,6 +30,7 @@ from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.research_index import (
     REGENERATE_HINT,
     extract_projects_block,
+    ledger_state_claims,
     render_projects_block,
     replace_projects_block,
 )
@@ -38,6 +40,15 @@ CHECK_FLAG = "--check"
 
 #: The flags, and the ONE place the set is written.
 FLAGS: tuple[str, ...] = (CHECK_FLAG, WRITE_FLAG)
+
+#: What a reader is told when the index asserts machine-local run state. It
+#: says DELETE rather than update, because updating is what produced the two
+#: stale counts in the first place: a number correct on the day it was typed
+#: and wrong by the next campaign, with nothing able to notice.
+CLAIM_GUIDANCE: Final[str] = (
+    "the ledger is machine-local and untracked, so nobody else can check a count "
+    "read off it; delete the claim rather than updating it\n"
+)
 
 
 def _read_document(path: pathlib.Path) -> str:
@@ -111,8 +122,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.
 
     Returns:
-        Exit code 0 when the file already matches or was written, 1 when it
-        is stale.
+        Exit code 0 when the file already matches or was written and asserts
+        no machine-local run state, 1 when it is stale or does assert some.
+
+        ``--write`` returns 1 on an asserted claim even though it wrote the
+        block successfully, because the claim is PROSE and writing cannot fix
+        it. Reporting 0 there would let a caller who runs the writing form
+        conclude the document is clean when the half no generator owns is
+        not.
 
     Raises:
         ValueError: If an unknown argument is given, if neither flag is
@@ -131,12 +148,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     path = index_path()
     text = _read_document(path)
 
+    claims = ledger_state_claims(text)
+    for claim in claims:
+        sys.stdout.write(f"{path}: {claim}\n")
+    if claims:
+        sys.stdout.write(CLAIM_GUIDANCE)
+
     if WRITE_FLAG in tokens:
         core_hooks.write_text(path, replace_projects_block(text, block))
         sys.stdout.write(f"wrote the project table into {path}\n")
-        return 0
+        return 1 if claims else 0
 
     if extract_projects_block(text) == block:
+        if claims:
+            return 1
         sys.stdout.write("the project table matches the registry\n")
         return 0
 
@@ -159,6 +184,7 @@ def entrypoint() -> None:
 
 __all__ = [
     "CHECK_FLAG",
+    "CLAIM_GUIDANCE",
     "FLAGS",
     "WRITE_FLAG",
     "declared_projects",

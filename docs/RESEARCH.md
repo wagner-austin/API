@@ -86,7 +86,23 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
 - **Provenance:** `RunRecord` + `RunFingerprint` — image digest, GPU model,
   driver, determinism posture, host, package versions. The only surface here
   that carries all six axes.
-- **Scale:** 131 ledger rows, the largest body of cluster work.
+- **Volume is NOT stated here, and the `Scale` field it used to sit in is gone
+  from every entry rather than corrected in each.** That bullet asserted a
+  row count and called this the largest body of cluster work. Measured on
+  2026-09-12 the count was low by a factor of four and the superlative
+  belonged to `rusted` by an order of magnitude; `cleargbm`'s was stale by a
+  smaller margin nothing would have caught. `tankpit`'s entry below had
+  ALREADY drawn the conclusion, "run state is the ledger's answer and this
+  file should not assert it", and three entries went on asserting it anyway,
+  which is the argument for enforcing a conclusion rather than recording one.
+  `hpc3.core.research_index.ledger_state_claims` now fails both
+  `hpc3-research-index --check` and `tests/test_research_index.py` on the
+  field and on the spelling, the writing form included: `--write` regenerates
+  the table and still exits 1, because the claim is prose and no generator
+  owns it. The ledger is machine-local and deliberately untracked, so
+  a count taken from it cannot be checked by anyone who is not sitting at this
+  machine, which is the whole reason prose must not carry one. Ask
+  `hpc3-trace`, or read `tools/hpc3/runs/ledger.jsonl`.
 
 #### `cartridge_benchmark` — cartridge capacity and composition on a real base
 
@@ -1168,16 +1184,113 @@ name appeared nowhere here — was mine, and another session bridged it.
   `BENCHMARK_RESULTS_2026-08-24_p6_farm_and_rw_value.md`,
   `BENCHMARK_RESULTS_2026-08-22_scale_pos_weight.md` and
   `BENCHMARK_RESULTS_2026-08-22_knob_closure.md`.
-- **Scale:** 108 ledger rows.
+- **Volume is not stated here**, for the reason `mi`'s entry gives.
 
 ### `floor` — cloze floor scoring
 
+The number every arm accuracy in the extraction-ablation programme is read as
+lift over: an UNTRAINED model's score on a fixed cloze set, produced somewhere
+a compute node can reach. `POST /runs/baselines/cloze` already did this and
+needs an API, a redis and an RQ worker to do it; `score_baseline` runs the same
+parser, scorer and determinism pin in-process. The only difference in what gets
+scored is that the item set is a staged file rather than a data-bank id.
+
 - **Repo:** this one, `services/Model-Trainer`
-- **Runs:** `modeltrainer-score-baseline --experiment extraction-eval`
-- **Produces:** `/pub/wagnera3/floor/results/*.json`
-- **Provenance:** `RunRecord`, and its known answers are registered so a
-  re-run is checked against an established value rather than merely recorded.
-- **Scale:** 7 ledger rows.
+- **Entry point:** `model_trainer.cli.score_baseline`, invoked as
+  `modeltrainer-score-baseline` by this project's own runs and as `python -m`
+  by every later one. It is registered in `mi`'s command list above rather than
+  here, because a command is named once and this is not the project most of it
+  runs under.
+- **Item set:** 2,627 cloze items, sha256 `80f9732a…`, `--max-seq-len 512`,
+  chance 0.25. Staged by `stage-floor-cloze-items.json`, and every run document
+  that reads it names that digest.
+- **Produces:** one `RunRecord` per arm under `/pub/wagnera3/floor/`, with a
+  per-item outcomes file beside it.
+- **Provenance:** `RunRecord`, and the answers are registered
+  (`known_answer_registry`) so a re-run is checked against an established value
+  rather than merely recorded. gpt2 scores **1374/2627 = 0.523030072325847**
+  and gpt2-medium **1464/2627 = 0.5572896840502475**, both established on an
+  RTX 3090 Ti.
+- **Sizing:** `free-gpu`, one A100, 8 CPUs, 32 GiB, 60 minutes, `deterministic`,
+  no checkpoint resume. **The image it declares is two generations behind
+  anything it ran:** `hpc3-floor.json` pins v4 (`df841c661b9e`), its last two
+  jobs ran under v20 (`2b89283fccf2`), and the campaign below runs under v29
+  (`195406706fde`). That is not registry drift, it is the project standing
+  still while the measurement moved to `mi`.
+
+- **THE PROJECT IS THE SMALL HALF OF ITS OWN MEASUREMENT, and reading this
+  entry as the whole is the mistake the name invites.** Seven jobs ever ran
+  under `floor`, all between 2026-08-26 and 2026-08-28 (`55589876` through
+  `55631584`), against **96 run documents that score the same floor under `mi`
+  and `mi-cu128`**: `floor-v27-*` (full set, four cards), `floor150-v28-*` (a
+  150-item chunk, four cards, two kernel arms), `floorfull-v29-*` (the full set
+  again, 18 chunks per card) and `floor150-cu128-*` (the Blackwell rung). A
+  reader who takes seven jobs for the size of this axis is off by more than an
+  order of magnitude. Until 2026-09-12 this entry was five bullets long and
+  said nothing that would have corrected them.
+
+- **The open question these runs were REGISTERED WITH has been answered, and
+  nothing said so for a fortnight.** The 2026-08-26 rows carry
+  `open_question: whether_the_same_items_were_correct`: the A100 had reproduced
+  the 3090 Ti's AGGREGATE (`a100_aggregate: reproduced_job_55590112`) and
+  nothing established that it got the same ITEMS right. `outcomes_digest`
+  exists for exactly that question, and digests `[item_id, correct]` pairs
+  while deliberately excluding `scores`, because raw negative log-likelihoods
+  differ in their low bits between any two cards; a digest over them would
+  differ on every comparison and so carry no information at all.
+
+  Read off the 92 records on 2026-09-12, this is where it stands:
+
+  | generation | items | arms | cards | result |
+  |---|---|---|---|---|
+  | v20 (`55631580`, `55631584`) | 2,627 | cuBLAS | 3090 Ti, A100 | digests EQUAL: gpt2 `e964e46b…`, gpt2-medium `21f9841d…` |
+  | v27 | 2,627 | cuBLAS | A100, A30, L40S, V100 | all four `e964e46b…`, equal to the 3090 Ti's |
+  | v28 | 150 | rank1 + cuBLAS | A100, A30, L40S, V100 | all eight `72e59097…` |
+  | v29 | 2,627 | rank1 (18 chunks) + cuBLAS | A100, A30, L40S, V100 | 18/18 chunk digests equal across all four cards, and 1374/2627 on every card under both arms |
+
+  So the floor holds ITEM FOR ITEM across five GPU models and both kernel arms,
+  not merely in aggregate. That is `mi-cu128`'s contrast seen from the other
+  side: vendor cuBLAS speaks per-card dialects at the GEMM level (18 of 93
+  digests shared there) and the cloze DECISION absorbs every one of them.
+
+- **What the zeros exclude, and the two axes disagree by three orders of
+  magnitude.** A zero-failure identity claim has no spread to divide by, so the
+  instrument is the exact one-sided Clopper-Pearson bound `1 - 0.05^(1/n)`, as
+  it is for `mi-cu128` and `tankpit`:
+
+  | axis | n | 95% UB | the question it answers |
+  |---|---|---|---|
+  | per-ITEM, full set | 2,627 | 0.114% | would a divergence on any single item have been seen |
+  | per-GPU-MODEL | 5 | 45.1% | would a card model whose floor differs have been seen |
+
+  The item axis is a conjunction over 2,627 separate decisions and is a very
+  sensitive detector, for the same reason `mi-cu128`'s full-set digest row is
+  its tightest. **But items are not replicates of the thing the claim is
+  about.** "The floor is card-invariant" is a statement about CARDS, and five
+  models all agreeing bounds the rate at which a sixth could differ at 45%. So
+  this is established for the 3090 Ti, V100, A30, A100 and L40S, and it is
+  NOT TESTED as a general property of hardware. A sixth model is one job.
+
+- **The finding is real and it is not instrumented, which is a different gap
+  from the ones this file usually records.** The 3090 Ti's records name
+  experiment `extraction-eval`; every generation from v27 on names
+  `wiki-corpus-extraction-ablation`. `compare_run_records` RAISES on two
+  records from different experiments rather than returning a verdict, so no
+  call in the shared vocabulary can put the baseline and the cluster cards side
+  by side, and the digest equality carrying this whole result was read off by
+  eye. The numbers are not in question; what is missing is that the comparison
+  the result rests on is the one comparison the tooling refuses to perform.
+  The forward fix is naming the experiment consistently on the next pass.
+
+- **Its evidence was machine-local until 2026-09-12, which is the failure
+  `.gitignore` already records four times over.** 96 of the 100 run documents
+  and all 92 records were untracked, held back by `**/artifacts/` and
+  `tools/hpc3/runs/*`; only the four documents named `floor-gpt2*`/`floor-run*`
+  were ever tracked. Negated now, on the reasoning the `cartridge-*`, `qa-*`,
+  `code-style-*` and extraction-ablation blocks each give: the 92 records
+  (92 KB) are committed because `payload_digest` is where the claim lives, and
+  the 92 outcomes files (5.7 MB) and the item set (1.2 MB) are not, being
+  pinned by digest from the records and documents that are.
 
 ### `turkic-lstm` — character-level LSTM for Turkic languages
 
@@ -1443,6 +1556,50 @@ name appeared nowhere here — was mine, and another session bridged it.
   stamp, commit or version — nothing recorded what produced the 539 archived
   runs and no fingerprint written now can claim it. Stamping the build at
   emission time is filed separately.
+
+- **What the corpus IS, counted on disk 2026-09-12.** The run-level design
+  matrix is `runs/bot/_index.tsv`: 247 sessions, one row each, carrying
+  `stamp`, `duration_s`, `exit_reason`, `ticks`, `stalls`, `shots_fired`,
+  `kills` and `kills_per_min`. Beside it sit 439 events artifacts and 298
+  capture sessions across 452 distinct run stamps in 1,279 files. The sim adds
+  91 sessions under `runs/sim`, each a `capture_session.json` with the
+  `world.json` that pins what it played, plus 18 worlds written with no session
+  beside them. All of it is workstation work: the six cluster jobs below are
+  the whole of what has run anywhere else.
+
+- **The tick table is a derivation, and no corpus of it exists.**
+  `tankpit-feature-rows` reshapes an events artifact into one row per tick, and
+  the wiki records the corpus it was built against as 539 runs and 132,266 rows
+  (`feature-corpus-provenance`, 2026-09-02). On 2026-09-12 there are **zero**
+  `.features.jsonl` files anywhere in this monorepo. The derivation is a code
+  path with tests and a `RunRecord`; the design matrix it describes is not on
+  this disk, and those two numbers are properties of the run they were measured
+  during rather than of anything a reader can open. That is the honest state of
+  "the tick corpus is a design matrix somebody will train on": nobody has, and
+  nothing is stopping them except running it.
+
+- **SIX JOBS RAN AND NOT ONE OF THEIR RUN DOCUMENTS SURVIVES, which is a
+  stronger version of the gap the `.gitignore` records elsewhere.**
+  `tankpit-sim-v1r1`, `v1r2`, `v1r3` and `v2clean` appear nowhere on this
+  machine except as names inside `ledger.jsonl`; `tools/hpc3/runs/` holds
+  `hpc3-tankpit.json` and the two image-build directories and nothing else.
+  Everywhere else that record is merely UNTRACKED and can be negated into git,
+  which is what the four `!tools/hpc3/runs/<prefix>-*.json` blocks did and what
+  `floor` got on 2026-09-12. Here there is no file to negate. So the six jobs
+  cannot be re-submitted from any record, and the cross-node determinism result
+  above rests on two job ids whose documents are gone.
+  `!tools/hpc3/runs/tankpit-*.json` is in place now so the next one is kept; it
+  cannot recover these.
+
+- **What "the remaining work is scale" means concretely.** The instrument is a
+  sweep, and its preconditions are met: `--layout` and `--population-seed`
+  state the world, so members differ in exactly what their document says, and
+  `deterministic: true` is measured rather than assumed. What has never run is
+  the sweep. Six jobs, of which two were image builds and two failed inside two
+  seconds, is a provisioning record and not a measurement; the power table
+  above sits at one node pair because nothing has widened it, and the tick
+  corpus needs one member per doctrine per world before any of this is a
+  design matrix rather than a plan for one.
 - **Sizing, measured 2026-09-02 rather than guessed:** a 150-round practice
   session ran 144 s wall and peaked at 26 MiB of Python allocation on the
   workstation. Declared 2 CPUs, 2 GB, 60 minutes on `free` — the wall clock

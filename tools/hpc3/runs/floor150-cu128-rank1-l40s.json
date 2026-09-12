@@ -1,0 +1,31 @@
+{
+  "project": "mi-cu128",
+  "name": "floor150-cu128-rank1-l40s",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "L40S",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/cu128-v1/abl-cu128.sif",
+    "sha256": "6d9ba0baac40b238b2e8b479c17ed5d08b055c7af6b000711888d6e22afc69b2",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.score_baseline --model gpt2 --items /pub/wagnera3/floor/cloze-items-first150.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-floor150-l40s-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/l40s-rank1.json --outcomes /pub/wagnera3/floor/cu128-v1/l40s-rank1-outcomes.json --kernel rank1",
+  "artifact": "/pub/wagnera3/floor/cu128-v1/l40s-rank1.json",
+  "experiment": {
+    "kind": "cloze-floor-kernel-arm",
+    "card": "L40S",
+    "image": "cu128-v1",
+    "controls": "both",
+    "kernel": "rank1",
+    "items": "first150"
+  },
+  "resumes_from_checkpoint": false
+}

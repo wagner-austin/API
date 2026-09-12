@@ -7,6 +7,7 @@ import pathlib
 import pytest
 
 from hpc3.cli.research_index import (
+    CLAIM_GUIDANCE,
     declared_projects,
     index_path,
     main,
@@ -18,8 +19,11 @@ from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.research_index import (
     BLOCK_END,
     BLOCK_START,
+    LEDGER_ROW_UNIT,
     REGENERATE_HINT,
+    SCALE_FIELD,
     extract_projects_block,
+    ledger_state_claims,
     render_project_row,
     render_projects_block,
     replace_projects_block,
@@ -276,6 +280,131 @@ class TestTheWritingAndStaleBranches:
         block = render_projects_block(declared_projects(runs_directory()))
         assert capsys.readouterr().out == (
             f"the project table in {index_path()} is stale; run `{REGENERATE_HINT}`\n\n{block}\n"
+        )
+
+
+class TestRefusingAssertedRunState:
+    """The half that cannot be generated, so it is refused instead.
+
+    A ledger row count restates a file that is machine-local and untracked, so
+    unlike every other number in the index it cannot be rendered from a source
+    and cannot be checked by a reader elsewhere. Both entries carrying one were
+    wrong when this was written.
+    """
+
+    def test_a_count_before_the_unit_is_a_claim(self) -> None:
+        """The spelling both live instances used."""
+        claims = ledger_state_claims(f"- **Runs:** 131 {LEDGER_ROW_UNIT}s, the largest.\n")
+
+        assert claims == (f"an asserted ledger row count: 131 {LEDGER_ROW_UNIT}s",)
+
+    def test_a_grouped_count_reads_as_one_number(self) -> None:
+        """``13,008`` is one count, and a digit scan that stops at the comma
+        would report ``008`` and read as a different, smaller claim."""
+        claims = ledger_state_claims(f"13,008 {LEDGER_ROW_UNIT}s")
+
+        assert claims == (f"an asserted ledger row count: 13,008 {LEDGER_ROW_UNIT}s",)
+
+    def test_the_scale_field_is_refused_on_its_own(self) -> None:
+        """The field is banned as an affordance, whatever it is filled with."""
+        claims = ledger_state_claims(f"{SCALE_FIELD} big.\n")
+
+        assert claims == (f"the `Scale` field is back: {SCALE_FIELD} big.",)
+
+    def test_an_indented_scale_field_is_refused_too(self) -> None:
+        """Nesting the bullet must not smuggle the field back in."""
+        assert len(ledger_state_claims(f"    {SCALE_FIELD} 12\n")) == 1
+
+    def test_a_job_id_after_the_unit_is_not_a_claim(self) -> None:
+        """The index legitimately cites job ids beside this noun.
+
+        ``tankpit``'s entry says "the ledger row for `55715577` carries", and
+        a rule that convicted it would be one an author learns to skip.
+        """
+        assert ledger_state_claims(f"the {LEDGER_ROW_UNIT} for `55715577` carries") == ()
+
+    def test_the_unit_without_a_count_is_not_a_claim(self) -> None:
+        """Describing the ledger is the behaviour being asked for."""
+        assert ledger_state_claims(f"a {LEDGER_ROW_UNIT} is written for you") == ()
+
+    def test_a_document_asserting_nothing_yields_nothing(self) -> None:
+        """The passing case, stated so the rule cannot fire vacuously."""
+        assert ledger_state_claims("- **Runs:** `hpc3-submit`\n") == ()
+
+    def test_every_claim_is_reported_not_just_the_first(self) -> None:
+        """Two entries carried one at once; reporting one would hide the other."""
+        text = f"{SCALE_FIELD} x\nand 108 {LEDGER_ROW_UNIT}s\n"
+
+        assert len(ledger_state_claims(text)) == 2
+
+    def test_the_committed_index_asserts_no_run_state(self) -> None:
+        """The assertion this rule exists for, against the real document."""
+        assert ledger_state_claims(index_path().read_text(encoding="utf-8")) == ()
+
+
+class TestReportingAssertedRunStateFromTheCommandLine:
+    """A claim fails both forms, and writing cannot clear it.
+
+    Driven through the file hooks rather than against ``docs/RESEARCH.md``,
+    for the reason ``TestTheWritingAndStaleBranches`` gives: a test that
+    rewrites a tracked document to prove it can is one nobody runs twice.
+    """
+
+    def _with_claim(self) -> str:
+        """Build a document carrying one asserted count.
+
+        Returns:
+            The committed index with a claim appended, so the generated block
+            is current and the claim is the only thing wrong with it.
+        """
+        return index_path().read_text(encoding="utf-8") + f"\n- 131 {LEDGER_ROW_UNIT}s\n"
+
+    def test_checking_fails_and_says_to_delete_rather_than_update(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """ "Update it" is the wrong instruction: the next count rots too.
+
+        Args:
+            capsys: Captured process output.
+        """
+        document = self._with_claim()
+        core_hooks.read_bytes = lambda path: (
+            document.encode("utf-8") if path == index_path() else path.read_bytes()
+        )
+
+        assert main(["--check"]) == 1
+
+        assert capsys.readouterr().out == (
+            f"{index_path()}: an asserted ledger row count: 131 {LEDGER_ROW_UNIT}s\n"
+            f"{CLAIM_GUIDANCE}"
+        )
+
+    def test_writing_still_fails_because_the_claim_is_prose(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--write fixes the block and cannot fix a sentence.
+
+        The written document still carries the claim, which is the point: a
+        caller who reads exit 0 from the writing form as "clean" would be
+        reading it from the half no generator owns.
+
+        Args:
+            capsys: Captured process output.
+        """
+        document = self._with_claim()
+        written: dict[pathlib.Path, str] = {}
+        core_hooks.read_bytes = lambda path: (
+            document.encode("utf-8") if path == index_path() else path.read_bytes()
+        )
+        core_hooks.write_text = lambda path, text: written.__setitem__(path, text)
+
+        assert main(["--write"]) == 1
+
+        assert written[index_path()] == document
+        assert capsys.readouterr().out == (
+            f"{index_path()}: an asserted ledger row count: 131 {LEDGER_ROW_UNIT}s\n"
+            f"{CLAIM_GUIDANCE}"
+            f"wrote the project table into {index_path()}\n"
         )
 
 

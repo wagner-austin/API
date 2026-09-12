@@ -227,6 +227,44 @@ tools/hpc3/runs/*
 # force works for whoever runs it and silently drops the file for the next
 # person. That failure is what this whole axis has been for.
 !tools/hpc3/runs/qa-*.json
+# The cloze-floor family, which is the same argument a fifth time and the
+# widest instance of it yet. `floor` reads as a 7-row project because that is
+# all its own name carries; the measurement runs under `mi` and `mi-cu128`, and
+# on 2026-09-12 that was 96 run documents on this machine and 4 in git. The
+# floor is what every arm accuracy in the ablation programme is read as lift
+# over, so a clone that cannot re-submit it cannot re-derive any lift.
+#
+# `floor*` rather than a per-generation prefix, because the generations (v27,
+# v28's 150-item chunk, v29's full set) are the same measurement at different
+# widths and splitting them in the filesystem would invite comparing one
+# generation's document against another's.
+!tools/hpc3/runs/floor*.json
+# tankpit's, which are NOT a negation of anything that exists -- and that is
+# the finding rather than an oversight. Its six cluster jobs ran on 2026-09-03
+# and their run documents are on no disk here: `tankpit-sim-v1r1` through
+# `v2clean` appear nowhere in this tree except as names inside the ledger, so
+# the jobs cannot be re-submitted from any record. The negation is here so the
+# NEXT one is kept, which is the only half of this still reachable.
+!tools/hpc3/runs/tankpit-*.json
+
+# The cloze-floor RECORDS, by the same argument the four run-document blocks
+# above make, applied to the other half of the pair. A run document says what
+# to run; the record says what came back, and for this axis what came back IS
+# the claim -- `payload_digest` digests [item_id, correct] pairs, so two cards
+# agreeing on it agreed item for item and not merely on an aggregate. That
+# distinction is the whole result, and on 2026-09-12 every record carrying it
+# was machine-local.
+#
+# 92 records, 92 KB. NOT the 92 per-item outcomes files (5.7 MB) and NOT the
+# item set itself (`cloze-items-*.jsonl`, 1.2 MB) -- both are pinned by sha256
+# in the run documents and in stage-floor-cloze-items.json, which is the same
+# split, and the same reasoning, as the extraction-ablation block below.
+!tools/hpc3/artifacts/
+tools/hpc3/artifacts/*
+!tools/hpc3/artifacts/floor*/
+tools/hpc3/artifacts/floor*/*
+!tools/hpc3/artifacts/floor*/*.json
+tools/hpc3/artifacts/floor*/*outcomes*.json
 
 # extraction-ablation SCORE RECORDS, for the reason the code-style-eval block
 # below states two days earlier and for a different project. Every accuracy in

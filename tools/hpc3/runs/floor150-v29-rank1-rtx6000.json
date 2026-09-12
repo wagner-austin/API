@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "floor150-v29-rank1-rtx6000",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "RTX6000",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v29/abl.sif",
+    "sha256": "195406706fde14c3607ab8138547c8dd7cbb023fb16b8ca4bed7b14451ce5051",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.score_baseline --model gpt2 --items /pub/wagnera3/floor/cloze-items-first150.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-floor150-rtx6000-rank1 --out /pub/wagnera3/floor/v29/rtx6000-rank1.json --outcomes /pub/wagnera3/floor/v29/rtx6000-rank1-outcomes.json --kernel rank1",
+  "artifact": "/pub/wagnera3/floor/v29/rtx6000-rank1.json",
+  "experiment": {
+    "kind": "cloze-floor-kernel-arm",
+    "card": "RTX6000",
+    "image": "v29",
+    "controls": "both",
+    "kernel": "rank1",
+    "items": "first150"
+  },
+  "resumes_from_checkpoint": false
+}
