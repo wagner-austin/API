@@ -422,16 +422,21 @@ class Doctrine(TypedDict):
             gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
             ``siege 0``, any dose but one is refused: it lies about its arm.
         outranged: Whether ``siegedose`` artillery shares join the mix
-            WHILE the remembered ground picture outranges it -- the
-            threat-armed sibling of the ``siege`` clause's time gate.
-            The time gate closed 0-for in the attrition tier because it
-            fired in every long game; the pinbase48 split (log
-            2026-09-12) is binary -- 39/39 against enemies that never
-            field artillery, 0/9 against the scout-plus-artillery
-            opening -- and the static merge measured catastrophic in
-            BOTH directions (arty39), so the join must follow the SEEN
-            opening: on a zero-artillery seed the clause never fires and
-            the match is the champion's, bit for bit.
+            WHILE a seen mobile ground threat outranges its land guns
+            AND that standoff class has drawn blood -- the threat-armed
+            sibling of the ``siege`` clause's time gate. The time gate
+            closed 0-for in the attrition tier because it fired in every
+            long game; the pinbase48 split (log 2026-09-12) is binary --
+            39/39 against enemies that never field artillery, 0/9
+            against the scout-plus-artillery opening -- and the static
+            merge measured catastrophic in BOTH directions (arty39), so
+            the join follows the SEEN opening. Sight alone was measured
+            insufficient twice (navpair48's ungated navtilt, then
+            condprobe13b arming on a 165-versus-160 technicality), so
+            the join waits for the naval gate's own calibration:
+            outranging movers must kill ``STANDOFF_BLOOD`` of ours
+            first. On a seed where no standoff bleeds us the clause
+            never fires and the match is the champion's, bit for bit.
         raze: Sample count past which the raid party's objectives become
             remembered enemy FACTORIES instead of extractors -- the
             displacement road (log 2026-09-11): every composition answer

@@ -227,9 +227,10 @@ def play(
     workforce = Workforce(EXPAND_RETRY_SAMPLES)
     recorder = Recorder(trace, profiles)
     scores = Scorekeeper(catalogue, profiles)
-    # Every WATER-moving type name seen this match, the bloodied gate's
-    # accumulating half ([[policy-exact-timing]], the naval wall).
+    # The two blood gates' accumulating halves: every WATER-mover seen, and
+    # every outranging ground mover seen ([[policy-exact-timing]]).
     fleet_seen: set[str] = set()
+    standoff_seen: set[str] = set()
     # Decision codes since the previous trace row -- consumed by
     # recorder.step, so each row carries its window's decisions (log 2026-08-09).
     pending_events: set[str] = set()
@@ -370,8 +371,7 @@ def play(
                 # Siege switch: shares join past the gate (Doctrine.siege).
                 *(("c_artillery",) * siegedose if siege and scores.samples_seen >= siege else ()),
             )
-            # One threat picture for every threat-armed clause, computed only
-            # when one of them is on -- the scout gate is theirs to share.
+            # One threat picture for every threat-armed clause; scout-gated.
             threats: tuple[Threat, ...] = ()
             if counter or outranged:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
@@ -385,6 +385,7 @@ def play(
                 siegedose=siegedose,
                 navtilt=navtilt,
                 fleet_seen=fleet_seen,
+                standoff_seen=standoff_seen,
                 deaths_to=scores.deaths_to,
                 predicted=sentries.predicted,
             )
@@ -470,9 +471,8 @@ def play(
             # ([[policy-economy]]).
             outlays.add(budget.ledger())
             # The enemy-shape columns read from live contact regardless of
-            # the counter knob: the trace records what was SEEN, and the
-            # fleet memory unions live contact with whatever the tilt path
-            # already remembered (log 2026-08-09).
+            # the counter knob: the trace records what was SEEN, and the fleet
+            # memory unions live contact with the tilt path's (log 2026-08-09).
             fleet_seen.update(fleet_types(tuple(targets)))
             navy_seen, air_seen = layer_counts(tuple(targets))
             navy_blood = scores.deaths_to(fleet_seen)

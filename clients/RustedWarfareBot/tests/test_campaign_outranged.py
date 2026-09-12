@@ -127,10 +127,59 @@ def test_the_identity_never_fields_artillery_even_against_the_standoff() -> None
     assert not any('"type":"c_artillery"' in line for line in produced)
 
 
-def test_the_switch_fields_artillery_while_the_enemy_shows_it() -> None:
-    """Against the seen standoff the share joins the ratio, and with a tank
-    already standing the deficit points at the artillery."""
+def test_sight_alone_never_joins_the_share() -> None:
+    """The blood gate, lifted from the naval tilt's calibration: an
+    outranging mover in view that has killed nothing is a technicality,
+    not a standoff -- sight-alone arming re-rolled winning seeds on a
+    165-versus-160 margin (condprobe13b, log 2026-09-12), exactly as the
+    ungated navtilt did on navpair48."""
     peer = _play(_standoff_world(), times=4, outranged=True)
+    produced = verb(peer, "produce")
+    assert any('"type":"c_tank"' in line for line in produced)
+    assert not any('"type":"c_artillery"' in line for line in produced)
+
+
+def _bled_worlds() -> tuple[Sample, Sample]:
+    """The standoff drawing blood: two tanks under artillery fire, then gone.
+
+    Returns:
+        The bleeding world and the world after, artillery in sight in both.
+    """
+    bleeding = sample(
+        CENTRE,
+        BUILDER,
+        FACTORY,
+        entity(1, "c_tank"),
+        entity(5, "c_tank", x=200.0, damaged_by="enemy_arty"),
+        entity(6, "c_tank", x=220.0, damaged_by="enemy_arty"),
+        enemy(9, "enemy_arty", x=400.0),
+        credits=4000,
+        pools=(pool(x=300.0),),
+        options=(
+            option(300, "c_tank"),
+            option(300, "c_artillery"),
+            option(214, "extractorT1", placed=True),
+        ),
+    )
+    return bleeding, _standoff_world()
+
+
+def test_the_switch_fields_artillery_once_the_standoff_draws_blood() -> None:
+    """Two of ours dead to the outranging gun and it still in sight: the
+    share joins the ratio, and with a tank already standing the deficit
+    points at the artillery."""
+    bleeding, after = _bled_worlds()
+    peer = ScriptedPeer(lines(bleeding, after, after, after))
+    play(
+        AgentChannel(peer),
+        (),
+        OUTRANGED_CATALOGUE,
+        PLACEMENTS,
+        OUTRANGED_PROFILES,
+        4,
+        reinforce=("c_tank",),
+        outranged=True,
+    )
     produced = verb(peer, "produce")
     assert any('"type":"c_artillery"' in line for line in produced)
 
