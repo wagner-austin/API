@@ -438,7 +438,11 @@ class FakeHost:
         self.clock += seconds
 
     def remove_path(self, path: Path) -> None:
-        """Record a removal and forget the path.
+        """Record a removal and forget the path and everything under it.
+
+        Recursive because the real implementation is ``rmtree`` on a
+        directory: a fake that forgot only the directory key passed a test
+        whose production run would have deleted the children too.
 
         Args:
             path: What to remove.
@@ -447,6 +451,10 @@ class FakeHost:
         self.removed.append(key)
         self.files.pop(key, None)
         self.dirs.discard(key)
+        for child in [k for k in self.files if k.startswith(f"{key}/")]:
+            del self.files[child]
+        for child in [k for k in self.dirs if k.startswith(f"{key}/")]:
+            self.dirs.discard(child)
 
     def kill_tree(self, pid: int) -> None:
         """Record a felling.

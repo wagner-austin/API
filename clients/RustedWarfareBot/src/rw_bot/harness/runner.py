@@ -341,6 +341,19 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
     # the process started in the repository.
     trace = trace_path(config["traces"], batch, job)
     play_log = match_log_path(config["out_dir"], job)
+    # The engine logs a line at a time and the recorder a row per sample, and
+    # both used to stream straight to the FINAL paths -- which on a compute
+    # node sit on the shared filesystem, so forty-eight members chatting
+    # small writes for an hour each is what made /pub crawl during every
+    # convergence (log 2026-09-12). They stage beside the member's own game
+    # clone instead -- node-local on the cluster, repository-local on a
+    # workstation -- under the FINAL basenames, and one bulk publish per
+    # match replaces the hour of chatter. The engine's sidecars (.err,
+    # .agent) land beside the staged log and ride the same publish.
+    stage = Path(game_dir) / f"stage-{name}"
+    staged_trace = stage / Path(trace).name
+    staged_log = stage / Path(play_log).name
+    _test_hooks.make_dirs(stage)
     # The planner opens the trace without creating its parent, so the
     # directory must exist before the match runs twenty minutes for nothing.
     _test_hooks.make_dirs(Path(trace).parent)
@@ -358,8 +371,8 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
             job,
             game_dir,
             config["lockstep"],
-            play_log,
-            trace,
+            str(staged_log.as_posix()),
+            str(staged_trace.as_posix()),
             # The lease owns the port: two concurrent random draws collided
             # and both matches died on the bind (imp-creep12, 2026-08-08).
             leased_port(game_dir, config["clone_prefix"]),
@@ -375,6 +388,17 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
         ),
         MATCH_WALL_SECONDS,
     )
+    # Publish before judging: a FAILED match's logs are exactly the ones
+    # forensics needs, so the move runs on every exit. The trace goes to its
+    # own root and everything else -- the engine log and its sidecars -- to
+    # the logs directory, each under the basename it staged with.
+    for entry in _test_hooks.list_names(stage):
+        source = stage / entry
+        if entry == staged_trace.name:
+            _test_hooks.copy_entry(source, Path(trace).parent)
+        else:
+            _test_hooks.copy_entry(source, Path(play_log).parent)
+    _test_hooks.remove_path(stage)
     card = scorecard(output)
     if not is_complete(card):
         _test_hooks.write_text_lines(out_dir / f"{name}.partial", (f"### {name} FAILED", *output))

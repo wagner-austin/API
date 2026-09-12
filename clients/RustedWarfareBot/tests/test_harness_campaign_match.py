@@ -328,11 +328,14 @@ class TestPlayingIt:
         assert _clone(0) in host.removed
 
     def test_a_failed_member_keeps_its_clone_because_the_wreckage_is_there(self) -> None:
+        """The clone survives for forensics; the only removal is the staging
+        directory, whose contents were already published to the shared
+        filesystem before the verdict was judged."""
         host = _planted()
         host.transcripts[_clone(0)] = ("[play] the agent never opened port 27511",)
         with host:
             assert main(_argv()) == EXIT_INCOMPLETE
-        assert host.removed == []
+        assert host.removed == [f"{_clone(0)}/stage-attack-s1"]
 
     def test_each_member_clones_ports_and_displays_under_its_own_lease(self) -> None:
         """Every member used to lease ordinal 1. All of them aimed at one

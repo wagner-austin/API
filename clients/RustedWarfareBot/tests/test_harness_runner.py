@@ -147,6 +147,26 @@ def test_an_existing_frozen_tree_is_reused_never_refreshed() -> None:
         assert "[sweep] reusing the frozen tree at runs/sweeps/demo/.tree" in host.printed
 
 
+def test_a_match_publishes_its_staged_artifacts_once_at_the_end() -> None:
+    """The engine log and the trace stream node-locally beside the member's
+    clone and move to their final homes in one publish -- forty-eight
+    members streaming small writes to the shared filesystem for an hour
+    each is what made /pub crawl during every convergence (log
+    2026-09-12). The sidecars ride along and the staging dir is gone."""
+    with FakeHost() as host:
+        host.plant_source(_SOURCE)
+        prepare_clone(0, _config())
+        host.files[".game-w1/stage-tank-s1/tank-s1.log"] = ("engine",)
+        host.files[".game-w1/stage-tank-s1/tank-s1.log.agent"] = ("agent",)
+        host.files[".game-w1/stage-tank-s1/tank-s1.ndjson"] = ("frame army",)
+        played = play_job(_job(), ".game-w1", _config())
+        assert played is True
+        assert host.files["runs/sweeps/demo/logs/tank-s1.log"] == ("engine",)
+        assert host.files["runs/sweeps/demo/logs/tank-s1.log.agent"] == ("agent",)
+        assert host.files["runs/traces/demo/tank-s1.ndjson"] == ("frame army",)
+        assert not host.path_exists(Path(".game-w1/stage-tank-s1/tank-s1.log"))
+
+
 def test_a_clone_is_a_copy_of_the_game_without_the_trees_it_rewrites() -> None:
     with FakeHost() as host:
         host.plant_source(_SOURCE)
