@@ -206,34 +206,38 @@ def _tilted(
     return (*mix, *(capable[i % len(capable)] for i in range(wanted)))
 
 
-def outranging_types(
+def outranging_movers(
     mix: Sequence[str],
     targets: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
     catalogue: Mapping[str, UnitStats],
-) -> tuple[str, ...]:
-    """Name the seen ground MOVERS that outrange every land gun in the mix.
+) -> int:
+    """Count the seen ground MOVERS that outrange every land gun in the mix.
 
     The arming read for the doctrine's ``outranged`` clause -- the
-    threat-armed sibling of the siege switch's time gate -- and the memory
-    feed for its blood gate, exactly as :func:`fleet_types` feeds the naval
-    one. The time gate closed 0-for in the attrition tier because it fired
-    in every long game; this names only the threat the clause answers: a
-    mobile, land-hitting ground hostile whose fire starts beyond the reach
-    of every land-hitting type the mix fields. Fliers are the air tilt's
-    threat and WATER-movers the naval clause's, and STRUCTURES are
-    nobody's: the first wiring read every armed hostile, and the enemy's
-    own command centre -- armed, visible from the base, forever -- held the
-    clause on from frame 0 of every match (condprobe13, log 2026-09-12).
-    Mobility is the catalogue's speed test, the same discipline
-    :func:`mobile_threats` measured -- seeing everything made the mix
-    blinder than seeing only what attacks. A type the catalogue does not
-    price is dropped, erring the same way.
+    threat-armed sibling of the siege switch's time gate. A count of
+    INSTANCES, not names, because concurrency is the signal the campaign's
+    whole falsification ladder converged on (log 2026-09-12): sight of one
+    armed on a 165-versus-160 technicality (condprobe13b), cumulative
+    blood at any dose traded marginal winners for opener flips or the
+    reverse (cond35's wash, conddose12's inverted trade), and first-blood
+    timing overlaps between the populations (openers fire at samples
+    1,020-1,857, regressed winners at 1,399-2,018). What separates them in
+    the feature table is how MANY long guns the enemy fields at once: the
+    scout-artillery opening stands batteries of them while the marginal
+    winner faces one or two snipers, so the count is the opening's own
+    signature and one piece can never arm the join.
 
-    Strictly beyond: a tie is a fair fight, not a standoff. A mix with no
-    land gun at all names nothing -- before the army is fielded there is
-    no standoff to answer, and the first wiring's opposite reading was the
-    other half of the frame-0 hold.
+    The membership tests carry the earlier falsifications: a mobile,
+    land-hitting ground hostile whose fire starts beyond the reach of every
+    land-hitting type the mix fields. Fliers are the air tilt's threat and
+    WATER-movers the naval clause's, and STRUCTURES are nobody's -- the
+    first wiring counted the enemy's own command centre and held the
+    clause on from frame 0 (condprobe13). Mobility is the catalogue's
+    speed test, the discipline :func:`mobile_threats` measured; unpriced
+    types drop the same way. Strictly beyond: a tie is a fair fight. A
+    mix with no land gun counts nothing -- before the army is fielded
+    there is no standoff to answer.
 
     Args:
         mix: The army mix as composed so far, repeats irrelevant here.
@@ -243,8 +247,7 @@ def outranging_types(
             building from a unit.
 
     Returns:
-        The outranging mobile ground types, in first-seen order, repeats
-        kept out -- empty while no standoff is in sight.
+        How many outranging mobile ground hostiles are in the picture.
 
     Raises:
         CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
@@ -257,10 +260,10 @@ def outranging_types(
         if record["hits_land"]
     ]
     if not own:
-        return ()
+        return 0
     reach = max(own)
-    names = (
-        t["type_name"]
+    return sum(
+        1
         for t in targets
         if not t["flying"]
         and t["movement"] != _NAVAL_LAYER
@@ -269,7 +272,6 @@ def outranging_types(
         and profile_of(profiles, t["type_name"])["hits_land"]
         and profile_of(profiles, t["type_name"])["attack_range"] > reach
     )
-    return tuple(dict.fromkeys(names, True))
 
 
 def counter_composition(
@@ -406,7 +408,6 @@ def threat_tilts(
     siegedose: int,
     navtilt: int,
     fleet_seen: set[str],
-    standoff_seen: set[str],
     deaths_to: Callable[[set[str]], int],
     predicted: bool,
 ) -> tuple[tuple[str, ...], frozenset[str]]:
@@ -425,8 +426,9 @@ def threat_tilts(
         catalogue: Unit stats by type name, for the mobility test the
             outranged clause runs (:func:`outranging_types`).
         counter: The doctrine's tilt switch.
-        outranged: The doctrine's outranged dose -- kills by seen
-            outranging movers before the join arms, zero never.
+        outranged: The doctrine's outranged threshold -- concurrent
+            outranging ground movers in the picture before the join
+            arms, zero never.
         siegedose: Artillery shares the outranged join adds while armed --
             the same dose knob the siege clause spends, deliberately: one
             number for "how much reach", however it was armed.
@@ -434,9 +436,6 @@ def threat_tilts(
         fleet_seen: Every WATER-mover type name seen this match. OWNED BY
             THE CALLER and updated here, because the bloodied gate reads
             kills by types seen EVER, not merely types in this picture.
-        standoff_seen: Every outranging ground-mover type name seen this
-            match -- the standoff join's own memory, caller-owned and
-            updated here for exactly the fleet_seen reason.
         deaths_to: The death ledger's count of our units killed by any of
             the named types (:meth:`~rw_bot.policy.scorekeeper.Scores.deaths_to`).
         predicted: Whether the doom model reads this game as fleet-doomed.
@@ -451,20 +450,15 @@ def threat_tilts(
             describe a type in the mix or a threat.
     """
     fired: set[str] = set()
-    if outranged:
-        # The same two-record join as the naval gate below, for the same
-        # measured reason: ungated on sight alone, the clause armed on any
-        # trivial-margin mover -- a 165-reach plasma tank against a
-        # 160-reach mix -- and re-rolled winning seeds exactly as the
-        # ungated navtilt did on navpair48 (condprobe13b, log 2026-09-12).
-        # The dose is the doctrine's, because the fixed calibration of two
-        # measured a wash at block scale (cond35): the seeds it regressed
-        # bled 4-14 across whole games where the flipped openers bled 29.
-        standoffs = outranging_types(composition, threats, profiles, catalogue)
-        standoff_seen.update(standoffs)
-        if standoffs and deaths_to(standoff_seen) >= outranged:
-            composition = (*composition, *("c_artillery",) * siegedose)
-            fired.add("O")
+    # Concurrency, after the falsification ladder (log 2026-09-12):
+    # sight-of-one armed on a reach technicality, cumulative blood at any
+    # dose traded winners for openers or the reverse, and first-blood
+    # timing overlaps between the populations -- while the feature table
+    # separates them on how many long guns stand at once. The join holds
+    # only while the battery does.
+    if outranged and outranging_movers(composition, threats, profiles, catalogue) >= outranged:
+        composition = (*composition, *("c_artillery",) * siegedose)
+        fired.add("O")
     if counter:
         # The bloodied gate joins two records: fleet types ever seen, and
         # the death ledger's kills by them -- a game the fleet never
@@ -487,6 +481,6 @@ __all__ = [
     "fleet_types",
     "layer_counts",
     "mobile_threats",
-    "outranging_types",
+    "outranging_movers",
     "threat_tilts",
 ]

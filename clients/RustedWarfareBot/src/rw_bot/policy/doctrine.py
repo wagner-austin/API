@@ -421,26 +421,28 @@ class Doctrine(TypedDict):
             form the timing family's closure left open (log 2026-09-11:
             gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
             ``siege 0``, any dose but one is refused: it lies about its arm.
-        outranged: Kills by seen outranging ground movers before
-            ``siegedose`` artillery shares join the mix, zero never --
-            the knob IS the blood dose, and the join holds only while
-            such a mover is in the picture. The threat-armed sibling of
-            the ``siege`` clause's time gate, built from the pinbase48
-            split (log 2026-09-12: 39/39 against enemies that never
-            field artillery, 0/9 against the scout-plus-artillery
-            opening) after the static merge measured catastrophic in
-            both directions (arty39). Sight alone was measured
-            insufficient twice (navpair48's ungated navtilt, then
-            condprobe13b arming on a 165-versus-160 technicality), and
-            the naval gate's calibration of two proved a WASH at block
-            scale (cond35: three marginal artillery-bleeding winners
-            traded for three opener flips, 39-for-39 net) -- the
-            regressed winners bled 4-14 to artillery across whole
-            control games while two flipped openers bled 29, so the
-            dose is where they separate and it belongs to the doctrine,
-            not a constant. On a seed where no standoff reaches the
-            dose the clause never fires and the match is the
-            champion's, bit for bit.
+        outranged: Concurrent outranging ground movers in the picture
+            before ``siegedose`` artillery shares join the mix, zero
+            never -- the join holds only while the battery does. The
+            threat-armed sibling of the ``siege`` clause's time gate,
+            built from the pinbase48 split (log 2026-09-12: 39/39
+            against enemies that never field artillery, 0/9 against the
+            scout-plus-artillery opening) after the static merge
+            measured catastrophic in both directions (arty39). The
+            trigger is concurrency because everything simpler was
+            falsified in order: sight of ONE armed on a 165-versus-160
+            technicality (condprobe13b); cumulative blood at the naval
+            calibration was a wash (cond35: three marginal winners for
+            three opener flips) and at higher doses inverted the trade
+            (conddose12: winners return, flips die -- the openers need
+            the join before blood can accumulate); and first-blood
+            timing overlaps between the populations (openers arm at
+            samples 1,020-1,857, regressed winners at 1,399-2,018).
+            What separates them in the feature table is how many long
+            guns stand at once: the opening fields batteries where the
+            marginal winner faces one or two snipers. On a seed where
+            the enemy never masses the threshold the clause never fires
+            and the match is the champion's, bit for bit.
         raze: Sample count past which the raid party's objectives become
             remembered enemy FACTORIES instead of extractors -- the
             displacement road (log 2026-09-11): every composition answer

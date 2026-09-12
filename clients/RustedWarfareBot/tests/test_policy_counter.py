@@ -9,7 +9,7 @@ to repeat, and everything visible flying.
 from __future__ import annotations
 
 from rw_bot.mechanics.combat_profile import CombatProfile
-from rw_bot.policy.counter import counter_composition, fleet_types, outranging_types
+from rw_bot.policy.counter import counter_composition, fleet_types, outranging_movers
 from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED, NAVTILT_PREDICTED
 from rw_bot.wire.state import Entity
 from tests.campaign_fixtures import unit_stats
@@ -276,36 +276,42 @@ def _arty(unit_id: int) -> Entity:
 
 def test_nothing_seen_reads_as_not_outranged() -> None:
     """Fog is not evidence here either -- same rule as the tilts."""
-    assert not outranging_types(("c_tank",), (), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), (), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_a_longer_land_gun_in_sight_reads_as_outranged() -> None:
     """The clause's whole case: 290 against a mix whose best land gun is
     the missile's 200."""
     mix = ("c_tank", "c_missile")
-    assert outranging_types(mix, (_arty(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE) == (
-        "enemy_arty",
-    )
+    assert outranging_movers(mix, (_arty(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE) == 1
+
+
+def test_a_battery_counts_by_the_piece_not_the_type() -> None:
+    """Concurrency is the opening's signature (the falsification ladder,
+    log 2026-09-12): three artillery of one type must read as three, not
+    one, because the marginal winner faces one sniper of the same type."""
+    picture = (_arty(1), _arty(2), _arty(3))
+    assert outranging_movers(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE) == 3
 
 
 def test_a_tie_is_a_fair_fight_not_a_standoff() -> None:
     """Strictly beyond: equal reach trades shots, and the join is priced
     for the fight the mix cannot answer at all."""
     picture = (entity(1, "c_tank", mine=False, hostile=True),)
-    assert not outranging_types(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_fliers_and_ships_belong_to_the_other_clauses() -> None:
     """Three clauses, three layers: the air tilt owns the flier and the
     naval clause the WATER-mover, however far either shoots."""
-    assert not outranging_types(("c_tank",), (_heli(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
-    assert not outranging_types(("c_tank",), (_ship(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), (_heli(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), (_ship(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_a_mover_that_cannot_shoot_the_ground_does_not_arm_it() -> None:
     """Reach that cannot land on us is not a standoff, whatever the number."""
     picture = (entity(1, "enemy_probe", mine=False, hostile=True),)
-    assert not outranging_types(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_an_armed_structure_never_arms_the_clause() -> None:
@@ -314,17 +320,17 @@ def test_an_armed_structure_never_arms_the_clause() -> None:
     in sight from the first observation -- and a STANDOFF is a fight
     against something that can come to you. Speed zero excludes it."""
     picture = (entity(1, "enemy_hall", mine=False, hostile=True),)
-    assert not outranging_types(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_a_type_the_catalogue_does_not_price_is_dropped() -> None:
     """The same err-toward-unscouted rule mobile_threats measured."""
     picture = (entity(1, "enemy_ghost", mine=False, hostile=True),)
-    assert not outranging_types(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("c_tank",), picture, _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
 
 
 def test_a_mix_with_no_land_gun_reads_as_not_outranged() -> None:
     """Before the army is fielded there is no standoff to answer: the
     opposite reading held the clause on from frame 0 of every match, when
     the composition was a builder and the whole map was armed."""
-    assert not outranging_types(("builder",), (_arty(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)
+    assert not outranging_movers(("builder",), (_arty(1),), _STANDOFF_PROFILES, _STANDOFF_CATALOGUE)

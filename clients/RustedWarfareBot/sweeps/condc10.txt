@@ -1,0 +1,22 @@
+# The concurrency trigger's first probe (log 2026-09-12): outranged is
+# now the count of outranging ground movers standing AT ONCE before the
+# artillery share joins, after sight-of-one, cumulative blood at every
+# dose, and first-blood timing were each falsified in turn -- the
+# feature table separates the opener from the marginal winner on how
+# many long guns the enemy masses, batteries against snipers. Threshold
+# three on the six seeds every prior trigger traded between (the three
+# cond35 regressions must stay WON, the three condprobe13c flips must
+# stay FLIPPED) plus the four identity seeds (byte-identity or
+# correct-fire wins). Controls: pinbase48, cond35, condprobe13c,
+# conddose12 -- four generations of the same seeds under certified
+# determinism, the falsification ladder this trigger must out-price.
+cond|8914457|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915393|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915705|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914041|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916641|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917681|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913001|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913729|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915497|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917889|doctrines/evolve1-g4m2-cond.doctrine|10000

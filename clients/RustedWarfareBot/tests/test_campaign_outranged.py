@@ -127,32 +127,32 @@ def test_the_identity_never_fields_artillery_even_against_the_standoff() -> None
     assert not any('"type":"c_artillery"' in line for line in produced)
 
 
-def test_sight_alone_never_joins_the_share() -> None:
-    """The blood gate, lifted from the naval tilt's calibration: an
-    outranging mover in view that has killed nothing is a technicality,
-    not a standoff -- sight-alone arming re-rolled winning seeds on a
-    165-versus-160 margin (condprobe13b, log 2026-09-12), exactly as the
-    ungated navtilt did on navpair48."""
+def test_one_piece_never_arms_a_battery_threshold() -> None:
+    """One outranging mover is the marginal winner's sniper, not the
+    opening: sight-of-one armed on a 165-versus-160 technicality
+    (condprobe13b), cumulative blood traded winners for openers in both
+    directions (cond35, conddose12), and concurrency is what the feature
+    table separates the populations on (log 2026-09-12)."""
     peer = _play(_standoff_world(), times=4, outranged=2)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)
 
 
-def _bled_worlds() -> tuple[Sample, Sample]:
-    """The standoff drawing blood: two tanks under artillery fire, then gone.
+def _battery_world() -> Sample:
+    """The opening's signature: three outranging guns standing at once.
 
     Returns:
-        The bleeding world and the world after, artillery in sight in both.
+        The scripted world.
     """
-    bleeding = sample(
+    return sample(
         CENTRE,
         BUILDER,
         FACTORY,
         entity(1, "c_tank"),
-        entity(5, "c_tank", x=200.0, damaged_by="enemy_arty"),
-        entity(6, "c_tank", x=220.0, damaged_by="enemy_arty"),
         enemy(9, "enemy_arty", x=400.0),
+        enemy(10, "enemy_arty", x=430.0),
+        enemy(11, "enemy_arty", x=460.0),
         credits=4000,
         pools=(pool(x=300.0),),
         options=(
@@ -161,15 +161,13 @@ def _bled_worlds() -> tuple[Sample, Sample]:
             option(214, "extractorT1", placed=True),
         ),
     )
-    return bleeding, _standoff_world()
 
 
-def test_the_switch_fields_artillery_once_the_standoff_draws_blood() -> None:
-    """Two of ours dead to the outranging gun and it still in sight: the
-    share joins the ratio, and with a tank already standing the deficit
-    points at the artillery."""
-    bleeding, after = _bled_worlds()
-    peer = ScriptedPeer(lines(bleeding, after, after, after))
+def test_the_switch_fields_artillery_while_the_battery_stands() -> None:
+    """Three outranging guns at once meet a threshold of three: the share
+    joins the ratio, and with a tank already standing the deficit points
+    at the artillery."""
+    peer = ScriptedPeer(lines(*(_battery_world() for _ in range(4))))
     play(
         AgentChannel(peer),
         (),
@@ -178,10 +176,29 @@ def test_the_switch_fields_artillery_once_the_standoff_draws_blood() -> None:
         OUTRANGED_PROFILES,
         4,
         reinforce=("c_tank",),
-        outranged=2,
+        outranged=3,
     )
     produced = verb(peer, "produce")
     assert any('"type":"c_artillery"' in line for line in produced)
+
+
+def test_a_higher_threshold_holds_the_join_past_the_same_battery() -> None:
+    """The threshold is the doctrine's: three guns against a threshold of
+    four hold the join, exactly as one gun holds it against two."""
+    peer = ScriptedPeer(lines(*(_battery_world() for _ in range(4))))
+    play(
+        AgentChannel(peer),
+        (),
+        OUTRANGED_CATALOGUE,
+        PLACEMENTS,
+        OUTRANGED_PROFILES,
+        4,
+        reinforce=("c_tank",),
+        outranged=4,
+    )
+    produced = verb(peer, "produce")
+    assert any('"type":"c_tank"' in line for line in produced)
+    assert not any('"type":"c_artillery"' in line for line in produced)
 
 
 def test_the_armed_switch_is_the_identity_when_nothing_outranges() -> None:
@@ -214,29 +231,6 @@ def _hall_world() -> Sample:
             option(214, "extractorT1", placed=True),
         ),
     )
-
-
-def test_a_higher_dose_holds_the_join_past_the_same_blood() -> None:
-    """The knob IS the blood dose (cond35, log 2026-09-12): the fixed
-    calibration of two measured a wash at block scale, trading marginal
-    winners that bleed 4-14 across whole games for openers that bleed 29,
-    so the separation lives in the dose. Two deaths against a dose of
-    four holds the join."""
-    bleeding, after = _bled_worlds()
-    peer = ScriptedPeer(lines(bleeding, after, after, after))
-    play(
-        AgentChannel(peer),
-        (),
-        OUTRANGED_CATALOGUE,
-        PLACEMENTS,
-        OUTRANGED_PROFILES,
-        4,
-        reinforce=("c_tank",),
-        outranged=4,
-    )
-    produced = verb(peer, "produce")
-    assert any('"type":"c_tank"' in line for line in produced)
-    assert not any('"type":"c_artillery"' in line for line in produced)
 
 
 def test_an_armed_enemy_structure_never_joins_the_share() -> None:

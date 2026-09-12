@@ -227,10 +227,9 @@ def play(
     workforce = Workforce(EXPAND_RETRY_SAMPLES)
     recorder = Recorder(trace, profiles)
     scores = Scorekeeper(catalogue, profiles)
-    # The two blood gates' accumulating halves: every WATER-mover seen, and
-    # every outranging ground mover seen ([[policy-exact-timing]]).
+    # Every WATER-moving type name seen this match, the naval blood gate's
+    # accumulating half ([[policy-exact-timing]], the naval wall).
     fleet_seen: set[str] = set()
-    standoff_seen: set[str] = set()
     # Decision codes since the previous trace row -- consumed by
     # recorder.step, so each row carries its window's decisions (log 2026-08-09).
     pending_events: set[str] = set()
@@ -385,7 +384,6 @@ def play(
                 siegedose=siegedose,
                 navtilt=navtilt,
                 fleet_seen=fleet_seen,
-                standoff_seen=standoff_seen,
                 deaths_to=scores.deaths_to,
                 predicted=sentries.predicted,
             )
