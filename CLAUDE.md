@@ -27,7 +27,7 @@ reads it against your diff.
 
 ## Corvis: the tools this session actually has
 
-`corvis` is Austin's own MCP fleet — 28 backends, 294 tools behind a proxy
+`corvis` is Austin's own MCP fleet — 28 backends, 296 tools behind a proxy
 — and it is configured **globally**, so it is live in this repo even though
 its code lives in `~/PROJECTS/MCPs`. Only four discovery tools appear in the
 tool list; everything else is reached through them:
