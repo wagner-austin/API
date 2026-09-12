@@ -191,7 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     claims = (
         ledger_state_claims(text)
         + image_digest_claims(text, projects)
-        + stale_review_claims(markers, tracked_counts(tuple(glob for glob, _ in markers)))
+        + stale_review_claims(markers, tracked_counts(tuple(marker["glob"] for marker in markers)))
     )
     for claim in claims:
         sys.stdout.write(f"{path}: {claim}\n")

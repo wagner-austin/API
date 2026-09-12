@@ -39,6 +39,9 @@ from hpc3.core.research_index import (
     REVIEW_MARKER_SEPARATOR,
     REVIEW_MARKER_SUFFIX,
     SCALE_FIELD,
+    ReviewMarker,
+    decode_review_marker,
+    encode_review_marker,
     image_digest_claims,
     ledger_state_claims,
     parse_review_markers,
@@ -104,7 +107,9 @@ class TestRefusingAssertedRunState:
 
     def test_an_indented_scale_field_is_refused_too(self) -> None:
         """Nesting the bullet must not smuggle the field back in."""
-        assert len(ledger_state_claims(f"    {SCALE_FIELD} 12\n")) == 1
+        assert ledger_state_claims(f"    {SCALE_FIELD} 12\n") == (
+            f"the `Scale` field is back: {SCALE_FIELD} 12",
+        )
 
     def test_a_job_id_after_the_unit_is_not_a_claim(self) -> None:
         """The index legitimately cites job ids beside this noun.
@@ -126,7 +131,10 @@ class TestRefusingAssertedRunState:
         """Two entries carried one at once; reporting one would hide the other."""
         text = f"{SCALE_FIELD} x\nand 108 {LEDGER_ROW_UNIT}s\n"
 
-        assert len(ledger_state_claims(text)) == 2
+        assert ledger_state_claims(text) == (
+            f"the `Scale` field is back: {SCALE_FIELD} x",
+            f"an asserted ledger row count: 108 {LEDGER_ROW_UNIT}s",
+        )
 
     def test_the_committed_index_asserts_no_run_state(self) -> None:
         """The assertion this rule exists for, against the real document."""
@@ -176,10 +184,19 @@ class TestRefusingARestatedImageDigest:
 
     def test_an_elided_digest_is_read_up_to_the_ellipsis(self) -> None:
         """``0cfdd5592a1a…`` must compare as twelve hex characters, not as
-        twelve plus a character that is not in any digest."""
+        twelve plus a character that is not in any digest.
+
+        Asserted as the exact message rather than as "something was
+        reported", because the token the rule READ is the thing under test:
+        a scan that swallowed the ellipsis would still report a claim here
+        and would name a different digest while doing it.
+        """
         text = self._index("- ships `/pub/x/images/v2/t.sif`, sha256 `bbbbbbbbbbbb…`")
 
-        assert image_digest_claims(text, {"rusted": project_config(image_sha="c" * 64)}) != ()
+        assert image_digest_claims(text, {"rusted": project_config(image_sha="c" * 64)}) == (
+            "`rusted` restates an image digest the registry contradicts: "
+            "bbbbbbbbbbbb against cccccccccccc",
+        )
 
     def test_a_digest_far_from_the_path_is_not_attributed_to_it(self) -> None:
         """A later bullet's digest belongs to that bullet, not to this image."""
@@ -222,18 +239,30 @@ class TestTheReviewMarker:
     rules above are blind to it.
     """
 
-    def test_a_marker_is_read_as_its_glob_and_count(self) -> None:
-        """The pairing is the whole declaration."""
-        text = f"{REVIEW_MARKER_PREFIX}runs/*.json{REVIEW_MARKER_SEPARATOR}7{REVIEW_MARKER_SUFFIX}"
+    def test_a_marker_round_trips_through_its_own_spelling(self) -> None:
+        """Rendering and reading are one format, pinned in one assertion.
 
-        assert parse_review_markers(text) == (("runs/*.json", 7),)
+        Every fixture below is built by ``encode_review_marker`` rather than
+        by retyping the delimiters, so this is the test that holds the two
+        halves together: if the spelling changes, this fails rather than the
+        parser and the fixtures drifting apart quietly.
+        """
+        marker = ReviewMarker(glob="runs/*.json", count=7)
+
+        assert encode_review_marker(marker) == (
+            f"{REVIEW_MARKER_PREFIX}runs/*.json{REVIEW_MARKER_SEPARATOR}7{REVIEW_MARKER_SUFFIX}"
+        )
+        assert parse_review_markers(encode_review_marker(marker)) == (marker,)
 
     def test_several_markers_are_read_in_order(self) -> None:
         """One entry can rest on more than one class of evidence."""
-        one = f"{REVIEW_MARKER_PREFIX}a/*{REVIEW_MARKER_SEPARATOR}1{REVIEW_MARKER_SUFFIX}"
-        two = f"{REVIEW_MARKER_PREFIX}b/*{REVIEW_MARKER_SEPARATOR}2{REVIEW_MARKER_SUFFIX}"
+        one = encode_review_marker(ReviewMarker(glob="a/*", count=1))
+        two = encode_review_marker(ReviewMarker(glob="b/*", count=2))
 
-        assert parse_review_markers(f"{one}\ntext\n{two}") == (("a/*", 1), ("b/*", 2))
+        assert parse_review_markers(f"{one}\ntext\n{two}") == (
+            ReviewMarker(glob="a/*", count=1),
+            ReviewMarker(glob="b/*", count=2),
+        )
 
     def test_a_document_with_no_markers_yields_none(self) -> None:
         """Carrying one is optional, and absence is not an error."""
@@ -244,30 +273,37 @@ class TestTheReviewMarker:
         with pytest.raises(ValueError, match="unterminated review marker"):
             _ = parse_review_markers(f"{REVIEW_MARKER_PREFIX}runs/*.json = 7")
 
-    def test_a_marker_without_the_separator_is_refused(self) -> None:
+    def test_a_body_without_the_separator_is_refused(self) -> None:
         """A glob with no count declares nothing to check against."""
         with pytest.raises(ValueError, match="omits"):
-            _ = parse_review_markers(f"{REVIEW_MARKER_PREFIX}runs/*.json{REVIEW_MARKER_SUFFIX}")
+            _ = decode_review_marker("runs/*.json")
+
+    def test_an_empty_glob_is_refused(self) -> None:
+        """git matches the whole repository on an empty pathspec.
+
+        That would report a count in the hundreds as though it were a
+        finding, which is a louder and more confusing failure than naming the
+        real mistake.
+        """
+        with pytest.raises(ValueError, match="empty glob"):
+            _ = decode_review_marker(f"{REVIEW_MARKER_SEPARATOR}5")
 
     def test_a_non_numeric_count_is_refused(self) -> None:
         """Caught on the real file: prose describing the syntax parsed as one."""
-        text = f"{REVIEW_MARKER_PREFIX}glob{REVIEW_MARKER_SEPARATOR}N{REVIEW_MARKER_SUFFIX}"
-
         with pytest.raises(ValueError, match="non-numeric count"):
-            _ = parse_review_markers(text)
+            _ = decode_review_marker(f"glob{REVIEW_MARKER_SEPARATOR}N")
 
     def test_a_glob_containing_the_separator_keeps_its_count(self) -> None:
         """Split from the RIGHT, so a path with " = " in it still resolves."""
-        text = (
-            f"{REVIEW_MARKER_PREFIX}odd = name/*.json"
-            f"{REVIEW_MARKER_SEPARATOR}3{REVIEW_MARKER_SUFFIX}"
-        )
+        marker = ReviewMarker(glob="odd = name/*.json", count=3)
 
-        assert parse_review_markers(text) == (("odd = name/*.json", 3),)
+        assert parse_review_markers(encode_review_marker(marker)) == (marker,)
 
     def test_a_count_that_moved_is_a_claim(self) -> None:
         """The code-style miss, reduced: one more file than was read."""
-        claims = stale_review_claims((("runs/*.json", 5),), {"runs/*.json": 6})
+        markers = (ReviewMarker(glob="runs/*.json", count=5),)
+
+        claims = stale_review_claims(markers, {"runs/*.json": 6})
 
         assert claims == (
             "`runs/*.json` now matches 6 tracked file(s) and this entry was read "
@@ -276,18 +312,26 @@ class TestTheReviewMarker:
 
     def test_evidence_that_disappeared_is_also_a_claim(self) -> None:
         """Fewer files is equally a reason to re-read, not only more."""
-        assert len(stale_review_claims((("runs/*.json", 5),), {"runs/*.json": 0})) == 1
+        markers = (ReviewMarker(glob="runs/*.json", count=5),)
+
+        assert stale_review_claims(markers, {"runs/*.json": 0}) == (
+            "`runs/*.json` now matches 0 tracked file(s) and this entry was read "
+            "against 5; re-read the entry and bump its marker",
+        )
 
     def test_a_count_that_agrees_is_not_a_claim(self) -> None:
         """The passing case, so the rule cannot pass vacuously."""
-        assert stale_review_claims((("runs/*.json", 6),), {"runs/*.json": 6}) == ()
+        markers = (ReviewMarker(glob="runs/*.json", count=6),)
+
+        assert stale_review_claims(markers, {"runs/*.json": 6}) == ()
 
     def test_the_committed_index_is_current_against_its_markers(self) -> None:
         """The assertion this rule exists for, against the real document."""
         markers = parse_review_markers(index_path().read_text(encoding="utf-8"))
+        counts = tracked_counts(tuple(marker["glob"] for marker in markers))
 
         assert markers != ()
-        assert stale_review_claims(markers, tracked_counts(tuple(g for g, _ in markers))) == ()
+        assert stale_review_claims(markers, counts) == ()
 
 
 class TestCountingTrackedFiles:

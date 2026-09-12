@@ -52,6 +52,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from typing_extensions import TypedDict
+
 from hpc3.contracts.project import ProjectConfig
 
 #: Opening marker of the generated block, and the ONE place it is written.
@@ -370,7 +372,71 @@ REVIEW_MARKER_SUFFIX: Final[str] = " -->"
 REVIEW_MARKER_SEPARATOR: Final[str] = " = "
 
 
-def parse_review_markers(text: str) -> tuple[tuple[str, int], ...]:
+class ReviewMarker(TypedDict):
+    """What one entry declares it has been read against.
+
+    Attributes:
+        glob: A git pathspec naming the evidence, which must be TRACKED
+            files. An untracked glob would make the count machine-local, and
+            a machine-local count is the thing :func:`ledger_state_claims`
+            exists to refuse.
+        count: How many files matched when the entry was last read.
+    """
+
+    glob: str
+    count: int
+
+
+def encode_review_marker(marker: ReviewMarker) -> str:
+    """Render a marker in the spelling the index carries.
+
+    This is the ONE place the format is written. Tests build their fixtures
+    through it rather than retyping the prefix, separator and suffix, so a
+    change to the spelling cannot leave a test asserting against the old one
+    while the parser reads the new one.
+
+    Args:
+        marker: The marker to render.
+
+    Returns:
+        The complete HTML comment, ready to paste under an entry's heading.
+    """
+    return (
+        f"{REVIEW_MARKER_PREFIX}{marker['glob']}"
+        f"{REVIEW_MARKER_SEPARATOR}{marker['count']}{REVIEW_MARKER_SUFFIX}"
+    )
+
+
+def decode_review_marker(body: str) -> ReviewMarker:
+    """Validate one marker's contents and give it a type.
+
+    Args:
+        body: The text between the marker's delimiters.
+
+    Returns:
+        The validated marker.
+
+    Raises:
+        ValueError: If the body omits the separator, names an empty glob, or
+            declares a count that is not a number. Each is refused with its
+            own message rather than one generic failure, because the three
+            are different mistakes: a missing separator is a malformed
+            marker, an empty glob would make git match the whole repository
+            and report a wildly wrong count as though it were a finding, and
+            a non-numeric count is what prose describing this syntax looks
+            like to the parser.
+    """
+    if REVIEW_MARKER_SEPARATOR not in body:
+        raise ValueError(f"review marker {body!r} omits {REVIEW_MARKER_SEPARATOR!r}")
+    glob, _, declared = body.rpartition(REVIEW_MARKER_SEPARATOR)
+    if not glob:
+        raise ValueError(f"review marker {body!r} names an empty glob")
+    if not declared.isdigit():
+        raise ValueError(f"review marker {body!r} declares a non-numeric count")
+    return ReviewMarker(glob=glob, count=int(declared))
+
+
+def parse_review_markers(text: str) -> tuple[ReviewMarker, ...]:
     """Read every "what this entry was read against" marker.
 
     An entry declares the evidence it has been read against as a tracked-file
@@ -384,34 +450,29 @@ def parse_review_markers(text: str) -> tuple[tuple[str, int], ...]:
         text: The research index's full text.
 
     Returns:
-        Each marker as its glob and the count it declares, in order.
+        Every marker in the document, in the order they appear.
 
     Raises:
-        ValueError: If a marker is unterminated, omits the separator, or
-            declares a count that is not a number. A malformed marker is
-            refused rather than skipped: skipping it would let a typo silently
-            disable the check on exactly the entry somebody was editing.
+        ValueError: If a marker is unterminated, or if
+            :func:`decode_review_marker` refuses its contents. A malformed
+            marker is refused rather than skipped: skipping it would let a
+            typo silently disable the check on exactly the entry somebody was
+            editing.
     """
-    markers: list[tuple[str, int]] = []
+    markers: list[ReviewMarker] = []
     index = text.find(REVIEW_MARKER_PREFIX)
     while index != -1:
         start = index + len(REVIEW_MARKER_PREFIX)
         end = text.find(REVIEW_MARKER_SUFFIX, start)
         if end == -1:
             raise ValueError(f"unterminated review marker at offset {index}")
-        body = text[start:end]
-        if REVIEW_MARKER_SEPARATOR not in body:
-            raise ValueError(f"review marker {body!r} omits {REVIEW_MARKER_SEPARATOR!r}")
-        glob, _, declared = body.rpartition(REVIEW_MARKER_SEPARATOR)
-        if not declared.isdigit():
-            raise ValueError(f"review marker {body!r} declares a non-numeric count")
-        markers.append((glob, int(declared)))
+        markers.append(decode_review_marker(text[start:end]))
         index = text.find(REVIEW_MARKER_PREFIX, end)
     return tuple(markers)
 
 
 def stale_review_claims(
-    markers: tuple[tuple[str, int], ...], counts: dict[str, int]
+    markers: tuple[ReviewMarker, ...], counts: dict[str, int]
 ) -> tuple[str, ...]:
     """Find every entry whose evidence has moved since it was last read.
 
@@ -443,12 +504,12 @@ def stale_review_claims(
     entries carry one is visible in the file.
     """
     claims: list[str] = []
-    for glob, declared in markers:
-        actual = counts[glob]
-        if actual != declared:
+    for marker in markers:
+        actual = counts[marker["glob"]]
+        if actual != marker["count"]:
             claims.append(
-                f"`{glob}` now matches {actual} tracked file(s) and this entry was read "
-                f"against {declared}; re-read the entry and bump its marker"
+                f"`{marker['glob']}` now matches {actual} tracked file(s) and this entry "
+                f"was read against {marker['count']}; re-read the entry and bump its marker"
             )
     return tuple(claims)
 
@@ -484,6 +545,9 @@ __all__ = [
     "REVIEW_MARKER_SEPARATOR",
     "REVIEW_MARKER_SUFFIX",
     "SCALE_FIELD",
+    "ReviewMarker",
+    "decode_review_marker",
+    "encode_review_marker",
     "extract_projects_block",
     "image_digest_claims",
     "ledger_state_claims",
