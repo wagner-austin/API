@@ -8,13 +8,15 @@ related:
 source_paths:
   - "scripts/sweep.py"
   - "src/rw_bot/harness/runner.py"
+  - "src/rw_bot/harness/frozen_tree.py"
   - "sweeps/run-xmap-1v1.sh"
 source_git_blobs:
-  "scripts/sweep.py": "97093577af50258d78e1609cb705fea02efc6738"
-  "src/rw_bot/harness/runner.py": "963ca0e1d8044f0f24a0cdd2eb547aa5875d21b8"
+  "scripts/sweep.py": "04784a693860f6845c4932175751ed3d8a09f305"
+  "src/rw_bot/harness/runner.py": "ac33271ebd336b570468a3eb8508e5e4badd664f"
+  "src/rw_bot/harness/frozen_tree.py": "418527622051c62ef309b215817aa6a7589897e8"
   "sweeps/run-xmap-1v1.sh": "4bf70377b380d60fae8fa09c1dd5509ddd483f5f"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-12
 confidence: high
 hubs: [headless-harness]
 ---
@@ -81,4 +83,13 @@ One supervisor, `scripts/runs.py`, as the only launch surface:
   and clones are inspected before reuse.
 - **Frozen trees are the run's identity.** A batch's `.tree` records what it
   measured; comparing batches means comparing tree identities first
-  ([[harness-parallel-matches]]).
+  ([[harness-parallel-matches]]). The freezing role lives in
+  `harness/frozen_tree.py` since 2026-09-12 (split from the runner at the
+  size ceiling), and the freeze refuses a prebuilt agent jar older than its
+  sources (`RW-SWEEP-007`) -- the gate the stale-jar incident bought.
+- **Artifacts stage node-locally and publish once.** A member's engine log
+  and per-sample trace stream beside its own game clone and move to the
+  shared filesystem in one bulk publish at match end, failures included --
+  forty-eight members streaming small NFS writes for an hour each is what
+  made `/pub` crawl through every convergence on 2026-09-12, and one copy
+  per match is what makes hundred-member bursts I/O-safe.

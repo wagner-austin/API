@@ -24,7 +24,7 @@ source_paths:
   - "src/rw_bot/policy/progress.py:20"
   - "src/rw_bot/policy/runner.py:91"
   - "src/rw_bot/policy/runner.py:392"
-  - "src/rw_bot/policy/campaign.py:238"
+  - "src/rw_bot/policy/campaign.py:239"
   - "src/rw_bot/policy/budget.py"
   - "scripts/play.py"
 source_git_blobs:
@@ -39,7 +39,7 @@ source_git_blobs:
   "src/rw_bot/policy/build_order.py": "4523f35ebd19be1b83f2f17f56e1027373594312"
   "src/rw_bot/policy/progress.py": "2586afbd25ffeb0216657b153e28dd9c7c19b4cd"
   "src/rw_bot/policy/runner.py": "857d1e24c2cde142054e40c7bcb50b3a1d94b009"
-  "src/rw_bot/policy/campaign.py": "a81a52b2f2fbaef12ac8f3ee06a397ba57d54db5"
+  "src/rw_bot/policy/campaign.py": "b7b445e8a9d27ddc81ad837419a5645b48b7a3f3"
   "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
   "scripts/play.py": "5a4fbf19261e961ae00ef2f19138c51ff4b85cd3"
 game_version: "1.15 (code 176, build #28)"

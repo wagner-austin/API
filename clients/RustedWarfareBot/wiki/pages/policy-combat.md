@@ -16,7 +16,7 @@ source_paths:
   - "agent/src/rwbot/agent/Orders.java"
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
-  - "src/rw_bot/policy/campaign.py:310"
+  - "src/rw_bot/policy/campaign.py:314"
   - "src/rw_bot/policy/dispatching.py:337"
   - "src/rw_bot/policy/match_report.py:71"
 source_git_blobs:
@@ -28,7 +28,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "2c69deb870c8606811cc09cb069e8df0cd43ae46"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "a81a52b2f2fbaef12ac8f3ee06a397ba57d54db5"
+  "src/rw_bot/policy/campaign.py": "b7b445e8a9d27ddc81ad837419a5645b48b7a3f3"
   "src/rw_bot/policy/dispatching.py": "bc9178f263566abf5bdb21cfc85b051be0ca094c"
   "src/rw_bot/policy/match_report.py": "72a04db3c287bdd73bb58daade2ac5321ed8e74d"
 game_version: "1.15 (code 176, build #28)"

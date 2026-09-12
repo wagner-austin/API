@@ -10,7 +10,7 @@ source_paths:
   - "doctrines/default.doctrine"
   - "src/rw_bot/harness/sweep.py"
 source_git_blobs:
-  "src/rw_bot/policy/doctrine.py": "1ff95e1bf5b5ff47780ecdc9b090982ea384d036"
+  "src/rw_bot/policy/doctrine.py": "eb2f37c6f8953c0da4b1215377ef96e836533765"
   "doctrines/default.doctrine": "76c43c9e6a02eed8f8a63945550d4ecb9a090bd6"
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
 game_version: "1.15 (code 176, build #28)"
