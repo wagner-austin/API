@@ -1,0 +1,27 @@
+# The rebuild gate priced on exactly the seeds that fail: the nine
+# pinbase48 non-wins (5 wiped, 2 defeated, 2 stalemated; log 2026-09-12
+# anatomy -- every one income-halved by the 25 percent mark, x1-2
+# extractors for the whole back half), each at both doses of the gate.
+# NO CONTROL ARM: under certified determinism the pinbase48 scorecards
+# ARE the champion's result on these seeds, so eighteen members buy nine
+# paired comparisons at two doses. A verdict flip on a wiped seed is the
+# gate paying exactly where the champion dies; the 48-pair adoption bar
+# on untouched seeds (laws six, nine) still stands after this probe.
+rb5k|8913313|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8913313|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8913833|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8913833|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8914041|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8914041|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8914977|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8914977|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8915185|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8915185|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8916121|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8916121|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8916641|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8916641|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8917473|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8917473|doctrines/evolve1-g4m2-rb15k.doctrine|10000
+rb5k|8917681|doctrines/evolve1-g4m2-rb5k.doctrine|10000
+rb15k|8917681|doctrines/evolve1-g4m2-rb15k.doctrine|10000
