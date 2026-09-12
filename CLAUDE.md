@@ -27,10 +27,18 @@ reads it against your diff.
 
 ## Corvis: the tools this session actually has
 
-`corvis` is Austin's own MCP fleet — ~27 backends, 250+ tools behind a proxy
+`corvis` is Austin's own MCP fleet — 28 backends, 294 tools behind a proxy
 — and it is configured **globally**, so it is live in this repo even though
 its code lives in `~/PROJECTS/MCPs`. Only four discovery tools appear in the
 tool list; everything else is reached through them:
+
+Those are as-of figures (2026-09-12), and this file is outside the guard that
+checks them. `~/PROJECTS/MCPs/CLAUDE.md` and that repo's `README.md` are pinned
+to the registries by `prose-counts-resolve.test.ts` and
+`readme-tool-surface.test.ts`; this copy is not, so it drifts silently. The
+previous text here read "~27 backends, 250+ tools", which was both stale and
+written as a hedge no check could catch. Re-derive rather than quote:
+`grep -oE '[0-9]+ tools total' ~/PROJECTS/MCPs/README.md`.
 
 ```
 search_tools(query)       rank the registry — ORDERS results, never proves absence
