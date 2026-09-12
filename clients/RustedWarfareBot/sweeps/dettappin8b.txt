@@ -1,0 +1,18 @@
+# dettappin8 RERUN AGAINST THE FRESH JAR, same 4 identical pairs, same
+# seeds, both pins, full tap (log 2026-09-11 correction entry): dettappin8
+# measured a STALE PRE-PIN agent -- the payload's prebuilt rw-agent.jar was
+# built at 09:53, before either pin commit, so its forks say nothing about
+# the pins. The jar is rebuilt (19:25, selftest green) and the freeze now
+# refuses staleness (RW-SWEEP-007), so this batch is the first honest
+# two-pin cluster reading. Same seeds as dettappin8 deliberately: pair its
+# members against these and the only variable is the jar. Diff member logs
+# pairwise exactly as the local recipe's read-order prescribes: aitick,
+# then rng frame= (which stream first), then credspend/chargestack.
+champ|8911001|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911001|doctrines/vh-twin.doctrine|10000
+champ|8911105|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911105|doctrines/vh-twin.doctrine|10000
+champ|8911209|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911209|doctrines/vh-twin.doctrine|10000
+champ|8911313|doctrines/evolve1-g4m2.doctrine|10000
+twin|8911313|doctrines/vh-twin.doctrine|10000
