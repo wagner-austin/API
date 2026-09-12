@@ -1,0 +1,23 @@
+# The outranged switch priced on both halves at once (log 2026-09-12):
+# the nine opener seeds where the champion is 0-for and the artillery
+# answer is needed, plus four of the champion's winning seeds where the
+# clause should NEVER fire -- on those four the armed doctrine must
+# reproduce the champion's card BYTE-IDENTICALLY (name-normalized),
+# because a threat-armed join that sees no threat composes nothing
+# differently. That identity is the property the static merge lacked
+# (arty39: 12 wins where the champion held 39), and reading it
+# empirically beside the flips is the whole adoption case in thirteen
+# members. Controls are the pinbase48 cards under certified determinism.
+cond|8913313|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913833|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914041|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914977|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915185|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916121|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916641|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917473|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917681|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913001|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913729|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915497|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917889|doctrines/evolve1-g4m2-cond.doctrine|10000
