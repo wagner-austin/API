@@ -1935,6 +1935,27 @@ scored is that the item set is a staged file rather than a data-bank id.
   the strata table: `wiki/pages/code-style-guard-pass-instrument-limits.md`. The first two sweeps were void for reasons recorded on
   the board: a token budget that truncated 83% of completions, and before that
   an unscoped guard invocation that gave every item the same verdict.
+- **THE RUN THAT SENTENCE ASKS FOR HAS SINCE HAPPENED, AND THIS ENTRY DID NOT
+  CARRY IT UNTIL 2026-09-12.** "Roughly 800 items reach power 0.73" was written
+  as the requirement; `runs/gen-v2/comparison.json` landed the next day, in
+  `56b71c9e` on 2026-09-09, with **875 shared items** on the same
+  `code-style-guard-pass` experiment and the same base-versus-candidate
+  contrast. Read off the record: base 3.31%, candidate 2.74%,
+  `net_improvement` −5, **29 discordant pairs (17 baseline-only, 12
+  candidate-only), mid-p 0.3616**. The sentence above it still described four
+  comparison files and three NOT TESTED strata from the v1 adapter, while a
+  sixth file sat in the same directory.
+
+  **What this does and does not settle, because the arm changed with the
+  size.** `gen-v2` scores the **v2** adapter, not a wider re-run of v1, so it
+  does not retroactively power v1's strata and those verdicts stand as
+  written. What it does is move the programme's standing result: at the width
+  this entry names as adequate for a +5 pp effect, the adapter does not beat
+  its own base, and the point estimate leans very slightly the OTHER way. The
+  guard-pass metric's floor is still ~3%, so this remains a weak instrument
+  for small effects however many items it scores; the correct reading is "no
+  improvement detected at the size we said would detect one", not "the
+  adapter is worse".
 - **Not novel, and the task spec that says otherwise is wrong.** A systematic
   search found the core already published: ContextCov (arXiv 2603.00822)
   compiles a repository's written conventions into executable AST and
