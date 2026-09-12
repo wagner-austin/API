@@ -1,0 +1,14 @@
+# The shore battery priced on the arty merge's residual losses: the
+# four seeds where evolve1-g4m2-arty still lost or stalemated
+# (artyprobe18, log 2026-09-12) plus s8917473, whose arty member is a
+# boot-failure refill still in flight. The residuals' kill lists are
+# multi-domain -- battleShip/gunShip/missileShip hulls ground artillery
+# cannot reach -- and the battery is the naval hole's cheapest priced
+# response. Controls are the artyprobe18 arty cards under certified
+# determinism, so five members buy five paired comparisons; a flip here
+# stacks with the artillery answer toward the stratified adoption run.
+artybat|8913833|doctrines/evolve1-g4m2-arty-bat.doctrine|10000
+artybat|8914041|doctrines/evolve1-g4m2-arty-bat.doctrine|10000
+artybat|8915185|doctrines/evolve1-g4m2-arty-bat.doctrine|10000
+artybat|8917681|doctrines/evolve1-g4m2-arty-bat.doctrine|10000
+artybat|8917473|doctrines/evolve1-g4m2-arty-bat.doctrine|10000
