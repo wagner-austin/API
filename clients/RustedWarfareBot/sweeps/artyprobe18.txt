@@ -1,0 +1,29 @@
+# The artillery answer priced on the artillery-opener seeds: the nine
+# pinbase48 non-wins, which the enemy-composition split (log 2026-09-12)
+# shows are exactly the seeds where the enemy opens scout-plus-artillery
+# (39/39 wins vs zero-artillery enemies, 0/9 against the opening). Two
+# arms per seed: the PARENT close0-flame4, whose goals still carry
+# c_artillery (if the parent flips these seeds, the range answer alone
+# is the mechanism); and evolve1-g4m2-arty, the champion with only its
+# hover slot restored to artillery (the minimal merge that would keep
+# the elite armor mix). NO CONTROL ARM: the pinbase48 scorecards are the
+# champion's deterministic result on these seeds. Runs beside rbgate18;
+# the adoption bar on untouched seeds (laws six, nine) stands.
+parent|8913313|doctrines/close0-flame4.doctrine|10000
+arty|8913313|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8913833|doctrines/close0-flame4.doctrine|10000
+arty|8913833|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8914041|doctrines/close0-flame4.doctrine|10000
+arty|8914041|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8914977|doctrines/close0-flame4.doctrine|10000
+arty|8914977|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8915185|doctrines/close0-flame4.doctrine|10000
+arty|8915185|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8916121|doctrines/close0-flame4.doctrine|10000
+arty|8916121|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8916641|doctrines/close0-flame4.doctrine|10000
+arty|8916641|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8917473|doctrines/close0-flame4.doctrine|10000
+arty|8917473|doctrines/evolve1-g4m2-arty.doctrine|10000
+parent|8917681|doctrines/close0-flame4.doctrine|10000
+arty|8917681|doctrines/evolve1-g4m2-arty.doctrine|10000
