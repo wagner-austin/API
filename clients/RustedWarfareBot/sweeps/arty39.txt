@@ -1,0 +1,48 @@
+# The regression half of the arty merge's adoption case: the 39 seeds
+# the pinned champion WINS (pinbase48, log 2026-09-12), replayed under
+# evolve1-g4m2-arty. The merge flipped 4 of 9 opener seeds
+# (artyprobe18) and costs one production slot of hoverTank; this batch
+# answers whether that slot was load-bearing anywhere the champion
+# currently wins. Controls are the pinbase48 cards under certified
+# determinism -- any regressed seed names itself exactly. The formal
+# adoption bar on UNTOUCHED seeds (laws six, nine) follows only if
+# this and the opener flips together clear 43/48 on the block.
+arty|8913001|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913105|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913209|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913417|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913521|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913625|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913729|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8913937|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914145|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914249|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914353|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914457|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914561|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914665|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914769|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8914873|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915081|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915289|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915393|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915497|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915601|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915705|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915809|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8915913|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916017|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916225|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916329|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916433|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916537|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916745|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916849|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8916953|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917057|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917161|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917265|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917369|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917577|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917785|doctrines/evolve1-g4m2-arty.doctrine|10000
+arty|8917889|doctrines/evolve1-g4m2-arty.doctrine|10000
