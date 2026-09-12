@@ -1,0 +1,23 @@
+# condprobe13 RERUN under the fixed clause (log 2026-09-12): the first
+# wiring read every armed hostile and a gunless early mix as outranged,
+# so the enemy command centre held the join on from frame 0 -- the
+# armed doctrine fired on every seed, wiped a winning one (s8913001),
+# and flipped only 2/9 openers. ground_outranged now runs the catalogue
+# mobility test and requires a fielded land gun, so the join arms only
+# against a seen mobile outranging threat. Same thirteen members: nine
+# opener seeds (flips expected) and four winning seeds (byte-identity
+# to the champion's pinbase48 cards expected, the adoption case's
+# identity half). Controls unchanged under certified determinism.
+cond|8913313|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913833|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914041|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914977|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915185|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916121|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916641|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917473|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917681|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913001|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913729|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915497|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917889|doctrines/evolve1-g4m2-cond.doctrine|10000
