@@ -206,6 +206,55 @@ def _tilted(
     return (*mix, *(capable[i % len(capable)] for i in range(wanted)))
 
 
+def ground_outranged(
+    mix: Sequence[str],
+    targets: Sequence[Threat],
+    profiles: Mapping[str, CombatProfile],
+) -> bool:
+    """Report whether a seen ground mover outranges every land gun in the mix.
+
+    The arming read for the doctrine's ``outranged`` clause -- the
+    threat-armed sibling of the siege switch's time gate. The time gate
+    closed 0-for in the attrition tier because it fired in every long game;
+    this fires only when the picture actually holds the threat it answers:
+    a LAND-moving, land-hitting hostile whose fire starts beyond the reach
+    of every land-hitting type the mix fields. Fliers are the air tilt's
+    threat and WATER-movers the naval clause's, so both are excluded here
+    -- three clauses, three layers, no overlap.
+
+    Strictly beyond: a tie is a fair fight, not a standoff. A mix with no
+    land gun at all reads as outranged by any armed land mover, because
+    zero reach is what "cannot answer" means at this arithmetic's level.
+
+    Args:
+        mix: The army mix as composed so far, repeats irrelevant here.
+        targets: The hostile entities currently visible or remembered.
+        profiles: Combat profiles by type name, for reach and layers.
+
+    Returns:
+        True while the seen ground picture outranges the mix.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
+            a type in the mix or a ground threat.
+    """
+    ground = tuple(t for t in targets if not t["flying"] and t["movement"] != _NAVAL_LAYER)
+    reaches = [
+        profile_of(profiles, t["type_name"])["attack_range"]
+        for t in ground
+        if profile_of(profiles, t["type_name"])["hits_land"]
+    ]
+    if not reaches:
+        return False
+    own = [
+        record["attack_range"]
+        for name in dict.fromkeys(mix, True)
+        for record in (profile_of(profiles, name),)
+        if record["hits_land"]
+    ]
+    return max(reaches) > (max(own) if own else 0.0)
+
+
 def counter_composition(
     composition: Sequence[str],
     targets: Sequence[Threat],
@@ -329,11 +378,79 @@ def mobile_threats(intel: Intel, catalogue: Mapping[str, UnitStats]) -> tuple[Th
     return tuple(threats)
 
 
+def threat_tilts(
+    composition: tuple[str, ...],
+    threats: Sequence[Threat],
+    profiles: Mapping[str, CombatProfile],
+    *,
+    counter: bool,
+    outranged: bool,
+    siegedose: int,
+    navtilt: int,
+    fleet_seen: set[str],
+    deaths_to: Callable[[set[str]], int],
+    predicted: bool,
+) -> tuple[tuple[str, ...], frozenset[str]]:
+    """Run every threat-armed composition clause and say which ones fired.
+
+    The one entry the campaign loop calls, so the loop stays orchestration
+    and the whole what-does-the-threat-picture-change decision lives here
+    beside the arithmetic it runs on. Two clauses, in the order their
+    evidence arrived: the outranged join first (the joined artillery is
+    part of the mix the tilts then balance), then the air-and-naval tilt.
+
+    Args:
+        composition: The mix as the doctrine and the clock composed it.
+        threats: The hostile entities currently visible or remembered.
+        profiles: Combat profiles by type name, for reach and layers.
+        counter: The doctrine's tilt switch.
+        outranged: The doctrine's outranged switch.
+        siegedose: Artillery shares the outranged join adds while armed --
+            the same dose knob the siege clause spends, deliberately: one
+            number for "how much reach", however it was armed.
+        navtilt: The doctrine's naval-tilt mode.
+        fleet_seen: Every WATER-mover type name seen this match. OWNED BY
+            THE CALLER and updated here, because the bloodied gate reads
+            kills by types seen EVER, not merely types in this picture.
+        deaths_to: The death ledger's count of our units killed by any of
+            the named types (:meth:`~rw_bot.policy.scorekeeper.Scores.deaths_to`).
+        predicted: Whether the doom model reads this game as fleet-doomed.
+
+    Returns:
+        The mix to produce against, and the trace letters of the clauses
+        that changed it -- ``"O"`` for the outranged join, ``"T"`` for the
+        tilt -- empty when the picture moved nothing.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not
+            describe a type in the mix or a threat.
+    """
+    fired: set[str] = set()
+    if outranged and ground_outranged(composition, threats, profiles):
+        composition = (*composition, *("c_artillery",) * siegedose)
+        fired.add("O")
+    if counter:
+        # The bloodied gate joins two records: fleet types ever seen, and
+        # the death ledger's kills by them -- a game the fleet never
+        # touched can never read bloodied (the calibration).
+        fleet_seen.update(fleet_types(threats))
+        bloodied = deaths_to(fleet_seen) >= FLEET_BLOOD
+        untilted = composition
+        composition = counter_composition(
+            composition, threats, profiles, navtilt, bloodied, predicted
+        )
+        if composition != untilted:
+            fired.add("T")
+    return composition, frozenset(fired)
+
+
 __all__ = [
     "FLEET_BLOOD",
     "Threat",
     "counter_composition",
     "fleet_types",
+    "ground_outranged",
     "layer_counts",
     "mobile_threats",
+    "threat_tilts",
 ]

@@ -109,6 +109,7 @@ FLAG_FIELDS: Final = (
     "brace",
     "huntgate",
     "bank",
+    "outranged",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -420,6 +421,17 @@ class Doctrine(TypedDict):
             form the timing family's closure left open (log 2026-09-11:
             gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
             ``siege 0``, any dose but one is refused: it lies about its arm.
+        outranged: Whether ``siegedose`` artillery shares join the mix
+            WHILE the remembered ground picture outranges it -- the
+            threat-armed sibling of the ``siege`` clause's time gate.
+            The time gate closed 0-for in the attrition tier because it
+            fired in every long game; the pinbase48 split (log
+            2026-09-12) is binary -- 39/39 against enemies that never
+            field artillery, 0/9 against the scout-plus-artillery
+            opening -- and the static merge measured catastrophic in
+            BOTH directions (arty39), so the join must follow the SEEN
+            opening: on a zero-artillery seed the clause never fires and
+            the match is the champion's, bit for bit.
         raze: Sample count past which the raid party's objectives become
             remembered enemy FACTORIES instead of extractors -- the
             displacement road (log 2026-09-11): every composition answer
@@ -535,6 +547,7 @@ class Doctrine(TypedDict):
     press: int
     huntgate: bool
     bank: bool
+    outranged: bool
 
 
 __all__ = [

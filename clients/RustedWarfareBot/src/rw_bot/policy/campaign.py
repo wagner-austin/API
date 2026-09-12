@@ -34,13 +34,7 @@ from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
 from rw_bot.policy.combat import FIRST_WAVE, WAVE_SIZES, find_army, find_targets
-from rw_bot.policy.counter import (
-    FLEET_BLOOD,
-    counter_composition,
-    fleet_types,
-    layer_counts,
-    mobile_threats,
-)
+from rw_bot.policy.counter import Threat, fleet_types, layer_counts, mobile_threats, threat_tilts
 from rw_bot.policy.creep import Creeper
 from rw_bot.policy.decoy import Decoys, scout_shortfall
 from rw_bot.policy.dispatch import WaveController
@@ -138,6 +132,7 @@ def play(
     retreat: int = FIRST_WAVE,
     siege: int = 0,
     siegedose: int = 1,
+    outranged: bool = False,
     raze: int = 0,
     press: int = 0,
     bank: bool = False,
@@ -194,7 +189,7 @@ def play(
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``, ``groupcap``,
-            ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``,
+            ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``, ``outranged``,
             ``raze``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
@@ -375,20 +370,24 @@ def play(
                 # Siege switch: shares join past the gate (Doctrine.siege).
                 *(("c_artillery",) * siegedose if siege and scores.samples_seen >= siege else ()),
             )
-            if counter:
+            # One threat picture for every threat-armed clause, computed only
+            # when one of them is on -- the scout gate is theirs to share.
+            threats: tuple[Threat, ...] = ()
+            if counter or outranged:
                 threats = mobile_threats(intel, catalogue) if scout else tuple(targets)
-                # The bloodied gate joins two records: fleet types ever seen,
-                # and the death ledger's kills by them -- a game the fleet
-                # never touched can never read bloodied (the calibration).
-                fleet_seen.update(fleet_types(threats))
-                bloodied = scores.deaths_to(fleet_seen) >= FLEET_BLOOD
-                predicted = sentries.predicted
-                untilted = composition_now
-                composition_now = counter_composition(
-                    composition_now, threats, profiles, navtilt, bloodied, predicted
-                )
-                if composition_now != untilted:
-                    pending_events.add("T")
+            composition_now, tilt_events = threat_tilts(
+                composition_now,
+                threats,
+                profiles,
+                counter=counter,
+                outranged=outranged,
+                siegedose=siegedose,
+                navtilt=navtilt,
+                fleet_seen=fleet_seen,
+                deaths_to=scores.deaths_to,
+                predicted=sentries.predicted,
+            )
+            pending_events.update(tilt_events)
             capable = wanted_producers(sample, composition_now)
             queues_open = sum(
                 1

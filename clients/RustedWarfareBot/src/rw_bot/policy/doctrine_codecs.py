@@ -294,6 +294,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             "field 'bank' funds the finisher through the razing head's safe window, "
             "and this doctrine stands no launchers: set nukes or turn the bank off",
         )
+    outranged = require_bool(payload, "outranged")
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -369,6 +370,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         press=press,
         huntgate=huntgate,
         bank=bank,
+        outranged=outranged,
     )
 
 
@@ -434,6 +436,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "press": doctrine["press"],
         "huntgate": doctrine["huntgate"],
         "bank": doctrine["bank"],
+        "outranged": doctrine["outranged"],
     }
 
 

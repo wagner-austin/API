@@ -9,7 +9,7 @@ to repeat, and everything visible flying.
 from __future__ import annotations
 
 from rw_bot.mechanics.combat_profile import CombatProfile
-from rw_bot.policy.counter import counter_composition, fleet_types
+from rw_bot.policy.counter import counter_composition, fleet_types, ground_outranged
 from rw_bot.policy.doctrine import NAVTILT_ALWAYS, NAVTILT_BLOODIED, NAVTILT_PREDICTED
 from rw_bot.wire.state import Entity
 from tests.wire_fixtures import entity, profile
@@ -241,3 +241,54 @@ def test_the_predicted_clause_fires_only_on_the_models_word() -> None:
         mix, picture, _NAVAL_PROFILES, NAVTILT_PREDICTED, True, False
     )
     assert bloodied_only == mix
+
+
+_STANDOFF_PROFILES: dict[str, CombatProfile] = {
+    **_NAVAL_PROFILES,
+    # The live game's shape: enemy artillery at 290 against the 110 tank.
+    "enemy_arty": profile("enemy_arty", 290.0),
+    # A hostile that moves but cannot shoot the ground -- the excluded case.
+    "enemy_probe": profile("enemy_probe", 150.0, land=False),
+}
+
+
+def _arty(unit_id: int) -> Entity:
+    return entity(unit_id, "enemy_arty", mine=False, hostile=True)
+
+
+def test_nothing_seen_reads_as_not_outranged() -> None:
+    """Fog is not evidence here either -- same rule as the tilts."""
+    assert not ground_outranged(("c_tank",), (), _STANDOFF_PROFILES)
+
+
+def test_a_longer_land_gun_in_sight_reads_as_outranged() -> None:
+    """The clause's whole case: 290 against a mix whose best land gun is
+    the missile's 200."""
+    mix = ("c_tank", "c_missile")
+    assert ground_outranged(mix, (_arty(1),), _STANDOFF_PROFILES)
+
+
+def test_a_tie_is_a_fair_fight_not_a_standoff() -> None:
+    """Strictly beyond: equal reach trades shots, and the join is priced
+    for the fight the mix cannot answer at all."""
+    picture = (entity(1, "c_tank", mine=False, hostile=True),)
+    assert not ground_outranged(("c_tank",), picture, _STANDOFF_PROFILES)
+
+
+def test_fliers_and_ships_belong_to_the_other_clauses() -> None:
+    """Three clauses, three layers: the air tilt owns the flier and the
+    naval clause the WATER-mover, however far either shoots."""
+    assert not ground_outranged(("c_tank",), (_heli(1),), _STANDOFF_PROFILES)
+    assert not ground_outranged(("c_tank",), (_ship(1),), _STANDOFF_PROFILES)
+
+
+def test_a_mover_that_cannot_shoot_the_ground_does_not_arm_it() -> None:
+    """Reach that cannot land on us is not a standoff, whatever the number."""
+    picture = (entity(1, "enemy_probe", mine=False, hostile=True),)
+    assert not ground_outranged(("c_tank",), picture, _STANDOFF_PROFILES)
+
+
+def test_a_mix_with_no_land_gun_is_outranged_by_any_armed_mover() -> None:
+    """Zero reach is what "cannot answer" means at this arithmetic's level:
+    an unarmed mix reads as outranged by any land gun in sight."""
+    assert ground_outranged(("builder",), (_arty(1),), _STANDOFF_PROFILES)
