@@ -1,0 +1,23 @@
+# Third round of the conditional's adoption probe (log 2026-09-12):
+# round one armed on the enemy command centre from frame 0 (structures
+# and a gunless mix), round two armed on a 165-versus-160 technicality
+# (any margin, sight alone) -- each caught by the four identity members
+# and fixed at the mechanism (mobility test, then the naval tilt's
+# blood gate lifted whole: outranging movers must kill STANDOFF_BLOOD
+# of ours before siegedose artillery joins). Same thirteen members,
+# same bar, unchanged: flips on the nine opener seeds AND byte-identity
+# to the champion's pinbase48 cards on the four winning seeds, both or
+# the clause is not adoptable. Controls under certified determinism.
+cond|8913313|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913833|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914041|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914977|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915185|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916121|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916641|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917473|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917681|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913001|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913729|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915497|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917889|doctrines/evolve1-g4m2-cond.doctrine|10000
