@@ -1,0 +1,45 @@
+# The regression half of the blood-gated conditional's adoption case:
+# the 35 champion-winning seeds not yet measured under
+# evolve1-g4m2-cond (condprobe13c's four identity members cover the
+# other four: one byte-identical, three correct-fires that stayed won,
+# log 2026-09-12). The clause legitimately fires on winners the enemy
+# bleeds with artillery, so preservation is measured, not assumed:
+# every member's control is its pinbase48 card under certified
+# determinism, and any regressed seed names itself. Clean here plus
+# the three opener flips adopts the clause at 42/48 on the block and
+# sends it to the stratified fresh-seed bar.
+cond|8913105|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913209|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913417|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913521|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913625|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8913937|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914145|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914249|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914353|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914457|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914561|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914665|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914769|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8914873|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915081|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915289|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915393|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915601|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915705|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915809|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8915913|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916017|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916225|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916329|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916433|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916537|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916745|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916849|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8916953|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917057|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917161|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917265|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917369|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917577|doctrines/evolve1-g4m2-cond.doctrine|10000
+cond|8917785|doctrines/evolve1-g4m2-cond.doctrine|10000
