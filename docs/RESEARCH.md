@@ -1580,9 +1580,16 @@ scored is that the item set is a staged file rather than a data-bank id.
 
 - **SIX JOBS RAN AND NOT ONE OF THEIR RUN DOCUMENTS SURVIVES, which is a
   stronger version of the gap the `.gitignore` records elsewhere.**
-  `tankpit-sim-v1r1`, `v1r2`, `v1r3` and `v2clean` appear nowhere on this
-  machine except as names inside `ledger.jsonl`; `tools/hpc3/runs/` holds
+  `tankpit-sim-v1r1`, `v1r2`, `v1r3` and `v2clean` appear nowhere in this
+  repository except as names inside `ledger.jsonl`; `tools/hpc3/runs/` holds
   `hpc3-tankpit.json` and the two image-build directories and nothing else.
+  Searched rather than assumed, and the scope is stated because the first
+  version of this sentence said "nowhere on this machine" off a search that
+  could not support it: a tree-wide grep honours `.gitignore` and so skips the
+  untracked run documents this claim is about, which is the one file class it
+  most needed to read. What is established is this repository and the wider
+  `~/PROJECTS` tree; a copy in a purged scratch directory would not have been
+  seen, and by definition no longer would be.
   Everywhere else that record is merely UNTRACKED and can be negated into git,
   which is what the four `!tools/hpc3/runs/<prefix>-*.json` blocks did and what
   `floor` got on 2026-09-12. Here there is no file to negate. So the six jobs
