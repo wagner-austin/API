@@ -23,6 +23,7 @@ from hpc3.core.research_index import (
     REGENERATE_HINT,
     SCALE_FIELD,
     extract_projects_block,
+    image_digest_claims,
     ledger_state_claims,
     render_project_row,
     render_projects_block,
@@ -340,6 +341,85 @@ class TestRefusingAssertedRunState:
     def test_the_committed_index_asserts_no_run_state(self) -> None:
         """The assertion this rule exists for, against the real document."""
         assert ledger_state_claims(index_path().read_text(encoding="utf-8")) == ()
+
+
+class TestRefusingARestatedImageDigest:
+    """The generated block renders every declared digest, and one was retyped.
+
+    ``rusted``'s entry named ``images/v4/rusted.sif`` and ``b1eaaa2e`` while
+    the registry declared v5 and ``97a80bdeb16d``, with the rendered table
+    carrying the right answer two screens above it. Sitting beside the
+    generated value is not what makes a restatement safe.
+    """
+
+    def _index(self, body: str) -> str:
+        """Wrap a fragment in the heading the section reader needs.
+
+        Args:
+            body: The entry's text.
+
+        Returns:
+            A document with one ``rusted`` section.
+        """
+        return f"### `rusted` — a title\n\n{body}\n"
+
+    def test_a_digest_the_registry_contradicts_is_a_claim(self) -> None:
+        """The live instance, reduced to its shape."""
+        text = self._index("- declares `/pub/x/images/v4/rusted.sif` pinned by sha256 `b1eaaa2e`")
+
+        claims = image_digest_claims(text, {"rusted": _project(image_sha="9" * 64)})
+
+        assert claims == (
+            "`rusted` restates an image digest the registry contradicts: "
+            "b1eaaa2e against 999999999999",
+        )
+
+    def test_a_digest_that_agrees_is_not_a_claim(self) -> None:
+        """``tankpit``'s restatement was CORRECT when this was written.
+
+        A rule that fired on it would be one an author learns to skip, and the
+        point is to catch disagreement rather than to ban the sentence.
+        """
+        text = self._index("- ships `/pub/x/images/v2/t.sif`, sha256 `aaaaaaaaaaaa…`, 127 MB")
+
+        assert image_digest_claims(text, {"rusted": _project(image_sha="a" * 64)}) == ()
+
+    def test_an_elided_digest_is_read_up_to_the_ellipsis(self) -> None:
+        """``0cfdd5592a1a…`` must compare as twelve hex characters, not as
+        twelve plus a character that is not in any digest."""
+        text = self._index("- ships `/pub/x/images/v2/t.sif`, sha256 `bbbbbbbbbbbb…`")
+
+        assert image_digest_claims(text, {"rusted": _project(image_sha="c" * 64)}) != ()
+
+    def test_a_digest_far_from_the_path_is_not_attributed_to_it(self) -> None:
+        """A later bullet's digest belongs to that bullet, not to this image."""
+        text = self._index("- ships `/pub/x/images/v2/t.sif`" + " padding" * 40 + " sha256 `dddd`")
+
+        assert image_digest_claims(text, {"rusted": _project(image_sha="e" * 64)}) == ()
+
+    def test_a_path_with_no_digest_is_not_a_claim(self) -> None:
+        """Naming the image without retyping its digest is the fixed shape."""
+        text = self._index("- declares `/pub/x/images/v5/rusted.sif`, binding `/pub`")
+
+        assert image_digest_claims(text, {"rusted": _project()}) == ()
+
+    def test_a_digest_outside_any_registered_section_is_left_alone(self) -> None:
+        """The preamble and the unregistered entries are not registry claims."""
+        text = "prose `/pub/x/images/v1/s.sif` sha256 `abcabcabcabc` with no heading above it\n"
+
+        assert image_digest_claims(text, {"rusted": _project()}) == ()
+
+    def test_an_unregistered_project_section_is_left_alone(self) -> None:
+        """``sirius`` is described at length and declares nothing."""
+        text = "### `sirius` — never run\n\n`/pub/x/s.sif` sha256 `abcabcabcabc`\n"
+
+        assert image_digest_claims(text, {"rusted": _project()}) == ()
+
+    def test_the_committed_index_restates_no_contradicted_digest(self) -> None:
+        """The assertion this rule exists for, against the real document."""
+        text = index_path().read_text(encoding="utf-8")
+
+        assert image_digest_claims(text, declared_projects(runs_directory())) == ()
 
 
 class TestReportingAssertedRunStateFromTheCommandLine:

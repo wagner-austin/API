@@ -1,0 +1,30 @@
+{
+  "project": "mi-cu128",
+  "name": "fullowned-cu128-l40s",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "L40S",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/cu128-v1/abl-cu128.sif",
+    "sha256": "6d9ba0baac40b238b2e8b479c17ed5d08b055c7af6b000711888d6e22afc69b2",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "bash -c \"mkdir -p /tmp/cuda-stub/bin /tmp/cuda-stub/include /tmp/cuda-stub/lib && CUDA_PATH=/tmp/cuda-stub python -m ordered_kernels.cli.score --model gpt2 --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-full-l40s-cu128-fullowned --out /pub/wagnera3/floor/cu128-v1/l40s-fullowned.json --outcomes /pub/wagnera3/floor/cu128-v1/l40s-fullowned-outcomes.json\"",
+  "artifact": "/pub/wagnera3/floor/cu128-v1/l40s-fullowned.json",
+  "experiment": {
+    "kind": "cloze-full-fully-owned",
+    "card": "L40S",
+    "image": "cu128-v1",
+    "kernel": "fully-owned",
+    "items": "full-2627"
+  },
+  "resumes_from_checkpoint": false
+}

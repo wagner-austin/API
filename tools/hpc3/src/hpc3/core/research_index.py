@@ -261,6 +261,105 @@ def ledger_state_claims(text: str) -> tuple[str, ...]:
     return tuple(claims)
 
 
+#: Marks the sentence that restates a project's declared image. A ``.sif``
+#: path is the anchor rather than the word "image", because the index cites
+#: image DIGESTS constantly and legitimately -- historical generations, the
+#: image an old job ran under -- and only a path claims to be the thing the
+#: registry currently declares.
+IMAGE_PATH_SUFFIX: Final[str] = ".sif"
+
+#: How far past a ``.sif`` path a digest may sit and still be that image's.
+#: Generous, because the claim wraps across markdown lines and normalising
+#: whitespace does not close the gap; wide enough to reach the digest in both
+#: spellings the file uses, short enough not to reach the next bullet.
+_DIGEST_WINDOW: Final[int] = 200
+
+#: Introduces a digest. Both live spellings put the token in backticks right
+#: after this word.
+_DIGEST_MARKER: Final[str] = "sha256 `"
+
+
+def _section_of(text: str, index: int) -> str:
+    """Name the project whose entry an offset falls in.
+
+    Args:
+        text: The index's full text.
+        index: An offset into it.
+
+    Returns:
+        The project named by the nearest ``### `name`` heading above the
+        offset, or the empty string when the offset precedes every heading.
+    """
+    heading = text.rfind("### `", 0, index)
+    if heading == -1:
+        return ""
+    start = heading + len("### `")
+    end = text.find("`", start)
+    return text[start:end] if end != -1 else ""
+
+
+def _digest_after(text: str, index: int) -> str:
+    """Read the digest a path claims, if it states one nearby.
+
+    Args:
+        text: The index's full text.
+        index: Offset just past the image path.
+
+    Returns:
+        The digest token, or the empty string when none sits within the
+        window. The token stops at the first character that is not hex, which
+        is how an elided ``0cfdd5592a1a…`` yields its twelve real characters
+        rather than the ellipsis with them.
+    """
+    marker = text.find(_DIGEST_MARKER, index, index + _DIGEST_WINDOW)
+    if marker == -1:
+        return ""
+    start = marker + len(_DIGEST_MARKER)
+    end = start
+    while end < len(text) and text[end] in "0123456789abcdef":
+        end += 1
+    return text[start:end]
+
+
+def image_digest_claims(text: str, projects: dict[str, ProjectConfig]) -> tuple[str, ...]:
+    """Find every restated image digest the registry contradicts.
+
+    The generated block already renders each project's declared digest, and
+    ``rusted``'s entry retyped it anyway and went stale beside it -- naming
+    ``images/v4`` and ``b1eaaa2e`` while the registry declared v5 and
+    ``97a80bdeb16d`` in a table two screens above. That is the third time that
+    one entry disagreed with its own registry, so the restatement is checked
+    rather than trusted.
+
+    Args:
+        text: The research index's full text.
+        projects: Declared projects, keyed by name.
+
+    Returns:
+        One human-readable claim per contradiction, in order of appearance.
+
+    WHAT THIS DOES NOT CATCH, deliberately. A digest with no ``.sif`` path
+    beside it is left alone, because the index cites superseded images
+    constantly and a rule convicting those would fire on correct history. So
+    this covers the sentence that claims to state what a project DECLARES, and
+    nothing else.
+    """
+    claims: list[str] = []
+    index = text.find(IMAGE_PATH_SUFFIX)
+    while index != -1:
+        end = index + len(IMAGE_PATH_SUFFIX)
+        project = _section_of(text, index)
+        declared = projects.get(project)
+        digest = _digest_after(text, end)
+        if declared is not None and digest and not declared["image"]["sha256"].startswith(digest):
+            claims.append(
+                f"`{project}` restates an image digest the registry contradicts: "
+                f"{digest} against {declared['image']['sha256'][:12]}"
+            )
+        index = text.find(IMAGE_PATH_SUFFIX, end)
+    return tuple(claims)
+
+
 def extract_projects_block(text: str) -> str:
     """Read the generated block out of a document.
 
@@ -285,10 +384,12 @@ def extract_projects_block(text: str) -> str:
 __all__ = [
     "BLOCK_END",
     "BLOCK_START",
+    "IMAGE_PATH_SUFFIX",
     "LEDGER_ROW_UNIT",
     "REGENERATE_HINT",
     "SCALE_FIELD",
     "extract_projects_block",
+    "image_digest_claims",
     "ledger_state_claims",
     "render_project_row",
     "render_projects_block",

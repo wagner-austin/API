@@ -30,6 +30,7 @@ from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.research_index import (
     REGENERATE_HINT,
     extract_projects_block,
+    image_digest_claims,
     ledger_state_claims,
     render_projects_block,
     replace_projects_block,
@@ -41,13 +42,16 @@ CHECK_FLAG = "--check"
 #: The flags, and the ONE place the set is written.
 FLAGS: tuple[str, ...] = (CHECK_FLAG, WRITE_FLAG)
 
-#: What a reader is told when the index asserts machine-local run state. It
-#: says DELETE rather than update, because updating is what produced the two
-#: stale counts in the first place: a number correct on the day it was typed
-#: and wrong by the next campaign, with nothing able to notice.
+#: What a reader is told when the index restates a value it does not own. One
+#: message for both classes because the remedy is one remedy: the ledger is
+#: machine-local so a count off it is uncheckable, the image digests are
+#: rendered so a copy of one is redundant, and in all three live instances
+#: UPDATING the restatement is exactly what had been done before and what left
+#: it stale again. The per-claim lines above it name which value and which
+#: project; this says what to do about it.
 CLAIM_GUIDANCE: Final[str] = (
-    "the ledger is machine-local and untracked, so nobody else can check a count "
-    "read off it; delete the claim rather than updating it\n"
+    "each line above restates a value this file does not own; delete the restatement "
+    "rather than updating it, because updating is what left the last three stale\n"
 )
 
 
@@ -144,11 +148,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if len(set(tokens)) != 1:
         raise ValueError(f"name exactly one of {FLAGS}")
 
-    block = render_projects_block(declared_projects(runs_directory()))
+    projects = declared_projects(runs_directory())
+    block = render_projects_block(projects)
     path = index_path()
     text = _read_document(path)
 
-    claims = ledger_state_claims(text)
+    claims = ledger_state_claims(text) + image_digest_claims(text, projects)
     for claim in claims:
         sys.stdout.write(f"{path}: {claim}\n")
     if claims:

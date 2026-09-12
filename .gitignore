@@ -239,6 +239,20 @@ tools/hpc3/runs/*
 # widths and splitting them in the filesystem would invite comparing one
 # generation's document against another's.
 !tools/hpc3/runs/floor*.json
+# The cu128 battery, which is the narrowest case here and the most complete.
+# `mi-cu128` is a whole registered project whose work is ONE day's closed
+# battery -- 23 arms over 27 submissions, 2026-09-04, verdicts already written
+# into the index -- and on 2026-09-12 it had 2 of its 23 run documents tracked,
+# both of them ones the floor negation above happened to catch. Its entry is
+# the most precisely evidenced in the file and was the least checkable in it.
+#
+# One pattern, not a per-family list: every document in the battery spells the
+# stack between hyphens (`arch-cu128-l40s`, `gemm-cu128-ordered-rtx6000`,
+# `train-cu128-owned-xl-rtx6000`), so the arm prefix is what varies and the
+# stack is what identifies them. The image BUILDS are driven from
+# `specs/abl-cu128-image.json`, which is already tracked, so there is no
+# build document to negate and no line here pretending there is.
+!tools/hpc3/runs/*-cu128-*.json
 # tankpit's, which are NOT a negation of anything that exists -- and that is
 # the finding rather than an oversight. Its six cluster jobs ran on 2026-09-03
 # and their run documents are on no disk here: `tankpit-sim-v1r1` through

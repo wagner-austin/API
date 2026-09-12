@@ -1,0 +1,28 @@
+{
+  "project": "mi-cu128",
+  "name": "arch-cu128-rtx6000",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "RTX6000",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 10,
+  "requeue": false,
+  "image": {
+    "path": "/pub/wagnera3/images/cu128-v1/abl-cu128.sif",
+    "sha256": "6d9ba0baac40b238b2e8b479c17ed5d08b055c7af6b000711888d6e22afc69b2",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -c 'import torch,json; print(json.dumps({\"arch_list\": torch.cuda.get_arch_list(), \"device\": torch.cuda.get_device_name(0), \"capability\": list(torch.cuda.get_device_capability(0)), \"torch\": torch.__version__, \"cuda\": torch.version.cuda}))'",
+  "artifact": null,
+  "experiment": {
+    "kind": "arch-probe",
+    "card": "RTX6000",
+    "image": "cu128-v1"
+  },
+  "resumes_from_checkpoint": false
+}

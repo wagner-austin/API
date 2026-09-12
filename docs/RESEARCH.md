@@ -1032,11 +1032,37 @@ name appeared nowhere here — was mine, and another session bridged it.
   `e007e999`, the SAME commit as the cu124 line's v33 image, and
   `transformers`/`cupy`/`numpy` held identical — so the two lines differ only
   in the CUDA stack.
-- **Runs:** 23 jobs, all `COMPLETED`, 2026-09-04 (55751296–55752044): arch
-  probes, gemm all five arms, train_step owned+ordered through xl, sdpa
-  probe, attn_probe, floor150 rank1, and the full 2,627-item fully-owned
-  score on both the RTX PRO 6000 (4:04) and the L40S (3:14). Records under
-  `/pub/wagnera3/{gemm,train,attn,floor}/cu128-v1/`.
+- **Runs:** **23 distinct arms across 27 measurement submissions, plus 2 image
+  builds, all 2026-09-04** (`55747880` and `55749663` built; `55751296` through
+  `55752044` measured): arch probes, gemm all five arms, train_step
+  owned+ordered through xl, sdpa probe, attn_probe, floor150 rank1, and the
+  full 2,627-item fully-owned score on both the RTX PRO 6000 (4:04) and the
+  L40S (3:14). Records under `/pub/wagnera3/{gemm,train,attn,floor}/cu128-v1/`.
+
+  **This bullet said "23 jobs, all `COMPLETED`" until 2026-09-12 and the
+  ledger says neither number nor that word.** It holds 29 rows for this
+  project, and the gap between 23 and 27 is FOUR RE-SUBMISSIONS:
+  `gemm-cu128-ordered-rtx6000` and `gemm-cu128-ordered-l40s` were each
+  submitted three times, at 12:44, 13:13 and 13:17, and the ledger cannot tell
+  the three apart because every recorded field is identical between them, image
+  digest and experiment mapping included. Three identical submissions of one
+  arm is the shape of an arm that did not land the first two times. **It is
+  also the shape of a deliberate re-run, and nothing committed distinguishes
+  them** -- the ledger records SUBMISSIONS, not outcomes, so `COMPLETED` was
+  never a claim it could support. Whatever sacct said on the day is not in this
+  repository, and the honest form of the original sentence is the one above
+  plus this paragraph.
+
+  **Its run documents were also the least tracked in the workspace, which is
+  the opposite of what this entry's precision implies.** On 2026-09-12 it had
+  2 of 23 in git, and both were ones the `floor` negation happened to sweep up
+  for an unrelated reason. So the most precisely evidenced entry in this file
+  was the least checkable in it: every digest and count above names a document
+  that existed on one machine. Negated now via
+  `!tools/hpc3/runs/*-cu128-*.json`, one pattern rather than a per-family list
+  because the stack is what identifies these and the arm prefix is what
+  varies. The image builds need no negation: they are driven from
+  `specs/abl-cu128-image.json`, which was already tracked.
 - **Verdict, within-stack:** ordered/owned records bit-identical across the
   Blackwell card and the L40S — gemm 186/186, train 1,283/1,283, attention
   stages 140/140, full-set outcomes one payload (`sha256:e964e46b…`),
@@ -1143,7 +1169,13 @@ name appeared nowhere here — was mine, and another session bridged it.
     `best_val_auc` and `duration_seconds` and nothing about what produced
     them. The 3,068 rows written before that state `"fingerprint": null`
     explicitly, which reads as "nobody recorded one" rather than "there was
-    nothing to record"; a missing key is refused outright.
+    nothing to record"; a missing key is refused outright. **Counted
+    2026-09-12, the file is exactly 3,068 lines, so every row in it is one of
+    those and NOT ONE carries a real fingerprint yet.** The capability landed
+    and the axis has not run since, which is the reading this bullet invited
+    the opposite of: "carries a `RunFingerprint` as of 2026-08-28" describes
+    the writer, not the file, and a reader checking whether the history is
+    reproducible needs the second sentence rather than the first.
   - **`scripts/optimize` still pins nothing.** It was not among the six entry
     points that got a pin, so its fingerprint honestly reports the
     determinism stack as `none`. The record is now true; the runs are still
@@ -1298,8 +1330,18 @@ scored is that the item set is a staged file rather than a data-bank id.
   `platform-core` by git rev, NOT by relative path — see below)
 - **Runs:** `runs/sweep-turkic-bases.json`, seven members, one per language
 - **Produces:** `/pub/wagnera3/LSTM/checkpoints/<lang>_best.pt`; locally
-  `results/*.csv` plus a `RunRecord` sidecar per evaluation, and as of
-  2026-09-03 a second sidecar per *training* run beside each checkpoint
+  `results/*.csv` plus a `RunRecord` sidecar on the evaluations that have one,
+  and as of 2026-09-03 a second sidecar per *training* run beside each
+  checkpoint. **"Per evaluation" is what this said until 2026-09-12 and it is
+  not what the directory holds: 5 of 24 result CSVs carry a sidecar**
+  (`v3_full_skip`, `v3_full_assimilate`, `v3_full_unk`, `v5_full_skip`,
+  `v6_full_skip`). The pre-adoption CSVs having none is expected and stated
+  below. What is NOT explained by adoption is that
+  `v5_full_skip_asymmetry.csv` and `v6_full_skip_asymmetry.csv` were written
+  on 2026-09-04, the same day as two files that DO carry one, and carry none
+  themselves. So the sidecar follows the entry point rather than the date, and
+  an arm evaluated through whichever path lacks it still lands in `results/`
+  looking exactly like an arm that has it
 - **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
   one model's cross-entropy minus another's — with confidence intervals,
   across seven languages and nine arms (`pilot_a/b/c`, `variant_b`, `v3`,
@@ -1506,9 +1548,18 @@ scored is that the item set is a staged file rather than a data-bank id.
   CPUs, 2 GB, 100 minutes on `free`, `requeue` on, `deterministic` on,
   `resumes_from_checkpoint: false`. The false is honest because the
   per-match scorecard IS the checkpoint: a preempted match costs one match.
-- **Declares an image**, `/pub/wagnera3/rusted/images/v4/rusted.sif` pinned
-  by sha256 `b1eaaa2e`, binding `/pub/wagnera3`, with `env_path` `/opt/env`
-  inside it.
+- **Declares an image**, binding `/pub/wagnera3`, with `env_path` `/opt/env`
+  inside it. **The digest is in the generated row above and is deliberately
+  not repeated here**, because until 2026-09-12 this bullet named the v4 image
+  and gave its digest as `b1eaaa2e` while the registry declared v5, and the
+  rendered table two screens up had been saying so since the image moved. That is the THIRD time this entry has disagreed with
+  its own registry, after the cores-and-wall-clock error and the
+  nothing-has-run error recorded below, and it is the most instructive of the
+  three: the generated block already carried the right answer, in this file,
+  and a hand-typed copy of a rendered cell went stale beside it anyway. A
+  restatement does not become safe by sitting next to the thing it restates.
+  `image_digest_claims` now fails on any digest given beside a `.sif` path
+  that the registry contradicts.
 - **The largest cluster consumer on this account, and every current-era
   verdict is cluster-played.** First job `rusted.image-v1` on 2026-08-30;
   11,485 jobs by 2026-09-09, the bulk in the CEM evolution and search
