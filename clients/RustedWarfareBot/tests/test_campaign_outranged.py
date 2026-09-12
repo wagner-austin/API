@@ -33,15 +33,24 @@ from tests.campaign_fixtures import (
 from tests.wire_fixtures import enemy, entity, lines, option, pool, profile, profiles_for, sample
 
 #: The fixture catalogue plus the joined share's own unit, priced by the
-#: real table ([[mechanics-unit-value]]).
-OUTRANGED_CATALOGUE = {**CATALOGUE, "c_artillery": unit_stats("c_artillery", price=900)}
+#: real table ([[mechanics-unit-value]]) -- and the enemy's pieces, because
+#: the clause reads the catalogue's speed to tell a mover from a building:
+#: the artillery moves, the hall does not.
+OUTRANGED_CATALOGUE = {
+    **CATALOGUE,
+    "c_artillery": unit_stats("c_artillery", price=900),
+    "enemy_arty": unit_stats("enemy_arty"),
+    "enemy_hall": unit_stats("enemy_hall", speed=0.0),
+}
 
 #: Profiles over the widened catalogue, with the enemy's artillery stated at
 #: the live game's 290 reach -- beyond every fixture gun (110), which is the
-#: standoff the clause reads.
+#: standoff the clause reads -- and the hall at a fortress gun's 400, which
+#: must NOT read as one.
 OUTRANGED_PROFILES = {
     **profiles_for(OUTRANGED_CATALOGUE),
     "enemy_arty": profile("enemy_arty", 290.0),
+    "enemy_hall": profile("enemy_hall", 400.0),
 }
 
 
@@ -131,6 +140,40 @@ def test_the_armed_switch_is_the_identity_when_nothing_outranges() -> None:
     game bit for bit on a quiet seed, which is the property that separates
     this clause from the static merge arty39 refused."""
     peer = _play(_quiet_world(), times=4, outranged=True)
+    produced = verb(peer, "produce")
+    assert any('"type":"c_tank"' in line for line in produced)
+    assert not any('"type":"c_artillery"' in line for line in produced)
+
+
+def _hall_world() -> Sample:
+    """The quiet world plus the enemy's armed command centre in sight.
+
+    Returns:
+        The scripted world.
+    """
+    return sample(
+        CENTRE,
+        BUILDER,
+        FACTORY,
+        entity(1, "c_tank"),
+        enemy(9, "enemy_hall", x=500.0),
+        credits=4000,
+        pools=(pool(x=300.0),),
+        options=(
+            option(300, "c_tank"),
+            option(300, "c_artillery"),
+            option(214, "extractorT1", placed=True),
+        ),
+    )
+
+
+def test_an_armed_enemy_structure_never_joins_the_share() -> None:
+    """The frame-0 regression witness (condprobe13, log 2026-09-12): the
+    first wiring read the enemy command centre -- armed, outranging
+    everything, visible forever -- and held the join on from the first
+    observation of every match, on winning seeds included. A standoff is a
+    fight against something that can come to you; the hall cannot."""
+    peer = _play(_hall_world(), times=4, outranged=True)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)

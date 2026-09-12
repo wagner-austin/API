@@ -379,6 +379,7 @@ def play(
                 composition_now,
                 threats,
                 profiles,
+                catalogue,
                 counter=counter,
                 outranged=outranged,
                 siegedose=siegedose,

@@ -210,49 +210,67 @@ def ground_outranged(
     mix: Sequence[str],
     targets: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
+    catalogue: Mapping[str, UnitStats],
 ) -> bool:
-    """Report whether a seen ground mover outranges every land gun in the mix.
+    """Report whether a seen ground MOVER outranges every land gun in the mix.
 
     The arming read for the doctrine's ``outranged`` clause -- the
     threat-armed sibling of the siege switch's time gate. The time gate
     closed 0-for in the attrition tier because it fired in every long game;
     this fires only when the picture actually holds the threat it answers:
-    a LAND-moving, land-hitting hostile whose fire starts beyond the reach
-    of every land-hitting type the mix fields. Fliers are the air tilt's
-    threat and WATER-movers the naval clause's, so both are excluded here
-    -- three clauses, three layers, no overlap.
+    a mobile, land-hitting ground hostile whose fire starts beyond the
+    reach of every land-hitting type the mix fields. Fliers are the air
+    tilt's threat and WATER-movers the naval clause's, and STRUCTURES are
+    nobody's: the first wiring read every armed hostile, and the enemy's
+    own command centre -- armed, visible from the base, forever -- held the
+    clause on from frame 0 of every match, which is exactly the
+    always-firing failure the time gate closed for (condprobe13, log
+    2026-09-12). Mobility is the catalogue's speed test, the same
+    discipline :func:`mobile_threats` measured -- seeing everything made
+    the mix blinder than seeing only what attacks. A type the catalogue
+    does not price is dropped, erring the same way.
 
     Strictly beyond: a tie is a fair fight, not a standoff. A mix with no
-    land gun at all reads as outranged by any armed land mover, because
-    zero reach is what "cannot answer" means at this arithmetic's level.
+    land gun at all reads as NOT outranged -- before the army is fielded
+    there is no standoff to answer, and the first wiring's opposite
+    reading was the other half of the frame-0 hold.
 
     Args:
         mix: The army mix as composed so far, repeats irrelevant here.
         targets: The hostile entities currently visible or remembered.
         profiles: Combat profiles by type name, for reach and layers.
+        catalogue: Unit stats by type name, for the speed that tells a
+            building from a unit.
 
     Returns:
-        True while the seen ground picture outranges the mix.
+        True while a seen mobile ground threat outranges the mix.
 
     Raises:
         CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
-            a type in the mix or a ground threat.
+            a type in the mix or a mobile ground threat.
     """
-    ground = tuple(t for t in targets if not t["flying"] and t["movement"] != _NAVAL_LAYER)
-    reaches = [
-        profile_of(profiles, t["type_name"])["attack_range"]
-        for t in ground
-        if profile_of(profiles, t["type_name"])["hits_land"]
-    ]
-    if not reaches:
-        return False
     own = [
         record["attack_range"]
         for name in dict.fromkeys(mix, True)
         for record in (profile_of(profiles, name),)
         if record["hits_land"]
     ]
-    return max(reaches) > (max(own) if own else 0.0)
+    if not own:
+        return False
+    movers = tuple(
+        t
+        for t in targets
+        if not t["flying"]
+        and t["movement"] != _NAVAL_LAYER
+        and (stats := catalogue.get(t["type_name"])) is not None
+        and stats["speed"] > 0.0
+    )
+    reaches = [
+        profile_of(profiles, t["type_name"])["attack_range"]
+        for t in movers
+        if profile_of(profiles, t["type_name"])["hits_land"]
+    ]
+    return bool(reaches) and max(reaches) > max(own)
 
 
 def counter_composition(
@@ -382,6 +400,7 @@ def threat_tilts(
     composition: tuple[str, ...],
     threats: Sequence[Threat],
     profiles: Mapping[str, CombatProfile],
+    catalogue: Mapping[str, UnitStats],
     *,
     counter: bool,
     outranged: bool,
@@ -403,6 +422,8 @@ def threat_tilts(
         composition: The mix as the doctrine and the clock composed it.
         threats: The hostile entities currently visible or remembered.
         profiles: Combat profiles by type name, for reach and layers.
+        catalogue: Unit stats by type name, for the mobility test the
+            outranged clause runs (:func:`ground_outranged`).
         counter: The doctrine's tilt switch.
         outranged: The doctrine's outranged switch.
         siegedose: Artillery shares the outranged join adds while armed --
@@ -426,7 +447,7 @@ def threat_tilts(
             describe a type in the mix or a threat.
     """
     fired: set[str] = set()
-    if outranged and ground_outranged(composition, threats, profiles):
+    if outranged and ground_outranged(composition, threats, profiles, catalogue):
         composition = (*composition, *("c_artillery",) * siegedose)
         fired.add("O")
     if counter:
