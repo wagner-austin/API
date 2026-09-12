@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import TypedDict
 
 from rw_bot.harness import _test_hooks
-from rw_bot.harness.agent_build import FROZEN_AGENT_JAR
 from rw_bot.harness.clone import (
     VOLATILE_FILES,
     clone_name,
@@ -27,16 +26,9 @@ from rw_bot.harness.clone import (
     required_entries,
     verify,
 )
-from rw_bot.harness.launch import (
-    CATALOGUE,
-    FROZEN_CATALOGUE,
-    FROZEN_TYPE_DUMP,
-    TYPE_DUMP,
-)
 from rw_bot.harness.match import MatchConfig, describe
 from rw_bot.harness.results_layout import match_log_path, trace_path
 from rw_bot.harness.sweep import (
-    SweepError,
     SweepJob,
     assigned,
     is_complete,
@@ -72,7 +64,7 @@ class SweepConfig(TypedDict):
             ``out_dir``. Every match imports from it instead of the working
             tree, so the tree is editable the moment the batch starts and the
             batch records exactly what its matches ran
-            (:func:`prepare_tree`).
+            (:func:`~rw_bot.harness.frozen_tree.prepare_tree`).
         match: Which match every job in the batch plays, or None for the
             engine's own default. Batch-level rather than per-job because the
             map decides the opponent count -- the engine caps teams by the
@@ -210,142 +202,11 @@ def encode_sweep_outcome(outcome: SweepOutcome) -> dict[str, int]:
     }
 
 
-#: What a batch freezes: everything a match imports or reads at launch.
-#:
-#: ``sweeps`` joined when the tree became a STAGED artifact. A compute node
-#: reads its job file from the payload like everything else, and the file
-#: naming which arms and seeds a batch played is as much the experiment as the
-#: doctrines are -- the same argument that put those here.
-#:
-#: The two registry dumps joined for the same reason and were the last to.
-#: They had been left out on the reasoning that a dump is an artifact of the
-#: game build rather than code that changes between batches -- true, and not
-#: the question the tree answers. The question is whether a match can READ it
-#: where the match runs, and the first cluster member to reach the planner
-#: died on ``FileNotFoundError: 'wiki/sources/m0-probe/printunits.log'``
-#: having already patched, seeded and held the world at frame one. A compute
-#: node has no repository for a repository-relative path to mean anything
-#: against (job 55663569, 2026-08-30).
-TREE_SOURCES = (
-    "scripts",
-    "doctrines",
-    "sweeps",
-    # The fitted heads ride with the code that scores them: a braced arm
-    # on a cluster node reads models/razebrace.ndjson out of the payload,
-    # and a tree without it would fail at model load, member by member
-    # ([[impossible-step-three-design]]).
-    "models",
-    "agent/build/rw-agent.jar",
-    CATALOGUE,
-    TYPE_DUMP,
-)
-
-#: The frozen tree's directory name, under the batch's results directory.
-TREE_DIR = ".tree"
-
-#: Written into the tree last, so its presence certifies a complete freeze.
-TREE_MARKER = ".complete"
-
 #: Wall clock on one match: three hours holds the slowest legitimate grind
 #: (the cluster's own 100-minute slurm wall) with room for a slow node; a
 #: match still running then is a hung engine, not a long game (the
 #: 2026-09-09 five-hour driver wedge).
 MATCH_WALL_SECONDS = 10800.0
-
-#: A frozen tree handed to a run was incomplete.
-_TREE_INCOMPLETE = "RW-SWEEP-006"
-
-#: What a match actually READS out of a frozen tree, as it is laid out inside
-#: one. Not the same strings as :data:`TREE_SOURCES`: a copy lands under its
-#: own basename, so ``agent/build/rw-agent.jar`` arrives flat as
-#: ``rw-agent.jar`` -- which is where
-#: :data:`~rw_bot.harness.agent_build.FROZEN_AGENT_JAR` looks for it. Checking
-#: the source spelling instead would refuse every tree ever frozen, and that
-#: is exactly what the first version of this did.
-FROZEN_ENTRIES = (
-    "src/rw_bot/__init__.py",
-    "doctrines",
-    "scripts",
-    "sweeps",
-    "models",
-    FROZEN_AGENT_JAR,
-    FROZEN_CATALOGUE,
-    FROZEN_TYPE_DUMP,
-)
-
-
-def prepare_tree(config: SweepConfig) -> None:
-    """Freeze the code the batch's matches will import, once, at launch.
-
-    A match imports the source tree at launch, so before this existed an edit
-    landed mid-batch meant later matches ran different code from earlier ones
-    -- an arm's twelve seeds were only one experiment if nobody touched the
-    tree for the batch's whole runtime, and the working tree was frozen for
-    hours at a stretch. The batch copies what its matches need into its own
-    results directory instead: the tree is editable the moment the sweep
-    starts, and the batch carries a record of exactly what it ran.
-
-    **An existing snapshot is reused, never refreshed.** That is what makes a
-    resumed batch a continuation rather than a new experiment: the matches
-    played after the interruption import the same frozen code as the ones
-    played before it, whatever has happened to the working tree in between.
-
-    Args:
-        config: How the batch is being played.
-
-    Raises:
-        OSError: When a copy fails.
-    """
-    tree = Path(config["tree"])
-    # Judged by the marker, not by the directory: a directory can survive a
-    # partial delete -- Windows file locks kept one alive with its doctrines
-    # gone -- and reusing a gutted tree fails ten matches at once with the
-    # freeze reporting success (log: 2026-07-31). The marker is written last,
-    # so its presence certifies every copy before it finished.
-    if _test_hooks.path_exists(tree / TREE_MARKER):
-        _test_hooks.write_line(f"[sweep] reusing the frozen tree at {config['tree']}")
-        return
-    _test_hooks.make_dirs(tree / "src")
-    _test_hooks.copy_entry(Path("src/rw_bot"), tree / "src")
-    for entry in TREE_SOURCES:
-        _test_hooks.copy_entry(Path(entry), tree)
-    _test_hooks.write_text_lines(tree / TREE_MARKER, ("frozen",))
-    _test_hooks.write_line(f"[sweep] tree frozen at {config['tree']}")
-
-
-def check_frozen_tree(tree: Path) -> None:
-    """Raise unless a tree carries everything a match reads out of it.
-
-    The counterpart to :func:`prepare_tree` for a run that does NOT freeze its
-    own. A cluster member is handed a tree that was frozen before submission
-    and staged, so it must check what it was given rather than build it: the
-    sources ``prepare_tree`` copies from are repository-relative, and a
-    compute node has no repository, so a freeze there would report success
-    having copied nothing.
-
-    The marker alone is not enough. It certifies that every copy BEFORE it
-    finished, and says nothing about a source that was absent when the copy
-    ran -- the agent jar is the case, because ``make agent`` builds it and the
-    repository does not carry it.
-
-    Args:
-        tree: The frozen tree.
-
-    Raises:
-        SweepError: ``RW-SWEEP-006`` naming every missing entry rather than
-            the first. The failure it replaces is a member dying on a node
-            with an import error, and one look should account for all of it.
-    """
-    absent = [
-        name for name in (TREE_MARKER, *FROZEN_ENTRIES) if not _test_hooks.path_exists(tree / name)
-    ]
-    if absent:
-        raise SweepError(
-            _TREE_INCOMPLETE,
-            f"the frozen tree at {tree} is missing {', '.join(absent)}: a match reads its "
-            "planner, its doctrines and its agent jar from here, and none of them can be "
-            "rebuilt on a compute node -- the Linux depot ships a JRE with no compiler",
-        )
 
 
 def prepare_clone(index: int, config: SweepConfig) -> str:
@@ -582,9 +443,6 @@ def outstanding(jobs: Sequence[SweepJob], out_dir: Path) -> tuple[SweepJob, ...]
 
 __all__ = [
     "MATCH_WALL_SECONDS",
-    "TREE_DIR",
-    "TREE_MARKER",
-    "TREE_SOURCES",
     "SweepConfig",
     "SweepOutcome",
     "decode_sweep_config",
@@ -594,7 +452,6 @@ __all__ = [
     "outstanding",
     "play_job",
     "prepare_clone",
-    "prepare_tree",
     "reset_volatile_files",
     "run_worker",
 ]

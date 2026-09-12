@@ -21,6 +21,7 @@ _JOBS = "sweeps/demo.txt"
 
 def _plant(host: FakeHost, *lines: str) -> None:
     host.plant_source(".game")
+    host.plant_agent()
     host.write_text_lines(Path(_JOBS), lines)
 
 

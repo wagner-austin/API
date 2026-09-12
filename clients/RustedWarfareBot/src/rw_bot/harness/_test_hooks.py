@@ -18,6 +18,7 @@ from __future__ import annotations
 from rw_bot.harness._hook_defaults import (
     _copy_entry_impl,
     _count_cores_impl,
+    _file_mtime_impl,
     _file_size_impl,
     _get_env_impl,
     _kill_tree_impl,
@@ -47,6 +48,7 @@ from rw_bot.harness._hook_protocols import (
     CAPTURE_TIMEOUT_STATUS,
     CopyEntryProto,
     CountCoresProto,
+    FileMtimeProto,
     FileSizeProto,
     GetEnvProto,
     KillTreeProto,
@@ -76,6 +78,7 @@ from rw_bot.harness._hook_protocols import (
 
 copy_entry: CopyEntryProto = _copy_entry_impl
 count_cores: CountCoresProto = _count_cores_impl
+file_mtime: FileMtimeProto = _file_mtime_impl
 file_size: FileSizeProto = _file_size_impl
 get_env: GetEnvProto = _get_env_impl
 kill_tree: KillTreeProto = _kill_tree_impl
@@ -106,6 +109,7 @@ __all__ = [
     "CAPTURE_TIMEOUT_STATUS",
     "CopyEntryProto",
     "CountCoresProto",
+    "FileMtimeProto",
     "FileSizeProto",
     "GetEnvProto",
     "KillTreeProto",
@@ -133,6 +137,7 @@ __all__ = [
     "WriteTextLinesProto",
     "copy_entry",
     "count_cores",
+    "file_mtime",
     "file_size",
     "get_env",
     "kill_tree",

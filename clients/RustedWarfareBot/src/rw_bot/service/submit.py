@@ -9,9 +9,10 @@ batch ([[harness-match-service]]).
 from __future__ import annotations
 
 from rw_bot.harness.clone import CLONE_PREFIX
+from rw_bot.harness.frozen_tree import TREE_DIR
 from rw_bot.harness.match import MatchConfig, decode_match_config
 from rw_bot.harness.results_layout import PINNED_GAME_DIR, SWEEP_ROOT, TRACE_ROOT
-from rw_bot.harness.runner import TREE_DIR, SweepConfig, decode_sweep_config
+from rw_bot.harness.runner import SweepConfig, decode_sweep_config
 
 #: One opponent: the duel, whose count the map caps anyway.
 DUEL_OPPONENTS = 1

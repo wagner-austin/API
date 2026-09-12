@@ -49,6 +49,7 @@ def test_the_real_delegates_drive_the_harness() -> None:
     """Tree, clone and match run through runner exactly as a sweep's do."""
     with FakeHost() as host:
         host.plant_source(".game")
+        host.plant_agent()
         _prepare_tree_impl(_CONFIG)
         game_dir = _prepare_clone_impl(0, _CONFIG)
         assert game_dir == ".game-w1"

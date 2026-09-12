@@ -14,6 +14,7 @@ works: that a real child really is felled, that a real socket really is seen.
 
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
@@ -25,6 +26,7 @@ import pytest
 from rw_bot.harness._hook_defaults import (
     COPY_EXCLUDES,
     _copy_entry_impl,
+    _file_mtime_impl,
     _file_size_impl,
     _kill_tree_impl,
     _monotonic_impl,
@@ -175,6 +177,25 @@ class TestMeasuringAStreamFile:
         a wait watching for growth reads "not written yet" and "empty"
         identically rather than dying on the difference."""
         assert _file_size_impl(tmp_path / "never-written.log") == 0
+
+
+class TestReadingAFilesModificationTime:
+    def test_a_later_write_reads_as_later(self, tmp_path: Path) -> None:
+        """The whole use is ordering two files, so the ordering is what the
+        test asserts rather than any absolute value."""
+        older = tmp_path / "rw-agent.jar"
+        older.write_bytes(b"built")
+        newer = tmp_path / "Premain.java"
+        newer.write_bytes(b"edited after the build")
+        os.utime(older, (1_000_000_000.0, 1_000_000_000.0))
+        os.utime(newer, (1_000_000_001.0, 1_000_000_001.0))
+        assert _file_mtime_impl(newer) > _file_mtime_impl(older)
+
+    def test_an_absent_file_surfaces_rather_than_reading_as_old(self, tmp_path: Path) -> None:
+        """A zero here would make a missing file infinitely old -- the
+        opposite of the refusal the comparison exists to produce."""
+        with pytest.raises(FileNotFoundError):
+            _file_mtime_impl(tmp_path / "never-built.jar")
 
 
 class TestTheMonotonicClock:

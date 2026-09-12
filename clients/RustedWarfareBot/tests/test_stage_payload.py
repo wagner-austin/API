@@ -37,14 +37,14 @@ from scripts.stage_payload import (
     main,
 )
 
-from rw_bot.harness.agent_build import JAVA_RELEASE
+from rw_bot.harness.agent_build import AGENT_MANIFEST, AGENT_SOURCE_DIR, JAVA_RELEASE
+from rw_bot.harness.frozen_tree import FROZEN_ENTRIES, TREE_MARKER, TREE_SOURCES
 from rw_bot.harness.launch import (
     CATALOGUE,
     FROZEN_CATALOGUE,
     FROZEN_TYPE_DUMP,
     TYPE_DUMP,
 )
-from rw_bot.harness.runner import FROZEN_ENTRIES, TREE_MARKER, TREE_SOURCES
 from rw_bot.harness.sweep import SweepError
 from rw_bot.tree_identity import tree_digest, tree_entries
 
@@ -75,6 +75,13 @@ def _repository(root: Path) -> None:
     (root / "src" / "rw_bot" / "__init__.py").write_bytes(b"package")
     (root / "src" / "rw_bot" / "policy" / "doom.py").write_bytes(b"policy")
     (root / "src" / "rw_bot" / "policy" / "__pycache__" / "doom.pyc").write_bytes(b"bytecode")
+    # The agent's sources, written BEFORE the jar the loop below plants, so
+    # the freshness check reads a jar at least as new as what it claims to be
+    # built from -- the order a real `make agent` leaves behind.
+    (root / AGENT_SOURCE_DIR).mkdir(parents=True)
+    (root / AGENT_SOURCE_DIR / "Premain.java").write_bytes(b"agent source")
+    (root / AGENT_MANIFEST).parent.mkdir(parents=True, exist_ok=True)
+    (root / AGENT_MANIFEST).write_bytes(b"manifest")
     for source in TREE_SOURCES:
         entry = root / source
         if entry.suffix:
@@ -268,12 +275,14 @@ class TestTheFrozenTree:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The agent jar is built by ``make agent`` and is not in the
-        repository, so a clean checkout has no jar to freeze. The copy itself
-        refuses, naming the path -- nothing is packed and nothing is staged."""
+        repository, so a clean checkout has no jar to freeze. The freshness
+        check refuses before the first copy, naming the path and the fix --
+        nothing is packed and nothing is staged."""
         _planted(tmp_path, monkeypatch)
         (tmp_path / "agent" / "build" / "rw-agent.jar").unlink()
-        with pytest.raises(FileNotFoundError, match=re.escape("rw-agent.jar")):
+        with pytest.raises(SweepError, match=re.escape("rw-agent.jar")) as caught:
             main(_argv(tmp_path))
+        assert caught.value.code == "RW-SWEEP-007"
         assert not (tmp_path / "out" / "rw-payload.tar").exists()
 
     def test_a_tree_frozen_without_the_jar_is_refused_before_packing(

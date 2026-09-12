@@ -21,8 +21,15 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from types import TracebackType
 
 from rw_bot.harness import _test_hooks
+from rw_bot.harness.agent_build import (
+    AGENT_BUILD_DIR,
+    AGENT_MANIFEST,
+    AGENT_SOURCE_DIR,
+    FROZEN_AGENT_JAR,
+)
 from rw_bot.harness.jvm import JVM_TOOLS, tool_path
 from rw_bot.platform_id import WINDOWS
+from tests.harness_fake_game import FakeGame
 
 #: Programs the launcher consults rather than launches a match with. They
 #: answer empty by default, which reads as "nothing holds the port" and "the
@@ -41,28 +48,6 @@ _CONSULTED_TOOLS = frozenset(
         "ps",
     }
 )
-
-
-class FakeGame:
-    """An engine process that never started.
-
-    Attributes:
-        pid: The process id the launcher will fell.
-        exit_status: What :meth:`poll` reports; ``None`` is a live engine.
-    """
-
-    def __init__(self, pid: int, exit_status: int | None = None) -> None:
-        self.pid = pid
-        self.exit_status = exit_status
-
-    def poll(self) -> int | None:
-        """Report the engine's state.
-
-        Returns:
-            The exit status this fake was told to die with, or ``None`` while
-            it plays the living.
-        """
-        return self.exit_status
 
 
 class FakeHost:
@@ -90,6 +75,10 @@ class FakeHost:
     ) -> None:
         self.files: dict[str, tuple[str, ...]] = {}
         self.dirs: set[str] = set()
+        #: Modification times by path, for files whose age matters to a test.
+        #: A file absent here reads as time zero -- the epoch -- so only the
+        #: paths a test states an ORDER for need entries at all.
+        self.mtimes: dict[str, float] = {}
         self.printed: list[str] = []
         self.commands: list[tuple[str, ...]] = []
         self.walls: list[float] = []
@@ -148,6 +137,7 @@ class FakeHost:
         self._sleep: _test_hooks.SleepProto = _test_hooks.sleep
         self._spawn_game: _test_hooks.SpawnGameProto = _test_hooks.spawn_game
         self._probe_port: _test_hooks.ProbePortProto = _test_hooks.probe_port
+        self._file_mtime: _test_hooks.FileMtimeProto = _test_hooks.file_mtime
         self._file_size: _test_hooks.FileSizeProto = _test_hooks.file_size
         self._monotonic: _test_hooks.MonotonicProto = _test_hooks.monotonic
         self._read_text_lines: _test_hooks.ReadTextLinesProto = _test_hooks.read_text_lines
@@ -173,6 +163,28 @@ class FakeHost:
         # step with the first.
         for tool in JVM_TOOLS:
             self.files[f"{source}/{tool_path(tool, self.platform)}"] = ()
+
+    def plant_agent(self, jar_mtime: float = 0.0, source_mtime: float = 0.0) -> None:
+        """Plant a prebuilt agent jar and the sources it claims to be built from.
+
+        What the freeze's freshness check reads: the jar, the manifest, and
+        one Java source. Asked of the same module the check asks, so a
+        planted agent cannot satisfy it at paths the real one would not.
+
+        Args:
+            jar_mtime: When the jar was built.
+            source_mtime: When the manifest and the source were last written.
+                The default pair -- both zero -- is a fresh build, because
+                equal times pass the check by design.
+        """
+        jar = f"{AGENT_BUILD_DIR}/{FROZEN_AGENT_JAR}"
+        source = f"{AGENT_SOURCE_DIR}/Premain.java"
+        self.files[jar] = ()
+        self.mtimes[jar] = jar_mtime
+        self.files[AGENT_MANIFEST] = ()
+        self.mtimes[AGENT_MANIFEST] = source_mtime
+        self.files[source] = ()
+        self.mtimes[source] = source_mtime
 
     # -- hook implementations -------------------------------------------------
 
@@ -372,6 +384,26 @@ class FakeHost:
         index = min(len(self.probed), len(self.stream_sizes) - 1)
         return self.stream_sizes[index]
 
+    def file_mtime(self, path: Path) -> float:
+        """Report a file's stated modification time.
+
+        Args:
+            path: The file asked about.
+
+        Returns:
+            The time stated in :attr:`mtimes`, or zero for a file that exists
+            but was never given one.
+
+        Raises:
+            FileNotFoundError: When the path does not exist, exactly as the
+                real ``stat`` would -- absence must surface to the caller,
+                never read as infinitely old.
+        """
+        key = path.as_posix()
+        if not self.path_exists(path):
+            raise FileNotFoundError(key)
+        return self.mtimes.get(key, 0.0)
+
     def monotonic(self) -> float:
         """Read the fake clock.
 
@@ -486,6 +518,7 @@ class FakeHost:
         self._sleep = _test_hooks.sleep
         self._spawn_game = _test_hooks.spawn_game
         self._probe_port = _test_hooks.probe_port
+        self._file_mtime = _test_hooks.file_mtime
         self._file_size = _test_hooks.file_size
         self._monotonic = _test_hooks.monotonic
         self._read_text_lines = _test_hooks.read_text_lines
@@ -509,6 +542,7 @@ class FakeHost:
         _test_hooks.sleep = self.sleep
         _test_hooks.spawn_game = self.spawn_game
         _test_hooks.probe_port = self.probe_port
+        _test_hooks.file_mtime = self.file_mtime
         _test_hooks.file_size = self.file_size
         _test_hooks.monotonic = self.monotonic
         _test_hooks.read_text_lines = self.read_text_lines
@@ -546,6 +580,7 @@ class FakeHost:
         _test_hooks.sleep = self._sleep
         _test_hooks.spawn_game = self._spawn_game
         _test_hooks.probe_port = self._probe_port
+        _test_hooks.file_mtime = self._file_mtime
         _test_hooks.file_size = self._file_size
         _test_hooks.monotonic = self._monotonic
         _test_hooks.read_text_lines = self._read_text_lines

@@ -4,7 +4,7 @@ THE FREEZE MOVES TO BEFORE SUBMISSION, and that is the whole point. On a
 workstation a batch freezes its own snapshot at launch, because the working
 tree is editable while the batch runs -- an edit landed mid-batch used to mean
 later matches ran different code from earlier ones. A compute node has the
-opposite problem: :func:`~rw_bot.harness.runner.prepare_tree` copies
+opposite problem: :func:`~rw_bot.harness.frozen_tree.prepare_tree` copies
 ``src/rw_bot``, ``scripts``, ``doctrines`` and the agent jar from
 REPOSITORY-RELATIVE paths, and a node has no repository. The freeze there
 would copy nothing and every member would fail importing its own planner.
@@ -41,13 +41,9 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import JAVA_RELEASE
+from rw_bot.harness.frozen_tree import TREE_SOURCES, check_frozen_tree, prepare_tree
 from rw_bot.harness.results_layout import PINNED_GAME_DIR, TRACE_ROOT
-from rw_bot.harness.runner import (
-    TREE_SOURCES,
-    check_frozen_tree,
-    decode_sweep_config,
-    prepare_tree,
-)
+from rw_bot.harness.runner import decode_sweep_config
 from rw_bot.stage_record import stage_manifest
 from rw_bot.tree_archive import write_archive
 from rw_bot.tree_identity import digest_record, encode_tree_entry, tree_digest, tree_entries

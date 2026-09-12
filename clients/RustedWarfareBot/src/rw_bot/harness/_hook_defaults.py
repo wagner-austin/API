@@ -362,6 +362,23 @@ def _file_size_impl(path: Path) -> int:
         return 0
 
 
+def _file_mtime_impl(path: Path) -> float:
+    """Production implementation of :class:`FileMtimeProto`.
+
+    Args:
+        path: The file to read.
+
+    Returns:
+        Seconds since the epoch, from ``stat``.
+
+    Raises:
+        OSError: When the file does not exist or cannot be read -- absence
+            must surface, because a caller is deciding whether one real file
+            was written after another.
+    """
+    return path.stat().st_mtime
+
+
 def _monotonic_impl() -> float:
     """Production implementation of :class:`MonotonicProto`.
 
@@ -513,6 +530,7 @@ def _write_line_impl(text: str) -> None:
 __all__ = [
     "_copy_entry_impl",
     "_count_cores_impl",
+    "_file_mtime_impl",
     "_file_size_impl",
     "_get_env_impl",
     "_kill_tree_impl",

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from rw_bot.harness.clone import PLAY_PORT_BASE, CloneError
+from rw_bot.harness.frozen_tree import prepare_tree
 from rw_bot.harness.match import MatchConfig
 from rw_bot.harness.runner import (
     MATCH_WALL_SECONDS,
@@ -23,11 +24,10 @@ from rw_bot.harness.runner import (
     outstanding,
     play_job,
     prepare_clone,
-    prepare_tree,
     reset_volatile_files,
     run_worker,
 )
-from rw_bot.harness.sweep import SweepJob
+from rw_bot.harness.sweep import SweepError, SweepJob
 from tests.harness_fakes import FakeHost
 
 _SOURCE = ".game"
@@ -73,7 +73,7 @@ def test_the_batch_freezes_the_tree_its_matches_will_import() -> None:
         host.dirs.add("src/rw_bot")
         host.dirs.add("scripts")
         host.dirs.add("doctrines")
-        host.files["agent/build/rw-agent.jar"] = ()
+        host.plant_agent()
         prepare_tree(_config())
         assert host.path_exists(Path("runs/sweeps/demo/.tree/src/rw_bot"))
         assert host.path_exists(Path("runs/sweeps/demo/.tree/scripts"))
@@ -81,6 +81,57 @@ def test_the_batch_freezes_the_tree_its_matches_will_import() -> None:
         assert host.path_exists(Path("runs/sweeps/demo/.tree/rw-agent.jar"))
         assert host.path_exists(Path("runs/sweeps/demo/.tree/.complete"))
         assert "[sweep] tree frozen at runs/sweeps/demo/.tree" in host.printed
+
+
+def test_a_stale_agent_jar_refuses_the_freeze() -> None:
+    """A tree would carry the aged jar onto machines that cannot rebuild it:
+    the 2026-09-11 pin batches measured an agent built before either pin
+    existed, because nothing between the pin commits and submission ran
+    ``make agent``."""
+    with FakeHost() as host:
+        host.dirs.add("src/rw_bot")
+        host.plant_agent(jar_mtime=100.0, source_mtime=200.0)
+        with pytest.raises(SweepError) as caught:
+            prepare_tree(_config())
+        assert caught.value.code == "RW-SWEEP-007"
+        assert "agent/src/rwbot/agent/Premain.java" in str(caught.value)
+        assert "make agent" in str(caught.value)
+        # Refused before the first copy: no tree exists to mistake for a
+        # good one on the next run.
+        assert not host.path_exists(Path("runs/sweeps/demo/.tree"))
+
+
+def test_a_never_built_agent_jar_refuses_the_freeze() -> None:
+    """The repository does not carry the jar and a compute node cannot build
+    one, so freezing without it must refuse rather than copy nothing."""
+    with FakeHost() as host:
+        host.dirs.add("src/rw_bot")
+        with pytest.raises(SweepError) as caught:
+            prepare_tree(_config())
+        assert caught.value.code == "RW-SWEEP-007"
+        assert "does not exist" in str(caught.value)
+
+
+def test_agent_sources_written_in_the_same_instant_as_the_jar_are_fresh() -> None:
+    """A checkout or copy can land a source and the jar in one second; only a
+    source strictly newer than the jar is evidence the jar predates it."""
+    with FakeHost() as host:
+        host.dirs.add("src/rw_bot")
+        host.plant_agent(jar_mtime=300.0, source_mtime=300.0)
+        prepare_tree(_config())
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/.complete"))
+
+
+def test_a_resumed_batch_is_not_refused_for_a_jar_that_aged_since() -> None:
+    """The freshness check guards what a freeze would CAPTURE. A resumed batch
+    captures nothing -- it reuses its own snapshot -- so the working jar's age
+    is irrelevant to it."""
+    with FakeHost() as host:
+        host.dirs.add("runs/sweeps/demo/.tree")
+        host.files["runs/sweeps/demo/.tree/.complete"] = ("frozen",)
+        host.plant_agent(jar_mtime=100.0, source_mtime=200.0)
+        prepare_tree(_config())
+        assert "[sweep] reusing the frozen tree at runs/sweeps/demo/.tree" in host.printed
 
 
 def test_an_existing_frozen_tree_is_reused_never_refreshed() -> None:

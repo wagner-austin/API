@@ -43,9 +43,10 @@ from platform_core.cli_args import parse_single_flags, require_flag
 from rw_bot import RwBotError
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.clone import CLONE_PREFIX
+from rw_bot.harness.frozen_tree import check_frozen_tree
 from rw_bot.harness.match import decode_match_config
 from rw_bot.harness.results_layout import declares_result_for, result_path
-from rw_bot.harness.runner import check_frozen_tree, decode_sweep_config, play_job, prepare_clone
+from rw_bot.harness.runner import decode_sweep_config, play_job, prepare_clone
 from rw_bot.harness.sweep import SweepJob, parse_jobs
 
 _NO_SUCH_JOB = "RW-MATCH-001"

@@ -26,12 +26,12 @@ from rw_bot.harness.campaign_match import (
     select_member,
 )
 from rw_bot.harness.clone import CLONE_PREFIX, DISPLAY_BASE, PLAY_PORT_BASE
+from rw_bot.harness.frozen_tree import FROZEN_ENTRIES, TREE_MARKER
 from rw_bot.harness.results_layout import (
     PAYLOAD_DIR,
     TRACE_ROOT,
     cluster_path,
 )
-from rw_bot.harness.runner import FROZEN_ENTRIES, TREE_MARKER
 from rw_bot.harness.sweep import SweepError, SweepJob
 from tests.harness_fakes import FakeHost
 

@@ -17,15 +17,14 @@ from pathlib import Path
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.clone import CLONE_PREFIX
+from rw_bot.harness.frozen_tree import TREE_DIR, prepare_tree
 from rw_bot.harness.match import decode_match_config, describe
 from rw_bot.harness.records import batch_fingerprint, read_batch_rows, write_arm_records
 from rw_bot.harness.results_layout import PINNED_GAME_DIR, SWEEP_ROOT, TRACE_ROOT
 from rw_bot.harness.runner import (
-    TREE_DIR,
     SweepConfig,
     decode_sweep_config,
     outstanding,
-    prepare_tree,
     run_worker,
 )
 from rw_bot.harness.sweep import parse_jobs

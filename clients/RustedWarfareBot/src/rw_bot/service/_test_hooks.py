@@ -93,7 +93,7 @@ sleep: Callable[[float], None] = time.sleep
 
 def _prepare_tree_impl(config: SweepConfig) -> None:
     """Freeze the batch tree through the harness, exactly as sweeps do."""
-    from rw_bot.harness.runner import prepare_tree
+    from rw_bot.harness.frozen_tree import prepare_tree
 
     prepare_tree(config)
 

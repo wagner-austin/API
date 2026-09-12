@@ -363,6 +363,30 @@ class FileSizeProto(Protocol):
         ...
 
 
+class FileMtimeProto(Protocol):
+    """Report when a file was last modified."""
+
+    def __call__(self, path: Path) -> float:
+        """Read one file's modification time.
+
+        Args:
+            path: The file to read.
+
+        Returns:
+            Seconds since the epoch, comparable across files on one host --
+            which is the whole use: deciding whether one file was written
+            after another.
+
+        Raises:
+            OSError: When the file does not exist or cannot be read. Absence
+                is an error rather than a sentinel because every caller is
+                comparing two real files, and a zero here would make a
+                missing file read as infinitely old -- the opposite of the
+                refusal the comparison exists to produce.
+        """
+        ...
+
+
 class MonotonicProto(Protocol):
     """Read a clock that only moves forward."""
 
@@ -486,6 +510,7 @@ __all__ = [
     "CAPTURE_TIMEOUT_STATUS",
     "CopyEntryProto",
     "CountCoresProto",
+    "FileMtimeProto",
     "FileSizeProto",
     "GetEnvProto",
     "KillTreeProto",
