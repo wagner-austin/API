@@ -1,0 +1,47 @@
+# The Impossible campaign's first probe: three roads on the first 12
+# impbase48 seeds, controls = those seeds' own 0/48 cards under
+# certified determinism (log 2026-09-12). TEMPO releases the whole
+# reserve at sample 600, before the structural double-income compounds
+# into the wiping army; EFFICIENCY arms the blood-gated artillery join
+# (every Impossible seed is an artillery opener, so the clause will
+# fire in every game); DENIAL retargets the raid party at enemy
+# production from sample 1,000. Against a 0-for-48 baseline ANY win or
+# survival is signal, and the road that shows one gets the next dose
+# ladder; three roads that all show nothing close the doctrine-knob
+# tier at this rung and the campaign builds new capability instead.
+tempo|8919001|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919001|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919001|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919105|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919105|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919105|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919209|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919209|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919209|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919313|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919313|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919313|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919417|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919417|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919417|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919521|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919521|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919521|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919625|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919625|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919625|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919729|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919729|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919729|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919833|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919833|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919833|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8919937|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8919937|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8919937|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8920041|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8920041|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8920041|doctrines/evolve1-g4m2-raze1000.doctrine|10000
+tempo|8920145|doctrines/evolve1-g4m2-allin600.doctrine|10000
+effic|8920145|doctrines/evolve1-g4m2-cond.doctrine|10000
+denial|8920145|doctrines/evolve1-g4m2-raze1000.doctrine|10000

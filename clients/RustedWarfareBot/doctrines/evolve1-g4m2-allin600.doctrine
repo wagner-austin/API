@@ -1,0 +1,59 @@
+# The Impossible campaign's TEMPO road (log 2026-09-12, impbase48):
+# the difficulty-3 subsidy doubles the enemy income from the first
+# sample and the median loss lands at 3,038 samples, so the race-and-
+# convert shape cannot apply -- this arm asks whether ending the game
+# EARLY can, releasing the champion's whole reserve at sample 600,
+# before the structural economy compounds into the multi-domain army
+# that wipes 36 of 48. Every other knob is the champion's; the control
+# is the seed's own impbase48 card under certified determinism.
+name evolve1-g4m2-allin600
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 600
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0
