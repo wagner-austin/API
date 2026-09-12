@@ -20,7 +20,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/TickBracket.java": "689735f35d3b3dfddd407fa340d3a9305ce01a72"
   "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-11
+fact_checked: 2026-09-12
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -258,6 +258,8 @@ make play PLAY_SEED=8773497 PLAY_DIFFICULTY=3 PLAY_PINDELTA=3 \
 ```
 
 `PLAY_ARGS` is the sample cap (120 covers a tick-scale question, 10000 a full match); `PLAY_RNGTAP=1` is the diagnostic arming switch — it turns on the draw tap, the per-window `rng`/`rngtap` hash lines, the think counters and candidate-scan logger, the per-tick `credspend` trace and the price-object `chargestack` hooks, all at once, and certified play keeps original bytes by leaving it off. `make play` exiting 1 at the end is the normal headless-exit artifact: judge the LOG, never the exit code. To diff a pair, extract and compare in this order — `aitick` lines (sim state per tick, first 120), `rng frame=` lines (three stream hashes per 75-frame window; the earliest differing window and which of engine/math/shuffle moved first localizes any fork), `credspend`/`chargestack` lines (the spend that realizes it). The 2026-09-11 log entries are worked examples of exactly this read, and `wiki/log.md` is where each pair's verdict lives.
+
+Three logging-layer artifacts can dress a bit-identical simulation as a fork, all measured on the dettappin8b certification pairs (log 2026-09-12) and locally: normalize `sun.reflect.GeneratedMethodAccessor[0-9]+` before hashing any stack-render stream (the number is JVM accessor-generation order, not sim state), drop the pre-first-reseed `frame=0` line (a boot-time duplicate race), and ignore lines after the final shared tick (teardown flush order). The same read runs at cluster scale — dettappin8b certified 4/4 pairs identical under both pins on the cluster, so a champion/twin pair there now measures the doctrine difference and nothing else — with one standing precondition the stale-jar incident bought: the cluster attaches the PREBUILT `agent/build/rw-agent.jar` that the freeze captures, and only `make agent` rebuilds it, so `check_agent_jar_fresh` (`src/rw_bot/harness/frozen_tree.py`, error `RW-SWEEP-007`) refuses any freeze whose jar is older than an agent source.
 
 [^1]: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/`, twelve results each from `sweeps/noise.txt` — one job line repeated twelve times under distinct labels, since results are filed by label.
 [^2]: `.decompiled/com/corrodinggames/rts/game/a/a.java:1713,1737,1761`; `game/a/o.java:96-97,166-167` — `o.w()` returns a random point on a disc and `a.java:1575` hands it to a worker as a destination; `game/units/y.java:4811-4837`.
