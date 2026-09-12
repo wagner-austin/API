@@ -1,0 +1,23 @@
+# The blood-dose ladder on exactly the seeds that decide it (log
+# 2026-09-12): cond35 measured the dose-2 gate a WASH at block scale --
+# three marginal winners regressed (their controls bleed 4-14 to
+# artillery across whole games) against three opener flips (two of
+# whose controls bleed 29) -- so the dose is where the two populations
+# separate, and it is now the knob's own value (outranged N = kills
+# before the join arms). Six seeds, two doses: the three regressed
+# winners must return to WON and the three flipped openers must stay
+# flipped. A dose that does both adopts at 42/48; the best partial
+# picks the frontier. Controls: pinbase48 for the winners, condprobe13c
+# for what dose 2 did, all under certified determinism.
+b8|8914457|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8914457|doctrines/evolve1-g4m2-cond-b16.doctrine|10000
+b8|8915393|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8915393|doctrines/evolve1-g4m2-cond-b16.doctrine|10000
+b8|8915705|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8915705|doctrines/evolve1-g4m2-cond-b16.doctrine|10000
+b8|8914041|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8914041|doctrines/evolve1-g4m2-cond-b16.doctrine|10000
+b8|8916641|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8916641|doctrines/evolve1-g4m2-cond-b16.doctrine|10000
+b8|8917681|doctrines/evolve1-g4m2-cond-b8.doctrine|10000
+b16|8917681|doctrines/evolve1-g4m2-cond-b16.doctrine|10000

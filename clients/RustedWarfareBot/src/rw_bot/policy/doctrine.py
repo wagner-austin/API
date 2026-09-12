@@ -91,6 +91,7 @@ INT_FIELDS: Final = (
     "siegedose",
     "raze",
     "press",
+    "outranged",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -109,7 +110,6 @@ FLAG_FIELDS: Final = (
     "brace",
     "huntgate",
     "bank",
-    "outranged",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -421,22 +421,26 @@ class Doctrine(TypedDict):
             form the timing family's closure left open (log 2026-09-11:
             gate 3,000 pooled +8 over 96 disjoint pairs, no bar). Off
             ``siege 0``, any dose but one is refused: it lies about its arm.
-        outranged: Whether ``siegedose`` artillery shares join the mix
-            WHILE a seen mobile ground threat outranges its land guns
-            AND that standoff class has drawn blood -- the threat-armed
-            sibling of the ``siege`` clause's time gate. The time gate
-            closed 0-for in the attrition tier because it fired in every
-            long game; the pinbase48 split (log 2026-09-12) is binary --
-            39/39 against enemies that never field artillery, 0/9
-            against the scout-plus-artillery opening -- and the static
-            merge measured catastrophic in BOTH directions (arty39), so
-            the join follows the SEEN opening. Sight alone was measured
+        outranged: Kills by seen outranging ground movers before
+            ``siegedose`` artillery shares join the mix, zero never --
+            the knob IS the blood dose, and the join holds only while
+            such a mover is in the picture. The threat-armed sibling of
+            the ``siege`` clause's time gate, built from the pinbase48
+            split (log 2026-09-12: 39/39 against enemies that never
+            field artillery, 0/9 against the scout-plus-artillery
+            opening) after the static merge measured catastrophic in
+            both directions (arty39). Sight alone was measured
             insufficient twice (navpair48's ungated navtilt, then
-            condprobe13b arming on a 165-versus-160 technicality), so
-            the join waits for the naval gate's own calibration:
-            outranging movers must kill ``STANDOFF_BLOOD`` of ours
-            first. On a seed where no standoff bleeds us the clause
-            never fires and the match is the champion's, bit for bit.
+            condprobe13b arming on a 165-versus-160 technicality), and
+            the naval gate's calibration of two proved a WASH at block
+            scale (cond35: three marginal artillery-bleeding winners
+            traded for three opener flips, 39-for-39 net) -- the
+            regressed winners bled 4-14 to artillery across whole
+            control games while two flipped openers bled 29, so the
+            dose is where they separate and it belongs to the doctrine,
+            not a constant. On a seed where no standoff reaches the
+            dose the clause never fires and the match is the
+            champion's, bit for bit.
         raze: Sample count past which the raid party's objectives become
             remembered enemy FACTORIES instead of extractors -- the
             displacement road (log 2026-09-11): every composition answer
@@ -552,7 +556,7 @@ class Doctrine(TypedDict):
     press: int
     huntgate: bool
     bank: bool
-    outranged: bool
+    outranged: int
 
 
 __all__ = [

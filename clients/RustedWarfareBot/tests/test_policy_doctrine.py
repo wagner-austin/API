@@ -75,7 +75,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         press=0,
         huntgate=False,
         bank=False,
-        outranged=False,
+        outranged=0,
     )
 
 

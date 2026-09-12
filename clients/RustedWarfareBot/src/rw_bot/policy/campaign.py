@@ -132,7 +132,7 @@ def play(
     retreat: int = FIRST_WAVE,
     siege: int = 0,
     siegedose: int = 1,
-    outranged: bool = False,
+    outranged: int = 0,
     raze: int = 0,
     press: int = 0,
     bank: bool = False,

@@ -63,6 +63,7 @@ _BAD_SIEGE = "RW-DOCTRINE-038"
 _BAD_SIEGE_DOSE = "RW-DOCTRINE-039"
 _BAD_RAZE = "RW-DOCTRINE-040"
 _BAD_PRESS = "RW-DOCTRINE-041"
+_BAD_OUTRANGED_BLOOD = "RW-DOCTRINE-042"
 
 
 def _count(
@@ -294,7 +295,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             "field 'bank' funds the finisher through the razing head's safe window, "
             "and this doctrine stands no launchers: set nukes or turn the bank off",
         )
-    outranged = require_bool(payload, "outranged")
+    outranged = _count(
+        payload, "outranged", _BAD_OUTRANGED_BLOOD, "kills before the standoff join arms, 0 off"
+    )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(

@@ -101,7 +101,7 @@ def _quiet_world() -> Sample:
     )
 
 
-def _play(world: Sample, times: int, outranged: bool) -> ScriptedPeer:
+def _play(world: Sample, times: int, outranged: int) -> ScriptedPeer:
     peer = ScriptedPeer(lines(*(world for _ in range(times))))
     play(
         AgentChannel(peer),
@@ -121,7 +121,7 @@ def test_the_identity_never_fields_artillery_even_against_the_standoff() -> None
     switch off, the seen artillery changes nothing and the same world
     produces tanks only -- which is exactly how the champion lost the nine
     opener seeds."""
-    peer = _play(_standoff_world(), times=4, outranged=False)
+    peer = _play(_standoff_world(), times=4, outranged=0)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)
@@ -133,7 +133,7 @@ def test_sight_alone_never_joins_the_share() -> None:
     not a standoff -- sight-alone arming re-rolled winning seeds on a
     165-versus-160 margin (condprobe13b, log 2026-09-12), exactly as the
     ungated navtilt did on navpair48."""
-    peer = _play(_standoff_world(), times=4, outranged=True)
+    peer = _play(_standoff_world(), times=4, outranged=2)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)
@@ -178,7 +178,7 @@ def test_the_switch_fields_artillery_once_the_standoff_draws_blood() -> None:
         OUTRANGED_PROFILES,
         4,
         reinforce=("c_tank",),
-        outranged=True,
+        outranged=2,
     )
     produced = verb(peer, "produce")
     assert any('"type":"c_artillery"' in line for line in produced)
@@ -188,7 +188,7 @@ def test_the_armed_switch_is_the_identity_when_nothing_outranges() -> None:
     """No seen standoff, no join: the armed doctrine plays the champion's
     game bit for bit on a quiet seed, which is the property that separates
     this clause from the static merge arty39 refused."""
-    peer = _play(_quiet_world(), times=4, outranged=True)
+    peer = _play(_quiet_world(), times=4, outranged=2)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)
@@ -216,13 +216,36 @@ def _hall_world() -> Sample:
     )
 
 
+def test_a_higher_dose_holds_the_join_past_the_same_blood() -> None:
+    """The knob IS the blood dose (cond35, log 2026-09-12): the fixed
+    calibration of two measured a wash at block scale, trading marginal
+    winners that bleed 4-14 across whole games for openers that bleed 29,
+    so the separation lives in the dose. Two deaths against a dose of
+    four holds the join."""
+    bleeding, after = _bled_worlds()
+    peer = ScriptedPeer(lines(bleeding, after, after, after))
+    play(
+        AgentChannel(peer),
+        (),
+        OUTRANGED_CATALOGUE,
+        PLACEMENTS,
+        OUTRANGED_PROFILES,
+        4,
+        reinforce=("c_tank",),
+        outranged=4,
+    )
+    produced = verb(peer, "produce")
+    assert any('"type":"c_tank"' in line for line in produced)
+    assert not any('"type":"c_artillery"' in line for line in produced)
+
+
 def test_an_armed_enemy_structure_never_joins_the_share() -> None:
     """The frame-0 regression witness (condprobe13, log 2026-09-12): the
     first wiring read the enemy command centre -- armed, outranging
     everything, visible forever -- and held the join on from the first
     observation of every match, on winning seeds included. A standoff is a
     fight against something that can come to you; the hall cannot."""
-    peer = _play(_hall_world(), times=4, outranged=True)
+    peer = _play(_hall_world(), times=4, outranged=2)
     produced = verb(peer, "produce")
     assert any('"type":"c_tank"' in line for line in produced)
     assert not any('"type":"c_artillery"' in line for line in produced)

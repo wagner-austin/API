@@ -206,18 +206,6 @@ def _tilted(
     return (*mix, *(capable[i % len(capable)] for i in range(wanted)))
 
 
-#: Kills by outranging ground movers before the standoff join arms. The
-#: naval gate's calibration lifted whole (:data:`FLEET_BLOOD`): one kill is
-#: a stray shot, two is a standoff that has found something it can farm.
-#: Sight alone was measured insufficient TWICE -- the ungated navtilt
-#: re-rolled winning seeds on navpair48, and the sight-armed standoff join
-#: re-rolled them again on condprobe13b, arming on a 165-reach plasma tank
-#: against a 160-reach mix (log 2026-09-12). Blood is what tells the
-#: 130-unit artillery standoff that razes an economy from the 5-unit
-#: technicality that never lands a shot.
-STANDOFF_BLOOD: Final = 2
-
-
 def outranging_types(
     mix: Sequence[str],
     targets: Sequence[Threat],
@@ -414,7 +402,7 @@ def threat_tilts(
     catalogue: Mapping[str, UnitStats],
     *,
     counter: bool,
-    outranged: bool,
+    outranged: int,
     siegedose: int,
     navtilt: int,
     fleet_seen: set[str],
@@ -437,7 +425,8 @@ def threat_tilts(
         catalogue: Unit stats by type name, for the mobility test the
             outranged clause runs (:func:`outranging_types`).
         counter: The doctrine's tilt switch.
-        outranged: The doctrine's outranged switch.
+        outranged: The doctrine's outranged dose -- kills by seen
+            outranging movers before the join arms, zero never.
         siegedose: Artillery shares the outranged join adds while armed --
             the same dose knob the siege clause spends, deliberately: one
             number for "how much reach", however it was armed.
@@ -468,9 +457,12 @@ def threat_tilts(
         # trivial-margin mover -- a 165-reach plasma tank against a
         # 160-reach mix -- and re-rolled winning seeds exactly as the
         # ungated navtilt did on navpair48 (condprobe13b, log 2026-09-12).
+        # The dose is the doctrine's, because the fixed calibration of two
+        # measured a wash at block scale (cond35): the seeds it regressed
+        # bled 4-14 across whole games where the flipped openers bled 29.
         standoffs = outranging_types(composition, threats, profiles, catalogue)
         standoff_seen.update(standoffs)
-        if standoffs and deaths_to(standoff_seen) >= STANDOFF_BLOOD:
+        if standoffs and deaths_to(standoff_seen) >= outranged:
             composition = (*composition, *("c_artillery",) * siegedose)
             fired.add("O")
     if counter:
@@ -490,7 +482,6 @@ def threat_tilts(
 
 __all__ = [
     "FLEET_BLOOD",
-    "STANDOFF_BLOOD",
     "Threat",
     "counter_composition",
     "fleet_types",

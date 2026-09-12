@@ -8,7 +8,7 @@
 # zero-artillery seed this clause never fires and the match is the
 # champion's bit for bit, the property the static merge could not have.
 # Every other knob and every goals slot is the champion's exactly.
-name evolve1-g4m2-cond
+name evolve1-g4m2-cond-b8
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
 heavies heavyTank,heavyTank
 max_workers 8
@@ -53,7 +53,7 @@ spacing 0
 retreat 3
 siege 0
 siegedose 1
-outranged 2
+outranged 8
 raze 0
 press 0
 brace 0

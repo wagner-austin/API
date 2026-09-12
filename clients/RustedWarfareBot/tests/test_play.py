@@ -404,7 +404,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     huntgate=False,
                     bank=False,
                     brace=False,
-                    outranged=False,
+                    outranged=0,
                 )
             )
         )
