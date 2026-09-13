@@ -355,15 +355,16 @@ class Doctrine(TypedDict):
             Very Hard opener is the scout-plus-artillery opening and the
             army stalls against those guns (logs 2026-09-12/13). No memory
             fallback: with no such gun in sight the party stands down and
-            none is raised. Arbitrated like the hunt ([[policy-raid]]).
+            none is raised. Arbitrated like the RAID, against the
+            escalating rung plus the party: the opening rung let a spent
+            army re-draft sixty-seven to ninety-three parties in one
+            game (dive16, log 2026-09-13) ([[policy-raid]]).
         divemargin: World units a gun must reach BEYOND the army's longest
             land gun before the dive counts it a standoff, zero for any
-            outranging gun. dive16 (log 2026-09-13) read the margin-free
-            clause diving plasma tanks (165) and missile mechs (190) against
-            a 160 line, fifty-five re-drafts on a seed the champion won
-            without ever seeing a piece, while its three opener flips were
-            dives into artillery at 290: at 100 against a 160 line,
-            artillery qualifies and every other ground gun does not.
+            outranging gun. At 100 against a 160 line artillery (290)
+            qualifies and laser, missile and plasma (165-190) do not;
+            measured a no-op at Very Hard, where every quarry the
+            margin-free dive took was artillery (dive16b, log 2026-09-13).
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
