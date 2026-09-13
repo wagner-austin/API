@@ -1,0 +1,72 @@
+# The champion with the dive armed, blood-gated on ARTILLERY (dive 3,
+# divemargin 100, divecap 16, diveblood 3): a party of the three
+# fastest gathered units closes on the nearest visible ground mover
+# that reaches at least 100 world units beyond every land gun the army
+# fields -- artillery at 290 against a 160 line, not the 165-190 movers
+# -- drafted against the opening rung so it dives in time, with the
+# first party held until three of our units have died to the artillery
+# sighted. diveblood13 (log 2026-09-13) read the margin-free gate opening
+# on deaths to plasma tanks and missile mechs on s8915497 at frame 120k,
+# fifty-eight thousand frames before that seed's third artillery death,
+# and lost the champion's win there; the reading blood_frames priced --
+# the third death to c_artillery or mechArtillery before frame 110k on
+# three of nine openers, on no touched winner and one winner in
+# thirty-five -- is the reading this file carries. The 96-seed bar
+# rejected the rung-arbitrated dive at 66 to 69 (divebar192); this arm
+# faces the same 96 seeds against the same certified champion cards.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-dive3-blood3m100
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 3
+divemargin 100
+divecap 16
+diveblood 3
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0
