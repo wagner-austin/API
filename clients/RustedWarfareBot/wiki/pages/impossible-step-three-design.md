@@ -73,7 +73,7 @@ express:
    Very Hard loss is legible at sample 1,500 with AUC 0.79 on the worth
    ratio), but every response the vocabulary offers on that cohort is
    now measured dead on the 96 certified seeds -- the press -4, the
-   turtle hold -12, the riposte counter-punch -6 alone and -7 behind
+   turtle hold -12, the riposte counter-punch -7 alone and -7 behind
    the hold at three thresholds, the dive -3 and -6, range-first
    targeting -60 ([[very-hard-race]]). A head at Very Hard needs the
    per-sample response surface of options one and two, exactly as at
