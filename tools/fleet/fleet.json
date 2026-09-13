@@ -58,7 +58,8 @@
   },
   "not_dispatchable": {
     "austinpc": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled in the identity registry because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it.",
-    "lapis-lazuli": "An Android phone in Termux. A client of the fleet and never a target: it submits dispatches, it does not run them. Named here rather than left silent because that is a permanent decision, not a machine waiting to be onboarded."
+    "lapis-lazuli": "An Android phone in Termux. A client of the fleet and never a target: it submits dispatches, it does not run them. Named here rather than left silent because that is a permanent decision, not a machine waiting to be onboarded.",
+    "serendipity": "The operator's own Yoga 9 laptop, enrolled 2026-09-12 and reachable from the hub. Held out of dispatch UNTIL the operator says it takes work: it is a machine he uses, and a measured budget (cores, RAM, whether it stays on AC) has not been taken. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict."
   },
   "projects": {
     "tools/fleet": {
