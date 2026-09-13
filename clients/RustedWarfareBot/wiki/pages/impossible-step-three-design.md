@@ -2,7 +2,7 @@
 title: Step three at Impossible -- what a learned head may drive, and what it may not
 tags: [impossible, learning, design]
 hubs: [bot-architecture]
-related: ["[[impossible-economy-problem]]", "[[harness-population-search]]", "[[policy-exact-timing]]"]
+related: ["[[impossible-economy-problem]]", "[[harness-population-search]]", "[[policy-exact-timing]]", "[[very-hard-race]]"]
 source_paths:
   - "src/rw_bot/policy/doom.py"
   - "models/fleetdoom.ndjson"
@@ -14,7 +14,7 @@ provenance:
   - "runs/sweeps/impincome96 — sweep run directory, untracked by git"
   - "wiki/log.md entry dated 2026-09-04 — kept as provenance rather than a source_path: log.md is append-only, so a blob pin on it drifts on every wiki operation while the cited entry itself cannot change"
   - "wiki/log.md impincome96 verdict entry dated 2026-09-06"
-fact_checked: 2026-09-06
+fact_checked: 2026-09-13
 confidence: high
 ---
 
@@ -68,7 +68,16 @@ express:
 3. **The doom template generalized to VH-and-below**, where responses
    are alive: the ledger's open "a response worth driving with the
    banked doom model" is still the cheapest head-shaped win, just not
-   an Impossible one.
+   an Impossible one. CLOSED AT VERY HARD 2026-09-13 by the same
+   argument that closed it here: the trigger was never the problem (a
+   Very Hard loss is legible at sample 1,500 with AUC 0.79 on the worth
+   ratio), but every response the vocabulary offers on that cohort is
+   now measured dead on the 96 certified seeds -- the press -4, the
+   turtle hold -12, the riposte counter-punch -6 alone and -7 behind
+   the hold at three thresholds, the dive -3 and -6, range-first
+   targeting -60 ([[very-hard-race]]). A head at Very Hard needs the
+   per-sample response surface of options one and two, exactly as at
+   Impossible.
 
 ## What this costs, honestly
 

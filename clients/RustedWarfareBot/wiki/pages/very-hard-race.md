@@ -119,6 +119,9 @@ so a flip and a regression are seed-named facts, not estimates.
 | range-first target order (prangebar96, 94 in) | 9 | 4 | 63 |
 | turtle 85 with the riposte counter-punch (turtlebar192) | 62 | 7 | 14 |
 | turtle 85, hold only (turtlebar192) | 57 | 0 | 12 |
+| turtle 70 with the riposte (turtlethr192) | 62 | 7 | 14 |
+| turtle 100 with the riposte (turtlethr192) | 62 | 7 | 14 |
+| riposte alone, no hold (ripostebar96, 95 in) | 62 | 7 | 13 |
 
 Every verb that converts an opener costs winners, because the bar's 69
 winners outnumber its opener-shaped seeds two to one and a verb that
@@ -213,12 +216,22 @@ the long games are the losses the hold exists for: on those the recall
 forfeits the field fight the champion goes on to win, and six of them
 end as 10,000-sample stalemates.[^12] With
 the press at -4 the response space of attacking LESS after a mid-game
-read is closed in both directions. The riposte alone and the threshold
-family are still filing on the same seeds; their flips so far are all
-on seeds above the latch, where only the riposte acts.[^13]
+read is closed in both directions.
+
+The attribution closed the same day. The riposte alone, with no hold
+in front of it, reads 62 on 95 seeds: it gains the same seven seeds
+every turtle arm gained and loses thirteen. The thresholds at 70 and
+100 read 62 each with the same seven gains and fourteen losses. So the
+counter-punch was the family's whole effect and it is a net minus six
+on the champion, and the hold's threshold does not matter because the
+riposte's flips happen on seeds the hold never touches.[^13] The seven
+gains are real seeds (three of them, s8925937 s8929161 s8931313, among
+the nine knife-edge losses the cohort table named) and would have read as a win on any nine-seed
+opener probe; the thirteen losses are the majority class the probe
+omits, the lesson the opener probes already taught.
 
 [^12]: `pair_read.py` over `runs/sweeps/turtlebar192` against `runs/sweeps/divebar192`, all 192 cards; the twelve hold-only losses are s8925001 s8925833 s8926977 s8927393 s8928641 s8929681 s8932665 s8932769 s8933497 s8933809 s8934121 s8934433, ratios 0.64-0.85 at sample 1,500 in the cohort table of `cohort_turtle.py`, the champion winning every one; the counter-punch arm wins seven of the twelve back (s8925001 s8926977 s8928641 s8932665 s8932769 s8933809 s8934433).
-[^13]: `runs/sweeps/ripostebar96` (31 filed: 30 won to the champion's 29) and `runs/sweeps/turtlethr192` (turtle100r 58 to 58 at 74, turtle70r 60 to 58 at 75), same readers; read again when they close.
+[^13]: `pair_read.py` over `runs/sweeps/ripostebar96` (95 of 96 cards; the missing seed is a champion win, so the closed figure is 62 or 63) and `runs/sweeps/turtlethr192` (all 192) against the divebar192 champion cards. Riposte alone: gained s8925937 s8929161 s8929473 s8931313 s8932249 s8932977 s8933913, lost s8925001 s8925105 s8925521 s8925833 s8927393 s8927913 s8928017 s8928225 s8929369 s8929681 s8933497 s8934121 s8934329. turtle70r: the same seven gained, the same thirteen lost plus s8932041. turtle100r: gained s8925937 s8929473 s8931313 s8932249 s8932977 s8933913 s8935473, lost s8925105 s8925833 s8927393 s8927601 s8927913 s8928017 s8928225 s8928433 s8929681 s8932041 s8933289 s8933497 s8934121 s8934329.
 
 [^7]: `sweeps/pressvh48.txt` -- control against `vh-press80` on 48 fresh seeds 8891001-8895889, judged by the pairs and margin report; the press reads at `src/rw_bot/policy/situation.py:223` (`PRESS_WINDOW`).
 [^8]: `src/rw_bot/policy/situation.py:234` (`TURTLE_WINDOW = 1500`) and `:237` (`Press`, now taking its window); `src/rw_bot/policy/dispatch.py:380` (`WaveController.command`, the `withhold` flag) and `:424` (the punching latch: a withheld controller with no forced release clears its released set, and a latched one musters until `released` empties); `src/rw_bot/policy/campaign.py:274` (`turtler = Press(turtle, TURTLE_WINDOW)`) and `:326` (the read beside the press read).

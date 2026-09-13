@@ -7,6 +7,8 @@ related:
   - "[[harness-match-service]]"
   - "[[policy-exact-timing]]"
   - "[[power-audit-mde-ledger]]"
+  - "[[very-hard-race]]"
+  - "[[impossible-economy-problem]]"
 source_paths:
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
@@ -16,7 +18,7 @@ provenance:
   - "wiki/log.md — the chronological record this page summarises. Deliberately NOT a pinned source_path: it is append-only, so a pin on it goes stale every time any session logs anything, including edits to this page. That is drift with no information in it, and it was firing here. The page's own framing says the same thing — log.md is the journal, this page is the current position."
 game_version: "1.15 (code 176, build #28)"
 confidence: high
-fact_checked: 2026-09-05
+fact_checked: 2026-09-13
 hubs: [bot-architecture]
 ---
 
@@ -71,6 +73,8 @@ panel. Nothing on this list is a guess.
 ## Closed questions (measured, with the log entry that closed them)
 
 **Very Hard:**
+- The mid-game read family, both responses, on the 96 certified bar seeds (log 2026-09-13, [[very-hard-race]]): the press (release everything at sample 2,000 when behind) read -4 on 48 pairs; the turtle (hold home from sample 1,500 when behind) reads 57 to the champion's 69 with twelve seeds lost and none gained, every one a seed the champion wins from behind; and the riposte counter-punch, alone or behind any threshold of the hold (70, 85, 100), reads 62 on every arm -- the same seven seeds gained, thirteen or fourteen lost. Attacking less after a mid-game read is closed in both directions, the counter-punch is a net -6, and no knob in the vocabulary wins the behind-at-1,500 cohort more often than the champion's own continued pressure.
+- The dive (a fast party closing on the gun that outranges the line) and the targeting order, on the same seeds (log 2026-09-13): escalating dive 66, blood-gated dive 63, range-first targeting 9, against 69; the concurrency-gated artillery share read 70 (four flips, three regressions, a trade not an adoption).
 - The hover-for-heavy army slot (evolve6's nominee `evolve6-g0m3`, c_tank x2 + hoverTank x2 + heavyTank): REJECTED at -5 against the +4 bar (e6g0m3vh48, 48 fresh pairs, control 38 wins vs hover2's 33, flips 7:12, mid-p 0.2632; paired margin -0.398 with own MDE 0.951 -- NOT TESTED at the 0.167 margin-scale interest, so the margin lean qualifies nothing and the win bar rules). The direction every evolve6 elite converged on does not survive contact with fresh seeds; the hover/heavy split returns to what evolve1-vs-evolve2 measured -- a flat direction, now flat at panel grade too. Champion retained, and its control side's 38/48 (79 percent) on untouched seeds is a fresh confirmation of the 75 percent rung rate. First panel judged end-to-end by committed code (`scripts.margin --power`, log 2026-09-10).
 - The artillery battery ([[policy-battery]]): REJECTED at -12 (battery96, 48 pairs, 6 wins vs control's 18; arm wiped 25 to 15) with the mechanism proven in 47 of 48 arm matches -- the first new-verb panel to measure the real thing on its first attempt. The standoff counter works and still loses: $2,100 plus a builder held through construction is paid out of tempo, and no trigger quality can rescue a response that drags every game it enters (law ten, third derivation). Capability banked: the channel, the quartermaster seam, five defect fixes lifted to every twin (log 2026-08-15).
 - The six-knob composition space (flame, close, raid, tech, medics, decoys): read as FLAT around the champion after vhsearch1 (grad1 +4 to the digit, grad2 22-22 dead even), and composition tuning was retired 2026-08-14 -- a verdict vhsearch2 OVERTURNED on 2026-09-02: the cluster-played search found `close 6`, and it survived both graduation laws to take the rung. The 08-14 closure was a statement about that search's reach (local fleet, smaller panels), not about the space; the space holds at least one adoptable knob the earlier reach missed.
@@ -82,6 +86,7 @@ panel. Nothing on this list is a guess.
 - The deficit-gated tilt: halves the damage, keeps the disease — army deficit is the normal shape of winning against a subsidized opponent (log 2026-08-08, navgate96).
 
 **Impossible:**
+- The community's turtle-and-counter posture, measured whole on the 48 certified impbase48 seeds (log 2026-09-13, [[impossible-economy-problem]]): the hold 0/48 at paired survival +93; hold with the riposte 0/48 at -231; behind two gun turret chains 0/48 at -231; behind the half-line turret walk with repair bays 0/48 at -249. Equal to the champion on wins, worse on survival wherever it punches or walls; stage two's turtle is refuted on its own terms, not blocked on funding.
 - Terrain as a parameter: all three alternative maps worse than duel_lake, each by a named mechanism -- unmanned chokes, amplified navy, fog-off feeding the tilt (log 2026-08-09).
 - Cadence: the whole bot at lockstep 25 reads mildly negative-to-noise; the decisions, not their frequency, are the ceiling (log 2026-08-09).
 - The choke-holding verb v1: -264 on its own bridge panel, mechanism photographed off death positions -- the post trickles, and a gather point is not a mass. Verb retained behind hold 0; v2 designs logged, not built (log 2026-08-09).
