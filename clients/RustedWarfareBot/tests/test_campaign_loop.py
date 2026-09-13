@@ -531,6 +531,7 @@ def test_the_mechanism_census_remembers_what_stood_and_died() -> None:
         sightings=0,
         raids=0,
         hunts=0,
+        dives=0,
         marches=0,
         killed=0,
         refused_claims=0,

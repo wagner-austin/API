@@ -64,7 +64,7 @@ def test_the_nearest_visible_mover_is_pressed_by_a_whole_party() -> None:
     orders = hunter.press(_world(*army), Intel(), army, targets, _CATALOGUE, True)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 400.0), (21, 400.0)]
     assert hunter.party() == frozenset({20, 21})
-    assert hunter.hunts == 1
+    assert hunter.objectives == 1
     assert hunter.marches == 2
 
 
@@ -93,7 +93,7 @@ def test_an_empty_horizon_pushes_at_the_nearest_memory() -> None:
     army = (_tank(20), _tank(21))
     orders = hunter.press(_world(*army), intel, army, (), _CATALOGUE, True)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 1200.0), (21, 1200.0)]
-    assert hunter.hunts == 1
+    assert hunter.objectives == 1
 
 
 def test_nothing_seen_and_nothing_remembered_raises_no_party() -> None:
@@ -104,7 +104,7 @@ def test_nothing_seen_and_nothing_remembered_raises_no_party() -> None:
     army = (_tank(20), _tank(21))
     assert hunter.press(_world(*army), Intel(), army, (), _CATALOGUE, True) == ()
     assert hunter.party() == frozenset()
-    assert hunter.hunts == 0
+    assert hunter.objectives == 0
 
 
 def test_no_anchor_is_no_hunt() -> None:
@@ -140,7 +140,7 @@ def test_a_nearer_mover_retargets_the_party() -> None:
         True,
     )
     assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 90.0), (21, 90.0)]
-    assert hunter.hunts == 2
+    assert hunter.objectives == 2
     assert hunter.marches == 4
 
 
@@ -161,7 +161,7 @@ def test_nearness_is_measured_from_the_party_not_from_home() -> None:
         True,
     )
     assert orders == ()
-    assert hunter.hunts == 1
+    assert hunter.objectives == 1
 
 
 def test_survivors_below_strength_disband_and_fight_home() -> None:

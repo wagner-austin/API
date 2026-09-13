@@ -49,6 +49,7 @@ from rw_bot.policy.dispatching import (
     send_recon,
     send_tech,
 )
+from rw_bot.policy.dive import Diver
 from rw_bot.policy.doctrine import NAVTILT_OFF, NAVTILT_PREDICTED
 from rw_bot.policy.expander import Expander
 from rw_bot.policy.firing import MAX_OPEN_GROUPS, PRIO_CONVERGENCE
@@ -125,6 +126,7 @@ def play(
     nukes: int = 0,
     rebuild: int = 0,
     hunt: int = 0,
+    dive: int = 0,
     worker_wait: int = 0,
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
@@ -188,7 +190,7 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``worker_wait``, ``groupcap``,
+            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``worker_wait``, ``groupcap``,
             ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``, ``outranged``,
             ``raze``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
@@ -263,10 +265,11 @@ def play(
     )
     closer = Closer(close)
     presser = Press(press)
-    # Sized by the doctrine; at zero the raid gate never fires and the
-    # raider is never consulted.
+    # Sized by the doctrine; at zero a party's gate never fires and it is
+    # never consulted.
     raiders = Raider(size=raid) if raid else Raider()
     hunters = Hunter(size=hunt) if hunt else Hunter()
+    divers = Diver(size=dive) if dive else Diver()
     rusher = Rusher()
     creeper = Creeper()
     nuker = Nuker()
@@ -289,14 +292,12 @@ def play(
     while scores.samples_seen < max_samples:
         sample = channel.next_sample()
 
-        # Acknowledged on every exit, including the ones that break out. In
-        # lockstep the agent holds the simulation until this arrives
-        # ([[policy-determinism]]).
+        # Acknowledged on every exit, including the ones that break out: in
+        # lockstep the agent holds the simulation until then ([[policy-determinism]]).
         try:
-            # The engine's refusals land in the ledger before anything
-            # decides: a refusal reported in THIS sample must already be
-            # excluded by this sample's site choices, or the tick spends an
-            # order on a site the engine just declined.
+            # The engine's refusals land in the ledger before anything decides:
+            # a refusal reported in THIS sample must already be excluded by this
+            # sample's site choices, or the tick re-orders a site just declined.
             for refusal in sample["refusals"]:
                 workforce.record_refusal((refusal["x"], refusal["y"]))
             army = find_army(sample, catalogue, profiles)
@@ -343,11 +344,9 @@ def play(
             build_reason = plan_step["reason"]
             plan_holds_worker = plan_step["holds_worker"]
             send_plan_step(channel, plan_step)
-            # Production runs before the army check, so a wave that has just
-            # been wiped still queues its replacements on the sample that
-            # notices.
-            # The wait gates the CEILING only -- worker_need's zero-worker
-            # branch ignores it, so a dead workforce is replaced either way.
+            # Production runs before the army check, so a wave just wiped still
+            # queues its replacements on the sample that notices. The wait gates
+            # the CEILING only: a dead workforce is replaced either way.
             need = worker_need(
                 free,
                 workforce.size(sample),
@@ -553,11 +552,13 @@ def play(
                 waves,
                 raiders,
                 hunters,
+                divers,
                 rusher,
                 momentum,
                 raid=raid,
                 raze_now=bool(raze) and scores.samples_seen >= raze,
                 hunt=hunt,
+                dive=dive,
                 rush=rush,
                 allin=allin,
                 strike=strike,
@@ -584,9 +585,10 @@ def play(
         rallied=waves.rallied,
         intercepts=waves.intercepts,
         sightings=intel.sightings_taken,
-        raids=raiders.raids,
-        hunts=hunters.hunts,
-        marches=raiders.marches + rusher.marches + hunters.marches,
+        raids=raiders.objectives,
+        hunts=hunters.objectives,
+        dives=divers.objectives,
+        marches=raiders.marches + rusher.marches + hunters.marches + divers.marches,
         killed=waves.killed(scores.visible_now),
         refused_claims=refused,
         outlays=outlays.rows(),

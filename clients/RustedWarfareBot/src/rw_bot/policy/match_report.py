@@ -56,6 +56,10 @@ class MatchReport(TypedDict):
         hunts: Objective changes taken by the hunt party -- each new mover
             pressed or structure pushed at counts one, for the same
             never-fired reason ([[engine-ai-triggers]]).
+        dives: Objective changes taken by the dive party -- each new
+            outranging gun closed on counts one. Zero on a seed where no
+            gun ever outranged the line is the identity, not a fault: the
+            dive answers a gun that is there ([[policy-raid]]).
         marches: Outbound orders sent to raid party members. The conveyor
             detector: v1's ``raids`` read 2-6 while dozens of lone
             replacements marched to the same objective and died, because
@@ -188,6 +192,7 @@ class MatchReport(TypedDict):
     sightings: int
     raids: int
     hunts: int
+    dives: int
     marches: int
     army_start: int
     army_end: int
@@ -267,6 +272,7 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"sightings      {report['sightings']}",
         f"raids          {report['raids']}",
         f"hunts          {report['hunts']}",
+        f"dives          {report['dives']}",
         f"marches        {report['marches']}",
         f"army           {report['army_start']} -> {report['army_end']}",
         f"army value     {report['army_value_start']} -> {report['army_value_end']}",

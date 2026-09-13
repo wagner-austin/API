@@ -82,7 +82,7 @@ def test_the_frontier_extractor_is_assaulted_first() -> None:
     orders = raider.strike(_world(*army), intel, army, _CATALOGUE, True, False)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(20, 900.0), (21, 900.0)]
     assert raider.party() == frozenset({20, 21})
-    assert raider.raids == 1
+    assert raider.objectives == 1
     assert raider.marches == 2
 
 

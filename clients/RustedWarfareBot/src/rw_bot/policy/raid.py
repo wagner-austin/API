@@ -37,11 +37,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.combat import FIRST_WAVE, RALLY_RADIUS
+from rw_bot.policy.combat import RALLY_RADIUS
 from rw_bot.policy.intel import Intel, Sighting
-from rw_bot.policy.party import draft_gathered, homeward
+from rw_bot.policy.party import Detachment, draft_gathered
 from rw_bot.policy.siting import find_anchor
-from rw_bot.wire.command import AttackMoveOrder, attack_move_order
+from rw_bot.wire.command import AttackMoveOrder
 from rw_bot.wire.state import Entity, Sample
 
 #: Types whose remembered sightings are raid objectives.
@@ -94,50 +94,13 @@ def production_objectives(intel: Intel) -> tuple[Sighting, ...]:
     return tuple(s for s in intel.remembered() if s["type_name"] in PRODUCTION_TYPES)
 
 
-class Raider:
+class Raider(Detachment):
     """Keeps one small party assaulting remembered enemy income.
 
-    The same shape as the other stateful controllers: decisions stay in pure
-    reads, and what lives here is the memory between observations -- who is in
-    the party, which objective it is on, and what has already been ordered
-    ([[issuing-orders]]).
-
-    Attributes:
-        size: Party size, public because the campaign arbitrates the draft
-            against it -- surplus is the wave gate's need plus this.
-        raids: Objectives assaulted so far, for the report.
-        marches: Outbound member-orders sent so far, for the report. The
-            figure that would have convicted v1 on its first scorecard: its
-            `raids` read 2-6 while dozens of lone replacements marched,
-            because re-drafts against the same objective counted nothing.
+    The bookkeeping is :class:`~rw_bot.policy.party.Detachment`'s; what is
+    the raid's own is the objective set, and the confirmation that reports
+    a dead objective back to the memory.
     """
-
-    def __init__(self, size: int = FIRST_WAVE) -> None:
-        """Open a raider.
-
-        Args:
-            size: Party size. Defaults to the engine's own first-group size:
-                below it the engine's AI calls a force a trickle, and so does
-                ours ([[engine-ai-triggers]]).
-        """
-        self.size = size
-        self.raids = 0
-        self.marches = 0
-        self._party: frozenset[int] = frozenset()
-        self._objective = 0
-        self._ordered: dict[int, int] = {}
-
-    def party(self) -> frozenset[int]:
-        """Return the engine ids currently drafted.
-
-        The campaign withholds these from the wave controller: a unit cannot
-        serve two commanders, and assignment is the arbitration
-        ([[engine-ai-zones]]).
-
-        Returns:
-            The party, empty when there is no objective to raid.
-        """
-        return self._party
 
     def _confirmed_dead(self, sample: Sample, army: Sequence[Entity], target: Sighting) -> bool:
         """Report whether a party member stands on the memory and sees nothing.
@@ -158,8 +121,9 @@ class Raider:
         if target["unit_id"] in visible:
             return False
         limit = RALLY_RADIUS**2
+        party = self.party()
         for unit in army:
-            if unit["unit_id"] not in self._party:
+            if unit["unit_id"] not in party:
                 continue
             d2 = (unit["x"] - target["x"]) ** 2 + (unit["y"] - target["y"]) ** 2
             if d2 <= limit:
@@ -215,8 +179,8 @@ class Raider:
         """
         objectives = production_objectives(intel) if raze_now else income_objectives(intel)
         if not objectives:
-            self._party = frozenset()
-            self._objective = 0
+            self.muster(())
+            self.forget_objective()
             return ()
         anchor = find_anchor(sample, catalogue)
         if anchor is None:
@@ -229,54 +193,21 @@ class Raider:
 
         target = min(objectives, key=nearness)
 
-        alive = {unit["unit_id"] for unit in army}
-        survivors = sorted(self._party & alive)
+        survivors = self.survivors(army)
         if survivors and len(survivors) < self.size:
-            return self._disband(survivors, anchor)
+            return self.disband(survivors, anchor)
         party = survivors
         if not party and may_draft:
             party = draft_gathered(army, anchor, self.size)
-        self._party = frozenset(party)
-        if not self._party:
+        if not self.muster(party):
             return ()
 
         if self._confirmed_dead(sample, army, target):
             intel.forget(target["unit_id"])
-            self._objective = 0
+            self.forget_objective()
             return ()
 
-        if target["unit_id"] != self._objective:
-            self._objective = target["unit_id"]
-            self._ordered = {}
-            self.raids += 1
-        orders = tuple(
-            attack_move_order(unit_id=member, x=target["x"], y=target["y"])
-            for member in sorted(self._party)
-            if self._ordered.get(member) != target["unit_id"]
-        )
-        for order in orders:
-            self._ordered[order["unit_id"]] = target["unit_id"]
-        self.marches += len(orders)
-        return orders
-
-    def _disband(self, survivors: Sequence[int], anchor: Entity) -> tuple[AttackMoveOrder, ...]:
-        """Send the under-strength party home fighting, and dissolve it.
-
-        The discipline is the shared one ([[policy-raid]]): the orders come
-        from :func:`~rw_bot.policy.party.homeward`, and what is this raid's
-        own is only the bookkeeping it dissolves with them.
-
-        Args:
-            survivors: The remaining members, in id order.
-            anchor: The structure the reserve gathers at.
-
-        Returns:
-            The homeward orders.
-        """
-        self._party = frozenset()
-        self._objective = 0
-        self._ordered = {}
-        return homeward(survivors, anchor)
+        return self.advance(target["unit_id"], target["x"], target["y"])
 
 
 __all__ = [

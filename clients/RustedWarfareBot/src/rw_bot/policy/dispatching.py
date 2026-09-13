@@ -27,6 +27,7 @@ from rw_bot.policy.budget import Budget
 from rw_bot.policy.creep import Creeper
 from rw_bot.policy.decoy import Decoys
 from rw_bot.policy.dispatch import WaveController
+from rw_bot.policy.dive import Diver
 from rw_bot.policy.hunt import Hunter
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.lurk import Lurker
@@ -188,6 +189,35 @@ def _draft_hunt(
     for order in hunters.press(sample, intel, army, targets, catalogue, spare):
         channel.send_attack_move(order)
     drafted = hunters.party()
+    return tuple(u for u in army if u["unit_id"] not in drafted)
+
+
+def _draft_dive(
+    channel: AgentChannel,
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    profiles: Mapping[str, CombatProfile],
+    army: tuple[Entity, ...],
+    targets: tuple[Entity, ...],
+    waves: WaveController,
+    divers: Diver,
+) -> tuple[Entity, ...]:
+    """Advance the dive and return the units the waves may still command.
+
+    The hunt's arbitration exactly -- the OPENING rung plus the party, a
+    unit cannot serve two commanders -- because the dive answers the same
+    early window: the battery stands at frames 60k-110k on every opener
+    seed, when the army holds eight to thirteen pieces and the escalating
+    rung would starve the draft the way it starved the hunt
+    (:meth:`WaveController.opening_need`). What is the dive's own is that
+    it never marches on an empty horizon: with no outranging gun in sight
+    the party stands down inside :meth:`Diver.dive` and every unit is the
+    waves' again ([[policy-raid]]).
+    """
+    spare = len(army) >= waves.opening_need() + divers.size
+    for order in divers.dive(sample, army, targets, catalogue, profiles, spare):
+        channel.send_attack_move(order)
+    drafted = divers.party()
     return tuple(u for u in army if u["unit_id"] not in drafted)
 
 
@@ -365,12 +395,14 @@ def fight(
     waves: WaveController,
     raiders: Raider,
     hunters: Hunter,
+    divers: Diver,
     rusher: Rusher,
     momentum: Momentum,
     *,
     raid: int,
     raze_now: bool,
     hunt: int,
+    dive: int,
     rush: bool,
     allin: int,
     strike: int,
@@ -398,6 +430,7 @@ def fight(
         waves: The wave controller, carrying its own commitments.
         raiders: The raid controller.
         hunters: The hunt controller.
+        divers: The dive controller.
         rusher: The forced-march controller.
         momentum: The rival army-value window the strike release reads.
         raid: The raid party's size, zero for no raiding.
@@ -406,6 +439,7 @@ def fight(
             Named apart from the head's ``razing_near``, which is the enemy
             razing US; this is the other direction.
         hunt: The hunt party's size, zero for no hunting.
+        dive: The dive party's size, zero for no diving (Doctrine.dive).
         rush: Whether released waves march at the estimated enemy start.
         allin: The all-in release observation, zero for never.
         strike: The momentum release window's size, zero for off.
@@ -425,17 +459,24 @@ def fight(
         struck = rusher.ordered()
         fighting = tuple(u for u in fighting if u["unit_id"] not in struck)
     if raid:
-        raids_before = raiders.raids
+        raids_before = raiders.objectives
         fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders, raze_now)
-        if raiders.raids > raids_before:
+        if raiders.objectives > raids_before:
             pending_events.add("R")
     if hunt:
-        hunts_before = hunters.hunts
+        hunts_before = hunters.objectives
         fighting = _draft_hunt(
             channel, sample, catalogue, intel, fighting, targets, waves, hunters, hunt_held
         )
-        if hunters.hunts > hunts_before:
+        if hunters.objectives > hunts_before:
             pending_events.add("H")
+    if dive:
+        dives_before = divers.objectives
+        fighting = _draft_dive(
+            channel, sample, catalogue, profiles, fighting, targets, waves, divers
+        )
+        if divers.objectives > dives_before:
+            pending_events.add("D")
     window_open = strike_window(momentum, strike)
     _note_releases(pending_events, window_open, committed_close, pressed)
     moves, attacks = waves.command(

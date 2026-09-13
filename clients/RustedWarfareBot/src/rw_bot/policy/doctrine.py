@@ -92,6 +92,7 @@ INT_FIELDS: Final = (
     "raze",
     "press",
     "outranged",
+    "dive",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -345,6 +346,21 @@ class Doctrine(TypedDict):
             first verb aimed at the wave LADDER rather than the wave;
             party discipline is the raid's, extracted shared
             ([[policy-raid]]).
+        dive: The dive party's size, zero for off. A standing party of the
+            FASTEST gathered units that closes on the visible enemy ground
+            mover whose land gun outranges every land gun the army fields
+            -- the outranged clause's own membership test, lifted -- so the
+            battery behind the screen is touched instead of traded into.
+            Every Very Hard opener seed is the scout-plus-artillery
+            opening and no winning seed faces a piece (log 2026-09-12);
+            the loss-table anatomy (log 2026-09-13) reads the army
+            stalling at eleven to thirteen pieces against those guns
+            while the enemy's income compounds, and every composition
+            answer measured flat. No memory fallback: with no outranging
+            gun in sight the party stands down and none is raised, so a
+            zero-artillery seed is the champion's match bit for bit.
+            Arbitrated like the hunt, against the opening rung; party
+            discipline is the raid's, shared ([[policy-raid]]).
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
@@ -559,6 +575,7 @@ class Doctrine(TypedDict):
     huntgate: bool
     bank: bool
     outranged: int
+    dive: int
 
 
 __all__ = [

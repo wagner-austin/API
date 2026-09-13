@@ -377,6 +377,7 @@ def _report() -> MatchReport:
         sightings=41,
         raids=3,
         hunts=2,
+        dives=0,
         marches=9,
         army_start=0,
         army_end=20,

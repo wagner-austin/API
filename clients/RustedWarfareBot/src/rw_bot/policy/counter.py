@@ -253,6 +253,31 @@ def outranging_movers(
         CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
             a type in the mix or a mobile ground threat.
     """
+    reach = land_reach(mix, profiles)
+    if reach is None:
+        return 0
+    return sum(1 for t in targets if outranges(t, reach, profiles, catalogue))
+
+
+def land_reach(mix: Sequence[str], profiles: Mapping[str, CombatProfile]) -> float | None:
+    """Return the longest land-hitting gun a mix fields, or None for no land gun.
+
+    The standoff's own side of the comparison, shared by the outranged
+    clause (which counts what beats it) and the dive (which hunts what
+    beats it): before the army fields a land gun there is no standoff to
+    answer, and both readers say so with the same None.
+
+    Args:
+        mix: Type names, repeats irrelevant.
+        profiles: Combat profiles by type name, for reach and layers.
+
+    Returns:
+        The longest ``attack_range`` among the land-hitting types, or None.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
+            a type in the mix.
+    """
     own = [
         record["attack_range"]
         for name in dict.fromkeys(mix, True)
@@ -260,18 +285,44 @@ def outranging_movers(
         if record["hits_land"]
     ]
     if not own:
-        return 0
-    reach = max(own)
-    return sum(
-        1
-        for t in targets
-        if not t["flying"]
-        and t["movement"] != _NAVAL_LAYER
-        and (stats := catalogue.get(t["type_name"])) is not None
-        and stats["speed"] > 0.0
-        and profile_of(profiles, t["type_name"])["hits_land"]
-        and profile_of(profiles, t["type_name"])["attack_range"] > reach
-    )
+        return None
+    return max(own)
+
+
+def outranges(
+    target: Threat,
+    reach: float,
+    profiles: Mapping[str, CombatProfile],
+    catalogue: Mapping[str, UnitStats],
+) -> bool:
+    """Report whether one hostile is a ground MOVER whose land gun beats ``reach``.
+
+    The membership test the outranged clause's falsifications bought
+    (:func:`outranging_movers`): not a flier, not a WATER-mover, priced by
+    the catalogue and moving by its speed figure, land-hitting, and
+    strictly beyond the reach -- a tie is a fair fight.
+
+    Args:
+        target: The hostile, visible or remembered.
+        reach: The longest land gun on our side.
+        profiles: Combat profiles by type name.
+        catalogue: Unit stats by type name, for the speed that tells a
+            building from a unit.
+
+    Returns:
+        True for an outranging mobile ground hostile.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe
+            a mobile ground threat.
+    """
+    if target["flying"] or target["movement"] == _NAVAL_LAYER:
+        return False
+    stats = catalogue.get(target["type_name"])
+    if stats is None or stats["speed"] <= 0.0:
+        return False
+    record = profile_of(profiles, target["type_name"])
+    return record["hits_land"] and record["attack_range"] > reach
 
 
 def counter_composition(
@@ -479,8 +530,10 @@ __all__ = [
     "Threat",
     "counter_composition",
     "fleet_types",
+    "land_reach",
     "layer_counts",
     "mobile_threats",
+    "outranges",
     "outranging_movers",
     "threat_tilts",
 ]

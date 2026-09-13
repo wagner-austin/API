@@ -230,6 +230,7 @@ class Scorekeeper:
         sightings: int,
         raids: int,
         hunts: int,
+        dives: int,
         marches: int,
         killed: int,
         refused_claims: int,
@@ -260,6 +261,7 @@ class Scorekeeper:
             sightings: Hostile sightings the intel memory recorded.
             raids: Income objectives the raid party assaulted.
             hunts: Objectives the hunt party pressed.
+            dives: Objectives the dive party closed on.
             marches: Outbound orders sent to raid party members.
             killed: Targets ordered against that are no longer visible.
             refused_claims: Credit claims the budget turned down.
@@ -289,6 +291,7 @@ class Scorekeeper:
             sightings=sightings,
             raids=raids,
             hunts=hunts,
+            dives=dives,
             marches=marches,
             army_start=self._army_start,
             army_end=self.army_end,

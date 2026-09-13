@@ -1,0 +1,66 @@
+# The champion with the dive armed (dive 3): a party of the three
+# FASTEST gathered units closes on the visible enemy ground mover whose
+# land gun outranges every land gun the army fields, nearest the party
+# (rw_bot.policy.dive, the outranged clause's own membership test
+# lifted). Built from the loss-table anatomy of pinbase48 (log
+# 2026-09-13): every opener seed is the scout-plus-artillery opening,
+# the army stalls at eleven to thirteen pieces trading into 290-reach
+# guns behind the screen while the enemy's income compounds, and every
+# composition answer measured flat. No memory fallback and no lesser
+# objective: with no outranging gun in sight the party stands down and
+# none is raised, so a zero-artillery seed is the champion's match bit
+# for bit -- the identity half of dive16 measures exactly that. Three is
+# the engine's own first-group size, the hunt's and the raid's default.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-dive3
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 3
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

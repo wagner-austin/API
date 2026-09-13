@@ -27,11 +27,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.combat import FIRST_WAVE
 from rw_bot.policy.intel import Intel, Sighting
-from rw_bot.policy.party import draft_gathered, homeward
+from rw_bot.policy.party import Detachment, draft_gathered
 from rw_bot.policy.siting import find_anchor
-from rw_bot.wire.command import AttackMoveOrder, attack_move_order
+from rw_bot.wire.command import AttackMoveOrder
 from rw_bot.wire.state import Entity, Sample
 
 
@@ -85,8 +84,8 @@ def _quarry(
     return (memory["unit_id"], memory["x"], memory["y"])
 
 
-def _centroid(members: Sequence[Entity]) -> tuple[float, float]:
-    """Return the party's own centre, the point pursuit measures from.
+def centroid(members: Sequence[Entity]) -> tuple[float, float]:
+    """Return a party's own centre, the point pursuit measures from.
 
     Args:
         members: The party's live entities, at least one.
@@ -101,49 +100,12 @@ def _centroid(members: Sequence[Entity]) -> tuple[float, float]:
     )
 
 
-class Hunter:
+class Hunter(Detachment):
     """Keeps one small party pressing the nearest visible enemy mover.
 
-    The same shape as the other stateful controllers: decisions stay in
-    pure reads, and what lives here is the memory between observations --
-    who is in the party, which mover it presses, and what has already
-    been ordered ([[issuing-orders]]).
-
-    Attributes:
-        size: Party size, public because the campaign arbitrates the
-            draft against it -- surplus is the wave gate's need plus this.
-        hunts: Objective changes so far, for the report.
-        marches: Member-orders sent so far, for the report.
+    The bookkeeping is :class:`~rw_bot.policy.party.Detachment`'s; what is
+    the hunt's own is the quarry and the recall.
     """
-
-    def __init__(self, size: int = FIRST_WAVE) -> None:
-        """Open a hunter.
-
-        Args:
-            size: Party size. Defaults to the engine's own first-group size
-                for the raid's reason: below it the engine's AI calls a
-                force a trickle, and so does ours ([[engine-ai-triggers]]).
-                The campaign gates on the knob, so an unused hunter is
-                constructed and never consulted.
-        """
-        self.size = size
-        self.hunts = 0
-        self.marches = 0
-        self._party: frozenset[int] = frozenset()
-        self._objective = 0
-        self._ordered: dict[int, int] = {}
-
-    def party(self) -> frozenset[int]:
-        """Return the engine ids currently drafted.
-
-        The campaign withholds these from the wave controller: a unit
-        cannot serve two commanders, and assignment is the arbitration
-        ([[engine-ai-zones]]).
-
-        Returns:
-            The party, empty when nothing is drafted.
-        """
-        return self._party
 
     def stand_down(
         self, army: Sequence[Entity], catalogue: Mapping[str, UnitStats], sample: Sample
@@ -162,17 +124,14 @@ class Hunter:
         Returns:
             The homeward orders, empty with no party or no anchor.
         """
-        alive = {unit["unit_id"] for unit in army}
-        survivors = sorted(self._party & alive)
-        self._party = frozenset()
-        self._objective = 0
-        self._ordered = {}
+        survivors = self.survivors(army)
+        self.dissolve()
         if not survivors:
             return ()
         anchor = find_anchor(sample, catalogue)
         if anchor is None:
             return ()
-        return homeward(survivors, anchor)
+        return self.disband(survivors, anchor)
 
     def press(
         self,
@@ -211,17 +170,9 @@ class Hunter:
         anchor = find_anchor(sample, catalogue)
         if anchor is None:
             return ()
-        alive = {unit["unit_id"] for unit in army}
-        survivors = sorted(self._party & alive)
+        survivors = self.survivors(army)
         if survivors and len(survivors) < self.size:
-            self._party = frozenset()
-            self._objective = 0
-            self._ordered = {}
-            return homeward(survivors, anchor)
-        if not survivors:
-            # A party that died whole leaves ids behind; drop them so the
-            # campaign stops withholding ghosts from the waves.
-            self._party = frozenset()
+            return self.disband(survivors, anchor)
         # The quarry is chosen BEFORE any draft, measured from where the
         # party would stand -- its own centre when one is out, the anchor
         # when one would be raised. Drafting first was imphunt60's second
@@ -229,34 +180,23 @@ class Hunter:
         # idled at the anchor, withheld from the waves while hunting
         # nothing -- a diversion with hunts=0, invisible to every counter.
         if survivors:
-            members = [unit for unit in army if unit["unit_id"] in self._party]
-            centre_x, centre_y = _centroid(members)
+            members = [unit for unit in army if unit["unit_id"] in self.party()]
+            centre_x, centre_y = centroid(members)
         else:
             centre_x, centre_y = anchor["x"], anchor["y"]
         quarry = _quarry(targets, intel, catalogue, centre_x, centre_y)
         if quarry is None:
+            # A party that died whole leaves ids behind; drop them so the
+            # campaign stops withholding ghosts from the waves.
+            self.muster(survivors)
             return ()
         party = survivors
         if not party and may_draft:
             party = draft_gathered(army, anchor, self.size)
-        self._party = frozenset(party)
-        if not self._party:
+        if not self.muster(party):
             return ()
         objective_id, x, y = quarry
-
-        if objective_id != self._objective:
-            self._objective = objective_id
-            self._ordered = {}
-            self.hunts += 1
-        orders = tuple(
-            attack_move_order(unit_id=member, x=x, y=y)
-            for member in sorted(self._party)
-            if self._ordered.get(member) != objective_id
-        )
-        for order in orders:
-            self._ordered[order["unit_id"]] = objective_id
-        self.marches += len(orders)
-        return orders
+        return self.advance(objective_id, x, y)
 
 
-__all__ = ["Hunter"]
+__all__ = ["Hunter", "centroid"]

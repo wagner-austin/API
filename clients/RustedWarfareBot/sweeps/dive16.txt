@@ -1,0 +1,30 @@
+# The dive's first probe (log 2026-09-13), and the party refactor's
+# certification in the same batch. The nine opener seeds carry the arm
+# (dive 3): a party of the three fastest gathered units closes on the
+# nearest visible ground mover that outranges every land gun the army
+# fields -- the artillery behind the screen on every one of these seeds.
+# The four identity seeds (never a piece fielded against the champion)
+# must read byte-identical to pinbase48's cards: the dive never drafts
+# without a gun in sight. The three champ members are seeds where the
+# raid fired most in pinbase48 (16, 13 and 11 raids): the Raider and
+# Hunter now share Detachment with the Diver, and a lifted party
+# bookkeeping that moved a single order would show here as a card that
+# differs from its control. Controls: pinbase48, under certified
+# determinism. A flip is an opener seed reading WON; a flipping arm goes
+# to the 96-seed bar.
+dive|8913313|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913833|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8914041|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8914977|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8915185|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8916121|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8916641|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917473|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917681|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913001|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913729|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8915497|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917889|doctrines/evolve1-g4m2-dive3.doctrine|10000
+champ|8915185|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915393|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915081|doctrines/evolve1-g4m2.doctrine|10000

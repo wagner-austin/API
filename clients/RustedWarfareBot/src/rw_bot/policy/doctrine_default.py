@@ -83,6 +83,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     huntgate=False,
     bank=False,
     outranged=0,
+    dive=0,
 )
 
 

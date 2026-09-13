@@ -135,6 +135,7 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         "sightings      0",
         "raids          0",
         "hunts          0",
+        "dives          0",
         "marches        0",
         "army           4 -> 4",
         # The scripted world carries no player records, so the engine's own
@@ -207,6 +208,7 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
         "sightings      0",
         "raids          0",
         "hunts          0",
+        "dives          0",
         "marches        0",
         "army           0 -> 0",
         "army value     0 -> 0",
@@ -269,6 +271,7 @@ def test_the_sample_budget_defaults_when_not_given(
         "sightings      0",
         "raids          0",
         "hunts          0",
+        "dives          0",
         "marches        0",
         "army           4 -> 4",
         # The scripted world carries no player records, so the engine's own
@@ -405,6 +408,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     bank=False,
                     brace=False,
                     outranged=0,
+                    dive=0,
                 )
             )
         )

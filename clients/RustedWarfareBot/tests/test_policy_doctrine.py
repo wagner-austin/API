@@ -76,6 +76,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         huntgate=False,
         bank=False,
         outranged=0,
+        dive=0,
     )
 
 
@@ -456,6 +457,17 @@ def test_a_press_outside_the_percent_range_is_refused_and_one_round_trips() -> N
     assert caught.value.code == "RW-DOCTRINE-041"
     payload["press"] = 80
     assert decode_doctrine(payload)["press"] == 80
+
+
+def test_a_negative_dive_is_refused_and_a_party_size_round_trips() -> None:
+    """Zero already means no diving; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["dive"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-043"
+    payload["dive"] = 3
+    assert decode_doctrine(payload)["dive"] == 3
 
 
 def test_a_gate_without_a_party_is_refused() -> None:
