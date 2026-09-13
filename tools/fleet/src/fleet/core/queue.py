@@ -25,7 +25,7 @@ from typing import Final
 
 from platform_core.error_codes_tooling import FleetErrorCode
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
 from fleet.contracts.dispatch import (
@@ -244,6 +244,38 @@ def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ..
     )
 
 
+def observe_sessions(
+    credentials: McpCredentials,
+    *,
+    machine: str,
+    observations: list[JSONValue],
+    identity: JSONObject,
+) -> str:
+    """Record one node's session records in the board's session ledger.
+
+    The one call in this module that goes to the TASKBOARD rather than the
+    dispatch queue: ``task_session_observe`` lives beside the board's other
+    ``task_*`` tools, so ``credentials`` here are the board's (see
+    :func:`board_watch.config.load_credentials`), not the queue's.
+
+    Args:
+        credentials: The board's endpoint and headers.
+        machine: The node's machine id in the harness's ``pidDomain``
+            spelling, ``win32:serendipity``.
+        observations: Every record read from the node, already in the tool's
+            wire shape.
+        identity: From :func:`identity_arguments`.
+
+    Returns:
+        The tool's rendered line, which names what the pass wrote.
+
+    Raises:
+        AppError: Any transport or contract failure from the underlying call.
+    """
+    arguments: JSONObject = {"machine": machine, "observations": observations, **identity}
+    return call_mcp_tool(_test_hooks.http_post, credentials, "task_session_observe", arguments)
+
+
 __all__ = [
     "API_KEY_VARIABLE",
     "DEFAULT_URL",
@@ -253,6 +285,7 @@ __all__ = [
     "held_by",
     "identity_arguments",
     "load_credentials",
+    "observe_sessions",
     "report_close",
     "report_start",
 ]

@@ -195,8 +195,8 @@ class TestFleetNodesReportsAndReconciles:
             dump_json_str(
                 {
                     "nodes": [
-                        {"name": "lavender", "enabled": True},
-                        {"name": "asleep", "enabled": True},
+                        {"name": "lavender", "role": "worker", "user": "austi", "enabled": True},
+                        {"name": "asleep", "role": "worker", "user": "austi", "enabled": True},
                     ]
                 }
             ),
@@ -224,8 +224,8 @@ class TestFleetNodesReportsAndReconciles:
             dump_json_str(
                 {
                     "nodes": [
-                        {"name": "lavender", "enabled": True},
-                        {"name": "asleep", "enabled": False},
+                        {"name": "lavender", "role": "worker", "user": "austi", "enabled": True},
+                        {"name": "asleep", "role": "worker", "user": "austi", "enabled": False},
                     ]
                 }
             ),
@@ -278,7 +278,14 @@ class TestReconcilingWithoutTouchingTheNetwork:
         """
         path = tmp_path / "fleet-nodes.json"
         path.write_text(
-            dump_json_str({"nodes": [{"name": name, "enabled": v} for name, v in enabled.items()]}),
+            dump_json_str(
+                {
+                    "nodes": [
+                        {"name": name, "role": "worker", "user": "austi", "enabled": v}
+                        for name, v in enabled.items()
+                    ]
+                }
+            ),
             encoding="utf-8",
         )
         return path

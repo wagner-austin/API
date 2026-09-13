@@ -186,6 +186,40 @@ class TestTheDriftThatHappened:
         assert registry.has_drifted(drift) is False
 
 
+class TestTheObserverReadsRoleAndUser:
+    def test_role_and_user_are_decoded_beside_name_and_enabled(self) -> None:
+        nodes = registry.decode_registry_nodes(_registry_document(loki=True))
+
+        assert nodes["loki"] == registry.RegistryNode(
+            name="loki", enabled=True, role="worker", user="austi"
+        )
+
+    def test_a_null_user_is_a_client_with_no_account_of_ours(self) -> None:
+        """The phone, exactly as the live registry declares it."""
+        nodes = registry.decode_registry_nodes(
+            '{"nodes": [{"name": "phone", "role": "client", "user": null, "enabled": true}]}'
+        )
+
+        assert nodes["phone"]["user"] is None
+        assert nodes["phone"]["role"] == "client"
+
+    def test_a_user_that_is_not_a_string_is_refused(self) -> None:
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "loki", "role": "worker", "user": 7, "enabled": true}]}'
+            )
+
+        assert "Expected JSON string, got int" in str(excinfo.value)
+
+    def test_a_node_missing_role_is_refused(self) -> None:
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "loki", "user": "austi", "enabled": true}]}'
+            )
+
+        assert "role" in str(excinfo.value)
+
+
 class TestAnUnreadableRegistryIsRefused:
     def test_a_document_that_is_not_an_object(self) -> None:
         with pytest.raises(AppError) as excinfo:

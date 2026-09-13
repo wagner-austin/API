@@ -113,7 +113,7 @@ the fleet is ever opened and no fleet credential ever lives on an
 internet-facing multi-tenant box. That is the whole reason the queue is
 inverted.
 
-A tick is two passes, in this order:
+A tick is three passes, in this order:
 
 1. **collect** — for every job this runner holds that is already running, ask
    the node whether the suite finished and close it on *both* sides, the local
@@ -121,15 +121,26 @@ A tick is two passes, in this order:
    finished result unreported for a whole interval.
 2. **claim** — take at most one new job, choose a node with capacity, stage,
    launch, and report it started.
+3. **observe** — read every enabled worker's Claude Code session records
+   (`~/.claude/sessions/<pid>.json`) over ssh and hand them to the board's
+   session ledger through `task_session_observe`, keyed by the machine they
+   came from (MCPs board task `5a3865bf`). The hub is not visited: its own
+   directory is recorded by `pcsession-mcp`. Only when `--registry` names
+   `fleet-mcp/fleet-nodes.json`; without it the tick logs that observation
+   was skipped. A node that is asleep is one logged line, not a failed tick.
+   This pass writes to the **taskboard**, so it needs `TASKBOARD_MCP_API_KEY`
+   (mcp-taskboard's `MCP_INTERNAL_KEY`) beside the queue's key.
 
 No loop. The interval belongs to whatever schedules it, where it is visible:
 
 ```bash
 export FLEET_MCP_API_KEY=...      # mcp-fleet's MCP_INTERNAL_KEY
+export TASKBOARD_MCP_API_KEY=...  # mcp-taskboard's MCP_INTERNAL_KEY (observe pass)
 export CORVIS_TENANT_ID=...       # the tenant whose queue this serves
 while true; do
   fleet-agent --config fleet.json --agent fleet-runner-austinpc \
-              --session <uuid> --repo-root ~/PROJECTS/API
+              --session <uuid> --repo-root ~/PROJECTS/API \
+              --registry ~/PROJECTS/MCPs/fleet-mcp/fleet-nodes.json
   sleep 30
 done
 ```

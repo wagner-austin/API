@@ -22,6 +22,7 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 # see its module docstring for the three declaration rules that failed on a
 # real node when it did not.
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
+board-watch = {path = "../board-watch", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"

@@ -19,6 +19,9 @@ import runpy
 import sys
 
 import pytest
+from board_watch import _test_hooks as board_watch_hooks
+from board_watch import config as board_config
+from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
@@ -31,6 +34,7 @@ from tests.conftest import (
     FakeRun,
     agent_argv,
     dispatch_replies,
+    failed,
     ok,
     prebuilt_archive,
 )
@@ -421,3 +425,125 @@ class TestCredentialsAndEntryPoint:
 
         ledger = (config_path.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert DEMO_PROJECT in ledger
+
+
+def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
+    """Write an identity registry with one worker and the hub, as the real file
+    is shaped.
+
+    Args:
+        tmp_path: pytest's per-test temporary directory.
+
+    Returns:
+        The registry's path.
+    """
+    path = tmp_path / "fleet-nodes.json"
+    path.write_text(
+        dump_json_str(
+            {
+                "nodes": [
+                    {"name": "austinpc", "role": "hub", "user": "Test", "enabled": True},
+                    {"name": "serendipity", "role": "worker", "user": "austi", "enabled": True},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+class TestObservingSessions:
+    """The third pass: the fleet's Claude Code sessions into the board's ledger."""
+
+    def test_a_registry_makes_the_tick_walk_the_workers_after_the_queue_work(
+        self,
+        config_path: pathlib.Path,
+        repo: pathlib.Path,
+        tmp_path: pathlib.Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        board_watch_hooks.env = FakeEnv(
+            {board_config.API_KEY_VARIABLE: "board-key", board_config.TENANT_ID_VARIABLE: "tenant"}
+        )
+        _test_hooks.run = FakeRun([failed(255, "ssh: serendipity is asleep")])
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert (
+                agent.main(
+                    [*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))]
+                )
+                == 0
+            )
+
+        # The queue passes ran, the hub was skipped, the one worker was asked
+        # and its silence was logged as an outcome rather than raised.
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        lines = [
+            record.getMessage() for record in caplog.records if "serendipity" in record.getMessage()
+        ]
+        assert lines == [
+            "serendipity: not observed -- ssh to serendipity failed while sending "
+            "C:/Users/austi/.fleet/observe-sessions.ps1: ssh: serendipity is asleep"
+        ]
+
+    def test_a_worker_that_answers_is_recorded_on_the_board(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        board_watch_hooks.env = FakeEnv(
+            {board_config.API_KEY_VARIABLE: "board-key", board_config.TENANT_ID_VARIABLE: "tenant"}
+        )
+        _test_hooks.run = FakeRun(
+            [
+                ok(""),
+                ok(dump_json_str({"platform": "win32", "hostname": "serendipity", "records": []})),
+            ]
+        )
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": None}),
+                "observed 0 session(s) for win32:serendipity (0 new row(s)) at t",
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        agent.main([*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))])
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim", "task_session_observe"]
+        assert endpoint.arguments[2]["machine"] == "win32:serendipity"
+        assert endpoint.arguments[2]["agent"] == "fleet-runner-austinpc"
+
+    def test_without_a_registry_the_tick_says_so_and_touches_no_node(
+        self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _test_hooks.run = FakeRun([])
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            agent.main(agent_argv(config_path, repo))
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        assert "session observation skipped: no --registry given" in [
+            record.getMessage() for record in caplog.records
+        ]
+
+    def test_the_board_key_is_required_only_once_the_queue_work_is_done(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """The two secrets are different containers' keys. A tick refused
+        for the board's before the queue passes ran would stall dispatch on a
+        credential dispatch does not use."""
+        board_watch_hooks.env = FakeEnv({})
+        endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with pytest.raises(AppError) as raised:
+            agent.main(
+                [*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))]
+            )
+
+        assert raised.value.code is BoardWatchErrorCode.API_KEY_MISSING
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]

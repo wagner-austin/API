@@ -16,7 +16,7 @@ ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- a shell
 loop, Task Scheduler, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
-A TICK IS TWO PASSES, IN THIS ORDER:
+A TICK IS THREE PASSES, IN THIS ORDER:
 
     1. COLLECT. For every job this runner holds that is already running, ask
        the node whether the suite has finished, and if it has, close the job
@@ -25,6 +25,14 @@ A TICK IS TWO PASSES, IN THIS ORDER:
        result unreported for a whole interval.
     2. CLAIM. Take at most one new job, choose a node with capacity, stage,
        launch, and report it started.
+    3. OBSERVE. Read every enabled worker's Claude Code session records over
+       ssh and hand them to the board's session ledger (MCPs board task
+       5a3865bf; :mod:`fleet.core.observe` carries the why). Last, because
+       it is the pass that touches every node, and a node asleep costs a
+       ten-second ssh timeout that the queue work should not wait behind.
+       Runs only when ``--registry`` names the identity registry: the pass
+       needs to know which machines exist, and that file lives in the MCPs
+       checkout, which a runner may legitimately not have.
 
 At most ONE new job per tick, deliberately. Several can be in flight across
 ticks; what a single tick must not do is claim a second job before the first
@@ -48,6 +56,7 @@ import pathlib
 import sys
 from collections.abc import Sequence
 
+from board_watch import config as board_config
 from platform_core import cli_args
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
@@ -60,7 +69,7 @@ from fleet.cli import run as run_cli
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import collect, dispatch, queue, rebuild
+from fleet.core import _test_hooks, collect, dispatch, observe, queue, rebuild, registry
 
 _log = get_logger(__name__)
 
@@ -69,6 +78,7 @@ SESSION_FLAG = "--session"
 ROOT_FLAG = "--repo-root"
 NODE_FLAG = "--node"
 MCPS_ROOT_FLAG = "--mcps-root"
+REGISTRY_FLAG = "--registry"
 
 _FLAGS = (
     _config.CONFIG_FLAG,
@@ -77,6 +87,7 @@ _FLAGS = (
     ROOT_FLAG,
     NODE_FLAG,
     MCPS_ROOT_FLAG,
+    REGISTRY_FLAG,
 )
 
 #: How long a claim survives without a report.
@@ -374,8 +385,34 @@ def claim_pass(
     return job
 
 
+def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
+    """Record every enabled worker's Claude Code sessions in the board's ledger.
+
+    The board's credentials are read HERE, not at the top of the tick: they
+    are the taskboard's (``TASKBOARD_MCP_API_KEY``), a different secret from
+    the queue's, and a runner started without ``--registry`` has no use for
+    them and must not be refused for lacking them.
+
+    Args:
+        registry_path: The identity registry, ``fleet-mcp/fleet-nodes.json``.
+        identity: This runner's identity arguments.
+
+    Raises:
+        AppError: ``NODE_REGISTRY_UNREADABLE`` for a registry this cannot
+            read, the board-watch credential codes when the taskboard's
+            variables are unset, and the contract faults
+            :func:`fleet.core.observe.observe_node` names. A node that does
+            not answer is logged, not raised.
+        OSError: When the registry file cannot be read.
+    """
+    nodes = registry.decode_registry_nodes(_test_hooks.read_text(registry_path))
+    board = board_config.load_credentials()
+    for outcome in observe.observe_pass(board, nodes, identity):
+        _log.info("%s", observe.render_outcome(outcome))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick: collect what has finished, then claim at most one job.
+    """Run one tick: collect what has finished, claim at most one job, observe.
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -416,6 +453,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         is None
     ):
         _log.info("queue empty")
+
+    raw_registry = parsed.get(REGISTRY_FLAG)
+    if raw_registry is None:
+        # Said out loud, every tick: a ledger with no fleet rows must be
+        # distinguishable from a runner that was never asked to write any.
+        _log.info("session observation skipped: no %s given", REGISTRY_FLAG)
+    else:
+        observe_pass(pathlib.Path(raw_registry).resolve(), identity)
     return 0
 
 
@@ -447,6 +492,7 @@ __all__ = [
     "CLAIM_LEASE_SECONDS",
     "MCPS_ROOT_FLAG",
     "NODE_FLAG",
+    "REGISTRY_FLAG",
     "ROOT_FLAG",
     "SESSION_FLAG",
     "claim_pass",
@@ -455,5 +501,6 @@ __all__ = [
     "entrypoint",
     "ledger_row_for",
     "main",
+    "observe_pass",
     "rebuild_job",
 ]

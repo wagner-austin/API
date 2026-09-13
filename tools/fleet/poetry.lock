@@ -111,6 +111,24 @@ files = [
 ]
 
 [[package]]
+name = "board-watch"
+version = "0.1.0"
+description = "Subscribe a shell to the corvis agent board's change feed, so a Monitor can wake an idle session on an @mention"
+optional = false
+python-versions = "^3.11"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+platform-core = {path = "../../libs/platform_core", develop = true}
+typing-extensions = "^4.12.2"
+
+[package.source]
+type = "directory"
+url = "../board-watch"
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -1090,4 +1108,4 @@ typing-extensions = ">=4.15.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "422ebcb46c46f1623023b575888842f8642ce7a1dc5d360e1bfb13e3fdd8ee2e"
+content-hash = "8940573b672d4dbbb2be2da8eaae5fee3d0d12b1f1d947578347b2f4325f266f"

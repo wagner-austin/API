@@ -43,6 +43,7 @@ from platform_core.errors import AppError
 from platform_core.json_utils import (
     JSONValue,
     load_json_str,
+    narrow_json_to_str,
     require_bool,
     require_str,
 )
@@ -54,18 +55,27 @@ from fleet.core import _test_hooks
 class RegistryNode(TypedDict):
     """One machine as the identity registry declares it.
 
-    A DELIBERATE SUBSET. That registry also carries roles, tailnet addresses,
-    tunnel ids and prose notes; none of it is this workspace's business, and
-    decoding fields nothing compares would make the contract wider than the
-    dependency.
+    A DELIBERATE SUBSET. That registry also carries tailnet addresses, tunnel
+    ids and prose notes; none of it is this workspace's business, and
+    decoding fields nothing reads would make the contract wider than the
+    dependency. ``role`` and ``user`` joined ``name`` and ``enabled`` when
+    the session-ledger observer started walking the registry (MCPs board
+    task 5a3865bf): it must skip the hub (observed by pcsession-mcp) and
+    clients (never provisioned), and it needs the account to write a script
+    under.
 
     Attributes:
-        name: The machine's registry name, which is also the workspace key.
+        name: The machine's registry name, which is also the workspace key
+            and the hub's ssh alias for it.
         enabled: Whether it is expected to answer.
+        role: ``hub``, ``vpn-jump``, ``worker`` or ``client``.
+        user: The account the fleet provisioned on it, or None for a client.
     """
 
     name: str
     enabled: bool
+    role: str
+    user: str | None
 
 
 class RegistryDrift(TypedDict):
@@ -123,7 +133,15 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
         if not isinstance(entry, dict):
             raise _unreadable(f"a node is {type(entry).__name__}, not an object")
         name = require_str(entry, "name")
-        declared[name] = RegistryNode(name=name, enabled=require_bool(entry, "enabled"))
+        raw_user = entry.get("user")
+        declared[name] = RegistryNode(
+            name=name,
+            enabled=require_bool(entry, "enabled"),
+            role=require_str(entry, "role"),
+            # ``null`` for a client such as the phone, which is never
+            # provisioned and has no account of ours to ssh in as.
+            user=None if raw_user is None else narrow_json_to_str(raw_user),
+        )
     return declared
 
 

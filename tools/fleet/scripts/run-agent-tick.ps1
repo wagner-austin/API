@@ -17,6 +17,14 @@
         Nothing is written to disk; docker being down surfaces as the
         agent's named QUEUE_CREDENTIALS_MISSING refusal, not as a silent
         empty tick.
+      * TASKBOARD_MCP_API_KEY -- the same read against ``mcp-taskboard``,
+        for the tick's third pass: the session-ledger observer writes to
+        the BOARD (task_session_observe), not the queue, and the two
+        containers hold different keys. Missing surfaces as board-watch's
+        named API_KEY_MISSING, after the queue passes have run.
+      * --registry -- fleet-mcp/fleet-nodes.json in the MCPs checkout, the
+        list of machines the observer walks. Without it the agent logs
+        that observation was skipped, every tick, by design.
 
     THE RUNNER'S IDENTITY IS FIXED, DELIBERATELY. ``fleet-runner-austinpc``
     with one minted-once UUID is a durable service identity, the same shape
@@ -56,10 +64,22 @@ if ($keyLine.Count -eq 1) {
 # QUEUE_CREDENTIALS_MISSING names the variable and where it comes from,
 # which is a better failure than anything this script could invent.
 
+# The board's key, the same way. A second block rather than a loop over the
+# two names, so a reader sees each container and each variable spelled out
+# beside the pass that needs it.
+$ErrorActionPreference = 'Continue'
+$boardEnv = docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' mcp-taskboard 2>$null
+$ErrorActionPreference = $prevEap
+$boardKeyLine = @($boardEnv | Where-Object { "$_".StartsWith('MCP_INTERNAL_KEY=') })
+if ($boardKeyLine.Count -eq 1) {
+    $env:TASKBOARD_MCP_API_KEY = "$($boardKeyLine[0])".Substring('MCP_INTERNAL_KEY='.Length)
+}
+
 Set-Location (Join-Path $apiRoot 'tools\fleet')
 poetry run fleet-agent --config fleet.json `
     --agent fleet-runner-austinpc `
     --session a850f688-f98d-415c-a244-e993226ca2fc `
     --repo-root $apiRoot `
-    --mcps-root $mcpsRoot
+    --mcps-root $mcpsRoot `
+    --registry (Join-Path $mcpsRoot 'fleet-mcp\fleet-nodes.json')
 exit $LASTEXITCODE
