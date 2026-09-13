@@ -18,7 +18,7 @@ source_paths:
   - "wiki/sources/m22-workers/worker-ceiling-ab.txt"
 source_git_blobs:
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "b7b445e8a9d27ddc81ad837419a5645b48b7a3f3"
+  "src/rw_bot/policy/campaign.py": "2fb2498c1b272cabc437630d6034a4d5b491da21"
   "scripts/play.py": "5a4fbf19261e961ae00ef2f19138c51ff4b85cd3"
   "wiki/sources/m20-one-tick/multi-builder-ab.txt": "f4bebb002c2360618983acaf73bc6d1dace5ad31"
   "wiki/sources/m21-losses/where-units-die.txt": "280848152bf106e667622974a0477c521f3c3801"

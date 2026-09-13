@@ -15,7 +15,7 @@ source_git_blobs:
   "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
   "src/rw_bot/policy/expander.py": "eeb4f76c13011abaab836b71aec978d582e2e68c"
   "src/rw_bot/policy/floor.py": "5471ec6039bbbe7a3256e8fdfcc68708d55732ee"
-  "src/rw_bot/policy/raid.py": "535a2b93667873701b9fc07ec2d963460be116b7"
+  "src/rw_bot/policy/raid.py": "6bf7705d0a39f09a5e36b3cb5f753f843d5c11e7"
   "sweeps/impden48.txt": "4926d5899c862a22df7e2e91d53efe1b41f8405a"
 provenance:
   - "runs/sweeps/imp48c6 + imp48c0f4 — 96 fresh scorecards, the control read"
