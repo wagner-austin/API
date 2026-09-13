@@ -85,6 +85,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     outranged=0,
     dive=0,
     divemargin=0,
+    divecap=0,
 )
 
 

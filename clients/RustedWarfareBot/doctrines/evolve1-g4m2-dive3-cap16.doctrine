@@ -1,0 +1,68 @@
+# The champion with the dive armed and its party budget capped (dive 3,
+# divecap 16): a party of the three fastest gathered units closes on
+# the nearest visible ground mover that outranges every land gun the
+# army fields, drafted against the OPENING rung so it dives in time,
+# with sixteen parties per match as the brake. The two brakes were
+# priced from opposite ends on the same sixteen members (log
+# 2026-09-13): drafting against the opening rung uncapped (dive16)
+# flipped three openers at four to thirteen parties each and lost
+# three champion wins to sixty-seven to ninety-three parties fed to
+# the same guns; drafting against the escalating rung (dive16c) cured
+# all three regressions and lost two of the three flips, the dive
+# first firing at frame 226k instead of 98k-104k. Sixteen sits above
+# every flip's cost and below a fifth of every regression's.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-dive3-cap16
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 3
+divemargin 0
+divecap 16
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

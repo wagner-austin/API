@@ -78,6 +78,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         outranged=0,
         dive=0,
         divemargin=0,
+        divecap=0,
     )
 
 
@@ -480,6 +481,17 @@ def test_a_negative_dive_margin_is_refused_and_a_standoff_width_round_trips() ->
     assert caught.value.code == "RW-DOCTRINE-044"
     payload["divemargin"] = 100
     assert decode_doctrine(payload)["divemargin"] == 100
+
+
+def test_a_negative_dive_cap_is_refused_and_a_party_budget_round_trips() -> None:
+    """Zero already means uncapped under the escalating rung; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["divecap"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-045"
+    payload["divecap"] = 16
+    assert decode_doctrine(payload)["divecap"] == 16
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

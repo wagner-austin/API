@@ -529,6 +529,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         outranged=doctrine["outranged"],
         dive=doctrine["dive"],
         divemargin=doctrine["divemargin"],
+        divecap=doctrine["divecap"],
         raze=doctrine["raze"],
         press=doctrine["press"],
         bank=doctrine["bank"],

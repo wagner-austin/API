@@ -1,0 +1,27 @@
+# The dive with the party cap as its brake (log 2026-09-13): dive 3,
+# divecap 16, drafting against the opening rung, on the nine Very Hard
+# opener seeds and the four champion wins the uncapped opening-rung dive
+# touched -- the three it lost to churn (s8913729 at 67 parties,
+# s8915497 at 93, s8917889 at 91) and s8913001, which fired twelve
+# times and still won. dive16 (opening rung, uncapped) read three flips
+# and three regressions; dive16c (escalating rung) read one flip and
+# none, the other two flips diving past the window. The cap is priced
+# to sit above every flip's cost (four to thirteen parties) and below a
+# fifth of every regression's. Bar: the three flips of dive16 back
+# (s8914041, s8916121, s8916641 WON) with the three churn seeds still
+# WON -- three for none -- sends this arm to the 96-seed bar; anything
+# less sends the rung arm's one clean flip instead.
+# Controls: pinbase48, dive16, dive16c, all under certified determinism.
+cap|8913313|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8913833|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8914041|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8914977|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8915185|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8916121|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8916641|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8917473|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8917681|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8913001|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8913729|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8915497|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8917889|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000

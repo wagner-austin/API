@@ -237,3 +237,43 @@ def test_the_diver_dives_by_its_own_margin() -> None:
     assert diver.party() == frozenset()
     orders = diver.dive(_world(*army), army, (*sniper, _gun(9, 900.0)), catalogue, profiles, True)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(30, 900.0), (31, 900.0)]
+
+
+def test_the_cap_bounds_the_parties_raised_in_one_match() -> None:
+    """dive16's churn: sixty-seven to ninety-three parties fed to the same
+    guns. At cap 2 the third draft is refused although the gun still
+    stands and the army has the leave; the standing party is unaffected."""
+    diver = Diver(size=1, cap=2)
+    army = (_hover(30),)
+    world = _world(*army)
+    gun = (_gun(9, 400.0),)
+    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True)) == 1
+    assert diver.drafts == 1
+    # The party dies whole; a second party is raised.
+    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
+    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True)) == 1
+    assert diver.drafts == 2
+    # It dies too; the cap holds the third.
+    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
+    assert diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True) == ()
+    assert diver.party() == frozenset()
+    assert diver.drafts == 2
+
+
+def test_an_uncapped_diver_re_drafts_without_limit() -> None:
+    diver = Diver(size=1)
+    army = (_hover(30),)
+    gun = (_gun(9, 400.0),)
+    for _ in range(3):
+        assert len(diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True)) == 1
+        diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
+    assert diver.drafts == 3
+
+
+def test_a_refused_draft_counts_no_party() -> None:
+    """The gathering ground holds fewer than a party: nothing is raised
+    and nothing is counted against the cap."""
+    diver = Diver(size=2, cap=1)
+    army = (_hover(30),)
+    assert diver.dive(_world(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True) == ()
+    assert diver.drafts == 0

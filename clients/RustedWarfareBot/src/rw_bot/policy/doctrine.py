@@ -94,6 +94,7 @@ INT_FIELDS: Final = (
     "outranged",
     "dive",
     "divemargin",
+    "divecap",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -351,20 +352,19 @@ class Doctrine(TypedDict):
             gathered units closes on the visible enemy ground mover whose
             land gun outranges every land gun the army fields (the
             outranged clause's membership test, lifted), so the battery
-            behind the screen is touched instead of traded into -- every
-            Very Hard opener is the scout-plus-artillery opening and the
-            army stalls against those guns (logs 2026-09-12/13). No memory
-            fallback: with no such gun in sight the party stands down and
-            none is raised. Arbitrated like the RAID, against the
-            escalating rung plus the party: the opening rung let a spent
-            army re-draft sixty-seven to ninety-three parties in one
-            game (dive16, log 2026-09-13) ([[policy-raid]]).
+            behind the screen is touched instead of traded into -- the
+            army stalls against those guns on every Very Hard opener
+            (logs 2026-09-12/13). No memory fallback: with no such gun in
+            sight the party stands down and none is raised ([[policy-raid]]).
         divemargin: World units a gun must reach BEYOND the army's longest
             land gun before the dive counts it a standoff, zero for any
-            outranging gun. At 100 against a 160 line artillery (290)
-            qualifies and laser, missile and plasma (165-190) do not;
-            measured a no-op at Very Hard, where every quarry the
-            margin-free dive took was artillery (dive16b, log 2026-09-13).
+            outranging gun; measured a no-op at Very Hard, where every
+            quarry was artillery at 290 (dive16b, log 2026-09-13).
+        divecap: Parties the dive may raise in one match under the
+            OPENING rung, zero for no cap with the escalating rung as the
+            brake instead: the opening rung dives in time (every flip cost
+            4-13 parties) and churns late (every regression 67-93), the
+            rung never churns and dives late (dive16/16c, log 2026-09-13).
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
@@ -581,6 +581,7 @@ class Doctrine(TypedDict):
     outranged: int
     dive: int
     divemargin: int
+    divecap: int
 
 
 __all__ = [

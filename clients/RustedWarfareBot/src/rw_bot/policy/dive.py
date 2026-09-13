@@ -100,17 +100,31 @@ class Diver(Detachment):
     Attributes:
         margin: World units beyond the line's reach a gun must start
             (:func:`outranging_guns`).
+        cap: Parties this diver may raise in one match, zero for no cap.
+            The brake dive16 and dive16c priced from opposite ends (log
+            2026-09-13): drafting against the opening rung dives in time
+            (every flip cost four to thirteen parties) and churns late
+            (every regression sixty-seven to ninety-three), drafting
+            against the escalating rung never churns and dives past the
+            window. With a cap the opening rung is the gate and the cap is
+            the brake; without one the escalating rung brakes instead
+            (:func:`~rw_bot.policy.dispatching.fight`).
+        drafts: Parties raised so far.
     """
 
-    def __init__(self, size: int = FIRST_WAVE, margin: float = 0.0) -> None:
+    def __init__(self, size: int = FIRST_WAVE, margin: float = 0.0, cap: int = 0) -> None:
         """Open a diver.
 
         Args:
             size: Party size, the engine's first-group size by default.
             margin: The standoff margin, zero for any outranging gun.
+            cap: Parties per match under the opening rung, zero for the
+                escalating rung with no cap (Doctrine.divecap).
         """
         super().__init__(size)
         self.margin = margin
+        self.cap = cap
+        self.drafts = 0
 
     def dive(
         self,
@@ -168,8 +182,10 @@ class Diver(Detachment):
 
         quarry = min(guns, key=nearness)
         party = survivors
-        if not party and may_draft:
+        if not party and may_draft and (self.cap == 0 or self.drafts < self.cap):
             party = draft_fastest(army, anchor, self.size, catalogue)
+            if party:
+                self.drafts += 1
         if not self.muster(party):
             return ()
         return self.advance(quarry["unit_id"], quarry["x"], quarry["y"])

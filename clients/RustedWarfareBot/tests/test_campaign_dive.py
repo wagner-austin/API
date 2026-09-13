@@ -42,7 +42,11 @@ def _world(hostile: Entity) -> Sample:
 
 
 def _play(
-    world: Sample, dive: int, trace: Path | None = None, divemargin: int = 0
+    world: Sample,
+    dive: int,
+    trace: Path | None = None,
+    divemargin: int = 0,
+    divecap: int = 0,
 ) -> tuple[ScriptedPeer, int]:
     """Play the world twice: the dive orders on the first observation and
     its decision code lands in the row the second one writes, because the
@@ -57,9 +61,19 @@ def _play(
         2,
         dive=dive,
         divemargin=divemargin,
+        divecap=divecap,
         trace=trace,
     )
     return peer, report["dives"]
+
+
+def test_a_capped_dive_drafts_against_the_opening_rung() -> None:
+    """The cap is the brake, so the gate is the opening rung: five tanks
+    clear three plus a party of two and the dive goes, exactly as it does
+    uncapped on the first rung, and the cap counts the one party."""
+    peer, dives = _play(_world(enemy(9, "enemy_arty", x=400.0)), dive=2, divecap=1)
+    assert len([line for line in peer.sent if "attack_move" in line]) == 2
+    assert dives == 1
 
 
 def test_the_margin_is_the_doctrines_and_holds_the_party_home() -> None:

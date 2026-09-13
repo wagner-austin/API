@@ -128,6 +128,7 @@ def play(
     hunt: int = 0,
     dive: int = 0,
     divemargin: int = 0,
+    divecap: int = 0,
     worker_wait: int = 0,
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
@@ -191,9 +192,10 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``worker_wait``,
-            ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``, ``raze``,
-            ``outranged``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
+            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``divecap``,
+            ``worker_wait``, ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
+            ``siegedose``, ``raze``, ``outranged``, ``press``, ``bank``, ``income_ladder``.
+            Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -266,10 +268,9 @@ def play(
     )
     closer = Closer(close)
     presser = Press(press)
-    # Sized by the doctrine; at zero a party's gate never fires, never consulted.
     raiders = Raider(size=raid) if raid else Raider()
     hunters = Hunter(size=hunt) if hunt else Hunter()
-    divers = Diver(size=dive, margin=divemargin) if dive else Diver()
+    divers = Diver(size=dive, margin=divemargin, cap=divecap) if dive else Diver()
     rusher = Rusher()
     creeper = Creeper()
     nuker = Nuker()
@@ -467,9 +468,8 @@ def play(
             # number above -- about four thousand sentences a match, discarded
             # ([[policy-economy]]).
             outlays.add(budget.ledger())
-            # The enemy-shape columns read from live contact regardless of
-            # the counter knob: the trace records what was SEEN, and the fleet
-            # memory unions live contact with the tilt path's (log 2026-08-09).
+            # The enemy-shape columns read from live contact regardless of the
+            # counter knob: the trace records what was SEEN (log 2026-08-09).
             fleet_seen.update(fleet_types(tuple(targets)))
             navy_seen, air_seen = layer_counts(tuple(targets))
             navy_blood = scores.deaths_to(fleet_seen)
