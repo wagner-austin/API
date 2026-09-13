@@ -1,0 +1,66 @@
+# The fortified turtle, choke-wall arm (turtle 85, riposte 1, creep 50):
+# the evolve1-g4m2-turtle85r hold and counter-punch with the turret walk
+# held at half the anchor-to-enemy line, every third structure a repair
+# bay -- the self-healing kill zone the community feeds the AI's
+# seventeen-second groups into (ai-opponent-strategy). The walk alone at
+# Impossible read on imp-creep12 and the cover24 turtle never had the
+# repair bay or a counter-punch; this arm is the guides' posture as a
+# whole: wall, repair, held army, punch when a wave breaks. Built for
+# impfort96 beside the gun-wall arm. Every other knob and every goals
+# slot is the champion's exactly.
+name evolve1-g4m2-turtle85r-creep50
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 50
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 1
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 0
+divemargin 0
+divecap 0
+diveblood 0
+turtle 85
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

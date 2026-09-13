@@ -1,0 +1,66 @@
+# The turtle threshold family's wide point (turtle 100, riposte 1): the
+# same one-shot read at sample 1,500 as evolve1-g4m2-turtle85r, latching
+# whenever the strongest rival's worth is at or above ours at the window
+# -- every match the corpus reads as behind at all, including the ones
+# the champion goes on to win -- with the riposte counter-punch behind
+# the hold. Priced beside turtle70r so the threshold's shape is read on
+# one bar rather than assumed from the 85 point turtlebar192 prices; if
+# the hold costs wins on the seeds the champion was winning anyway, this
+# is the arm that shows it. Every other knob and every goals slot is the
+# champion's exactly.
+name evolve1-g4m2-turtle100r
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 1
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 0
+divemargin 0
+divecap 0
+diveblood 0
+turtle 100
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

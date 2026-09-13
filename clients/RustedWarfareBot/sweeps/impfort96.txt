@@ -1,0 +1,113 @@
+# The fortified turtle at Impossible (log 2026-09-13): the community's
+# posture as a whole on the champion's composition -- the
+# evolve1-g4m2-turtle85r hold and riposte counter-punch (which
+# impturtlebar96 prices alone) with a wall behind it: guns
+# (evolve1-g4m2-turtle85r-guns2, two top-tier gun turret chains walked
+# through the withhold) and creep (evolve1-g4m2-turtle85r-creep50, the
+# turret walk held at half the anchor-to-enemy line, every third
+# structure a repair bay). On the 48 seeds of the certified impbase48
+# block, read against impbase48's champion cards (0/48) and beside
+# impturtlebar96. The wall alone died faster than the champion at
+# Impossible (imp-fortress12, imp-creep12, log 2026-08-07) and the
+# cover24 turtle had neither repair bays nor a counter-punch; no
+# measured arm has stood a held army with a punch behind a wall, which
+# is the posture every guide describes ([[ai-opponent-strategy]],
+# [[community-play-strategies]]). The bar is impdive24's: a survival
+# shift with its mechanism visible in the W rows and the loss table, or
+# a clean zero; a win at any seed is a specimen.
+guns|8919001|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919001|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919105|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919105|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919209|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919209|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919313|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919313|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919417|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919417|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919521|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919521|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919625|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919625|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919729|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919729|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919833|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919833|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8919937|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8919937|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920041|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920041|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920145|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920145|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920249|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920249|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920353|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920353|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920457|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920457|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920561|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920561|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920665|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920665|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920769|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920769|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920873|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920873|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8920977|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8920977|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921081|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921081|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921185|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921185|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921289|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921289|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921393|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921393|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921497|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921497|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921601|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921601|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921705|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921705|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921809|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921809|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8921913|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8921913|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922017|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922017|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922121|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922121|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922225|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922225|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922329|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922329|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922433|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922433|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922537|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922537|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922641|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922641|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922745|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922745|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922849|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922849|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8922953|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8922953|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923057|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923057|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923161|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923161|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923265|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923265|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923369|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923369|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923473|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923473|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923577|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923577|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923681|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923681|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923785|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923785|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
+guns|8923889|doctrines/evolve1-g4m2-turtle85r-guns2.doctrine|10000
+creep|8923889|doctrines/evolve1-g4m2-turtle85r-creep50.doctrine|10000
