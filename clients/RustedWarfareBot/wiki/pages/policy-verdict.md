@@ -11,7 +11,7 @@ source_paths:
   - "wiki/sources/m6-wire/world-sample.ndjson"
 source_git_blobs:
   "src/rw_bot/policy/verdict.py": "095d8c64f2e8723feeffa924ea39c48848b65dc6"
-  "src/rw_bot/policy/campaign.py": "622e286278407fcc368df52fdb4f5d435c71cfb0"
+  "src/rw_bot/policy/campaign.py": "63c6c310b6bca8241aeb7988a544e20aff93c2ef"
   "wiki/sources/m6-wire/world-sample.ndjson": "201f82ea1c9071c70d20ee8b29952b0d2fc79455"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17

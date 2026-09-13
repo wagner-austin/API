@@ -15,7 +15,7 @@ source_git_blobs:
   "src/rw_bot/policy/raid.py": "6bf7705d0a39f09a5e36b3cb5f753f843d5c11e7"
   "src/rw_bot/policy/party.py": "66f07f551bbb437600a967a1fe1699d0df1a328f"
   "src/rw_bot/policy/hunt.py": "e00e6a8ab543a94899205b49795d4f2174fb2ed7"
-  "src/rw_bot/policy/dive.py": "c071cc9ea67c547b6a1964eef80876a12362962c"
+  "src/rw_bot/policy/dive.py": "42c9133abd8fe268ec6ecd74814c31c77dde0a06"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-13
 confidence: high
@@ -148,10 +148,18 @@ raid's escalating rung (dive16c) it never churns and dives past the window
 on two of the three flip seeds, first firing at frame 226k instead of
 98k-104k. So the third reading keeps the opening rung's timing and bounds
 the party budget instead: `divecap N` is parties per match under the
-opening rung, and zero keeps the escalating rung as the brake. `dive N` is
-the party size, `divemargin` the standoff width a gun must reach beyond the
-line (measured a no-op at Very Hard, where every quarry was artillery), and
-`D` is the trace code.[^6]
+opening rung, and zero keeps the escalating rung as the brake. It read the
+same three flips and the SAME three champion wins lost at a third of the
+parties (divecap13), so the party count was never the cost; the early dive
+itself is, on a seed the line was already beating unaided. The fourth
+reading gates the FIRST draft on the champion's own loss table: `diveblood
+N` holds the party until N of our units have died to the outranging guns
+sighted so far, and the champion's cards separate the populations at three
+-- the third death to a gun falls before frame 110k on three of nine
+openers, on none of the four touched winners and one of thirty-five winners
+(`blood_frames`, log 2026-09-13). `dive N` is the party size, `divemargin`
+the standoff width a gun must reach beyond the line (measured a no-op at
+Very Hard, where every quarry was artillery), and `D` is the trace code.[^6]
 
 [^1]: `src/rw_bot/policy/raid.py` — `Raider.strike`, `income_objectives`, `_confirmed_dead`; `tests/test_policy_raid.py` pins each rule.
 [^5]: `src/rw_bot/policy/party.py` — `Detachment`, `draft_fastest`; `tests/test_policy_party.py` pins the shared contract, `tests/test_policy_hunt.py` and `tests/test_policy_raid.py` pass unchanged on the rewritten holders.

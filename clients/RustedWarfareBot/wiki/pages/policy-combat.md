@@ -16,8 +16,8 @@ source_paths:
   - "agent/src/rwbot/agent/Orders.java"
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
-  - "src/rw_bot/policy/campaign.py:316"
-  - "src/rw_bot/policy/dispatching.py:392"
+  - "src/rw_bot/policy/campaign.py:317"
+  - "src/rw_bot/policy/dispatching.py:393"
   - "src/rw_bot/policy/match_report.py:75"
 source_git_blobs:
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
@@ -28,8 +28,8 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "41c1ad218291e99fc6ae0a0ab1ce39b654a7585e"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "622e286278407fcc368df52fdb4f5d435c71cfb0"
-  "src/rw_bot/policy/dispatching.py": "71ac23fbc2c4e8dfb0d7026c25be48a951dbbecd"
+  "src/rw_bot/policy/campaign.py": "63c6c310b6bca8241aeb7988a544e20aff93c2ef"
+  "src/rw_bot/policy/dispatching.py": "6a05a4c5473b536e62f2b4902a8e3d98bcf57627"
   "src/rw_bot/policy/match_report.py": "2b95059f6ed9ecd25610092f0a49ca2f72b03215"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03
