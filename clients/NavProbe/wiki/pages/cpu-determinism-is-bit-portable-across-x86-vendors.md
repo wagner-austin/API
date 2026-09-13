@@ -9,7 +9,7 @@ source_git_blobs:
 provenance:
   - "mujoco-warp 3.11.0"
   - "warp-lang 1.16.0"
-fact_checked: 2026-08-18
+fact_checked: 2026-09-13
 confidence: high
 measured_with:
   package: mujoco-warp 3.11.0
@@ -20,6 +20,7 @@ measured_with:
     - pendragon — AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD (Ryzen Z1 Extreme, Zen 4); AVX2 + AVX512F
     - sedona — Intel64 Family 6 Model 154 Stepping 3, GenuineIntel (i7-12700H, Alder Lake); AVX2, **no AVX512F**
     - emerald — AMD64 Family 21 Model 48 Stepping 1, AuthenticAMD (A10-7800, Steamroller); AVX only, **no AVX2**
+    - lenovoold — Intel64 Family 6 Model 61 Stepping 4, GenuineIntel (i5-5200U, Broadwell); AVX2, **no AVX512F**
   harness: navprobe.sweep.run_scene_sweep over navprobe.scenes.row_scene
   adapter: navprobe.adapters.mjx_warp_state
   seed: 7
@@ -41,23 +42,26 @@ disagreeing simulator. It had only ever been exercised on one vendor's silicon a
 width, which makes it a narrower claim than it reads as.
 
 Run on four processors spanning two vendors and **every vector width this software can
-execute on**, the control holds and every digest matches.[^1][^2][^4][^5]
+execute on**, the control holds and every digest matches.[^1][^2][^4][^5][^6]
 
-## Four processors, ten scenes, zero differences
+## Five processors, ten scenes, zero differences
 
-| | Intel i7-11700K | AMD Ryzen Z1 Extreme | Intel i7-12700H | AMD A10-7800 |
-|---|---|---|---|---|
-| family | Family 6 Model 167 (Rocket Lake) | Family 25 Model 116 (Zen 4) | Family 6 Model 154 (Alder Lake) | Family 21 Model 48 (Steamroller) |
-| vendor string | `GenuineIntel` | `AuthenticAMD` | `GenuineIntel` | `AuthenticAMD` |
-| AVX | present | present | present | present |
-| AVX2 | present | present | present | **absent** |
-| AVX-512F | present | present | **absent** | **absent** |
-| all ten scenes reproduce | yes | yes | yes | yes |
-| **run digests** | **identical across all four columns, 10/10** | | | |
+Each column is one host's `REPORT`, parsed and compared to the others scene for
+scene.[^3][^4][^5][^6]
+
+| | Intel i7-11700K | AMD Ryzen Z1 Extreme | Intel i7-12700H | AMD A10-7800 | Intel i5-5200U |
+|---|---|---|---|---|---|
+| family | Family 6 Model 167 (Rocket Lake) | Family 25 Model 116 (Zen 4) | Family 6 Model 154 (Alder Lake) | Family 21 Model 48 (Steamroller) | Family 6 Model 61 (Broadwell) |
+| vendor string | `GenuineIntel` | `AuthenticAMD` | `GenuineIntel` | `AuthenticAMD` | `GenuineIntel` |
+| AVX | present | present | present | present | present |
+| AVX2 | present | present | present | **absent** | present |
+| AVX-512F | present | present | **absent** | **absent** | **absent** |
+| all ten scenes reproduce | yes | yes | yes | yes | yes |
+| **run digests** | **identical across all five columns, 10/10** | | | | |
 
 Every host reported `all_deterministic: true`, and mechanical comparison of the emitted
 reports found **10 matching digests and 0 mismatches** in each pairing, scene for
-scene.[^3][^4][^5]
+scene.[^3][^4][^5][^6]
 
 ## The width axis is closed, not merely sampled
 
@@ -71,6 +75,13 @@ Two hosts carry the weight. The Alder Lake part has AVX-512 fused off by Intel o
 12th-generation silicon, and the Steamroller part predates AVX2 by design — a 2014
 microarchitecture executing the same workload through a two-generation-older vector unit
 than the newest host here.[^4][^5] Neither moved a single bit.
+
+The AVX2-without-AVX-512 width now has two samples rather than one. The Broadwell part is
+a 2015 low-power mobile chip in a consumer laptop, the oldest Intel microarchitecture and
+the smallest thermal envelope measured, and it produced the same ten digests as the
+desktop and workstation parts.[^6] That second sample matters because a single machine at a
+width leaves open whether the width or that one chip is what held; two independent parts,
+Family 6 Model 61 and Family 6 Model 154, close that.
 
 This includes the touching family at 5, 6, 8 and 32 bodies — the exact configurations where
 the GPU produces twelve different answers from twelve runs of the same rollout
@@ -97,7 +108,7 @@ machines that can only be compared to themselves.
 
 ## What this does not establish
 
-All four hosts ran the same OS family, the same Python 3.11, and the same package versions,
+All five hosts ran the same OS family, the same Python 3.11, and the same package versions,
 installed the same way. This is deliberate — holding them fixed is what isolates the
 processor — but it means the result says nothing about compiler or libm differences, which
 [[cpu-determinism-survives-os-and-version-change]] covers on a different axis and a
@@ -116,3 +127,4 @@ rather than a closed question.
 [^3]: `[observed]` — the emitted `REPORT` JSON documents parsed and compared pairwise by `(bodies, spacing)`: `MATCHING DIGESTS: 10/10   MISMATCHES: 0`. Separated family `f581f7d13e9f97a9`, `28da8310f3fae984`, `7ab7b42709d5e13c`, `7209271298759b49`; touching family `e834fb8482a2d99c`, `bcd8bd4a0cca6234`, `267590080dc41147`, `29588b5842782589`, `dbc9204ac108f3ab`, `f39840062e7615e4`.
 [^4]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — the identical script on host `sedona`, reached over SSH from austinpc. Reported `processor: Intel64 Family 6 Model 154 Stepping 3, GenuineIntel`, features `{SSE3, SSE4_1, SSE4_2, AVX, AVX2}` true and **`AVX512F: false`**, `all_deterministic: true`, and all ten digests equal to those in [^3]. The host's `Win32_Processor.Name` is `12th Gen Intel(R) Core(TM) i7-12700H`.
 [^5]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — the identical script on host `emerald`, reached over SSH from austinpc. Reported `processor: AMD64 Family 21 Model 48 Stepping 1, AuthenticAMD`, features `{SSE3, SSE4_1, SSE4_2, AVX}` true with **`AVX2: false`** and **`AVX512F: false`**, `all_deterministic: true`, and all ten digests equal to those in [^3]. The host's `Win32_Processor.Name` is `AMD A10-7800 Radeon R7, 12 Compute Cores 4C+8G`. This host also demonstrates the AVX floor from the other side: `import mujoco` succeeds here, where it fails on a processor lacking AVX entirely.
+[^6]: src/navprobe/sweep.py:51 `run_scene_sweep` — `[observed]` — the identical script on host `lenovoold`, run 2026-09-13 as a one-shot scheduled task under SYSTEM (`schtasks /create /tn navprobe-sweep`) so the sshd job object could not end it, stdout to `C:\navprobe\sweep-lenovoold.log`, wall clock 13:48:38 to 13:55:16 local. Reported `processor: Intel64 Family 6 Model 61 Stepping 4, GenuineIntel`, features `{SSE3, SSE4_1, SSE4_2, AVX, AVX2}` true and **`AVX512F: false`**, `all_deterministic: true`, and all ten digests equal to those in [^3] by mechanical comparison keyed on `(bodies, spacing)`: `MATCHING DIGESTS: 10/10   MISMATCHES: 0`. The host's `Win32_Processor.Name` is `Intel(R) Core(TM) i5-5200U CPU @ 2.20GHz` in a `LENOVO 80JH`, Windows 10 build 19045, 7.9 GB. Toolchain pinned with `==`: warp-lang 1.16.0, mujoco 3.11.0, mujoco-warp 3.11.0, numpy 2.4.6, interpreter `C:\navprobe\.venv\Scripts\python.exe` (Python 3.11.9). Source provenance verified before running: `cpu_control_sweep.py` sha256 `20e6be79ac402b61a88bd3c88ec278116d6b8bd4b98a6f926f1ad9efafb1ec78` and `canonical.py` sha256 `ef5e763744de1aad0959ae60031fcd17fe627649a2b2136ae6aadbeee0916668`, both equal to the copies on `lavender` and to the values recorded for the `emerald` run; 32 of 32 `.py` files. `UsoSvc` was `Automatic`/`Running` with no reboot pending, and uptime was continuous across the run.
