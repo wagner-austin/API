@@ -1075,13 +1075,34 @@ name appeared nowhere here — was mine, and another session bridged it.
   `gemm-cu128-ordered-rtx6000` and `gemm-cu128-ordered-l40s` were each
   submitted three times, at 12:44, 13:13 and 13:17, and the ledger cannot tell
   the three apart because every recorded field is identical between them, image
-  digest and experiment mapping included. Three identical submissions of one
-  arm is the shape of an arm that did not land the first two times. **It is
-  also the shape of a deliberate re-run, and nothing committed distinguishes
-  them** -- the ledger records SUBMISSIONS, not outcomes, so `COMPLETED` was
-  never a claim it could support. Whatever sacct said on the day is not in this
-  repository, and the honest form of the original sentence is the one above
-  plus this paragraph.
+  digest and experiment mapping included. The ledger records SUBMISSIONS, not
+  outcomes, so `COMPLETED` was never a claim it could support.
+
+  **Answered from accounting and the logs on 2026-09-13, not inferred.**
+  `sacct` says FAILED, FAILED, COMPLETED for each arm: `55751328` and
+  `55751332` died in 7 s, `55751941` and `55751944` in 1 s and 0 s, and
+  `55752018` (44 s) and `55752025` (15 s) completed. The stderrs say why. The
+  cu128-v1 image's wheels are pinned to `e007e999`, where
+  `ordered_kernels.cli.gemm_probe` read `probed_shapes_hook` from
+  `model_trainer.cli._test_hooks`; `5bea978c` had already moved it to
+  `_measurement_hooks`, so the image's own entry point for the `ordered` arm
+  crashes with an `AttributeError` before touching a GPU. The second attempt was
+  the same rebinding as a `python -c` one-liner and died on a `SyntaxError`
+  (unquoted argv). The third ran
+  `/pub/wagnera3/gemm/cu128-v1/run_ordered_gemm_probe.py`, a twenty-line bridge
+  that rebinds the old name to the production default and passes argv through
+  to the real `main`. `8fdeca63` fixed it at root on main.
+
+  **What that means for the verdicts below.** The `ordered` gemm rows
+  (186/186 within-stack, 186/186 cross-stack) came from the same
+  `gemm_probe.main` as every other arm, reached through one rebinding the
+  record's fingerprint cannot see: the image digest is honest about the
+  wheels and silent about the bridge. The bridge lives on the cluster and in
+  no repository, and is a monkey-patch by construction, which this repo's own
+  guards refuse in any linted path, so its BYTES are not committed and its
+  DIGEST is, in `runs/cu128-ordered-bridge-digests.txt`, the way the corpora
+  are pinned. 21 of the 23 arms ran the image's entry point directly; these
+  two are the exception, and the record now says so.
 
   **Its run documents were also the least tracked in the workspace, which is
   the opposite of what this entry's precision implies.** On 2026-09-12 it had
@@ -1253,7 +1274,7 @@ name appeared nowhere here — was mine, and another session bridged it.
 
 ### `floor` — cloze floor scoring
 
-<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 92 -->
+<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 93 -->
 <!-- reviewed: tools/hpc3/runs/floor*.json = 100 -->
 
 The number every arm accuracy in the extraction-ablation programme is read as
@@ -1315,6 +1336,7 @@ scored is that the item set is a staged file rather than a data-bank id.
   | v27 | 2,627 | cuBLAS | A100, A30, L40S, V100 | all four `e964e46b…`, equal to the 3090 Ti's |
   | v28 | 150 | rank1 + cuBLAS | A100, A30, L40S, V100 | all eight `72e59097…` |
   | v29 | 2,627 | rank1 (18 chunks) + cuBLAS | A100, A30, L40S, V100 | 18/18 chunk digests equal across all four cards, and 1374/2627 on every card under both arms |
+  | baseline, 2026-09-13 | 2,627 | cuBLAS | 3090 Ti | the v20 baseline re-scored under the campaign's experiment name: `e964e46b…` again, and the first record of this floor the comparability layer can read beside a cluster card |
 
   So the floor holds ITEM FOR ITEM across five GPU models and both kernel arms,
   not merely in aggregate. That is `mi-cu128`'s contrast seen from the other
@@ -1339,16 +1361,32 @@ scored is that the item set is a staged file rather than a data-bank id.
   this is established for the 3090 Ti, V100, A30, A100 and L40S, and it is
   NOT TESTED as a general property of hardware. A sixth model is one job.
 
-- **The finding is real and it is not instrumented, which is a different gap
-  from the ones this file usually records.** The 3090 Ti's records name
+- **The finding was real and not instrumented until 2026-09-13, and the
+  instrument's first verdict is worth reading.** The 3090 Ti's v20 records name
   experiment `extraction-eval`; every generation from v27 on names
-  `wiki-corpus-extraction-ablation`. `compare_run_records` RAISES on two
-  records from different experiments rather than returning a verdict, so no
-  call in the shared vocabulary can put the baseline and the cluster cards side
-  by side, and the digest equality carrying this whole result was read off by
-  eye. The numbers are not in question; what is missing is that the comparison
-  the result rests on is the one comparison the tooling refuses to perform.
-  The forward fix is naming the experiment consistently on the next pass.
+  `wiki-corpus-extraction-ablation`, and `compare_run_records` RAISES on two
+  records from different experiments, so the digest equality carrying this
+  result had only ever been read off by eye. Closed by re-scoring gpt2 on the
+  same 3090 Ti under the campaign's name, offline, on the identical stack
+  (`torch 2.6.0+cu124`, `transformers 4.46.3`, `numpy 2.3.5`, driver 591.86):
+  `artifacts/floor-baseline/gpt2-3090ti-cublas.json`, **1374/2627 =
+  0.523030072325847, payload `e964e46b…`**, byte-equal to the v20 baseline and
+  to all four cluster cards. Its `image_digest` is the empty string and says so,
+  because a workstation run has no image, the same honest blank the 44
+  extraction-ablation score records carry.
+
+  Put beside `floorfull-v29/a100-cublas.json` the call now RETURNS instead of
+  raising, and what it returns is `uncalibrated` on exactly four axes:
+  `image_digest`, `gpu_model`, `driver_version`, `host`. That is the correct
+  answer and it is not a hedge. The comparability layer refuses to SUBTRACT two
+  accuracies across a card, driver, host and image jump for which no offset has
+  been measured, and no calibration exists for this experiment. The item-level
+  identity is a separate fact from the subtractability of the scalar, and the
+  record of the first now carries no assumption about the second. **The
+  measured cross-card term for this floor is exactly zero over five cards**,
+  which is precisely what a `Calibration` on `gpu_model` for this experiment
+  would record; recording one is a programme decision rather than a fix, and
+  it is the reason the verdict above is `uncalibrated` rather than `equal`.
 
 - **Its evidence was machine-local until 2026-09-12, which is the failure
   `.gitignore` already records four times over.** 96 of the 100 run documents

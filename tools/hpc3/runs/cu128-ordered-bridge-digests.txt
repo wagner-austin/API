@@ -1,0 +1,34 @@
+# Independent digest record: the bridge two cu128 verdicts actually ran through
+#
+# `gemm-cu128-ordered-rtx6000.json` and `gemm-cu128-ordered-l40s.json` do not
+# invoke the image's entry point. Their command runs
+# /pub/wagnera3/gemm/cu128-v1/run_ordered_gemm_probe.py, a twenty-line file
+# that lives on the cluster and nowhere in this repository. Read off its own
+# docstring on 2026-09-13: the cu128-v1 image's wheels are pinned to e007e999,
+# where ordered_kernels.cli.gemm_probe read probed_shapes_hook from
+# model_trainer.cli._test_hooks; 5bea978c had already moved that hook to
+# cli._measurement_hooks, so the image's own CLI crashes on import (jobs
+# 55751328 and 55751332, FAILED in 7s, AttributeError in both stderrs). The
+# bridge rebinds the old name to the production default and passes argv
+# through to the real main. 8fdeca63 fixed it at root on main; the bridge
+# exists only because the image predates that.
+#
+# So the "ordered gemm 186/186" verdict in docs/RESEARCH.md rests on the same
+# gemm_probe.main as every other arm, reached through one rebinding the
+# record's fingerprint cannot see. The fingerprint's image digest is honest
+# about the wheels; this file is what says what else was in the process.
+#
+# The bytes are NOT committed, and the reason is the repository's own rule
+# rather than size: the bridge is a monkey-patch by construction, which
+# `monkey-patch-ban` and ruff both refuse in any linted path. Storing it under
+# another extension to slip past that would be moving a file to work around
+# tooling. A digest is what the corpora get, and it is enough to prove the
+# cluster copy is still the file that ran.
+#
+# Recorded 2026-09-13 with `sha256sum` on hpc3 against the file in place.
+# 770 bytes, mtime 2026-09-04 06:16 cluster-local, 13:16Z: three minutes after
+# the second failure (55751941, 13:13Z, a one-line inline attempt at the same
+# rebinding that died on a SyntaxError) and one minute before the submission
+# that completed (55752018, 13:17Z). The ledger's timestamps are UTC.
+
+bc6fdb7737f1c337d96038da345541467f300b99b678c5afa1361d2d7f432ff4  run_ordered_gemm_probe.py
