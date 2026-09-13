@@ -139,9 +139,16 @@ centre. No memory fallback and no lesser objective: with no outranging gun
 in sight a standing party goes home and none is raised, which is what makes
 a zero-artillery seed the champion's match bit for bit -- the identity
 property the static merge could not have and the conditional join could
-only approximate. Arbitrated like the hunt, against the opening rung,
-because the battery stands at frames 60k-110k when the army holds eight to
-thirteen pieces. `dive N` is the doctrine field; `D` is its trace code.[^6]
+only approximate. Arbitrated like the RAID, against the escalating wave
+rung plus the party: the first probe drafted against the hunt's opening
+rung and the three flips it bought cost six to thirteen parties each
+while three champion wins were lost to sixty-seven to ninety-three
+parties fed to the same guns across a long game (dive16, dive16b), so the
+draft now waits for a wave's worth plus the party, the brake that engages
+exactly when the army is spent. `dive N` is the doctrine field,
+`divemargin` the standoff width a gun must reach beyond the line (measured
+a no-op on the Very Hard population, where every quarry was artillery),
+and `D` is its trace code.[^6]
 
 [^1]: `src/rw_bot/policy/raid.py` — `Raider.strike`, `income_objectives`, `_confirmed_dead`; `tests/test_policy_raid.py` pins each rule.
 [^5]: `src/rw_bot/policy/party.py` — `Detachment`, `draft_fastest`; `tests/test_policy_party.py` pins the shared contract, `tests/test_policy_hunt.py` and `tests/test_policy_raid.py` pass unchanged on the rewritten holders.
