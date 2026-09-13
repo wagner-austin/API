@@ -14,14 +14,17 @@ from rw_bot.policy.dispatching import _note_releases
 
 def test_each_release_signal_lands_its_own_trace_code() -> None:
     """One code per live signal: S the strike window, C the close, P the
-    press. The analysis side attributes releases by these letters, so a
-    signal firing without its code is a release the record cannot see."""
+    press, W the turtle's hold. The analysis side attributes releases by
+    these letters, so a signal firing without its code is a release the
+    record cannot see."""
     events: set[str] = set()
-    _note_releases(events, False, False, False)
+    _note_releases(events, False, False, False, False)
     assert events == set()
-    _note_releases(events, True, False, False)
+    _note_releases(events, True, False, False, False)
     assert events == {"S"}
-    _note_releases(events, False, True, False)
+    _note_releases(events, False, True, False, False)
     assert events == {"S", "C"}
-    _note_releases(events, False, False, True)
+    _note_releases(events, False, False, True, False)
     assert events == {"S", "C", "P"}
+    _note_releases(events, False, False, False, True)
+    assert events == {"S", "C", "P", "W"}

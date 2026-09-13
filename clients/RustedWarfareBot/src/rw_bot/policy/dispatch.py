@@ -304,6 +304,10 @@ class WaveController:
         # that muster has not yet consumed.
         self._intruding = False
         self._avenging = False
+        # Whether the wave out was FORCED (riposte, all-in, strike): the
+        # turtle's hold lets such a wave run to its break instead of
+        # recalling it the tick after it was thrown.
+        self._punching = False
         self.attack_orders = 0
         self.rallied = 0
         self.intercepts = 0
@@ -380,6 +384,7 @@ class WaveController:
         profiles: Mapping[str, CombatProfile],
         army: Sequence[Entity],
         strike: bool = False,
+        withhold: bool = False,
     ) -> tuple[tuple[MoveOrder, ...], tuple[AttackOrder, ...]]:
         """Decide this observation's moves and attacks.
 
@@ -396,6 +401,13 @@ class WaveController:
             catalogue: Unit stats by type name, for mobility and the anchor.
             profiles: Combat profiles by type name, for reachability.
             army: Units available to fight, as the caller found them.
+            strike: Whether a release signal forces the whole reserve out.
+            withhold: Whether the turtle holds the army home: no wave
+                releases on size, every unit is the reserve's and gathers
+                at the rally post under the guard, and only a FORCED
+                release -- the riposte's counter-punch, the all-in, the
+                strike window -- lets it out (Doctrine.turtle). The
+                ladder does not advance while held.
 
         Returns:
             The move orders and the attack orders to send, in that order.
@@ -406,22 +418,36 @@ class WaveController:
         # built: the riposte's intrusion edge, the all-in's clock, and the
         # strike window's army-value ratio -- the signal the first two were
         # approximating ([[policy-situation]]).
-        wave = muster(
-            army,
-            self._released,
-            self._waves,
-            self._ladder,
-            force=self._avenging or self._committed or strike,
-            retreat=self._retreat,
-            strength=self._strength,
-        )
+        force = self._avenging or self._committed or strike
+        if force:
+            self._punching = True
+        if withhold and not self._punching:
+            # The turtle's hold: the losses are field fights against an
+            # army the enemy's opening rolled larger (very-hard-race), so
+            # nothing releases on size and a wave out on size is recalled
+            # by the gather pass the moment it is no longer released. A
+            # FORCED wave -- the counter-punch -- is a normal wave from its
+            # release to its break, or the riposte would be recalled the
+            # tick after it was thrown.
+            self._released = frozenset()
+        else:
+            wave = muster(
+                army,
+                self._released,
+                self._waves,
+                self._ladder,
+                force=force,
+                retreat=self._retreat,
+                strength=self._strength,
+            )
+            self._released = wave["released"]
+            self._waves = wave["waves"]
+            self._strength = wave["strength"]
+            self._punching = self._punching and bool(self._released)
         # Consumed whether or not it released: a riposte with too few units
         # to punch is a riposte missed, not one banked for an arbitrary
         # later moment that has lost the window.
         self._avenging = False
-        self._released = wave["released"]
-        self._waves = wave["waves"]
-        self._strength = wave["strength"]
         # A unit cleared to attack is no longer gathering, so it forgets it was
         # ever sent home. That is what lets a disbanded wave be sent home again
         # rather than standing where it died.

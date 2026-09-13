@@ -1,0 +1,69 @@
+# The champion with the turtle armed and the riposte behind it (turtle
+# 85, riposte 1): the same one-shot read at sample 1,500 -- at or below
+# 85 percent of the strongest rival's worth the army holds home, no
+# wave releasing on size -- with the counter-punch the hold exists for:
+# the moment an intrusion inside our outpost radius ENDS, the whole
+# reserve releases as one wave and runs to its break before the hold
+# resumes. The human play the community corpus ranks first against the
+# shipped AI: let the attack burn on the defences, then push into the
+# window before the next group finishes staging (ai-opponent-strategy).
+# The sibling evolve1-g4m2-turtle85 holds without ever punching, so the
+# pair separates the hold's own worth from the counter's. Built from the
+# certified 96-game corpus (very-hard-race, log 2026-09-13). Every other
+# knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-turtle85r
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 1
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 0
+divemargin 0
+divecap 0
+diveblood 0
+turtle 85
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

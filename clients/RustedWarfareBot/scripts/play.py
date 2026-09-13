@@ -531,6 +531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         divemargin=doctrine["divemargin"],
         divecap=doctrine["divecap"],
         diveblood=doctrine["diveblood"],
+        turtle=doctrine["turtle"],
         raze=doctrine["raze"],
         press=doctrine["press"],
         bank=doctrine["bank"],

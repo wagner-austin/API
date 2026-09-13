@@ -70,7 +70,7 @@ from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
 from rw_bot.policy.sentries import Sentries
-from rw_bot.policy.situation import Closer, Momentum, Press
+from rw_bot.policy.situation import TURTLE_WINDOW, Closer, Momentum, Press
 from rw_bot.policy.spending import (
     build_plan,
     replace_losses,
@@ -140,6 +140,7 @@ def play(
     outranged: int = 0,
     raze: int = 0,
     press: int = 0,
+    turtle: int = 0,
     bank: bool = False,
     income_ladder: bool = False,
     stop_when_plan_done: bool = False,
@@ -195,7 +196,8 @@ def play(
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
             ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``divecap``, ``diveblood``,
             ``worker_wait``, ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
-            ``siegedose``, ``raze``, ``outranged``, ``press``, ``bank``, ``income_ladder``.
+            ``siegedose``, ``raze``, ``outranged``, ``press``, ``turtle``, ``bank``,
+            ``income_ladder``.
             Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
@@ -269,6 +271,7 @@ def play(
     )
     closer = Closer(close)
     presser = Press(press)
+    turtler = Press(turtle, TURTLE_WINDOW)
     raiders = Raider(size=raid) if raid else Raider()
     hunters = Hunter(size=hunt) if hunt else Hunter()
     divers = Diver(dive, margin=divemargin, cap=divecap, blood=diveblood) if dive else Diver()
@@ -320,6 +323,7 @@ def play(
             scores.observe(sample, army, targets, workforce.size(sample))
             # The press reads AFTER scores: this tick's worth pair.
             pressed = presser.observe(scores.samples_seen, scores.worth_end, scores.rival_worth_end)
+            turtled = turtler.observe(scores.samples_seen, scores.worth_end, scores.rival_worth_end)
             completed = tracker.completed(sample)
 
             # Read unconditionally: movement tells the plan and the economy an order
@@ -393,11 +397,9 @@ def play(
                 for entity in sample["entities"]
                 if entity["unit_id"] in set(capable) and entity["queued"] == 0
             )
-            # Upgrading claims before production: production-first left the
-            # T3 conversion asked 1,816 times and granted never while produce
-            # drained every credit into units that traded even and
-            # equilibrated. The reserve still protects replacing a loss, so
-            # production is deferred, not starved ([[policy-economy]]).
+            # Upgrading claims before production: production-first left the T3
+            # conversion asked 1,816 times and granted never; the reserve still
+            # protects replacing a loss, so production is deferred, not starved.
             # Tech claims before income conversions: the unlock saves toward
             # itself when refused, and the T2 conversion funds at 2,300 where
             # the unlock needs 2,900 -- the other order snipes every accrual
@@ -452,12 +454,9 @@ def play(
                     razed=razed_pools.positions(),
                 ),
             )
-            # The walks send AFTER the expander, never before: the engine
-            # holds one order per unit and whoever sends last holds the
-            # builder. v3 learned this (navy96b) and v4 forgot it by
-            # moving the call above the expander block -- all 48 navy96d
-            # walks exhausted with the builder re-tasked every tick while
-            # navy96c's factories stood 24/26 (log 2026-08-10).
+            # The walks send AFTER the expander, never before: the engine holds
+            # one order per unit and whoever sends last holds the builder --
+            # all 48 navy96d walks exhausted when v4 moved this up (log 2026-08-10).
             send_builds(channel, quartermaster.builds(sample, catalogue, budget))
             refused_now = sum(1 for claim in budget.ledger() if not claim["granted"])
             refused += refused_now
@@ -563,6 +562,7 @@ def play(
                 strike=strike,
                 committed_close=committed_close,
                 pressed=pressed,
+                turtled=turtled,
                 hunt_held=sentries.razing_near,
                 pending_events=pending_events,
                 deaths_to=scores.deaths_to,

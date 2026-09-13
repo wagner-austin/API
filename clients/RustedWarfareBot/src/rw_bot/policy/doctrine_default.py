@@ -87,6 +87,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     divemargin=0,
     divecap=0,
     diveblood=0,
+    turtle=0,
 )
 
 

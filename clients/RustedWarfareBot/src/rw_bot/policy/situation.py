@@ -222,30 +222,45 @@ class Closer:
 #: ~2,400, so a read here fires before the close, not after it.
 PRESS_WINDOW: Final = 2000
 
+#: The sample the turtle trigger reads at.
+#:
+#: Earlier than the press's, because the turtle's response is the press's
+#: opposite and needs the fight still ahead of it: on the certified
+#: 96-game corpus (log 2026-09-13, `very-hard-race`) worth/rival alone
+#: rank-AUCs 0.79 for a loss here against 0.88 at 2,000, and the field
+#: fight that decides the race is lost between 1,500 and 2,500 -- a hold
+#: read at 2,000 would arrive after the waves it is meant to keep home
+#: had already died forward.
+TURTLE_WINDOW: Final = 1500
+
 
 class Press:
-    """Latches the decision to force the fight, on a losing compounding race.
+    """Latches a decision on a losing compounding race, read once at a window.
 
     The :class:`Closer`'s mirror. That latch ends a match being WON
-    decisively; this one forces the decision in a match the compounding
-    race is deciding against us -- the regime where every fixed lever
-    measured flat with its mechanism verified (log 2026-09-11, the
-    0-for-5 closure). Where the closer debounces a continuous window,
-    the press reads ONCE, at :data:`PRESS_WINDOW`: the measurement that
-    priced this trigger read there, and a one-shot read cannot become
-    the lifelong premature all-in the raw close latch measured
-    (`runs/sweeps/vh-latch`). Forward memory is the closer's own: once
-    committed, always committed.
+    decisively; this one commits in a match the compounding race is
+    deciding against us -- the regime where every fixed lever measured
+    flat with its mechanism verified (log 2026-09-11, the 0-for-5
+    closure). Where the closer debounces a continuous window, this reads
+    ONCE, at its window: the measurement that priced the trigger read
+    there, and a one-shot read cannot become the lifelong premature
+    all-in the raw close latch measured (`runs/sweeps/vh-latch`). Forward
+    memory is the closer's own: once committed, always committed. Two
+    responses share the latch and differ only in window and verb: the
+    press forces the fight at :data:`PRESS_WINDOW`, the turtle withholds
+    it at :data:`TURTLE_WINDOW` (Doctrine.press, Doctrine.turtle).
     """
 
-    def __init__(self, press: int) -> None:
-        """Open the press.
+    def __init__(self, press: int, window: int = PRESS_WINDOW) -> None:
+        """Open the latch.
 
         Args:
             press: The worth percent of the rival's at or below which the
                 window read commits, zero for never.
+            window: The sample the one-shot read happens at.
         """
         self._press = press
+        self._window = window
         self._evaluated = False
         self._committed = False
 
@@ -262,7 +277,7 @@ class Press:
         """
         if self._committed:
             return True
-        if self._press and not self._evaluated and samples_seen >= PRESS_WINDOW:
+        if self._press and not self._evaluated and samples_seen >= self._window:
             self._evaluated = True
             self._committed = worth * 100 <= self._press * rival_worth
         return self._committed
@@ -290,6 +305,7 @@ __all__ = [
     "CLOSE_HOLD",
     "MOMENTUM_WINDOW",
     "PRESS_WINDOW",
+    "TURTLE_WINDOW",
     "Closer",
     "Momentum",
     "Press",

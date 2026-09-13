@@ -68,6 +68,7 @@ _BAD_DIVE_SIZE = "RW-DOCTRINE-043"
 _BAD_DIVE_MARGIN = "RW-DOCTRINE-044"
 _BAD_DIVE_CAP = "RW-DOCTRINE-045"
 _BAD_DIVE_BLOOD = "RW-DOCTRINE-046"
+_BAD_TURTLE = "RW-DOCTRINE-047"
 
 
 def _count(
@@ -213,6 +214,29 @@ def _press(payload: Mapping[str, str | int | float | bool]) -> int:
     return press
 
 
+def _percent(
+    payload: Mapping[str, str | int | float | bool], field: str, code: str, meaning: str
+) -> int:
+    """Read a 0-100 percent field, refusing anything outside the range.
+
+    Args:
+        payload: The doctrine's decoded fields.
+        field: The field name.
+        code: The error code a refusal carries.
+        meaning: What the percent is a percent OF, for the message.
+
+    Returns:
+        The percent, 0-100.
+
+    Raises:
+        DoctrineError: With ``code`` when the value is outside 0-100.
+    """
+    value = require_int(payload, field)
+    if value < 0 or value > 100:
+        raise DoctrineError(code, f"field '{field}' is {meaning}, 0-100, got {value}")
+    return value
+
+
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
     """Decode a flat payload into a :class:`Doctrine`.
 
@@ -310,24 +334,15 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     diveblood = _count(
         payload, "diveblood", _BAD_DIVE_BLOOD, "deaths to sighted guns before the first dive, 0 off"
     )
-    hp_floor = require_int(payload, "hp_floor")
-    if hp_floor < 0 or hp_floor > 100:
-        raise DoctrineError(
-            _BAD_HP_FLOOR,
-            f"field 'hp_floor' is a percent of health, 0-100 with 0 for never, got {hp_floor}",
-        )
+    turtle = _percent(payload, "turtle", _BAD_TURTLE, "a worth percent of the rival's, 0 never")
+    hp_floor = _percent(payload, "hp_floor", _BAD_HP_FLOOR, "a percent of health with 0 for never")
     navtilt = require_int(payload, "navtilt")
     if navtilt < NAVTILT_OFF or navtilt > NAVTILT_PREDICTED:
         raise DoctrineError(
             _BAD_NAVTILT,
             f"field 'navtilt' is 0 off, 1 always, 2 bloodied, or 3 predicted, got {navtilt}",
         )
-    hold = require_int(payload, "hold")
-    if hold < 0 or hold > 100:
-        raise DoctrineError(
-            _BAD_HOLD,
-            f"field 'hold' is 0-100, the percent of the way to stand at, got {hold}",
-        )
+    hold = _percent(payload, "hold", _BAD_HOLD, "the percent of the way to stand at")
     creep = require_int(payload, "creep")
     if creep < 0 or creep > 100:
         raise DoctrineError(
@@ -390,6 +405,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         divemargin=divemargin,
         divecap=divecap,
         diveblood=diveblood,
+        turtle=turtle,
     )
 
 
@@ -460,6 +476,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "divemargin": doctrine["divemargin"],
         "divecap": doctrine["divecap"],
         "diveblood": doctrine["diveblood"],
+        "turtle": doctrine["turtle"],
     }
 
 

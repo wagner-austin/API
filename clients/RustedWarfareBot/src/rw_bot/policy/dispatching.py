@@ -372,7 +372,11 @@ def _march_rush(
 
 
 def _note_releases(
-    pending_events: set[str], window_open: bool, committed_close: bool, pressed: bool
+    pending_events: set[str],
+    window_open: bool,
+    committed_close: bool,
+    pressed: bool,
+    turtled: bool,
 ) -> None:
     """Land each live release signal's code in the next trace row.
 
@@ -381,6 +385,7 @@ def _note_releases(
         window_open: Whether the strike window stands open this tick.
         committed_close: Whether the closer holds its latched commitment.
         pressed: Whether the press holds its latched commitment.
+        turtled: Whether the turtle holds its latched commitment.
     """
     if window_open:
         pending_events.add("S")
@@ -388,6 +393,8 @@ def _note_releases(
         pending_events.add("C")
     if pressed:
         pending_events.add("P")
+    if turtled:
+        pending_events.add("W")
 
 
 def fight(
@@ -414,6 +421,7 @@ def fight(
     strike: int,
     committed_close: bool,
     pressed: bool,
+    turtled: bool,
     hunt_held: bool,
     pending_events: set[str],
     deaths_to: Callable[[Collection[str]], int],
@@ -455,6 +463,10 @@ def fight(
             closer's mirror, forcing the fight in a losing compounding
             race (Doctrine.press). Forces the muster and the march like
             the close, and touches nothing the close funds.
+        turtled: Whether the turtle holds its latched commitment -- the
+            press's opposite: no wave releases on size and the army holds
+            home under the guard until a forced release throws the
+            counter-punch (Doctrine.turtle).
         hunt_held: Whether the head holds the hunt party home this tick.
         pending_events: Decision codes accumulating toward the next row.
         deaths_to: The campaign's death ledger, asked how many of our units
@@ -487,13 +499,14 @@ def fight(
         if divers.objectives > dives_before:
             pending_events.add("D")
     window_open = strike_window(momentum, strike)
-    _note_releases(pending_events, window_open, committed_close, pressed)
+    _note_releases(pending_events, window_open, committed_close, pressed, turtled)
     moves, attacks = waves.command(
         sample,
         catalogue,
         profiles,
         fighting,
         strike=window_open or committed_close or pressed,
+        withhold=turtled,
     )
     _send_moves(channel, moves)
     _send_attacks(channel, attacks)

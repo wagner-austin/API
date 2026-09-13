@@ -85,6 +85,60 @@ def test_the_opening_need_holds_at_the_first_rung_while_the_gate_climbs() -> Non
     assert waves.opening_need() == 3
 
 
+def test_the_hold_releases_nothing_on_size_and_recalls_a_wave_out() -> None:
+    """The turtle's hold: a full wave with a target in sight attacks nobody
+    and gathers home instead; a wave already released is recalled -- its
+    ids leave the released set and the gather pass sends it home once --
+    and the ladder does not advance while held (very-hard-race)."""
+    waves = WaveController(ladder=(3, 5))
+    army = tuple(_tank(10 + n) for n in range(3))
+    hostile = (entity(90, "c_tank", x=520.0, y=500.0, mine=False, hostile=True, team=1),)
+    # Released on size first, so there is a wave out to recall.
+    _, attacks = waves.command(_world(*army, hostiles=hostile), _CATALOGUE, _PROFILES, army)
+    assert len(attacks) == 3
+    assert waves.need() == 5
+    held, held_attacks = waves.command(
+        _world(*army, hostiles=hostile), _CATALOGUE, _PROFILES, army, withhold=True
+    )
+    assert held_attacks == ()
+    assert [m["unit_id"] for m in held] == [10, 11, 12]
+    assert waves.released() == frozenset()
+    assert waves.need() == 5
+    # Still held next observation: nothing re-sent, nothing released.
+    again, again_attacks = waves.command(
+        _world(*army, hostiles=hostile), _CATALOGUE, _PROFILES, army, withhold=True
+    )
+    assert again == () and again_attacks == ()
+
+
+def test_a_forced_release_punches_through_the_hold_and_runs_to_its_break() -> None:
+    """The counter-punch: a forced release under the hold is a normal wave
+    from its release to its break, or the riposte would be recalled the
+    tick after it was thrown. Once broken, the hold holds again."""
+    waves = WaveController(ladder=(3, 5), retreat=2)
+    army = tuple(_tank(10 + n) for n in range(3))
+    hostile = (entity(90, "c_tank", x=520.0, y=500.0, mine=False, hostile=True, team=1),)
+    world = _world(*army, hostiles=hostile)
+    _, attacks = waves.command(world, _CATALOGUE, _PROFILES, army, strike=True, withhold=True)
+    assert len(attacks) == 3
+    # Next tick, the strike signal is gone but the punch is out: it holds
+    # its target rather than being recalled.
+    _, attacks = waves.command(world, _CATALOGUE, _PROFILES, army, withhold=True)
+    assert attacks == ()
+    assert waves.released() == frozenset({10, 11, 12})
+    # The wave breaks below the retreat count; the survivor goes home and
+    # the hold resumes: a full army gathered again releases nothing.
+    survivor = (_tank(10),)
+    _, attacks = waves.command(
+        _world(*survivor, hostiles=hostile), _CATALOGUE, _PROFILES, survivor, withhold=True
+    )
+    assert attacks == ()
+    assert waves.released() == frozenset()
+    _, attacks = waves.command(world, _CATALOGUE, _PROFILES, army, withhold=True)
+    assert attacks == ()
+    assert waves.released() == frozenset()
+
+
 def test_below_the_first_wave_the_army_gathers_and_nobody_attacks() -> None:
     waves = WaveController()
     army = (_tank(10), _tank(11))

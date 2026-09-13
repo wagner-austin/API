@@ -1,0 +1,71 @@
+# The champion with the turtle armed (turtle 85, riposte 0): a one-shot
+# read at sample 1,500 of our worth against the strongest rival's, and
+# at or below 85 percent the army holds home for the rest of the match
+# -- no wave releases on size, the reserve gathers under the guard and
+# the anti-air, and only a forced release lets it out; with riposte off
+# the forced releases left are the all-in and the strike, both zero
+# here, so this arm holds without ever counter-punching. Built from the
+# certified 96-game corpus (very-hard-race, log 2026-09-13): a Very Hard
+# loss is the field fight lost between samples 1,500 and 2,500 against
+# an army the enemy's weighted-random opening rolled larger, losers
+# dying to the mobile army in the field before they reach the base,
+# and worth/rival at 1,500 rank-AUCs 0.79 for that loss. The press,
+# the same read at 2,000 with the opposite response, read -4 on 48
+# pairs (pressvh48). Every other knob and every goals slot is the
+# champion's exactly.
+name evolve1-g4m2-turtle85
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 0
+divemargin 0
+divecap 0
+diveblood 0
+turtle 85
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

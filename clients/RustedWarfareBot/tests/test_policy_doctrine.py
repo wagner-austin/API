@@ -80,6 +80,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         divemargin=0,
         divecap=0,
         diveblood=0,
+        turtle=0,
     )
 
 
@@ -460,6 +461,22 @@ def test_a_press_outside_the_percent_range_is_refused_and_one_round_trips() -> N
     assert caught.value.code == "RW-DOCTRINE-041"
     payload["press"] = 80
     assert decode_doctrine(payload)["press"] == 80
+
+
+def test_a_turtle_outside_the_percent_range_is_refused_and_one_round_trips() -> None:
+    """The press's mirror carries the press's range: a worth percent of the
+    rival's, 0-100 with 0 for never."""
+    payload = encode_doctrine(_doctrine())
+    payload["turtle"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-047"
+    payload["turtle"] = 101
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-047"
+    payload["turtle"] = 85
+    assert decode_doctrine(payload)["turtle"] == 85
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

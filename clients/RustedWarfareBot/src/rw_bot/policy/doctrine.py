@@ -96,6 +96,7 @@ INT_FIELDS: Final = (
     "divemargin",
     "divecap",
     "diveblood",
+    "turtle",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -330,6 +331,14 @@ class Doctrine(TypedDict):
             never waits -- on the same wave-break signal the strike
             release reads, because the wave being broken is what makes
             the walk survivable ([[policy-situation]]).
+        turtle: Worth percent of the strongest rival's at or below which a
+            one-shot read at sample 1,500 holds the army home for the rest
+            of the match -- the press's opposite: no wave releases on size,
+            the reserve gathers under the guard, only a forced release
+            (riposte, all-in, strike) lets it out. The 96-game corpus reads
+            a Very Hard loss as the field fight lost between 1,500 and 2,500
+            against a larger rolled army, legible on this ratio at 1,500
+            (`very-hard-race`, log 2026-09-13). Zero never holds.
         brace: Whether the razing head plays. On, the loop scores the
             fitted model in ``models/razebrace.ndjson`` on a sliding
             window of the match's own shape and, ONCE, when the razing
@@ -341,29 +350,24 @@ class Doctrine(TypedDict):
             before 2026-09-04 played with this off.
         hunt: The hunt party's size, zero for off. A standing party that
             presses the nearest visible enemy MOVER, pushing at the nearest
-            remembered structure when nothing moves in sight, so the
-            enemy's groups are bled while they form: the shipped AI commits
-            a staging group early at whatever size it holds when any member
-            is damaged ([[engine-ai-triggers]]). The first verb aimed at the
-            wave LADDER; party discipline is the raid's ([[policy-raid]]).
+            remembered structure when nothing moves in sight, so the enemy's
+            groups are bled while they form: the shipped AI commits a staging
+            group early once any member is damaged ([[engine-ai-triggers]]).
+            The first verb aimed at the wave LADDER ([[policy-raid]]).
         dive: The dive party's size, zero for off. A party of the FASTEST
             gathered units closes on the visible enemy ground mover whose
-            land gun outranges every land gun the army fields (the
-            outranged clause's test, lifted), so the battery behind the
-            screen is touched instead of traded into; with no such gun in
-            sight the party stands down and none is raised ([[policy-raid]]).
+            land gun outranges every land gun the army fields (the outranged
+            clause's test, lifted); with no such gun in sight the party
+            stands down and none is raised ([[policy-raid]]).
         divemargin: World units a gun must reach BEYOND the army's longest
-            land gun to count as a standoff, zero for any outranging gun;
-            a no-op at Very Hard, every quarry artillery (dive16b).
-        divecap: Parties per match under the OPENING rung, zero for no
-            cap with the escalating rung as the brake: the opening rung
-            dives in time and loses champion wins at ANY budget (dive16,
-            divecap13), the rung holds them and dives late (dive16c).
+            land gun to count, zero for any; a no-op at Very Hard (dive16b).
+        divecap: Parties per match under the OPENING rung, zero for no cap
+            with the escalating rung as the brake: the opening rung dives in
+            time and loses champion wins at ANY budget (dive16, divecap13).
         diveblood: Deaths to sighted outranging guns before the first
-            draft, zero for none. The champion's own loss table separates
-            the seeds the line beats unaided from the openers by when the
-            THIRD unit dies to a gun: before frame 110k on three of nine
-            openers, no touched winner, one of thirty-five winners.
+            draft, zero for none: the third death to a gun falls before
+            frame 110k on three of nine openers and one winner in
+            thirty-five (blood_frames, log 2026-09-13).
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
@@ -464,14 +468,9 @@ class Doctrine(TypedDict):
             and the match is the champion's, bit for bit.
         raze: Sample count past which the raid party's objectives become
             remembered enemy FACTORIES instead of extractors -- the
-            displacement road (log 2026-09-11): every composition answer
-            to the attrition regime measured flat with its mechanism
-            verified, so this strikes the standoff line's PRODUCTION.
-            At Very Hard the 1.8x subsidy funds no income floor (the
-            Impossible "proportional and bounded" verdict does not carry
-            down), so a killed factory stays a dent. Same party, same
-            discipline, retasked: requires ``raid``, refused without it.
-            Zero -- every prior measurement -- never retasks.
+            displacement road (log 2026-09-11): every composition answer to
+            the attrition regime measured flat, so this strikes the line's
+            PRODUCTION. Requires ``raid``; zero never retasks.
         press: Worth percent of the strongest rival's at or below which a
             one-shot read at the press window commits the whole army --
             waves force-released, marches at the enemy -- for the rest of
@@ -582,6 +581,7 @@ class Doctrine(TypedDict):
     divemargin: int
     divecap: int
     diveblood: int
+    turtle: int
 
 
 __all__ = [

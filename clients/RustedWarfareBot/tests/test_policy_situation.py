@@ -12,6 +12,7 @@ from rw_bot.policy.situation import (
     CLOSE_HOLD,
     MOMENTUM_WINDOW,
     PRESS_WINDOW,
+    TURTLE_WINDOW,
     Closer,
     Momentum,
     Press,
@@ -184,6 +185,20 @@ def test_the_press_reads_once_and_a_healthy_window_closes_it_forever() -> None:
     assert press.observe(PRESS_WINDOW, 9_000.0, 10_000.0) is False
     # The race collapses later; the press already gave its answer.
     assert press.observe(PRESS_WINDOW + 500, 100.0, 10_000.0) is False
+
+
+def test_the_turtle_shares_the_latch_at_its_own_earlier_window() -> None:
+    """The same one-shot read, five hundred samples earlier: the turtle's
+    response needs the field fight still ahead of it (very-hard-race), so
+    it reads at the turtle window and not at the press's."""
+    assert TURTLE_WINDOW < PRESS_WINDOW
+    turtle = Press(85, TURTLE_WINDOW)
+    assert turtle.observe(TURTLE_WINDOW - 1, 100.0, 10_000.0) is False
+    assert turtle.observe(TURTLE_WINDOW, 8_400.0, 10_000.0) is True
+    assert turtle.observe(PRESS_WINDOW, 50_000.0, 10_000.0) is True
+    healthy = Press(85, TURTLE_WINDOW)
+    assert healthy.observe(TURTLE_WINDOW, 8_600.0, 10_000.0) is False
+    assert healthy.observe(PRESS_WINDOW, 100.0, 10_000.0) is False
 
 
 def test_the_press_boundary_is_at_or_below() -> None:
