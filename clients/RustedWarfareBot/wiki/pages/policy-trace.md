@@ -6,18 +6,25 @@ related:
   - "[[policy-holding-ground]]"
   - "[[policy-production]]"
   - "[[policy-verdict]]"
+  - "[[very-hard-race]]"
 source_paths:
   - "src/rw_bot/policy/trace.py"
   - "src/rw_bot/policy/recorder.py"
+  - "src/rw_bot/policy/scoreboard.py"
+  - "agent/src/rwbot/agent/Scoreboard.java"
+  - "agent/src/rwbot/agent/LedgerNames.java"
   - "src/rw_bot/harness/sweep.py:290"
   - "src/rw_bot/harness/results_layout.py:106"
 source_git_blobs:
-  "src/rw_bot/policy/trace.py": "9bc4d266a0258debb350a1044bc4c241f22e85c3"
-  "src/rw_bot/policy/recorder.py": "888a0a116b5c9cd4bcc87899509566d3a7bda650"
+  "src/rw_bot/policy/trace.py": "60378d14c073f5941f4f650df3d19082bc4156a6"
+  "src/rw_bot/policy/recorder.py": "3dac235b7ca9d03776025fa0a83c449a24c10a99"
+  "src/rw_bot/policy/scoreboard.py": "7d20e66fbc39878a0562a158d09d344fafa3b3a3"
+  "agent/src/rwbot/agent/Scoreboard.java": "bd6285fc06b3ed05a9244cd9b5c68d4f12ba3f09"
+  "agent/src/rwbot/agent/LedgerNames.java": "c7b8c5c2005b89de12af597dd478d76323264661"
   "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
   "src/rw_bot/harness/results_layout.py": "bf31143781274b48e5f24bc1dffc6fcdfd372879"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-03
+fact_checked: 2026-09-13
 confidence: high
 hubs: [headless-harness, bot-architecture]
 ---
@@ -49,7 +56,22 @@ whenever buildings grow through a wave's death; zero means "no
 scoreboard this sample" and a drop reader must skip zeros exactly as
 Momentum does. The `events` letter vocabulary has grown with the
 verbs: `B` (the brace armed) and `H` (the hunt took a new objective)
-joined 2026-09-04/05 beside the original codes.
+joined 2026-09-04/05 beside the original codes, `D` (a dive drafted)
+and `W` (the turtle holding) on 2026-09-13. The same day appended the
+kill-ledger pair after `rival_army`: `rival_lost` and `rival_razed`,
+the mobile units and buildings the strongest rival has lost so far,
+cumulative, read off the engine's own kill ledger (the object behind
+its end-of-match "Units Killed" / "Units Lost" screen, booked at every
+kill from the damage path so both sides of a death agree). The per-loss
+table below records OUR deaths alone, and `rival_army` at any sample is
+what they built minus what they lost -- so this pair is the only read
+that separates an army the opening rolled large from an army our waves
+never killed, the question the 96-game Very Hard corpus could not
+answer from the columns before it ([[very-hard-race]]). The agent
+carries the four counters per player on the wire (`units_killed`,
+`buildings_killed`, `units_lost`, `buildings_lost`), the trace keeps
+the rival's two losses, and the card is unchanged, so certified cards
+stay byte-identical across the change.
 
 **Per loss** — the unit, its type, and where it was standing when last seen. This answers *where*, which is what separates "dying on the walk home" from "dying at the enemy front".
 

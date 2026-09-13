@@ -8,7 +8,7 @@ not largest income -- and the zero on a board with nothing hostile on it.
 
 from __future__ import annotations
 
-from rw_bot.policy.scoreboard import best_rival, rival_income
+from rw_bot.policy.scoreboard import best_rival, rival_attrition, rival_income, strongest_rival
 from tests.wire_fixtures import player, sample
 
 
@@ -44,3 +44,20 @@ def test_a_weaker_rival_after_the_strongest_does_not_displace_it() -> None:
     strong = player(1, index=1, income=60, army_value=5000)
     weak = player(2, index=2, income=300, army_value=100)
     assert rival_income(sample(players=(strong, weak))) == 60
+
+
+def test_the_attrition_pair_comes_off_the_same_row_as_the_income() -> None:
+    """The kill ledger of the strongest rival by worth, not of the rival that
+    has lost the most: a poorer opponent bleeding units is not the race."""
+    bleeding = player(1, index=1, income=200, army_value=1000, units_lost=90, buildings_lost=12)
+    strong = player(2, index=2, income=40, army_value=8000, units_lost=17, buildings_lost=3)
+    board = sample(players=(bleeding, strong))
+    assert strongest_rival(board) is strong
+    assert rival_attrition(board) == (17, 3)
+
+
+def test_attrition_reads_zero_zero_with_nothing_hostile() -> None:
+    us = player(0, index=0, local=True, hostile=False, units_lost=5)
+    assert strongest_rival(sample(players=(us,))) is None
+    assert rival_attrition(sample(players=(us,))) == (0, 0)
+    assert rival_attrition(sample()) == (0, 0)

@@ -134,6 +134,10 @@ final class StateStream {
      * "we are behind the leader and ahead of three others", which the visible
      * enemy count cannot say because it measures our own vision as much as
      * their army.
+     *
+     * <p>The four kill-ledger counters ride beside them for the same reason:
+     * their army value at any moment is what they built minus what they lost,
+     * and only the ledger separates the two terms.
      */
     static String playerRecord(int frame, int index, Scoreboard.PlayerStat player) {
         StringBuilder out = new StringBuilder();
@@ -159,6 +163,14 @@ final class StateStream {
         appendInt(out, "army_value", player.armyValue());
         out.append(',');
         appendInt(out, "building_value", player.buildingValue());
+        out.append(',');
+        appendInt(out, "units_killed", player.unitsKilled());
+        out.append(',');
+        appendInt(out, "buildings_killed", player.buildingsKilled());
+        out.append(',');
+        appendInt(out, "units_lost", player.unitsLost());
+        out.append(',');
+        appendInt(out, "buildings_lost", player.buildingsLost());
         out.append('}');
         return out.toString();
     }

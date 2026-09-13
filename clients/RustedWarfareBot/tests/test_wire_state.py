@@ -92,20 +92,29 @@ def test_engine_ids_are_distinct_and_stable_across_samples() -> None:
         assert surviving == ids
 
 
-def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
-    """Exactly 3ms of wire clock per frame -- the pinned delta, not a rate.
+def test_the_real_capture_advances_at_one_fixed_step_per_frame() -> None:
+    """A whole number of milliseconds of wire clock per frame, the same
+    number between every pair of samples -- the engine's fixed step.
 
-    The agent pins the engine's frame delta at 3ms (the determinism regime),
-    so the clock and the counter are locked, not merely correlated. The old
-    assertion here was a ~300fps window from before the pin; a re-take under
-    the pin lands at 1000/3 fps and the window read that as a failure.
+    The capture is a sandbox boot, and the agent's 3ms pin installs only
+    through a requested match (``MatchSetup``), so the step here is the
+    depot's own: 3ms on the Windows depot, 5ms on the Linux depot the
+    cluster image runs, where the fixture is now taken. An earlier version
+    asserted 3 exactly and called it the pin; it was the platform. What
+    every capture must show is that the clock and the counter are locked
+    at one integer step, not merely correlated, and that the step is the
+    engine's rather than the wall's.
     """
     samples = decode_samples(_capture_lines())
+    steps: set[int] = set()
     for earlier, later in itertools.pairwise(samples):
         frames = later["frame"] - earlier["frame"]
         millis = later["clock_ms"] - earlier["clock_ms"]
         assert frames > 0
-        assert millis == frames * 3
+        assert millis % frames == 0
+        steps.add(millis // frames)
+    assert len(steps) == 1
+    assert steps <= {3, 5}
 
 
 def test_engine_ids_are_the_dispatch_handles() -> None:
@@ -351,6 +360,40 @@ def test_encode_decode_round_trips_the_real_capture() -> None:
     for sample in original:
         lines.extend(encode_sample(sample))
     assert decode_samples(lines) == original
+
+
+def test_a_player_record_carries_the_kill_ledger_and_round_trips() -> None:
+    """The four counters ride the player line exactly as the agent writes
+    them, in the agent's own key order, and decode to the same integers."""
+    frame = (
+        '{"kind":"frame","frame":1918,"clock_ms":25,"visible":0,"pools":0,"options":0,"players":1,'
+        '"refused":0,"credits":4000,"defeated":false,"wiped":false,"players_left":2}'
+    )
+    line = (
+        '{"kind":"player","frame":1918,"index":2,"team":3,"local":false,"hostile":true,'
+        '"defeated":false,"wiped":false,"income":12,"army_value":4200,"building_value":9100,'
+        '"units_killed":31,"buildings_killed":4,"units_lost":27,"buildings_lost":2}'
+    )
+    (decoded,) = decode_samples([frame, line])
+    (row,) = decoded["players"]
+    assert (row["units_killed"], row["buildings_killed"]) == (31, 4)
+    assert (row["units_lost"], row["buildings_lost"]) == (27, 2)
+    assert encode_sample(decoded)[1] == line
+
+
+def test_a_player_record_without_the_ledger_is_refused() -> None:
+    """A stream from an agent that predates the ledger is not decoded with
+    zeros invented for it: the absence is the error."""
+    frame = (
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":1,'
+        '"refused":0,"credits":4000,"defeated":false,"wiped":false,"players_left":2}'
+    )
+    line = (
+        '{"kind":"player","frame":1,"index":0,"team":0,"local":true,"hostile":false,'
+        '"defeated":false,"wiped":false,"income":18,"army_value":500,"building_value":3000}'
+    )
+    with pytest.raises(DecodeError, match="units_killed"):
+        decode_samples([frame, line])
 
 
 def test_encode_escapes_characters_that_would_break_the_line() -> None:

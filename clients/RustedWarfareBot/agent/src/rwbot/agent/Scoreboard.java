@@ -98,6 +98,10 @@ final class Scoreboard {
         private final int income;
         private final int armyValue;
         private final int buildingValue;
+        private final int unitsKilled;
+        private final int buildingsKilled;
+        private final int unitsLost;
+        private final int buildingsLost;
 
         PlayerStat(
                 int team,
@@ -107,7 +111,11 @@ final class Scoreboard {
                 boolean wiped,
                 int income,
                 int armyValue,
-                int buildingValue) {
+                int buildingValue,
+                int unitsKilled,
+                int buildingsKilled,
+                int unitsLost,
+                int buildingsLost) {
             this.team = team;
             this.local = local;
             this.hostile = hostile;
@@ -116,6 +124,10 @@ final class Scoreboard {
             this.income = income;
             this.armyValue = armyValue;
             this.buildingValue = buildingValue;
+            this.unitsKilled = unitsKilled;
+            this.buildingsKilled = buildingsKilled;
+            this.unitsLost = unitsLost;
+            this.buildingsLost = buildingsLost;
         }
 
         int team() {
@@ -148,6 +160,22 @@ final class Scoreboard {
 
         int buildingValue() {
             return this.buildingValue;
+        }
+
+        int unitsKilled() {
+            return this.unitsKilled;
+        }
+
+        int buildingsKilled() {
+            return this.buildingsKilled;
+        }
+
+        int unitsLost() {
+            return this.unitsLost;
+        }
+
+        int buildingsLost() {
+            return this.buildingsLost;
         }
     }
 
@@ -193,6 +221,7 @@ final class Scoreboard {
             if (player == null || isAbsent(player)) {
                 continue;
             }
+            Object tally = tallyOf(engine, player);
             stats.add(
                     new PlayerStat(
                             EngineAccess.readIntField(player, EngineNames.TEAM_ID),
@@ -202,9 +231,51 @@ final class Scoreboard {
                             EngineAccess.readBooleanField(player, EngineNames.PLAYER_WIPED),
                             statOf(player, EngineNames.STAT_INCOME),
                             statOf(player, EngineNames.STAT_ARMY_VALUE),
-                            statOf(player, EngineNames.STAT_BUILDING_VALUE)));
+                            statOf(player, EngineNames.STAT_BUILDING_VALUE),
+                            EngineAccess.readIntField(tally, LedgerNames.UNITS_KILLED),
+                            EngineAccess.readIntField(tally, LedgerNames.BUILDINGS_KILLED),
+                            EngineAccess.readIntField(tally, LedgerNames.UNITS_LOST),
+                            EngineAccess.readIntField(tally, LedgerNames.BUILDINGS_LOST)));
         }
         return stats;
+    }
+
+    /**
+     * Returns one player's kill tally from the engine's ledger.
+     *
+     * <p>The ledger is the object behind the end-of-match "Units Killed" and
+     * "Units Lost" screen, booked at every kill from the damage path: the
+     * killer's team gains a kill and the victim's a loss in one call, so both
+     * sides of a death agree. It is the only place the OPPONENT'S losses are
+     * counted -- the per-loss trace sees ours alone -- which is what lets a
+     * match report say whether their army is large because they built it or
+     * because it was never killed.
+     *
+     * @param engine The live engine instance.
+     * @param player The player to look up.
+     * @return The tally, one of the ledger's own objects.
+     * @throws IllegalStateException When the ledger is absent, which is a
+     *     pinned name that has moved.
+     */
+    private static Object tallyOf(Object engine, Object player) {
+        Object ledger = EngineAccess.readField(engine, LedgerNames.LEDGER);
+        if (ledger == null) {
+            throw new IllegalStateException(
+                    "rw-agent: the engine carries no kill ledger" + EngineNames.PIN);
+        }
+        Object tally =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                ledger.getClass(),
+                                LedgerNames.TALLY,
+                                EngineAccess.pinnedClass(EngineNames.TEAM_CLASS)),
+                        ledger,
+                        player);
+        if (tally == null) {
+            throw new IllegalStateException(
+                    "rw-agent: the kill ledger answered no tally" + EngineNames.PIN);
+        }
+        return tally;
     }
 
     /**

@@ -309,6 +309,10 @@ def player(
     income: int = 18,
     army_value: int = 0,
     building_value: int = 0,
+    units_killed: int = 0,
+    buildings_killed: int = 0,
+    units_lost: int = 0,
+    buildings_lost: int = 0,
 ) -> PlayerStat:
     """Build one player scoreboard entry.
 
@@ -322,6 +326,10 @@ def player(
         income: Credits per second.
         army_value: Value of everything mobile.
         building_value: Value of everything standing.
+        units_killed: Mobile units killed so far, from the kill ledger.
+        buildings_killed: Buildings killed so far.
+        units_lost: Mobile units lost so far.
+        buildings_lost: Buildings lost so far.
 
     Returns:
         The scoreboard entry.
@@ -336,6 +344,10 @@ def player(
         income=income,
         army_value=army_value,
         building_value=building_value,
+        units_killed=units_killed,
+        buildings_killed=buildings_killed,
+        units_lost=units_lost,
+        buildings_lost=buildings_lost,
     )
 
 

@@ -117,6 +117,8 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 own_covered=3,
                 foe_covered=2,
                 rival_army=8200,
+                rival_lost=41,
+                rival_razed=6,
             ),
         ),
         (Loss(frame=7, unit_id=1, type_name="c_tank", x=900.0, y=250.0, killer="c_artillery"),),
@@ -147,6 +149,8 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "own_covered",
         "foe_covered",
         "rival_army",
+        "rival_lost",
+        "rival_razed",
     ]
     assert lines[1].split() == [
         "7",
@@ -174,6 +178,8 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "3",
         "2",
         "8200",
+        "41",
+        "6",
     ]
     assert lines[2] == ""
     assert lines[3].split() == ["frame", "unit", "type", "x", "y", "killer"]
@@ -204,6 +210,8 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 own_covered=0,
                 foe_covered=0,
                 rival_army=0,
+                rival_lost=0,
+                rival_razed=0,
                 air_seen=0,
                 navy_blood=0,
                 events="-",
@@ -215,6 +223,16 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
         (),
     )
     assert lines[-1].split() == ["frame", "unit", "type", "x", "y", "killer"]
+
+
+def test_the_attrition_pair_appends_past_every_positional_reader() -> None:
+    """The kill-ledger pair lands after rival_army, so a reader indexing
+    rival_army at 24 keeps its column and the new pair is 25 and 26."""
+    header = format_trace((), ())[0].split()
+    assert header.index("rival_army") == 24
+    assert header.index("rival_lost") == 25
+    assert header.index("rival_razed") == 26
+    assert len(header) == 27
 
 
 def test_the_income_pair_sits_before_the_world_digest() -> None:

@@ -178,15 +178,30 @@ def best_rival(sample: Sample) -> int:
     return max((worth_of(p) for p in sample["players"] if p["hostile"]), default=0)
 
 
+def strongest_rival(sample: Sample) -> PlayerStat | None:
+    """Return the player :func:`best_rival` reads its worth from.
+
+    The hostile with the largest total worth, so every column read off the
+    rival describes ONE opponent: worth is what they have accumulated, income
+    the rate they compound at, the kill ledger what they have paid for it, and
+    a trace that read one player's worth beside another's income would chart
+    a rivalry between nobody ([[policy-economy]]).
+
+    Args:
+        sample: One observation of the world.
+
+    Returns:
+        That player's row, or None when nothing hostile remains.
+    """
+    strongest: PlayerStat | None = None
+    for player in sample["players"]:
+        if player["hostile"] and (strongest is None or worth_of(player) > worth_of(strongest)):
+            strongest = player
+    return strongest
+
+
 def rival_income(sample: Sample) -> int:
     """Return the income of the player :func:`best_rival` reads its worth from.
-
-    The same selection as :func:`best_rival` -- the hostile with the largest
-    total worth -- rather than the largest hostile income, so the two columns
-    describe one opponent. Worth is what they have accumulated; income is the
-    rate they are compounding at, and a trace that read the worth of one player
-    beside the income of another would chart a rivalry between nobody
-    ([[policy-economy]]).
 
     Args:
         sample: One observation of the world.
@@ -194,11 +209,30 @@ def rival_income(sample: Sample) -> int:
     Returns:
         That player's income, or zero when nothing hostile remains.
     """
-    strongest: PlayerStat | None = None
-    for player in sample["players"]:
-        if player["hostile"] and (strongest is None or worth_of(player) > worth_of(strongest)):
-            strongest = player
+    strongest = strongest_rival(sample)
     return 0 if strongest is None else strongest["income"]
+
+
+def rival_attrition(sample: Sample) -> tuple[int, int]:
+    """Return what the strongest rival has lost so far: mobile units, buildings.
+
+    The engine's kill ledger, cumulative from the match's first frame. Their
+    army value at any sample is what they built minus this, and the per-loss
+    trace records only OUR deaths -- so this is the one column that separates
+    "their army is large because the opening rolled it large" from "their
+    army is large because our waves never killed it" ([[very-hard-race]]).
+
+    Args:
+        sample: One observation of the world.
+
+    Returns:
+        ``(units_lost, buildings_lost)``, both zero when nothing hostile
+        remains.
+    """
+    strongest = strongest_rival(sample)
+    if strongest is None:
+        return (0, 0)
+    return (strongest["units_lost"], strongest["buildings_lost"])
 
 
 __all__ = [
@@ -206,6 +240,7 @@ __all__ = [
     "composition_of",
     "deepest_dip",
     "local_player",
+    "rival_attrition",
     "rival_income",
     "standing_of",
     "worth_of",

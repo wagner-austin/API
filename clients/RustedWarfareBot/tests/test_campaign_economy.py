@@ -343,18 +343,29 @@ def test_the_trace_is_written_when_a_path_is_given(tmp_path: Path) -> None:
     first_row = written.splitlines()[1].split()
     assert first_row[12] == "0"
     assert first_row[13] == "0"
+    assert first_row[25:27] == ["0", "0"]
 
 
 def test_the_trace_carries_the_income_pair_off_the_scoreboard(tmp_path: Path) -> None:
     """Ours at column 12, the strongest rival's at 13 -- distinct figures, so a
-    swap of the pair could not pass ([[policy-economy]])."""
-    us = player(0, index=0, local=True, hostile=False, income=54, building_value=3000)
-    them = player(1, index=1, income=180, army_value=4200, building_value=1500)
+    swap of the pair could not pass ([[policy-economy]]). The rival's kill
+    ledger rides at 25 and 26 off the same row, ours never appearing."""
+    us = player(0, index=0, local=True, hostile=False, income=54, building_value=3000, units_lost=9)
+    them = player(
+        1,
+        index=1,
+        income=180,
+        army_value=4200,
+        building_value=1500,
+        units_lost=23,
+        buildings_lost=4,
+    )
     target = tmp_path / "trace.txt"
     run_campaign(sample(CENTRE, *WAVE, ENEMY, players=(us, them)), times=2, trace=target)
     first_row = target.read_text(encoding="utf-8").splitlines()[1].split()
     assert first_row[12] == "54"
     assert first_row[13] == "180"
+    assert first_row[25:27] == ["23", "4"]
 
 
 def test_the_report_renders_as_lines() -> None:

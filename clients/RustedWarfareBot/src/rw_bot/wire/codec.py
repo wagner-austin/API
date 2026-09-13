@@ -197,6 +197,10 @@ def _decode_player(record: Mapping[str, str | int | float | bool]) -> PlayerStat
         income=require_int(record, "income"),
         army_value=require_int(record, "army_value"),
         building_value=require_int(record, "building_value"),
+        units_killed=require_int(record, "units_killed"),
+        buildings_killed=require_int(record, "buildings_killed"),
+        units_lost=require_int(record, "units_lost"),
+        buildings_lost=require_int(record, "buildings_lost"),
     )
 
 
@@ -493,7 +497,11 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"defeated":{str(player["defeated"]).lower()},'
             f'"wiped":{str(player["wiped"]).lower()},'
             f'"income":{player["income"]},"army_value":{player["army_value"]},'
-            f'"building_value":{player["building_value"]}}}'
+            f'"building_value":{player["building_value"]},'
+            f'"units_killed":{player["units_killed"]},'
+            f'"buildings_killed":{player["buildings_killed"]},'
+            f'"units_lost":{player["units_lost"]},'
+            f'"buildings_lost":{player["buildings_lost"]}}}'
         )
     for index, refusal in enumerate(sample["refusals"]):
         type_name = _escape(refusal["type_name"])

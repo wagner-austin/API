@@ -263,6 +263,17 @@ class PlayerStat(TypedDict):
         income: Credits earned per second.
         army_value: Total value of everything mobile the player holds.
         building_value: Total value of everything standing.
+        units_killed: Mobile units this player has killed, cumulative, from
+            the engine's own kill ledger -- the figure behind its
+            end-of-match "Units Killed" line. Booked at the kill together
+            with the victim's loss, so the four counters agree across
+            players.
+        buildings_killed: Buildings this player has killed, cumulative.
+        units_lost: Mobile units this player has lost, cumulative. The only
+            place an OPPONENT'S losses are counted: the per-loss trace sees
+            ours alone, and their army value at any moment is what they
+            built minus this.
+        buildings_lost: Buildings this player has lost, cumulative.
     """
 
     index: int
@@ -274,6 +285,10 @@ class PlayerStat(TypedDict):
     income: int
     army_value: int
     building_value: int
+    units_killed: int
+    buildings_killed: int
+    units_lost: int
+    buildings_lost: int
 
 
 class Refusal(TypedDict):

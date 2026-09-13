@@ -1,0 +1,107 @@
+# The champion's own 96 bar seeds replayed once more, for the trace
+# columns the corpus lacked (log 2026-09-13): the same evolve1-g4m2
+# members divebar192, condcbar192 and condbar144/b certified byte-
+# identical three times, played from the tree that appends the kill
+# ledger pair (rival_lost, rival_razed) after rival_army. The cards
+# must come back byte-identical to divebar192's champ cards on every
+# seed -- a fourth certification, and the proof the instrument changed
+# no decision -- and the traces then answer the one question the
+# 27-loss reading could not: whether the rival's army is larger at
+# sample 1,500 because the opening rolled it larger or because our
+# waves killed less of it ([[very-hard-race]], [[policy-trace]]).
+champ|8925001|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925105|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925209|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925313|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925417|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925521|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925625|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925729|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925833|doctrines/evolve1-g4m2.doctrine|10000
+champ|8925937|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926041|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926145|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926249|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926353|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926457|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926561|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926665|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926769|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926873|doctrines/evolve1-g4m2.doctrine|10000
+champ|8926977|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927081|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927185|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927289|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927393|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927497|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927601|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927705|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927809|doctrines/evolve1-g4m2.doctrine|10000
+champ|8927913|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928017|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928121|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928225|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928329|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928433|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928537|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928641|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928745|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928849|doctrines/evolve1-g4m2.doctrine|10000
+champ|8928953|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929057|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929161|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929265|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929369|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929473|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929577|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929681|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929785|doctrines/evolve1-g4m2.doctrine|10000
+champ|8929889|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931001|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931105|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931209|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931313|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931417|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931521|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931625|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931729|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931833|doctrines/evolve1-g4m2.doctrine|10000
+champ|8931937|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932041|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932145|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932249|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932353|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932457|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932561|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932665|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932769|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932873|doctrines/evolve1-g4m2.doctrine|10000
+champ|8932977|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933081|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933185|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933289|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933393|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933497|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933601|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933705|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933809|doctrines/evolve1-g4m2.doctrine|10000
+champ|8933913|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934017|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934121|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934225|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934329|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934433|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934537|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934641|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934745|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934849|doctrines/evolve1-g4m2.doctrine|10000
+champ|8934953|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935057|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935161|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935265|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935369|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935473|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935577|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935681|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935785|doctrines/evolve1-g4m2.doctrine|10000
+champ|8935889|doctrines/evolve1-g4m2.doctrine|10000

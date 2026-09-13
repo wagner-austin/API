@@ -15,7 +15,7 @@ from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.upgrades import TIER_CHAINS, satisfies
 from rw_bot.policy.economy import EXTRACTOR_TYPE
 from rw_bot.policy.field import coverage
-from rw_bot.policy.scoreboard import local_player, rival_income
+from rw_bot.policy.scoreboard import local_player, rival_attrition, rival_income
 from rw_bot.policy.situation import read_situation
 from rw_bot.policy.trace import (
     Loss,
@@ -115,6 +115,10 @@ class Recorder:
         # honest column ([[policy-economy]]).
         local = local_player(sample)
         covered = coverage(sample, self._profiles, self._extractors)
+        # The rival's attrition pair, read off the same strongest-rival row
+        # as its income: their army is what they built minus this, and
+        # nothing else on the trace can tell the two apart.
+        rival_lost, rival_razed = rival_attrition(sample)
         self.ticks.append(
             Tick(
                 frame=sample["frame"],
@@ -146,6 +150,8 @@ class Recorder:
                 rival_army=(
                     0 if (situation := read_situation(sample)) is None else situation["rival_army"]
                 ),
+                rival_lost=rival_lost,
+                rival_razed=rival_razed,
             )
         )
 

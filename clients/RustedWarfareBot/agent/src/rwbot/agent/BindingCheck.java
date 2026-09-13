@@ -203,6 +203,22 @@ final class BindingCheck {
             // invocations, forking at the first AI decision -- the exact
             // defect it was pinned to close.
             checkField(engine, EngineNames.SYNC_SEED, problems);
+            // The kill ledger. Losing it fails loudly at the first sample
+            // (the scoreboard reads it for every player), which is the
+            // right direction: a scoreboard that silently read zero
+            // attrition would chart every opponent as immortal.
+            checkField(engine, LedgerNames.LEDGER, problems);
+        }
+        Class<?> ledger = checkClass(LedgerNames.LEDGER_CLASS, problems);
+        Class<?> tally = checkClass(LedgerNames.TALLY_CLASS, problems);
+        if (ledger != null && team != null) {
+            checkMethod(ledger, LedgerNames.TALLY, problems, team);
+        }
+        if (tally != null) {
+            checkField(tally, LedgerNames.UNITS_KILLED, problems);
+            checkField(tally, LedgerNames.BUILDINGS_KILLED, problems);
+            checkField(tally, LedgerNames.UNITS_LOST, problems);
+            checkField(tally, LedgerNames.BUILDINGS_LOST, problems);
         }
 
         // The refusal watch. Losing the queue pair crashes the sweep loudly,

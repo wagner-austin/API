@@ -161,6 +161,16 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
             thresholds were calibrated against worth dips that top out at
             14,150 across 144 Impossible scorecards (imprb48, log
             2026-09-04).
+        rival_lost: Mobile units the same rival has lost so far, from the
+            engine's kill ledger, cumulative. Appended after ``rival_army``
+            per the appendix rule. The per-loss table records OUR deaths
+            alone, and ``rival_army`` is what they built minus this, so the
+            pair is the only read that separates an army the opening rolled
+            large from an army our waves never killed ([[very-hard-race]]).
+            Zero when the sample carries no scoreboard.
+        rival_razed: Buildings the same rival has lost so far, cumulative.
+            The base assault's own progress figure, where ``engaged gone``
+            on the card counts targets that merely left sight.
     """
 
     frame: int
@@ -188,6 +198,8 @@ scoreboard.best_rival` reads its worth from, so the pair describes one
     own_covered: int
     foe_covered: int
     rival_army: int
+    rival_lost: int
+    rival_razed: int
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -266,6 +278,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{'plan':>10}{'workers':>9}"
         f"{'navy_seen':>11}{'air_seen':>10}{'navy_blood':>12}{'events':>8}"
         f"{'eco_covered':>13}{'own_covered':>13}{'foe_covered':>13}{'rival_army':>12}"
+        f"{'rival_lost':>12}{'rival_razed':>13}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
@@ -275,7 +288,7 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
         f"{t['world']:>12}{t['plan']:>10}{t['workers']:>9}"
         f"{t['navy_seen']:>11}{t['air_seen']:>10}{t['navy_blood']:>12}{t['events']:>8}"
         f"{t['eco_covered']:>13}{t['own_covered']:>13}{t['foe_covered']:>13}"
-        f"{t['rival_army']:>12}"
+        f"{t['rival_army']:>12}{t['rival_lost']:>12}{t['rival_razed']:>13}"
         for t in ticks
     )
     lines.append("")

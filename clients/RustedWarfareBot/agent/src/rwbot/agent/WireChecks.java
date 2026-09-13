@@ -54,18 +54,23 @@ final class WireChecks {
                                 1918,
                                 2,
                                 new Scoreboard.PlayerStat(
-                                        3, false, true, false, false, 12, 4200, 9100))
+                                        3, false, true, false, false, 12, 4200, 9100, 31, 4, 27, 2))
                         .equals(
                                 "{\"kind\":\"player\",\"frame\":1918,\"index\":2,\"team\":3,"
                                         + "\"local\":false,\"hostile\":true,\"defeated\":false,"
                                         + "\"wiped\":false,\"income\":12,\"army_value\":4200,"
-                                        + "\"building_value\":9100}"),
+                                        + "\"building_value\":9100,\"units_killed\":31,"
+                                        + "\"buildings_killed\":4,\"units_lost\":27,"
+                                        + "\"buildings_lost\":2}"),
                 "player record is exact");
         // A player who has just been eliminated is exactly who a report wants to
         // name, so their slot is carried rather than dropped.
         failures += Check.expect(
                 StateStream.playerRecord(
-                                1, 0, new Scoreboard.PlayerStat(1, true, false, true, true, 0, 0, 0))
+                                1,
+                                0,
+                                new Scoreboard.PlayerStat(
+                                        1, true, false, true, true, 0, 0, 0, 0, 0, 0, 0))
                         .contains("\"defeated\":true,\"wiped\":true"),
                 "an eliminated player is still on the wire");
 
