@@ -65,6 +65,7 @@ _BAD_RAZE = "RW-DOCTRINE-040"
 _BAD_PRESS = "RW-DOCTRINE-041"
 _BAD_OUTRANGED_BLOOD = "RW-DOCTRINE-042"
 _BAD_DIVE_SIZE = "RW-DOCTRINE-043"
+_BAD_DIVE_MARGIN = "RW-DOCTRINE-044"
 
 
 def _count(
@@ -300,6 +301,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         payload, "outranged", _BAD_OUTRANGED_BLOOD, "outranging movers standing at once, 0 off"
     )
     dive = _count(payload, "dive", _BAD_DIVE_SIZE, "a party size with 0 meaning no diving")
+    divemargin = _count(
+        payload, "divemargin", _BAD_DIVE_MARGIN, "world units beyond the line's reach, 0 any"
+    )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -377,6 +381,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         bank=bank,
         outranged=outranged,
         dive=dive,
+        divemargin=divemargin,
     )
 
 
@@ -444,6 +449,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "bank": doctrine["bank"],
         "outranged": doctrine["outranged"],
         "dive": doctrine["dive"],
+        "divemargin": doctrine["divemargin"],
     }
 
 

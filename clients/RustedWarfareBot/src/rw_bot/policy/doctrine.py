@@ -93,6 +93,7 @@ INT_FIELDS: Final = (
     "press",
     "outranged",
     "dive",
+    "divemargin",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -346,21 +347,23 @@ class Doctrine(TypedDict):
             first verb aimed at the wave LADDER rather than the wave;
             party discipline is the raid's, extracted shared
             ([[policy-raid]]).
-        dive: The dive party's size, zero for off. A standing party of the
-            FASTEST gathered units that closes on the visible enemy ground
-            mover whose land gun outranges every land gun the army fields
-            -- the outranged clause's own membership test, lifted -- so the
-            battery behind the screen is touched instead of traded into.
-            Every Very Hard opener seed is the scout-plus-artillery
-            opening and no winning seed faces a piece (log 2026-09-12);
-            the loss-table anatomy (log 2026-09-13) reads the army
-            stalling at eleven to thirteen pieces against those guns
-            while the enemy's income compounds, and every composition
-            answer measured flat. No memory fallback: with no outranging
-            gun in sight the party stands down and none is raised, so a
-            zero-artillery seed is the champion's match bit for bit.
-            Arbitrated like the hunt, against the opening rung; party
-            discipline is the raid's, shared ([[policy-raid]]).
+        dive: The dive party's size, zero for off. A party of the FASTEST
+            gathered units closes on the visible enemy ground mover whose
+            land gun outranges every land gun the army fields (the
+            outranged clause's membership test, lifted), so the battery
+            behind the screen is touched instead of traded into -- every
+            Very Hard opener is the scout-plus-artillery opening and the
+            army stalls against those guns (logs 2026-09-12/13). No memory
+            fallback: with no such gun in sight the party stands down and
+            none is raised. Arbitrated like the hunt ([[policy-raid]]).
+        divemargin: World units a gun must reach BEYOND the army's longest
+            land gun before the dive counts it a standoff, zero for any
+            outranging gun. dive16 (log 2026-09-13) read the margin-free
+            clause diving plasma tanks (165) and missile mechs (190) against
+            a 160 line, fifty-five re-drafts on a seed the champion won
+            without ever seeing a piece, while its three opener flips were
+            dives into artillery at 290: at 100 against a 160 line,
+            artillery qualifies and every other ground gun does not.
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
@@ -576,6 +579,7 @@ class Doctrine(TypedDict):
     bank: bool
     outranged: int
     dive: int
+    divemargin: int
 
 
 __all__ = [

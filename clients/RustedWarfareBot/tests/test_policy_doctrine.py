@@ -77,6 +77,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         bank=False,
         outranged=0,
         dive=0,
+        divemargin=0,
     )
 
 
@@ -468,6 +469,17 @@ def test_a_negative_dive_is_refused_and_a_party_size_round_trips() -> None:
     assert caught.value.code == "RW-DOCTRINE-043"
     payload["dive"] = 3
     assert decode_doctrine(payload)["dive"] == 3
+
+
+def test_a_negative_dive_margin_is_refused_and_a_standoff_width_round_trips() -> None:
+    """Zero already means any outranging gun; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["divemargin"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-044"
+    payload["divemargin"] = 100
+    assert decode_doctrine(payload)["divemargin"] == 100
 
 
 def test_a_gate_without_a_party_is_refused() -> None:

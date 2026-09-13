@@ -84,6 +84,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     bank=False,
     outranged=0,
     dive=0,
+    divemargin=0,
 )
 
 

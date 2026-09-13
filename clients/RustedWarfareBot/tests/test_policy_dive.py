@@ -87,19 +87,19 @@ def test_only_outranging_ground_movers_are_guns() -> None:
         enemy(5, "battleShip", x=300.0, movement="WATER"),
         enemy(4, "mystery", x=50.0),
     )
-    assert [g["unit_id"] for g in outranging_guns(army, targets, _PROFILES, _CATALOGUE)] == [9]
+    assert [g["unit_id"] for g in outranging_guns(army, targets, _PROFILES, _CATALOGUE, 0.0)] == [9]
 
 
 def test_a_tie_is_a_fair_fight_not_a_standoff() -> None:
     """A hover at 140 against the tank's 130: the reach is the army's longest."""
     army = (_tank(20), _hover(21))
     targets = (enemy(9, "hoverTank", x=400.0),)
-    assert outranging_guns(army, targets, _PROFILES, _CATALOGUE) == ()
+    assert outranging_guns(army, targets, _PROFILES, _CATALOGUE, 0.0) == ()
 
 
 def test_an_army_with_no_land_gun_has_no_standoff() -> None:
     army = (entity(20, "builder"),)
-    assert outranging_guns(army, (_gun(9, 400.0),), _PROFILES, _CATALOGUE) == ()
+    assert outranging_guns(army, (_gun(9, 400.0),), _PROFILES, _CATALOGUE, 0.0) == ()
 
 
 def test_the_nearest_gun_is_closed_on_by_the_fastest_party() -> None:
@@ -205,3 +205,35 @@ def test_no_draft_without_the_campaigns_leave() -> None:
 
 def test_the_default_size_is_the_engines_first_group() -> None:
     assert Diver().size == 3
+    assert Diver().margin == 0.0
+
+
+def test_the_margin_separates_a_standoff_from_a_technicality() -> None:
+    """dive16's lesson: against this fixture's 140 line, a 190 gun
+    outranges by a technicality and artillery at 290 by a standoff; at
+    margin 100 only the artillery is quarry, and at zero both are."""
+    army = (_tank(20), _hover(21))
+    targets = (enemy(8, "sniper", x=300.0), _gun(9, 400.0))
+    catalogue = {**_CATALOGUE, "sniper": _stats("sniper", 0.8)}
+    profiles = {**_PROFILES, "sniper": profile("sniper", 190.0)}
+    both = outranging_guns(army, targets, profiles, catalogue, 0.0)
+    assert [g["unit_id"] for g in both] == [8, 9]
+    artillery_only = outranging_guns(army, targets, profiles, catalogue, 100.0)
+    assert [g["unit_id"] for g in artillery_only] == [9]
+    # The line here is the hover's 140, so 160 puts the threshold at 300,
+    # past the artillery too.
+    assert outranging_guns(army, targets, profiles, catalogue, 160.0) == ()
+
+
+def test_the_diver_dives_by_its_own_margin() -> None:
+    """A margin-100 diver raises nothing against the 190 sniper and a
+    party against the 290 gun; the sniper never draws it."""
+    army = (_hover(30), _hover(31))
+    catalogue = {**_CATALOGUE, "sniper": _stats("sniper", 0.8)}
+    profiles = {**_PROFILES, "sniper": profile("sniper", 190.0)}
+    diver = Diver(size=2, margin=100.0)
+    sniper = (enemy(8, "sniper", x=300.0),)
+    assert diver.dive(_world(*army), army, sniper, catalogue, profiles, True) == ()
+    assert diver.party() == frozenset()
+    orders = diver.dive(_world(*army), army, (*sniper, _gun(9, 900.0)), catalogue, profiles, True)
+    assert [(o["unit_id"], o["x"]) for o in orders] == [(30, 900.0), (31, 900.0)]

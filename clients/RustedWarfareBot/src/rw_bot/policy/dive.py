@@ -38,6 +38,7 @@ from collections.abc import Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
+from rw_bot.policy.combat import FIRST_WAVE
 from rw_bot.policy.counter import land_reach, outranges
 from rw_bot.policy.hunt import centroid
 from rw_bot.policy.party import Detachment, draft_fastest
@@ -51,13 +52,21 @@ def outranging_guns(
     targets: Sequence[Entity],
     profiles: Mapping[str, CombatProfile],
     catalogue: Mapping[str, UnitStats],
+    margin: float,
 ) -> tuple[Entity, ...]:
     """Return the visible hostile ground movers that outrange the army's guns.
 
     The dive's objective class. The reach is the longest land gun among
     the types the ARMY fields now -- not the doctrine's mix -- because the
     question is whether the pieces standing today can answer the gun, and
-    an army with no land gun yet has no standoff to close.
+    an army with no land gun yet has no standoff to close. The margin is
+    how far beyond that reach a gun must start before it is a standoff
+    rather than a technicality: dive16 (log 2026-09-13) read the margin-
+    free clause diving plasma tanks (165) and missile mechs (190) against
+    a 160 line, re-drafting fifty-five times on a seed the champion won
+    without ever seeing a piece -- the same 165-versus-160 reading that
+    armed the outranged clause's first probe from frame 0. Artillery
+    starts at 290.
 
     Args:
         army: Units available to fight, scouts already excluded.
@@ -65,6 +74,8 @@ def outranging_guns(
         profiles: Combat profiles by type name, for reach and layers.
         catalogue: Unit stats by type name, for the speed that tells a
             building from a unit.
+        margin: World units a gun must reach beyond the army's longest
+            land gun (Doctrine.divemargin); zero for any outranging gun.
 
     Returns:
         The outranging movers, in the order seen.
@@ -76,16 +87,30 @@ def outranging_guns(
     reach = land_reach(tuple(unit["type_name"] for unit in army), profiles)
     if reach is None:
         return ()
-    return tuple(t for t in targets if outranges(t, reach, profiles, catalogue))
+    return tuple(t for t in targets if outranges(t, reach + margin, profiles, catalogue))
 
 
 class Diver(Detachment):
     """Keeps one fast party closing on the nearest outranging gun.
 
     The bookkeeping is :class:`~rw_bot.policy.party.Detachment`'s; what is
-    the dive's own is the quarry (only a gun that outranges the line) and
-    the draft (the fastest gathered).
+    the dive's own is the quarry (only a gun that outranges the line by
+    the margin) and the draft (the fastest gathered).
+
+    Attributes:
+        margin: World units beyond the line's reach a gun must start
+            (:func:`outranging_guns`).
     """
+
+    def __init__(self, size: int = FIRST_WAVE, margin: float = 0.0) -> None:
+        """Open a diver.
+
+        Args:
+            size: Party size, the engine's first-group size by default.
+            margin: The standoff margin, zero for any outranging gun.
+        """
+        super().__init__(size)
+        self.margin = margin
 
     def dive(
         self,
@@ -125,7 +150,7 @@ class Diver(Detachment):
         survivors = self.survivors(army)
         if survivors and len(survivors) < self.size:
             return self.disband(survivors, anchor)
-        guns = outranging_guns(army, targets, profiles, catalogue)
+        guns = outranging_guns(army, targets, profiles, catalogue, self.margin)
         if not guns:
             # Nothing outranges the line: a standing party is a diversion
             # with no objective, so it goes home and rejoins the reserve.

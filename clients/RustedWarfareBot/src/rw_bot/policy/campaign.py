@@ -127,6 +127,7 @@ def play(
     rebuild: int = 0,
     hunt: int = 0,
     dive: int = 0,
+    divemargin: int = 0,
     worker_wait: int = 0,
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
@@ -190,9 +191,9 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``worker_wait``, ``groupcap``,
-            ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``, ``outranged``,
-            ``raze``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
+            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``worker_wait``,
+            ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``, ``siegedose``, ``raze``,
+            ``outranged``, ``press``, ``bank``, ``income_ladder``. Each is documented ONCE, on
             :class:`~rw_bot.policy.doctrine.Doctrine`, reasoning and
             measurements alike; repeating a summary line here is how the
             two drifted apart before ([[policy-doctrine]]).
@@ -265,11 +266,10 @@ def play(
     )
     closer = Closer(close)
     presser = Press(press)
-    # Sized by the doctrine; at zero a party's gate never fires and it is
-    # never consulted.
+    # Sized by the doctrine; at zero a party's gate never fires, never consulted.
     raiders = Raider(size=raid) if raid else Raider()
     hunters = Hunter(size=hunt) if hunt else Hunter()
-    divers = Diver(size=dive) if dive else Diver()
+    divers = Diver(size=dive, margin=divemargin) if dive else Diver()
     rusher = Rusher()
     creeper = Creeper()
     nuker = Nuker()

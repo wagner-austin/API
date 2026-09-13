@@ -41,7 +41,9 @@ def _world(hostile: Entity) -> Sample:
     return sample(CENTRE, *ARMY, hostile)
 
 
-def _play(world: Sample, dive: int, trace: Path | None = None) -> tuple[ScriptedPeer, int]:
+def _play(
+    world: Sample, dive: int, trace: Path | None = None, divemargin: int = 0
+) -> tuple[ScriptedPeer, int]:
     """Play the world twice: the dive orders on the first observation and
     its decision code lands in the row the second one writes, because the
     fight runs after the row is cut ([[policy-loop]])."""
@@ -54,9 +56,22 @@ def _play(world: Sample, dive: int, trace: Path | None = None) -> tuple[Scripted
         DIVE_PROFILES,
         2,
         dive=dive,
+        divemargin=divemargin,
         trace=trace,
     )
     return peer, report["dives"]
+
+
+def test_the_margin_is_the_doctrines_and_holds_the_party_home() -> None:
+    """The 290 gun against the fixture's 110 line is a 180 standoff: a
+    margin of 200 reads it as no standoff at all and raises nobody, and
+    a margin of 100 reads it as the dive16 artillery and sends the party."""
+    held, dives = _play(_world(enemy(9, "enemy_arty", x=400.0)), dive=2, divemargin=200)
+    assert [line for line in held.sent if "attack_move" in line] == []
+    assert dives == 0
+    sent, dives = _play(_world(enemy(9, "enemy_arty", x=400.0)), dive=2, divemargin=100)
+    assert len([line for line in sent.sent if "attack_move" in line]) == 2
+    assert dives == 1
 
 
 def test_the_dive_closes_a_party_on_the_outranging_gun(tmp_path: Path) -> None:

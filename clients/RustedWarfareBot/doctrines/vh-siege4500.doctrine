@@ -52,6 +52,7 @@ siege 4500
 siegedose 1
 outranged 0
 dive 0
+divemargin 0
 raze 0
 press 0
 brace 0

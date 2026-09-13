@@ -1,0 +1,27 @@
+# The dive at the standoff's own width (log 2026-09-13): the same sixteen
+# members as dive16 under evolve1-g4m2-dive3m100 (dive 3, divemargin
+# 100). dive16's margin-free reading flipped three openers -- every flip
+# a dive into artillery at 290 -- and lost one champion win to fifty-five
+# re-drafts against 165- and 190-reach movers that outrange the line's
+# 160 by a technicality, after which the enemy teched artillery on a seed
+# where the champion never saw a piece. At margin 100 the threshold is
+# 260: the three flips must HOLD (their quarries were artillery), the two
+# identity seeds that fired (s8913001, s8913729) must read byte-identical
+# to pinbase48, and the champ members must stay identical as before.
+# Controls: pinbase48 and dive16, both under certified determinism.
+dive|8913313|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8913833|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8914041|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8914977|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8915185|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8916121|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8916641|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8917473|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8917681|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8913001|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8913729|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8915497|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8917889|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+champ|8915185|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915393|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915081|doctrines/evolve1-g4m2.doctrine|10000
