@@ -1,0 +1,39 @@
+# The dive at Impossible (log 2026-09-13): the first new capability to
+# reach that rung since the doctrine-knob tier closed there 0/36
+# (improads36). Twelve seeds of impbase48's block, two arms: the
+# margin-free dive (evolve1-g4m2-dive3) and the dive at the standoff's
+# own width (evolve1-g4m2-dive3m100). At Very Hard the margin measured a
+# no-op because every quarry was artillery; the Impossible population
+# fields laser tanks, missile mechs and plasma tanks (165-190 reach
+# against the line's 160), so this is the population where the two arms
+# can differ. Both draft under the raid's escalating-rung arbitration.
+# Controls: impbase48 (0/48 for the champion, every seed multi-domain,
+# the subsidy structural), under certified determinism. The bar is not
+# a win -- no arm has ever won at this rung -- but a survival shift with
+# its mechanism visible in the D rows and the loss table, or a clean
+# zero that says the tactical answer to artillery is not the Impossible
+# answer either.
+dive|8919001|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919001|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919105|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919105|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919209|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919209|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919313|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919313|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919417|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919417|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919521|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919521|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919625|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919625|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919729|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919729|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919833|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919833|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8919937|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8919937|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8920041|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8920041|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
+dive|8920145|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dm100|8920145|doctrines/evolve1-g4m2-dive3m100.doctrine|10000
