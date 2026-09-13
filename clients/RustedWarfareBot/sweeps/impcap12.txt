@@ -1,0 +1,22 @@
+# The capped dive at Impossible (log 2026-09-13): the same twelve seeds
+# of the impbase48 block as impdive24, under evolve1-g4m2-dive3-cap16.
+# impdive24 read the rung-arbitrated dive never drafting on 22 of 24
+# members -- the hunt's lesson, the army at Impossible never clears a
+# wave's worth plus a party -- so the cap arm, which drafts against the
+# opening rung (three units plus the party) with sixteen parties as the
+# brake, is the first dive that can draft there at all. Controls:
+# impbase48 (0/48) and impdive24, under certified determinism. The bar
+# is the one impdive24 set: a survival shift with its mechanism visible
+# in the D rows and the loss table, or a clean zero.
+cap|8919001|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919105|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919209|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919313|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919417|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919521|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919625|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919729|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919833|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8919937|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8920041|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
+cap|8920145|doctrines/evolve1-g4m2-dive3-cap16.doctrine|10000
