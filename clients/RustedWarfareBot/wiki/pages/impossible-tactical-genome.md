@@ -8,7 +8,7 @@ source_paths:
   - "scripts/evolve.py"
 source_git_blobs:
   "src/rw_bot/policy/combat.py": "41c1ad218291e99fc6ae0a0ab1ce39b654a7585e"
-  "src/rw_bot/policy/dispatching.py": "16ae73025541909698e9bcb0546eb3587975e106"
+  "src/rw_bot/policy/dispatching.py": "71ac23fbc2c4e8dfb0d7026c25be48a951dbbecd"
   "scripts/evolve.py": "0902cc9522f990abf6ca21db21b3ecb751825c44"
 provenance:
   - "wiki/log.md entries 2026-09-07: the corpus label measurement and its correction; the eighth closure (wwait24); the engagement-gate prevalence refutation"

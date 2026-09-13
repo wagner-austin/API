@@ -16,7 +16,7 @@ source_paths:
 source_git_blobs:
   "agent/src/rwbot/agent/SplitRandom.java": "f9ce0027b04a03e4ceebf4b35f168bf9152a8165"
   "agent/src/rwbot/agent/MatchSetup.java": "c0ce18a3cec9235727ca1364cbbddafdfae30e88"
-  "scripts/play.py": "5961721f83a954166f88e2adec0100707945ccf5"
+  "scripts/play.py": "7c5e10fc9c4aeedb18be1e00bef0d08f9601aef9"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high
