@@ -17,7 +17,7 @@ source_paths:
   - "src/rw_bot/policy/combat.py"
   - "src/rw_bot/policy/production.py"
   - "src/rw_bot/policy/campaign.py:317"
-  - "src/rw_bot/policy/dispatching.py:393"
+  - "src/rw_bot/policy/dispatching.py:400"
   - "src/rw_bot/policy/match_report.py:75"
 source_git_blobs:
   "wiki/sources/m15-production/before-after.txt": "a141155176d9ceb1631fbf3d3004244fc252261b"
@@ -28,11 +28,11 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "41c1ad218291e99fc6ae0a0ab1ce39b654a7585e"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "63c6c310b6bca8241aeb7988a544e20aff93c2ef"
-  "src/rw_bot/policy/dispatching.py": "6a05a4c5473b536e62f2b4902a8e3d98bcf57627"
+  "src/rw_bot/policy/campaign.py": "b04a2a2e3dbec7b0625f7e1a0f66b67ccb8f4beb"
+  "src/rw_bot/policy/dispatching.py": "117a59a11128484869769370583290f66a1e4382"
   "src/rw_bot/policy/match_report.py": "2b95059f6ed9ecd25610092f0a49ca2f72b03215"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-03
+fact_checked: 2026-09-13
 confidence: high
 hubs: [engine-internals, bot-architecture]
 ---
@@ -144,7 +144,7 @@ Negative ids mean "not on a movement grid", which is what every **structure** re
 [^3]: `src/rw_bot/policy/match_report.py:68` — the `MatchReport` field `killed`, documented as "Targets ordered against that are no longer visible. Not a kill count -- a target that retreated into fog reads the same way, which is why the field is named for what was observed", declared at `:193`. This footnote named a `Battle` report in `campaign.py` until 2026-09-03; no type called `Battle` exists anywhere in the repository, and the field's home is `match_report.py`. The semantics the footnote asserts are exactly right — only its address was wrong.
 [^4]: `src/rw_bot/policy/combat.py` — `find_army`, `find_targets`, `choose_target` and `engagements`, all pure.
 [^5]: `src/rw_bot/policy/production.py` — `sustain` and `idle_producers`, also pure.
-[^6]: `src/rw_bot/policy/combat.py` and `src/rw_bot/policy/build_order.py` — neither contains the string `channel`. The senders are `src/rw_bot/policy/dispatching.py:60` onward (`send_produce`, `send_build`, `send_move`, `send_attack`, `send_attack_move`, `send_posture`), plus `campaign.py`, `convert.py`, `medic.py` and `navy.py`. Two claims in the earlier version of this footnote were wrong and are withdrawn: `fight` is not in `campaign.py` — it is `src/rw_bot/policy/dispatching.py:304`, and it is combat dispatch only, explicitly touching no budget, so it orders no reinforcements. And production does not run "before the army check": `find_army` is called at `campaign.py:305`, well before the production channels at `:419`. The behaviour that observation was reaching for does survive, by a different mechanism — production is not gated on the army at all (no `if army` guard exists in the loop), so a wiped wave still queues its replacements.
+[^6]: `src/rw_bot/policy/combat.py` and `src/rw_bot/policy/build_order.py` — neither contains the string `channel`. The senders are `src/rw_bot/policy/dispatching.py:51` onward (`send_plan_step`, `send_produces`, `send_builds`, `send_recon`, `send_postures`, `send_nukes`, `send_tech`), plus `campaign.py`, `convert.py`, `medic.py` and `navy.py`. Two claims in the earlier version of this footnote were wrong and are withdrawn: `fight` is not in `campaign.py` — it is `src/rw_bot/policy/dispatching.py:400`, and it is combat dispatch only, explicitly touching no budget, so it orders no reinforcements. And production does not run "before the army check": `find_army` is called at `campaign.py:308`, well before the production channels at `:421`. The behaviour that observation was reaching for does survive, by a different mechanism — production is not gated on the army at all (no `if army` guard exists in the loop), so a wiped wave still queues its replacements.
 [^7]: `wiki/sources/m15-production/before-after.txt` — the two scorecards side by side, with the counts re-derived from the run log at the foot of the file.
 [^9]: `wiki/sources/m15-production/target-churn.txt` — the three runs side by side, with the counts derived from each run log and the variance caveat stated in the file itself.
 [^8]: `wiki/sources/m15-production/sustained-run.log` — 743 `channel: attack` lines and 49 `channel: produce` lines; the distinct target and attacker counts are the sorted-unique ids from those lines.

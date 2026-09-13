@@ -11,19 +11,42 @@ source_paths:
   - "src/rw_bot/policy/match_report.py"
   - "src/rw_bot/policy/scorekeeper.py"
   - "src/rw_bot/policy/dive.py"
+  - "src/rw_bot/policy/situation.py:234"
+  - "src/rw_bot/policy/situation.py:237"
+  - "src/rw_bot/policy/dispatch.py:380"
+  - "src/rw_bot/policy/dispatch.py:424"
+  - "src/rw_bot/policy/dispatching.py:374"
+  - "src/rw_bot/policy/campaign.py:274"
+  - "src/rw_bot/policy/campaign.py:326"
+  - "src/rw_bot/policy/doctrine_codecs.py:337"
   - "sweeps/divebar192.txt"
   - "sweeps/bloodbar96.txt"
   - "sweeps/prangebar96.txt"
+  - "sweeps/pressvh48.txt"
+  - "sweeps/turtlebar192.txt"
+  - "doctrines/evolve1-g4m2-turtle85.doctrine"
+  - "doctrines/evolve1-g4m2-turtle85r.doctrine"
 source_git_blobs:
   "src/rw_bot/policy/match_report.py": "2b95059f6ed9ecd25610092f0a49ca2f72b03215"
   "src/rw_bot/policy/scorekeeper.py": "e900ce487c7565519ff5d6687e22e24cd829a482"
   "src/rw_bot/policy/dive.py": "42c9133abd8fe268ec6ecd74814c31c77dde0a06"
+  "src/rw_bot/policy/situation.py": "fb274ddf0a998bf1ac710d68ff173cf7646d1f2e"
+  "src/rw_bot/policy/dispatch.py": "26dbd532a0aa0d08ae952d4013e26b5dd1a4125a"
+  "src/rw_bot/policy/dispatching.py": "117a59a11128484869769370583290f66a1e4382"
+  "src/rw_bot/policy/campaign.py": "b04a2a2e3dbec7b0625f7e1a0f66b67ccb8f4beb"
+  "src/rw_bot/policy/doctrine_codecs.py": "b4e3f2ef3532f8a370bd54c51660aa006bf70414"
   "sweeps/divebar192.txt": "10368ad3ccf2a6cf91d218850403bd4b5ebb326b"
   "sweeps/bloodbar96.txt": "5c28157873019ccfd71fbc4bd1e1339b3d02f02c"
   "sweeps/prangebar96.txt": "b79981018c3fe5149651ba08e31a799bfc535f5e"
+  "sweeps/pressvh48.txt": "51d3d0a7628c3fb532f984fc320ef009c0bba5a0"
+  "sweeps/turtlebar192.txt": "d5633067d5ee71b18ece1ffcee58630554f1cefb"
+  "doctrines/evolve1-g4m2-turtle85.doctrine": "cf0dc0dafa3116a50c08dc92a6fc366e75474841"
+  "doctrines/evolve1-g4m2-turtle85r.doctrine": "9780044df77e45dba2a4ab471ac216dfc83a9482"
 provenance:
   - "runs/sweeps/divebar192, bloodbar96, prangebar96 and their traces on hpc3 (/pub/wagnera3/rusted/runs): the 96 champion cards these figures are read from, byte-identical to condcbar192's and condbar144/b's on every seed"
   - "scratchpad corpus96.py and early96.py (session f670d9e0, 2026-09-13): the two readers; every number below is their printed output"
+  - "runs/sweeps/pressvh48 on hpc3: the 48 paired press verdicts the turtle section reads against"
+  - "runs/sweeps/turtlebar192 on hpc3, submitted 2026-09-13 at Very Hard from commit d0ea7720: the bar the turtle section names as unread"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-13
 confidence: high
@@ -150,6 +173,41 @@ against 10.5, navy 5.1 against 3.3) before they reach it.[^6] The loss is
 the field fight against an army the enemy's opening rolled larger, and
 the doctrine vocabulary has no arm that wins that fight more often than
 the champion's own.
+
+## The response built from the reading: the turtle
+
+The press was the first arm cut from this reading and it read the wrong
+way: at sample 2000, at or below its worth percent of the strongest
+rival, the press forces every wave out, and on 48 paired seeds the
+press-80 arm lost four more games than the champion (`pressvh48`).[^7]
+The turtle is the same one-shot read at sample 1500 with the opposite
+response: at or below the percent (85 on the arms built), the wave
+controller withholds every size release for the rest of the match, the
+wave already out is sent home, and the reserve gathers under the guard
+and the anti-air. A forced release still runs: an avenge, a committed
+close or a strike sets a punching latch that lets the wave out and keeps
+it out until its break, so the hold can carry the counter-punch the
+community corpus ranks first against the shipped AI (let the attack burn
+on the defences, then push into the window before the next group
+stages, [[ai-opponent-strategy]]).[^8] Every held sample carries the `W`
+code in the trace's event column, beside the press's `C`.[^9]
+
+The field is `turtle`, a percent validated under code RW-DOCTRINE-047,
+zero on every tracked preset.[^10] Two arms stand on the champion:
+`evolve1-g4m2-turtle85` holds with riposte off, so no forced release
+exists and the arm never punches; `evolve1-g4m2-turtle85r` holds with
+riposte on, so an intrusion ending inside the outpost radius releases the
+whole reserve as one wave. `turtlebar192` prices both against the
+champion on the 96 certified bar seeds at Very Hard, and the pair
+separates the hold's own worth from the counter's. The bar is submitted
+and unread; the adoption line is 69 held with wins on the behind-at-1500
+cohort, which is the cohort the corpus says is lost today.[^11]
+
+[^7]: `sweeps/pressvh48.txt` -- control against `vh-press80` on 48 fresh seeds 8891001-8895889, judged by the pairs and margin report; the press reads at `src/rw_bot/policy/situation.py:223` (`PRESS_WINDOW`).
+[^8]: `src/rw_bot/policy/situation.py:234` (`TURTLE_WINDOW = 1500`) and `:237` (`Press`, now taking its window); `src/rw_bot/policy/dispatch.py:380` (`WaveController.command`, the `withhold` flag) and `:424` (the punching latch: a withheld controller with no forced release clears its released set, and a latched one musters until `released` empties); `src/rw_bot/policy/campaign.py:274` (`turtler = Press(turtle, TURTLE_WINDOW)`) and `:326` (the read beside the press read).
+[^9]: `src/rw_bot/policy/dispatching.py:374` (`_note_releases`, `W` at `:397`); `tests/test_campaign_turtle.py` pins the latch, the three recall moves and the `W` row through `play`.
+[^10]: `src/rw_bot/policy/doctrine_codecs.py:337` -- `_percent(payload, "turtle", _BAD_TURTLE, ...)`, the helper `hp_floor` and `hold` share.
+[^11]: `doctrines/evolve1-g4m2-turtle85.doctrine`, `doctrines/evolve1-g4m2-turtle85r.doctrine`, `sweeps/turtlebar192.txt` -- 96 seeds 8925001+104k and 8931001+104k, arm cards only, the champion's cards being divebar192's under certified determinism; commit d0ea7720.
 
 [^4]: `auc96.py` over `runs/traces/divebar192` and `runs/traces/pinbase48` with their cards.
 [^5]: `cohort96.py` over `runs/sweeps/{divebar192,condcbar192,bloodbar96,prangebar96,condbar144,condbar144b}` and the champion traces of divebar192.

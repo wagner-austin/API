@@ -27,7 +27,7 @@ source_git_blobs:
   "wiki/sources/m27-aggression/attack-vs-turtle.txt": "e9fdde7396a6a99b6cc35b14b59e193b003b198a"
   "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
   "src/rw_bot/policy/spending.py": "cdef325f6e784124d362b1b910e3c716f4c8507c"
-  "scripts/play.py": "1134fd2528df6a6936c8d6750b89cd4bb52076d0"
+  "scripts/play.py": "71b80ff070e1004981f182de875654bd2b1aaa37"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-08-17
 confidence: high

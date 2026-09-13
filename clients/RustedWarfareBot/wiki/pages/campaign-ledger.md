@@ -11,7 +11,7 @@ source_paths:
   - "doctrines/flame-nocover.doctrine"
   - "runs/sweeps/"
 source_git_blobs:
-  "doctrines/flame-nocover.doctrine": "92fb4281994111f6e153ee8d21aabef1a6d86ab9"
+  "doctrines/flame-nocover.doctrine": "a5dd7f1da45a76199966375cefc0362ad95796aa"
 provenance:
   - "wiki/log.md — the chronological record this page summarises. Deliberately NOT a pinned source_path: it is append-only, so a pin on it goes stale every time any session logs anything, including edits to this page. That is drift with no information in it, and it was firing here. The page's own framing says the same thing — log.md is the journal, this page is the current position."
 game_version: "1.15 (code 176, build #28)"
