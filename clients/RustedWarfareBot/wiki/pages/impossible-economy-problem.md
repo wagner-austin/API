@@ -1,17 +1,29 @@
 ---
 title: The Impossible Economy Problem
 tags: [impossible, economy, design]
-related: ["[[campaign-ledger]]", "[[policy-budget]]", "[[harness-population-search]]", "[[policy-raid]]", "[[policy-economy]]"]
+related: ["[[campaign-ledger]]", "[[policy-budget]]", "[[harness-population-search]]", "[[policy-raid]]", "[[policy-economy]]", "[[very-hard-race]]"]
 source_paths:
   - "src/rw_bot/policy/economy.py"
   - "src/rw_bot/policy/expander.py"
   - "src/rw_bot/policy/floor.py"
   - "src/rw_bot/policy/raid.py"
   - "sweeps/impden48.txt"
+  - "sweeps/impturtlebar96.txt"
+  - "sweeps/impfort96.txt"
+  - "doctrines/evolve1-g4m2-turtle85.doctrine"
+  - "doctrines/evolve1-g4m2-turtle85r.doctrine"
+  - "doctrines/evolve1-g4m2-turtle85r-guns2.doctrine"
+  - "doctrines/evolve1-g4m2-turtle85r-creep50.doctrine"
   - "runs/sweeps/imp48c6"
   - "runs/sweeps/imp48c0f4"
   - "runs/sweeps/impden48"
 source_git_blobs:
+  "sweeps/impturtlebar96.txt": "5c31fdbb62241dbf10889a4cfbd21d5461b03b8c"
+  "sweeps/impfort96.txt": "8bd193f8600e47879ceb8e63a7be1e554e318dad"
+  "doctrines/evolve1-g4m2-turtle85.doctrine": "cf0dc0dafa3116a50c08dc92a6fc366e75474841"
+  "doctrines/evolve1-g4m2-turtle85r.doctrine": "9780044df77e45dba2a4ab471ac216dfc83a9482"
+  "doctrines/evolve1-g4m2-turtle85r-guns2.doctrine": "ba5d146d97771b7eee550b7d3232a6bd3ddf06e7"
+  "doctrines/evolve1-g4m2-turtle85r-creep50.doctrine": "13b1a851c12988cfcd7a6a966eab7426de950cc3"
   "src/rw_bot/policy/economy.py": "ecb91c97c17306e889a9c49209bf5baa6a3efe13"
   "src/rw_bot/policy/expander.py": "eeb4f76c13011abaab836b71aec978d582e2e68c"
   "src/rw_bot/policy/floor.py": "5471ec6039bbbe7a3256e8fdfcc68708d55732ee"
@@ -22,7 +34,8 @@ provenance:
   - "runs/sweeps/impden48 — 144 scorecards, raid 3/6/8 on 48 shared seeds, 2026-09-03"
   - "wiki/log.md entries 2026-08-08 (pre-cluster saving/withhold variants) through 2026-09-02"
   - "runs/sweeps/impopen96 — 96 scorecards, 8 opening arms on 12 shared seeds, 2026-09-05"
-fact_checked: 2026-09-05
+  - "runs/sweeps/impturtlebar96 + impfort96 — 192 scorecards, four turtle arms on the 48 certified impbase48 seeds, 2026-09-13, read against runs/sweeps/impbase48 by pair_read.py"
+fact_checked: 2026-09-13
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -207,6 +220,26 @@ funded wall. If any opening moves survival materially, the 56k chain
 becomes fundable -- with law eight satisfied this time: the withhold
 gates on the proven head machinery rather than tick-one or a crude
 income floor, which is exactly how the earlier nuke arms starved.
+
+**Stage 2's turtle half is now measured, and it is closed (2026-09-13).**
+The doctrine turtle -- a one-shot read of our worth against the
+strongest rival's at sample 1,500, below which the army holds home for
+the rest of the match ([[very-hard-race]]) -- took the posture to this
+rung on the certified impbase48 seeds, four arms in two batches, 144
+matches, every one paired against the champion's 0/48 cards. The hold
+alone read 0/48 at paired survival +93 samples; the hold with the
+riposte counter-punch 0/48 at -231; the hold and counter-punch behind
+two top-tier gun turret chains 0/48 at -231; behind the half-line
+turret walk with its repair bays 0/48 at -249. The read latches on
+every member here, so these are not conditional arms but the posture
+itself, and the repair bay the community material calls load-bearing
+is in the third arm. **Every arrangement of turtle-and-counter is equal
+to the champion on wins, which is zero, and worse on survival wherever
+it punches or walls.** The pre-cluster never-release turtle read the
+same way on three seeds; this is that result under certified
+determinism on forty-eight pairs. Stage 2's turtle is therefore not
+blocked on funding -- it is refuted on its own terms, and the fortress
+and nuke behind it remain blocked on the 45,000 nothing funds.
 
 **Stage 3 -- above the vocabulary, if openings read flat.** Per-sample
 tactical policy ([[impossible-step-three-design]] option 1), and the
