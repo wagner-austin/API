@@ -30,7 +30,7 @@ source_git_blobs:
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
   "src/rw_bot/policy/campaign.py": "7839cb581d2829441bec8436b75496bfff7fccbe"
   "src/rw_bot/policy/dispatching.py": "9fc1f7e70a8dc4b58052bfe565289c09bf819b4d"
-  "src/rw_bot/policy/match_report.py": "72a04db3c287bdd73bb58daade2ac5321ed8e74d"
+  "src/rw_bot/policy/match_report.py": "2b95059f6ed9ecd25610092f0a49ca2f72b03215"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03
 confidence: high
