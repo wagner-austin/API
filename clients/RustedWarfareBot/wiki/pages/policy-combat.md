@@ -28,7 +28,7 @@ source_git_blobs:
   "agent/src/rwbot/agent/Orders.java": "846c66b42fcf439dc5ad3534424b42d0da6d598a"
   "src/rw_bot/policy/combat.py": "2c69deb870c8606811cc09cb069e8df0cd43ae46"
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
-  "src/rw_bot/policy/campaign.py": "2fb2498c1b272cabc437630d6034a4d5b491da21"
+  "src/rw_bot/policy/campaign.py": "7839cb581d2829441bec8436b75496bfff7fccbe"
   "src/rw_bot/policy/dispatching.py": "9fc1f7e70a8dc4b58052bfe565289c09bf819b4d"
   "src/rw_bot/policy/match_report.py": "72a04db3c287bdd73bb58daade2ac5321ed8e74d"
 game_version: "1.15 (code 176, build #28)"

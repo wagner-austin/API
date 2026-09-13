@@ -15,7 +15,7 @@ source_git_blobs:
   "src/rw_bot/policy/raid.py": "6bf7705d0a39f09a5e36b3cb5f753f843d5c11e7"
   "src/rw_bot/policy/party.py": "66f07f551bbb437600a967a1fe1699d0df1a328f"
   "src/rw_bot/policy/hunt.py": "e00e6a8ab543a94899205b49795d4f2174fb2ed7"
-  "src/rw_bot/policy/dive.py": "62bcb2cf49760736834cdaff4881cfccb43e858e"
+  "src/rw_bot/policy/dive.py": "34d7708d42fdf25125419f04f77800038f64fa32"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-13
 confidence: high
