@@ -10,7 +10,7 @@
       "gpu": null,
       "cpus": 4,
       "mem_gb": 2,
-      "minutes": 100,
+      "minutes": 180,
       "requeue": true,
       "image": {
         "path": "/pub/wagnera3/rusted/images/v5/rusted.sif",
