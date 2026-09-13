@@ -201,13 +201,37 @@ def test_what_the_opponents_field_is_reported() -> None:
     )
     report, _ = run_campaign(world, times=1)
     assert report["enemy_types_end"] == (("c_tank", 2), ("extractorT2", 1))
+    assert report["enemy_peak"] == (("c_tank", 2), ("extractorT2", 1))
+
+
+def test_the_enemy_peak_remembers_what_the_last_observation_no_longer_sees() -> None:
+    """The retraction's instrument (log 2026-09-13): a won game's last
+    sample sees a razed base, so the end-state line read "no artillery"
+    on seeds where artillery stood mid-game. The peak keeps the census."""
+    crowded = sample(
+        CENTRE,
+        *WAVE,
+        enemy(9, "c_tank", x=100.0),
+        enemy(10, "c_tank", x=120.0),
+        enemy(11, "c_artillery", x=140.0),
+    )
+    thinned = sample(CENTRE, *WAVE, enemy(9, "c_tank", x=100.0))
+    peer = ScriptedPeer(lines(crowded, thinned))
+    report = play(AgentChannel(peer), (), CATALOGUE, PLACEMENTS, PROFILES, 2)
+    assert report["enemy_types_end"] == (("c_tank", 1),)
+    assert report["enemy_peak"] == (("c_tank", 2), ("c_artillery", 1))
+    rendered = format_report(report)
+    assert "enemy fields   c_tank x1" in rendered
+    assert "enemy peak     c_tank x2, c_artillery x1" in rendered
 
 
 def test_an_unseen_enemy_is_reported_as_none_rather_than_blank() -> None:
     """Nothing visible is a real observation, not a missing measurement."""
     report, _ = run_campaign(sample(CENTRE, *WAVE), times=1)
     assert report["enemy_types_end"] == ()
+    assert report["enemy_peak"] == ()
     assert "enemy fields   none" in format_report(report)
+    assert "enemy peak     none" in format_report(report)
 
 
 def test_the_reserve_gathers_at_the_base() -> None:

@@ -114,6 +114,12 @@ class Scorekeeper:
         # the ledger proved payment while nothing proved existence
         # (log 2026-08-10). A channel's pilot reads this line.
         self._owned_peak: dict[str, int] = {}
+        # The enemy's census, the owned peak's mirror: ``enemy fields`` is
+        # the LAST observation's visible hostiles, and three log entries
+        # read it as the match's -- a won game's last sample sees a razed
+        # base, so "zero artillery on every winning seed" was the end state
+        # talking (log 2026-09-13). Peak simultaneous count per type seen.
+        self._enemy_peak: dict[str, int] = {}
         #: Losses inferred on the last observation -- the doom watch's
         #: ``lost`` column, matching the trace's by construction: both run
         #: the same roster diff at the same cadence ([[policy-trace]]).
@@ -183,6 +189,9 @@ class Scorekeeper:
         self._composition_end = composition_of(army)
         self._standing_end = composition_of(standing_of(sample, self._catalogue))
         self._enemy_types_end = composition_of(targets)
+        for name, count in self._enemy_types_end:
+            if count > self._enemy_peak.get(name, 0):
+                self._enemy_peak[name] = count
         self.verdict = grade(sample)
 
         if self.samples_seen == 1:
@@ -312,6 +321,7 @@ class Scorekeeper:
             composition_end=self._composition_end,
             owned_peak=_ranked(self._owned_peak),
             enemy_types_end=self._enemy_types_end,
+            enemy_peak=_ranked(self._enemy_peak),
             units_lost_to=_ranked(self._unit_deaths),
             buildings_lost_to=_ranked(self._building_deaths),
             income_end=self._income_end,

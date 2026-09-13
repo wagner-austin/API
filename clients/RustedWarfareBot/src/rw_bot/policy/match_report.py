@@ -136,6 +136,15 @@ class MatchReport(TypedDict):
             leaves the mix silently at whatever else was makeable. Without this
             the experiment cannot tell a mix that was built from a mix that was
             requested and quietly denied ([[policy-production]]).
+        enemy_peak: Peak simultaneous count of every hostile type ever
+            SEEN, commonest first -- ``enemy_types_end``'s cumulative
+            mirror, the enemy census. The end-state line was read as the
+            match's for a day: a won game's last observation sees a razed
+            base, so every winning seed read "no artillery" while artillery
+            stood in the champion's own winning games (log 2026-09-13, the
+            retraction). A "seen" is any observation's visible hostiles,
+            fog and all, so a type that stood unseen the whole match reads
+            zero here honestly.
         owned_peak: Peak simultaneous count of every type ever owned,
             commonest first -- the mechanism census. The end-state tables
             cannot testify for anything that stood and then died, and five
@@ -215,6 +224,7 @@ class MatchReport(TypedDict):
     units_lost_to: tuple[tuple[str, int], ...]
     buildings_lost_to: tuple[tuple[str, int], ...]
     enemy_types_end: tuple[tuple[str, int], ...]
+    enemy_peak: tuple[tuple[str, int], ...]
     income_end: int
     players_start: int
     players_end: int
@@ -286,6 +296,7 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"units lost to  {_format_composition(report['units_lost_to'])}",
         f"works lost to  {_format_composition(report['buildings_lost_to'])}",
         f"enemy fields   {_format_composition(report['enemy_types_end'])}",
+        f"enemy peak     {_format_composition(report['enemy_peak'])}",
         f"income         {report['income_end']}/s",
         f"enemies seen   {report['targets_seen']} -> {report['targets_end']}"
         f" ({report['engageable_end']} engageable)",

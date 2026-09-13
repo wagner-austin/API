@@ -395,6 +395,7 @@ def _report() -> MatchReport:
         rival_worth_drawdown=700,
         workers_end=33,
         enemy_types_end=(("c_tank", 40), ("extractorT2", 3)),
+        enemy_peak=(("c_tank", 44), ("extractorT2", 3)),
         composition_end=(("c_tank", 20),),
         units_lost_to=(("c_artillery", 3),),
         buildings_lost_to=(),
