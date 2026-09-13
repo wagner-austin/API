@@ -1,0 +1,63 @@
+# The champion with the range-first target priority (prio 1): every
+# kill-group sorts its engageable targets by the LONGEST enemy reach
+# before convergence breaks ties (rw_bot.policy.firing, PRIO_RANGE), so
+# a standing group turns on the artillery behind the line before the
+# hover tanks in front of it. Measured only at Impossible (wwtac60,
+# log 2026-09-08: -508 paired samples, zero wins anywhere, every
+# tactical arm shorter) and never at Very Hard, where the loss-table anatomy of
+# pinbase48 (log 2026-09-13) names the opener as the seed on which the
+# enemy fields three to twelve c_artillery, zero on every winning seed.
+# The cheapest form of the artillery-screening capability: not a new
+# verb, the existing allele aimed at the population that has the gun.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-prange
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 1
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

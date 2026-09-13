@@ -1,0 +1,35 @@
+# The target-priority alleles at Very Hard for the first time (log
+# 2026-09-13). The loss-table anatomy of pinbase48 refuted the
+# first-minute reading of the opener: every seed's first 36,000 frames
+# are byte-identical to every other's, first_2x_deficit is structural
+# (the 1.8x subsidy crosses 2x at sample ~80 on all 48), and the first
+# unit dies at frames 58k-75k on winner and opener alike. What the
+# table separates on is the enemy's build: three to twelve c_artillery
+# and five to sixteen scouts on every opener seed, zero artillery on
+# every winning seed, and the enemy's income compounding past 76 by
+# sample 1500 while ours stalls -- the army stalls at 11-13 pieces
+# because it trades into the long guns. The alleles were measured only
+# at Impossible (wwtac60, log 2026-09-08, zero wins in any arm); here they face
+# the nine opener seeds where the gun they aim at actually stands.
+# Controls: pinbase48 (the champion's own cards on these seeds under
+# certified determinism). A flip is an opener seed reading WON; the
+# alleles change every engagement so identity is not on offer, and a
+# flipping allele goes to the 96-seed bar next.
+prange|8913313|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8913313|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8913833|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8913833|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8914041|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8914041|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8914977|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8914977|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8915185|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8915185|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8916121|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8916121|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8916641|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8916641|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8917473|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8917473|doctrines/evolve1-g4m2-pfrail.doctrine|10000
+prange|8917681|doctrines/evolve1-g4m2-prange.doctrine|10000
+pfrail|8917681|doctrines/evolve1-g4m2-pfrail.doctrine|10000
