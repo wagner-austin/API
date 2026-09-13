@@ -179,6 +179,53 @@ the field fight against an army the enemy's opening rolled larger, and
 the doctrine vocabulary has no arm that wins that fight more often than
 the champion's own.
 
+## The losses at the event level: the same fights, the same raids, a bigger army
+
+Two more readers over the 96 champion traces, after the turtle closed,
+asked whether anything in HOW a loss is played differs from a win.
+Army deaths in the deciding window, grouped into engagements by time
+gap and distance:[^14]
+
+| | wins (69) | losses (27) |
+|---|---|---|
+| engagements per game | 24.4 | 25.8 |
+| army deaths per game | 46.1 | 49.8 |
+| mean deaths per engagement | 1.89 | 1.93 |
+| share of deaths in engagements of four or more | 0.36 | 0.39 |
+| fraction of the standing army lost per engagement | 0.11 | 0.12 |
+| rival army / our worth when the engagement begins | 0.36 | 0.52 |
+
+The losses fight the same number of engagements, of the same size,
+losing the same fraction of the army each time; the only column that
+moves is the ratio. There is no bad-odds engagement a per-sample
+engage decision could refuse -- the field fight is lost globally, not
+locally.
+
+Our own income falls behind by sample 1,500 in the losses (57 against
+62), and the extractor reader names the mechanism: between samples
+1,000 and 1,500 the losses lose 1.30 extractors per game against 0.68,
+a full 1.00 of them on our own side of the map, killed by the AI's
+tank-and-scout raiders at 0.78 per game against 0.32. The extra 0.6
+dead extractors are the five credits per second. The interception
+answers those raids -- 222 intercept orders per thousand samples in
+the losses against 84 in the wins -- and loses the extractors anyway,
+so the responders exist and lose the race or the fight against raiders
+drawn from an army half again larger.[^15] The expansion rate halves
+(4.1 per thousand samples against 9.5) because the pools stay occupied
+and the workers are the same.
+
+Every level of the corpus now says one thing: a Very Hard loss is the
+rival's larger army at sample 1,500, and every downstream difference
+(income, extractor drops, interceptions, engagement ratio) follows from
+it. What the traces cannot yet say is whether the rival's army is
+larger because it BUILT more or because we KILLED less of it -- our
+deaths are recorded per event, the rival's only as a card total -- and
+that is the question that separates an economy lane from a tactical
+one.
+
+[^14]: `bursts96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/traces/divebar192/champ-*.ndjson`: army deaths in frames 75,000-190,000 grouped with a 900-frame gap and a 400-unit radius; the ratio is `rival_army / worth` at the sample before each burst. Burst size histogram, wins: 1102 singles, 289 pairs, 124 triples, 171 of four or more; losses: 494, 102, 39, 62.
+[^15]: `extract96.py` over the same traces (extractor deaths by window, side and killer; extractors and workers columns at samples 750-2,000) and the `intercepted`, `expansions`, `samples seen` lines of the 96 champion cards in `runs/sweeps/divebar192`. Extractors at 1,000 / 1,500: wins 5.68 / 5.04, losses 5.56 / 4.37; workers 7.70 / 5.84 against 7.56 / 6.11.
+
 ## The response built from the reading: the turtle
 
 The press was the first arm cut from this reading and it read the wrong
