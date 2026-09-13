@@ -18,7 +18,7 @@ one call and no claim.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
@@ -201,6 +201,7 @@ def _draft_dive(
     targets: tuple[Entity, ...],
     waves: WaveController,
     divers: Diver,
+    deaths_to: Callable[[Collection[str]], int],
 ) -> tuple[Entity, ...]:
     """Advance the dive and return the units the waves may still command.
 
@@ -220,7 +221,7 @@ def _draft_dive(
     """
     gate = waves.opening_need() if divers.cap else waves.need()
     spare = len(army) >= gate + divers.size
-    for order in divers.dive(sample, army, targets, catalogue, profiles, spare):
+    for order in divers.dive(sample, army, targets, catalogue, profiles, spare, deaths_to):
         channel.send_attack_move(order)
     drafted = divers.party()
     return tuple(u for u in army if u["unit_id"] not in drafted)
@@ -415,6 +416,7 @@ def fight(
     pressed: bool,
     hunt_held: bool,
     pending_events: set[str],
+    deaths_to: Callable[[Collection[str]], int],
 ) -> None:
     """Run one tick's combat dispatch, noting each decision as it happens.
 
@@ -455,6 +457,8 @@ def fight(
             the close, and touches nothing the close funds.
         hunt_held: Whether the head holds the hunt party home this tick.
         pending_events: Decision codes accumulating toward the next row.
+        deaths_to: The campaign's death ledger, asked how many of our units
+            the dive's sighted guns have killed (Doctrine.diveblood).
     """
     fighting = army
     if waves.committed():
@@ -478,7 +482,7 @@ def fight(
     if dive:
         dives_before = divers.objectives
         fighting = _draft_dive(
-            channel, sample, catalogue, profiles, fighting, targets, waves, divers
+            channel, sample, catalogue, profiles, fighting, targets, waves, divers, deaths_to
         )
         if divers.objectives > dives_before:
             pending_events.add("D")

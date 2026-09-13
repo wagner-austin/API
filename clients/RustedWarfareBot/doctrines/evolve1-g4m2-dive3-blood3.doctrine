@@ -1,0 +1,70 @@
+# The champion with the dive armed and blood-gated (dive 3, divecap 16,
+# diveblood 3): a party of the three fastest gathered units closes on
+# the nearest visible ground mover that outranges every land gun the
+# army fields, drafted against the OPENING rung so it dives in time --
+# but the first party is not raised until THREE of our units have died
+# to the outranging guns sighted so far. The fourth reading of the
+# draft brake (log 2026-09-13): the opening rung's early dive costs the
+# champion's win on seeds where the line beats the battery unaided
+# (dive16 and divecap13, three regressions each at any party budget),
+# and the champion's own loss table separates those seeds from the
+# openers by when the third unit dies to a gun -- before frame 110k on
+# three of nine openers (two of them the dive's flips), on none of the
+# four touched winners and one of thirty-five winners. The cap of
+# sixteen selects the opening rung and stays above every flip's cost.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-dive3-blood3
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 0
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 3
+divemargin 0
+divecap 16
+diveblood 3
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

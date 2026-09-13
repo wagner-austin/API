@@ -1,0 +1,29 @@
+# The blood-gated dive (log 2026-09-13): dive 3, divecap 16, diveblood 3
+# -- the opening rung's timing with the first party held until three of
+# our units have died to the outranging guns sighted -- on the same
+# thirteen members as divecap13: the nine Very Hard openers and the four
+# champion wins the early dive touched. divecap13 read the same three
+# flips and the same three regressions at a third of the parties, so
+# the party budget was never the mechanism: the early dive itself costs
+# a seed the line was already winning. The champion's own loss table
+# separates those seeds by when the third unit dies to a gun (before
+# frame 110k on s8914041, s8916121, s8917681; at 126,600, 184,875 and
+# 171,375 on s8913729, s8915497, s8917889; s8916641's third at 154,050).
+# Bar: the three churn seeds WON and the flips that fire in time
+# (s8914041, s8916121 at least) still flipped -- flips for no
+# regression sends this arm to the 96-seed bar beside or instead of the
+# rung arm now running there. Controls: pinbase48, dive16, dive16c,
+# divecap13, under certified determinism.
+blood|8913313|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8913833|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8914041|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8914977|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8915185|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8916121|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8916641|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8917473|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8917681|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8913001|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8913729|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8915497|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000
+blood|8917889|doctrines/evolve1-g4m2-dive3-blood3.doctrine|10000

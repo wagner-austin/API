@@ -129,6 +129,7 @@ def play(
     dive: int = 0,
     divemargin: int = 0,
     divecap: int = 0,
+    diveblood: int = 0,
     worker_wait: int = 0,
     groupcap: int = MAX_OPEN_GROUPS,
     prio: int = PRIO_CONVERGENCE,
@@ -192,7 +193,7 @@ def play(
             ``creep``, ``hold``, ``tech``, ``lurk``, ``decoys``, ``kite``,
             ``hp_floor``, ``allin``, ``strike``, ``medics``, ``navy``,
             ``battery``, ``bunkers``, ``flame``, ``close``, ``guns``,
-            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``divecap``,
+            ``nukes``, ``rebuild``, ``hunt``, ``dive``, ``divemargin``, ``divecap``, ``diveblood``,
             ``worker_wait``, ``groupcap``, ``prio``, ``spacing``, ``retreat``, ``siege``,
             ``siegedose``, ``raze``, ``outranged``, ``press``, ``bank``, ``income_ladder``.
             Each is documented ONCE, on
@@ -270,7 +271,7 @@ def play(
     presser = Press(press)
     raiders = Raider(size=raid) if raid else Raider()
     hunters = Hunter(size=hunt) if hunt else Hunter()
-    divers = Diver(size=dive, margin=divemargin, cap=divecap) if dive else Diver()
+    divers = Diver(dive, margin=divemargin, cap=divecap, blood=diveblood) if dive else Diver()
     rusher = Rusher()
     creeper = Creeper()
     nuker = Nuker()
@@ -314,17 +315,15 @@ def play(
             momentum.observe(sample)
             razed_pools.observe(sample)
             airwatch.observe(sample)
-            # The closer ends a decided match while decided; top of tick
-            # because the finisher funds from the commitment itself.
+            # The closer ends a decided match; top of tick, the finisher funds from it.
             committed_close = closer.observe(sample)
             scores.observe(sample, army, targets, workforce.size(sample))
             # The press reads AFTER scores: this tick's worth pair.
             pressed = presser.observe(scores.samples_seen, scores.worth_end, scores.rival_worth_end)
             completed = tracker.completed(sample)
 
-            # Read unconditionally: movement is what tells the plan and the
-            # economy an order is still being carried out, so every worker is
-            # sampled even on observations that never reach a decision.
+            # Read unconditionally: movement tells the plan and the economy an order
+            # is still being carried out, so every worker is sampled on every tick.
             free = workforce.free(sample)
 
             # Braced, the reserve floor is zero: razing predicted, credits
@@ -566,6 +565,7 @@ def play(
                 pressed=pressed,
                 hunt_held=sentries.razing_near,
                 pending_events=pending_events,
+                deaths_to=scores.deaths_to,
             )
         finally:
             channel.send_ack()

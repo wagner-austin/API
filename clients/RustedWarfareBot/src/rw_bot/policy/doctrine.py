@@ -95,6 +95,7 @@ INT_FIELDS: Final = (
     "dive",
     "divemargin",
     "divecap",
+    "diveblood",
 )
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
@@ -339,32 +340,30 @@ class Doctrine(TypedDict):
             ([[impossible-step-three-design]]); every arm measured
             before 2026-09-04 played with this off.
         hunt: The hunt party's size, zero for off. A standing party that
-            presses the nearest visible enemy MOVER -- and pushes at the
-            nearest remembered structure when nothing moves in sight --
-            so the enemy's groups are bled while they form: the shipped
-            AI commits a staging group early at whatever size it holds
-            when any member is damaged, a rule read from source and
-            watched live at Impossible ([[engine-ai-triggers]]). The
-            first verb aimed at the wave LADDER rather than the wave;
-            party discipline is the raid's, extracted shared
-            ([[policy-raid]]).
+            presses the nearest visible enemy MOVER, pushing at the nearest
+            remembered structure when nothing moves in sight, so the
+            enemy's groups are bled while they form: the shipped AI commits
+            a staging group early at whatever size it holds when any member
+            is damaged ([[engine-ai-triggers]]). The first verb aimed at the
+            wave LADDER; party discipline is the raid's ([[policy-raid]]).
         dive: The dive party's size, zero for off. A party of the FASTEST
             gathered units closes on the visible enemy ground mover whose
             land gun outranges every land gun the army fields (the
-            outranged clause's membership test, lifted), so the battery
-            behind the screen is touched instead of traded into -- the
-            army stalls against those guns on every Very Hard opener
-            (logs 2026-09-12/13). No memory fallback: with no such gun in
+            outranged clause's test, lifted), so the battery behind the
+            screen is touched instead of traded into; with no such gun in
             sight the party stands down and none is raised ([[policy-raid]]).
         divemargin: World units a gun must reach BEYOND the army's longest
-            land gun before the dive counts it a standoff, zero for any
-            outranging gun; measured a no-op at Very Hard, where every
-            quarry was artillery at 290 (dive16b, log 2026-09-13).
-        divecap: Parties the dive may raise in one match under the
-            OPENING rung, zero for no cap with the escalating rung as the
-            brake instead: the opening rung dives in time (every flip cost
-            4-13 parties) and churns late (every regression 67-93), the
-            rung never churns and dives late (dive16/16c, log 2026-09-13).
+            land gun to count as a standoff, zero for any outranging gun;
+            a no-op at Very Hard, every quarry artillery (dive16b).
+        divecap: Parties per match under the OPENING rung, zero for no
+            cap with the escalating rung as the brake: the opening rung
+            dives in time and loses champion wins at ANY budget (dive16,
+            divecap13), the rung holds them and dives late (dive16c).
+        diveblood: Deaths to sighted outranging guns before the first
+            draft, zero for none. The champion's own loss table separates
+            the seeds the line beats unaided from the openers by when the
+            THIRD unit dies to a gun: before frame 110k on three of nine
+            openers, no touched winner, one of thirty-five winners.
         huntgate: Whether the razing head recalls the hunt. On, the loop
             scores ``models/razebrace.ndjson`` every sample and the party
             stands down -- fights its way home and rejoins the reserve --
@@ -582,6 +581,7 @@ class Doctrine(TypedDict):
     dive: int
     divemargin: int
     divecap: int
+    diveblood: int
 
 
 __all__ = [

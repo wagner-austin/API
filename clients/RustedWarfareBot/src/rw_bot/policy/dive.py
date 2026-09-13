@@ -34,7 +34,7 @@ campaign sends them.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
@@ -110,9 +110,22 @@ class Diver(Detachment):
             the brake; without one the escalating rung brakes instead
             (:func:`~rw_bot.policy.dispatching.fight`).
         drafts: Parties raised so far.
+        blood: Deaths to outranging guns before the first draft, zero for
+            none. The fourth reading (log 2026-09-13): the opening rung's
+            early dive costs the champion's win on seeds where the line
+            beats the battery unaided, and the champion's own loss table
+            separates those seeds from the openers by when the THIRD unit
+            dies to a gun -- before frame 110k on three of nine openers,
+            on none of the four touched winners and one of thirty-five
+            winners. The gate reads the campaign's death ledger against
+            the gun types this diver has seen.
+        seen: Type names of every outranging gun sighted so far, the
+            killers the blood gate counts deaths to.
     """
 
-    def __init__(self, size: int = FIRST_WAVE, margin: float = 0.0, cap: int = 0) -> None:
+    def __init__(
+        self, size: int = FIRST_WAVE, margin: float = 0.0, cap: int = 0, blood: int = 0
+    ) -> None:
         """Open a diver.
 
         Args:
@@ -120,11 +133,15 @@ class Diver(Detachment):
             margin: The standoff margin, zero for any outranging gun.
             cap: Parties per match under the opening rung, zero for the
                 escalating rung with no cap (Doctrine.divecap).
+            blood: Deaths to sighted guns before the first draft, zero for
+                no gate (Doctrine.diveblood).
         """
         super().__init__(size)
         self.margin = margin
         self.cap = cap
+        self.blood = blood
         self.drafts = 0
+        self.seen: set[str] = set()
 
     def dive(
         self,
@@ -134,6 +151,7 @@ class Diver(Detachment):
         catalogue: Mapping[str, UnitStats],
         profiles: Mapping[str, CombatProfile],
         may_draft: bool,
+        deaths_to: Callable[[Collection[str]], int],
     ) -> tuple[AttackMoveOrder, ...]:
         """Advance the dive by at most one objective's worth of orders.
 
@@ -153,6 +171,8 @@ class Diver(Detachment):
             profiles: Combat profiles by type name, for the reach test.
             may_draft: Whether the campaign judges the army able to spare
                 a fresh party. A party already out is managed regardless.
+            deaths_to: The campaign's death ledger, asked how many of our
+                units the sighted guns have killed -- the blood gate's read.
 
         Returns:
             The attack-move orders to send, empty while the party is
@@ -169,6 +189,13 @@ class Diver(Detachment):
             # Nothing outranges the line: a standing party is a diversion
             # with no objective, so it goes home and rejoins the reserve.
             return self.disband(survivors, anchor)
+        self.seen.update(gun["type_name"] for gun in guns)
+        if not survivors and deaths_to(self.seen) < self.blood:
+            # The line has not bled to these guns yet: it is still winning
+            # the fight unaided, and pulling its fastest pieces out now is
+            # what cost the champion's wins (divecap13, log 2026-09-13).
+            self.muster(())
+            return ()
         if survivors:
             members = [unit for unit in army if unit["unit_id"] in self.party()]
             centre_x, centre_y = centroid(members)

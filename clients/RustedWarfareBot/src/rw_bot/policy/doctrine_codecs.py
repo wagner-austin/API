@@ -67,6 +67,7 @@ _BAD_OUTRANGED_BLOOD = "RW-DOCTRINE-042"
 _BAD_DIVE_SIZE = "RW-DOCTRINE-043"
 _BAD_DIVE_MARGIN = "RW-DOCTRINE-044"
 _BAD_DIVE_CAP = "RW-DOCTRINE-045"
+_BAD_DIVE_BLOOD = "RW-DOCTRINE-046"
 
 
 def _count(
@@ -306,6 +307,9 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         payload, "divemargin", _BAD_DIVE_MARGIN, "world units beyond the line's reach, 0 any"
     )
     divecap = _count(payload, "divecap", _BAD_DIVE_CAP, "dive parties per match, 0 uncapped")
+    diveblood = _count(
+        payload, "diveblood", _BAD_DIVE_BLOOD, "deaths to sighted guns before the first dive, 0 off"
+    )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
@@ -385,6 +389,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         dive=dive,
         divemargin=divemargin,
         divecap=divecap,
+        diveblood=diveblood,
     )
 
 
@@ -454,6 +459,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "dive": doctrine["dive"],
         "divemargin": doctrine["divemargin"],
         "divecap": doctrine["divecap"],
+        "diveblood": doctrine["diveblood"],
     }
 
 

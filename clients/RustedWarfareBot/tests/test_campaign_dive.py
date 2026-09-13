@@ -47,24 +47,51 @@ def _play(
     trace: Path | None = None,
     divemargin: int = 0,
     divecap: int = 0,
+    diveblood: int = 0,
+    *worlds: Sample,
 ) -> tuple[ScriptedPeer, int]:
-    """Play the world twice: the dive orders on the first observation and
-    its decision code lands in the row the second one writes, because the
-    fight runs after the row is cut ([[policy-loop]])."""
-    peer = ScriptedPeer(lines(world, world))
+    """Play the world twice (or the given sequence): the dive orders on
+    the first observation and its decision code lands in the row the
+    second one writes, because the fight runs after the row is cut
+    ([[policy-loop]])."""
+    played = (world, *worlds) if worlds else (world, world)
+    peer = ScriptedPeer(lines(*played))
     report = play(
         AgentChannel(peer),
         (),
         DIVE_CATALOGUE,
         PLACEMENTS,
         DIVE_PROFILES,
-        2,
+        len(played),
         dive=dive,
         divemargin=divemargin,
         divecap=divecap,
+        diveblood=diveblood,
         trace=trace,
     )
     return peer, report["dives"]
+
+
+def test_the_blood_gate_waits_for_a_death_to_the_sighted_gun() -> None:
+    """The gun stands from the first observation and the line has the
+    leave, but no party goes until a unit has died to it: the sixth tank
+    is last damaged by the gun on the first observation and gone on the
+    second, so the ledger reads one death and the dive fires there, with
+    a party drawn from the five that remain."""
+    gun = enemy(9, "enemy_arty", x=400.0)
+    doomed = entity(6, "c_tank", damaged_by="enemy_arty")
+    before = sample(CENTRE, *ARMY, doomed, gun)
+    after = sample(CENTRE, *ARMY, gun)
+    peer, dives = _play(before, 2, None, 0, 1, 1, after, after)
+    marched = [line for line in peer.sent if "attack_move" in line]
+    assert marched == [
+        '{"kind":"attack_move","unit_id":1,"x":400.0,"y":0.0}',
+        '{"kind":"attack_move","unit_id":2,"x":400.0,"y":0.0}',
+    ]
+    assert dives == 1
+    held, none = _play(before, 2, None, 0, 1, 2, after, after)
+    assert [line for line in held.sent if "attack_move" in line] == []
+    assert none == 0
 
 
 def test_a_capped_dive_drafts_against_the_opening_rung() -> None:

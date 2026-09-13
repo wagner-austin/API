@@ -13,11 +13,18 @@ none is raised -- the identity property on a zero-artillery seed
 
 from __future__ import annotations
 
+from collections.abc import Collection
+
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.policy.dive import Diver, outranging_guns
 from rw_bot.wire.state import Entity, Sample
 from tests.wire_fixtures import enemy, entity, profile, sample
+
+
+def _unbloodied(killers: Collection[str]) -> int:
+    """A death ledger on which no sighted gun has killed anything."""
+    return 0
 
 
 def _stats(type_name: str, speed: float) -> UnitStats:
@@ -107,7 +114,7 @@ def test_the_nearest_gun_is_closed_on_by_the_fastest_party() -> None:
     diver = Diver(size=2)
     army = (_tank(20), _tank(21), _tank(22), _hover(31), _hover(30))
     targets = (_gun(9, 900.0), _gun(8, 400.0))
-    orders = diver.dive(_world(*army), army, targets, _CATALOGUE, _PROFILES, True)
+    orders = diver.dive(_world(*army), army, targets, _CATALOGUE, _PROFILES, True, _unbloodied)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(30, 400.0), (31, 400.0)]
     assert diver.party() == frozenset({30, 31})
     assert diver.objectives == 1
@@ -119,7 +126,7 @@ def test_no_gun_in_sight_raises_no_party() -> None:
     diver = Diver(size=2)
     army = (_hover(30), _hover(31))
     targets = (enemy(9, "c_tank", x=400.0),)
-    assert diver.dive(_world(*army), army, targets, _CATALOGUE, _PROFILES, True) == ()
+    assert diver.dive(_world(*army), army, targets, _CATALOGUE, _PROFILES, True, _unbloodied) == ()
     assert diver.party() == frozenset()
     assert diver.objectives == 0
 
@@ -127,7 +134,8 @@ def test_no_gun_in_sight_raises_no_party() -> None:
 def test_no_anchor_is_no_dive() -> None:
     diver = Diver(size=2)
     army = (_hover(30), _hover(31))
-    assert diver.dive(sample(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True) == ()
+    gun = (_gun(9, 400.0),)
+    assert diver.dive(sample(*army), army, gun, _CATALOGUE, _PROFILES, True, _unbloodied) == ()
 
 
 def test_orders_are_not_resent_while_the_objective_holds() -> None:
@@ -135,27 +143,24 @@ def test_orders_are_not_resent_while_the_objective_holds() -> None:
     army = (_hover(30), _hover(31))
     world = _world(*army)
     targets = (_gun(9, 400.0),)
-    diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True)
-    assert diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True) == ()
+    diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True, _unbloodied)
+    assert diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True, _unbloodied) == ()
     assert diver.marches == 2
 
 
 def test_a_nearer_gun_retargets_the_party_measured_from_the_party() -> None:
     diver = Diver(size=2)
     home = (_hover(30), _hover(31))
-    diver.dive(_world(*home), home, (_gun(9, 1050.0),), _CATALOGUE, _PROFILES, True)
+    diver.dive(_world(*home), home, (_gun(9, 1050.0),), _CATALOGUE, _PROFILES, True, _unbloodied)
     # Walked deep: 1050 is 50 from the party and 200 is 800 away, so the
     # objective holds and nothing re-sends.
     away = (_hover(30, x=1000.0), _hover(31, x=1000.0))
-    held = diver.dive(
-        _world(*away), away, (_gun(9, 1050.0), _gun(7, 200.0)), _CATALOGUE, _PROFILES, True
-    )
+    pair = (_gun(9, 1050.0), _gun(7, 200.0))
+    held = diver.dive(_world(*away), away, pair, _CATALOGUE, _PROFILES, True, _unbloodied)
     assert held == ()
     assert diver.objectives == 1
     # Back home, the gun at 200 is the nearer one and the party turns.
-    turned = diver.dive(
-        _world(*home), home, (_gun(9, 1050.0), _gun(7, 200.0)), _CATALOGUE, _PROFILES, True
-    )
+    turned = diver.dive(_world(*home), home, pair, _CATALOGUE, _PROFILES, True, _unbloodied)
     assert [(o["unit_id"], o["x"]) for o in turned] == [(30, 200.0), (31, 200.0)]
     assert diver.objectives == 2
 
@@ -165,9 +170,10 @@ def test_survivors_below_strength_disband_and_fight_home() -> None:
     army = (_hover(30), _hover(31))
     world = _world(*army)
     targets = (_gun(9, 400.0),)
-    diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True)
+    diver.dive(world, army, targets, _CATALOGUE, _PROFILES, True, _unbloodied)
     reduced = (_hover(31),)
-    orders = diver.dive(_world(*reduced), reduced, targets, _CATALOGUE, _PROFILES, True)
+    world = _world(*reduced)
+    orders = diver.dive(world, reduced, targets, _CATALOGUE, _PROFILES, True, _unbloodied)
     assert [(o["unit_id"], o["x"], o["y"]) for o in orders] == [(31, 0.0, 0.0)]
     assert diver.party() == frozenset()
 
@@ -177,12 +183,12 @@ def test_a_standing_party_stands_down_when_the_gun_is_gone() -> None:
     diver = Diver(size=2)
     army = (_hover(30), _hover(31))
     world = _world(*army)
-    diver.dive(world, army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True)
-    orders = diver.dive(world, army, (), _CATALOGUE, _PROFILES, True)
+    diver.dive(world, army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True, _unbloodied)
+    orders = diver.dive(world, army, (), _CATALOGUE, _PROFILES, True, _unbloodied)
     assert [(o["unit_id"], o["x"], o["y"]) for o in orders] == [(30, 0.0, 0.0), (31, 0.0, 0.0)]
     assert diver.party() == frozenset()
     # The gun returns: a fresh party, a fresh objective.
-    again = diver.dive(world, army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True)
+    again = diver.dive(world, army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True, _unbloodied)
     assert len(again) == 2
     assert diver.objectives == 2
 
@@ -190,16 +196,18 @@ def test_a_standing_party_stands_down_when_the_gun_is_gone() -> None:
 def test_a_party_that_died_whole_leaves_no_ghosts() -> None:
     diver = Diver(size=2)
     army = (_hover(30), _hover(31))
-    diver.dive(_world(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True)
+    diver.dive(_world(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True, _unbloodied)
     rest = (_tank(20),)
-    assert diver.dive(_world(*rest), rest, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, False) == ()
+    gun = (_gun(9, 400.0),)
+    assert diver.dive(_world(*rest), rest, gun, _CATALOGUE, _PROFILES, False, _unbloodied) == ()
     assert diver.party() == frozenset()
 
 
 def test_no_draft_without_the_campaigns_leave() -> None:
     diver = Diver(size=2)
     army = (_hover(30), _hover(31))
-    assert diver.dive(_world(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, False) == ()
+    gun = (_gun(9, 400.0),)
+    assert diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, False, _unbloodied) == ()
     assert diver.party() == frozenset()
 
 
@@ -233,9 +241,10 @@ def test_the_diver_dives_by_its_own_margin() -> None:
     profiles = {**_PROFILES, "sniper": profile("sniper", 190.0)}
     diver = Diver(size=2, margin=100.0)
     sniper = (enemy(8, "sniper", x=300.0),)
-    assert diver.dive(_world(*army), army, sniper, catalogue, profiles, True) == ()
+    assert diver.dive(_world(*army), army, sniper, catalogue, profiles, True, _unbloodied) == ()
     assert diver.party() == frozenset()
-    orders = diver.dive(_world(*army), army, (*sniper, _gun(9, 900.0)), catalogue, profiles, True)
+    both = (*sniper, _gun(9, 900.0))
+    orders = diver.dive(_world(*army), army, both, catalogue, profiles, True, _unbloodied)
     assert [(o["unit_id"], o["x"]) for o in orders] == [(30, 900.0), (31, 900.0)]
 
 
@@ -247,15 +256,15 @@ def test_the_cap_bounds_the_parties_raised_in_one_match() -> None:
     army = (_hover(30),)
     world = _world(*army)
     gun = (_gun(9, 400.0),)
-    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True)) == 1
+    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True, _unbloodied)) == 1
     assert diver.drafts == 1
     # The party dies whole; a second party is raised.
-    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
-    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True)) == 1
+    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True, _unbloodied)
+    assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True, _unbloodied)) == 1
     assert diver.drafts == 2
     # It dies too; the cap holds the third.
-    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
-    assert diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True) == ()
+    diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True, _unbloodied)
+    assert diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True, _unbloodied) == ()
     assert diver.party() == frozenset()
     assert diver.drafts == 2
 
@@ -264,9 +273,10 @@ def test_an_uncapped_diver_re_drafts_without_limit() -> None:
     diver = Diver(size=1)
     army = (_hover(30),)
     gun = (_gun(9, 400.0),)
+    world = _world(*army)
     for _ in range(3):
-        assert len(diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True)) == 1
-        diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True)
+        assert len(diver.dive(world, army, gun, _CATALOGUE, _PROFILES, True, _unbloodied)) == 1
+        diver.dive(_world(), (), gun, _CATALOGUE, _PROFILES, True, _unbloodied)
     assert diver.drafts == 3
 
 
@@ -275,5 +285,64 @@ def test_a_refused_draft_counts_no_party() -> None:
     and nothing is counted against the cap."""
     diver = Diver(size=2, cap=1)
     army = (_hover(30),)
-    assert diver.dive(_world(*army), army, (_gun(9, 400.0),), _CATALOGUE, _PROFILES, True) == ()
+    gun = (_gun(9, 400.0),)
+    assert diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True, _unbloodied) == ()
     assert diver.drafts == 0
+
+
+class _Ledger:
+    """A death ledger that answers with one figure and records what it was asked."""
+
+    def __init__(self, deaths: int) -> None:
+        self.deaths = deaths
+        self.asked: list[frozenset[str]] = []
+
+    def __call__(self, killers: Collection[str]) -> int:
+        self.asked.append(frozenset(killers))
+        return self.deaths
+
+
+def test_the_blood_gate_holds_the_first_draft_until_the_guns_have_killed() -> None:
+    """divecap13's lesson: on a seed the line beats the battery unaided the
+    early dive costs the win. Three deaths to sighted guns is the reading
+    that separates those seeds from the openers, so below it no party is
+    raised although the gun stands and the army has the leave."""
+    army = (_hover(30), _hover(31))
+    gun = (_gun(9, 400.0),)
+    unbled = _Ledger(2)
+    diver = Diver(size=2, blood=3)
+    assert diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True, unbled) == ()
+    assert diver.party() == frozenset()
+    assert diver.seen == {"c_artillery"}
+    assert unbled.asked == [frozenset({"c_artillery"})]
+    bled = _Ledger(3)
+    orders = diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True, bled)
+    assert [(o["unit_id"], o["x"]) for o in orders] == [(30, 400.0), (31, 400.0)]
+
+
+def test_the_blood_gate_counts_every_gun_type_ever_sighted() -> None:
+    """A mech artillery seen once stays in the ledger's question after it
+    leaves sight, so its kills keep counting."""
+    army = (_hover(30), _hover(31))
+    ledger = _Ledger(0)
+    diver = Diver(size=2, blood=1)
+    both = (_gun(9, 400.0), enemy(8, "mechArtillery", x=500.0))
+    catalogue = {**_CATALOGUE, "mechArtillery": _stats("mechArtillery", 0.7)}
+    profiles = {**_PROFILES, "mechArtillery": profile("mechArtillery", 290.0)}
+    diver.dive(_world(*army), army, both, catalogue, profiles, True, ledger)
+    diver.dive(_world(*army), army, (_gun(9, 400.0),), catalogue, profiles, True, ledger)
+    assert diver.seen == {"c_artillery", "mechArtillery"}
+    assert ledger.asked[-1] == frozenset({"c_artillery", "mechArtillery"})
+
+
+def test_a_standing_party_is_not_recalled_by_the_gate() -> None:
+    """The gate is on the FIRST draft: a party already out keeps its
+    objective whatever the ledger says, because recalling it would leave
+    the gun it closed on untouched."""
+    army = (_hover(30), _hover(31))
+    gun = (_gun(9, 400.0),)
+    diver = Diver(size=2, blood=3)
+    diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True, _Ledger(3))
+    assert diver.party() == frozenset({30, 31})
+    assert diver.dive(_world(*army), army, gun, _CATALOGUE, _PROFILES, True, _Ledger(0)) == ()
+    assert diver.party() == frozenset({30, 31})
