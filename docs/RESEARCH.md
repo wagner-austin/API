@@ -131,6 +131,58 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   machine, which is the whole reason prose must not carry one. Ask
   `hpc3-trace`, or read `tools/hpc3/runs/ledger.jsonl`.
 
+#### the determinism campaign, which this entry did not describe
+
+<!-- reviewed: tools/hpc3/artifacts/gemm-*/*.json = 58 -->
+<!-- reviewed: tools/hpc3/artifacts/train-*/*.json = 30 -->
+<!-- reviewed: tools/hpc3/artifacts/trace-*/*.json = 12 -->
+
+**Until 2026-09-13 this entry was ten sub-sections about cartridges and one
+about the extraction ablation, and the body of work that produces most of
+`mi`'s run documents appeared in it as names in the command list and a path
+glob.** Counted on this machine: 79 `gemm-*` run documents, 63 `train-*`, 18
+`trace-*`, 34 `bench-*`, 20 known-answer probes (`ka-probe-*` and `probe-*`),
+21 ladder documents, and the attention, fully-owned, lm-head, train-cost and
+sdpa probes, across images v8 through v33 on the A100, A30, L40S and V100 (the
+`train-*` glob also catches the cu128 arms, which are `mi-cu128`'s and already
+covered there); and under `tools/hpc3/artifacts/`
+22 directories of records, gemm-v25 through v30, train-v29 and v30, trace-v24
+and v26, ka-probe-v20/22/23, ladder-v21, lmhead-v20/21, traincost-v20.
+
+- **What it measures.** Whether the same computation on two cards produces
+  the same bytes, at which layer it stops doing so, and what recovers it: the
+  vendor GEMM against owned, ordered, rank-1 and fp64 arms; `train_step` under
+  each; per-tensor digests at every module boundary through a forward pass;
+  known answers registered so a re-run checks rather than records; the split-K
+  cost benches that price the recovery. It is the work `mi-cu128` extended to
+  the Blackwell card, and the reason that entry could state its verdicts as
+  "within-stack" and "cross-stack" at all.
+- **Where the narrative is, and why it is not here.** The personal wiki's
+  `numerical-reproducibility` hub: `a-loss-agrees-where-the-computation-does-not`,
+  `cross-gpu-agreement-is-recoverable-by-disabling-split-k`,
+  `cross-gpu-agreement-is-not-an-architecture-property`,
+  `same-seed-gpt2-runs-diverge-without-determinism` and their siblings. Those
+  are `study_type: original-measurement` pages with `sources: []`, which is
+  correct for a measurement one took oneself and means the RECORDS are their
+  only evidence. This entry names the records and their state; it does not
+  restate the findings, for the reason stated at the top of this file.
+- **The records were the largest machine-local exposure in the index, and
+  most families had been force-added once and then not again.** On 2026-09-13,
+  30 of 34 bench documents were tracked, 10 of 79 gemm, 7 of 63 train, 6 of 18
+  trace, 5 of 13 `ka-probe`, 6 of 7 `probe`, 19 of 21 ladder, 2 of 6
+  attention, 2 of 6 fully-owned, 0 of 2 gemmlog; only train-cost, lm-head and
+  sdpa were whole, and no artifact record was tracked at all. That is the
+  pattern `.gitignore` describes for the workspace documents, reached ten
+  times over: somebody committed the first of a family by hand and the ignore
+  silently dropped every later one.
+  The wiki pages above were therefore resting on files that existed on one
+  machine and on the cluster. 163 documents and 129 records (11 MB, the trace
+  and train records carrying per-tensor digests) are negated and committed
+  now; `gemmlog-v29`'s Slurm output is not, being logs rather than records.
+- **The markers above cover the three record families the wiki pages cite
+  most.** A new gemm, train or trace record is exactly the event after which
+  this paragraph and those pages should be re-read, and the guard will say so.
+
 #### `cartridge_benchmark` — cartridge capacity and composition on a real base
 
 Added 2026-09-03. Measures a trained key-value prefix against a real

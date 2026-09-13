@@ -1,0 +1,28 @@
+{
+  "project": "mi",
+  "name": "arch-probe-rtx6000",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "RTX6000",
+    "count": 1
+  },
+  "cpus": 4,
+  "mem_gb": 16,
+  "minutes": 10,
+  "requeue": false,
+  "image": {
+    "path": "/pub/wagnera3/images/v6/abl.sif",
+    "sha256": "1112dbb11706245c5110c59f54b0da5c2dd8d6618ed84aafdc67164cbd024828",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -c 'import torch,json; print(json.dumps({\"arch_list\": torch.cuda.get_arch_list(), \"device\": torch.cuda.get_device_name(0), \"capability\": list(torch.cuda.get_device_capability(0)), \"torch\": torch.__version__}))'",
+  "artifact": null,
+  "experiment": {
+    "kind": "arch-probe",
+    "card": "RTX6000",
+    "image": "v6"
+  },
+  "resumes_from_checkpoint": false
+}

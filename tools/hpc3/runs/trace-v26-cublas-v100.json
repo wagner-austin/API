@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "trace-v26-cublas-v100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 40,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v26/abl.sif",
+    "sha256": "bcb5cef65318db9302a8da0e4a51313b753e699b0f6d6c0b64edee545e449002",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.probe_trace --device cuda --out /pub/wagnera3/trace/v26/v100-cublas.json --controls both --kernel cublas",
+  "artifact": "/pub/wagnera3/trace/v26/v100-cublas.json",
+  "experiment": {
+    "kind": "forward-trace-kernel-arm",
+    "card": "V100",
+    "image": "v26",
+    "controls": "both",
+    "kernel": "cublas"
+  },
+  "resumes_from_checkpoint": false
+}

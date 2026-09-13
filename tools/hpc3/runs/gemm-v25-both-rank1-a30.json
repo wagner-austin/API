@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "gemm-v25-both-rank1-a30",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 20,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v25/abl.sif",
+    "sha256": "21de32591f549e71c905fb48e070cb60efcd70443966db10e3426ddbb29ac37e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v25/a30-both-rank1.json --controls both --kernel rank1",
+  "artifact": "/pub/wagnera3/gemm/v25/a30-both-rank1.json",
+  "experiment": {
+    "kind": "gemm-kernel-arm",
+    "card": "A30",
+    "image": "v25",
+    "controls": "both",
+    "kernel": "rank1"
+  },
+  "resumes_from_checkpoint": false
+}

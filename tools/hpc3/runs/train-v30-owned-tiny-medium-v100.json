@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "train-v30-owned-tiny-medium-v100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "V100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v30/abl.sif",
+    "sha256": "d4267e7732508d8c1dbd3f4c618c847cb8465741a9c363a2f955b0e11575d0e5",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.train_step_probe --device cuda --rungs tiny,medium --controls both --kernel owned --out /pub/wagnera3/train/v30/v100-owned-tiny-medium.json",
+  "artifact": "/pub/wagnera3/train/v30/v100-owned-tiny-medium.json",
+  "experiment": {
+    "kind": "train-step-arm",
+    "card": "V100",
+    "image": "v30",
+    "controls": "both",
+    "kernel": "owned",
+    "rungs": "tiny,medium"
+  },
+  "resumes_from_checkpoint": false
+}

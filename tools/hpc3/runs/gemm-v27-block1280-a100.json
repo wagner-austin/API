@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "gemm-v27-block1280-a100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 20,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v27/abl.sif",
+    "sha256": "e6d9865298cdbf29839238115fe59365e64065111ce4c1d22da64701a105581e",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v27/a100-block1280.json --controls both --kernel block1280",
+  "artifact": "/pub/wagnera3/gemm/v27/a100-block1280.json",
+  "experiment": {
+    "kind": "gemm-kernel-arm",
+    "card": "A100",
+    "image": "v27",
+    "controls": "both",
+    "kernel": "block1280"
+  },
+  "resumes_from_checkpoint": false
+}

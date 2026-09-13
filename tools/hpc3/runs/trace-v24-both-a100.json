@@ -1,0 +1,29 @@
+{
+  "project": "mi",
+  "name": "trace-v24-both-a100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 20,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v24/abl.sif",
+    "sha256": "2855d0903d58ef178a0ac6b04233e7a1c958e1bfff995a4461b8af032f0db72d",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.probe_trace --device cuda --out /pub/wagnera3/trace/v24/a100-both.json --controls both",
+  "artifact": "/pub/wagnera3/trace/v24/a100-both.json",
+  "experiment": {
+    "kind": "forward-trace-attribution",
+    "card": "A100",
+    "image": "v24",
+    "controls": "both"
+  },
+  "resumes_from_checkpoint": false
+}

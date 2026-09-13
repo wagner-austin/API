@@ -261,24 +261,59 @@ tools/hpc3/runs/*
 # NEXT one is kept, which is the only half of this still reachable.
 !tools/hpc3/runs/tankpit-*.json
 
-# The cloze-floor RECORDS, by the same argument the four run-document blocks
-# above make, applied to the other half of the pair. A run document says what
-# to run; the record says what came back, and for this axis what came back IS
-# the claim -- `payload_digest` digests [item_id, correct] pairs, so two cards
-# agreeing on it agreed item for item and not merely on an aggregate. That
-# distinction is the whole result, and on 2026-09-12 every record carrying it
-# was machine-local.
+# The `mi` determinism campaign's run documents: gemm kernel arms, train_step
+# arms, module-boundary traces, known-answer probes, the probe ladder, the
+# split-K cost benches, attention attribution, the fully-owned score, the
+# lm-head and train-cost probes, and the sdpa probes. On 2026-09-13 these were
+# 167 documents on this machine and EVERY family was partially tracked -- 30
+# of 34 bench, 10 of 79 gemm, 7 of 63 train, 6 of 18 trace -- which is the
+# force-add-then-forget shape this file warns about, reached nine times over.
+# The `numerical-reproducibility` pages on the personal wiki are original
+# measurements with `sources: []`; these documents and the records below are
+# what they rest on, and until now none of it was in any repository.
 #
-# 92 records, 92 KB. NOT the 92 per-item outcomes files (5.7 MB) and NOT the
-# item set itself (`cloze-items-*.jsonl`, 1.2 MB) -- both are pinned by sha256
-# in the run documents and in stage-floor-cloze-items.json, which is the same
-# split, and the same reasoning, as the extraction-ablation block below.
+# One line per family rather than `!*.json`, for the reason the cartridge
+# block gives: the ignore still holds back the documents nobody has claimed.
+!tools/hpc3/runs/gemm-*.json
+!tools/hpc3/runs/gemmlog-*.json
+!tools/hpc3/runs/train-*.json
+!tools/hpc3/runs/traincost-*.json
+!tools/hpc3/runs/trace-*.json
+!tools/hpc3/runs/ka-probe-*.json
+!tools/hpc3/runs/probe-*.json
+!tools/hpc3/runs/ladder-*.json
+!tools/hpc3/runs/lmhead-*.json
+!tools/hpc3/runs/attn-*.json
+!tools/hpc3/runs/sdpa-*.json
+!tools/hpc3/runs/fullowned-*.json
+!tools/hpc3/runs/bench-*.json
+!tools/hpc3/runs/arch-probe-*.json
+
+# RESEARCH RECORDS under tools/hpc3/artifacts, and here the policy is the
+# OPPOSITE of the one for runs/, on purpose. A run document says what to run;
+# a record says what came back, and a record IS the claim -- for the floor,
+# `payload_digest` digests [item_id, correct] pairs, so two cards agreeing on it
+# agreed item for item; for a trace, the record digests every tensor crossing a
+# module boundary, which is the whole measurement. runs/ holds documents from
+# abandoned work that the ignore rightly keeps out; artifacts/ exists for
+# records and holds nothing else, so every JSON in it is evidence for a claim
+# somewhere and the negation is general rather than per family.
+#
+# First written for the floor alone on 2026-09-12 (92 records, 92 KB), widened
+# 2026-09-13 when the determinism campaign turned out to be the same exposure
+# at ten times the size: 22 directories, ~130 records, ~10 MB, the trace and
+# train records being the large ones because they carry per-tensor digests.
+#
+# NOT the per-item outcomes files and NOT logs: the floor's 93 outcomes files
+# (5.7 MB) and the item set (1.2 MB) are pinned by sha256 from the records and
+# from stage-floor-cloze-items.json, the same split as the extraction-ablation
+# block below, and gemmlog-v29's .out/.err are Slurm output, not records.
 !tools/hpc3/artifacts/
 tools/hpc3/artifacts/*
-!tools/hpc3/artifacts/floor*/
-tools/hpc3/artifacts/floor*/*
-!tools/hpc3/artifacts/floor*/*.json
-tools/hpc3/artifacts/floor*/*outcomes*.json
+!tools/hpc3/artifacts/*/
+tools/hpc3/artifacts/*/*
+!tools/hpc3/artifacts/*/*.json
+tools/hpc3/artifacts/*/*outcomes*.json
 
 # extraction-ablation SCORE RECORDS, for the reason the code-style-eval block
 # below states two days earlier and for a different project. Every accuracy in

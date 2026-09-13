@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "attn-v32-a100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "gpu_pinned_because": "per-card determinism record: the four-card fully-owned verdict needs THIS model's digests, a different card answers a different question (board task 0c028119)",
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 25,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v33/abl.sif",
+    "sha256": "5dfd78a7eb14c7691811e54e848a802f138f6b3e842fd8fb590d21f1b3e899a0",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "bash -c \"mkdir -p /tmp/cuda-stub/bin /tmp/cuda-stub/include /tmp/cuda-stub/lib && CUDA_PATH=/tmp/cuda-stub python -m ordered_kernels.cli.attn_probe --device cuda --lengths 15,16,17,20,64 --out /pub/wagnera3/attn/v32/a100-stages.json\"",
+  "artifact": "/pub/wagnera3/attn/v32/a100-stages.json",
+  "experiment": {
+    "kind": "attn-attribution",
+    "card": "A100",
+    "image": "v33",
+    "lengths": "15,16,17,20,64"
+  },
+  "resumes_from_checkpoint": false
+}

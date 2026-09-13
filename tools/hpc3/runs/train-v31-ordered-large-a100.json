@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "train-v31-ordered-large-a100",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A100",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v31/abl.sif",
+    "sha256": "c03c6619486567363b6d9deb7dbb28547498b4aee0e56251a9bd6fb98c3de016",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "bash -c \"mkdir -p /tmp/cuda-stub/bin /tmp/cuda-stub/include /tmp/cuda-stub/lib && CUDA_PATH=/tmp/cuda-stub python -m ordered_kernels.cli.train_step --device cuda --rungs large --out /pub/wagnera3/train/v31/a100-ordered-large.json\"",
+  "artifact": "/pub/wagnera3/train/v31/a100-ordered-large.json",
+  "experiment": {
+    "kind": "train-step-arm",
+    "card": "A100",
+    "image": "v31",
+    "controls": "both",
+    "kernel": "ordered",
+    "rungs": "large"
+  },
+  "resumes_from_checkpoint": false
+}

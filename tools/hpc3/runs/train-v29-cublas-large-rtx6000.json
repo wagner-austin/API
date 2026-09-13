@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "train-v29-cublas-large-rtx6000",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "RTX6000",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v29/abl.sif",
+    "sha256": "195406706fde14c3607ab8138547c8dd7cbb023fb16b8ca4bed7b14451ce5051",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.train_step_probe --device cuda --rungs large --controls both --kernel cublas --out /pub/wagnera3/train/v29/rtx6000-cublas-large.json",
+  "artifact": "/pub/wagnera3/train/v29/rtx6000-cublas-large.json",
+  "experiment": {
+    "kind": "train-step-arm",
+    "card": "RTX6000",
+    "image": "v29",
+    "controls": "both",
+    "kernel": "cublas",
+    "rungs": "large"
+  },
+  "resumes_from_checkpoint": false
+}

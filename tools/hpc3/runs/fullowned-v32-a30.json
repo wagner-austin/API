@@ -1,0 +1,31 @@
+{
+  "project": "mi",
+  "name": "fullowned-v32-a30",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "gpu_pinned_because": "per-card determinism record: the four-card fully-owned verdict needs THIS model's digests, a different card answers a different question (board task 0c028119)",
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v33/abl.sif",
+    "sha256": "5dfd78a7eb14c7691811e54e848a802f138f6b3e842fd8fb590d21f1b3e899a0",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "bash -c \"mkdir -p /tmp/cuda-stub/bin /tmp/cuda-stub/include /tmp/cuda-stub/lib && CUDA_PATH=/tmp/cuda-stub python -m ordered_kernels.cli.score --model gpt2 --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --label gpt2-full-a30-v32-fullowned --out /pub/wagnera3/floor/v32/a30-fullowned.json --outcomes /pub/wagnera3/floor/v32/a30-fullowned-outcomes.json\"",
+  "artifact": "/pub/wagnera3/floor/v32/a30-fullowned.json",
+  "experiment": {
+    "kind": "cloze-full-fully-owned",
+    "card": "A30",
+    "image": "v33",
+    "kernel": "fully-owned",
+    "items": "full-2627"
+  },
+  "resumes_from_checkpoint": false
+}

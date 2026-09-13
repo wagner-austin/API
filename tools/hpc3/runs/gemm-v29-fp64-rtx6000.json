@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "gemm-v29-fp64-rtx6000",
+  "partition": "free-gpu32",
+  "gpu": {
+    "model": "RTX6000",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 25,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v29/abl.sif",
+    "sha256": "195406706fde14c3607ab8138547c8dd7cbb023fb16b8ca4bed7b14451ce5051",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v29/rtx6000-fp64.json --controls both --kernel fp64",
+  "artifact": "/pub/wagnera3/gemm/v29/rtx6000-fp64.json",
+  "experiment": {
+    "kind": "gemm-batched-arm",
+    "card": "RTX6000",
+    "image": "v29",
+    "controls": "both",
+    "kernel": "fp64"
+  },
+  "resumes_from_checkpoint": false
+}

@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "gemm-v30-owned-a30",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 55,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v30/abl.sif",
+    "sha256": "d4267e7732508d8c1dbd3f4c618c847cb8465741a9c363a2f955b0e11575d0e5",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v30/a30-owned.json --controls both --kernel owned",
+  "artifact": "/pub/wagnera3/gemm/v30/a30-owned.json",
+  "experiment": {
+    "kind": "gemm-batched-arm",
+    "card": "A30",
+    "image": "v30",
+    "controls": "both",
+    "kernel": "owned"
+  },
+  "resumes_from_checkpoint": false
+}

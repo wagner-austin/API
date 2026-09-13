@@ -1,0 +1,30 @@
+{
+  "project": "mi",
+  "name": "gemm-v28-block256-a30",
+  "partition": "free-gpu",
+  "gpu": {
+    "model": "A30",
+    "count": 1
+  },
+  "cpus": 8,
+  "mem_gb": 64,
+  "minutes": 20,
+  "requeue": true,
+  "image": {
+    "path": "/pub/wagnera3/images/v28/abl.sif",
+    "sha256": "2c8dfab756e57e6dc6c5e5c20fc6fd4e035d9ce808d92e6a47a0a83feaf68430",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  },
+  "command": "python -m model_trainer.cli.gemm_probe --device cuda --out /pub/wagnera3/gemm/v28/a30-block256.json --controls both --kernel block256",
+  "artifact": "/pub/wagnera3/gemm/v28/a30-block256.json",
+  "experiment": {
+    "kind": "gemm-kernel-arm",
+    "card": "A30",
+    "image": "v28",
+    "controls": "both",
+    "kernel": "block256"
+  },
+  "resumes_from_checkpoint": false
+}
