@@ -174,6 +174,19 @@ class FleetErrorCode(ErrorCodeBase):
     # the rest. An unreadable registry is the opposite case -- nothing was
     # compared at all, and reporting that as "no drift" would be a lie.
     NODE_REGISTRY_UNREADABLE = "NODE_REGISTRY_UNREADABLE"
+    # The session ledger's fleet arm (MCPs board task 5a3865bf). The agent
+    # reads a node's ~/.claude/sessions/<pid>.json records over ssh and hands
+    # them to `task_session_observe`. A record that is not the shape the
+    # harness writes is refused by name rather than recorded with a field
+    # invented for it -- the ledger's whole value is that every row is a
+    # fact somebody can trace to a file.
+    SESSION_RECORD_UNREADABLE = "SESSION_RECORD_UNREADABLE"
+    # A record that names its own machine (`pidDomain`, 2.1.270 onward) and
+    # names a different one than the node it was read from. That is
+    # corruption, not a remote session, and recording it under the node's
+    # name would be the ledger's first lie -- the same refusal pcsession-mcp
+    # makes for the hub's own directory.
+    SESSION_MACHINE_MISMATCH = "SESSION_MACHINE_MISMATCH"
 
     # The lease -- one project's environment, mutated by one dispatch at a
     # time. This is the code that answers the incident the package was written
