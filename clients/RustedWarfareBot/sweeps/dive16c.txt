@@ -1,0 +1,32 @@
+# The dive under the raid's arbitration (log 2026-09-13): the same
+# sixteen members as dive16 and dive16b, the margin-free arm
+# (evolve1-g4m2-dive3), with the draft gated on the CURRENT wave rung
+# plus the party instead of the opening rung. dive16b proved the margin
+# a no-op on this population -- identical cards, identical first frames,
+# identical dive counts, every quarry already artillery -- so the three
+# regressions were never the wrong gun: they were sixty-seven to
+# ninety-three whole parties drafted and fed to the same battery across
+# a long game, because the opening rung is three units for the whole
+# match and a depleted army re-drafted every time six pieces gathered.
+# The raid's rung escalates with the ladder and engages exactly when
+# the army is spent. The three flips must hold (they cost six to
+# thirteen parties each, well inside the early rungs), the three churn
+# seeds (s8913729, s8915497, s8917889) must return toward the champion's
+# wins, and the champ members stay the refactor's identity check.
+# Controls: pinbase48 and dive16, both under certified determinism.
+dive|8913313|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913833|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8914041|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8914977|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8915185|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8916121|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8916641|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917473|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917681|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913001|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8913729|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8915497|doctrines/evolve1-g4m2-dive3.doctrine|10000
+dive|8917889|doctrines/evolve1-g4m2-dive3.doctrine|10000
+champ|8915185|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915393|doctrines/evolve1-g4m2.doctrine|10000
+champ|8915081|doctrines/evolve1-g4m2.doctrine|10000

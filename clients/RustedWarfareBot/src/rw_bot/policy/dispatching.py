@@ -204,17 +204,23 @@ def _draft_dive(
 ) -> tuple[Entity, ...]:
     """Advance the dive and return the units the waves may still command.
 
-    The hunt's arbitration exactly -- the OPENING rung plus the party, a
-    unit cannot serve two commanders -- because the dive answers the same
-    early window: the battery stands at frames 60k-110k on every opener
-    seed, when the army holds eight to thirteen pieces and the escalating
-    rung would starve the draft the way it starved the hunt
-    (:meth:`WaveController.opening_need`). What is the dive's own is that
-    it never marches on an empty horizon: with no outranging gun in sight
-    the party stands down inside :meth:`Diver.dive` and every unit is the
-    waves' again ([[policy-raid]]).
+    The RAID's arbitration -- the current rung plus the party, a unit
+    cannot serve two commanders -- not the hunt's opening rung. The first
+    probe drafted against the opening rung (dive16, log 2026-09-13) and
+    the three flips it bought cost six to thirteen parties each, while
+    three champion wins were lost to sixty-seven to ninety-three parties
+    drafted whole and fed to the same guns across a long game: the
+    opening rung is three units for the whole match, so a depleted army
+    re-drafted every time six pieces gathered. The escalating rung is the
+    brake the raid already lives under -- the draft waits for a wave's
+    worth plus the party -- and it engages exactly when the army is
+    spent. The battery window is still open under it: at frames 60k-110k
+    the army holds eight to thirteen pieces against a rung of three to
+    five. What is the dive's own is that it never marches on an empty
+    horizon: with no outranging gun in sight the party stands down inside
+    :meth:`Diver.dive` and every unit is the waves' again ([[policy-raid]]).
     """
-    spare = len(army) >= waves.opening_need() + divers.size
+    spare = len(army) >= waves.need() + divers.size
     for order in divers.dive(sample, army, targets, catalogue, profiles, spare):
         channel.send_attack_move(order)
     drafted = divers.party()
