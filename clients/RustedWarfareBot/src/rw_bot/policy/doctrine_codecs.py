@@ -296,7 +296,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             "and this doctrine stands no launchers: set nukes or turn the bank off",
         )
     outranged = _count(
-        payload, "outranged", _BAD_OUTRANGED_BLOOD, "kills before the standoff join arms, 0 off"
+        payload, "outranged", _BAD_OUTRANGED_BLOOD, "outranging movers standing at once, 0 off"
     )
     hp_floor = require_int(payload, "hp_floor")
     if hp_floor < 0 or hp_floor > 100:

@@ -1,13 +1,17 @@
-# The champion with the outranged switch armed: siegedose artillery
-# shares join the production ratio only WHILE a seen ground mover
-# outranges every land gun in the mix (rw_bot.policy.counter,
-# ground_outranged). Built from the arty39/artyprobe18 opposition (log
-# 2026-09-12): the artillery slot wins four opener seeds the hover slot
-# loses, the hover slot wins twenty-plus block seeds the artillery slot
-# loses, and no static goals mix satisfies both -- while on a
-# zero-artillery seed this clause never fires and the match is the
-# champion's bit for bit, the property the static merge could not have.
-# Every other knob and every goals slot is the champion's exactly.
+# The blood-dose ladder's dose-16 arm (log 2026-09-12), kept as the
+# record of what condbar144/condbar144b measured: under the clause's
+# THIRD reading, outranged 16 meant the artillery share joined after
+# sixteen kills to outranging ground movers, and on 96 untouched seeds
+# that arm read 69 wins to the champion's 69 -- no flip and no
+# regression, only loss modes moved on seven seeds (five wiped to
+# defeated, one survived to wiped, one defeated to wiped), and the
+# reading was retired. Under the current CONCURRENCY
+# reading (rw_bot.policy.counter, outranging_movers) this same file
+# arms the join only while sixteen outranging movers stand at once, a
+# rung of the concurrency ladder no batch has measured; the sibling
+# evolve1-g4m2-cond carries threshold three and the ladder's
+# falsification history. Every other knob and every goals slot is the
+# champion's exactly.
 name evolve1-g4m2-cond-b16
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
 heavies heavyTank,heavyTank

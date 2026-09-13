@@ -1,12 +1,19 @@
 # The champion with the outranged switch armed: siegedose artillery
-# shares join the production ratio only WHILE a seen ground mover
-# outranges every land gun in the mix (rw_bot.policy.counter,
-# ground_outranged). Built from the arty39/artyprobe18 opposition (log
-# 2026-09-12): the artillery slot wins four opener seeds the hover slot
-# loses, the hover slot wins twenty-plus block seeds the artillery slot
-# loses, and no static goals mix satisfies both -- while on a
-# zero-artillery seed this clause never fires and the match is the
-# champion's bit for bit, the property the static merge could not have.
+# shares join the production ratio only WHILE three or more seen ground
+# movers that outrange every land gun in the mix stand at once
+# (rw_bot.policy.counter, outranging_movers). Built from the
+# arty39/artyprobe18 opposition (log 2026-09-12): the artillery slot
+# wins four opener seeds the hover slot loses, the hover slot wins
+# twenty-plus block seeds the artillery slot loses, and no static goals
+# mix satisfies both. The threshold is a CONCURRENCY count, the fourth
+# reading of this clause: sight of one gun fired at frame 0 on the
+# enemy command centre, cumulative blood at doses 2/8/16 traded winners
+# for openers evenly (cond35, conddose12), and the feature table
+# separates the opener from the marginal winner on how many long guns
+# the enemy masses at once, not on how many it fields over a game.
+# condc10 measured this reading: it fires mid-game on nearly every Very
+# Hard seed (frames 64k-129k), so it is NOT the champion bit for bit on
+# quiet seeds; condcbar192 is its fresh-seed adoption bar.
 # Every other knob and every goals slot is the champion's exactly.
 name evolve1-g4m2-cond
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
