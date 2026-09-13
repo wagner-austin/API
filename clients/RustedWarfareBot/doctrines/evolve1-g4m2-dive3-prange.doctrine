@@ -1,0 +1,66 @@
+# The dive and the range-first target order together (dive 3, prio 1).
+# Two verbs aimed at the same gun from different seats: the dive is a
+# detached party of the three fastest gathered units closing on the
+# nearest visible ground mover that outranges every land gun the army
+# fields (rw_bot.policy.dive), and prio 1 is the kill-groups' own target
+# order, longest enemy reach first before convergence breaks ties
+# (rw_bot.policy.firing, PRIO_RANGE). Measured apart on the nine Very
+# Hard opener seeds (log 2026-09-13): the dive flips s8914041, s8916121
+# and s8916641 under the raid's draft arbitration, and range-first
+# flips s8915185, a seed the dive leaves wiped, so the composition is
+# the first arm that could reach four of nine. The party is withheld
+# from the kill-groups, so the two orders never contend for a unit.
+# Every other knob and every goals slot is the champion's exactly.
+name evolve1-g4m2-dive3-prange
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,heavyTank,hoverTank
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve -1
+guard_cap 0
+raid 3
+tech 1
+lurk 0
+allin 0
+creep 0
+hold 0
+decoys 0
+hp_floor 0
+strike 0
+navtilt 0
+medics 0
+navy 0
+battery 0
+bunkers 0
+flame 4
+close 0
+guns 0
+nukes 0
+expand 1
+counter 1
+cover 0
+intercept 1
+aa_cover 1
+forward 0
+scout 0
+rush 0
+riposte 0
+kite 0
+income_ladder 0
+rebuild 0
+hunt 0
+worker_wait 0
+groupcap 2
+prio 1
+spacing 0
+retreat 3
+siege 0
+siegedose 1
+outranged 0
+dive 3
+divemargin 0
+raze 0
+press 0
+brace 0
+huntgate 0
+bank 0

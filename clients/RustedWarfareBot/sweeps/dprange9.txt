@@ -1,0 +1,21 @@
+# The dive and the range-first order together on the nine Very Hard
+# opener seeds (log 2026-09-13). Apart, the dive flips three (s8914041,
+# s8916121, s8916641, under the raid's draft arbitration measured in
+# dive16c) and range-first flips one the dive leaves wiped (s8915185,
+# prio18's refilled member, army 52 at the end). The party is withheld
+# from the kill-groups, so the two orders never contend for a unit, and
+# the composition is the first arm that could reach four of nine. Read
+# against pinbase48 (the champion's cards) and against dive16c and
+# prio18 (each verb alone), all under certified determinism: a seed
+# that flips under neither verb alone and flips here is the
+# composition's own; a seed that flips under one and not here is the
+# composition's cost.
+dprange|8913313|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8913833|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8914041|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8914977|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8915185|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8916121|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8916641|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8917473|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
+dprange|8917681|doctrines/evolve1-g4m2-dive3-prange.doctrine|10000
