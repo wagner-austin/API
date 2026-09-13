@@ -16,9 +16,9 @@ source_paths:
   - "runs/bracket-ff1-trace.ndjson"
   - "src/rw_bot/harness/sweep.py"
 source_git_blobs:
-  "agent/src/rwbot/agent/EngineRandom.java": "e2109457626322b9b654268c5b8cd239e4816ce9"
+  "agent/src/rwbot/agent/EngineRandom.java": "72de3abd927da7b551ede7cafe2e935153cb5136"
   "agent/src/rwbot/agent/TickBracket.java": "689735f35d3b3dfddd407fa340d3a9305ce01a72"
-  "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
+  "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-12
 confidence: high

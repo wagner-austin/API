@@ -12,9 +12,9 @@ source_paths:
   - "src/rw_bot/harness/sweep.py:290"
   - "src/rw_bot/harness/results_layout.py:106"
 source_git_blobs:
-  "src/rw_bot/policy/trace.py": "1494fc9ecdde3c89c833f0046faef92b0ac817d7"
+  "src/rw_bot/policy/trace.py": "9bc4d266a0258debb350a1044bc4c241f22e85c3"
   "src/rw_bot/policy/recorder.py": "888a0a116b5c9cd4bcc87899509566d3a7bda650"
-  "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
+  "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
   "src/rw_bot/harness/results_layout.py": "bf31143781274b48e5f24bc1dffc6fcdfd372879"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-03

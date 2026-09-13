@@ -12,7 +12,7 @@ source_paths:
 source_git_blobs:
   "src/rw_bot/policy/production.py": "3ccbb9f5aec7bffa5fece236bf8a1d9684ebc110"
   "src/rw_bot/policy/doctrine.py": "aa2571df8cbe3941b444fbe4b352e51f18f7a88c"
-  "src/rw_bot/policy/situation.py": "4cf16f1d98b8bbe2e1f3611935f872b196533543"
+  "src/rw_bot/policy/situation.py": "a5c07b2709622cd66484c7950384c36be3b56f56"
 provenance:
   - "wiki/log.md 2026-08-07 'the arm ladder' — the wiki's own journal, kept as provenance rather than as a source_path: SCHEMA bans citing this wiki as evidence for a claim, and log.md is append-only so a pin on it would drift on every wiki operation"
 fact_checked: 2026-09-04

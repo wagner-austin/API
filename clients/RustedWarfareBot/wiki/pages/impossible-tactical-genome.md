@@ -7,9 +7,9 @@ source_paths:
   - "src/rw_bot/policy/dispatching.py"
   - "scripts/evolve.py"
 source_git_blobs:
-  "src/rw_bot/policy/combat.py": "2c69deb870c8606811cc09cb069e8df0cd43ae46"
+  "src/rw_bot/policy/combat.py": "41c1ad218291e99fc6ae0a0ab1ce39b654a7585e"
   "src/rw_bot/policy/dispatching.py": "9fc1f7e70a8dc4b58052bfe565289c09bf819b4d"
-  "scripts/evolve.py": "b33dee0d23201d670b9974e985d954e1d7bc54f6"
+  "scripts/evolve.py": "0902cc9522f990abf6ca21db21b3ecb751825c44"
 provenance:
   - "wiki/log.md entries 2026-09-07: the corpus label measurement and its correction; the eighth closure (wwait24); the engagement-gate prevalence refutation"
   - "wiki/log.md 2026-07-31 micro arc (kill-sized fire groups built, capped at two; artillery-standoff refuted as engine-native)"

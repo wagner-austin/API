@@ -14,7 +14,7 @@ source_paths:
   - "scripts/sweep.py"
   - "Makefile"
 source_git_blobs:
-  "src/rw_bot/harness/sweep.py": "0bb67b340e58ce958c1f4eacc7bd9bbc5af0005a"
+  "src/rw_bot/harness/sweep.py": "e8b6f40bca00e03903fb7b823e69812193ed78fb"
   "src/rw_bot/harness/clone.py": "6083a9f62b07cde157b0956f7b6801a7de5fe2f5"
   "src/rw_bot/harness/runner.py": "ac33271ebd336b570468a3eb8508e5e4badd664f"
   "scripts/sweep.py": "04784a693860f6845c4932175751ed3d8a09f305"

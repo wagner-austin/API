@@ -8,7 +8,7 @@ source_paths:
   - "src/rw_bot/policy/doom.py"
 source_git_blobs:
   "src/rw_bot/policy/campaign.py": "7839cb581d2829441bec8436b75496bfff7fccbe"
-  "src/rw_bot/policy/trace.py": "1494fc9ecdde3c89c833f0046faef92b0ac817d7"
+  "src/rw_bot/policy/trace.py": "9bc4d266a0258debb350a1044bc4c241f22e85c3"
   "src/rw_bot/policy/doom.py": "69fbc15602e4f48a97c4e82fdbc4eaac4fe6866c"
 provenance:
   - "/pub/wagnera3/rusted/runs/traces -- 7,830 per-sample trace files, 931MB, one per cluster match through impincome96 (ls | wc -l and du -sh, read 2026-09-06)"
