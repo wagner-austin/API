@@ -109,14 +109,51 @@ left flank fifteen thousand frames early.[^3]
 Every verb was first priced on the nine pinbase48 openers, where
 range-first read one flip and no regression and the blood-gated dive
 read four flips and two. A probe with no winner in it measures half of
-every verb, and the half it omits is the majority class. Nine of the 27
-loss seeds flipped under some arm today -- s8925937, s8926457, s8929161,
-s8931313, s8931625, s8933601, s8934017, s8934225, s8935473 -- so a policy
-that chose the right arm per seed from early state would sit near 78 of
-96; no fixed arm reaches it, and the columns that separate the populations
-only separate them by sample 2000, when the fight is already being lost.
-That is the head tier's problem statement at Very Hard, in the corpus's
-own numbers.
+every verb, and the half it omits is the majority class.
+
+## Can a loss be seen early, and would a selector help?
+
+Rank AUC of single tick features for loss against win, on the 96 seeds
+and on 144 with pinbase48 added (a value below 0.5 means the feature is
+higher in wins):
+
+| feature at sample | 750 | 1000 | 1250 | 1500 | 1750 | 2000 |
+|---|---|---|---|---|---|---|
+| worth / rival (96) | 0.52 | 0.24 | 0.26 | 0.21 | 0.14 | 0.12 |
+| worth / rival (144) | 0.48 | 0.28 | 0.27 | 0.21 | 0.14 | 0.12 |
+| rival army / our worth (144) | 0.45 | 0.65 | 0.66 | 0.73 | 0.84 | 0.88 |
+| extractors (144) | 0.46 | 0.38 | 0.30 | 0.25 | 0.26 | 0.25 |
+| rival income / our income (144) | 0.53 | 0.63 | 0.75 | 0.79 | 0.82 | 0.84 |
+
+A loss is visible at sample 1000 with about 0.75 AUC on the worth ratio
+alone and 0.8 by 1500, a thousand samples before the fight is decided --
+so a head fitted at 1250-1500 would have inputs to work with.[^4]
+
+What it would not have is a response. Nine of the 27 loss seeds flipped
+under some arm today (s8925937, s8926457, s8929161, s8931313, s8931625,
+s8933601, s8934017, s8934225, s8935473), but on the behind-early cohort
+they scatter across arms with no structure: on the 31 seeds where the
+champion sat at or below 0.9 at sample 1500, the champion wins 15, the
+concurrency share 16, the dose-8 arm 16, the dose-16 arm 15, the dive 12,
+the blood-gated dive 11, range-first 3 -- and on the complement every
+arm is at or below the champion. No measured arm is conditionally better
+by more than one seed, so a selector over this vocabulary is worth at
+most one win, and the nine flips are what knife-edge seeds do under any
+perturbation rather than a signal an arm carries.[^5]
+
+The per-loss tables say what the losses are: between samples 1000 and
+2500 the army dies forward in both populations (41.9 deaths per winning
+game, 43.4 per losing one), but winners die to enemy STRUCTURES (11.4 per
+game against 5.9) because they are assaulting the base, and losers die to
+the enemy's mobile army in the field (ground 16.7 against 14.4, air 12.9
+against 10.5, navy 5.1 against 3.3) before they reach it.[^6] The loss is
+the field fight against an army the enemy's opening rolled larger, and
+the doctrine vocabulary has no arm that wins that fight more often than
+the champion's own.
+
+[^4]: `auc96.py` over `runs/traces/divebar192` and `runs/traces/pinbase48` with their cards.
+[^5]: `cohort96.py` over `runs/sweeps/{divebar192,condcbar192,bloodbar96,prangebar96,condbar144,condbar144b}` and the champion traces of divebar192.
+[^6]: `where96.py` over the per-loss tables of `runs/traces/divebar192/champ-*.ndjson`, frames 75,000-190,000, home meaning x at or beyond 1,900 on duel_lake.
 
 [^1]: `runs/sweeps/divebar192/champ-*.txt` -- `enemy peak`, `units lost to`, `samples seen` on all 96 cards, read by `corpus96.py`.
 [^2]: `runs/traces/divebar192/champ-*.ndjson` -- the tick table at samples 1000/1500/2000/2500 on all 96 traces, read by `early96.py`.
