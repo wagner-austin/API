@@ -1181,9 +1181,16 @@ name appeared nowhere here — was mine, and another session bridged it.
   both, while `n54-03` presents its Blackwell card normally. `sinfo` shows all
   three IDLE with no reason and four GPUs each, so the scheduler would place
   the resubmission on the same two nodes. `exclude_nodes` was added to the
-  job contract for exactly this, and the resubmission below names them. The
-  fault itself belongs to RCIC and is reported separately; nothing in this
-  repository can repair a node.
+  job contract for exactly this. The fault itself belongs to RCIC and is
+  reported separately; nothing in this repository can repair a node.
+
+  Resubmitted through `hpc3-campaign` with both nodes excluded as array
+  `56008489`: **19 of 19 `COMPLETED`** on `n54-02` and `n54-03`, 2.17
+  GPU-hours metered at zero. The result is the floor's sixth card and is
+  written up under `floor`; for this entry's own question it is the full
+  2,627-item set equal to the cu124 corpus under BOTH arms, `e964e46b…` and
+  18/18 rank1 chunks, where the battery above had established cross-stack
+  equality for the 150-item chunk and the fully-owned score only.
   Blackwell card and the L40S — gemm 186/186, train 1,283/1,283, attention
   stages 140/140, full-set outcomes one payload (`sha256:e964e46b…`),
   accuracy 1,374/2,627 on both. Vendor cuBLAS still speaks per-card dialects
@@ -1352,7 +1359,7 @@ name appeared nowhere here — was mine, and another session bridged it.
 
 ### `floor` — cloze floor scoring
 
-<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 93 -->
+<!-- reviewed: tools/hpc3/artifacts/floor*/*.json = 112 -->
 <!-- reviewed: tools/hpc3/runs/floor*.json = 100 -->
 
 The number every arm accuracy in the extraction-ablation programme is read as
@@ -1415,11 +1422,27 @@ scored is that the item set is a staged file rather than a data-bank id.
   | v28 | 150 | rank1 + cuBLAS | A100, A30, L40S, V100 | all eight `72e59097…` |
   | v29 | 2,627 | rank1 (18 chunks) + cuBLAS | A100, A30, L40S, V100 | 18/18 chunk digests equal across all four cards, and 1374/2627 on every card under both arms |
   | baseline, 2026-09-13 | 2,627 | cuBLAS | 3090 Ti | the v20 baseline re-scored under the campaign's experiment name: `e964e46b…` again, and the first record of this floor the comparability layer can read beside a cluster card |
+  | cu128, 2026-09-14 (array `56008489`) | 2,627 | rank1 (18 chunks) + cuBLAS | RTX PRO 6000 | `e964e46b…` and 18/18 chunk digests equal to the A100's, on Blackwell and on a DIFFERENT CUDA stack, `torch 2.7.1+cu128` against the campaign's `2.6.0+cu124`; 1374/2627 under both arms |
 
-  So the floor holds ITEM FOR ITEM across five GPU models and both kernel arms,
-  not merely in aggregate. That is `mi-cu128`'s contrast seen from the other
-  side: vendor cuBLAS speaks per-card dialects at the GEMM level (18 of 93
-  digests shared there) and the cloze DECISION absorbs every one of them.
+  So the floor holds ITEM FOR ITEM across six GPU models, both kernel arms, and
+  one CUDA-stack boundary, not merely in aggregate. That is `mi-cu128`'s
+  contrast seen from the other side: vendor cuBLAS speaks per-card dialects at
+  the GEMM level (18 of 93 digests shared there) and the cloze DECISION absorbs
+  every one of them. The sixth card is the first full-set floor across a stack
+  jump; `mi-cu128` had established cross-stack equality for the 150-item chunk
+  and the fully-owned score, and this widens it to the whole set under both
+  arms.
+
+  **How the sixth card was run, because two of its lessons are about the
+  tooling.** Nineteen members on a QOS that lets one user hold four GPUs is a
+  sweep the package refused until it could declare a `throttle`; its first
+  submission then died entirely on two nodes whose GPU 0 is dead while `sinfo`
+  calls them healthy, which is what `exclude_nodes` now exists for (both in
+  `mi-cu128`'s entry). And the 15-minute wall clock stated from a 328-second
+  chunk on an unloaded node was nearly too short: three chunks ran 819 to 885
+  seconds against a 900-second cap, with four members sharing each node. A
+  chunk time measured alone is a lower bound on a chunk time measured four at
+  a time.
 
 - **What the zeros exclude, and the two axes disagree by three orders of
   magnitude.** A zero-failure identity claim has no spread to divide by, so the
@@ -1429,15 +1452,18 @@ scored is that the item set is a staged file rather than a data-bank id.
   | axis | n | 95% UB | the question it answers |
   |---|---|---|---|
   | per-ITEM, full set | 2,627 | 0.114% | would a divergence on any single item have been seen |
-  | per-GPU-MODEL | 5 | 45.1% | would a card model whose floor differs have been seen |
+  | per-GPU-MODEL | 6 | 39.3% | would a card model whose floor differs have been seen |
 
   The item axis is a conjunction over 2,627 separate decisions and is a very
   sensitive detector, for the same reason `mi-cu128`'s full-set digest row is
   its tightest. **But items are not replicates of the thing the claim is
-  about.** "The floor is card-invariant" is a statement about CARDS, and five
-  models all agreeing bounds the rate at which a sixth could differ at 45%. So
-  this is established for the 3090 Ti, V100, A30, A100 and L40S, and it is
-  NOT TESTED as a general property of hardware. A sixth model is one job.
+  about.** "The floor is card-invariant" is a statement about CARDS, and six
+  models all agreeing bounds the rate at which a seventh could differ at 39%.
+  So this is established for the 3090 Ti, V100, A30, A100, L40S and RTX PRO
+  6000, and it is NOT TESTED as a general property of hardware. The sixth
+  model moved the bound from 45% to 39%, which is what one more zero-failure
+  trial is worth on this axis; the per-item bound did not move, because it
+  was never the axis in question.
 
 - **The finding was real and not instrumented until 2026-09-13, and the
   instrument's first verdict is worth reading.** The 3090 Ti's v20 records name
