@@ -108,6 +108,7 @@ class TestResolveRun:
             "command": "python train.py --arm B",
             "artifact": None,
             "gpu_pinned_because": None,
+            "exclude_nodes": (),
         }
 
     def test_a_run_may_declare_why_its_card_pin_must_hold(self) -> None:
@@ -119,6 +120,14 @@ class TestResolveRun:
         )
 
         assert spec["gpu_pinned_because"] == "per-card record; the card is the arm"
+
+    def test_a_run_may_name_the_nodes_it_must_avoid(self) -> None:
+        """Per submission, never a project default: a node fault is a fact
+        about today's cluster, and a default would keep routing around a node
+        long after it was repaired."""
+        spec = resolve_run(_workspace(), _run(exclude_nodes=["hpc3-gpu-n54-00"]))
+
+        assert spec["exclude_nodes"] == ("hpc3-gpu-n54-00",)
 
     def test_changing_a_project_default_changes_every_run(self) -> None:
         """One edit, not one per document -- the reason this layer exists."""
@@ -209,6 +218,19 @@ class TestUnknownFieldsAreRefused:
         reason = "the card is the measurement"
         expanded = expand_sweep(resolve_sweep(_workspace(), _sweep(gpu_pinned_because=reason)))
         assert [job["gpu_pinned_because"] for job in expanded] == [reason] * 3
+
+    def test_every_member_inherits_the_sweeps_excluded_nodes(self) -> None:
+        """A node that cannot present its GPU to one member cannot present it
+        to another, so the restriction is stated once and shared."""
+        document = _sweep(exclude_nodes=["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"])
+        expanded = expand_sweep(resolve_sweep(_workspace(), document))
+        assert [job["exclude_nodes"] for job in expanded] == [
+            ("hpc3-gpu-n54-00", "hpc3-gpu-n54-01")
+        ] * 3
+
+    def test_a_sweep_that_names_no_nodes_restricts_nothing(self) -> None:
+        expanded = expand_sweep(resolve_sweep(_workspace(), _sweep()))
+        assert [job["exclude_nodes"] for job in expanded] == [()] * 3
 
     def test_a_sweep_that_says_nothing_pins_for_no_stated_reason(self) -> None:
         """Absent stays absent. A default sentence here would waive the

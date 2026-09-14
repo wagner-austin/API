@@ -42,6 +42,7 @@ RUN_IDENTITY_FIELDS = (
     "depends_on",
     "artifact",
     "gpu_pinned_because",
+    "exclude_nodes",
 )
 """What only a run can say. Never inherited, never optional.
 
@@ -64,6 +65,7 @@ SWEEP_IDENTITY_FIELDS = (
     "depends_on",
     "gpu_pinned_because",
     "throttle",
+    "exclude_nodes",
 )
 """What only a sweep can say.
 
@@ -82,8 +84,11 @@ was refused by the gpu-supply rule with no way to answer it, and the only route
 left was submitting the rung one job at a time -- which is exactly the
 hand-rolled path the sweep contract exists to remove."""
 
-CHAIN_IDENTITY_FIELDS = ("project", "name", "stages", "experiment")
+CHAIN_IDENTITY_FIELDS = ("project", "name", "stages", "experiment", "exclude_nodes")
 """What a chain document may say for itself.
+
+``exclude_nodes`` is chain-level and inherited by every stage, because a node
+that cannot present its GPU to stage one cannot present it to stage two.
 
 ``depends_on`` is absent deliberately: a chain wires its stages to each other
 from the ids Slurm issues, and an outer dependency stated here would have to be
@@ -248,6 +253,10 @@ def resolve_run(workspace: Workspace, value: JSONValue) -> JobSpec:
     # default would waive the gpu-supply rule for every run, restoring the
     # inherited-default queueing the rule exists to catch.
     merged["gpu_pinned_because"] = document.get("gpu_pinned_because")
+    # Per submission, never a project default: a node fault is a fact about
+    # today's cluster, and a default would keep routing around a node long
+    # after it was repaired.
+    merged["exclude_nodes"] = document.get("exclude_nodes")
     return decode_job_spec(
         merged,
         workspace_cluster(workspace),
@@ -297,6 +306,7 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     # pins the same card, so a per-member reason would be the same sentence six
     # times and could disagree with itself on the seventh.
     base["gpu_pinned_because"] = document.get("gpu_pinned_because")
+    base["exclude_nodes"] = document.get("exclude_nodes")
 
     members = require_list(document, "members")
     if members == []:
@@ -364,6 +374,7 @@ def _resolve_stage(
     experiment["stage"] = suffix
     merged["experiment"] = experiment
     merged["depends_on"] = None
+    merged["exclude_nodes"] = chain.get("exclude_nodes")
     return merged
 
 

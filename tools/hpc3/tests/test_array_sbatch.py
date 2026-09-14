@@ -88,6 +88,15 @@ class TestDirectives:
         assert "#SBATCH --gres=gpu:A100:1\n" in script
         assert "nvidia-smi --query-gpu=name,memory.total" in script
 
+    def test_excluded_nodes_reach_the_array_header_in_the_single_job_spelling(self) -> None:
+        """One helper renders it for both shapes, so the array cannot spell
+        the restriction differently from a single job."""
+        script = _render(exclude_nodes=["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"])
+        assert "#SBATCH --exclude=hpc3-gpu-n54-00,hpc3-gpu-n54-01\n" in script
+
+    def test_no_exclusion_emits_no_exclude_line(self) -> None:
+        assert "--exclude" not in _render()
+
     def test_a_dependency_is_paired_with_the_kill_switch(self) -> None:
         """Same pairing as the single-job renderer: without it, an
         unsatisfiable dependency parks EVERY task of the array on

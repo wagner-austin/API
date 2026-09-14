@@ -92,25 +92,26 @@ def _by_project() -> dict[str, Workspace]:
     return owners
 
 
-def _sweep_member_artifacts() -> list[JSONValue]:
-    """Read the artifact every sweep member declares.
+def _sweep_member_artifacts() -> dict[str, list[JSONValue]]:
+    """Read the artifact every sweep member declares, grouped by project.
 
     Returns:
-        One value per member across every sweep document, in document order.
+        One value per member across every sweep document, in document order,
+        under the project the document names.
 
     Raises:
         TypeError: If a member is not a JSON object, which would mean the
             document is not a sweep at all.
     """
-    artifacts: list[JSONValue] = []
-    for _, _, document in submissions():
+    artifacts: dict[str, list[JSONValue]] = {}
+    for _, project, document in submissions():
         members = document.get("members")
         if not isinstance(members, list):
             continue
         for member in members:
             if not isinstance(member, dict):
                 raise TypeError("a sweep member must be a JSON object")
-            artifacts.append(member["artifact"])
+            artifacts.setdefault(project, []).append(member["artifact"])
     return artifacts
 
 
@@ -317,21 +318,23 @@ class TestEveryCommittedSubmissionResolves:
         assert resolved == [project for project, _ in runs]
 
     def test_every_sweep_document_resolves_and_expands(self) -> None:
+        """Resolution is the assertion, as it is for run documents above.
+
+        THIS CARRIED THE FOURTH HARDCODED INVENTORY IN THIS FILE, a sorted
+        list of nine sweep filenames and a member total of 126, and it did
+        exactly what the three before it did: on 2026-09-14 the first new
+        sweep in eleven days -- the cloze floor's sixth card -- turned it red,
+        and the edit that would have fixed it was retyping two numbers in a
+        test that had checked nothing about them. The rule it stood in for is
+        that every committed sweep resolves against its project's workspace
+        and expands to at least one member, and that there are some.
+        """
         owners = _by_project()
         sweeps = [(n, p, d) for n, p, d in submissions() if "members" in d]
-        expanded = [len(expand_sweep(resolve_sweep(owners[p], d))) for _, p, d in sweeps]
-        assert sorted(name for name, _, _ in sweeps) == [
-            "sweep-cleargbm-p6-rung1.json",
-            "sweep-cleargbm-p6-rung2.json",
-            "sweep-cleargbm-p6-rung3.json",
-            "sweep-cleargbm-p6-rung4.json",
-            "sweep-cleargbm-p6-rung4b.json",
-            "sweep-cleargbm-p6-rung5.json",
-            "sweep-turkic-bases-resume-1.json",
-            "sweep-turkic-bases-v4.json",
-            "sweep-turkic-bases.json",
-        ]
-        assert sum(expanded) == 126
+        expanded = {n: len(expand_sweep(resolve_sweep(owners[p], d))) for n, p, d in sweeps}
+
+        assert expanded != {}
+        assert [name for name, count in expanded.items() if count < 1] == []
 
     def test_no_sweep_member_leaves_its_artifact_unstated(self) -> None:
         """Stated, which is not the same as null.
@@ -342,27 +345,27 @@ class TestEveryCommittedSubmissionResolves:
         accident of the corpus look like a rule, and the first sweep that
         DOES produce a file -- ``sweep-turkic-bases``, whose members each
         write a checkpoint -- would have failed a test that was never about
-        them. What the contract requires is that the key is present and
-        deliberate; what its value should be is the member's business.
+        them. It then asserted the counts instead (126 members, 108 nulls, 18
+        paths), which was the same accident with more digits, and the sixth
+        card's sweep turned that red too.
+
+        What the contract requires is that the key is PRESENT on every
+        member, which ``decode_sweep_member`` enforces at resolution, and that
+        a stated path is a real cluster path rather than a placeholder. Which
+        members state one is decided per project, and the two postures that
+        exist are pinned here BY PROJECT so the reason travels with the rule:
+        cleargbm's optimisation members write nothing of their own, and every
+        other project's members name the record or checkpoint they produce.
         """
-        artifacts = _sweep_member_artifacts()
-        stated = sorted(str(a) for a in artifacts if a is not None)
-        assert len(artifacts) == 126
-        assert sum(1 for a in artifacts if a is None) == 108
-        assert stated[0] == "/pub/wagnera3/LSTM/checkpoints/az_best.pt"
-        # 7 from the original sweep, 4 more from the resume round that
-        # followed the 2026-08-28 preemption wave. `free-gpu` is
-        # PreemptMode=CANCEL, so a preempted member does not come back on its
-        # own and is resubmitted as a new record naming the jobs it resumes --
-        # which is why a resume round is a committed document rather than a
-        # command someone re-ran.
-        #
-        # 7 more from sweep-turkic-bases-v4, which retrains every language on
-        # the corrected corpus. Those write to checkpoints_v4 rather than over
-        # checkpoints: five of the seven v3 corpora are byte-identical to v4,
-        # so those checkpoints stay valid, and keeping them is what lets the
-        # v4 run measure run-to-run variability against a real baseline.
-        assert len(stated) == 18
+        by_project = _sweep_member_artifacts()
+
+        assert "cleargbm" in by_project
+        assert set(by_project["cleargbm"]) == {None}
+        for project, artifacts in by_project.items():
+            if project == "cleargbm":
+                continue
+            unstated = [a for a in artifacts if not isinstance(a, str) or not a.startswith("/pub/")]
+            assert unstated == [], f"{project}: a member names no cluster path"
 
 
 class TestTheInputCheckHasASubject:

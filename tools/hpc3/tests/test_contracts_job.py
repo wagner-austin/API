@@ -39,6 +39,7 @@ def _spec(**overrides: JSONValue) -> dict[str, JSONValue]:
         "partition": "free-gpu",
         "gpu": gpus("A100"),
         "gpu_pinned_because": None,
+        "exclude_nodes": [],
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,
@@ -71,6 +72,7 @@ class TestValidSpec:
             "depends_on",
             "deterministic",
             "env_path",
+            "exclude_nodes",
             "experiment",
             "gpu",
             "gpu_pinned_because",
@@ -124,6 +126,53 @@ class TestTheGpuPinReason:
                     gpu_pinned_because="there is no card here",
                 ),
             )
+
+
+class TestExcludedNodes:
+    """A node fault the scheduler does not know about is routed around by name.
+
+    Measured 2026-09-14: two nodes IDLE with no reason, advertising four
+    RTX6000 each, whose GPU 0 answered ``nvidia-smi`` with "Unable to
+    determine the device handle". Nineteen tasks died in under ten seconds
+    and the scheduler would have placed the resubmission on the same nodes.
+    """
+
+    def test_declared_nodes_are_kept_in_order(self) -> None:
+        spec = decode_job_spec(_spec(exclude_nodes=["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"]))
+
+        assert spec["exclude_nodes"] == ("hpc3-gpu-n54-00", "hpc3-gpu-n54-01")
+
+    def test_absent_decodes_to_no_restriction(self) -> None:
+        payload = _spec()
+        del payload["exclude_nodes"]
+
+        assert decode_job_spec(payload)["exclude_nodes"] == ()
+
+    def test_null_decodes_to_no_restriction(self) -> None:
+        assert decode_job_spec(_spec(exclude_nodes=None))["exclude_nodes"] == ()
+
+    def test_a_non_list_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a list"):
+            decode_job_spec(_spec(exclude_nodes="hpc3-gpu-n54-00"))
+
+    def test_a_blank_entry_is_refused(self) -> None:
+        """``--exclude=,`` is a usage error, not an empty restriction."""
+        with pytest.raises(JSONTypeError, match="non-empty node names"):
+            decode_job_spec(_spec(exclude_nodes=["hpc3-gpu-n54-00", " "]))
+
+    def test_a_non_string_entry_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="non-empty node names"):
+            decode_job_spec(_spec(exclude_nodes=[54]))
+
+    def test_a_repeated_node_is_refused(self) -> None:
+        """A list edited twice and read once."""
+        with pytest.raises(JSONTypeError, match="names a node twice"):
+            decode_job_spec(_spec(exclude_nodes=["hpc3-gpu-n54-00", "hpc3-gpu-n54-00"]))
+
+    def test_the_restriction_round_trips(self) -> None:
+        payload = _spec(exclude_nodes=["hpc3-gpu-n54-00"])
+
+        assert encode_job_spec(decode_job_spec(payload))["exclude_nodes"] == ["hpc3-gpu-n54-00"]
 
 
 class TestTheDeclaredArtifactIsCheckedAgainstItsOwnCommand:

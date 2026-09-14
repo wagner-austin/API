@@ -120,6 +120,24 @@ def format_walltime(minutes: int) -> str:
     return f"{hours:02d}:{mins:02d}:00"
 
 
+def exclude_directives(spec: JobSpec) -> list[str]:
+    """Render the nodes a job must avoid, or nothing when it names none.
+
+    One helper for both renderers rather than a line in each, so a single job
+    and an array member cannot spell the restriction differently. No directive
+    at all for an empty list: ``--exclude=`` is a usage error, not a no-op.
+
+    Args:
+        spec: The job, carrying ``exclude_nodes``.
+
+    Returns:
+        Zero or one ``#SBATCH --exclude`` line.
+    """
+    if spec["exclude_nodes"] == ():
+        return []
+    return [f"#SBATCH --exclude={','.join(spec['exclude_nodes'])}"]
+
+
 def job_comment(spec: JobSpec) -> str:
     """Build the provenance string Slurm carries alongside the job.
 
@@ -356,6 +374,7 @@ def render_sbatch(spec: JobSpec, *, log_dir: str, charge_account: str) -> str:
         # one is not the same thing: `--gres=gpu:0` is a GPU request for none,
         # which Slurm may still route to a GPU partition's accounting.
         *([] if gpu is None else [f"#SBATCH --gres=gpu:{gpu['model']}:{gpu['count']}"]),
+        *exclude_directives(spec),
         f"#SBATCH -c {spec['cpus']}",
         f"#SBATCH --mem={spec['mem_gb']}G",
         f"#SBATCH -t {format_walltime(spec['minutes'])}",
@@ -441,6 +460,7 @@ __all__ = [
     "MINUTES_PER_HOUR",
     "code_provenance_export",
     "determinism_exports",
+    "exclude_directives",
     "format_walltime",
     "image_digest_export",
     "job_comment",

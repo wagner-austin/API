@@ -44,16 +44,18 @@ CHECK_FLAG = "--check"
 #: The flags, and the ONE place the set is written.
 FLAGS: tuple[str, ...] = (CHECK_FLAG, WRITE_FLAG)
 
-#: What a reader is told when the index restates a value it does not own. One
-#: message for both classes because the remedy is one remedy: the ledger is
-#: machine-local so a count off it is uncheckable, the image digests are
-#: rendered so a copy of one is redundant, and in all three live instances
-#: UPDATING the restatement is exactly what had been done before and what left
-#: it stale again. The per-claim lines above it name which value and which
-#: project; this says what to do about it.
+#: What a reader is told under the claim lines. The per-claim lines name the
+#: value and the entry; this names the two remedies and which applies. A
+#: restated ledger count or image digest is DELETED, never updated, because
+#: updating is what had been done to all three live instances and what left
+#: them stale again. A moved review marker is the opposite case: the sentence
+#: was true and the evidence moved, so the entry is re-read against it and
+#: the marker bumped. Until 2026-09-14 this line said "delete" for both, and
+#: the first marker to fire was told to delete the marker.
 CLAIM_GUIDANCE: Final[str] = (
-    "each line above restates a value this file does not own; delete the restatement "
-    "rather than updating it, because updating is what left the last three stale\n"
+    "a restated ledger count or image digest above is deleted rather than updated, "
+    "because updating is what left the last three stale; a moved review marker means "
+    "new evidence landed, so re-read that entry against it and bump the marker\n"
 )
 
 

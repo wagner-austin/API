@@ -1086,7 +1086,7 @@ spreads and the perturbation hierarchy the card term comes from:
 
 ### `mi-cu128` — the Blackwell determinism baseline
 
-<!-- reviewed: tools/hpc3/runs/*-cu128-*.json = 23 -->
+<!-- reviewed: tools/hpc3/runs/*-cu128-*.json = 24 -->
 
 
 Registered 2026-09-04 (board task `9e4db632`, commit `3400be03`); the full
@@ -1166,7 +1166,24 @@ name appeared nowhere here — was mine, and another session bridged it.
   because the stack is what identifies these and the arm prefix is what
   varies. The image builds need no negation: they are driven from
   `specs/abl-cu128-image.json`, which was already tracked.
-- **Verdict, within-stack:** ordered/owned records bit-identical across the
+
+  **The 24th document is `sweep-floorfull-cu128-rtx6000.json`, added
+  2026-09-14, and its first submission is a cluster finding rather than a
+  measurement.** It scores the full 2,627-item floor on the RTX PRO 6000,
+  cuBLAS plus rank1 in eighteen chunks, nineteen members throttled to four so
+  that it fits a QOS that lets one user hold four GPUs (the `throttle` field
+  and its ceiling rule were added to the package for it). Array `56008291`:
+  **all nineteen FAILED in 5 to 10 seconds.** The prologue, which runs
+  `nvidia-smi` OUTSIDE the container, printed `No devices were found` on
+  `hpc3-gpu-n54-00` and `-01`. Probed directly with a 2-minute `srun` on each:
+  the allocated device `0000:71:00.0` (GPU 0, the one an idle node hands out
+  first) answers `Unable to determine the device handle: Unknown Error` on
+  both, while `n54-03` presents its Blackwell card normally. `sinfo` shows all
+  three IDLE with no reason and four GPUs each, so the scheduler would place
+  the resubmission on the same two nodes. `exclude_nodes` was added to the
+  job contract for exactly this, and the resubmission below names them. The
+  fault itself belongs to RCIC and is reported separately; nothing in this
+  repository can repair a node.
   Blackwell card and the L40S — gemm 186/186, train 1,283/1,283, attention
   stages 140/140, full-set outcomes one payload (`sha256:e964e46b…`),
   accuracy 1,374/2,627 on both. Vendor cuBLAS still speaks per-card dialects

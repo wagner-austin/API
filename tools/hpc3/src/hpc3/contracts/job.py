@@ -148,6 +148,17 @@ class JobSpec(TypedDict):
             the experiment -- and this field is how a run says so and queues
             deliberately. Refused on a CPU-only job (no pin to justify) and
             refused blank (a reason nobody wrote is not a reason).
+        exclude_nodes: Nodes the scheduler must not place this job on, empty
+            for no restriction. Rendered as ``#SBATCH --exclude``. This
+            exists because on 2026-09-14 ``hpc3-gpu-n54-00`` and ``-01`` sat
+            IDLE with no reason, advertising four RTX6000 each, while the
+            device an allocation on them bound (``0000:71:00.0``, GPU 0, the
+            one an idle node hands out first) answered ``nvidia-smi`` with
+            "Unable to determine the device handle: Unknown Error". Nineteen
+            tasks died in under ten seconds and the scheduler would have
+            placed the resubmission on the same two nodes. A node fault the
+            scheduler does not know about is one the document has to route
+            around by name.
     """
 
     project: str
@@ -155,6 +166,7 @@ class JobSpec(TypedDict):
     partition: str
     gpu: GpuRequest | None
     gpu_pinned_because: str | None
+    exclude_nodes: tuple[str, ...]
     cpus: int
     mem_gb: int
     minutes: int
@@ -325,6 +337,7 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "partition": spec["partition"],
         "gpu": encode_gpu_request(spec["gpu"]),
         "gpu_pinned_because": spec["gpu_pinned_because"],
+        "exclude_nodes": list(spec["exclude_nodes"]),
         "cpus": spec["cpus"],
         "mem_gb": spec["mem_gb"],
         "minutes": spec["minutes"],
@@ -339,6 +352,38 @@ def encode_job_spec(spec: JobSpec) -> dict[str, JSONValue]:
         "experiment": encode_experiment(spec["experiment"]),
         "command": spec["command"],
     }
+
+
+def _decode_exclude_nodes(value: dict[str, JSONValue]) -> tuple[str, ...]:
+    """Read the nodes a job must not be placed on.
+
+    Args:
+        value: The job object.
+
+    Returns:
+        The node names, in document order, or empty when the field is absent
+        or null.
+
+    Raises:
+        JSONTypeError: If the field is present and not a list of non-empty
+            strings, or names a node twice. A blank entry would render as
+            ``--exclude=,`` and Slurm's answer to that is a usage error three
+            layers later; a repeat is a list somebody edited twice and read
+            once.
+    """
+    raw = value.get("exclude_nodes")
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise JSONTypeError(f"Field 'exclude_nodes' must be a list, got {type(raw).__name__}")
+    nodes: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or item.strip() == "":
+            raise JSONTypeError("Field 'exclude_nodes' must hold non-empty node names")
+        nodes.append(item)
+    if len(set(nodes)) != len(nodes):
+        raise JSONTypeError(f"Field 'exclude_nodes' names a node twice: {nodes}")
+    return tuple(nodes)
 
 
 def decode_job_spec(
@@ -407,6 +452,7 @@ def decode_job_spec(
         partition=partition,
         gpu=gpu,
         gpu_pinned_because=gpu_pinned_because,
+        exclude_nodes=_decode_exclude_nodes(value),
         cpus=_require_positive(value, "cpus"),
         mem_gb=_require_positive(value, "mem_gb"),
         minutes=minutes,

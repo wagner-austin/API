@@ -127,6 +127,12 @@ class TestResolveChain:
         stages = resolve_chain(_workspace(), _document())["stages"]
         assert {stage["env_path"] for stage in stages} == {"/opt/env"}
 
+    def test_every_stage_inherits_the_chains_excluded_nodes(self) -> None:
+        """Chain-level: a node that cannot present its GPU to stage one
+        cannot present it to stage two."""
+        chain = resolve_chain(_workspace(), _document(exclude_nodes=["hpc3-gpu-n54-00"]))
+        assert [stage["exclude_nodes"] for stage in chain["stages"]] == [("hpc3-gpu-n54-00",)] * 2
+
     def test_a_stage_may_differ_in_resources_from_its_neighbour(self) -> None:
         """The reason a chain is not a sweep: a training stage holds a GPU and
         the evaluation reading its checkpoints often does not."""

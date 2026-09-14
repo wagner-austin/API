@@ -93,6 +93,9 @@ def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
             partition=spec["base"]["partition"],
             gpu=spec["base"]["gpu"],
             gpu_pinned_because=spec["base"]["gpu_pinned_because"],
+            # Shared like the environment: a node that cannot present its
+            # GPU to one member cannot present it to another.
+            exclude_nodes=spec["base"]["exclude_nodes"],
             cpus=spec["base"]["cpus"],
             mem_gb=spec["base"]["mem_gb"],
             minutes=spec["base"]["minutes"],

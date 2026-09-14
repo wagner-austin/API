@@ -41,6 +41,7 @@ from hpc3.contracts.sweep import SweepSpec, expand_sweep
 from hpc3.core.sbatch import (
     code_provenance_export,
     determinism_exports,
+    exclude_directives,
     format_walltime,
     image_digest_export,
     job_comment,
@@ -104,6 +105,7 @@ def render_array_sbatch(spec: SweepSpec, *, log_dir: str, charge_account: str) -
         f"#SBATCH -p {base['partition']}",
         *([] if charge_account == "" else [f"#SBATCH --account={charge_account}"]),
         *([] if gpu is None else [f"#SBATCH --gres=gpu:{gpu['model']}:{gpu['count']}"]),
+        *exclude_directives(base),
         f"#SBATCH -c {base['cpus']}",
         f"#SBATCH --mem={base['mem_gb']}G",
         f"#SBATCH -t {format_walltime(base['minutes'])}",

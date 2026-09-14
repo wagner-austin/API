@@ -52,6 +52,7 @@ def _spec(model: str | None, count: int = 1) -> JobSpec:
         partition="free-gpu",
         gpu=None if model is None else {"model": model, "count": count},
         gpu_pinned_because=None,
+        exclude_nodes=(),
         cpus=8,
         mem_gb=16,
         minutes=30,

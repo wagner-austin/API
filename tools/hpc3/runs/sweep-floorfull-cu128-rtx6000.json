@@ -3,6 +3,7 @@
   "name": "floorfull-cu128-rtx6000",
   "throttle": 4,
   "minutes": 15,
+  "exclude_nodes": ["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"],
   "experiment": {
     "kind": "cloze-floor-kernel-arm",
     "card": "RTX6000",

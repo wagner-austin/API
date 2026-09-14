@@ -37,6 +37,7 @@ def _base(**overrides: JSONValue) -> dict[str, JSONValue]:
         "partition": "free-gpu",
         "gpu": gpus("A100"),
         "gpu_pinned_because": None,
+        "exclude_nodes": [],
         "cpus": 8,
         "mem_gb": 96,
         "minutes": 30,

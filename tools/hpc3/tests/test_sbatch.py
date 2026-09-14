@@ -77,6 +77,16 @@ class TestRenderSbatch:
         assert "#SBATCH --mem=96G" in script
         assert "#SBATCH -t 00:30:00" in script
 
+    def test_excluded_nodes_become_one_exclude_directive(self) -> None:
+        """Comma-joined, one line, the spelling Slurm reads."""
+        script = _render(spec(exclude_nodes=["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"]))
+
+        assert "#SBATCH --exclude=hpc3-gpu-n54-00,hpc3-gpu-n54-01" in script
+
+    def test_no_exclusion_emits_no_exclude_line_at_all(self) -> None:
+        """``--exclude=`` with nothing after it is a usage error, not a no-op."""
+        assert "--exclude" not in _render(spec())
+
     def test_log_paths_carry_the_job_id_pattern(self) -> None:
         script = _render(spec())
         assert f"#SBATCH -o {LOG_DIR}/abl.arm-b-42-%j.out" in script
