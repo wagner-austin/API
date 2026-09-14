@@ -8,12 +8,12 @@ source_paths:
   - "src/hpc3/core/array_submit.py"
   - "src/hpc3/contracts/array.py"
 source_git_blobs:
-  "src/hpc3/core/array_sbatch.py": "8ebc37d14ba8fb7d1dcd8b629225fddb57e1cd53"
-  "src/hpc3/core/array_submit.py": "97a1d6240ff6a7032bbba3a86710c3220d624061"
-  "src/hpc3/contracts/array.py": "cb1ed261958a7a3b541d972e0d64a69da681692e"
+  "src/hpc3/core/array_sbatch.py": "2e4af50b67a58a6b888da19effb40259e8d384ed"
+  "src/hpc3/core/array_submit.py": "d6fc8dc095a59ed38f35082ed246298c8cc4e291"
+  "src/hpc3/contracts/array.py": "3ac2482e4cf1f25db5a90cbfc76de537e94c4811"
 provenance:
   - "probe job 55678543 (free, --array=0-3%2), 2026-09-01"
-fact_checked: 2026-09-06
+fact_checked: 2026-09-14
 confidence: high
 ---
 
@@ -36,6 +36,14 @@ what ran" true while letting a campaign resubmit its sparse gap --
 task-to-member mapping cannot drift between convergence passes. Uniformity
 needs no runtime check: the renderer takes the sweep document itself, whose
 members share the template by construction.
+
+The throttle follows the second rule. A sweep that declares ``throttle: 4``
+is submitted as ``--array=0-18%4`` by ``format_array_argument``, and a
+campaign resubmitting its gap as ``--array=3,17-19%4`` still runs it four at
+a time against the same script. It was the one half of the ``%`` syntax this
+package lacked: ``expand_job_id`` had discarded a throttle from the cluster's
+pending aggregate since the probe below, and no document could write one
+until 2026-09-14 ([[sweeps-and-artifacts]] has the case that needed it).
 
 ## Identity, measured before coded
 

@@ -7,9 +7,9 @@ source_paths:
   - "src/hpc3/contracts/run.py"
   - "src/hpc3/contracts/experiment.py"
 source_git_blobs:
-  "src/hpc3/contracts/run.py": "c3d17711f71ea01ba5eeb14eb3293ad89f527cd0"
+  "src/hpc3/contracts/run.py": "fe5f5b4deaf3f7d404cd01142b8ace6ecb19fcbd"
   "src/hpc3/contracts/experiment.py": "530e8484b421d13119e951fef3ed8ea8b2706abf"
-fact_checked: 2026-09-09
+fact_checked: 2026-09-14
 confidence: high
 ---
 
@@ -70,3 +70,23 @@ A run may chain onto a job already queued:
 It is never a project default — a default would name ids from a previous
 session, and a stale `afterok` on a job that finished last week is satisfied
 instantly and silently. Multi-stage pipelines belong to [[chains]].
+
+## exclude_nodes is per submission, for the same reason
+
+```json
+{ "project": "mi-cu128", "name": "floorfull-cu128-rtx6000",
+  "exclude_nodes": ["hpc3-gpu-n54-00", "hpc3-gpu-n54-01"], ... }
+```
+
+Added 2026-09-14 after those two nodes sat IDLE with no reason, advertising
+`gpu:RTX6000:4`, while the device an allocation on them bound (`0000:71:00.0`,
+GPU 0, the one an idle node hands out first) answered `nvidia-smi` with
+"Unable to determine the device handle: Unknown Error". Nineteen tasks died in
+under ten seconds and the scheduler would have placed the resubmission on the
+same nodes. It renders as `#SBATCH --exclude=` on both the single-job and the
+array script, from one helper so the two cannot spell it differently; a sweep's
+members and a chain's stages inherit it. A blank entry, a repeat, or anything
+that is not a list of names is refused. A project default would be the wrong
+shape for the same reason `depends_on` cannot be one: a node fault is a fact
+about today's cluster, and a default would keep routing around a node long
+after it was repaired.

@@ -7,13 +7,13 @@ source_paths:
   - "src/hpc3/core/sbatch.py"
   - "src/hpc3/core/array_sbatch.py"
 source_git_blobs:
-  "src/hpc3/core/sbatch.py": "7b378a66a9ab8eaee53a33e06a62494395d259a3"
-  "src/hpc3/core/array_sbatch.py": "8ebc37d14ba8fb7d1dcd8b629225fddb57e1cd53"
+  "src/hpc3/core/sbatch.py": "8aee3d5af17615635b977964617361d2de8aac0a"
+  "src/hpc3/core/array_sbatch.py": "2e4af50b67a58a6b888da19effb40259e8d384ed"
 provenance:
   - "probe job 55675199 on hpc3-l18-04, 2026-09-01"
   - "rusted engine log champion-s2707 (ab48-v7), 2026-09-01"
   - "clients/RustedWarfareBot src/rw_bot/harness/campaign.py@member_command (outside this workspaceRoot)"
-fact_checked: 2026-09-01
+fact_checked: 2026-09-14
 confidence: high
 ---
 

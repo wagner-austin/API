@@ -7,9 +7,9 @@ source_paths:
   - "src/hpc3/contracts/sweep.py"
   - "src/hpc3/core/sweep.py"
 source_git_blobs:
-  "src/hpc3/contracts/sweep.py": "52dcf1549a3531a2b847643ca056f6c2226043fa"
-  "src/hpc3/core/sweep.py": "6796f42b6a10dbb1ea223b0ae9f3651ff4f1675e"
-fact_checked: 2026-09-09
+  "src/hpc3/contracts/sweep.py": "7c63b071da5d96248cbee482acb3624a04cb8a25"
+  "src/hpc3/core/sweep.py": "b730820ce899c2f022e3c69fd97f78844d77c6cd"
+fact_checked: 2026-09-14
 confidence: high
 ---
 
@@ -59,3 +59,29 @@ Which ceiling binds follows from the partition: GPU work pends against
 `gres/gpu`, CPU work against `cpu`. A ceiling the QOS **does not declare** is
 not checked — `free-gpu-part` caps GPUs and says nothing about cores, and
 inventing a core limit for it would refuse sweeps the cluster would have run.
+
+## A sweep larger than the ceiling declares a throttle
+
+Nineteen cloze-floor members on `free-gpu32`, whose QOS lets one user hold
+four GPUs, is a sweep the check above refuses and the package had no shape
+for until 2026-09-14: a chain is sequential single jobs, a campaign resolves
+the whole sweep first, and five documents for one measurement is the failure
+[[preemption-and-campaigns]] describes. Slurm's own answer is `--array=0-18%4`,
+and the parsers here had understood that `%` from the cluster's side since
+probe job 55678543 without a document being able to write it.
+
+A sweep may now carry `"throttle": 4`. Absent or null means what every earlier
+document meant, all at once. **The ceiling is checked against the throttle
+when one is declared**, because the throttle is what the scheduler will
+actually let run: nineteen members at throttle 4 hold four GPUs. Decoding
+refuses a throttle below one, above the member count (it cannot bind, so it
+is a typo), a boolean, or a non-integer, each by name. The rendered `%N`
+travels on both `sbatch` calls, the `--test-only` dry run and the real one,
+so the preflight verdict is about the job that gets submitted — and it stays
+the submitter's argument rather than a script directive, for the reason
+[[job-arrays]] gives.
+
+The wall clock is the other half of fitting. The same document brought its
+budget projection from 17.4 GPU-hours to 4.75 by stating `minutes: 15` from a
+measured 328-second chunk rather than inheriting the project's 55-minute
+default; the cap itself was not touched.
