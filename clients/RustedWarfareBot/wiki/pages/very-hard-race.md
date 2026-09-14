@@ -234,7 +234,7 @@ of it -- our deaths were recorded per event, the rival's only as a card
 total -- and that is the question that separates an economy lane from
 a tactical one.
 
-## The kill ledger answers: same deaths, a fifth fewer kills, at every starting size
+## The kill ledger answers: same deaths, a fifth fewer kills, and the numbers explain it
 
 The engine's kill ledger now rides every sample ([[policy-trace]]), and
 `attrbar96` replayed the champion's 96 seeds from that tree: all 96
@@ -252,47 +252,59 @@ At sample 1,000, before real fighting, the rival's army is already 841
 larger in the losses: that is the opening roll. By 1,500 the gap is
 2,193, and our side of it is on the KILL side of the exchange, not the
 death side -- 23.1 of ours lost against 24.6, but 15.7 of theirs
-against 12.5. Binned by the rival's army at 1,000, the losses trade
-worse than the wins inside every bin, and the exchange RISES with the
-rival's starting size in both groups, so it is not Lanchester's
-arithmetic of fighting a bigger army:[^17]
+against 12.5.
 
-| rival army at 1,000 | wins: n, exchange 1,000-1,500 | losses: n, exchange |
+The first reading of that deficit was wrong, and the correction is the
+finding. Binned by the rival's army at sample 1,000, the losses traded
+worse than the wins inside every bin and the exchange appeared to RISE
+with the rival's size, which read as a tactical deficit rather than
+Lanchester's arithmetic. But the rival grows faster between 1,000 and
+1,500 in the losses (its income is 78 there against 67), so its size
+at 1,000 understates what the waves actually fought. Binned by its
+size at 1,500 -- the size at fight time -- the exchange falls with the
+rival's size in both groups, as numbers say it should, and the gap
+between wins and losses closes wherever both have members:[^17]
+
+| rival army at 1,500 | wins: n, exchange 1,000-1,500 | losses: n, exchange |
 |---|---|---|
-| under 8,000 | 23, 0.67 | 5, 0.37 |
-| 8,000-9,000 | 18, 0.78 | 4, 0.48 |
-| 9,000-10,000 | 19, 0.75 | 8, 0.63 |
-| 10,000-11,000 | 9, 0.98 | 8, 0.70 |
-| over 11,000 | 0 | 2, 0.76 |
+| under 9,000 | 29, 0.94 | 4, 0.65 |
+| 9,000-10,500 | 10, 0.78 | 5, 0.57 |
+| 10,500-12,000 | 14, 0.60 | 5, 0.77 |
+| 12,000-14,000 | 13, 0.55 | 8, 0.55 |
+| over 14,000 | 3, 0.60 | 5, 0.42 |
 
-In that window our deaths per game match (18.2 against 18.9) and so
-does what kills us (ground 10.0 against 9.8, artillery 0.8 against 1.0,
-structures 1.3 against 1.2; air 4.8 against 5.7 is the one class that
-moves), but a smaller share of them fall forward (0.81 against 0.74)
-and we raze less (1.2 buildings against 0.8). The one verb in that
-window that spends the reserve on a target it does not kill is the
-interception, which the losses issue two and a half times as often;
-the champion commits the whole reserve to it (`guard_cap 0`) and the
-flag itself was never in the population search's genome. `icptbar192`
-priced the interception off and bounded to three units on the same 96
-seeds.[^18]
+The fights themselves say the same thing. Clustering both sides'
+losses into fights by time, the losses fight the same number of trades
+(3.3 against 3.1 per game) that start on the same footing (2.5 of ours
+inside their guns against 2.9, 3.0 of theirs inside ours against 3.2,
+an army of 10.9 against 11.2), and the kill deficit splits three ways
+with no dominant piece: trades a little worse (8.4 of theirs against
+9.7 for the same 11 of ours), fewer harvests where theirs die on our
+defences with none of ours lost (2.4 against 3.4), and one more of ours
+per game dying forward to a gunship with nothing killed back (1.7
+against 0.9).[^18] Every piece is what a tenth more enemy army does at
+the fight; none is a decision the champion is making wrong.
 
-Both are rejected, and the two answers together rule the interception
-out as the cause. Off reads 59, fifteen gained and twenty-five lost:
-the reserve turning on raiders is worth ten wins to the champion, so
-the losses' extra interceptions are the symptom of more raids, not a
-drain. Bounded to three reads 68, eleven gained and twelve lost -- the
-largest flip count of any arm on this bar, twenty-three seeds moving
-for a net of minus one, which is what a perturbation of the deciding
-fights on knife-edge seeds looks like and not what a lever looks like.
-The kill-side deficit in the window stands, with its first candidate
-cause measured and cleared.[^19]
+So the corpus reading stands where the event level left it, now with
+the ledger behind it: a Very Hard loss is the rival's income roll,
+which builds an army a tenth larger by 1,000 and a fifth larger by
+1,500, and the exchange follows the numbers. `icptbar192` priced the
+interception off and bounded to three units on the same 96 seeds
+before that correction landed, because the window's extra
+interceptions had read as a candidate cause; both are rejected. Off
+reads 59, fifteen gained and twenty-five lost: the reserve turning on
+raiders is worth ten wins to the champion, so the extra interceptions
+are the symptom of more raids reaching home. Bounded to three reads 68,
+eleven gained and twelve lost -- the largest flip count of any arm on
+this bar, twenty-three seeds moving for a net of minus one, which is
+what a perturbation of the deciding fights on knife-edge seeds looks
+like and not what a lever looks like.[^19]
 
 [^19]: `pair_read.py` over `runs/sweeps/icptbar192` (all 192 cards, nine members preempted and requeued) against the divebar192 champion cards. guard3 gained s8927185 s8927289 s8929161 s8929473 s8931313 s8931625 s8932977 s8933913 s8934537 s8935473 s8935785, lost s8925001 s8925105 s8925209 s8925833 s8929057 s8929265 s8931001 s8931729 s8932041 s8932145 s8933185 s8935369; noicpt gained 15 and lost 25, the lists in the log entry of 2026-09-14.
 
 [^16]: `attr96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/sweeps/attrbar96` against `runs/sweeps/divebar192` (identity on every line but the title, engine clock, dives and enemy peak lines) and over `runs/traces/attrbar96/champ-*.ndjson`, columns 24-26 at the named samples and the per-loss table for our deaths to that sample.
-[^17]: `exchange96.py` over the same traces: rival units lost between samples 1,000 and 1,500 (column 25 differenced) over our per-loss deaths in the same frames, binned by column 24 at sample 1,000.
-[^18]: the same reader's killer-class split of our deaths in the window (`x` below 1,900 is forward on duel_lake) and column 26 differenced for buildings razed; `sweeps/icptbar192.txt` with `doctrines/evolve1-g4m2-noicpt.doctrine` (intercept 0) and `doctrines/evolve1-g4m2-guard3.doctrine` (guard_cap 3), each one line from the champion; the intercept counts are the cards' `intercepted` line per thousand samples, 84 in the wins against 222 in the losses.
+[^17]: `exchange96.py` over the same traces: rival units lost between samples 1,000 and 1,500 (column 25 differenced) over our per-loss deaths in the same frames, binned by column 24 at sample 1,000 (the first, confounded read: wins 0.67/0.78/0.75/0.98 against losses 0.37/0.48/0.63/0.70 for rival armies under 8,000, 8,000-9,000, 9,000-10,000 and 10,000-11,000) and at sample 1,500 (the table).
+[^18]: `fights96.py` over the same traces: every loss event on either side in the window (ours from the per-loss table with killer class and `x` below 1,900 as forward on duel_lake; theirs from column 25 differenced sample to sample) on one timeline, clustered with a 1,500-frame gap; a fight with losses on both sides is a trade, on ours alone a free fight, on theirs alone a harvest; the footing is columns 22, 23 and 1 at the trade's first sample. `sweeps/icptbar192.txt` with `doctrines/evolve1-g4m2-noicpt.doctrine` (intercept 0) and `doctrines/evolve1-g4m2-guard3.doctrine` (guard_cap 3), each one line from the champion; the intercept counts are the cards' `intercepted` line per thousand samples, 84 in the wins against 222 in the losses.
 
 [^14]: `bursts96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/traces/divebar192/champ-*.ndjson`: army deaths in frames 75,000-190,000 grouped with a 900-frame gap and a 400-unit radius; the ratio is `rival_army / worth` at the sample before each burst. Burst size histogram, wins: 1102 singles, 289 pairs, 124 triples, 171 of four or more; losses: 494, 102, 39, 62.
 [^15]: `extract96.py` over the same traces (extractor deaths by window, side and killer; extractors and workers columns at samples 750-2,000) and the `intercepted`, `expansions`, `samples seen` lines of the 96 champion cards in `runs/sweeps/divebar192`. Extractors at 1,000 / 1,500: wins 5.68 / 5.04, losses 5.56 / 4.37; workers 7.70 / 5.84 against 7.56 / 6.11.
