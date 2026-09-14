@@ -62,10 +62,18 @@ class SweepSpec(TypedDict):
         base: The shared job settings. Already validated, so every member
             inherits a spec that satisfies all five submission rules.
         members: The variations. Never empty.
+        throttle: How many members may RUN at once, or None for all of them.
+            Rendered as Slurm's ``%N`` on the array argument. This is what
+            lets a sweep be LARGER than the running ceiling without pending
+            against the QOS: the ceiling is checked against the throttle,
+            because the throttle is what the scheduler will actually let
+            run. Absent, the sweep means what it always meant, every member
+            at once, and the ceiling binds on the member count.
     """
 
     base: JobSpec
     members: list[SweepMember]
+    throttle: int | None
 
 
 def expand_sweep(spec: SweepSpec) -> list[JobSpec]:
@@ -159,12 +167,15 @@ def decode_sweep_member(value: JSONValue) -> SweepMember:
 
 
 def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
-    """Reject a sweep larger than the partition's per-user QOS admits.
+    """Reject a sweep that would RUN more at once than the per-user QOS admits.
 
     Args:
         cluster: The cluster whose measured QOS ceilings apply.
         base: The template, carrying the partition and per-job GPU count.
-        count: Number of members.
+        count: How many members may run concurrently -- the whole sweep, or
+            its throttle when it declares one. A throttled sweep of nineteen
+            members with ``throttle`` 4 holds four GPUs, not nineteen, and is
+            checked as four.
 
     Raises:
         AppError: With
@@ -189,10 +200,11 @@ def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
     if gpu_ceiling is not None and gpus > gpu_ceiling:
         raise AppError(
             Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING,
-            f"{count} members x {per_job_gpus} GPU(s) = {gpus}, but "
+            f"{count} concurrent members x {per_job_gpus} GPU(s) = {gpus}, but "
             f"{base['partition']!r} on {cluster['slug']!r} allows one user "
             f"{gpu_ceiling} at once. "
-            "The excess would pend against the QOS, not against the cluster.",
+            "The excess would pend against the QOS, not against the cluster; "
+            "declare a `throttle` at or under the ceiling to run the sweep in waves.",
         )
 
     cpus = count * base["cpus"]
@@ -200,19 +212,54 @@ def _check_ceilings(cluster: ClusterFacts, base: JobSpec, count: int) -> None:
     if cpu_ceiling is not None and cpus > cpu_ceiling:
         raise AppError(
             Hpc3ErrorCode.SWEEP_EXCEEDS_CPU_CEILING,
-            f"{count} members x {base['cpus']} core(s) = {cpus}, but "
+            f"{count} concurrent members x {base['cpus']} core(s) = {cpus}, but "
             f"{base['partition']!r} on {cluster['slug']!r} allows one user "
             f"{cpu_ceiling} at once. "
-            "The excess would pend against the QOS, not against the cluster.",
+            "The excess would pend against the QOS, not against the cluster; "
+            "declare a `throttle` at or under the ceiling to run the sweep in waves.",
         )
 
     job_ceiling = facts["max_jobs_per_user"]
     if count > job_ceiling:
         raise AppError(
             Hpc3ErrorCode.SWEEP_EXCEEDS_JOB_CEILING,
-            f"{count} members, but {base['partition']!r} on {cluster['slug']!r} "
-            f"runs at most {job_ceiling} of one user's jobs at once.",
+            f"{count} concurrent members, but {base['partition']!r} on "
+            f"{cluster['slug']!r} runs at most {job_ceiling} of one user's jobs at once; "
+            "declare a `throttle` at or under the ceiling to run the sweep in waves.",
         )
+
+
+def _decode_throttle(value: dict[str, JSONValue], count: int) -> int | None:
+    """Read how many members a sweep allows to run at once.
+
+    Args:
+        value: The sweep object.
+        count: How many members the sweep has.
+
+    Returns:
+        The declared throttle, or None when the field is absent or null,
+        which means every member at once.
+
+    Raises:
+        JSONTypeError: If the field is present and not an integer, is below
+            one, or exceeds the member count. A throttle of zero would run
+            nothing and a throttle above the count cannot bind, so either is a
+            typo rather than a choice, and refusing it is what tells the
+            author which.
+    """
+    raw = value.get("throttle")
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise JSONTypeError(f"Field 'throttle' must be an integer, got {type(raw).__name__}")
+    if raw < 1:
+        raise JSONTypeError(f"Field 'throttle' must be at least 1, got {raw}")
+    if raw > count:
+        raise JSONTypeError(
+            f"Field 'throttle' is {raw} but the sweep has {count} member(s); "
+            "a throttle above the member count cannot bind and is a typo"
+        )
+    return raw
 
 
 def encode_sweep_spec(spec: SweepSpec) -> dict[str, JSONValue]:
@@ -232,7 +279,11 @@ def encode_sweep_spec(spec: SweepSpec) -> dict[str, JSONValue]:
         }
         for member in spec["members"]
     ]
-    return {"base": encode_job_spec(spec["base"]), "members": members}
+    return {
+        "base": encode_job_spec(spec["base"]),
+        "members": members,
+        "throttle": spec["throttle"],
+    }
 
 
 def decode_sweep_spec(
@@ -250,10 +301,11 @@ def decode_sweep_spec(
 
     Raises:
         JSONTypeError: If the value is not an object, the member list is
-            missing or empty, a member is invalid, or two members share a
-            suffix -- which would point two jobs at one log file.
-        AppError: If the template breaks a submission rule, or the sweep is
-            larger than the QOS admits.
+            missing or empty, a member is invalid, two members share a
+            suffix -- which would point two jobs at one log file -- or the
+            throttle is not an integer between one and the member count.
+        AppError: If the template breaks a submission rule, or more members
+            would run at once than the QOS admits.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"sweep spec must be a JSON object, got {type(value).__name__}")
@@ -269,8 +321,9 @@ def decode_sweep_spec(
     if len(set(suffixes)) != len(suffixes):
         raise JSONTypeError(f"Field 'members' must not repeat a suffix, got {suffixes}")
 
-    _check_ceilings(cluster, base, len(members))
-    return SweepSpec(base=base, members=members)
+    throttle = _decode_throttle(value, len(members))
+    _check_ceilings(cluster, base, len(members) if throttle is None else throttle)
+    return SweepSpec(base=base, members=members, throttle=throttle)
 
 
 __all__ = [

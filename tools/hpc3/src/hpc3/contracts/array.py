@@ -146,6 +146,32 @@ def format_array_indices(indices: tuple[int, ...]) -> str:
     return ",".join(parts)
 
 
+def format_array_argument(indices: tuple[int, ...], throttle: int | None) -> str:
+    """Render the complete ``--array`` argument, throttle included.
+
+    Slurm spells "at most N of these tasks at once" as a ``%N`` suffix on
+    the index expression -- ``0-18%4`` -- and it is the submitter's argument
+    rather than a script directive for the same reason the indices are: the
+    script on disk stays the byte-identical member table across every
+    convergence pass, and how fast it may run is decided at submission.
+
+    Args:
+        indices: The document positions to run, strictly increasing.
+        throttle: How many tasks may run at once, or None for no limit.
+
+    Returns:
+        The index expression from :func:`format_array_indices`, followed by
+        ``%`` and the throttle when one is declared.
+
+    Raises:
+        AppError: On the same terms as :func:`format_array_indices`.
+    """
+    expression = format_array_indices(indices)
+    if throttle is None:
+        return expression
+    return f"{expression}{_THROTTLE_SEPARATOR}{throttle}"
+
+
 def _expand_bracket(base_id: str, expression: str, raw: str) -> tuple[str, ...]:
     """Expand one bracketed index expression into task ids.
 
@@ -231,5 +257,6 @@ __all__ = [
     "base_job_id",
     "base_job_ids",
     "expand_job_id",
+    "format_array_argument",
     "format_array_indices",
 ]

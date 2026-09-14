@@ -29,7 +29,7 @@ import pathlib
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 
-from hpc3.contracts.array import array_task_id, format_array_indices
+from hpc3.contracts.array import array_task_id, format_array_argument
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.layout import qualified_name
 from hpc3.contracts.ledger import LedgerEntry
@@ -148,7 +148,7 @@ def array_preflight(
     label = qualified_name(base["project"], base["name"])
     remote.put_bytes(host, f"{script_dir}/{label}.sbatch", script.encode("utf-8"))
 
-    expression = format_array_indices(indices)
+    expression = format_array_argument(indices, spec["throttle"])
     probe = (
         f"cd {script_dir} && sbatch --test-only --array={expression} {label}.sbatch 2>&1; "
         'echo "rc=$?"'
@@ -209,7 +209,7 @@ def submit_array(
             codes from :func:`array_preflight`, or ``REMOTE_COMMAND_FAILED``
             when a command failed or ``sbatch`` announced no usable id.
     """
-    expression = format_array_indices(indices)
+    expression = format_array_argument(indices, spec["throttle"])
     rows = selected_members(spec, indices)
 
     # One account enumeration for every member, then the same per-artifact

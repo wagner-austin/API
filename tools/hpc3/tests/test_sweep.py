@@ -17,11 +17,12 @@ from tests.conftest import PREFLIGHT_LINE, FakeRun, LoggedEvent, cluster, gpus
 _AT = "2026-08-22T16:00:00+00:00"
 
 
-def _sweep(count: int = 3, **overrides: JSONValue) -> SweepSpec:
+def _sweep(count: int = 3, *, throttle: int | None = None, **overrides: JSONValue) -> SweepSpec:
     """Build a decoded sweep.
 
     Args:
         count: How many members.
+        throttle: How many may run at once, or None for all.
         **overrides: Template fields to replace.
 
     Returns:
@@ -49,7 +50,7 @@ def _sweep(count: int = 3, **overrides: JSONValue) -> SweepSpec:
         {"suffix": f"s{i}", "command": f"python train.py --seed {i}", "artifact": None}
         for i in range(count)
     ]
-    return decode_sweep_spec({"base": base, "members": members})
+    return decode_sweep_spec({"base": base, "members": members, "throttle": throttle})
 
 
 def _healthy(fake: FakeRun) -> None:
@@ -105,6 +106,23 @@ class TestSubmitSweep:
             c for c in fake_run.commands() if "sbatch --array=" in c and "--test-only" not in c
         ]
         assert submits == ["cd /j && sbatch --array=0-2 abl.rung.sbatch"]
+
+    def test_a_throttled_sweep_carries_the_throttle_on_both_sbatch_calls(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        """The dry run must see the same argument the real submission sends,
+        or the preflight verdict is about a different job. And the throttle
+        is an argument, never a script directive, so the script on disk stays
+        the byte-identical member table across convergence passes."""
+        _healthy(fake_run)
+        fake_run.add("sbatch --array=", stdout="Submitted batch job 101\n")
+
+        assert _run(_sweep(6, throttle=2), tmp_path) == [f"101_{i}" for i in range(6)]
+        array_calls = [c for c in fake_run.commands() if "sbatch" in c and "--array=" in c]
+        assert array_calls == [
+            'cd /j && sbatch --test-only --array=0-5%2 abl.rung.sbatch 2>&1; echo "rc=$?"',
+            "cd /j && sbatch --array=0-5%2 abl.rung.sbatch",
+        ]
 
     def test_every_member_is_reported_by_the_name_squeue_will_show(
         self, tmp_path: pathlib.Path, fake_run: FakeRun

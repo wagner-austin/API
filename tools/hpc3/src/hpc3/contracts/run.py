@@ -63,6 +63,7 @@ SWEEP_IDENTITY_FIELDS = (
     "experiment",
     "depends_on",
     "gpu_pinned_because",
+    "throttle",
 )
 """What only a sweep can say.
 
@@ -304,7 +305,7 @@ def resolve_sweep(workspace: Workspace, value: JSONValue) -> SweepSpec:
     base["command"] = first.get("command") if isinstance(first, dict) else None
 
     return decode_sweep_spec(
-        {"base": base, "members": members},
+        {"base": base, "members": members, "throttle": document.get("throttle")},
         workspace_cluster(workspace),
         max_service_units=defaults["budget"]["max_service_units"],
     )

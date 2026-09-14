@@ -1,0 +1,111 @@
+{
+  "project": "mi-cu128",
+  "name": "floorfull-cu128-rtx6000",
+  "throttle": 4,
+  "minutes": 15,
+  "experiment": {
+    "kind": "cloze-floor-kernel-arm",
+    "card": "RTX6000",
+    "image": "cu128-v1",
+    "controls": "both",
+    "items": "full2627",
+    "why": "sixth_gpu_model_for_the_full_set_floor_panel"
+  },
+  "members": [
+    {
+      "suffix": "cublas",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/cloze-items-80f9732a.jsonl --label gpt2-floorfull-rtx6000-cu128-cublas --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-cublas.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-cublas-outcomes.json --kernel cublas",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-cublas.json"
+    },
+    {
+      "suffix": "rank1-c00",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-00.jsonl --label gpt2-floorfull-c00-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c00.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c00-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c00.json"
+    },
+    {
+      "suffix": "rank1-c01",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-01.jsonl --label gpt2-floorfull-c01-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c01.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c01-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c01.json"
+    },
+    {
+      "suffix": "rank1-c02",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-02.jsonl --label gpt2-floorfull-c02-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c02.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c02-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c02.json"
+    },
+    {
+      "suffix": "rank1-c03",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-03.jsonl --label gpt2-floorfull-c03-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c03.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c03-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c03.json"
+    },
+    {
+      "suffix": "rank1-c04",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-04.jsonl --label gpt2-floorfull-c04-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c04.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c04-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c04.json"
+    },
+    {
+      "suffix": "rank1-c05",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-05.jsonl --label gpt2-floorfull-c05-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c05.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c05-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c05.json"
+    },
+    {
+      "suffix": "rank1-c06",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-06.jsonl --label gpt2-floorfull-c06-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c06.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c06-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c06.json"
+    },
+    {
+      "suffix": "rank1-c07",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-07.jsonl --label gpt2-floorfull-c07-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c07.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c07-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c07.json"
+    },
+    {
+      "suffix": "rank1-c08",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-08.jsonl --label gpt2-floorfull-c08-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c08.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c08-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c08.json"
+    },
+    {
+      "suffix": "rank1-c09",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-09.jsonl --label gpt2-floorfull-c09-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c09.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c09-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c09.json"
+    },
+    {
+      "suffix": "rank1-c10",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-10.jsonl --label gpt2-floorfull-c10-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c10.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c10-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c10.json"
+    },
+    {
+      "suffix": "rank1-c11",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-11.jsonl --label gpt2-floorfull-c11-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c11.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c11-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c11.json"
+    },
+    {
+      "suffix": "rank1-c12",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-12.jsonl --label gpt2-floorfull-c12-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c12.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c12-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c12.json"
+    },
+    {
+      "suffix": "rank1-c13",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-13.jsonl --label gpt2-floorfull-c13-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c13.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c13-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c13.json"
+    },
+    {
+      "suffix": "rank1-c14",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-14.jsonl --label gpt2-floorfull-c14-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c14.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c14-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c14.json"
+    },
+    {
+      "suffix": "rank1-c15",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-15.jsonl --label gpt2-floorfull-c15-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c15.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c15-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c15.json"
+    },
+    {
+      "suffix": "rank1-c16",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-16.jsonl --label gpt2-floorfull-c16-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c16.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c16-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c16.json"
+    },
+    {
+      "suffix": "rank1-c17",
+      "command": "python -m model_trainer.cli.score_baseline --model gpt2 --device cuda --max-seq-len 512 --experiment wiki-corpus-extraction-ablation --items /pub/wagnera3/floor/chunks150/chunk-17.jsonl --label gpt2-floorfull-c17-rtx6000-cu128-rank1 --out /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c17.json --outcomes /pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c17-outcomes.json --kernel rank1",
+      "artifact": "/pub/wagnera3/floor/cu128-v1/rtx6000-full-rank1-c17.json"
+    }
+  ]
+}

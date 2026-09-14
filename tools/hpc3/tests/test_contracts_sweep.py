@@ -79,7 +79,7 @@ def _sweep(**overrides: JSONValue) -> dict[str, JSONValue]:
     Returns:
         A JSON object ready for decoding.
     """
-    spec: dict[str, JSONValue] = {"base": _base(), "members": _members(3)}
+    spec: dict[str, JSONValue] = {"base": _base(), "members": _members(3), "throttle": None}
     spec.update(overrides)
     return spec
 
@@ -87,6 +87,85 @@ def _sweep(**overrides: JSONValue) -> dict[str, JSONValue]:
 class TestValidSweep:
     def test_a_valid_sweep_round_trips(self) -> None:
         assert encode_sweep_spec(decode_sweep_spec(_sweep())) == _sweep()
+
+    def test_a_document_without_the_throttle_field_means_no_throttle(self) -> None:
+        """Every sweep committed before the field existed omits it, and each
+        of them meant every member at once. Absent and null are one value."""
+        payload = _sweep()
+        del payload["throttle"]
+
+        assert decode_sweep_spec(payload)["throttle"] is None
+
+
+class TestThrottle:
+    """A sweep may be larger than the running ceiling if it says how fast it runs.
+
+    The case this was built for: nineteen cloze-floor members on
+    ``free-gpu32``, whose QOS lets one user hold four GPUs. Without a throttle
+    that sweep cannot be constructed; with ``throttle`` 4 it holds four GPUs at
+    a time and the ceiling is checked against four.
+    """
+
+    def test_a_throttled_sweep_over_the_ceiling_is_admitted(self) -> None:
+        payload = _sweep(
+            base=_base(partition="free-gpu32", gpu=gpus("RTX6000")),
+            members=_members(19),
+            throttle=4,
+        )
+
+        decoded = decode_sweep_spec(payload)
+
+        assert len(decoded["members"]) == 19
+        assert decoded["throttle"] == 4
+
+    def test_the_same_sweep_without_a_throttle_is_refused(self) -> None:
+        """The pair that proves the throttle is what admitted it."""
+        payload = _sweep(
+            base=_base(partition="free-gpu32", gpu=gpus("RTX6000")),
+            members=_members(19),
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            decode_sweep_spec(payload)
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
+        assert "declare a `throttle`" in str(excinfo.value)
+
+    def test_a_throttle_over_the_ceiling_is_still_refused(self) -> None:
+        """Throttling to five on a four-GPU QOS pends one, which is the
+        failure the ceiling check exists for."""
+        payload = _sweep(
+            base=_base(partition="free-gpu32", gpu=gpus("RTX6000")),
+            members=_members(19),
+            throttle=5,
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            decode_sweep_spec(payload)
+        assert excinfo.value.code is Hpc3ErrorCode.SWEEP_EXCEEDS_GPU_CEILING
+
+    def test_the_throttle_round_trips(self) -> None:
+        payload = _sweep(members=_members(6), throttle=2)
+
+        assert encode_sweep_spec(decode_sweep_spec(payload)) == payload
+
+    def test_a_throttle_below_one_is_refused(self) -> None:
+        """Zero would run nothing; that is a typo, not a choice."""
+        with pytest.raises(JSONTypeError, match="at least 1"):
+            decode_sweep_spec(_sweep(throttle=0))
+
+    def test_a_throttle_above_the_member_count_is_refused(self) -> None:
+        """A throttle that cannot bind is one somebody mistyped."""
+        with pytest.raises(JSONTypeError, match="cannot bind"):
+            decode_sweep_spec(_sweep(members=_members(3), throttle=4))
+
+    def test_a_non_integer_throttle_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be an integer"):
+            decode_sweep_spec(_sweep(throttle="4"))
+
+    def test_a_boolean_throttle_is_refused(self) -> None:
+        """``True`` is an ``int`` to ``isinstance`` and would read as 1."""
+        with pytest.raises(JSONTypeError, match="must be an integer"):
+            decode_sweep_spec(_sweep(throttle=True))
 
     def test_expansion_names_each_member_from_the_template(self) -> None:
         specs = expand_sweep(decode_sweep_spec(_sweep()))

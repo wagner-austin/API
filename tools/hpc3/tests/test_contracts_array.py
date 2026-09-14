@@ -16,6 +16,7 @@ from hpc3.contracts.array import (
     base_job_id,
     base_job_ids,
     expand_job_id,
+    format_array_argument,
     format_array_indices,
 )
 
@@ -142,7 +143,35 @@ class TestFormattingIndices:
         assert reversed_caught.value.code is Hpc3ErrorCode.ARRAY_ID_UNPARSABLE
 
 
+class TestFormattingTheArgument:
+    """The complete ``--array`` value: indices, and the throttle when declared."""
+
+    def test_no_throttle_is_the_bare_index_expression(self) -> None:
+        assert format_array_argument((0, 1, 2, 3), None) == "0-3"
+
+    def test_a_throttle_is_appended_with_slurms_separator(self) -> None:
+        """``0-18%4``: nineteen tasks, four at a time."""
+        assert format_array_argument(tuple(range(19)), 4) == "0-18%4"
+
+    def test_a_sparse_gap_keeps_its_throttle(self) -> None:
+        """A campaign resubmitting three members still runs them throttled."""
+        assert format_array_argument((3, 17, 18, 19), 2) == "3,17-19%2"
+
+    def test_an_empty_selection_is_refused_before_the_throttle_is_read(self) -> None:
+        with pytest.raises(AppError) as excinfo:
+            format_array_argument((), 4)
+        assert excinfo.value.code is Hpc3ErrorCode.ARRAY_INDICES_EMPTY
+
+
 class TestRoundTrip:
+    def test_a_throttled_argument_expands_to_the_same_selection(self) -> None:
+        """The cluster echoes the throttle back in the pending aggregate and
+        the parser discards it; what it submitted and what it sees must be
+        the same tasks."""
+        indices = (0, 2, 3, 4, 9)
+        expanded = expand_job_id(f"777_[{format_array_argument(indices, 4)}]")
+        assert expanded == tuple(array_task_id("777", index) for index in indices)
+
     def test_formatting_then_expanding_returns_the_selection(self) -> None:
         """The submitter renders --array from indices; the parsers expand
         the cluster's echo of it. The two must be inverses or a campaign's
