@@ -1299,12 +1299,21 @@ name appeared nowhere here — was mine, and another session bridged it.
     the opposite of: "carries a `RunFingerprint` as of 2026-08-28" describes
     the writer, not the file, and a reader checking whether the history is
     reproducible needs the second sentence rather than the first.
-  - **`scripts/optimize` still pins nothing.** It was not among the six entry
-    points that got a pin, so its fingerprint honestly reports the
-    determinism stack as `none`. The record is now true; the runs are still
-    not reproducible against themselves. Fixing that means pinning before
-    numpy loads, which `scripts/optimize/__init__.py` currently prevents by
-    importing the world at package import time.
+  - **`scripts/optimize` HAS pinned since 2026-08-29, and this bullet said
+    the opposite for sixteen days.** Until 2026-09-14 it read "still pins
+    nothing … which `scripts/optimize/__init__.py` currently prevents by
+    importing the world at package import time". `460c20382` did exactly the
+    fix it described as blocked: `__init__` holds no re-exports, and
+    `__main__` calls `apply_cpu_determinism` before its first numeric import,
+    refusing with `NativeLibrariesAlreadyLoadedError` if numpy is already up
+    rather than recording a posture the process does not have. Three tests
+    pin the ordering, the refusal and the success path. So the fingerprint a
+    run writes now names the pinned stack, and the reason every row in the
+    history is still `null` is the one the Power bullet above gives: the axis
+    has not run since. **Why this stayed wrong:** the entry's review marker
+    counts benchmark manifests, and a code change to an existing file moves
+    no file count. That is the marker's stated boundary, not a defect in it,
+    and this bullet is the case that shows the boundary is real.
 - **Power:** audited 2026-09-09, board `1e4ab572`. The benchmark family's
   verdicts are stated as per-seed WIN COUNTS over five seeds, which is a sign
   test whose best attainable two-sided p is 0.0625 — **no outcome rejects at
@@ -1484,7 +1493,29 @@ scored is that the item set is a staged file rather than a data-bank id.
   on 2026-09-04, the same day as two files that DO carry one, and carry none
   themselves. So the sidecar follows the entry point rather than the date, and
   an arm evaluated through whichever path lacks it still lands in `results/`
-  looking exactly like an arm that has it
+  looking exactly like an arm that has it.
+
+  **Cause found and fixed 2026-09-14, LSTM `1767d9b`, forward-only.** There
+  was never a second entry point: `zero_shot_eval` writes both files from one
+  run and wrote one sidecar, for the matrix. The asymmetry table now gets its
+  own, under experiment `turkic-zero-shot-asymmetry` rather than the matrix's,
+  because a matrix row is a LEVEL and an asymmetry row is a DIFFERENCE of two
+  with its own interval, and `compare_run_records` refusing to subtract across
+  experiments is precisely the refusal wanted between those. The end-to-end
+  test had asserted the matrix CSV's header and nothing about either sidecar;
+  it now decodes both.
+
+  **The existing v5 and v6 asymmetry files keep no sidecar, and the reason is
+  a finding of its own.** Regenerating `v6_full_skip.csv` from the
+  repository's defaults does not reproduce the committed file: 42 of 49 rows
+  differ, and `number_of_positions_scored` differs (3,137 against 3,010 for
+  `az→az`), so the INPUT differed, not the arithmetic; `data/perception`
+  gives 2,758. The invocation that produced the committed v5 and v6 results
+  is recorded nowhere in that repository, and a sidecar written by a run that
+  cannot reproduce the file would be provenance for a different measurement.
+  This is the same gap the paper-bound arms carry from before adoption,
+  reached from the other side: those had results and no record, these have a
+  record shape and no way to re-derive the results it would describe
 - **Compares:** `zero_shot_excess_ce_*.csv` carries `excess_cross_entropy` —
   one model's cross-entropy minus another's — with confidence intervals,
   across seven languages and nine arms (`pilot_a/b/c`, `variant_b`, `v3`,
