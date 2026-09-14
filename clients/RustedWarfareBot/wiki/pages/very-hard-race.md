@@ -26,7 +26,15 @@ source_paths:
   - "sweeps/turtlebar192.txt"
   - "doctrines/evolve1-g4m2-turtle85.doctrine"
   - "doctrines/evolve1-g4m2-turtle85r.doctrine"
+  - "sweeps/attrbar96.txt"
+  - "sweeps/icptbar192.txt"
+  - "doctrines/evolve1-g4m2-noicpt.doctrine"
+  - "doctrines/evolve1-g4m2-guard3.doctrine"
 source_git_blobs:
+  "sweeps/attrbar96.txt": "f2952dbcc9a7e9ed967af9aa8dad89c50eda1208"
+  "sweeps/icptbar192.txt": "b4f0e2ab8b424ba8c2b5d800ad3fb565366b6582"
+  "doctrines/evolve1-g4m2-noicpt.doctrine": "b789d9033e6474ea839e5a9057e939dd18835ac0"
+  "doctrines/evolve1-g4m2-guard3.doctrine": "7f9cb0926233176fdcee9d85b105ef896f62f28c"
   "src/rw_bot/policy/match_report.py": "2b95059f6ed9ecd25610092f0a49ca2f72b03215"
   "src/rw_bot/policy/scorekeeper.py": "e900ce487c7565519ff5d6687e22e24cd829a482"
   "src/rw_bot/policy/dive.py": "42c9133abd8fe268ec6ecd74814c31c77dde0a06"
@@ -47,6 +55,7 @@ provenance:
   - "scratchpad corpus96.py and early96.py (session f670d9e0, 2026-09-13): the two readers; every number below is their printed output"
   - "runs/sweeps/pressvh48 on hpc3: the 48 paired press verdicts the turtle section reads against"
   - "runs/sweeps/turtlebar192 on hpc3, submitted 2026-09-13 at Very Hard from commit d0ea7720: the bar the turtle section names as unread"
+  - "runs/sweeps/attrbar96 and runs/traces/attrbar96 on hpc3, the champion's 96 seeds replayed from commit 619f2f07c with the kill-ledger columns; attr96.py and exchange96.py (scratchpad, session f670d9e0) are the readers of the two attrition tables"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: 2026-09-13
 confidence: high
@@ -214,14 +223,61 @@ drawn from an army half again larger.[^15] The expansion rate halves
 (4.1 per thousand samples against 9.5) because the pools stay occupied
 and the workers are the same.
 
-Every level of the corpus now says one thing: a Very Hard loss is the
-rival's larger army at sample 1,500, and every downstream difference
-(income, extractor drops, interceptions, engagement ratio) follows from
-it. What the traces cannot yet say is whether the rival's army is
-larger because it BUILT more or because we KILLED less of it -- our
-deaths are recorded per event, the rival's only as a card total -- and
-that is the question that separates an economy lane from a tactical
-one.
+Every level of the corpus read so far said one thing: a Very Hard loss
+is the rival's larger army at sample 1,500, and every downstream
+difference (income, extractor drops, interceptions, engagement ratio)
+follows from it. What those columns could not say is whether the
+rival's army is larger because it BUILT more or because we KILLED less
+of it -- our deaths were recorded per event, the rival's only as a card
+total -- and that is the question that separates an economy lane from
+a tactical one.
+
+## The kill ledger answers: same deaths, a fifth fewer kills, at every starting size
+
+The engine's kill ledger now rides every sample ([[policy-trace]]), and
+`attrbar96` replayed the champion's 96 seeds from that tree: all 96
+cards byte-identical to divebar192's, the fourth certification, so the
+columns below were read off matches that are the same matches.[^16]
+
+| sample | rival army, wins / losses | rival units lost, wins / losses | our units lost, wins / losses | exchange, wins / losses |
+|---|---|---|---|---|
+| 1000 | 8,459 / 9,300 | 2.6 / 1.7 | 4.9 / 5.7 | 0.70 / 0.32 |
+| 1500 | 9,703 / 11,896 | 15.7 / 12.5 | 23.1 / 24.6 | 0.70 / 0.52 |
+| 2000 | 8,507 / 12,993 | 32.9 / 26.7 | 37.3 / 41.2 | 0.91 / 0.67 |
+| 2500 | 5,437 / 14,352 | 51.6 / 42.9 | 54.6 / 59.3 | 0.99 / 0.75 |
+
+At sample 1,000, before real fighting, the rival's army is already 841
+larger in the losses: that is the opening roll. By 1,500 the gap is
+2,193, and our side of it is on the KILL side of the exchange, not the
+death side -- 23.1 of ours lost against 24.6, but 15.7 of theirs
+against 12.5. Binned by the rival's army at 1,000, the losses trade
+worse than the wins inside every bin, and the exchange RISES with the
+rival's starting size in both groups, so it is not Lanchester's
+arithmetic of fighting a bigger army:[^17]
+
+| rival army at 1,000 | wins: n, exchange 1,000-1,500 | losses: n, exchange |
+|---|---|---|
+| under 8,000 | 23, 0.67 | 5, 0.37 |
+| 8,000-9,000 | 18, 0.78 | 4, 0.48 |
+| 9,000-10,000 | 19, 0.75 | 8, 0.63 |
+| 10,000-11,000 | 9, 0.98 | 8, 0.70 |
+| over 11,000 | 0 | 2, 0.76 |
+
+In that window our deaths per game match (18.2 against 18.9) and so
+does what kills us (ground 10.0 against 9.8, artillery 0.8 against 1.0,
+structures 1.3 against 1.2; air 4.8 against 5.7 is the one class that
+moves), but a smaller share of them fall forward (0.81 against 0.74)
+and we raze less (1.2 buildings against 0.8). The one verb in that
+window that spends the reserve on a target it does not kill is the
+interception, which the losses issue two and a half times as often;
+the champion commits the whole reserve to it (`guard_cap 0`) and the
+flag itself was never in the population search's genome. `icptbar192`
+prices the interception off and bounded to three units on the same 96
+seeds.[^18]
+
+[^16]: `attr96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/sweeps/attrbar96` against `runs/sweeps/divebar192` (identity on every line but the title, engine clock, dives and enemy peak lines) and over `runs/traces/attrbar96/champ-*.ndjson`, columns 24-26 at the named samples and the per-loss table for our deaths to that sample.
+[^17]: `exchange96.py` over the same traces: rival units lost between samples 1,000 and 1,500 (column 25 differenced) over our per-loss deaths in the same frames, binned by column 24 at sample 1,000.
+[^18]: the same reader's killer-class split of our deaths in the window (`x` below 1,900 is forward on duel_lake) and column 26 differenced for buildings razed; `sweeps/icptbar192.txt` with `doctrines/evolve1-g4m2-noicpt.doctrine` (intercept 0) and `doctrines/evolve1-g4m2-guard3.doctrine` (guard_cap 3), each one line from the champion; the intercept counts are the cards' `intercepted` line per thousand samples, 84 in the wins against 222 in the losses.
 
 [^14]: `bursts96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/traces/divebar192/champ-*.ndjson`: army deaths in frames 75,000-190,000 grouped with a 900-frame gap and a 400-unit radius; the ratio is `rival_army / worth` at the sample before each burst. Burst size histogram, wins: 1102 singles, 289 pairs, 124 triples, 171 of four or more; losses: 494, 102, 39, 62.
 [^15]: `extract96.py` over the same traces (extractor deaths by window, side and killer; extractors and workers columns at samples 750-2,000) and the `intercepted`, `expansions`, `samples seen` lines of the 96 champion cards in `runs/sweeps/divebar192`. Extractors at 1,000 / 1,500: wins 5.68 / 5.04, losses 5.56 / 4.37; workers 7.70 / 5.84 against 7.56 / 6.11.
