@@ -57,7 +57,7 @@ provenance:
   - "runs/sweeps/turtlebar192 on hpc3, submitted 2026-09-13 at Very Hard from commit d0ea7720: the bar the turtle section names as unread"
   - "runs/sweeps/attrbar96 and runs/traces/attrbar96 on hpc3, the champion's 96 seeds replayed from commit 619f2f07c with the kill-ledger columns; attr96.py and exchange96.py (scratchpad, session f670d9e0) are the readers of the two attrition tables"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-09-13
+fact_checked: 2026-09-14
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -131,6 +131,8 @@ so a flip and a regression are seed-named facts, not estimates.
 | turtle 70 with the riposte (turtlethr192) | 62 | 7 | 14 |
 | turtle 100 with the riposte (turtlethr192) | 62 | 7 | 14 |
 | riposte alone, no hold (ripostebar96) | 62 | 7 | 14 |
+| interception bounded to three units (icptbar192) | 68 | 11 | 12 |
+| interception off (icptbar192) | 59 | 15 | 25 |
 
 Every verb that converts an opener costs winners, because the bar's 69
 winners outnumber its opener-shaped seeds two to one and a verb that
@@ -272,8 +274,21 @@ window that spends the reserve on a target it does not kill is the
 interception, which the losses issue two and a half times as often;
 the champion commits the whole reserve to it (`guard_cap 0`) and the
 flag itself was never in the population search's genome. `icptbar192`
-prices the interception off and bounded to three units on the same 96
+priced the interception off and bounded to three units on the same 96
 seeds.[^18]
+
+Both are rejected, and the two answers together rule the interception
+out as the cause. Off reads 59, fifteen gained and twenty-five lost:
+the reserve turning on raiders is worth ten wins to the champion, so
+the losses' extra interceptions are the symptom of more raids, not a
+drain. Bounded to three reads 68, eleven gained and twelve lost -- the
+largest flip count of any arm on this bar, twenty-three seeds moving
+for a net of minus one, which is what a perturbation of the deciding
+fights on knife-edge seeds looks like and not what a lever looks like.
+The kill-side deficit in the window stands, with its first candidate
+cause measured and cleared.[^19]
+
+[^19]: `pair_read.py` over `runs/sweeps/icptbar192` (all 192 cards, nine members preempted and requeued) against the divebar192 champion cards. guard3 gained s8927185 s8927289 s8929161 s8929473 s8931313 s8931625 s8932977 s8933913 s8934537 s8935473 s8935785, lost s8925001 s8925105 s8925209 s8925833 s8929057 s8929265 s8931001 s8931729 s8932041 s8932145 s8933185 s8935369; noicpt gained 15 and lost 25, the lists in the log entry of 2026-09-14.
 
 [^16]: `attr96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/sweeps/attrbar96` against `runs/sweeps/divebar192` (identity on every line but the title, engine clock, dives and enemy peak lines) and over `runs/traces/attrbar96/champ-*.ndjson`, columns 24-26 at the named samples and the per-loss table for our deaths to that sample.
 [^17]: `exchange96.py` over the same traces: rival units lost between samples 1,000 and 1,500 (column 25 differenced) over our per-loss deaths in the same frames, binned by column 24 at sample 1,000.
