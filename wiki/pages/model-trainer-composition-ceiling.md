@@ -14,7 +14,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_composition_sweep.py": 2abd00e4e999a0b87a27f40d6f3650f7629b0684
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py": 9856d519c51064f045c27e30c1ab65192cfb99e2
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 8311628f7d7c217293518e7d77a12a0a486c0889
-  "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
+  "docs/RESEARCH.md": 073bcaf3d6bc252560aace54f84aeb9c3ee1f4f4
 provenance:
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "v2 record bit-identical across two processes: sha256 aa61330b9692f4c4bc13b410f4bf1874 (truncated), plan label gpt2-compartments-gpt2-w256-s4-e12-lr0.01-n2.4.8-f64-b512-seeds7.8.9"
@@ -22,7 +22,7 @@ provenance:
   - "board task a67d6038-ef16-4bcf-acbc-77b47f7fd4ad carries the full trail including the two artifacts the run caught"
   - "the other two pins repinned 2026-09-11 on mechanical arguments. cartridge_composition_sweep.py removed NOT ONE LINE (its diff is purely additive), so every line this page could cite is present byte-identical. cartridge_plans.py removed six, and all six are the body of corpus_digest being replaced by a call to a new digest_parts -- whose body is byte-for-byte the same length-prefixed sha256 loop. The digest VALUE is therefore unchanged, which matters because this page cites corpus digest e2f23c635583 as the thing that pairs two runs."
   - "repinned 2026-09-11 (commit a8afd6c9): cartridge_measurement.py was refactored so the composition geometry -- seed offsets, fold order, untrained-composed draws -- has one owner shared with the trait grid, and docs/RESEARCH.md gained a section for that arm. NEITHER CHANGES A NUMBER HERE, and the refactor's shape was chosen to guarantee that: composed_replicates hands each replicate to a consumer rather than returning a list, so scoring still interleaves with training exactly as it did when these numbers were measured -- the geometry probe consumes process-wide RNG in training mode and none in evaluation mode, so a collected-then-scored ordering would have moved every arm. Verified by the sweep's own suite passing unchanged."
-fact_checked: "2026-09-04"
+fact_checked: "2026-09-14"
 confidence: high
 hubs: [services]
 ---
@@ -78,5 +78,11 @@ finding that concatenation works only when trained for -- was measured the
 following day and MOVES this ceiling: see
 [[model-trainer-companioned-training-recipe]], where the trained-p0.5
 recipe puts n4 retention at +44.6% against this page's -45.4%. This page's
-numbers stand as the naive baseline that recipe is judged against.
-`docs/RESEARCH.md` carries both run summaries under the `mi` project.
+numbers stand as the naive baseline that recipe is judged against, and the
+programme has since gone further than that page's first result: the diverse
+companion pool measured on 2026-09-05 is the recipe of record (n4 +55.5%,
+n8 +28.0% on gpt2), and the scale ladder that followed finds the
+eight-compartment penalty is a mid-depth valley that is gone at 48 layers.
+Read that page for the current operating point rather than this sentence,
+which was last brought up to date on 2026-09-14.
+`docs/RESEARCH.md` carries every run summary under the `mi` project.

@@ -27,7 +27,7 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_base_lora_sweep.py": 8016cdc60390944dff4bc6d9c6e28e8a2f2349d8
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": 6950eadcbe579b6ee9b3cff54110b5c448baafd7
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": dfa5a7d174611bbff80a1509c61c5236ae3ad670
-  "docs/RESEARCH.md": 575670696f235494c5f7c5a9d61f3dcedd208e77
+  "docs/RESEARCH.md": 073bcaf3d6bc252560aace54f84aeb9c3ee1f4f4
 provenance:
   - "the three sweep pins repinned 2026-09-11 after establishing that their deletions are a MOVE rather than a removal. Each lost 100-150 non-comment lines to cartridge_lora_families.py, whose own docstring records why: the companion-cross arms, the two cell families and the per-family floors were byte-identical between the base-LoRA and content-LoRA sweeps, and two copies of a measurement are two copies of its ARM NAMES -- which is what pairs a run against this page's ladder. The identifiers this page names, train_on and train_composition_lora_invariant, both resolve at HEAD, and all three sweeps still expose measure_grid and main."
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
