@@ -213,35 +213,13 @@ def rival_income(sample: Sample) -> int:
     return 0 if strongest is None else strongest["income"]
 
 
-def rival_attrition(sample: Sample) -> tuple[int, int]:
-    """Return what the strongest rival has lost so far: mobile units, buildings.
-
-    The engine's kill ledger, cumulative from the match's first frame. Their
-    army value at any sample is what they built minus this, and the per-loss
-    trace records only OUR deaths -- so this is the one column that separates
-    "their army is large because the opening rolled it large" from "their
-    army is large because our waves never killed it" ([[very-hard-race]]).
-
-    Args:
-        sample: One observation of the world.
-
-    Returns:
-        ``(units_lost, buildings_lost)``, both zero when nothing hostile
-        remains.
-    """
-    strongest = strongest_rival(sample)
-    if strongest is None:
-        return (0, 0)
-    return (strongest["units_lost"], strongest["buildings_lost"])
-
-
 __all__ = [
     "best_rival",
     "composition_of",
     "deepest_dip",
     "local_player",
-    "rival_attrition",
     "rival_income",
     "standing_of",
+    "strongest_rival",
     "worth_of",
 ]

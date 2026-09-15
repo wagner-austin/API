@@ -15,7 +15,7 @@ from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.upgrades import TIER_CHAINS, satisfies
 from rw_bot.policy.economy import EXTRACTOR_TYPE
 from rw_bot.policy.field import coverage
-from rw_bot.policy.scoreboard import local_player, rival_attrition, rival_income
+from rw_bot.policy.scoreboard import local_player, strongest_rival
 from rw_bot.policy.situation import read_situation
 from rw_bot.policy.trace import (
     Loss,
@@ -114,11 +114,12 @@ class Recorder:
         # only on a stream that predates the player record, where zero is the
         # honest column ([[policy-economy]]).
         local = local_player(sample)
+        # One row for the rival's three columns -- income and the attrition
+        # pair -- so they describe one opponent: their army is what they
+        # built minus what they lost, and nothing else on the trace can tell
+        # the two apart. Zero when nothing hostile remains, like ``local``.
+        strongest = strongest_rival(sample)
         covered = coverage(sample, self._profiles, self._extractors)
-        # The rival's attrition pair, read off the same strongest-rival row
-        # as its income: their army is what they built minus this, and
-        # nothing else on the trace can tell the two apart.
-        rival_lost, rival_razed = rival_attrition(sample)
         self.ticks.append(
             Tick(
                 frame=sample["frame"],
@@ -134,7 +135,7 @@ class Recorder:
                 worth=worth,
                 rival=rival,
                 income=0 if local is None else local["income"],
-                rival_income=rival_income(sample),
+                rival_income=0 if strongest is None else strongest["income"],
                 navy_seen=navy_seen,
                 air_seen=air_seen,
                 navy_blood=navy_blood,
@@ -150,8 +151,8 @@ class Recorder:
                 rival_army=(
                     0 if (situation := read_situation(sample)) is None else situation["rival_army"]
                 ),
-                rival_lost=rival_lost,
-                rival_razed=rival_razed,
+                rival_lost=0 if strongest is None else strongest["units_lost"],
+                rival_razed=0 if strongest is None else strongest["buildings_lost"],
             )
         )
 
