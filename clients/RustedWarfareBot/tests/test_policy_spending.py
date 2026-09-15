@@ -338,3 +338,47 @@ def test_a_refused_unlock_withholds_its_price_from_later_spenders() -> None:
     # because replacing losses drains to zero and would empty the saving.
     assert budget.claim("replace:c_tank", 350, protected=True)["granted"] is False
     assert budget.claim("expand:extractorT1", 700)["granted"] is False
+
+
+def test_the_unlock_draws_on_the_reserve_so_the_saving_can_complete() -> None:
+    """The plateau: 2,200 in the bank against an 800 reserve, forever.
+
+    An unprotected unlock needs price plus reserve; its own withholding
+    caps the bank at price plus one unit, because protected production
+    spends everything above it each tick. On the champion that is a
+    2,200-credit plateau from sample 800 to the end of the match with no
+    heavy tank ever built, in 32 of the 96 certified bar games
+    ([[very-hard-race]]). The unlock is the army's own roster, so it draws
+    on the reserve like a replacement does, and the tick after the saving
+    reaches the price it is bought.
+    """
+    offering = sample(
+        entity(500, "landFactory"),
+        credits=2_200,
+        options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
+    )
+    ordered: set[int] = set()
+    budget = Budget(2_200, reserve=800)
+    orders = unlock_tech(offering, budget, ordered, limit=1)
+    assert [o["unit_id"] for o in orders] == [500]
+    assert budget.spent() == 2000
+    assert ordered == {500}
+    # What the reserve still means: an investment claim after the unlock
+    # cannot dip into the remaining 200, and a replacement can.
+    assert budget.claim("expand:extractorT1", 200)["granted"] is False
+    assert budget.claim("replace:c_tank", 200, protected=True)["granted"] is True
+
+
+def test_below_the_price_the_unlock_still_saves_rather_than_spending_the_reserve_early() -> None:
+    """Protected means it may cross the reserve once the price is there, not
+    that a short bank buys anything: at 1,999 nothing is ordered, the price
+    is withheld, and the next tick's spenders are bound by it."""
+    offering = sample(
+        entity(500, "landFactory"),
+        credits=1_999,
+        options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
+    )
+    budget = Budget(1_999, reserve=800)
+    assert unlock_tech(offering, budget, set(), limit=1) == ()
+    assert budget.spent() == 0
+    assert budget.claim("replace:c_tank", 350, protected=True)["granted"] is False

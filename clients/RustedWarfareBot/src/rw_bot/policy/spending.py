@@ -219,6 +219,14 @@ def unlock_tech(
     this is a single bounded purchase per factory, and it is the whole
     point of the arm that carries it.
 
+    **And the claim is protected, or the saving never completes.** The
+    withholding lets the bank reach the price; an unprotected claim also
+    needs the reserve on top, and protected production spends everything
+    above the withholding each tick, so the bank stalls at the price plus
+    one unit and the two floors deadlock. Measured on the certified bar: a
+    third of the champion's games plateaued at 2,200 credits for the whole
+    match, bought no unlock and built no heavy tank ([[very-hard-race]]).
+
     Args:
         sample: One observation of the world.
         budget: The tick's credits.
@@ -252,7 +260,21 @@ def unlock_tech(
         if offer is None:
             continue
         key, price = offer
-        claim = budget.claim(f"tech:{entity['type_name']}", price)
+        # Protected, because the unlock is the army: it is the purchase that
+        # makes the heavies the composition already counts buildable at all,
+        # and the reserve exists to keep the army fundable, not to stand
+        # between the army and its own roster. Unprotected it deadlocks with
+        # the reserve: the claim needs price plus reserve in the bank, the
+        # withholding below caps the bank at price plus one unit (protected
+        # production spends everything above it each tick), so the unlock
+        # can only be bought in a lull with every factory busy long enough
+        # for credits to climb the reserve's width. On the champion (reserve
+        # 800, four factories in the games that matter) that lull never
+        # comes: 32 of the 96 certified bar games sat at a 2,200-credit
+        # plateau from sample 800 to the end and never fielded a heavy tank,
+        # winning 17 against 52 of 64 where the unlock was bought
+        # ([[very-hard-race]], log 2026-09-14).
+        claim = budget.claim(f"tech:{entity['type_name']}", price, protected=True)
         if not claim["granted"]:
             budget.withhold(price)
             break
