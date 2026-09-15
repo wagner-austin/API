@@ -350,9 +350,21 @@ deadlock breaking or not under a perturbed rhythm.[^22]
 The fix (2026-09-14) makes the unlock's claim protected, since it is the
 purchase that makes the composition's own heavies buildable. `techbar96`
 replays the champion's doctrine on the same 96 seeds from the fixed
-tree with a prediction no earlier arm could make: the 64 unlock-bought
-seeds replay identically, and the change falls on the 32 plateau seeds,
-17 wins to hold and 15 losses to win.[^23]
+tree, and it was submitted with a two-part prediction: the 32 plateau
+seeds change, 17 wins to hold and 15 losses to win, and the 64
+unlock-bought seeds replay identically.[^23]
+
+The first part held and the second was wrong, on the first 71 cards.
+On the plateau seeds the fix reads 21 wins to the champion's 14 on 25
+filed (nine gained, two lost). Off the plateau every card changed,
+because those games had also bought the unlock late, in whatever lull
+let the bank reach 2,800; the fixed tree buys it the moment the bank
+reaches 2,000, so the unlock lands earlier in every game and every
+trajectory moves -- 41 wins to 38 there on 46 filed (five gained, two
+lost). Net on 71 seeds: 62 to 52. The closed figures are read when the
+last 25 members, the long games, file.[^24]
+
+[^24]: `techread.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/sweeps/techbar96` against `runs/sweeps/divebar192`, on the identity lines, with the plateau set from `bank96.py`. Interim at 71 cards: plateau gained s8926249 s8926353 s8926457 s8927185 s8927497 s8932249 s8933601 s8934225 s8935473, lost s8933185 s8933289; off the plateau gained s8925937 s8927289 s8929473 s8931625 s8934537, lost s8931105 s8933809.
 
 [^20]: `spend96.py` over `runs/traces/attrbar96` (columns 2, 6, 7, 12 at samples 750-2,500 and over the window) and the cards' `reinforced` and `samples seen` lines.
 [^21]: `bank96.py` over the same traces: credits, idle producers, refusals and orders per 100-sample block from 800 to 1,900; the plateau is a game whose mean credits over samples 1,000-1,500 exceed 1,800, and its heavy count is the cards' `owned peak` line.
