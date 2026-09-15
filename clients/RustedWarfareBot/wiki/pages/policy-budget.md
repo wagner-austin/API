@@ -5,14 +5,17 @@ related:
   - "[[policy-loop]]"
   - "[[policy-economy]]"
   - "[[policy-production]]"
+  - "[[very-hard-race]]"
 source_paths:
   - "src/rw_bot/policy/budget.py"
   - "src/rw_bot/policy/campaign.py"
+  - "src/rw_bot/policy/spending.py"
 source_git_blobs:
   "src/rw_bot/policy/budget.py": "06e3cb9d18cf4b87be4d309da6b5a9b52a0c226f"
   "src/rw_bot/policy/campaign.py": "b04a2a2e3dbec7b0625f7e1a0f66b67ccb8f4beb"
+  "src/rw_bot/policy/spending.py": "77f82b55b26d45d42b6d4479accad1d3b9e17ba5"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: 2026-08-17
+fact_checked: 2026-09-14
 confidence: high
 hubs: [bot-architecture]
 ---
@@ -95,3 +98,32 @@ claimants spending them. The code does not branch on its result, and says why.
 Coverage found that: the branch testing it was unreachable, and unreachable
 error handling is worse than none, because it reads as a case somebody has
 thought about.
+
+## The two floors can deadlock, and did in a third of the champion's games
+
+A withholding is the saving mechanism: a refused spender keeps its price back
+from every later claim, protected ones included, so the bank climbs across
+ticks until the claim fits. But an unprotected claim fits only when the bank
+holds its price **plus the reserve**, and protected production spends
+everything above the withholding each tick, so the bank stalls at the price
+plus one unit and never reaches the price plus the reserve. The saving
+completes only in a lull with every factory busy for long enough for credits
+to climb the reserve's width. On the champion (reserve 800, the heavy tank's
+price; four factories in the games that matter) that lull never came: the
+kill-ledger replay of its 96 certified seeds found 32 games parked at a
+2,200-credit plateau from sample 800 to the end, three claims refused every
+tick, that never bought the land factory's 2,000-credit unlock and never
+fielded a heavy tank -- 17 wins of 32, against 52 of the 64 games that bought
+it ([[very-hard-race]]).[^1]
+
+The unlock is the purchase that makes the composition's own heavies buildable,
+so its claim is protected (2026-09-14): it draws on the reserve the way a
+replacement does, the tick after the withholding has brought the bank to its
+price. The reserve still stands between investment and the army; it no longer
+stands between the army and its own roster. The same structure binds every
+other unprotected saver (the anti-air turret's 600 against the 800 reserve
+completes only in a lull, which is why its ledger reads reached 181, acted 6
+per thousand samples on the winning cards), and each is a knob measured under
+that behaviour, so none is changed here.
+
+[^1]: `src/rw_bot/policy/spending.py`, `unlock_tech` -- the protected claim and the withholding after a refusal; `src/rw_bot/policy/budget.py`, `Budget.claim` (``available`` for a protected claim is the remainder less the withholding, for an unprotected one less the reserve too) and `Budget.withhold`. The plateau read is `spend96.py` and `bank96.py` over `runs/traces/attrbar96` (scratchpad, session f670d9e0, copies at `/pub/wagnera3/rusted/`): credits, idle producers and refusals per 100-sample block, and the cards' `owned peak` line for the heavy tank count.

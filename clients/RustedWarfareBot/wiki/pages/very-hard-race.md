@@ -7,7 +7,10 @@ related:
   - "[[policy-raid]]"
   - "[[policy-determinism]]"
   - "[[policy-trace]]"
+  - "[[policy-budget]]"
 source_paths:
+  - "src/rw_bot/policy/spending.py"
+  - "sweeps/techbar96.txt"
   - "src/rw_bot/policy/match_report.py"
   - "src/rw_bot/policy/scorekeeper.py"
   - "src/rw_bot/policy/dive.py"
@@ -31,6 +34,8 @@ source_paths:
   - "doctrines/evolve1-g4m2-noicpt.doctrine"
   - "doctrines/evolve1-g4m2-guard3.doctrine"
 source_git_blobs:
+  "src/rw_bot/policy/spending.py": "77f82b55b26d45d42b6d4479accad1d3b9e17ba5"
+  "sweeps/techbar96.txt": "1623224dcd8b73ef6551ba3132d7d6ee890fd8e2"
   "sweeps/attrbar96.txt": "f2952dbcc9a7e9ed967af9aa8dad89c50eda1208"
   "sweeps/icptbar192.txt": "b4f0e2ab8b424ba8c2b5d800ad3fb565366b6582"
   "doctrines/evolve1-g4m2-noicpt.doctrine": "b789d9033e6474ea839e5a9057e939dd18835ac0"
@@ -308,6 +313,51 @@ like and not what a lever looks like.[^19]
 
 [^14]: `bursts96.py` (scratchpad, session f670d9e0; a copy at `/pub/wagnera3/rusted/`) over `runs/traces/divebar192/champ-*.ndjson`: army deaths in frames 75,000-190,000 grouped with a 900-frame gap and a 400-unit radius; the ratio is `rival_army / worth` at the sample before each burst. Burst size histogram, wins: 1102 singles, 289 pairs, 124 triples, 171 of four or more; losses: 494, 102, 39, 62.
 [^15]: `extract96.py` over the same traces (extractor deaths by window, side and killer; extractors and workers columns at samples 750-2,000) and the `intercepted`, `expansions`, `samples seen` lines of the 96 champion cards in `runs/sweeps/divebar192`. Extractors at 1,000 / 1,500: wins 5.68 / 5.04, losses 5.56 / 4.37; workers 7.70 / 5.84 against 7.56 / 6.11.
+
+## The plateau: a third of the games never buy the unlock, and they are the knife-edge seeds
+
+The ledger read said the loss is numbers at the fight. The spend surface
+says where a thousand credits of army went: in the losses the champion
+holds them. Over samples 1,000-1,500 the losses average 1,514 credits
+against the wins' 1,002 (medians of each game's mean 2,170 against 666),
+with more factories (3.6 against 3.1), more of them idle (1.47 against
+0.87) and 14 percent fewer units produced per unit time (30 against 35
+per thousand samples).[^20] The bank is not a save that ramps and
+drops: in 32 of the 96 games credits sit at a 2,200 plateau from sample
+800 to the end of the match, three claims refused every tick, four
+factories standing, and not one heavy tank is ever built. The other 64
+games ramp to about 2,000 by sample 900, buy the land factory's unlock
+and drain to the 800 reserve, and field eleven to sixteen heavies.[^21]
+
+| | games | champion wins | heavy tanks, peak | factories |
+|---|---|---|---|---|
+| plateau | 32 | 17 (53 percent) | 0.0 | 3.9 to 4.1 |
+| unlock bought | 64 | 52 (81 percent) | 11.3 to 16.2 | 2.9 |
+
+The mechanism is a deadlock in the budget, not a knob
+([[policy-budget]]). The unlock is a 2,000-credit claim that was
+unprotected, so it needed the price plus the 800 reserve in the bank;
+refused, it withholds 2,000 from every later claim, production
+included, so production spends everything above 2,000 each tick and
+the bank can never climb the extra 800. Only a lull with every factory
+busy long enough buys it, and four factories almost never allow one.
+Fifteen of the 27 losses are plateau games, and the plateau seeds are
+the knife-edge seeds: eight of those fifteen are among the seeds the
+turtle, riposte and interception arms flipped to wins, and most of the
+seeds those arms lost are plateau wins -- every arm's churn was the
+deadlock breaking or not under a perturbed rhythm.[^22]
+
+The fix (2026-09-14) makes the unlock's claim protected, since it is the
+purchase that makes the composition's own heavies buildable. `techbar96`
+replays the champion's doctrine on the same 96 seeds from the fixed
+tree with a prediction no earlier arm could make: the 64 unlock-bought
+seeds replay identically, and the change falls on the 32 plateau seeds,
+17 wins to hold and 15 losses to win.[^23]
+
+[^20]: `spend96.py` over `runs/traces/attrbar96` (columns 2, 6, 7, 12 at samples 750-2,500 and over the window) and the cards' `reinforced` and `samples seen` lines.
+[^21]: `bank96.py` over the same traces: credits, idle producers, refusals and orders per 100-sample block from 800 to 1,900; the plateau is a game whose mean credits over samples 1,000-1,500 exceed 1,800, and its heavy count is the cards' `owned peak` line.
+[^22]: plateau wins: s8925001 s8925209 s8925313 s8925833 s8926977 s8927393 s8928017 s8928121 s8928225 s8928433 s8929369 s8929681 s8931001 s8931729 s8932041 s8933185 s8933289; plateau losses: s8925729 s8926249 s8926353 s8926457 s8927185 s8927497 s8929161 s8929889 s8932249 s8933601 s8934225 s8934641 s8935057 s8935473 s8935681. Compare the gained and lost lists in footnotes 12, 13 and 19.
+[^23]: `src/rw_bot/policy/spending.py`, `unlock_tech`, commit 6048b74a2; `sweeps/techbar96.txt`.
 
 ## The response built from the reading: the turtle
 
