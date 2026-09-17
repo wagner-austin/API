@@ -20,10 +20,34 @@
     within one bake-length of being asked for. A tick against an empty
     queue is two HTTP calls.
 
-    RUNS AS THE INTERACTIVE USER, NOT SYSTEM, and that is load-bearing for
+    RUNS AS THE OPERATOR'S ACCOUNT, NOT SYSTEM, and that is load-bearing for
     the same three reasons as the MCPs fleet-audit task: the profile holds
     the ssh keys (node dispatches), the docker credentials (the API key is
     read from the live container), and the poetry environment.
+
+    S4U, NOT "INTERACTIVE ONLY" (MCPs board tasks 660964d9 and d6c6bbea).
+    Registered interactive-only, the task:
+
+      * did not run from 03:28 to 10:25 local across the 2026-09-15 reboot,
+        so dispatch and session-observe stopped while nobody was logged in;
+      * ran with the operator's FILTERED token, and every session job needs
+        more than that token can read. Measured 2026-09-17 with a one-shot
+        task under the same principal: psutil.Process(<pid>).environ()
+        raised AccessDenied on an sshd-spawned claude.exe and
+        Win32_Process returned its CommandLine empty, so session-audit's
+        pane join -- which is how restart-session and kill-session find the
+        pane to type into -- could never resolve a pane from this runner.
+
+    The same probe under an S4U task, still at RunLevel Limited, read the
+    session's SSH_CONNECTION and its full command line. So the fix is the
+    logon type, not elevation: RunLevel stays Limited. mcps-manager-audit
+    has run PowerShell as an S4U task every 30 minutes since 2026-09-05
+    and exits 0, which is the precedent for the action below.
+
+    BOOT PLUS AN INDEFINITE REPETITION, never a logon trigger: the box is
+    reached over ssh and is never logged into interactively, so a logon
+    trigger fires once and never again (the WSL-Ubuntu-KeepAlive and
+    DockerDesktopAutoStart outages).
 
     Idempotent: re-running unregisters + re-registers, so this serves as
     both install and refresh.
@@ -34,21 +58,49 @@
 $ErrorActionPreference = 'Stop'
 
 $taskName = 'API-FleetAgent-3min'
-$action = Join-Path $PSScriptRoot 'run-agent-tick.ps1'
+$tick = Join-Path $PSScriptRoot 'run-agent-tick.ps1'
 
-# An absent task is the expected first-run answer, not an error; scoping the
-# preference around the call is the same fix check-base-freshness.ps1 carries
-# for docker-run-against-a-missing-image (a native command's stderr under
-# script-level 'Stop' becomes a terminating NativeCommandError).
-$prevEap = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-schtasks /Delete /TN $taskName /F 2>$null | Out-Null
-$ErrorActionPreference = $prevEap
+$existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($existing) {
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+}
 
-schtasks /Create /TN $taskName /F `
-    /SC MINUTE /MO 3 `
-    /TR "powershell -NoProfile -ExecutionPolicy Bypass -File `"$action`"" `
-    | Out-Null
+$action = New-ScheduledTaskAction `
+    -Execute 'powershell.exe' `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$tick`""
 
-Write-Host "Registered $taskName (every 3 minutes, interactive user):"
-schtasks /Query /TN $taskName /FO LIST | Select-String 'TaskName|Status|Next Run Time'
+$bootTrigger = New-ScheduledTaskTrigger -AtStartup
+$timeTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+    -RepetitionInterval (New-TimeSpan -Minutes 3)
+
+# The identity comes from WindowsIdentity, NOT "$env:USERDOMAIN\$env:USERNAME":
+# austinpc is not domain-joined and "WORKGROUP\test" does not resolve
+# (0x80070534). GetCurrent().Name yields "AUSTINPC\Test".
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$principal = New-ScheduledTaskPrincipal `
+    -UserId $identity `
+    -LogonType S4U `
+    -RunLevel Limited
+
+# IgnoreNew: a rebuild tick that outlasts three minutes must not be joined
+# by a second tick racing it for the same queue rows. The 72-hour ceiling is
+# the scheduler's default and was the task's limit before this change.
+$settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 72) `
+    -StartWhenAvailable
+
+Register-ScheduledTask `
+    -TaskName $taskName `
+    -Action $action `
+    -Trigger @($bootTrigger, $timeTrigger) `
+    -Settings $settings `
+    -Principal $principal `
+    -Description 'One fleet-agent tick: drain the dispatch queue (API tools/fleet). See register-agent-schedule.ps1.' | Out-Null
+
+Write-Host "Registered $taskName (every 3 minutes and at boot, $identity, S4U, Limited):"
+Get-ScheduledTask -TaskName $taskName |
+    Select-Object TaskName, State, @{ n = 'LogonType'; e = { $_.Principal.LogonType } } |
+    Format-Table -AutoSize
