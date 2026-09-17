@@ -186,7 +186,109 @@ class TestRestartLane:
         assert runner.calls == []
         closed = endpoint.arguments[2]
         assert closed["status"] == "refused"
-        assert "REVIVE_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
+        assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
+
+    @pytest.mark.parametrize(
+        ("command", "hard", "outcome"),
+        [
+            ("kill-session", False, "ENDED session {target} (graceful): /exit typed into pane %16"),
+            ("kill-session-hard", True, "ENDED session {target} (hard): taskkill ended pid 26576"),
+        ],
+    )
+    def test_a_claimed_kill_runs_session_audits_kill_mode_in_the_rows_own_mode(
+        self,
+        config_path: pathlib.Path,
+        repo: pathlib.Path,
+        tmp_path: pathlib.Path,
+        command: str,
+        hard: bool,
+        outcome: str,
+    ) -> None:
+        """The two kill verbs (MCPs mig 526, board task 660964d9) ride the same
+        job path; the hard flag comes from the row's verb and nowhere else."""
+        mcps = tmp_path / "mcps-checkout"
+        mcps.mkdir()
+        line = f"KILL - {outcome.format(target=TARGET)}\n"
+        runner = FakeRun([_test_hooks.CommandResult(returncode=0, stdout=line, stderr="")])
+        _test_hooks.run = runner
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": restart_row(command=command)}),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="running", node="austinpc")}
+                ),
+                dump_json_str(
+                    {"job": restart_row(command=command, status="passed", node="austinpc")}
+                ),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        assert runner.calls == [
+            restart.kill_argv(mcps, TARGET, "fable-dm-versionsplit-0912", hard=hard)
+        ]
+        assert runner.unset_env == [("VIRTUAL_ENV",)]
+        assert endpoint.arguments[2]["runId"] == f"kill-{DEFAULT_JOB_ID}"
+        closed = endpoint.arguments[3]
+        assert closed["status"] == "passed"
+        detail = narrow_json_to_str(closed["detail"])
+        assert detail == f"session-audit kill exited 0: {line.strip()}"
+
+    def test_a_kill_session_audit_did_not_carry_out_closes_failed(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        mcps = tmp_path / "mcps-checkout"
+        mcps.mkdir()
+        refused = f"KILL - REFUSED session {TARGET} (graceful): nothing typed: busy right now\n"
+        _test_hooks.run = FakeRun(
+            [_test_hooks.CommandResult(returncode=1, stdout=refused, stderr="")]
+        )
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": restart_row(command="kill-session")}),
+                dump_json_str(
+                    {"job": restart_row(command="kill-session", status="running", node="austinpc")}
+                ),
+                dump_json_str(
+                    {"job": restart_row(command="kill-session", status="failed", node="austinpc")}
+                ),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        closed = endpoint.arguments[3]
+        assert closed["status"] == "failed"
+        assert closed["exitCode"] == 1
+        assert "KILL - REFUSED" in narrow_json_to_str(closed["detail"])
+
+    def test_a_kill_whose_submitter_is_not_a_label_is_refused_before_it_runs(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        mcps = tmp_path / "mcps-checkout"
+        mcps.mkdir()
+        runner = FakeRun([])
+        _test_hooks.run = runner
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str(
+                    {"claimed": restart_row(command="kill-session-hard", submittedBy="--hard; rm")}
+                ),
+                dump_json_str({"job": restart_row(command="kill-session-hard", status="refused")}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(hub_argv(config_path, repo, mcps)) == 0
+
+        assert runner.calls == []
+        assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(endpoint.arguments[2]["detail"])
 
     def test_a_skipped_or_failed_restart_closes_failed_with_session_audits_reason(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path

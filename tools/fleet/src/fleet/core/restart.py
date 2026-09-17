@@ -31,13 +31,21 @@ constraint and the writer both refuse anything but a lowercase hex UUID,
 and this runner re-checks before the value lands in an argv element,
 because the runner is the layer nearest the machine and the one that
 cannot assume the other two were consulted.
+
+FOUR SESSION VERBS, ONE TABLE (MCPs migs 507, 525 and 526). Restart,
+revive, and the two kills (``kill-session`` and ``kill-session-hard``,
+board task 660964d9) each map to exactly one session-audit invocation
+through :func:`session_invocation`, so the runner has one job path for all
+of them and no verb can reach an invocation another verb owns. The hard
+kill is its own verb on the queue and its own ``--hard`` flag here: nothing
+in this module can turn a graceful kill into a hard one.
 """
 
 from __future__ import annotations
 
 import pathlib
 import re
-from typing import Final
+from typing import Final, TypedDict
 
 from fleet.core import _test_hooks
 from fleet.core._test_hooks import CommandResult
@@ -69,15 +77,26 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: verb is a row here rather than a second copy of the job.
 RESTART_COMMAND: Final = "restart-session"
 REVIVE_COMMAND: Final = "revive-session"
-SESSION_COMMANDS: Final[tuple[str, ...]] = (RESTART_COMMAND, REVIVE_COMMAND)
+KILL_COMMAND: Final = "kill-session"
+KILL_HARD_COMMAND: Final = "kill-session-hard"
+SESSION_COMMANDS: Final[tuple[str, ...]] = (
+    RESTART_COMMAND,
+    REVIVE_COMMAND,
+    KILL_COMMAND,
+    KILL_HARD_COMMAND,
+)
+
+#: Detail prefix for a command this module has no invocation for.
+COMMAND_UNKNOWN_CODE: Final = "SESSION_COMMAND_UNKNOWN"
 
 #: The board label grammar, for the ``--requested-by`` a revive carries into
-#: the brief it types. Refused before it reaches an argv element, like the
-#: target: the value is typed into a terminal by session-audit.
+#: the brief it types and a kill prints with its outcome. Refused before it
+#: reaches an argv element, like the target: a revive's is typed into a
+#: terminal by session-audit.
 LABEL_PATTERN: Final = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
 
-#: Detail prefix for a revive whose submitter label is not a board label.
-REQUESTER_INVALID_CODE: Final = "REVIVE_REQUESTER_INVALID"
+#: Detail prefix for a revive or kill whose submitter label is not a board label.
+REQUESTER_INVALID_CODE: Final = "SESSION_REQUESTER_INVALID"
 
 
 def refusal_for(mcps_root: pathlib.Path, session_target: str | None) -> str | None:
@@ -165,6 +184,100 @@ def revive_argv(mcps_root: pathlib.Path, session_target: str, requested_by: str)
     )
 
 
+def kill_argv(
+    mcps_root: pathlib.Path, session_target: str, requested_by: str, *, hard: bool
+) -> tuple[str, ...]:
+    """Compose the session-audit invocation for one kill job.
+
+    Args:
+        mcps_root: The MCPs checkout (already existence-checked).
+        session_target: The session UUID (already grammar-checked).
+        requested_by: The label that enqueued the kill (already
+            grammar-checked), printed with session-audit's outcome.
+        hard: Whether the queue row is ``kill-session-hard``.
+
+    Returns:
+        The argv: ``poetry -C <mcps>/packages/session-audit run session-audit
+        kill --session <uuid> --requested-by <label>``, with ``--hard`` last
+        for the hard verb and never otherwise.
+    """
+    base = (
+        "poetry",
+        "-C",
+        str(mcps_root / pathlib.Path(SESSION_AUDIT_DIR)),
+        "run",
+        "session-audit",
+        "kill",
+        "--session",
+        session_target,
+        "--requested-by",
+        requested_by,
+    )
+    return (*base, "--hard") if hard else base
+
+
+class SessionInvocation(TypedDict):
+    """What one session verb runs.
+
+    Attributes:
+        verb: The run-id prefix: ``restart``, ``revive`` or ``kill``.
+        mode: The session-audit mode the closing detail names.
+        argv: The one invocation.
+        types_requester: Whether the submitter label becomes an argv
+            element, and so must be judged before the run.
+    """
+
+    verb: str
+    mode: str
+    argv: tuple[str, ...]
+    types_requester: bool
+
+
+def session_invocation(
+    mcps_root: pathlib.Path, command: str, session_target: str, requested_by: str
+) -> SessionInvocation:
+    """Map one session verb to its one invocation.
+
+    Args:
+        mcps_root: The MCPs checkout (already existence-checked).
+        command: The queue row's command.
+        session_target: The session UUID (already grammar-checked).
+        requested_by: The queue row's ``submitted_by``.
+
+    Returns:
+        The :class:`SessionInvocation`.
+
+    Raises:
+        ValueError: ``SESSION_COMMAND_UNKNOWN`` for a command that is not a
+            session verb. The caller routes only :data:`SESSION_COMMANDS`
+            here, so this names a routing defect rather than guessing.
+    """
+    if command == RESTART_COMMAND:
+        return SessionInvocation(
+            verb="restart",
+            mode="rollover",
+            argv=restart_argv(mcps_root, session_target),
+            types_requester=False,
+        )
+    if command == REVIVE_COMMAND:
+        return SessionInvocation(
+            verb="revive",
+            mode="revive",
+            argv=revive_argv(mcps_root, session_target, requested_by),
+            types_requester=True,
+        )
+    if command in (KILL_COMMAND, KILL_HARD_COMMAND):
+        return SessionInvocation(
+            verb="kill",
+            mode="kill",
+            argv=kill_argv(
+                mcps_root, session_target, requested_by, hard=command == KILL_HARD_COMMAND
+            ),
+            types_requester=True,
+        )
+    raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command!r} is not a session verb")
+
+
 def requester_refusal(requested_by: str) -> str | None:
     """Judge the submitter label a revive will type into a terminal.
 
@@ -178,7 +291,7 @@ def requester_refusal(requested_by: str) -> str | None:
     if LABEL_PATTERN.fullmatch(requested_by) is None:
         return (
             f"{REQUESTER_INVALID_CODE}: submitter {requested_by!r} is not a board label; "
-            "refused before it could be typed into a pane"
+            "refused before it could become an argv element or be typed into a pane"
         )
     return None
 
@@ -196,56 +309,35 @@ def requester_refusal(requested_by: str) -> str | None:
 SESSION_ENVIRONMENT_EXCLUDED: Final[tuple[str, ...]] = ("VIRTUAL_ENV",)
 
 
-def run_session_revive(
-    mcps_root: pathlib.Path, *, session_target: str, requested_by: str
-) -> CommandResult:
-    """Run the revive, blocking until session-audit reports.
+def run_session_job(invocation: SessionInvocation) -> CommandResult:
+    """Run one session verb, blocking until session-audit reports.
 
     Args:
-        mcps_root: The MCPs checkout.
-        session_target: The session UUID to revive.
-        requested_by: The label that asked.
+        invocation: What :func:`session_invocation` composed.
 
     Returns:
         The invocation's exit status and captured streams. Exit 0 means the
-        session was REVIVED; anything else means it was not, and the stdout
-        tail carries session-audit's ``REVIVE - <OUTCOME>`` line saying why.
+        verb did what it names (RESTARTED, REVIVED, ENDED); anything else
+        means it did not, and the stdout tail carries session-audit's own
+        outcome line saying why.
     """
-    return _test_hooks.run(
-        revive_argv(mcps_root, session_target, requested_by),
-        unset_env=SESSION_ENVIRONMENT_EXCLUDED,
-    )
+    return _test_hooks.run(invocation["argv"], unset_env=SESSION_ENVIRONMENT_EXCLUDED)
 
 
-def run_session_restart(mcps_root: pathlib.Path, *, session_target: str) -> CommandResult:
-    """Run the restart, blocking until session-audit reports.
-
-    Args:
-        mcps_root: The MCPs checkout.
-        session_target: The session UUID to restart.
-
-    Returns:
-        The invocation's exit status and captured streams. Exit 0 means the
-        named session was RESTARTED; anything else means it was not, and the
-        stdout tail carries session-audit's own outcome line saying why.
-    """
-    return _test_hooks.run(
-        restart_argv(mcps_root, session_target), unset_env=SESSION_ENVIRONMENT_EXCLUDED
-    )
-
-
-def describe_result(result: CommandResult, mode: str = "rollover") -> str:
+def describe_result(result: CommandResult, mode: str) -> str:
     """Compose a closing detail from a finished session job.
 
     Args:
         result: The invocation's outcome.
-        mode: The session-audit mode that ran, ``rollover`` or ``revive``,
-            named so the reader knows which outcome block the tail carries.
+        mode: The session-audit mode that ran (``rollover``, ``revive`` or
+            ``kill``), named so the reader knows which outcome block the
+            tail carries.
 
     Returns:
         The exit code and the tail of the combined output -- the tail,
         because session-audit prints its outcome block (``ROLLOVER
-        APPLIED`` with one line per session, or ``REVIVE - <OUTCOME>``) last.
+        APPLIED`` with one line per session, ``REVIVE - <OUTCOME>``, or
+        ``KILL - <OUTCOME>``) last.
     """
     combined = (result["stdout"] + result["stderr"]).strip()
     tail = combined[-DETAIL_TAIL_CHARS:]
@@ -253,6 +345,9 @@ def describe_result(result: CommandResult, mode: str = "rollover") -> str:
 
 
 __all__ = [
+    "COMMAND_UNKNOWN_CODE",
+    "KILL_COMMAND",
+    "KILL_HARD_COMMAND",
     "LABEL_PATTERN",
     "REQUESTER_INVALID_CODE",
     "RESTART_COMMAND",
@@ -263,11 +358,13 @@ __all__ = [
     "SESSION_TARGET_PATTERN",
     "TARGET_INVALID_CODE",
     "TARGET_MISSING_CODE",
+    "SessionInvocation",
     "describe_result",
+    "kill_argv",
     "refusal_for",
     "requester_refusal",
     "restart_argv",
     "revive_argv",
-    "run_session_restart",
-    "run_session_revive",
+    "run_session_job",
+    "session_invocation",
 ]

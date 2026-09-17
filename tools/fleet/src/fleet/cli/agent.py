@@ -308,19 +308,20 @@ def restart_job(
     *,
     mcps_root: pathlib.Path | None,
 ) -> DispatchJob:
-    """Execute a claimed session job (``restart-session`` or ``revive-session``)
-    on the hub, start to close.
+    """Execute a claimed session job (restart, revive, or either kill) on the
+    hub, start to close.
 
     The same shape as :func:`rebuild_job` and for the same reasons: the
     work is local, well under a minute, and closing it in one tick leaves
     nothing to collect. The keystroke sequence and every rail around it
-    belong to ``session_audit.rollover`` (restart) and
-    ``session_audit.revive`` (revive); this runner composes one invocation
-    and reports what it said (module docstring of :mod:`fleet.core.restart`).
+    belong to ``session_audit`` (``rollover``, ``revive`` and ``kill``);
+    this runner composes one invocation per verb through
+    :func:`fleet.core.restart.session_invocation` and reports what it said
+    (module docstring of :mod:`fleet.core.restart`).
 
     Args:
         credentials: The queue's endpoint and headers.
-        job: The claimed ``restart-session`` or ``revive-session`` job.
+        job: The claimed session job.
         identity: This runner's identity arguments.
         mcps_root: The MCPs checkout, or None when the runner was started
             without ``--mcps-root``.
@@ -348,15 +349,15 @@ def restart_job(
         return _refuse_hub_job(credentials, job, identity, detail=refusal)
     # Narrowed by the refusal above: a None target was refused there.
     target = job["session_target"] if job["session_target"] is not None else ""
-    # The second session verb (MCPs mig 525): a revive types the submitter's
-    # label into the brief, so the label is judged before it can become an
-    # argv element, the same way the target is.
-    reviving = job["command"] == restart.REVIVE_COMMAND
-    if reviving:
+    invocation = restart.session_invocation(mcps_root, job["command"], target, job["submitted_by"])
+    # A revive types the submitter's label into its brief and a kill passes
+    # it as an argument (MCPs migs 525 and 526), so the label is judged
+    # before it can become an argv element, the same way the target is.
+    if invocation["types_requester"]:
         requester_refusal = restart.requester_refusal(job["submitted_by"])
         if requester_refusal is not None:
             return _refuse_hub_job(credentials, job, identity, detail=requester_refusal)
-    verb = "revive" if reviving else "restart"
+    verb = invocation["verb"]
     run_id = f"{verb}-{job['job_id']}"
     queue.report_start(
         credentials,
@@ -367,14 +368,8 @@ def restart_job(
         identity=identity,
     )
     _log.info("started %s on austinpc as %s (local %s)", job["job_id"], run_id, verb)
-    result = (
-        restart.run_session_revive(
-            mcps_root, session_target=target, requested_by=job["submitted_by"]
-        )
-        if reviving
-        else restart.run_session_restart(mcps_root, session_target=target)
-    )
-    detail = restart.describe_result(result, "revive" if reviving else "rollover")
+    result = restart.run_session_job(invocation)
+    detail = restart.describe_result(result, invocation["mode"])
     queue.report_close(
         credentials,
         job_id=job["job_id"],

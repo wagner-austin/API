@@ -12,6 +12,8 @@ from __future__ import annotations
 import pathlib
 from collections.abc import Sequence
 
+import pytest
+
 from fleet.core import _test_hooks, rebuild, restart
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
@@ -55,7 +57,67 @@ class TestRestartArgv:
             "--requested-by",
             "fable-system-audit-0915",
         )
-        assert restart.SESSION_COMMANDS == ("restart-session", "revive-session")
+        assert restart.SESSION_COMMANDS == (
+            "restart-session",
+            "revive-session",
+            "kill-session",
+            "kill-session-hard",
+        )
+
+    def test_composes_the_exact_kill_invocations_and_only_the_hard_verb_is_hard(self) -> None:
+        """MCPs mig 526, board task 660964d9: two verbs, one mode, and the
+        --hard flag is the queue's choice, never this runner's."""
+        root = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
+        graceful = (
+            "poetry",
+            "-C",
+            str(root / "packages" / "session-audit"),
+            "run",
+            "session-audit",
+            "kill",
+            "--session",
+            TARGET,
+            "--requested-by",
+            "opus-mcps-0917-e7b5",
+        )
+
+        assert restart.kill_argv(root, TARGET, "opus-mcps-0917-e7b5", hard=False) == graceful
+        assert restart.kill_argv(root, TARGET, "opus-mcps-0917-e7b5", hard=True) == (
+            *graceful,
+            "--hard",
+        )
+
+    def test_maps_every_session_verb_to_exactly_one_invocation(self) -> None:
+        root = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
+        label = "opus-mcps-0917-e7b5"
+
+        assert restart.session_invocation(root, "restart-session", TARGET, label) == {
+            "verb": "restart",
+            "mode": "rollover",
+            "argv": restart.restart_argv(root, TARGET),
+            "types_requester": False,
+        }
+        assert restart.session_invocation(root, "revive-session", TARGET, label) == {
+            "verb": "revive",
+            "mode": "revive",
+            "argv": restart.revive_argv(root, TARGET, label),
+            "types_requester": True,
+        }
+        assert restart.session_invocation(root, "kill-session", TARGET, label) == {
+            "verb": "kill",
+            "mode": "kill",
+            "argv": restart.kill_argv(root, TARGET, label, hard=False),
+            "types_requester": True,
+        }
+        assert restart.session_invocation(root, "kill-session-hard", TARGET, label)["argv"] == (
+            restart.kill_argv(root, TARGET, label, hard=True)
+        )
+
+    def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
+        root = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
+        refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
+        with pytest.raises(ValueError, match=refusal):
+            restart.session_invocation(root, "check", TARGET, "opus-mcps-0917-e7b5")
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
         refusal = restart.requester_refusal("Not A Label; rm -rf /")
@@ -122,7 +184,9 @@ class TestRunAndDescribe:
 
         _test_hooks.run = fake_run
 
-        result = restart.run_session_restart(tmp_path, session_target=TARGET)
+        result = restart.run_session_job(
+            restart.session_invocation(tmp_path, "restart-session", TARGET, "fable-dm-0912")
+        )
 
         assert result["returncode"] == 0
         assert calls == [restart.restart_argv(tmp_path, TARGET)]
@@ -148,8 +212,10 @@ class TestRunAndDescribe:
 
         _test_hooks.run = fake_run
 
-        result = restart.run_session_revive(
-            tmp_path, session_target=TARGET, requested_by="fable-system-audit-0915"
+        result = restart.run_session_job(
+            restart.session_invocation(
+                tmp_path, "revive-session", TARGET, "fable-system-audit-0915"
+            )
         )
 
         assert calls == [restart.revive_argv(tmp_path, TARGET, "fable-system-audit-0915")]
@@ -166,7 +232,8 @@ class TestRunAndDescribe:
                     "ROLLOVER APPLIED - 1 restart(s) attempted: 0 restarted, 1 skipped, 0 failed\n"
                 ),
                 stderr="",
-            )
+            ),
+            "rollover",
         )
 
         assert detail == (
@@ -179,7 +246,8 @@ class TestRunAndDescribe:
         detail = restart.describe_result(
             _test_hooks.CommandResult(
                 returncode=0, stdout=f"{head}RESTARTED mcps-99 now pid 41324", stderr=""
-            )
+            ),
+            "rollover",
         )
 
         assert detail.endswith("RESTARTED mcps-99 now pid 41324")

@@ -60,11 +60,22 @@ DISPATCH_COMMANDS: Final = (
     # MCPs mig 525, board task 1fe89973: the twin of restart-session for a
     # session with no pane; the same hub pins and the same session target.
     "revive-session",
+    # MCPs mig 526, board task 660964d9: ending a live session on purpose,
+    # the graceful verb and its explicit hard successor.
+    "kill-session",
+    "kill-session-hard",
 )
 
 #: Narrow type for a queue job's command.
 DispatchCommand = Literal[
-    "check", "lint", "test", "build-bases", "restart-session", "revive-session"
+    "check",
+    "lint",
+    "test",
+    "build-bases",
+    "restart-session",
+    "revive-session",
+    "kill-session",
+    "kill-session-hard",
 ]
 
 #: The terminal statuses a runner may report.
