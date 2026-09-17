@@ -44,10 +44,13 @@ class FakeRun:
         stdin: Every stdin payload it was given, in order, with None for the
             calls that had none. A separate list rather than a field on the
             call, so a test asserting on argv does not have to mention bytes.
+        unset_env: Every set of withheld variable names it was given, in
+            order, empty for the calls that withheld nothing.
     """
 
     calls: list[tuple[str, ...]]
     stdin: list[bytes | None]
+    unset_env: list[tuple[str, ...]]
     _replies: list[_test_hooks.CommandResult]
 
     def __init__(self, replies: Sequence[_test_hooks.CommandResult]) -> None:
@@ -60,16 +63,22 @@ class FakeRun:
         """
         self.calls = []
         self.stdin = []
+        self.unset_env = []
         self._replies = list(replies)
 
     def __call__(
-        self, argv: Sequence[str], *, stdin_bytes: bytes | None = None
+        self,
+        argv: Sequence[str],
+        *,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
     ) -> _test_hooks.CommandResult:
         """Record a call and answer with the next scripted result.
 
         Args:
             argv: The command.
             stdin_bytes: Its standard input, or None.
+            unset_env: The variables the caller withheld from the child.
 
         Returns:
             The next scripted result.
@@ -79,6 +88,7 @@ class FakeRun:
         """
         self.calls.append(tuple(argv))
         self.stdin.append(stdin_bytes)
+        self.unset_env.append(tuple(unset_env))
         assert self._replies, f"unscripted call: {list(argv)}"
         return self._replies.pop(0)
 

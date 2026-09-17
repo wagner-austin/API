@@ -92,6 +92,9 @@ class TestRestartLane:
             "dispatch_report",
         ]
         assert runner.calls == [restart.restart_argv(mcps, TARGET)]
+        # The child must not inherit this agent's own poetry venv, or the
+        # session-audit script resolves inside the wrong environment.
+        assert runner.unset_env == [("VIRTUAL_ENV",)]
         started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
@@ -150,6 +153,7 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == [restart.revive_argv(mcps, TARGET, "fable-dm-versionsplit-0912")]
+        assert runner.unset_env == [("VIRTUAL_ENV",)]
         started = endpoint.arguments[2]
         assert started["runId"] == f"revive-{DEFAULT_JOB_ID}"
         closed = endpoint.arguments[3]

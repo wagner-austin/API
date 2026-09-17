@@ -108,11 +108,16 @@ class TestRefusals:
 class TestRunAndDescribe:
     def test_run_goes_through_the_command_seam(self, tmp_path: pathlib.Path) -> None:
         calls: list[tuple[str, ...]] = []
+        withheld: list[tuple[str, ...]] = []
 
         def fake_run(
-            argv: Sequence[str], *, stdin_bytes: bytes | None = None
+            argv: Sequence[str],
+            *,
+            stdin_bytes: bytes | None = None,
+            unset_env: Sequence[str] = (),
         ) -> _test_hooks.CommandResult:
             calls.append(tuple(argv))
+            withheld.append(tuple(unset_env))
             return _test_hooks.CommandResult(returncode=0, stdout="RESTARTED", stderr="")
 
         _test_hooks.run = fake_run
@@ -121,16 +126,22 @@ class TestRunAndDescribe:
 
         assert result["returncode"] == 0
         assert calls == [restart.restart_argv(tmp_path, TARGET)]
+        assert withheld == [("VIRTUAL_ENV",)]
 
     def test_revive_goes_through_the_command_seam_and_names_its_mode(
         self, tmp_path: pathlib.Path
     ) -> None:
         calls: list[tuple[str, ...]] = []
+        withheld: list[tuple[str, ...]] = []
 
         def fake_run(
-            argv: Sequence[str], *, stdin_bytes: bytes | None = None
+            argv: Sequence[str],
+            *,
+            stdin_bytes: bytes | None = None,
+            unset_env: Sequence[str] = (),
         ) -> _test_hooks.CommandResult:
             calls.append(tuple(argv))
+            withheld.append(tuple(unset_env))
             return _test_hooks.CommandResult(
                 returncode=0, stdout="REVIVE - REVIVED session x: now pid 5", stderr=""
             )
@@ -142,6 +153,7 @@ class TestRunAndDescribe:
         )
 
         assert calls == [restart.revive_argv(tmp_path, TARGET, "fable-system-audit-0915")]
+        assert withheld == [restart.SESSION_ENVIRONMENT_EXCLUDED] == [("VIRTUAL_ENV",)]
         assert restart.describe_result(result, "revive") == (
             "session-audit revive exited 0: REVIVE - REVIVED session x: now pid 5"
         )

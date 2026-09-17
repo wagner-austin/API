@@ -183,6 +183,19 @@ def requester_refusal(requested_by: str) -> str | None:
     return None
 
 
+#: Environment variables a session-audit invocation must not inherit from
+#: this agent. The agent runs under ``poetry run fleet-agent``
+#: (scripts/run-agent-tick.ps1), which exports ``VIRTUAL_ENV`` naming the
+#: FLEET venv, and poetry prefers an activated venv to the ``-C`` project's
+#: own: with it inherited, ``poetry -C packages/session-audit run
+#: session-audit`` executed in the fleet venv and died on
+#: ``ModuleNotFoundError: No module named 'session_audit'`` (dispatch job
+#: f7c3b8a2, 2026-09-17 00:46Z, the first session verb ever run live).
+#: Withholding this one variable makes poetry resolve session-audit's own
+#: ``.venv`` even with the fleet venv first on PATH (measured both ways).
+SESSION_ENVIRONMENT_EXCLUDED: Final[tuple[str, ...]] = ("VIRTUAL_ENV",)
+
+
 def run_session_revive(
     mcps_root: pathlib.Path, *, session_target: str, requested_by: str
 ) -> CommandResult:
@@ -198,7 +211,10 @@ def run_session_revive(
         session was REVIVED; anything else means it was not, and the stdout
         tail carries session-audit's ``REVIVE - <OUTCOME>`` line saying why.
     """
-    return _test_hooks.run(revive_argv(mcps_root, session_target, requested_by))
+    return _test_hooks.run(
+        revive_argv(mcps_root, session_target, requested_by),
+        unset_env=SESSION_ENVIRONMENT_EXCLUDED,
+    )
 
 
 def run_session_restart(mcps_root: pathlib.Path, *, session_target: str) -> CommandResult:
@@ -213,7 +229,9 @@ def run_session_restart(mcps_root: pathlib.Path, *, session_target: str) -> Comm
         named session was RESTARTED; anything else means it was not, and the
         stdout tail carries session-audit's own outcome line saying why.
     """
-    return _test_hooks.run(restart_argv(mcps_root, session_target))
+    return _test_hooks.run(
+        restart_argv(mcps_root, session_target), unset_env=SESSION_ENVIRONMENT_EXCLUDED
+    )
 
 
 def describe_result(result: CommandResult, mode: str = "rollover") -> str:

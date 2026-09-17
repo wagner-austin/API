@@ -101,6 +101,26 @@ class TestDefaultHooks:
 
         assert result["stdout"].strip() == "piped"
 
+    def test_run_withholds_named_variables_and_passes_every_other_one(self) -> None:
+        """A real child, asked which of two variables it can see.
+
+        PATH is the probe because every parent has it, so the test needs no
+        environment of its own: withheld, the child reports it absent;
+        not withheld, present. The second value proves the rest of the
+        environment still arrives rather than the child starting empty.
+        """
+        probe = [
+            sys.executable,
+            "-c",
+            "import os; print('PATH' in os.environ, len(os.environ) > 1)",
+        ]
+        withheld = _test_hooks._default_run(probe, unset_env=("PATH",))
+        inherited = _test_hooks._default_run(probe)
+
+        assert withheld["returncode"] == 0
+        assert withheld["stdout"].split() == ["False", "True"]
+        assert inherited["stdout"].split() == ["True", "True"]
+
     def test_now_reads_whole_seconds_from_the_real_clock(self) -> None:
         """Whole rather than fractional, and moving forwards.
 

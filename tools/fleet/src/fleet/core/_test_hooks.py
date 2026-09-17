@@ -28,7 +28,7 @@ import time
 from collections.abc import Sequence
 from typing import Protocol
 
-from platform_core.config import _optional_env_str
+from platform_core.config import _optional_env_str, config_test_hooks
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 from typing_extensions import TypedDict
 
@@ -73,7 +73,13 @@ class CommandResult(TypedDict):
 class RunProtocol(Protocol):
     """Runs a local command to completion and collects its output."""
 
-    def __call__(self, argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> CommandResult:
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
+    ) -> CommandResult:
         """Run a command.
 
         Args:
@@ -82,6 +88,14 @@ class RunProtocol(Protocol):
                 interpretation of it would be a defect rather than a feature.
             stdin_bytes: Bytes to write to the process's standard input, or
                 None to provide none.
+            unset_env: Names of environment variables the child must NOT
+                inherit; every other variable of this process reaches it
+                unchanged. Measured 2026-09-17: the agent itself runs under
+                ``poetry run``, which exports ``VIRTUAL_ENV``, and poetry
+                honours an activated venv over a ``-C`` project's own, so a
+                session-audit invocation inherited the fleet venv and could
+                not import ``session_audit``. There is no argv-level way to
+                drop a variable on Windows, so the seam carries it.
 
         Returns:
             Exit status and captured streams. A non-zero status is returned
@@ -251,23 +265,35 @@ class WriteTextProtocol(Protocol):
         """
 
 
-def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> CommandResult:
+def _default_run(
+    argv: Sequence[str],
+    *,
+    stdin_bytes: bytes | None = None,
+    unset_env: Sequence[str] = (),
+) -> CommandResult:
     """Run a command with the real subprocess module.
 
     Args:
         argv: Executable and arguments.
         stdin_bytes: Bytes for standard input, or None.
+        unset_env: Variable names withheld from the child's environment.
 
     Returns:
         The command's exit status and captured streams, decoded as UTF-8 with
         undecodable bytes replaced -- a mangled character in a diagnostic is
         better than losing the diagnostic.
     """
+    withheld = frozenset(unset_env)
+    # The parent environment comes from the monorepo's one permitted reader
+    # (the ``env`` guard bans ``os.environ`` everywhere else); the copy it
+    # hands back is filtered here, never mutated.
+    parent = config_test_hooks.get_environment()
     completed = subprocess.run(
         list(argv),
         check=False,
         input=stdin_bytes,
         capture_output=True,
+        env={name: value for name, value in parent.items() if name not in withheld},
     )
     return CommandResult(
         returncode=completed.returncode,
