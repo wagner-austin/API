@@ -44,14 +44,28 @@ DISPATCH_STATUSES: Final = (
 #: Narrow type for a queue job's status.
 DispatchStatus = Literal["queued", "claimed", "running", "passed", "failed", "refused", "cancelled"]
 
-#: The make targets a job may ask for. There is no free-command field.
-#: ``build-bases`` (MCPs mig 497, board 3c9033ff) is the one verb that runs
-#: on the hub itself rather than on a node -- the R6 rebuild lane; its
-#: execution lives in :mod:`fleet.core.rebuild`.
-DISPATCH_COMMANDS: Final = ("check", "lint", "test", "build-bases")
+#: The commands a job may ask for. There is no free-command field.
+#: ``build-bases`` (MCPs mig 497, board 3c9033ff) runs on the hub itself
+#: rather than on a node -- the R6 rebuild lane; its execution lives in
+#: :mod:`fleet.core.rebuild`. ``restart-session`` (MCPs mig 507, board
+#: ccec3417) is the second hub-local verb, the only one that carries a
+#: target; :mod:`fleet.core.restart` maps it to one session-audit
+#: invocation.
+DISPATCH_COMMANDS: Final = (
+    "check",
+    "lint",
+    "test",
+    "build-bases",
+    "restart-session",
+    # MCPs mig 525, board task 1fe89973: the twin of restart-session for a
+    # session with no pane; the same hub pins and the same session target.
+    "revive-session",
+)
 
 #: Narrow type for a queue job's command.
-DispatchCommand = Literal["check", "lint", "test", "build-bases"]
+DispatchCommand = Literal[
+    "check", "lint", "test", "build-bases", "restart-session", "revive-session"
+]
 
 #: The terminal statuses a runner may report.
 CLOSING_STATUSES: Final = ("passed", "failed", "refused")
@@ -85,6 +99,10 @@ class DispatchJob(TypedDict):
             runner writes must name who asked for the work -- a dispatch
             whose provenance was the runner's own label would say only that
             the runner ran something, which is the one fact nobody needs.
+        session_target: The session a ``restart-session`` job acts on, and
+            None for every other command. The tool renders it as an explicit
+            ``null`` on those, so a missing key is a changed contract, not
+            an absent target.
     """
 
     job_id: str
@@ -97,6 +115,7 @@ class DispatchJob(TypedDict):
     claimed_by: str | None
     submitted_by: str
     session_id: str
+    session_target: str | None
 
 
 def _malformed(detail: str, *, answer: str) -> AppError[FleetErrorCode]:
@@ -242,6 +261,7 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         claimed_by=_require_optional_str(value, "claimedBy", answer=answer),
         submitted_by=_require_str(value, "submittedBy", answer=answer),
         session_id=_require_str(value, "sessionId", answer=answer),
+        session_target=_require_optional_str(value, "sessionTarget", answer=answer),
     )
 
 
@@ -340,7 +360,15 @@ def encode_job_line(job: DispatchJob) -> str:
     """
     where = job["node"] if job["node"] is not None else (job["requested_node"] or "any node")
     run = f" run={job['run_id']}" if job["run_id"] != "" else ""
-    return f"{job['job_id']} {job['status']} make {job['command']} {job['project']} @{where}{run}"
+    # A restart is not a make; naming a target that does not exist would
+    # send the reader to a Makefile for a rule they will not find.
+    target = job["session_target"]
+    verb = (
+        f"restart session {target}"
+        if target is not None
+        else f"make {job['command']} {job['project']}"
+    )
+    return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
 
 
 __all__ = [

@@ -69,7 +69,7 @@ from fleet.cli import run as run_cli
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, collect, dispatch, observe, queue, rebuild, registry
+from fleet.core import _test_hooks, collect, dispatch, observe, queue, rebuild, registry, restart
 
 _log = get_logger(__name__)
 
@@ -200,14 +200,14 @@ def collect_pass(
         _log.info("%s", collect_one_job(loaded, credentials, job, identity))
 
 
-def _refuse_rebuild(
+def _refuse_hub_job(
     credentials: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
     *,
     detail: str,
 ) -> DispatchJob:
-    """Close a rebuild job as refused, with its named reason.
+    """Close a hub-local job as refused, with its named reason.
 
     Args:
         credentials: The queue's endpoint and headers.
@@ -263,7 +263,7 @@ def rebuild_job(
             :func:`claim_pass` describes.
     """
     if mcps_root is None:
-        return _refuse_rebuild(
+        return _refuse_hub_job(
             credentials,
             job,
             identity,
@@ -276,7 +276,7 @@ def rebuild_job(
         )
     refusal = rebuild.refusal_for(mcps_root, job["submitted_by"])
     if refusal is not None:
-        return _refuse_rebuild(credentials, job, identity, detail=refusal)
+        return _refuse_hub_job(credentials, job, identity, detail=refusal)
     run_id = f"bases-{job['job_id']}"
     queue.report_start(
         credentials,
@@ -289,6 +289,92 @@ def rebuild_job(
     _log.info("started %s on austinpc as %s (local bake)", job["job_id"], run_id)
     result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
     detail = rebuild.describe_result(result)
+    queue.report_close(
+        credentials,
+        job_id=job["job_id"],
+        status="passed" if result["returncode"] == 0 else "failed",
+        exit_code=result["returncode"],
+        detail=detail,
+        identity=identity,
+    )
+    _log.info("%s: %s", encode_job_line(job), detail)
+    return job
+
+
+def restart_job(
+    credentials: McpCredentials,
+    job: DispatchJob,
+    identity: JSONObject,
+    *,
+    mcps_root: pathlib.Path | None,
+) -> DispatchJob:
+    """Execute a claimed session job (``restart-session`` or ``revive-session``)
+    on the hub, start to close.
+
+    The same shape as :func:`rebuild_job` and for the same reasons: the
+    work is local, well under a minute, and closing it in one tick leaves
+    nothing to collect. The keystroke sequence and every rail around it
+    belong to ``session_audit.rollover`` (restart) and
+    ``session_audit.revive`` (revive); this runner composes one invocation
+    and reports what it said (module docstring of :mod:`fleet.core.restart`).
+
+    Args:
+        credentials: The queue's endpoint and headers.
+        job: The claimed ``restart-session`` or ``revive-session`` job.
+        identity: This runner's identity arguments.
+        mcps_root: The MCPs checkout, or None when the runner was started
+            without ``--mcps-root``.
+
+    Returns:
+        The job, whatever became of it.
+
+    Raises:
+        AppError: Only from the queue calls themselves, as
+            :func:`claim_pass` describes.
+    """
+    if mcps_root is None:
+        return _refuse_hub_job(
+            credentials,
+            job,
+            identity,
+            detail=(
+                f"{restart.ROOT_MISSING_CODE}: this runner was started "
+                f"without {MCPS_ROOT_FLAG}, so it has no session-audit to "
+                "invoke; resubmit once a hub runner is scheduled"
+            ),
+        )
+    refusal = restart.refusal_for(mcps_root, job["session_target"])
+    if refusal is not None:
+        return _refuse_hub_job(credentials, job, identity, detail=refusal)
+    # Narrowed by the refusal above: a None target was refused there.
+    target = job["session_target"] if job["session_target"] is not None else ""
+    # The second session verb (MCPs mig 525): a revive types the submitter's
+    # label into the brief, so the label is judged before it can become an
+    # argv element, the same way the target is.
+    reviving = job["command"] == restart.REVIVE_COMMAND
+    if reviving:
+        requester_refusal = restart.requester_refusal(job["submitted_by"])
+        if requester_refusal is not None:
+            return _refuse_hub_job(credentials, job, identity, detail=requester_refusal)
+    verb = "revive" if reviving else "restart"
+    run_id = f"{verb}-{job['job_id']}"
+    queue.report_start(
+        credentials,
+        job_id=job["job_id"],
+        node="austinpc",
+        run_id=run_id,
+        lease_seconds=CLAIM_LEASE_SECONDS,
+        identity=identity,
+    )
+    _log.info("started %s on austinpc as %s (local %s)", job["job_id"], run_id, verb)
+    result = (
+        restart.run_session_revive(
+            mcps_root, session_target=target, requested_by=job["submitted_by"]
+        )
+        if reviving
+        else restart.run_session_restart(mcps_root, session_target=target)
+    )
+    detail = restart.describe_result(result, "revive" if reviving else "rollover")
     queue.report_close(
         credentials,
         job_id=job["job_id"],
@@ -340,9 +426,11 @@ def claim_pass(
         return None
     _log.info("claimed %s", encode_job_line(job))
     if job["command"] == "build-bases":
-        # The one verb that runs on the hub itself, synchronously —
+        # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
+    if job["command"] in restart.SESSION_COMMANDS:
+        return restart_job(credentials, job, identity, mcps_root=mcps_root)
     try:
         chosen, declaration, workers = run_cli.choose(
             loaded, project=job["project"], named=job["requested_node"]
@@ -503,4 +591,5 @@ __all__ = [
     "main",
     "observe_pass",
     "rebuild_job",
+    "restart_job",
 ]
