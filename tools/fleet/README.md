@@ -237,8 +237,8 @@ The fleet is described in two repositories and the columns barely overlap:
 
 | file | carries |
 |---|---|
-| `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
-| `API/tools/fleet/fleet.json` | host, stage root, cores, RAM, GPU, budget, **enabled** — what a dispatch may take |
+| `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, **platform**, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
+| `API/tools/fleet/fleet.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled** — what a dispatch may take |
 
 Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
 make this repo depend on a checkout of the other one, which dispatch must work
@@ -524,6 +524,30 @@ registration that cannot start is not a dispatch.
 `-AllowStartIfOnBatteries` and `-DontStopIfGoingOnBatteries` are on the
 settings for the same reason: `New-ScheduledTaskSettingsSet` defaults both to
 refusing, and two of the three nodes are laptops.
+
+## Two dialects, chosen by the node's declared `platform`
+
+Every node declares `platform` (`windows` or `linux`), and the identity
+registry declares the same field; `fleet-nodes --registry` reports the two
+disagreeing, because every script goes out in the declared platform's dialect
+and the wrong one is a parse error on the far side that reads as the node's
+fault. `fleet.core.dialect` names the acts once as a protocol and
+`dialect_windows` / `dialect_linux` render each: how a file is written over
+ssh (`Set-Content` behind cmd's quoting, or `mkdir -p … && cat >`), how a
+script is run by path (`powershell -File` or `/bin/sh`), how the archive is
+reassembled and digested (`[Convert]::FromBase64String` + `Get-FileHash`, or
+`base64 -d` + `sha256sum`), how capacity is read (`Win32_OperatingSystem`, or
+`/proc/meminfo` and `df`), and how the suite is detached from the connection.
+On Linux that last one is a **transient systemd user unit**
+(`systemd-run --user --unit=fleet-<run>`), the user manager's equivalent of a
+scheduled task: owned by the machine rather than the connection, stoppable by
+name, started or refused synchronously. It needs the account to **linger**
+(`sudo loginctl enable-linger <user>`), because a user manager stops with the
+user's last session otherwise and the unit would die with the ssh that started
+it; the launch script checks first and names that command. `tar -xzmf` and
+`git init` are the same on both and are spelled once. The Linux toolchain
+probe asks `python3` (what `scripts/make/shell.mk` calls there) and reports it
+under `python`, so the 3.11 requirement reads one report on every platform.
 
 ## What a lease can and cannot tell you
 

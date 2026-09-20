@@ -12,7 +12,7 @@ leave the one before it half-done:
   only recorded finished work would let the next dispatch onto a node the
   first had already filled.
 
-WHY THE SUITE IS LAUNCHED THROUGH TASK SCHEDULER AND NOT AS AN SSH CHILD.
+WHY THE SUITE IS DETACHED FROM THE CONNECTION AND NOT RUN AS AN SSH CHILD.
 Windows OpenSSH assigns the session's process tree to a job object precisely
 so the tree dies when the connection ends. A suite started as a child of the
 dispatching ssh call therefore dies when that call returns -- which is
@@ -20,11 +20,14 @@ immediately, since the whole point is not to hold the connection for the
 duration of a build. Measured on this fleet's own hardware and written up in
 ``memory/reference_long_runs_need_task_scheduler.md``: a ten-hour job launched
 that way is leashed to a connection, and a process cannot be moved out of a
-job object once it is in one.
+job object once it is in one. Linux sshd sends the session's process group
+SIGHUP for the same effect, so the build is a transient systemd user unit
+there.
 
-The scripts that do the launching live in :mod:`fleet.core.launch`, split out
-of here by role when this file crossed the 600-line ceiling. This module owns
-the ORDER; that one owns what the node is asked to run.
+The scripts that do the launching live in :mod:`fleet.core.dialect`, one set
+per platform, split out of here by role when this file crossed the 600-line
+ceiling. This module owns the ORDER; the dialect owns what the node is asked
+to run, and :mod:`fleet.core.names` owns what each file is called.
 
 NOTHING HERE CATCHES. A failure to stage or launch propagates with its own
 code, and :func:`finish` is the explicit act that gives the lease back -- at a
@@ -41,7 +44,7 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
-from fleet.core import _test_hooks, launch, leases, manifest, records, remote, staging
+from fleet.core import _test_hooks, dialect, leases, manifest, names, records, remote, staging
 
 #: How much longer than its estimate a dispatch may hold its lease.
 #:
@@ -304,7 +307,11 @@ def start(
     # file. The lease stops them sharing a node, not a filename.
     payload = staging.archive(project_root, members, archive_dir / f"{run_id}-{node_name}.tgz")
     target = staging.stage(
-        node["host"], run_id=run_id, stage_root=node["stage_root"], payload=payload
+        node["host"],
+        platform=node["platform"],
+        run_id=run_id,
+        stage_root=node["stage_root"],
+        payload=payload,
     )
     emit(
         loaded_feed,
@@ -322,15 +329,18 @@ def start(
         now_unix=_test_hooks.now(),
     )
 
+    spoken = dialect.for_platform(node["platform"])
     remote.send_script(
         node["host"],
-        f"{target}/{launch.BUILD_SCRIPT_NAME}",
-        launch.build_script(target=target, project=project, workers=workers),
+        spoken.script_path(target, names.BUILD_STEM),
+        spoken.build_script(target=target, project=project, workers=workers),
+        platform=node["platform"],
     )
     remote.run_script(
         node["host"],
-        f"{target}/{launch.REGISTER_SCRIPT_NAME}",
-        launch.register_script(target=target, run_id=run_id),
+        spoken.script_path(target, names.LAUNCH_STEM),
+        spoken.launch_script(target=target, run_id=run_id),
+        platform=node["platform"],
     )
     row = started_row(lease=lease, host=node["host"], workers=workers, detail=f"staged to {target}")
     records.append_ledger(loaded_ledger, row)

@@ -18,7 +18,7 @@ import pathlib
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, manifest, staging
+from fleet.core import _test_hooks, dialect, dialect_windows, manifest, staging
 from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
 
 
@@ -168,11 +168,59 @@ class TestStage:
         _test_hooks.run = runner
 
         target = staging.stage(
-            "lavender", run_id=DEMO_RUN_ID, stage_root="C:/fleet/stage", payload=payload
+            "lavender",
+            platform="windows",
+            run_id=DEMO_RUN_ID,
+            stage_root="C:/fleet/stage",
+            payload=payload,
         )
 
         assert target == f"C:/fleet/stage/{DEMO_RUN_ID}"
         assert any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+        # Every script went out under the Windows dialect's name and runner.
+        assert runner.calls[0][-1].endswith(f"mkdir-{DEMO_RUN_ID}.ps1' -Encoding utf8\"")
+        assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
+
+    def test_a_linux_node_is_staged_in_sh(self) -> None:
+        """The same five acts, in the other dialect: written through a
+        mkdir-and-cat command, run by /bin/sh, reassembled with base64 and
+        sha256sum, and the shared tar and git steps unchanged."""
+        payload = b"archive-bytes"
+        runner = FakeRun(
+            [
+                ok(""),  # send mkdir script
+                ok(""),  # run mkdir
+                ok(""),  # send the base64
+                ok(""),  # send reassemble script
+                ok(staging.digest(payload)),  # run reassemble -> digest
+                ok(""),  # send extract script
+                ok(""),  # run extract
+                ok(""),  # send the git-init script
+                ok(""),  # run git init
+            ]
+        )
+        _test_hooks.run = runner
+
+        target = staging.stage(
+            "diphtheria",
+            platform="linux",
+            run_id=DEMO_RUN_ID,
+            stage_root="/home/corvis/fleet/stage",
+            payload=payload,
+        )
+
+        assert target == f"/home/corvis/fleet/stage/{DEMO_RUN_ID}"
+        assert runner.calls[0][-1] == (
+            f"mkdir -p \"$(dirname '/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh')\" && "
+            f"cat > '/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh'"
+        )
+        made = f"/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh"
+        assert runner.calls[1][-2:] == ("/bin/sh", made)
+        assert runner.calls[3][-1].endswith(f"{target}/reassemble.sh'")
+        assert b"sha256sum" in (runner.stdin[3] or b"")
+        assert runner.stdin[5] == f"tar -xzmf '{target}/tree.tgz' -C '{target}'\n".encode()
+        assert runner.stdin[7] == f"git -C '{target}' init --quiet\n".encode()
+        assert not any("powershell" in argument for call in runner.calls for argument in call)
 
     def test_the_staged_tree_becomes_a_git_repository(self) -> None:
         """Ruff applies .gitignore ONLY inside a git repository, so without
@@ -196,17 +244,22 @@ class TestStage:
         )
         _test_hooks.run = runner
 
-        staging.stage("lavender", run_id=DEMO_RUN_ID, stage_root="C:/fleet/stage", payload=payload)
+        staging.stage(
+            "lavender",
+            platform="windows",
+            run_id=DEMO_RUN_ID,
+            stage_root="C:/fleet/stage",
+            payload=payload,
+        )
 
-        assert any(b"git -C" in (sent or b"") and b"init" in (sent or b"") for sent in runner.stdin)
-
-    def test_the_repository_is_initialised_after_the_tree_lands(self) -> None:
-        """Before extraction there is nothing for the ignore rules to cover,
-        and the .gitignore that gives them content arrives with the tree."""
-        body = staging.init_repository_script("C:/s/run-1")
-
-        assert "init" in body
-        assert "C:/s/run-1" in body
+        sent = [payload or b"" for payload in runner.stdin]
+        assert any(b"git -C" in body and b"init" in body for body in sent)
+        # After the tree lands: before extraction there is nothing for the
+        # ignore rules to cover, and the .gitignore that gives them content
+        # arrives with the tree.
+        assert sent.index(dialect.extract_script(f"C:/fleet/stage/{DEMO_RUN_ID}").encode()) < (
+            sent.index(dialect.init_repository_script(f"C:/fleet/stage/{DEMO_RUN_ID}").encode())
+        )
 
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.
@@ -214,7 +267,7 @@ class TestStage:
         The build then does nothing, which reads as a suite that passed
         instantly.
         """
-        assert "-xzmf" in staging.extract_script("C:/s/run-1")
+        assert "-xzmf" in dialect.extract_script("C:/s/run-1")
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
@@ -223,7 +276,11 @@ class TestStage:
 
         with pytest.raises(AppError) as excinfo:
             staging.stage(
-                "lavender", run_id=DEMO_RUN_ID, stage_root="C:/fleet/stage", payload=b"bytes"
+                "lavender",
+                platform="windows",
+                run_id=DEMO_RUN_ID,
+                stage_root="C:/fleet/stage",
+                payload=b"bytes",
             )
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH

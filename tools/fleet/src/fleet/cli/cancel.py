@@ -4,7 +4,8 @@ Usage:
     fleet-cancel --config fleet.json --run services-Model-Trainer-1757000000
 
 WHAT IT ACTUALLY DOES, in the order that matters. It stops the scheduled task
-on the node, closes the ledger row as ``cancelled``, emits that on the feed,
+(or, on a Linux node, the transient user unit) on the node, closes the ledger
+row as ``cancelled``, emits that on the feed,
 and releases the lease last -- so a failure part-way leaves the lease HELD,
 which expires on its own. Releasing first and failing after would free the
 environment while the record still said ``running``, and the next capacity
@@ -36,7 +37,7 @@ from fleet.cli import _config
 from fleet.contracts.feed import FeedEvent
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, is_live
 from fleet.contracts.workspace import require_node
-from fleet.core import _test_hooks, dispatch, launch, leases, records, remote
+from fleet.core import _test_hooks, dialect, dispatch, leases, names, records, remote
 
 _log = get_logger(__name__)
 
@@ -80,33 +81,6 @@ def find_live_row(loaded: _config.LoadedWorkspace, *, run_id: str) -> LedgerEntr
     return latest
 
 
-def stop_script(run_id: str) -> str:
-    """Render the script that stops one dispatch's task on the node.
-
-    ``-Confirm:$false`` because there is nobody at the node to answer, and an
-    unanswered prompt would hang this command until its ssh timeout rather
-    than stopping anything.
-
-    The task's name comes from :func:`fleet.core.launch.task_name`, the
-    same function the dispatch registered it with. Spelling it here a second
-    time is one rename away from a cancel that reports success having stopped
-    nothing.
-
-    Args:
-        run_id: The dispatch, which names its own task.
-
-    Returns:
-        The script's text.
-    """
-    task = launch.task_name(run_id)
-    return (
-        f"Stop-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue\n"
-        f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false "
-        f"-ErrorAction SilentlyContinue\n"
-        f"Write-Output 'stopped {task}'\n"
-    )
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """Cancel one dispatch.
 
@@ -129,10 +103,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     row = find_live_row(loaded, run_id=run_id)
     node = require_node(loaded.workspace, row["node"])
+    # The task or unit is named by names.task_name, the same function the
+    # dispatch launched it with; a second spelling here would be one rename
+    # away from a cancel that reports success having stopped nothing.
+    spoken = dialect.for_platform(node["platform"])
     remote.run_script(
         node["host"],
-        f"{node['stage_root']}/stop-{run_id}.ps1",
-        stop_script(run_id),
+        spoken.script_path(node["stage_root"], names.stop_stem(run_id)),
+        spoken.stop_script(run_id),
+        platform=node["platform"],
     )
 
     ended_unix = _test_hooks.now()
@@ -190,7 +169,7 @@ def entrypoint() -> None:
     raise SystemExit(main())
 
 
-__all__ = ["entrypoint", "find_live_row", "main", "stop_script"]
+__all__ = ["entrypoint", "find_live_row", "main"]
 
 
 # Without this, `python -m fleet.cli.cancel` imports the module, runs nothing

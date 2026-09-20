@@ -2,10 +2,11 @@
 
 THE SCRIPT IS SENT AND RUN BY PATH, never interpolated into a command line --
 see :mod:`fleet.core.remote` for the two failed attempts that established the
-rule. The body below is a CONSTANT: nothing is substituted into it by this
-package, so there is no value that could carry a quote into a shell. The
-braces it does contain are PowerShell's own format operator, evaluated on the
-far side after the bytes have arrived, and are never seen by Python.
+rule. The body is the node's dialect's CONSTANT (:mod:`fleet.core.dialect`):
+nothing is substituted into it by this package, so there is no value that
+could carry a quote into a shell. The braces the PowerShell one contains are
+its own format operator, evaluated on the far side after the bytes have
+arrived, and are never seen by Python.
 
 WHAT IT REPORTS AND WHAT IT DOES NOT. Free memory and free disk, and nothing
 about processes. It would be easy to count the node's ``python.exe`` instances
@@ -14,8 +15,9 @@ editor, some are another tool's -- and acting on it would make the fleet's
 behaviour depend on software it does not manage. Live fleet runs come from the
 ledger, where they are ours by construction because we wrote them.
 
-THE OUTPUT FORMAT IS KEY=VALUE LINES, one per field, parsed strictly. Not JSON,
-because the node renders it with PowerShell string formatting and a malformed
+THE OUTPUT FORMAT IS KEY=VALUE LINES, one per field, parsed strictly, and it is
+the same shape from both dialects so this module parses one thing. Not JSON,
+because the node renders it with shell string formatting and a malformed
 number would produce malformed JSON that fails with a parser message instead of
 a field name. Not positional, because a reordered script would silently swap
 two numbers.
@@ -33,29 +35,7 @@ from typing import TypedDict
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodeConfig, NodeState
-from fleet.core import remote
-
-#: What the capacity probe is called under a node's stage root.
-#:
-#: A NAME, not a path, and under the stage root rather than the node's TEMP.
-#: ``$env:TEMP`` cannot be used: :mod:`fleet.core.remote` writes through a
-#: single-quoted PowerShell literal, which does not expand it, so the node
-#: would grow a directory called ``$env:TEMP`` instead of resolving one. The
-#: writer creates the parent, so nothing has to exist first.
-PROBE_SCRIPT_NAME = "fleet-capacity.ps1"
-
-#: The probe, verbatim. No substitution, so nothing can be injected into it.
-#:
-#: ``$ErrorActionPreference`` is left at its default: a failure to read the
-#: machine's own memory is not something to soften, and the non-zero exit that
-#: results is what :func:`~fleet.core.remote.run_ssh` turns into a typed error.
-PROBE_SCRIPT = """\
-$os = Get-CimInstance Win32_OperatingSystem
-$drive = Get-PSDrive C
-"free_ram_gb={0:N3}" -f ($os.FreePhysicalMemory / 1MB)
-"free_disk_gb={0:N3}" -f ($drive.Free / 1GB)
-"logical_cores={0}" -f (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
-"""
+from fleet.core import dialect, names, remote
 
 #: The numeric fields a node must report before anything can be decided about it.
 REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb")
@@ -242,8 +222,18 @@ def attempt_probe(node: NodeConfig, *, live_runs: int) -> ProbeOutcome:
     Returns:
         Its live state, or why nothing could be read from it.
     """
+    # The probe lives under the stage root rather than the node's TEMP:
+    # ``$env:TEMP`` would not be expanded inside the single-quoted literal
+    # the writer uses, so the node would grow a directory of that name. The
+    # writer creates the parent, so nothing has to exist before the first
+    # probe. The script is the platform's constant; nothing is substituted
+    # into it, so nothing can be injected.
+    spoken = dialect.for_platform(node["platform"])
     outcome = remote.attempt_script(
-        node["host"], f"{node['stage_root']}/{PROBE_SCRIPT_NAME}", PROBE_SCRIPT
+        node["host"],
+        spoken.script_path(node["stage_root"], names.CAPACITY_PROBE_STEM),
+        spoken.capacity_probe_script(),
+        platform=node["platform"],
     )
     failure = outcome["failure"]
     if failure is not None:
@@ -278,8 +268,6 @@ def probe_node(node: NodeConfig, *, live_runs: int) -> NodeState:
 
 
 __all__ = [
-    "PROBE_SCRIPT",
-    "PROBE_SCRIPT_NAME",
     "REQUIRED_FIELDS",
     "ProbeOutcome",
     "attempt_probe",

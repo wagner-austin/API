@@ -2,7 +2,8 @@
 
 THIS FILE CLOSES A HOLE THE TESTS COULD NOT SEE. Before it existed,
 :func:`fleet.core.dispatch.finish` and
-:func:`fleet.core.launch.result_script` were written, covered and reachable
+the result script (then ``fleet.core.launch.result_script``, now a dialect
+method) were written, covered and reachable
 only from the test suite: NO command ever called them. So a dispatch could be
 leased, staged, started and recorded, and then had no path at all from the
 node's exit status back to the ledger -- every run stayed ``running`` until
@@ -32,17 +33,10 @@ from typing_extensions import TypedDict
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
-from fleet.core import dispatch, launch, remote
+from fleet.core import dialect, dispatch, names, remote
 
 #: The exit status a passing ``make check`` leaves.
 PASSING_EXIT_CODE = 0
-
-#: What the result-reading script is called under a dispatch's directory.
-#:
-#: A distinct name from the build's own scripts so that reading a result
-#: cannot overwrite the thing that produced it -- collection runs repeatedly
-#: against a directory a build is still writing to.
-POLL_SCRIPT_NAME = "collect.ps1"
 
 
 class RunResult(TypedDict):
@@ -82,10 +76,15 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
             forever, holding a node's budget against work that stopped.
     """
     target = f"{node['stage_root']}/{run_id}"
+    spoken = dialect.for_platform(node["platform"])
+    # A distinct script name from the build's own, so that reading a result
+    # cannot overwrite the thing that produced it -- collection runs
+    # repeatedly against a directory a build is still writing to.
     answer = remote.run_script(
         node["host"],
-        f"{target}/{POLL_SCRIPT_NAME}",
-        launch.result_script(target),
+        spoken.script_path(target, names.COLLECT_STEM),
+        spoken.result_script(target),
+        platform=node["platform"],
     ).strip()
     if not answer:
         return None
@@ -94,7 +93,7 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
         raise AppError(
             FleetErrorCode.RUN_RESULT_UNREADABLE,
             f"{run_id} on {node['host']} recorded {answer!r} where an exit status and a "
-            f"timestamp were expected; the build's last act writes {launch.RESULT_NAME} and "
+            f"timestamp were expected; the build's last act writes {names.RESULT_NAME} and "
             "nothing else does, so this is a node that was written to by something other than "
             "the build",
         )
@@ -150,7 +149,7 @@ def describe(node: NodeConfig, *, run_id: str, exit_code: int) -> str:
     """
     return (
         f"make {MAKE_TARGET} exited {exit_code}; log at "
-        f"{node['host']}:{node['stage_root']}/{run_id}/{launch.RESULT_NAME}.log"
+        f"{node['host']}:{node['stage_root']}/{run_id}/{names.RESULT_NAME}.log"
     )
 
 
@@ -200,7 +199,6 @@ def outlived_its_lease(row: LedgerEntry, plan: ProjectConfig, *, finished_unix: 
 
 __all__ = [
     "PASSING_EXIT_CODE",
-    "POLL_SCRIPT_NAME",
     "RunResult",
     "describe",
     "lease_deadline",

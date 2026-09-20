@@ -2,6 +2,7 @@
   "nodes": {
     "sedona": {
       "host": "sedona",
+      "platform": "windows",
       "stage_root": "C:/fleet/stage",
       "logical_cores": 20,
       "ram_gb": 16.0,
@@ -22,6 +23,7 @@
     },
     "lavender": {
       "host": "lavender",
+      "platform": "windows",
       "stage_root": "C:/fleet/stage",
       "logical_cores": 16,
       "ram_gb": 32.0,
@@ -42,6 +44,7 @@
     },
     "loki": {
       "host": "loki",
+      "platform": "windows",
       "stage_root": "C:/fleet/stage",
       "logical_cores": 16,
       "ram_gb": 31.0,

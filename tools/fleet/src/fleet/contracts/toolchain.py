@@ -110,7 +110,10 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="poetry",
         reason="every Makefile's lint and test targets run poetry lock and poetry sync",
-        install={"python": "python -m pip install --user poetry"},
+        install={
+            "pip": "python -m pip install --user poetry",
+            "pipx": "pipx install poetry",
+        },
     ),
     RequiredTool(
         name="git",
@@ -118,6 +121,7 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         install={
             "winget": "winget install --id Git.Git -e --source winget --accept-source-agreements",
             "choco": "choco install git -y",
+            "apt-get": "sudo apt-get install -y git",
         },
     ),
     RequiredTool(
@@ -128,6 +132,7 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
                 "winget install --id GnuWin32.Make -e --source winget --accept-source-agreements"
             ),
             "choco": "choco install make -y",
+            "apt-get": "sudo apt-get install -y make",
         },
     ),
     RequiredTool(
@@ -139,16 +144,32 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
 
 #: The package managers a node is asked about, in the order they are preferred.
 #:
-#: ``python`` first because poetry installs through its own pip and needs no
-#: system package manager at all -- and a node that has no Python cannot run a
-#: build regardless, so nothing is lost by preferring it.
+#: ``pip`` first because poetry installs through the interpreter's own pip
+#: and needs no system package manager at all -- and a node that has no
+#: Python cannot run a build regardless, so nothing is lost by preferring it.
+#: It was keyed ``python`` until 2026-09-20 and reported by the interpreter's
+#: own line; it is its own line now (``python -m pip --version`` answering)
+#: because a Linux node reports its interpreter under ``python`` too, and
+#: there the user-site install this manager runs is refused outright:
+#: Ubuntu 24.04's interpreter is externally managed (PEP 668). Splitting the
+#: manager from the tool is what lets that node report the interpreter it has
+#: without being offered an install command that cannot work on it.
 #:
 #: ``winget`` before ``choco`` because it ships with Windows and needs no
 #: elevation for a user-scope install, while choco is a deliberate
 #: installation somebody made. Measured 2026-09-04: sedona has both, lavender
 #: only winget, loki only choco -- so the order decides only sedona, and
 #: either would work there.
-PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("python", "winget", "choco")
+#:
+#: ``pipx`` and ``apt-get`` are the Linux pair, added with the first Linux
+#: node (diphtheria, 2026-09-20). ``pipx`` is how poetry documents its own
+#: install. ``apt-get`` is spelled with ``sudo`` because a package install is
+#: root's act on that platform; the node's account must be allowed it, and
+#: the command failing on a password prompt is the honest answer when it is
+#: not. A Windows probe never reports these two and a Linux probe never
+#: reports the Windows three, so the order only ever decides among managers
+#: one platform has.
+PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("pip", "pipx", "winget", "choco", "apt-get")
 
 #: The Python a project's environment is built from.
 #:

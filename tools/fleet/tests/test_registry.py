@@ -25,13 +25,15 @@ from fleet.core import _test_hooks, registry
 from tests.conftest import workspace_document
 
 
-def _registry_document(**enabled: bool) -> str:
+def _registry_document(platform: str = "windows", **enabled: bool) -> str:
     """Render an identity registry carrying the given nodes.
 
     Shaped like the real one: an object with a ``nodes`` ARRAY whose entries
-    carry ``name`` and ``enabled`` among fields this package ignores.
+    carry ``name``, ``enabled``, ``role``, ``user`` and ``platform`` among
+    fields this package ignores.
 
     Args:
+        platform: What the registry says every node here runs.
         **enabled: Node name to whether the registry says it is expected to
             answer.
 
@@ -45,6 +47,7 @@ def _registry_document(**enabled: bool) -> str:
                 "name": name,
                 "role": "worker",
                 "user": "austi",
+                "platform": platform,
                 "tailnetIp": "100.0.0.1",
                 "enabled": value,
                 "tunnel": None,
@@ -142,6 +145,23 @@ class TestTheDriftThatHappened:
         assert registry.has_drifted(drift) is False
         assert registry.describe(drift, registry_path="/x/r.json") == ()
 
+    def test_a_platform_the_two_files_disagree_on_is_drift(self) -> None:
+        """Every script goes out in the declared platform's dialect, so this
+        one is found by a dispatch's parse error unless the reconciler finds
+        it first. The line names both sides so the reader edits the wrong one
+        deliberately rather than by guess."""
+        drift = registry.compare(
+            _workspace(lavender=True),
+            registry.decode_registry_nodes(_registry_document(platform="linux", lavender=True)),
+        )
+
+        assert drift["platform_disagrees"] == (("lavender", "windows", "linux"),)
+        assert registry.has_drifted(drift) is True
+        lines = registry.describe(drift, registry_path="/x/r.json")
+        assert len(lines) == 1
+        assert lines[0].startswith("lavender: this workspace says windows, /x/r.json says linux.")
+        assert "parse error" in lines[0]
+
     def test_a_registry_node_that_is_off_and_unmentioned_is_not_drift(self) -> None:
         """The registry holds every machine on the tailnet, including two
         boxes offline since August. Nothing dispatches to those and none of
@@ -191,22 +211,25 @@ class TestTheObserverReadsRoleAndUser:
         nodes = registry.decode_registry_nodes(_registry_document(loki=True))
 
         assert nodes["loki"] == registry.RegistryNode(
-            name="loki", enabled=True, role="worker", user="austi"
+            name="loki", enabled=True, role="worker", user="austi", platform="windows"
         )
 
     def test_a_null_user_is_a_client_with_no_account_of_ours(self) -> None:
         """The phone, exactly as the live registry declares it."""
         nodes = registry.decode_registry_nodes(
-            '{"nodes": [{"name": "phone", "role": "client", "user": null, "enabled": true}]}'
+            '{"nodes": [{"name": "phone", "role": "client", "user": null, "enabled": true, '
+            '"platform": "linux"}]}'
         )
 
         assert nodes["phone"]["user"] is None
         assert nodes["phone"]["role"] == "client"
+        assert nodes["phone"]["platform"] == "linux"
 
     def test_a_user_that_is_not_a_string_is_refused(self) -> None:
         with pytest.raises(Exception) as excinfo:
             registry.decode_registry_nodes(
-                '{"nodes": [{"name": "loki", "role": "worker", "user": 7, "enabled": true}]}'
+                '{"nodes": [{"name": "loki", "role": "worker", "user": 7, "enabled": true, '
+                '"platform": "windows"}]}'
             )
 
         assert "Expected JSON string, got int" in str(excinfo.value)
@@ -214,10 +237,21 @@ class TestTheObserverReadsRoleAndUser:
     def test_a_node_missing_role_is_refused(self) -> None:
         with pytest.raises(Exception) as excinfo:
             registry.decode_registry_nodes(
-                '{"nodes": [{"name": "loki", "user": "austi", "enabled": true}]}'
+                '{"nodes": [{"name": "loki", "user": "austi", "enabled": true, '
+                '"platform": "windows"}]}'
             )
 
         assert "role" in str(excinfo.value)
+
+    def test_a_node_missing_platform_is_refused(self) -> None:
+        """A registry without the platform column cannot be reconciled against
+        the dialect every dispatch is rendered in."""
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "loki", "role": "worker", "user": "austi", "enabled": true}]}'
+            )
+
+        assert "platform" in str(excinfo.value)
 
 
 class TestAnUnreadableRegistryIsRefused:

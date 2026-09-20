@@ -234,7 +234,7 @@ def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> 
         ]
     )
     windows_payload_path = f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}.sh"
-    remote.send_script(spec["host"], windows_payload_path, payload)
+    remote.send_script(spec["host"], windows_payload_path, payload, platform="windows")
     wsl_payload_path = _windows_to_wsl_path(windows_payload_path)
     driver = "\n".join(
         [
@@ -248,6 +248,7 @@ def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> 
         spec["host"],
         f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-driver.ps1",
         driver,
+        platform="windows",
     )
 
 
@@ -284,6 +285,7 @@ def _provision_windows(
         spec["host"],
         f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-win.ps1",
         "\n".join(lines),
+        platform="windows",
     )
 
 

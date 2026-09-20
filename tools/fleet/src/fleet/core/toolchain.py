@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig
+from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
     REQUIRED_PYTHON,
@@ -33,39 +33,7 @@ from fleet.contracts.toolchain import (
     missing,
     python_is_right,
 )
-from fleet.core import remote
-
-#: What the toolchain probe is called under a node's stage root.
-#:
-#: A NAME rather than a path, resolved against the node's declared stage root
-#: by its caller. ``$env:TEMP`` was tried first and is wrong:
-#: :mod:`fleet.core.remote` writes through a single-quoted PowerShell literal,
-#: which does not expand it, so a node would grow a directory named
-#: ``$env:TEMP``. The writer creates the parent, so nothing needs to exist
-#: before the very first probe.
-PROBE_SCRIPT_NAME = "fleet-toolchain.ps1"
-
-#: What the install script is called under a node's stage root.
-INSTALL_SCRIPT_NAME = "fleet-install.ps1"
-
-#: The probe, verbatim. Nothing is substituted into it by this package.
-#:
-#: ``--version`` is asked of each tool and the first line kept, because git and
-#: poetry both print several. A tool that is present but declines to answer
-#: yields an empty version rather than a failure: absence and silence are
-#: different states, and only the first stops a dispatch.
-PROBE_SCRIPT = """\
-foreach ($tool in @('python','poetry','git','make','tar','winget','choco')) {
-  $found = Get-Command $tool -ErrorAction SilentlyContinue
-  if ($found) {
-    $raw = (& $tool --version 2>&1 | Select-Object -First 1)
-    $text = ($raw | Out-String).Trim() -replace '[\\r\\n]', ' '
-    "$tool=yes=$text"
-  } else {
-    "$tool=no="
-  }
-}
-"""
+from fleet.core import dialect, names, remote
 
 
 def parse_probe(output: str) -> tuple[ToolReport, ...]:
@@ -115,8 +83,19 @@ def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
             ``DISPATCH_FAILED`` if the probe exits non-zero, or
             ``NODE_TOOL_MISSING`` if its answer cannot be read.
     """
+    # Under the stage root rather than the node's TEMP: ``$env:TEMP`` was
+    # tried first and is wrong, because the writer's single-quoted literal
+    # does not expand it and a node would grow a directory of that name. The
+    # writer creates the parent, so nothing needs to exist before the very
+    # first probe.
+    spoken = dialect.for_platform(node["platform"])
     return parse_probe(
-        remote.run_script(node["host"], f"{node['stage_root']}/{PROBE_SCRIPT_NAME}", PROBE_SCRIPT)
+        remote.run_script(
+            node["host"],
+            spoken.script_path(node["stage_root"], names.TOOLCHAIN_PROBE_STEM),
+            spoken.toolchain_probe_script(),
+            platform=node["platform"],
+        )
     )
 
 
@@ -175,11 +154,13 @@ def _python_version(reports: tuple[ToolReport, ...]) -> str:
     return "unknown"
 
 
-def install_script(names: tuple[str, ...], managers: tuple[str, ...]) -> str:
+def install_script(
+    tools: tuple[str, ...], managers: tuple[str, ...], *, platform: NodePlatform
+) -> str:
     """Render the script that installs the named tools on one node.
 
     Args:
-        names: The tools to install, each of which must have a command for
+        tools: The tools to install, each of which must have a command for
             one of ``managers`` -- :func:`installable` is what guarantees
             that, and calling this with anything else is a caller error.
         managers: That node's available package managers, in preference
@@ -187,6 +168,8 @@ def install_script(names: tuple[str, ...], managers: tuple[str, ...]) -> str:
             same missing ``make`` is a winget command on lavender and a choco
             one on loki, and this function must not guess which node it is
             rendering for.
+        platform: The node's declared platform, for the echo that precedes
+            each command.
 
     Returns:
         The script's text, one command per tool, each preceded by an echo so
@@ -199,15 +182,16 @@ def install_script(names: tuple[str, ...], managers: tuple[str, ...]) -> str:
             the caller would then re-probe and see the tool still absent
             with no explanation.
     """
+    spoken = dialect.for_platform(platform)
     lines: list[str] = []
-    for name in names:
+    for name in tools:
         command = install_command(name, managers)
         if not command:
             raise ValueError(
                 f"{name!r} has no install command for managers {managers}; "
                 "installable() is what filters these and it was not consulted"
             )
-        lines.append(f"Write-Output 'installing {name}'")
+        lines.append(spoken.echo_command(f"installing {name}"))
         lines.append(command)
     return "\n".join(lines) + "\n"
 
@@ -253,21 +237,20 @@ def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[
             softened: a half-installed node is worse than an untouched one
             because it looks ready.
     """
-    names = installable(reports)
-    if not names:
+    tools = installable(reports)
+    if not tools:
         return ()
+    spoken = dialect.for_platform(node["platform"])
     remote.run_script(
         node["host"],
-        f"{node['stage_root']}/{INSTALL_SCRIPT_NAME}",
-        install_script(names, available_managers(reports)),
+        spoken.script_path(node["stage_root"], names.INSTALL_STEM),
+        install_script(tools, available_managers(reports), platform=node["platform"]),
+        platform=node["platform"],
     )
-    return names
+    return tools
 
 
 __all__ = [
-    "INSTALL_SCRIPT_NAME",
-    "PROBE_SCRIPT",
-    "PROBE_SCRIPT_NAME",
     "install_missing",
     "install_script",
     "installable",

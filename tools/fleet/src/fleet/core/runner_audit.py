@@ -400,6 +400,7 @@ def attempt_audit_host(spec: HostRunnerSpec) -> AuditOutcome:
         spec["host"],
         f"{spec['scratch_dir']}/{AUDIT_SCRIPT_NAME}",
         render_audit_script(spec),
+        platform="windows",
     )
     failure = outcome["failure"]
     if failure is not None:

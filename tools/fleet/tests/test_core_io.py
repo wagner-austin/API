@@ -25,7 +25,7 @@ from fleet.contracts.budget import NodeBudget
 from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.contracts.node import NodeConfig
-from fleet.core import _test_hooks, probe, records, remote
+from fleet.core import _test_hooks, dialect_linux, dialect_windows, probe, records, remote
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -308,17 +308,30 @@ class TestRemote:
         runner = FakeRun([ok("")])
         _test_hooks.run = runner
 
-        remote.send_script("lavender", "C:/tmp/probe.ps1", "Write-Host 'hi'")
+        remote.send_script("lavender", "C:/tmp/probe.ps1", "Write-Host 'hi'", platform="windows")
 
         assert runner.stdin[0] == b"Write-Host 'hi'"
         assert "Set-Content" in runner.calls[0][-1]
         assert "C:/tmp/probe.ps1" in runner.calls[0][-1]
 
+    def test_a_linux_node_is_written_through_mkdir_and_cat(self) -> None:
+        """The same act in the other dialect: one argument for the remote
+        login shell, the parent made in the same round trip."""
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+
+        remote.send_script("diphtheria", "/home/c/stage/probe.sh", "echo hi", platform="linux")
+
+        assert runner.stdin[0] == b"echo hi"
+        assert runner.calls[0][-1] == (
+            "mkdir -p \"$(dirname '/home/c/stage/probe.sh')\" && cat > '/home/c/stage/probe.sh'"
+        )
+
     def test_an_unreachable_node_during_send_says_so(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "no route to host")])
 
         with pytest.raises(AppError) as excinfo:
-            remote.send_script("pendragon", "C:/tmp/probe.ps1", "x")
+            remote.send_script("pendragon", "C:/tmp/probe.ps1", "x", platform="windows")
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 
@@ -326,7 +339,7 @@ class TestRemote:
         _test_hooks.run = FakeRun([failed(1, "access denied")])
 
         with pytest.raises(AppError) as excinfo:
-            remote.send_script("lavender", "C:/tmp/probe.ps1", "x")
+            remote.send_script("lavender", "C:/tmp/probe.ps1", "x", platform="windows")
 
         assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
         assert "access denied" in excinfo.value.message
@@ -336,10 +349,17 @@ class TestRemote:
         runner = FakeRun([ok(""), ok("output")])
         _test_hooks.run = runner
 
-        assert remote.run_script("lavender", "C:/tmp/p.ps1", "body") == "output"
+        assert remote.run_script("lavender", "C:/tmp/p.ps1", "body", platform="windows") == "output"
         assert runner.stdin[0] == b"body"
-        assert runner.calls[1][-6:-1] == remote.POWERSHELL_INVOCATION
+        assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
         assert runner.calls[1][-1] == "C:/tmp/p.ps1"
+
+    def test_run_script_on_a_linux_node_runs_through_bin_sh(self) -> None:
+        runner = FakeRun([ok(""), ok("output")])
+        _test_hooks.run = runner
+
+        assert remote.run_script("diphtheria", "/s/p.sh", "body", platform="linux") == "output"
+        assert runner.calls[1][-2:] == ("/bin/sh", "/s/p.sh")
 
 
 def _node() -> NodeConfig:
@@ -350,6 +370,7 @@ def _node() -> NodeConfig:
     """
     return NodeConfig(
         host="lavender",
+        platform="windows",
         stage_root="C:/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,
@@ -429,7 +450,8 @@ class TestProbe:
 
         assert state["free_ram_gb"] == 27.0
         assert state["live_runs"] == 1
-        assert runner.stdin[0] == probe.PROBE_SCRIPT.encode("utf-8")
+        assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
+        assert runner.calls[0][-1].endswith("C:/fleet/stage/fleet-capacity.ps1' -Encoding utf8\"")
 
     def test_the_script_arrives_byte_identical_to_the_constant(self) -> None:
         """THE RENDER-AND-SEND RULE, asserted rather than described.
@@ -445,5 +467,19 @@ class TestProbe:
 
         probe.probe_node(_node(), live_runs=0)
 
-        assert runner.stdin[0] == probe.PROBE_SCRIPT.encode("utf-8")
-        assert "{0:N3}" in probe.PROBE_SCRIPT
+        assert runner.stdin[0] == dialect_windows.CAPACITY_PROBE_SCRIPT.encode("utf-8")
+        assert "{0:N3}" in dialect_windows.CAPACITY_PROBE_SCRIPT
+
+    def test_a_linux_node_is_probed_with_the_sh_constant(self) -> None:
+        runner = FakeRun([ok(""), ok("free_ram_gb=26.394\nfree_disk_gb=687.729\n")])
+        _test_hooks.run = runner
+        node = _node()
+        node["platform"] = "linux"
+        node["stage_root"] = "/home/corvis/fleet/stage"
+
+        state = probe.probe_node(node, live_runs=0)
+
+        assert state["free_disk_gb"] == 687.729
+        assert runner.stdin[0] == dialect_linux.CAPACITY_PROBE_SCRIPT.encode("utf-8")
+        assert runner.calls[0][-1].endswith("cat > '/home/corvis/fleet/stage/fleet-capacity.sh'")
+        assert runner.calls[1][-2:] == ("/bin/sh", "/home/corvis/fleet/stage/fleet-capacity.sh")

@@ -3,30 +3,33 @@
 THE FLEET IS WRITTEN DOWN TWICE, IN TWO REPOSITORIES, AND THE COLUMNS BARELY
 OVERLAP:
 
-  MCPs  fleet-mcp/fleet-nodes.json   name, role, user, tailnetIp, ENABLED,
-                                     tunnel, notes -- identity and
+  MCPs  fleet-mcp/fleet-nodes.json   name, role, user, PLATFORM, tailnetIp,
+                                     ENABLED, tunnel, notes -- identity and
                                      reachability, every machine on the
                                      tailnet including ones nothing dispatches
                                      to (a phone, two boxes offline since
                                      August).
-  API   tools/fleet/fleet.json       host, stage_root, logical_cores, ram_gb,
-                                     gpu, budget -- what a dispatch may take
-                                     from a machine.
+  API   tools/fleet/fleet.json       host, PLATFORM, stage_root,
+                                     logical_cores, ram_gb, gpu, budget --
+                                     what a dispatch may take from a machine.
 
 Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
 make one repo depend on the other. They are two VIEWS, and that is fine.
 
-WHAT IS NOT FINE IS THE ONE FACT THEY SHARE: whether a machine is expected to
-answer. On 2026-09-05 the identity registry marked loki disabled for a trip
+WHAT IS NOT FINE ARE THE TWO FACTS THEY SHARE. Whether a machine is expected
+to answer: on 2026-09-05 the identity registry marked loki disabled for a trip
 and this workspace never learned, because it had no field to learn it into.
 Every auto-select dispatch then paid a ten-second ssh timeout rediscovering
-it, and one was refused outright.
+it, and one was refused outright. And which platform it is: every script a
+dispatch sends is rendered in the platform's dialect, so a workspace that
+called a Linux box Windows would send it PowerShell and read the parse error
+as the node's fault.
 
-So the workspace now declares ``enabled`` itself -- the API repo must be able
-to dispatch with no MCPs checkout present -- and this module makes the two
-CHECKABLE against each other. Detection, not prevention: nothing here stops
-somebody adding a node to one file and not the other. It stops that going
-unnoticed.
+So the workspace now declares ``enabled`` and ``platform`` itself -- the API
+repo must be able to dispatch with no MCPs checkout present -- and this
+module makes the two CHECKABLE against each other. Detection, not prevention:
+nothing here stops somebody adding a node to one file and not the other. It
+stops that going unnoticed.
 
 THE PATH IS PASSED IN, NEVER GUESSED. A reconciler that searched for the other
 repo would silently report success on a machine where it simply failed to find
@@ -70,12 +73,17 @@ class RegistryNode(TypedDict):
         enabled: Whether it is expected to answer.
         role: ``hub``, ``vpn-jump``, ``worker`` or ``client``.
         user: The account the fleet provisioned on it, or None for a client.
+        platform: ``windows`` or ``linux``, as the registry spells it; read
+            as a plain string because the registry's set is its own (a phone
+            is ``linux`` there) and this workspace only compares it against
+            the platform it declared.
     """
 
     name: str
     enabled: bool
     role: str
     user: str | None
+    platform: str
 
 
 class RegistryDrift(TypedDict):
@@ -98,12 +106,18 @@ class RegistryDrift(TypedDict):
             ``not_dispatchable``. Capacity nobody has decided about --
             distinct from ``disabled_here_enabled_there``, where a decision
             was made and disagrees.
+        platform_disagrees: Nodes the two files place on different
+            platforms, as ``(name, here, there)``. The one that would be
+            found by a dispatch rather than a reconciler: every script goes
+            out in the platform's dialect, and the wrong one is a parse
+            error on the far side that reads as the node's fault.
     """
 
     enabled_here_disabled_there: tuple[str, ...]
     disabled_here_enabled_there: tuple[str, ...]
     missing_from_registry: tuple[str, ...]
     enabled_there_absent_here: tuple[str, ...]
+    platform_disagrees: tuple[tuple[str, str, str], ...]
 
 
 def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
@@ -118,7 +132,8 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
     Raises:
         AppError: ``NODE_REGISTRY_UNREADABLE`` when the document is not the
             shape the registry has always had -- an object with a ``nodes``
-            array of objects carrying ``name`` and ``enabled``. Raised rather
+            array of objects carrying ``name``, ``enabled``, ``role`` and
+            ``platform``. Raised rather
             than skipped: a reconciler that shrugged at an unreadable registry
             would report agreement it never established.
     """
@@ -141,6 +156,7 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
             # ``null`` for a client such as the phone, which is never
             # provisioned and has no account of ours to ssh in as.
             user=None if raw_user is None else narrow_json_to_str(raw_user),
+            platform=require_str(entry, "platform"),
         )
     return declared
 
@@ -158,7 +174,7 @@ def _unreadable(detail: str) -> AppError[FleetErrorCode]:
         FleetErrorCode.NODE_REGISTRY_UNREADABLE,
         f"the fleet identity registry cannot be read: {detail}. Expected the shape "
         "fleet-mcp/fleet-nodes.json has always had -- an object with a 'nodes' array, "
-        "each entry carrying 'name' and 'enabled'.",
+        "each entry carrying 'name', 'enabled', 'role' and 'platform'.",
     )
 
 
@@ -192,6 +208,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
     disabled_here_enabled_there: list[str] = []
     missing: list[str] = []
     undecided: list[str] = []
+    platform_disagrees: list[tuple[str, str, str]] = []
     for name, node in sorted(workspace["nodes"].items()):
         declared = registry.get(name)
         if declared is None:
@@ -201,6 +218,8 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             enabled_here_disabled_there.append(name)
         if not node["enabled"] and declared["enabled"]:
             disabled_here_enabled_there.append(name)
+        if node["platform"] != declared["platform"]:
+            platform_disagrees.append((name, node["platform"], declared["platform"]))
     for name, declared in sorted(registry.items()):
         unmentioned = name not in workspace["nodes"] and name not in workspace["not_dispatchable"]
         if declared["enabled"] and unmentioned:
@@ -210,6 +229,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
         disabled_here_enabled_there=tuple(disabled_here_enabled_there),
         missing_from_registry=tuple(missing),
         enabled_there_absent_here=tuple(undecided),
+        platform_disagrees=tuple(platform_disagrees),
     )
 
 
@@ -220,13 +240,14 @@ def has_drifted(drift: RegistryDrift) -> bool:
         drift: What :func:`compare` found.
 
     Returns:
-        True when any of the four disagreements is non-empty.
+        True when any of the five disagreements is non-empty.
     """
     return bool(
         drift["enabled_here_disabled_there"]
         or drift["disabled_here_enabled_there"]
         or drift["missing_from_registry"]
         or drift["enabled_there_absent_here"]
+        or drift["platform_disagrees"]
     )
 
 
@@ -266,6 +287,12 @@ def describe(drift: RegistryDrift, *, registry_path: str) -> tuple[str, ...]:
             f"{name}: {registry_path} says it is enabled and this workspace says nothing "
             "at all. Declare it as a node, or as not_dispatchable with the reason -- "
             "silence cannot be told apart from an oversight."
+        )
+    for name, here, there in drift["platform_disagrees"]:
+        lines.append(
+            f"{name}: this workspace says {here}, {registry_path} says {there}. Every "
+            "script a dispatch sends is rendered for the declared platform, so the wrong "
+            "one is a parse error on the node that reads as the node's fault."
         )
     return tuple(lines)
 

@@ -40,6 +40,7 @@ def _node(
     """
     return NodeConfig(
         host=host,
+        platform="windows",
         stage_root="C:/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,

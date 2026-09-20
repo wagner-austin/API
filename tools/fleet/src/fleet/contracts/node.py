@@ -15,6 +15,8 @@ measurement is about to be pinned to a card.
 
 from __future__ import annotations
 
+from typing import Final, Literal
+
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -28,6 +30,21 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
+
+#: The operating-system family a node runs, which decides every script a
+#: dispatch sends it: how a file is written over ssh, how a script is run by
+#: path, how the suite is detached from the connection (Task Scheduler on
+#: one, a transient systemd user unit on the other), and how capacity is read.
+#:
+#: A closed set rather than a free string because each value names a whole
+#: dialect in :mod:`fleet.core.dialect`, and a third value would need a third
+#: one before it could dispatch anything. The identity registry
+#: (``fleet-mcp/fleet-nodes.json``) declares the same field under the same
+#: name, and ``fleet-nodes --registry`` reports the two disagreeing.
+NodePlatform = Literal["windows", "linux"]
+
+#: Every platform, for the decoder's refusal and the reconciler's reading.
+NODE_PLATFORMS: Final[tuple[NodePlatform, ...]] = ("windows", "linux")
 
 
 class NodeGpu(TypedDict):
@@ -64,6 +81,11 @@ class NodeConfig(TypedDict):
             hostname or an address. The alias carries the user and the key,
             and a tailnet address changes without warning while an alias does
             not.
+        platform: Which :data:`NodePlatform` the node is, and so which script
+            dialect every remote act uses. Declared rather than probed
+            because it is needed to write the very first probe, and declared
+            rather than read from the identity registry because the API repo
+            must dispatch with no MCPs checkout present.
         stage_root: Absolute directory on the node holding staged working
             trees, one per run. Declared rather than derived from a home
             directory, because the three live nodes disagree about where a
@@ -93,6 +115,7 @@ class NodeConfig(TypedDict):
     """
 
     host: str
+    platform: NodePlatform
     stage_root: str
     logical_cores: int
     ram_gb: float
@@ -187,6 +210,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
     gpu = node["gpu"]
     return {
         "host": node["host"],
+        "platform": node["platform"],
         "stage_root": node["stage_root"],
         "logical_cores": node["logical_cores"],
         "ram_gb": node["ram_gb"],
@@ -207,11 +231,13 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, ``gpu`` is absent rather than explicitly null, or the
+            mistyped, ``gpu`` is absent rather than explicitly null,
+            ``platform`` is not one of :data:`NODE_PLATFORMS`, or the
             machine's own numbers are not positive.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"node must be a JSON object, got {type(value).__name__}")
+    platform = decode_node_platform(require_str(value, "platform"))
     if "gpu" not in value:
         raise JSONTypeError(
             "node must declare 'gpu', using null for a CPU-only machine. An absent key is "
@@ -234,12 +260,37 @@ def decode_node_config(value: JSONValue) -> NodeConfig:
     gpu_value = value["gpu"]
     return NodeConfig(
         host=require_str(value, "host"),
+        platform=platform,
         stage_root=stage_root,
         logical_cores=logical_cores,
         ram_gb=_positive_float(value, "ram_gb"),
         gpu=None if gpu_value is None else decode_node_gpu(gpu_value),
         enabled=require_bool(value, "enabled"),
         budget=decode_node_budget(require_dict(value, "budget")),
+    )
+
+
+def decode_node_platform(value: str) -> NodePlatform:
+    """Read a platform name into the closed set.
+
+    Args:
+        value: The declared name.
+
+    Returns:
+        The platform.
+
+    Raises:
+        JSONTypeError: If it is not one of :data:`NODE_PLATFORMS`. A value
+            outside the set has no dialect, so nothing could be sent to the
+            node; refusing here is what keeps that from surfacing as a
+            script the far side cannot parse.
+    """
+    for platform in NODE_PLATFORMS:
+        if value == platform:
+            return platform
+    raise JSONTypeError(
+        f"platform must be one of {', '.join(NODE_PLATFORMS)}, got {value!r}; each names the "
+        "script dialect every remote act uses, and a value outside the set has none"
     )
 
 
@@ -282,11 +333,14 @@ def describe_node(node: NodeConfig, state: NodeState) -> str:
 
 
 __all__ = [
+    "NODE_PLATFORMS",
     "NodeConfig",
     "NodeGpu",
+    "NodePlatform",
     "NodeState",
     "decode_node_config",
     "decode_node_gpu",
+    "decode_node_platform",
     "describe_node",
     "encode_node_config",
     "encode_node_gpu",

@@ -42,6 +42,25 @@ from tests.conftest import (
 )
 
 
+def _registry_node(name: str, *, enabled: bool) -> JSONObject:
+    """One identity-registry worker entry, Windows like the fixture workspace.
+
+    Args:
+        name: The node's registry name.
+        enabled: Whether the registry says it answers.
+
+    Returns:
+        The entry, carrying every field the reconciler decodes.
+    """
+    return {
+        "name": name,
+        "role": "worker",
+        "user": "austi",
+        "enabled": enabled,
+        "platform": "windows",
+    }
+
+
 @pytest.fixture(name="mixed_config")
 def _mixed_config(tmp_path: pathlib.Path) -> pathlib.Path:
     """A workspace with one enabled node and one deliberately disabled.
@@ -195,8 +214,8 @@ class TestFleetNodesReportsAndReconciles:
             dump_json_str(
                 {
                     "nodes": [
-                        {"name": "lavender", "role": "worker", "user": "austi", "enabled": True},
-                        {"name": "asleep", "role": "worker", "user": "austi", "enabled": True},
+                        _registry_node("lavender", enabled=True),
+                        _registry_node("asleep", enabled=True),
                     ]
                 }
             ),
@@ -224,8 +243,8 @@ class TestFleetNodesReportsAndReconciles:
             dump_json_str(
                 {
                     "nodes": [
-                        {"name": "lavender", "role": "worker", "user": "austi", "enabled": True},
-                        {"name": "asleep", "role": "worker", "user": "austi", "enabled": False},
+                        _registry_node("lavender", enabled=True),
+                        _registry_node("asleep", enabled=False),
                     ]
                 }
             ),
@@ -279,12 +298,7 @@ class TestReconcilingWithoutTouchingTheNetwork:
         path = tmp_path / "fleet-nodes.json"
         path.write_text(
             dump_json_str(
-                {
-                    "nodes": [
-                        {"name": name, "role": "worker", "user": "austi", "enabled": v}
-                        for name, v in enabled.items()
-                    ]
-                }
+                {"nodes": [_registry_node(name, enabled=v) for name, v in enabled.items()]}
             ),
             encoding="utf-8",
         )

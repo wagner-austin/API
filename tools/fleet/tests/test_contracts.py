@@ -81,6 +81,7 @@ def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
     """
     return NodeConfig(
         host="lavender",
+        platform="windows",
         stage_root="C:/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,
@@ -238,6 +239,27 @@ class TestNodeConfig:
     def test_a_node_with_no_memory_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="ram_gb must be positive"):
             decode_node_config({**encode_node_config(_node()), "ram_gb": 0.0})
+
+    def test_the_platform_is_carried_and_a_linux_node_decodes(self) -> None:
+        encoded = encode_node_config(_node())
+        assert encoded["platform"] == "windows"
+
+        decoded = decode_node_config({**encoded, "platform": "linux"})
+
+        assert decoded["platform"] == "linux"
+
+    def test_a_platform_outside_the_set_is_refused(self) -> None:
+        """A value with no dialect has nothing to send; refusing here keeps
+        that from surfacing as a script the far side cannot parse."""
+        with pytest.raises(JSONTypeError, match="platform must be one of windows, linux"):
+            decode_node_config({**encode_node_config(_node()), "platform": "solaris"})
+
+    def test_a_node_missing_platform_is_refused(self) -> None:
+        encoded = encode_node_config(_node())
+        del encoded["platform"]
+
+        with pytest.raises(JSONTypeError, match="platform"):
+            decode_node_config(encoded)
 
 
 class TestDescribeNode:

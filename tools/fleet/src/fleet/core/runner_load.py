@@ -262,6 +262,7 @@ def sample_host(spec: HostRunnerSpec, *, at: int) -> LoadSample:
             spec["host"],
             f"{spec['scratch_dir']}/{FOREST_SCRIPT_NAME}",
             WINDOWS_FOREST_SCRIPT,
+            platform="windows",
         )
     return take_sample(spec, wsl_output, windows_output, at=at)
 

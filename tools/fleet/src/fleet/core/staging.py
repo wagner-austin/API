@@ -37,7 +37,8 @@ import pathlib
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, remote
+from fleet.contracts.node import NodePlatform
+from fleet.core import _test_hooks, dialect, names, remote
 
 #: Directory names never carried to a node.
 #:
@@ -67,12 +68,6 @@ EXCLUDED_DIRECTORIES = (
 #: live outside the repository entirely
 #: (:attr:`fleet.cli._config.LoadedWorkspace.archives`), so nothing about a
 #: project's own tree has to be hidden to keep them out.
-
-#: What the reassembled archive is called on the node.
-ARCHIVE_NAME = "tree.tgz"
-
-#: What the base64 text is called on the node before it is decoded.
-ENCODED_NAME = "tree.b64"
 
 
 def archive(
@@ -156,108 +151,32 @@ def encode(payload: bytes) -> str:
 
     Returns:
         Standard base64, one line. One line rather than wrapped, because the
-        node reads it with a single ``Get-Content -Raw`` and wrapping would
-        make the decode depend on how the writer chose to fold it.
+        node reads it in one go (``Get-Content -Raw`` on one platform,
+        ``base64 -d`` on the other) and wrapping would make the decode depend
+        on how the writer chose to fold it.
     """
     return base64.b64encode(payload).decode("ascii")
-
-
-def make_directory_script(target: str) -> str:
-    """Render the script that creates a dispatch's directory.
-
-    Args:
-        target: Absolute remote directory for this dispatch.
-
-    Returns:
-        The script's text.
-    """
-    return f"New-Item -ItemType Directory -Force -LiteralPath '{target}' | Out-Null\n"
-
-
-def reassemble_script(target: str) -> str:
-    """Render the script that rebuilds the archive and reports its digest.
-
-    It deliberately does NOT extract. The digest it prints is what the sender
-    compares against, and unpacking here would mean an unverified tree had
-    already landed where the build will look for it.
-
-    Args:
-        target: Absolute remote directory for this dispatch.
-
-    Returns:
-        The script's text, whose only output is the digest.
-    """
-    return (
-        f"$encoded = Get-Content -Raw -LiteralPath '{target}/{ENCODED_NAME}'\n"
-        f"$bytes = [Convert]::FromBase64String($encoded.Trim())\n"
-        f"[IO.File]::WriteAllBytes('{target}/{ARCHIVE_NAME}', $bytes)\n"
-        f"(Get-FileHash -Algorithm SHA256 -LiteralPath "
-        f"'{target}/{ARCHIVE_NAME}').Hash.ToLower()\n"
-    )
-
-
-def init_repository_script(target: str) -> str:
-    """Render the script that makes a staged tree a git repository.
-
-    WITHOUT THIS A STAGED BUILD LINTS DIFFERENT FILES FROM A LOCAL ONE, and
-    the difference is not cosmetic. Ruff honours ``.gitignore``, and applies
-    it ONLY inside a git repository -- so a tree that carries the file but no
-    ``.git`` silently widens what gets linted to include everything the
-    repository deliberately excludes.
-
-    Measured on lavender 2026-09-04, dispatching ``tools/hpc3``: 902 ruff
-    errors, all in ``tools/hpc3/runs``, which ``.gitignore`` line 170 excludes
-    as build artifacts while explicitly tracking the run documents beside
-    them. The same tree with ``git init`` run in it reports ``All checks
-    passed``. Locally ``ruff check .`` passes and
-    ``ruff check . --no-respect-gitignore`` reports exactly 902 -- the same
-    number, which identifies the mechanism rather than suggesting it.
-
-    THE ALTERNATIVE WAS TO ADD AN EXCLUDE TO THE PROJECT, AND IT WOULD HAVE
-    BEEN WRONG. The repository already states which paths are build output;
-    a ruff ``exclude`` restating it is a second copy of one policy, and the
-    copy that drifts is the one nobody looks at. Reproducing the environment
-    a build is defined against is this package's job, not the project's.
-
-    Args:
-        target: Absolute remote directory holding the staged tree.
-
-    Returns:
-        The script's text. It initialises an empty repository and commits
-        nothing: the ignore rules are read from the working tree, so the
-        marker is all ruff needs.
-    """
-    return f"git -C '{target}' init --quiet\n"
-
-
-def extract_script(target: str) -> str:
-    """Render the script that unpacks a verified archive.
-
-    ``-m`` makes extracted files take the node's clock rather than the
-    sender's. Without it a tree staged from a machine whose clock is ahead
-    produces make targets that look newer than their sources, and the build
-    does nothing at all -- which reads as a suite that passed instantly.
-
-    Args:
-        target: Absolute remote directory for this dispatch.
-
-    Returns:
-        The script's text.
-    """
-    return f"tar -xzmf '{target}/{ARCHIVE_NAME}' -C '{target}'\n"
 
 
 def stage(
     host: str,
     *,
+    platform: NodePlatform,
     run_id: str,
     stage_root: str,
     payload: bytes,
 ) -> str:
     """Send a project's tree to a node and verify it before unpacking.
 
+    The scripts are the node's dialect (:mod:`fleet.core.dialect`): the
+    directory is made, the encoded archive lands, the node reassembles and
+    digests it WITHOUT extracting, and only a digest that matches the
+    sender's is followed by the extract and the ``git init`` that makes ruff
+    honour ``.gitignore`` there.
+
     Args:
         host: SSH destination.
+        platform: The node's declared platform.
         run_id: The dispatch, which names its own directory so two dispatches
             of one project cannot extract over each other.
         stage_root: Absolute directory on the node holding staged trees.
@@ -273,12 +192,21 @@ def stage(
             retried: a transfer that truncated once will do it again, and a
             retry loop turns a diagnosable fault into an intermittent one.
     """
+    spoken = dialect.for_platform(platform)
     target = f"{stage_root}/{run_id}"
-    remote.run_script(host, f"{stage_root}/mkdir-{run_id}.ps1", make_directory_script(target))
-    remote.send_script(host, f"{target}/{ENCODED_NAME}", encode(payload))
+    remote.run_script(
+        host,
+        spoken.script_path(stage_root, names.make_directory_stem(run_id)),
+        spoken.make_directory_script(target),
+        platform=platform,
+    )
+    remote.send_script(host, f"{target}/{names.ENCODED_NAME}", encode(payload), platform=platform)
 
     received = remote.run_script(
-        host, f"{target}/reassemble.ps1", reassemble_script(target)
+        host,
+        spoken.script_path(target, names.REASSEMBLE_STEM),
+        spoken.reassemble_script(target),
+        platform=platform,
     ).strip()
     expected = digest(payload)
     if received != expected:
@@ -288,21 +216,25 @@ def stage(
             f"{expected} was sent; nothing has been unpacked",
         )
 
-    remote.run_script(host, f"{target}/extract.ps1", extract_script(target))
-    remote.run_script(host, f"{target}/init-repo.ps1", init_repository_script(target))
+    remote.run_script(
+        host,
+        spoken.script_path(target, names.EXTRACT_STEM),
+        dialect.extract_script(target),
+        platform=platform,
+    )
+    remote.run_script(
+        host,
+        spoken.script_path(target, names.INIT_REPOSITORY_STEM),
+        dialect.init_repository_script(target),
+        platform=platform,
+    )
     return target
 
 
 __all__ = [
-    "ARCHIVE_NAME",
-    "ENCODED_NAME",
     "EXCLUDED_DIRECTORIES",
     "archive",
     "digest",
     "encode",
-    "extract_script",
-    "init_repository_script",
-    "make_directory_script",
-    "reassemble_script",
     "stage",
 ]

@@ -15,7 +15,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import _test_hooks, observe, remote
+from fleet.core import _test_hooks, dialect_windows, observe, remote
 from fleet.core.registry import RegistryNode
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok
@@ -77,7 +77,7 @@ def node(
     Returns:
         The node.
     """
-    return RegistryNode(name=name, enabled=enabled, role=role, user=user)
+    return RegistryNode(name=name, enabled=enabled, role=role, user=user, platform="windows")
 
 
 def document(*records: JSONObject, hostname: str = "serendipity") -> str:
@@ -234,7 +234,7 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
         "ssh",
         *remote.SSH_OPTIONS,
         "serendipity",
-        *remote.POWERSHELL_INVOCATION,
+        *dialect_windows.POWERSHELL_INVOCATION,
         "C:/Users/austin/.fleet/observe-sessions.ps1",
     )
     assert board.tools == ["task_session_observe"]

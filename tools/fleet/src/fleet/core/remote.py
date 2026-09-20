@@ -34,6 +34,12 @@ auto-select dispatch was refused with ``NODE_UNREACHABLE: ssh to loki failed``
 while lavender had already answered and had room. loki was powered off for a
 trip. One laptop being asleep disabled the whole fleet, because the probe loop
 raised instead of collecting.
+
+THE NODE'S PLATFORM DECIDES HOW A FILE IS WRITTEN AND HOW A SCRIPT IS RUN.
+Until 2026-09-20 both were PowerShell for every node; with the first Linux
+node they are one of two dialects (:mod:`fleet.core.dialect`), chosen by the
+platform the caller passes. Passed rather than probed, because the very
+first thing sent to a node is a probe, and it has to be written somehow.
 """
 
 from __future__ import annotations
@@ -42,7 +48,8 @@ from typing import TypedDict
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks
+from fleet.contracts.node import NodePlatform
+from fleet.core import _test_hooks, dialect
 
 
 class RemoteFailure(TypedDict):
@@ -125,14 +132,6 @@ def _raise_on(failure: RemoteFailure | None) -> None:
 #: because a prompt would hang a dispatch forever.
 SSH_OPTIONS = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
 
-#: How the node is asked to run a script file it has just been handed.
-#:
-#: ``-NoProfile`` because a profile is the node owner's, and a dispatch that
-#: inherited it would run different code on different machines for reasons
-#: nobody recorded. ``-ExecutionPolicy Bypass`` because the script arrived over
-#: ssh and is unsigned by construction.
-POWERSHELL_INVOCATION = ("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File")
-
 #: ssh's own exit status when it cannot reach the host or the connection dies.
 #:
 #: A remote command that genuinely exits 255 is indistinguishable from this,
@@ -140,32 +139,6 @@ POWERSHELL_INVOCATION = ("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass
 #: exit 0 or a small status, so 255 from one of them would itself be a fault
 #: worth surfacing as unreachable rather than as a result.
 SSH_FAILURE = 255
-
-#: How a script's body is written on the far side.
-#:
-#: Streamed from stdin rather than passed as an argument, so no shell between
-#: here and the disk can interpret it. ``-LiteralPath`` because a path is a
-#: path: without it PowerShell treats ``[`` and ``]`` as wildcards.
-#:
-#: THE OUTER QUOTES ARE LOad-BEARING AND THEIR ABSENCE WAS A REAL BUG. Windows
-#: OpenSSH hands a remote command to ``cmd.exe``, not to PowerShell. Unquoted,
-#: cmd sees the ``|`` as ITS OWN pipe, runs ``powershell -Command $input``, and
-#: pipes the result to ``Set-Content`` -- which cmd does not have. Measured
-#: 2026-09-04 on the first real dispatch: ``'Set-Content' is not recognized as
-#: an internal or external command``. Quoting makes the whole thing one
-#: argument to powershell.
-#:
-#: The directory is created in the same command because the alternative is a
-#: second round trip that would itself need a path to already exist. Paths
-#: given to this must be ABSOLUTE and literal: a ``$env:TEMP`` inside the
-#: single quotes below is not expanded by PowerShell, so it would create a
-#: directory named ``$env:TEMP`` rather than resolving one.
-_WRITE_COMMAND = (
-    'powershell -NoProfile -Command "'
-    "New-Item -ItemType Directory -Force -Path (Split-Path -Parent '{path}') | Out-Null; "
-    "$input | Set-Content -LiteralPath '{path}' -Encoding utf8"
-    '"'
-)
 
 
 def attempt_ssh(host: str, argv: tuple[str, ...]) -> RemoteOutcome:
@@ -209,30 +182,35 @@ def run_ssh(host: str, argv: tuple[str, ...]) -> str:
     return outcome["output"]
 
 
-def attempt_send(host: str, remote_path: str, body: str) -> RemoteFailure | None:
+def attempt_send(
+    host: str, remote_path: str, body: str, *, platform: NodePlatform
+) -> RemoteFailure | None:
     """Place a script on a node, reporting failure as a value.
 
     The body is streamed over stdin into a file on the far side rather than
     passed as an argument, so its content cannot be interpreted by any shell
     between here and the disk -- see the module docstring for what that costs
-    when it is not done.
+    when it is not done. The command that receives the stream is the
+    platform's (:meth:`fleet.core.dialect.Dialect.write_command`), and the
+    incidents behind each are recorded on the dialect.
 
     Args:
         host: SSH destination.
         remote_path: Absolute path on the node to write.
         body: The script's complete text.
+        platform: The node's declared platform.
 
     Returns:
         The reason it did not land, or None when it did.
     """
     result = _test_hooks.run(
-        ["ssh", *SSH_OPTIONS, host, _WRITE_COMMAND.format(path=remote_path)],
+        ["ssh", *SSH_OPTIONS, host, dialect.for_platform(platform).write_command(remote_path)],
         stdin_bytes=body.encode("utf-8"),
     )
     return _failure_for(host, f"sending {remote_path}", result)
 
 
-def send_script(host: str, remote_path: str, body: str) -> None:
+def send_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> None:
     """Place a script on a node.
 
     The raising boundary over :func:`attempt_send`.
@@ -241,21 +219,26 @@ def send_script(host: str, remote_path: str, body: str) -> None:
         host: SSH destination.
         remote_path: Absolute path on the node to write.
         body: The script's complete text.
+        platform: The node's declared platform.
 
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
             :func:`run_ssh` describes.
     """
-    _raise_on(attempt_send(host, remote_path, body))
+    _raise_on(attempt_send(host, remote_path, body, platform=platform))
 
 
-def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
+def attempt_script(
+    host: str, remote_path: str, body: str, *, platform: NodePlatform
+) -> RemoteOutcome:
     """Send a script to a node and run it by path, reporting failure as a value.
 
     Args:
         host: SSH destination.
         remote_path: Absolute path on the node to write and then execute.
         body: The script's complete text.
+        platform: The node's declared platform, which decides how the path
+            is executed (:meth:`fleet.core.dialect.Dialect.invocation`).
 
     Returns:
         The script's standard output, or the reason there is none. A send that
@@ -263,13 +246,13 @@ def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
         answer with the far side's "file not found" rather than with the
         transport fault that actually happened.
     """
-    failure = attempt_send(host, remote_path, body)
+    failure = attempt_send(host, remote_path, body, platform=platform)
     if failure is not None:
         return RemoteOutcome(output="", failure=failure)
-    return attempt_ssh(host, (*POWERSHELL_INVOCATION, remote_path))
+    return attempt_ssh(host, (*dialect.for_platform(platform).invocation(), remote_path))
 
 
-def run_script(host: str, remote_path: str, body: str) -> str:
+def run_script(host: str, remote_path: str, body: str, *, platform: NodePlatform) -> str:
     """Send a script to a node and run it by path.
 
     The raising boundary over :func:`attempt_script`.
@@ -278,6 +261,7 @@ def run_script(host: str, remote_path: str, body: str) -> str:
         host: SSH destination.
         remote_path: Absolute path on the node to write and then execute.
         body: The script's complete text.
+        platform: The node's declared platform.
 
     Returns:
         The script's standard output.
@@ -285,13 +269,12 @@ def run_script(host: str, remote_path: str, body: str) -> str:
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``.
     """
-    outcome = attempt_script(host, remote_path, body)
+    outcome = attempt_script(host, remote_path, body, platform=platform)
     _raise_on(outcome["failure"])
     return outcome["output"]
 
 
 __all__ = [
-    "POWERSHELL_INVOCATION",
     "SSH_FAILURE",
     "SSH_OPTIONS",
     "RemoteFailure",

@@ -55,6 +55,7 @@ def _workspace_document() -> JSONObject:
     }
     node: JSONObject = {
         "host": "lavender",
+        "platform": "windows",
         "stage_root": "C:/fleet/stage",
         "logical_cores": 16,
         "ram_gb": 32.0,

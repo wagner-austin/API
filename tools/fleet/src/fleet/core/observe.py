@@ -58,9 +58,10 @@ OBSERVABLE_ROLES: Final = frozenset({"worker", "vpn-jump"})
 #: The script, rendered verbatim onto the node and run by path.
 #:
 #: ``platform`` is the literal ``win32`` because the runner that executes this
-#: is PowerShell on Windows by construction (``POWERSHELL_INVOCATION``); a node
-#: that cannot run it reports that as an unreachable outcome rather than as a
-#: platform. ``hostname`` is lowercased because that is how the harness spells
+#: is PowerShell on Windows by construction (it is sent in the Windows
+#: dialect, ``platform="windows"`` below); a node that cannot run it reports
+#: that as an unreachable outcome rather than as a platform. ``hostname`` is
+#: lowercased because that is how the harness spells
 #: ``pidDomain`` (measured on austinpc: ``$env:COMPUTERNAME`` is ``AUSTINPC``,
 #: the record says ``win32:austinpc``). Records are emitted UNTOUCHED so the
 #: decode on this side sees exactly the bytes the harness wrote.
@@ -347,7 +348,9 @@ def observe_node(board: McpCredentials, node: RegistryNode, identity: JSONObject
         return NodeOutcome(
             node=node["name"], recorded=False, detail="no provisioned user in the registry"
         )
-    outcome = remote.attempt_script(node["name"], script_path(user), OBSERVE_SCRIPT)
+    outcome = remote.attempt_script(
+        node["name"], script_path(user), OBSERVE_SCRIPT, platform="windows"
+    )
     failure = outcome["failure"]
     if failure is not None:
         return NodeOutcome(node=node["name"], recorded=False, detail=failure["message"])

@@ -442,8 +442,20 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
         dump_json_str(
             {
                 "nodes": [
-                    {"name": "austinpc", "role": "hub", "user": "Test", "enabled": True},
-                    {"name": "serendipity", "role": "worker", "user": "austi", "enabled": True},
+                    {
+                        "name": "austinpc",
+                        "role": "hub",
+                        "user": "Test",
+                        "enabled": True,
+                        "platform": "windows",
+                    },
+                    {
+                        "name": "serendipity",
+                        "role": "worker",
+                        "user": "austi",
+                        "enabled": True,
+                        "platform": "windows",
+                    },
                 ]
             }
         ),
