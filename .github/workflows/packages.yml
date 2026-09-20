@@ -18,7 +18,8 @@ name: packages
 #
 # WHY A MATRIX AND NOT FORTY-ONE FILES. Forty-one near-identical workflows is
 # the duplication that made a lifecycle bug need fixing thirty-six times in
-# scripts/run-tests.ps1's header. A matrix cannot be path-filtered per entry,
+# the shared test launcher's header (then scripts/run-tests.ps1, since
+# 2026-09-20 tools/maketools). A matrix cannot be path-filtered per entry,
 # so the entry list is computed instead: scripts/ci_select_packages.py reads
 # which packages a change actually affects, following the path dependencies
 # each pyproject.toml already declares. A change to platform_core selects the

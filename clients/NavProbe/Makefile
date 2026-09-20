@@ -1,67 +1,54 @@
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+include ../../scripts/make/shell.mk
+
+MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
 .PHONY: help install lint test check
 
 help:
-	@Write-Host ""
-	@Write-Host "NavProbe -- available targets" -ForegroundColor Cyan
-	@Write-Host "=============================" -ForegroundColor Cyan
-	@Write-Host ""
-	@Write-Host "Code health:" -ForegroundColor Yellow
-	@Write-Host "  make check                       lint + test (the gate)"
-	@Write-Host "  make lint                        guard + ruff + mypy over src, tests, scripts"
-	@Write-Host "  make test                        pytest + coverage (100% statements and branches)"
-	@Write-Host "  make install                     poetry install"
-	@Write-Host ""
+	@echo ""
+	@echo "NavProbe -- available targets"
+	@echo "============================="
+	@echo ""
+	@echo "Code health:"
+	@echo "  make check                       lint + test (the gate)"
+	@echo "  make lint                        guard + ruff + mypy over src, tests, scripts"
+	@echo "  make test                        pytest + coverage (100% statements and branches)"
+	@echo "  make install                     poetry install"
+	@echo ""
 
 install:
-	@Write-Host ""
-	@Write-Host "==> install" -ForegroundColor Cyan
+	@echo "=== install"
 	poetry lock
 	poetry install --with dev
-	@Write-Host "[install] done" -ForegroundColor Green
+	@echo "[install] done"
 
 lint:
-	@Write-Host ""
-	@Write-Host "==> lint" -ForegroundColor Cyan
-	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
+	@echo "=== lint"
+	$(MAKETOOLS) venv-check
 	poetry lock
 	poetry install --with dev
-	@Write-Host ""
-	@Write-Host "  -> guard" -ForegroundColor DarkCyan
-	poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] guard failed" -ForegroundColor Red; exit $$LASTEXITCODE }
-	@Write-Host ""
-	@Write-Host "  -> ruff check + format" -ForegroundColor DarkCyan
+	@echo "  -- guard"
+	poetry run python -m scripts.guard
+	@echo "  -- ruff check + format"
 	poetry run ruff check . --fix
 	poetry run ruff format .
-	@Write-Host ""
-	@Write-Host "  -> mypy" -ForegroundColor DarkCyan
+	@echo "  -- mypy"
 	poetry run mypy src tests scripts
-	@Write-Host ""
-	@Write-Host "[lint] passed" -ForegroundColor Green
+	@echo "[lint] passed"
 
-# Coverage data goes to a per-run path, not the default fixed ``.coverage``.
-#
-# Coverage writes one SQLite file at a fixed path, and two concurrent runs
-# corrupt it. The reader then fails with "no such table: arc" and reports
-# 0.00% while every test passes -- a green suite presented as a coverage
-# failure, which reads as a code problem and is not one.
-#
-# Per-run paths cannot collide, so no lock is needed. Fragments land beside
-# the combined file: xdist writes ``.coverage-<id>.<host>.<pid>.<rand>`` per
-# worker and coverage combines them, so cleanup globs rather than naming one
-# file. Under runs/ because that is where untracked run output already lives.
+# Test running lives in the shared launcher, tools/maketools (the ``test``
+# command): a per-run COVERAGE_FILE under runs/ so two concurrent runs cannot
+# corrupt one SQLite file (the reader then fails with "no such table: arc"
+# and reports 0.00% while every test passes), the pre-run sweep, and the
+# kill-on-close job object on Windows.
 test:
-	@Write-Host ""
-	@Write-Host "==> test" -ForegroundColor Cyan
+	@echo "=== test"
 	poetry lock
 	poetry install --with dev
-	& "..\\..\\scripts\\run-tests.ps1"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
-	@Write-Host ""
-	@Write-Host "[test] passed" -ForegroundColor Green
+	$(MAKETOOLS) test
+	@echo "[test] passed"
 
 check: lint | test
-	@Write-Host ""
-	@Write-Host "=== ALL CHECKS PASSED ===" -ForegroundColor Green
-	@Write-Host ""
+	@echo ""
+	@echo "=== ALL CHECKS PASSED ==="
+	@echo ""

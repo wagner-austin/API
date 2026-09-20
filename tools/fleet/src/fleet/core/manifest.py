@@ -7,8 +7,10 @@ is what "dispatch a project" reads as and is not enough to build:
 * ``pyproject.toml`` declares ``platform-core = { path = "../../libs/platform_core" }``.
   Poetry resolves that path at lock time, so a tree without it cannot produce
   a lockfile, let alone install from one.
-* every Makefile's ``test`` target calls ``..\\..\\scripts\\run-tests.ps1``,
-  the launcher all forty-one packages share.
+* every Makefile begins ``include ../../scripts/make/shell.mk`` and its
+  ``lint`` and ``test`` targets call ``../../tools/maketools/scripts/run.py``,
+  the launcher all the packages share, which in turn puts
+  ``libs/platform_core/src`` on ``sys.path`` for its error codes and JSON.
 * every ``scripts/guard.py`` inserts ``<root>/libs/monorepo_guards/src`` onto
   ``sys.path`` before importing the rules, because that package is a
   dependency of four packages and cannot be imported by the other thirty-seven.
@@ -26,14 +28,15 @@ poetry already reads the authoritative list every time anybody builds, and a
 second copy drifts silently in the direction of staging too little -- which
 surfaces as a lockfile error on a node and reads as the project's fault.
 
-WHY THE TWO SHARED PATHS ARE CONSTANTS AND NOT DISCOVERED. Neither is
-discoverable. ``scripts/`` is named by a Makefile recipe and
-``libs/monorepo_guards`` by a hard-coded ``parents[3]`` inside a shim that is
-byte-identical in all forty-one packages -- so the monorepo asserts both as
-facts about its own layout, and mirroring them here is quoting that assertion,
-not duplicating a source of truth. Both are checked to exist on every call,
-so a rename fails a dispatch loudly instead of staging a tree that cannot
-build.
+WHY THE SHARED PATHS ARE CONSTANTS AND NOT DISCOVERED. None is
+discoverable. ``scripts/`` is named by every Makefile's ``include``,
+``tools/maketools`` by every Makefile's recipes, ``libs/platform_core`` by
+the launcher's ``sys.path`` insert, and ``libs/monorepo_guards`` by a
+hard-coded ``parents[3]`` inside a shim that is byte-identical in every
+package -- so the monorepo asserts all four as facts about its own layout,
+and mirroring them here is quoting that assertion, not duplicating a source
+of truth. Each is checked to exist on every call, so a rename fails a
+dispatch loudly instead of staging a tree that cannot build.
 """
 
 from __future__ import annotations
@@ -50,11 +53,20 @@ from fleet.core import _test_hooks
 
 #: Repo-relative DIRECTORIES every dispatch carries, whatever the project.
 #:
-#: ``scripts`` holds ``run-tests.ps1`` and the reaper it calls;
+#: ``scripts`` holds ``make/shell.mk``, the prologue every Makefile includes;
+#: ``tools/maketools`` is the launcher every ``lint`` and ``test`` recipe
+#: calls; ``libs/platform_core`` is what that launcher imports for its error
+#: codes and JSON, by a ``sys.path`` insert rather than an install, so a
+#: project that does not depend on it still needs it staged;
 #: ``libs/monorepo_guards`` holds the rules ``scripts/guard.py`` imports by
 #: absolute path. See the module docstring for why these are quoted here
 #: rather than discovered.
-SHARED_DIRECTORIES: Final[tuple[str, ...]] = ("scripts", "libs/monorepo_guards")
+SHARED_DIRECTORIES: Final[tuple[str, ...]] = (
+    "scripts",
+    "tools/maketools",
+    "libs/platform_core",
+    "libs/monorepo_guards",
+)
 
 #: Repo-relative FILES every dispatch must carry, whatever the project.
 #:

@@ -153,7 +153,7 @@ addopts = "-v -n 8 --dist loadscope"
 # SIGALRM, so "thread" is the only option, and its expiry calls os._exit(1). The
 # worker dies with no cleanup and no protocol shutdown, the xdist controller is
 # left waiting on a dead channel, and the survivors block forever. See
-# scripts/run-tests.ps1 for the 2026-08-19 incident.
+# tools/maketools/src/maketools/reap.py for the 2026-08-19 incident.
 #
 # This bound is here to catch a genuine hang, not to police a slow test. Revisit
 # with real parallel-run durations rather than by guessing.

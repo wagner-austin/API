@@ -96,6 +96,6 @@ addopts = "-v -n auto --dist loadscope"
 # Windows has no SIGALRM, so timeout_method can only be "thread", whose expiry
 # calls os._exit(1): the worker dies with no cleanup and no protocol shutdown,
 # and the xdist controller is left waiting on a dead channel. A timeout here is
-# not a soft failure. See scripts/run-tests.ps1 for the 2026-08-19 incident.
+# not a soft failure. See tools/maketools/src/maketools/reap.py for the 2026-08-19 incident.
 timeout = 900
 timeout_method = "thread"

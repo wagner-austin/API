@@ -1,5 +1,6 @@
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+include ../../scripts/make/shell.mk
+
+MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
 .PHONY: lint test check native-deps
 
@@ -10,24 +11,27 @@ SHELL := powershell.exe
 # theoretical drift: it presented as `module 'cleargbm_rs' has no attribute
 # 'py_gbm_model_to_json_rs'` at conftest import, which took the whole test
 # suite down. This target reinstalls from the crate's built wheel whenever that
-# wheel is newer than the installed package.
+# wheel is newer than the installed package (tools/maketools, ``native-wheel``).
 native-deps:
-	@$$wheel = Get-ChildItem "../../libs/cleargbm_rs/target/wheels/*.whl" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1; if ($$null -eq $$wheel) { Write-Host "[native-deps] no cleargbm_rs wheel built; skipping" -ForegroundColor DarkGray } else { $$info = Get-ChildItem ".venv/Lib/site-packages/cleargbm_rs-*.dist-info" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1; if ($$null -ne $$info -and $$info.LastWriteTime -ge $$wheel.LastWriteTime) { Write-Host "[native-deps] cleargbm_rs up to date" -ForegroundColor DarkGray } else { Write-Host "[native-deps] reinstalling cleargbm_rs from $$($$wheel.Name)" -ForegroundColor Yellow; poetry run pip install --force-reinstall --no-deps $$wheel.FullName } }
+	$(MAKETOOLS) native-wheel --crate ../../libs/cleargbm_rs --package cleargbm_rs
 
 lint: native-deps
-	@if (-not (Get-Command poetry -ErrorAction SilentlyContinue)) { Write-Host "ERROR: poetry not found. Install it with: pip install pipx && pipx install poetry" -ForegroundColor Red; exit 1 }
-	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
+	$(MAKETOOLS) require-tool poetry "Install it with pipx: pip install pipx, then pipx install poetry"
+	$(MAKETOOLS) venv-check
 	poetry lock
 	poetry sync --with dev
-	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
+	$(MAKETOOLS) guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
 	poetry run mypy src tests scripts
 
+# Test running lives in the shared launcher, tools/maketools (the ``test``
+# command); see any sibling package's Makefile for what it adds over the
+# inline recipe and the incident behind it.
 test: native-deps
-	@if (-not (Get-Command poetry -ErrorAction SilentlyContinue)) { Write-Host "ERROR: poetry not found. Install it with: pip install pipx && pipx install poetry" -ForegroundColor Red; exit 1 }
+	$(MAKETOOLS) require-tool poetry "Install it with pipx: pip install pipx, then pipx install poetry"
 	poetry lock
 	poetry sync --with dev
-	& "..\\..\\scripts\\run-tests.ps1"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
+	$(MAKETOOLS) test
 
 check: lint | test

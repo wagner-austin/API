@@ -83,7 +83,7 @@ class TestArchive:
     def test_the_shared_launcher_directory_is_inside(
         self, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        """Every Makefile's test target calls ..\\..\\scripts\\run-tests.ps1."""
+        """Every Makefile includes scripts/make/shell.mk and calls tools/maketools."""
         destination = tmp_path / "tree.tgz"
 
         staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)

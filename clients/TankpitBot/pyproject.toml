@@ -200,7 +200,7 @@ asyncio_mode = "auto"
 # Windows has no SIGALRM, so timeout_method can only be "thread", whose expiry
 # calls os._exit(1): the worker dies with no cleanup and no protocol shutdown,
 # and the xdist controller is left waiting on a dead channel. A timeout here is
-# not a soft failure. See scripts/run-tests.ps1 for the 2026-08-19 incident and
+# not a soft failure. See tools/maketools/src/maketools/reap.py for the 2026-08-19 incident and
 # --max-worker-restart=0, which turns that into a loud stop rather than a
 # 124-clone crash loop.
 timeout = 600

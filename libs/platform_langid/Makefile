@@ -1,33 +1,31 @@
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+include ../../scripts/make/shell.mk
 
 .PHONY: lint test check
 
 lint:
-	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
+	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
 	poetry lock
 	poetry sync --with dev
-	if ((Test-Path ".\scripts\guard.py") -or (Test-Path ".\scripts\guard\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
+	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
 	poetry run mypy src tests scripts
 
-# Coverage data goes to a per-run path, not the default fixed ``.coverage``.
+# Test running lives in the shared launcher, tools/maketools (the ``test``
+# command), so it is defined once instead of being copy-pasted into every
+# Makefile. That duplication is why a process-lifecycle bug had to be fixed
+# 36 times rather than once.
 #
-# Coverage writes one SQLite file at a fixed path, and two runs that overlap
-# corrupt it. The reader then reports a spurious failure on a run whose tests
-# all passed, which reads as a code problem and is not one. Several sessions
-# work this repo at once, so overlapping runs are the normal case rather than
-# the exception.
-#
-# Per-run paths cannot collide, so no lock is needed. Fragments land beside
-# the combined file: xdist writes ``.coverage-<id>.<host>.<pid>.<rand>`` per
-# worker and coverage combines them, so cleanup globs rather than naming one
-# file. Under runs/ because that is gitignored (``**/runs/``) and is where
-# untracked run output already belongs.
+# The launcher keeps the per-run coverage path this recipe always had:
+# coverage writes one SQLite file at a fixed path, and two overlapping runs
+# corrupt it, which surfaces as a spurious failure on a run whose tests all
+# passed; several sessions work this repo at once, so overlap is normal. It
+# adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
+# that dies cannot strand its xdist workers; its module header carries the
+# 2026-08-19 incident that motivated both.
 test:
 	poetry lock
 	poetry sync --with dev
-	& "..\\..\\scripts\\run-tests.ps1"; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
+	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
 check: lint | test

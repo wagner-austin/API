@@ -99,8 +99,14 @@ class TestAgainstTheRealRepository:
 
     def test_the_launcher_the_makefile_calls_is_carried(self) -> None:
         recipe = (self.repo_root() / "tools/fleet/Makefile").read_text(encoding="utf-8")
-        assert "scripts\\\\run-tests.ps1" in recipe
-        assert "scripts" in manifest.build_tree(self.repo_root(), "tools/fleet")
+        assert "include ../../scripts/make/shell.mk" in recipe
+        assert "../../tools/maketools/scripts/run.py" in recipe
+        launcher = (self.repo_root() / "tools/maketools/scripts/run.py").read_text(encoding="utf-8")
+        assert '"libs" / "platform_core" / "src"' in launcher
+        members = manifest.build_tree(self.repo_root(), "tools/fleet")
+        assert "scripts" in members
+        assert "tools/maketools" in members
+        assert "libs/platform_core" in members
 
 
 class TestGuardInputs:
@@ -354,7 +360,14 @@ class TestWalkingSyntheticTrees:
         members = manifest.build_tree(tmp_path, "libs/a")
 
         assert members.count(guards) == 1
-        assert members == ("libs/a", guards, "scripts", *manifest.SHARED_FILES)
+        assert members == (
+            "libs/a",
+            guards,
+            "scripts",
+            "tools/maketools",
+            "libs/platform_core",
+            *manifest.SHARED_FILES,
+        )
 
     def test_a_dependency_directly_at_the_root_is_allowed(self, tmp_path: pathlib.Path) -> None:
         # The root itself is inside the root, which `resolved.parents` alone

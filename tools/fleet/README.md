@@ -20,7 +20,8 @@ and destroyed each other's work twice in one hour:
    aggregate CPU delta of 0.016 s over 5 s — doing nothing, and leaving 22 GB
    of 179 GB free. Nothing had refused either dispatch.
 
-`scripts/reap-test-processes.ps1` was blamed for the first and is innocent:
+The pre-run reaper (then `scripts/reap-test-processes.ps1`, since 2026-09-20
+`tools/maketools`' `reap-stale`) was blamed for the first and is innocent:
 its filter requires a command line matching `*pytest*` or `*exec(eval*`, its
 sweep only considers processes older than sixty minutes, and an aggregate
 CPU-idle gate aborts if any candidate is burning CPU. The collision is
@@ -342,8 +343,9 @@ bug.
 **A project is not the unit of staging, and the first real dispatch proved
 it.** `tools/fleet` went to sedona as one directory, which is what "dispatch a
 project" reads as and cannot build: its `pyproject.toml` resolves
-`platform-core` at `../../libs/platform_core`, its Makefile calls
-`..\..\scripts\run-tests.ps1`, its `scripts/guard.py` imports from
+`platform-core` at `../../libs/platform_core`, its Makefile includes
+`../../scripts/make/shell.mk` and calls `../../tools/maketools/scripts/run.py`
+(which puts `libs/platform_core/src` on `sys.path`), its `scripts/guard.py` imports from
 `<root>/libs/monorepo_guards/src`, and those rules then read
 `monorepo-guards.toml` from the root. `fleet.core.manifest` computes the set:
 the project, its transitive **path dependencies read out of the manifests that

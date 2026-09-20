@@ -1,13 +1,15 @@
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+include ../scripts/make/shell.mk
 
 .PHONY: lint test check
 
+# Each target runs the same target in every package directly under this one
+# that carries a Makefile, runs them all even after one fails, and names the
+# failures at the end (tools/maketools, the ``fan-out`` command).
 lint:
-	$$root = Get-Location; $$dirs = @(); foreach ($$d in Get-ChildItem -Path . -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$($$d.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll lint passed" -ForegroundColor Green }
+	$(PYTHON) ../tools/maketools/scripts/run.py fan-out lint .
 
 test:
-	$$root = Get-Location; $$dirs = @(); foreach ($$d in Get-ChildItem -Path . -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$($$d.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll tests passed" -ForegroundColor Green }
+	$(PYTHON) ../tools/maketools/scripts/run.py fan-out test .
 
 check:
-	$$root = Get-Location; $$dirs = @(); foreach ($$d in Get-ChildItem -Path . -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Checking $$($$d.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make check; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll checks passed" -ForegroundColor Green }
+	$(PYTHON) ../tools/maketools/scripts/run.py fan-out check .

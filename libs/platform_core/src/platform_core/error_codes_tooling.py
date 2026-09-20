@@ -447,6 +447,39 @@ class CiWakeErrorCode(ErrorCodeBase):
     ENROLMENT_FIELD_MALFORMED = "ENROLMENT_FIELD_MALFORMED"
 
 
+class MaketoolsErrorCode(ErrorCodeBase):
+    """What the Makefile recipes' launcher (``tools/maketools``) refuses.
+
+    The package runs under the SYSTEM interpreter before any venv exists,
+    which is why its codes live here beside the other tooling enums rather
+    than in a module of its own: ``platform_core.errors`` is the one error
+    module the monorepo permits, and it is stdlib-importable by path.
+    """
+
+    # The command line a recipe passed is not one the launcher recognises,
+    # or carries arguments the command does not take. Named separately from
+    # a command's own refusals because the fix is in the Makefile, not in
+    # the machine.
+    USAGE = "MAKETOOLS_USAGE"
+
+    # The process snapshot could not be taken or did not have the shape the
+    # reaper reads (PowerShell's CIM query exited non-zero, or ``/proc/stat``
+    # carried no ``btime``). The sweep that needed it does not run rather
+    # than running over an empty table and reporting nothing stale.
+    PROCESS_TABLE = "MAKETOOLS_PROCESS_TABLE"
+
+    # A recipe's prerequisite executable (``poetry``, ``uv``) is not on the
+    # PATH. Refused before the recipe runs a dozen lines that would each
+    # fail with "not recognized", and the message carries the install hint
+    # the Makefile used to print.
+    TOOL_MISSING = "MAKETOOLS_TOOL_MISSING"
+
+    # A first-party wheel or a virtual environment the recipe was told to
+    # use is not where it was told it would be: no wheel under the crate's
+    # ``target/wheels``, no ``.venv`` executable of the requested name.
+    ARTIFACT_MISSING = "MAKETOOLS_ARTIFACT_MISSING"
+
+
 __all__ = [
     "BoardBridgeErrorCode",
     "BoardWatchErrorCode",
@@ -454,5 +487,6 @@ __all__ = [
     "FleetErrorCode",
     "Hpc3ErrorCode",
     "HpcWakeErrorCode",
+    "MaketoolsErrorCode",
     "McpClientErrorCode",
 ]

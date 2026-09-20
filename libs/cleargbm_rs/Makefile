@@ -1,12 +1,13 @@
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+include ../../scripts/make/shell.mk
+
+MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 
 .PHONY: lint test check rust-lint rust-test rust-cov python-lint python-test setup
 
-# Setup: create venv and install dev dependencies with uv
+# Setup: create the uv venv and install the dev extras (a no-op when the
+# venv already answers; tools/maketools, ``uv-venv-check``).
 setup:
-	if (-not (Test-Path ".venv")) { uv venv }
-	uv pip install -e ".[dev]"
+	$(MAKETOOLS) uv-venv-check
 
 # Rust linting: fmt + clippy
 rust-lint:
@@ -23,19 +24,21 @@ rust-cov:
 	cargo llvm-cov --all-features --json --output-path coverage.json
 	cargo run --bin check_segment_coverage -- --threshold 100
 
-# Python linting: ruff + mypy + guard
+# Python linting: ruff + mypy + guard, through the uv venv's own executables
+# (``venv-exec`` resolves .venv/Scripts on Windows and .venv/bin elsewhere).
 python-lint:
-	@$$ErrorActionPreference = 'SilentlyContinue'; .venv\Scripts\mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" }; uv venv; uv pip install -e ".[dev]" }
-	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { .venv\Scripts\python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
-	.venv\Scripts\ruff check . --fix
-	.venv\Scripts\ruff format .
-	.venv\Scripts\mypy tests scripts
+	$(MAKETOOLS) uv-venv-check
+	$(MAKETOOLS) venv-exec python -m scripts.guard
+	$(MAKETOOLS) venv-exec ruff check . --fix
+	$(MAKETOOLS) venv-exec ruff format .
+	$(MAKETOOLS) venv-exec mypy tests scripts
 
-# Python tests with coverage
+# Python tests with coverage, through the shared launcher on the uv venv's
+# interpreter; the per-run COVERAGE_FILE under runs/ and its scoped cleanup
+# come with it.
 python-test:
-	@if (-not (Test-Path ".venv")) { uv venv; uv pip install -e ".[dev]" }
-	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; $$env:COVERAGE_FILE = (Resolve-Path -LiteralPath ".").Path + "\runs\.coverage-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$code = 0; try { .venv\Scripts\pytest -n auto -v @covArgs; $$code = $$LASTEXITCODE } finally { Get-ChildItem -Path "runs" -Filter ".coverage-*" -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Remove-Item Env:\COVERAGE_FILE -ErrorAction SilentlyContinue }; if ($$code -ne 0) { exit $$code }
+	$(MAKETOOLS) uv-venv-check
+	$(MAKETOOLS) test --runner venv
 
 # Lint: Rust + Python (guard runs during python-lint)
 lint: rust-lint python-lint
@@ -45,4 +48,4 @@ test: rust-test python-test
 
 # Full check: lint, test, then Rust coverage
 check: lint test rust-cov
-	@Write-Host "`n=== ALL CHECKS PASSED ===" -ForegroundColor Green
+	@echo "=== ALL CHECKS PASSED ==="

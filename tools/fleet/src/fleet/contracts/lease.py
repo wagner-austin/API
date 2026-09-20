@@ -14,7 +14,8 @@ check`` opens the window twice. And 40 of the monorepo's 48 Makefiles do it,
 against one ``.venv`` per PROJECT rather than per session, so any two sessions
 in one project collide -- not only two running tests.
 
-WHAT WAS BLAMED FIRST AND WAS INNOCENT. ``scripts/reap-test-processes.ps1``
+WHAT WAS BLAMED FIRST AND WAS INNOCENT. The pre-run reaper (then
+``scripts/reap-test-processes.ps1``, since 2026-09-20 ``maketools.reap``)
 was accused, on timing alone. It could not have done it: its process filter
 requires a command line matching ``*pytest*`` or ``*exec(eval*`` and a
 benchmark's matches neither, its sweep only considers processes older than

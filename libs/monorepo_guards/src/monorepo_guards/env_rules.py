@@ -28,6 +28,14 @@ class EnvRule:
     # before handing over. Reading credentials stays in
     # `board_watch.config.load_credentials`; this file only builds the
     # context that loader runs in.
+    #
+    # `tools/maketools/src/maketools/_test_hooks.py` joined it on 2026-09-20
+    # for the same purpose one layer down: it is the seam through which the
+    # shared pytest launcher (the port of `scripts/run-tests.ps1`) assembles
+    # the suite's environment -- the parent's, plus the per-run
+    # `COVERAGE_FILE` and the BLAS thread caps -- before `subprocess.run`
+    # hands it over. The package runs under the system interpreter before any
+    # venv exists, so it reads the environment there and nowhere else.
     _ALLOW_SUFFIXES: ClassVar[set[str]] = {
         "src/platform_core/toml_utils.py",
         "src/platform_core/config/_utils.py",
@@ -38,6 +46,7 @@ class EnvRule:
         "tests/test_config_loader.py",
         "tests/test_env_rules.py",
         "tools/hpc-wake/scripts/run_cycle.py",
+        "tools/maketools/src/maketools/_test_hooks.py",
     }
 
     def _is_allowed(self, path: Path) -> bool:

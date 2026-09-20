@@ -1,3 +1,5 @@
+include ../../../scripts/make/shell.mk
+
 .PHONY: check lint typecheck test build serve dev
 
 check: lint typecheck test
@@ -14,7 +16,11 @@ test:
 build:
 	npm run build
 
+# The HTTPS static server is the api package's scripts/webserver.py (tested
+# there), run from that package's venv with the port and the directory to
+# serve; it used to be an inline python -c program here, which no portable
+# recipe can carry.
 serve: build
-	python -c "import http.server,ssl;s=http.server.HTTPServer(('0.0.0.0',8091),http.server.SimpleHTTPRequestHandler);c=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);c.load_cert_chain('cert.pem','key.pem');s.socket=c.wrap_socket(s.socket,server_side=True);print('HTTPS on https://0.0.0.0:8091');s.serve_forever()"
+	poetry -C .. run python -m scripts.webserver 8091 web
 
 dev: build serve
