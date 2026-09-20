@@ -102,11 +102,16 @@ test:
 # bounds, wikilinks land, footnotes pair, every page is hub-reachable, and the
 # index counts are true. Enforced because the 2026-08-14 hand audit found five
 # defects that had accumulated silently -- and its own first run then caught
-# the hand audit overcounting every hub by the format-comment line.
+# the hand audit overcounting every hub by the format-comment line. Citations
+# into the gitignored artifact store (runs/, .game/, .decompiled/) are
+# existence-checked on the machine that holds every one of those roots and
+# reported as not applicable, in numbers, anywhere else: the checker decides
+# from the tree, because this target runs on CI runners and fleet nodes now
+# and the --artifacts flag it used to pass failed the gate on all of them.
 sources:
 	@echo ""
 	@echo "=== sources (wiki provenance and navigation)"
-	poetry run python -m scripts.wiki_check --artifacts
+	poetry run python -m scripts.wiki_check
 
 # The Java half is gated here too. Without agent-selftest in the chain, a
 # patcher regression or an obfuscated name that moved in a game update stays

@@ -20,6 +20,10 @@ a pinned hash no longer matching the file -- is deliberately not gated:
 that means "nobody re-read this page since that blob", and reddening the
 build on it rewards bumping pins without re-reading.
 
+Citations into the artifact store (:data:`ARTIFACT_ROOTS`) are checked
+only on a machine that holds the store, and the summary line says in
+numbers which of the two happened; see :func:`run_checks`.
+
 Run through the target that owns it::
 
     make sources
@@ -30,6 +34,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 EXIT_OK = 0
 EXIT_VIOLATIONS = 1
@@ -70,14 +75,76 @@ def _first_group_all(pattern: re.Pattern[str], text: str) -> tuple[str, ...]:
 
 
 #: Roots whose contents are gitignored measurement records -- the artifact
-#: store, present only on machines that hold the mirror (the workstation and
-#: the cluster), absent by design from every fresh clone. Their existence is
-#: the ARTIFACT tier's claim, not the repo contract's; see
-#: :func:`run_checks`.
+#: store, present only on the workstation that produced the record, absent
+#: by design from every fresh clone, CI runner and fleet node. A machine
+#: holds the store only when every root is a directory here: ``runs/``
+#: alone proves nothing (the test suite creates ``runs/fleet/`` and
+#: ``runs/traces/`` wherever it runs) and ``.game/`` alone is the licensed
+#: game tree CI links in, which on Linux lacks the launcher scripts the
+#: pages cite. Their existence is the ARTIFACT tier's claim, not the repo
+#: contract's; see :func:`run_checks`.
 ARTIFACT_ROOTS = ("runs/", ".game/", ".decompiled/")
 
 
-def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> list[str]:
+class SourceScan(NamedTuple):
+    """What one page's citations showed.
+
+    Attributes:
+        violations: One line per citation that failed a check.
+        artifact_citations: How many citations point into the artifact
+            store, whether or not they were existence-checked.
+    """
+
+    violations: tuple[str, ...]
+    artifact_citations: int
+
+
+class Report(NamedTuple):
+    """The whole tree's result, with the artifact tier's standing in numbers.
+
+    Attributes:
+        violations: One line per violation, empty when the contract holds.
+        pages: How many content pages were read.
+        artifact_citations: How many citations point into the artifact
+            store across every page.
+        absent_roots: The artifact roots that are not directories on this
+            machine. Empty means the store is held and every artifact
+            citation was existence-checked; otherwise none of them was.
+    """
+
+    violations: tuple[str, ...]
+    pages: int
+    artifact_citations: int
+    absent_roots: tuple[str, ...]
+
+    def summary(self) -> str:
+        """Return the closing line, which never lets a skipped tier read as a pass."""
+        head = f"[sources] {len(self.violations)} violation(s) across {self.pages} pages"
+        if not self.absent_roots:
+            roots = ", ".join(ARTIFACT_ROOTS)
+            checked = f"{self.artifact_citations} citation(s) checked under {roots}"
+            return f"{head}; artifact tier: {checked}"
+        absent = ", ".join(self.absent_roots)
+        return (
+            f"{head}; artifact tier not applicable: {absent} absent on this machine, "
+            f"{self.artifact_citations} artifact citation(s) not checked"
+        )
+
+
+def absent_artifact_roots(root: Path) -> tuple[str, ...]:
+    """Return the artifact roots that are not directories under ``root``.
+
+    Args:
+        root: The client directory.
+
+    Returns:
+        The absent roots in :data:`ARTIFACT_ROOTS` order; empty when the
+        machine holds the whole store.
+    """
+    return tuple(name for name in ARTIFACT_ROOTS if not (root / name).is_dir())
+
+
+def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> SourceScan:
     """Verify every cited path resolves and every line anchor is in bounds.
 
     Args:
@@ -88,15 +155,18 @@ def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> list[
             existence-checked too. See :func:`run_checks`.
 
     Returns:
-        One line per violation.
+        The page's violations and its artifact-citation count.
     """
     found: list[str] = []
+    artifact_citations = 0
     for entry in [*_source_entries(matter), *_blob_paths(matter)]:
         if entry.startswith("http"):
             continue
         path_part, _, line_part = entry.partition(":")
-        if not artifacts and path_part.startswith(ARTIFACT_ROOTS):
-            continue
+        if path_part.startswith(ARTIFACT_ROOTS):
+            artifact_citations += 1
+            if not artifacts:
+                continue
         cited = root / path_part
         if not cited.exists():
             found.append(f"{page}: source path does not resolve: {path_part}")
@@ -105,7 +175,7 @@ def _check_sources(page: str, matter: str, root: Path, artifacts: bool) -> list[
             length = len(cited.read_text(encoding="utf-8", errors="ignore").splitlines())
             if int(line_part) > length:
                 found.append(f"{page}: anchor {entry} is beyond the file's {length} lines")
-    return found
+    return SourceScan(violations=tuple(found), artifact_citations=artifact_citations)
 
 
 def _check_links(page: str, text: str, slugs: frozenset[str]) -> list[str]:
@@ -161,28 +231,31 @@ def _index_total(index: str) -> str | None:
     return None if total is None else total.group(1)
 
 
-def run_checks(root: Path, artifacts: bool = False) -> tuple[str, ...]:
+def run_checks(root: Path) -> Report:
     """Run every check over the wiki tree.
 
     Two tiers, split by what a machine can honestly assert (2026-09-07,
     the first CI run on a fresh clone). The REPO tier -- frontmatter,
     tracked-path resolution, anchors, links, navigation, counts -- is true
-    or false of the checkout alone, so the test suite enforces it on every
-    machine including CI. The ARTIFACT tier additionally
-    existence-checks paths under :data:`ARTIFACT_ROOTS`: those are
-    gitignored measurement records held only beside the artifact store,
-    so ``make sources`` on the workstation enforces it and a fresh clone
-    does not pretend to. Before the split, the schema enforced artifact
-    existence unconditionally -- which meant the gate could only ever pass
-    on one machine, and a gate that only one machine can pass gates
-    nothing anywhere else (``wiki/SCHEMA.md``).
+    or false of the checkout alone, so it runs on every machine including
+    CI. The ARTIFACT tier additionally existence-checks paths under
+    :data:`ARTIFACT_ROOTS`: those are gitignored measurement records held
+    only beside the artifact store, so it runs where the store is held
+    (every root a directory here, :func:`absent_artifact_roots`) and is
+    reported as not applicable, with the count of citations it did not
+    check, everywhere else. The machine decides, not a flag: from
+    2026-09-20 ``make check`` runs on CI runners and fleet nodes as well
+    as the workstation, and a flag the Makefile always passed made the
+    same gate fail on every machine but one. Before the split, the schema
+    enforced artifact existence unconditionally -- which meant the gate
+    could only ever pass on one machine, and a gate that only one machine
+    can pass gates nothing anywhere else (``wiki/SCHEMA.md``).
 
     Args:
         root: The client directory holding ``wiki/``.
-        artifacts: Whether the artifact tier runs too.
 
     Returns:
-        One line per violation, empty when the contract holds.
+        The violations, the page count and the artifact tier's standing.
 
     Raises:
         OSError: When a wiki file cannot be read.
@@ -190,44 +263,51 @@ def run_checks(root: Path, artifacts: bool = False) -> tuple[str, ...]:
     pages = sorted((root / "wiki" / "pages").glob("*.md"))
     hubs = sorted((root / "wiki" / "hubs").glob("*.md"))
     slugs = frozenset(p.stem for p in [*pages, *hubs])
+    absent_roots = absent_artifact_roots(root)
     found: list[str] = []
+    artifact_citations = 0
     for page in pages:
         text = page.read_text(encoding="utf-8")
         matter = _frontmatter(text)
         if "title:" not in matter:
             found.append(f"{page.name}: no frontmatter title; the page is unpinnable")
-        found.extend(_check_sources(page.name, matter, root, artifacts))
+        scan = _check_sources(page.name, matter, root, artifacts=not absent_roots)
+        found.extend(scan.violations)
+        artifact_citations += scan.artifact_citations
         found.extend(_check_links(page.name, text, slugs))
     found.extend(_check_navigation(root, pages, hubs))
-    return tuple(found)
+    return Report(
+        violations=tuple(found),
+        pages=len(pages),
+        artifact_citations=artifact_citations,
+        absent_roots=absent_roots,
+    )
 
 
 def main(argv: list[str] | None = None, root: Path | None = None) -> int:
     """Check the wiki and report.
 
     Args:
-        argv: ``--artifacts`` runs the artifact tier too (what
-            ``make sources`` passes on artifact-holding machines); no
-            other argument is accepted. ``None`` reads ``sys.argv[1:]``.
+        argv: No argument is accepted; the artifact tier is decided by
+            the machine (:func:`run_checks`). ``None`` reads
+            ``sys.argv[1:]``.
         root: The client directory, injectable for tests. ``None`` uses
             the working directory.
 
     Returns:
         ``EXIT_OK`` when the contract holds, ``EXIT_VIOLATIONS`` with one
         line per violation when it does not, ``EXIT_BAD_USAGE`` on any
-        other argument.
+        argument.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if args not in ([], ["--artifacts"]):
-        sys.stdout.write("usage: wiki_check [--artifacts]\n")
+    if args:
+        sys.stdout.write("usage: wiki_check\n")
         return EXIT_BAD_USAGE
-    base = root if root is not None else Path()
-    found = run_checks(base, artifacts=args == ["--artifacts"])
-    for line in found:
+    report = run_checks(root if root is not None else Path())
+    for line in report.violations:
         sys.stdout.write(f"{line}\n")
-    pages = len(list((base / "wiki" / "pages").glob("*.md")))
-    sys.stdout.write(f"[sources] {len(found)} violation(s) across {pages} pages\n")
-    return EXIT_OK if not found else EXIT_VIOLATIONS
+    sys.stdout.write(f"{report.summary()}\n")
+    return EXIT_OK if not report.violations else EXIT_VIOLATIONS
 
 
 if __name__ == "__main__":

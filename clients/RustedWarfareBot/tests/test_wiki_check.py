@@ -13,13 +13,33 @@ import sys
 from pathlib import Path
 
 import pytest
-from scripts.wiki_check import EXIT_BAD_USAGE, EXIT_OK, EXIT_VIOLATIONS, main, run_checks
+from scripts.wiki_check import (
+    ARTIFACT_ROOTS,
+    EXIT_BAD_USAGE,
+    EXIT_OK,
+    EXIT_VIOLATIONS,
+    Report,
+    absent_artifact_roots,
+    main,
+    run_checks,
+)
+
+NOT_APPLICABLE = (
+    "artifact tier not applicable: runs/, .game/, .decompiled/ absent on this machine, "
+    "{n} artifact citation(s) not checked"
+)
 
 
 def _write(root: Path, rel: str, text: str) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _hold_the_store(root: Path) -> None:
+    """Make every artifact root a directory, the way only the workstation has them."""
+    for name in ARTIFACT_ROOTS:
+        (root / name).mkdir(exist_ok=True)
 
 
 def _clean_tree(root: Path) -> None:
@@ -52,14 +72,19 @@ def test_a_clean_tree_passes_with_a_summary(
 ) -> None:
     _clean_tree(tmp_path)
     assert main([], root=tmp_path) == EXIT_OK
-    assert capsys.readouterr().out == "[sources] 0 violation(s) across 2 pages\n"
+    assert capsys.readouterr().out == (
+        f"[sources] 0 violation(s) across 2 pages; {NOT_APPLICABLE.format(n=0)}\n"
+    )
 
 
-def test_a_missing_artifact_path_is_the_artifact_tiers_finding_alone(tmp_path: Path) -> None:
+def test_a_missing_artifact_path_is_the_artifact_tiers_finding_alone(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     """The two-tier split (SCHEMA.md, 2026-09-07): a `runs/` citation that
     does not resolve is invisible to the repo tier -- a fresh clone holds no
-    measurement record, honestly -- and fatal to the artifact tier, which is
-    what `make sources` runs beside the artifact store."""
+    measurement record, honestly, and the summary counts the citation it did
+    not check -- and fatal to the artifact tier, which runs on the machine
+    that holds the store (every artifact root a directory, 2026-09-20)."""
     _clean_tree(tmp_path)
     _write(
         tmp_path,
@@ -67,14 +92,57 @@ def test_a_missing_artifact_path_is_the_artifact_tiers_finding_alone(tmp_path: P
         '---\ntitle: "Beta"\nsource_paths:\n  - "runs/sweeps/demo/absent.txt"\n---\n'
         "# Beta\n\nPlain.\n",
     )
-    assert run_checks(tmp_path) == ()
-    assert run_checks(tmp_path, artifacts=True) == (
-        "beta.md: source path does not resolve: runs/sweeps/demo/absent.txt",
+    assert run_checks(tmp_path) == Report(
+        violations=(), pages=2, artifact_citations=1, absent_roots=ARTIFACT_ROOTS
     )
-    assert main(["--artifacts"], root=tmp_path) == EXIT_VIOLATIONS
+    assert main([], root=tmp_path) == EXIT_OK
+    assert capsys.readouterr().out == (
+        f"[sources] 0 violation(s) across 2 pages; {NOT_APPLICABLE.format(n=1)}\n"
+    )
+
+    _hold_the_store(tmp_path)
+
+    assert run_checks(tmp_path) == Report(
+        violations=("beta.md: source path does not resolve: runs/sweeps/demo/absent.txt",),
+        pages=2,
+        artifact_citations=1,
+        absent_roots=(),
+    )
+    assert main([], root=tmp_path) == EXIT_VIOLATIONS
+    assert capsys.readouterr().out == (
+        "beta.md: source path does not resolve: runs/sweeps/demo/absent.txt\n"
+        "[sources] 1 violation(s) across 2 pages; artifact tier: 1 citation(s) checked "
+        "under runs/, .game/, .decompiled/\n"
+    )
 
 
-def test_an_artifact_path_that_resolves_passes_both_tiers(tmp_path: Path) -> None:
+def test_a_partial_store_is_not_the_store(tmp_path: Path) -> None:
+    """`runs/` alone is what the test suite leaves behind on any machine and
+    `.game/` alone is what CI links in, so neither turns the artifact tier on;
+    the summary names exactly which roots are missing."""
+    _clean_tree(tmp_path)
+    _write(
+        tmp_path,
+        "wiki/pages/beta.md",
+        '---\ntitle: "Beta"\nsource_paths:\n  - ".game/fallback64.bat"\n---\n# Beta\n\nPlain.\n',
+    )
+    (tmp_path / "runs").mkdir()
+    (tmp_path / ".game").mkdir()
+
+    assert absent_artifact_roots(tmp_path) == (".decompiled/",)
+    report = run_checks(tmp_path)
+    assert report == Report(
+        violations=(), pages=2, artifact_citations=1, absent_roots=(".decompiled/",)
+    )
+    assert report.summary() == (
+        "[sources] 0 violation(s) across 2 pages; artifact tier not applicable: "
+        ".decompiled/ absent on this machine, 1 artifact citation(s) not checked"
+    )
+
+
+def test_an_artifact_path_that_resolves_passes_both_tiers(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     _clean_tree(tmp_path)
     _write(tmp_path, "runs/sweeps/demo/present.txt", "a scorecard\n")
     _write(
@@ -83,8 +151,16 @@ def test_an_artifact_path_that_resolves_passes_both_tiers(tmp_path: Path) -> Non
         '---\ntitle: "Beta"\nsource_paths:\n  - "runs/sweeps/demo/present.txt"\n---\n'
         "# Beta\n\nPlain.\n",
     )
-    assert run_checks(tmp_path) == ()
-    assert main(["--artifacts"], root=tmp_path) == EXIT_OK
+    assert run_checks(tmp_path).violations == ()
+    _hold_the_store(tmp_path)
+    assert run_checks(tmp_path) == Report(
+        violations=(), pages=2, artifact_citations=1, absent_roots=()
+    )
+    assert main([], root=tmp_path) == EXIT_OK
+    assert capsys.readouterr().out == (
+        "[sources] 0 violation(s) across 2 pages; artifact tier: 1 citation(s) checked "
+        "under runs/, .game/, .decompiled/\n"
+    )
 
 
 def test_every_rule_fires_once_on_the_broken_tree(
@@ -123,15 +199,14 @@ def test_every_rule_fires_once_on_the_broken_tree(
         "index.md: hub ghost states 1 pages, links 0",
         "index.md: hub topic states 5 pages, links 2",
         "index.md: total states 9 pages, 3 exist",
-        "[sources] 10 violation(s) across 3 pages",
+        f"[sources] 10 violation(s) across 3 pages; {NOT_APPLICABLE.format(n=0)}",
     ]
 
 
 def test_an_index_without_a_total_is_a_violation(tmp_path: Path) -> None:
     _clean_tree(tmp_path)
     _write(tmp_path, "wiki/index.md", "# Wiki\n\n[Topic](hubs/topic.md) -- things (2 pages)\n")
-    found = run_checks(tmp_path)
-    assert found == ("index.md: no content-page total found",)
+    assert run_checks(tmp_path).violations == ("index.md: no content-page total found",)
 
 
 def test_a_page_without_frontmatter_is_unpinnable(tmp_path: Path) -> None:
@@ -141,12 +216,18 @@ def test_a_page_without_frontmatter_is_unpinnable(tmp_path: Path) -> None:
     violation rather than a silent pass."""
     _clean_tree(tmp_path)
     _write(tmp_path, "wiki/pages/beta.md", "# Beta\n\nNo frontmatter, links to [[alpha]].\n")
-    assert run_checks(tmp_path) == ("beta.md: no frontmatter title; the page is unpinnable",)
+    assert run_checks(tmp_path).violations == (
+        "beta.md: no frontmatter title; the page is unpinnable",
+    )
 
 
 def test_a_bad_argument_count_prints_usage(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["--verbose"]) == EXIT_BAD_USAGE
-    assert capsys.readouterr().out.startswith("usage: wiki_check")
+    """Any argument is refused, including the `--artifacts` flag the Makefile
+    passed until 2026-09-20: the machine decides the tier now, and a flag
+    that could ask for the tier on a machine without the store would put the
+    gate back to failing everywhere but the workstation."""
+    assert main(["--artifacts"]) == EXIT_BAD_USAGE
+    assert capsys.readouterr().out == "usage: wiki_check\n"
 
 
 def test_the_module_entry_point_exits_with_the_check_result(
@@ -168,4 +249,7 @@ def test_the_module_entry_point_exits_with_the_check_result(
 def test_the_real_wiki_passes_the_gate() -> None:
     """The gate's own dogfood: the tree this repo ships must hold the
     contract, and this test failing alongside make sources is the point."""
-    assert run_checks(Path(__file__).resolve().parents[1]) == ()
+    client = Path(__file__).resolve().parents[1]
+    report = run_checks(client)
+    assert report.violations == ()
+    assert report.pages == len(list((client / "wiki" / "pages").glob("*.md")))
