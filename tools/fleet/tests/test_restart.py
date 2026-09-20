@@ -171,16 +171,21 @@ class TestRunAndDescribe:
     def test_run_goes_through_the_command_seam(self, tmp_path: pathlib.Path) -> None:
         calls: list[tuple[str, ...]] = []
         withheld: list[tuple[str, ...]] = []
+        deadlines: list[int] = []
 
         def fake_run(
             argv: Sequence[str],
             *,
+            timeout_seconds: int,
             stdin_bytes: bytes | None = None,
             unset_env: Sequence[str] = (),
         ) -> _test_hooks.CommandResult:
             calls.append(tuple(argv))
             withheld.append(tuple(unset_env))
-            return _test_hooks.CommandResult(returncode=0, stdout="RESTARTED", stderr="")
+            deadlines.append(timeout_seconds)
+            return _test_hooks.CommandResult(
+                returncode=0, stdout="RESTARTED", stderr="", timed_out=False
+            )
 
         _test_hooks.run = fake_run
 
@@ -191,6 +196,7 @@ class TestRunAndDescribe:
         assert result["returncode"] == 0
         assert calls == [restart.restart_argv(tmp_path, TARGET)]
         assert withheld == [("VIRTUAL_ENV",)]
+        assert deadlines == [restart.SESSION_JOB_TIMEOUT_SECONDS]
 
     def test_revive_goes_through_the_command_seam_and_names_its_mode(
         self, tmp_path: pathlib.Path
@@ -201,13 +207,18 @@ class TestRunAndDescribe:
         def fake_run(
             argv: Sequence[str],
             *,
+            timeout_seconds: int,
             stdin_bytes: bytes | None = None,
             unset_env: Sequence[str] = (),
         ) -> _test_hooks.CommandResult:
             calls.append(tuple(argv))
             withheld.append(tuple(unset_env))
+            assert timeout_seconds == restart.SESSION_JOB_TIMEOUT_SECONDS
             return _test_hooks.CommandResult(
-                returncode=0, stdout="REVIVE - REVIVED session x: now pid 5", stderr=""
+                returncode=0,
+                stdout="REVIVE - REVIVED session x: now pid 5",
+                stderr="",
+                timed_out=False,
             )
 
         _test_hooks.run = fake_run
@@ -232,6 +243,7 @@ class TestRunAndDescribe:
                     "ROLLOVER APPLIED - 1 restart(s) attempted: 0 restarted, 1 skipped, 0 failed\n"
                 ),
                 stderr="",
+                timed_out=False,
             ),
             "rollover",
         )
@@ -245,7 +257,10 @@ class TestRunAndDescribe:
         head = "plan line\n" * 400
         detail = restart.describe_result(
             _test_hooks.CommandResult(
-                returncode=0, stdout=f"{head}RESTARTED mcps-99 now pid 41324", stderr=""
+                returncode=0,
+                stdout=f"{head}RESTARTED mcps-99 now pid 41324",
+                stderr="",
+                timed_out=False,
             ),
             "rollover",
         )

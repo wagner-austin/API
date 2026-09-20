@@ -54,6 +54,12 @@ EXCLUDED_DIRECTORIES = (
     ".ruff_cache",
 )
 
+#: The archive's deadline, in seconds. The largest tree ever staged here
+#: (tools/hpc3, 5.7 MB compressed) took under ten seconds; ten minutes
+#: holds a tree a hundred times that and still ends a tar wedged on a
+#: locked file before the tick's own bound does.
+ARCHIVE_TIMEOUT_SECONDS = 600
+
 #: WHY `runs` IS NOT ON THAT LIST, though it was for an hour.
 #:
 #: Five consecutive dispatches of tools/fleet grew 185 KB, 1.4 MB, 4.5 MB,
@@ -118,7 +124,8 @@ def archive(
     for name in EXCLUDED_DIRECTORIES:
         excludes.extend(("--exclude", name))
     result = _test_hooks.run(
-        ["tar", "-czf", str(destination), "-C", str(project_root), *excludes, *members]
+        ["tar", "-czf", str(destination), "-C", str(project_root), *excludes, *members],
+        timeout_seconds=ARCHIVE_TIMEOUT_SECONDS,
     )
     if result["returncode"] != 0:
         raise AppError(

@@ -46,11 +46,15 @@ class FakeRun:
             call, so a test asserting on argv does not have to mention bytes.
         unset_env: Every set of withheld variable names it was given, in
             order, empty for the calls that withheld nothing.
+        timeouts: Every deadline it was given, in order, one per call: the
+            seam makes the deadline mandatory, and a test that asserts on
+            the deadline a call site chose reads it here.
     """
 
     calls: list[tuple[str, ...]]
     stdin: list[bytes | None]
     unset_env: list[tuple[str, ...]]
+    timeouts: list[int]
     _replies: list[_test_hooks.CommandResult]
 
     def __init__(self, replies: Sequence[_test_hooks.CommandResult]) -> None:
@@ -64,12 +68,14 @@ class FakeRun:
         self.calls = []
         self.stdin = []
         self.unset_env = []
+        self.timeouts = []
         self._replies = list(replies)
 
     def __call__(
         self,
         argv: Sequence[str],
         *,
+        timeout_seconds: int,
         stdin_bytes: bytes | None = None,
         unset_env: Sequence[str] = (),
     ) -> _test_hooks.CommandResult:
@@ -77,6 +83,7 @@ class FakeRun:
 
         Args:
             argv: The command.
+            timeout_seconds: The deadline the caller chose.
             stdin_bytes: Its standard input, or None.
             unset_env: The variables the caller withheld from the child.
 
@@ -89,6 +96,7 @@ class FakeRun:
         self.calls.append(tuple(argv))
         self.stdin.append(stdin_bytes)
         self.unset_env.append(tuple(unset_env))
+        self.timeouts.append(timeout_seconds)
         assert self._replies, f"unscripted call: {list(argv)}"
         return self._replies.pop(0)
 
@@ -166,7 +174,7 @@ def ok(stdout: str) -> _test_hooks.CommandResult:
     Returns:
         The result, exit status zero and empty stderr.
     """
-    return _test_hooks.CommandResult(returncode=0, stdout=stdout, stderr="")
+    return _test_hooks.CommandResult(returncode=0, stdout=stdout, stderr="", timed_out=False)
 
 
 def failed(returncode: int, stderr: str) -> _test_hooks.CommandResult:
@@ -179,7 +187,30 @@ def failed(returncode: int, stderr: str) -> _test_hooks.CommandResult:
     Returns:
         The result, with empty stdout.
     """
-    return _test_hooks.CommandResult(returncode=returncode, stdout="", stderr=stderr)
+    return _test_hooks.CommandResult(
+        returncode=returncode, stdout="", stderr=stderr, timed_out=False
+    )
+
+
+def timed_out(seconds: int) -> _test_hooks.CommandResult:
+    """Build the result of a command ended at its deadline.
+
+    The shape :func:`fleet.core._test_hooks._default_run` returns for one:
+    :const:`~fleet.core._test_hooks.TIMED_OUT_RETURNCODE`, empty streams,
+    stderr carrying the elapsed seconds, and the flag.
+
+    Args:
+        seconds: The deadline that passed.
+
+    Returns:
+        The result.
+    """
+    return _test_hooks.CommandResult(
+        returncode=_test_hooks.TIMED_OUT_RETURNCODE,
+        stdout="",
+        stderr=f"timed out after {seconds} s",
+        timed_out=True,
+    )
 
 
 #: The pinned clock every end-to-end dispatch test runs against.

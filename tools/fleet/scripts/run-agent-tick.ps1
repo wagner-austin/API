@@ -76,10 +76,51 @@ if ($boardKeyLine.Count -eq 1) {
 }
 
 Set-Location (Join-Path $apiRoot 'tools\fleet')
-poetry run fleet-agent --config fleet.json `
-    --agent fleet-runner-austinpc `
-    --session a850f688-f98d-415c-a244-e993226ca2fc `
-    --repo-root $apiRoot `
-    --mcps-root $mcpsRoot `
-    --registry (Join-Path $mcpsRoot 'fleet-mcp\fleet-nodes.json')
-exit $LASTEXITCODE
+
+# THE TICK WRITES A LOG, BECAUSE UNTIL 2026-09-20 IT WROTE NOTHING. The
+# scheduled action carried no redirection, the agent logs to its streams,
+# and Task Scheduler's own history was disabled on the hub, so a tick that
+# hung for three days (board tasks 35940277 and 41ac6ed2) left no record
+# of itself anywhere: it was found by its absence from the fleet
+# container's log. One file per day under the same directory the
+# supervisor and manager-audit passes log to; both streams land in it
+# with the tick's start, pid and exit; files older than the retention are
+# removed at the start of each tick, so the directory bounds itself.
+#
+# Start-Process with the streams redirected to FILES, not `*>>` or a pipe:
+# Windows PowerShell 5.1 wraps a native command's stderr lines in
+# NativeCommandError records on redirection, and a pipe with no console
+# (this is an S4U task) is the shape `tasklist | findstr` blocked on
+# (memory: powershell-deadlocks-under-s4u-tasks). A redirected file handle
+# has a real EOF. The exit code is read off the process object, which no
+# redirection can clobber.
+$logDirectory = Join-Path $env:LOCALAPPDATA 'Temp\claude'
+New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+$retentionDays = 14
+Get-ChildItem -Path $logDirectory -Filter 'fleet-agent-*.log' |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$retentionDays) } |
+    Remove-Item -Force
+$log = Join-Path $logDirectory ("fleet-agent-" + (Get-Date -Format 'yyyy-MM-dd') + '.log')
+$stdoutFile = Join-Path $env:TEMP "fleet-agent-tick-$PID.out"
+$stderrFile = Join-Path $env:TEMP "fleet-agent-tick-$PID.err"
+$startedAt = Get-Date -Format o
+$agentArguments = @(
+    'run', 'fleet-agent', '--config', 'fleet.json',
+    '--agent', 'fleet-runner-austinpc',
+    '--session', 'a850f688-f98d-415c-a244-e993226ca2fc',
+    '--repo-root', $apiRoot,
+    '--mcps-root', $mcpsRoot,
+    '--registry', (Join-Path $mcpsRoot 'fleet-mcp\fleet-nodes.json')
+)
+$process = Start-Process -FilePath 'poetry' -ArgumentList $agentArguments `
+    -WorkingDirectory (Join-Path $apiRoot 'tools\fleet') `
+    -NoNewWindow -Wait -PassThru `
+    -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+$exitCode = $process.ExitCode
+$lines = @("TICK START $startedAt pid $($process.Id) task-pid $PID")
+$lines += Get-Content -Path $stdoutFile -Encoding UTF8
+$lines += Get-Content -Path $stderrFile -Encoding UTF8
+$lines += "TICK EXIT $exitCode $(Get-Date -Format o)"
+[System.IO.File]::AppendAllLines($log, [string[]]$lines, (New-Object System.Text.UTF8Encoding($false)))
+Remove-Item -Force $stdoutFile, $stderrFile
+exit $exitCode

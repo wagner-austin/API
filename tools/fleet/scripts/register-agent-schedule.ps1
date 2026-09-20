@@ -83,13 +83,24 @@ $principal = New-ScheduledTaskPrincipal `
     -RunLevel Limited
 
 # IgnoreNew: a rebuild tick that outlasts three minutes must not be joined
-# by a second tick racing it for the same queue rows. The 72-hour ceiling is
-# the scheduler's default and was the task's limit before this change.
+# by a second tick racing it for the same queue rows.
+#
+# THE EXECUTION LIMIT IS THE LAST LINE, AND 72 HOURS WAS THE SCHEDULER'S
+# DEFAULT, NOT A DECISION. With IgnoreNew, a tick that never exits refuses
+# every tick after it until this limit ends it; measured 2026-09-17 11:15Z
+# to 2026-09-20 11:15Z (board tasks 35940277 and 41ac6ed2), one ssh whose
+# peer slept mid-command held the queue for exactly that long, and the
+# revive queued at 10:00Z on the 20th ran at 19:21Z. Every command a tick
+# runs now carries its own deadline (fleet.core._test_hooks.RunProtocol,
+# mandatory): 120 s per ssh, 600 s per session verb, 1800 s for a bake.
+# Forty minutes holds the longest of those with the collect and observe
+# passes around it, and ends anything that escaped them thirteen ticks
+# later rather than a thousand.
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -MultipleInstances IgnoreNew `
-    -ExecutionTimeLimit (New-TimeSpan -Hours 72) `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 40) `
     -StartWhenAvailable
 
 Register-ScheduledTask `

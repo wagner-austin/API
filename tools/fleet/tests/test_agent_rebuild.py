@@ -15,7 +15,7 @@ import pytest
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, queue
+from fleet.core import _test_hooks, queue, rebuild
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_job
 from tests.conftest import FakeRun, agent_argv
 
@@ -49,7 +49,11 @@ class TestRebuildLane:
         mcps = tmp_path / "mcps-checkout"
         mcps.mkdir()
         runner = FakeRun(
-            [_test_hooks.CommandResult(returncode=0, stdout="Base images rebuilt.\n", stderr="")]
+            [
+                _test_hooks.CommandResult(
+                    returncode=0, stdout="Base images rebuilt.\n", stderr="", timed_out=False
+                )
+            ]
         )
         _test_hooks.run = runner
         endpoint = FakeQueue(
@@ -89,6 +93,9 @@ class TestRebuildLane:
                 "BOARD_AGENT_LABEL=opus-phone-0911",
             )
         ]
+        # A bake that wedges under the fleet lock ends at the lane's own
+        # deadline rather than holding the tick to the scheduler's ceiling.
+        assert runner.timeouts == [rebuild.BUILD_BASES_TIMEOUT_SECONDS] == [1800]
         started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
@@ -110,6 +117,7 @@ class TestRebuildLane:
                     returncode=2,
                     stdout="",
                     stderr="make: *** [Makefile:73: build-bases] Error 2",
+                    timed_out=False,
                 )
             ]
         )

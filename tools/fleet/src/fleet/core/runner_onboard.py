@@ -45,6 +45,11 @@ from typing_extensions import TypedDict
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, remote, runner_audit, runner_render
 
+#: The token mint's deadline, in seconds: one HTTPS round trip to GitHub.
+#: A minute outlasts any answer ``gh`` gives and ends a hung login prompt
+#: or a proxy that never connects with a named refusal.
+GH_API_TIMEOUT_SECONDS = 60
+
 
 class OnboardPlan(TypedDict):
     """What onboarding one repo onto one host will create.
@@ -163,7 +168,8 @@ def mint_registration_token(repo: str) -> str:
             f"repos/{repo}/actions/runners/registration-token",
             "-q",
             ".token",
-        ]
+        ],
+        timeout_seconds=GH_API_TIMEOUT_SECONDS,
     )
     token = result["stdout"].strip()
     if result["returncode"] != 0 or not token:

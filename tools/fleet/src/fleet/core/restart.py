@@ -308,9 +308,18 @@ def requester_refusal(requested_by: str) -> str | None:
 #: ``.venv`` even with the fleet venv first on PATH (measured both ways).
 SESSION_ENVIRONMENT_EXCLUDED: Final[tuple[str, ...]] = ("VIRTUAL_ENV",)
 
+#: A session verb's deadline, in seconds.
+#:
+#: session-audit's own rails bound each verb (a revive waits 30 seconds for
+#: a prompt and then for a record; a kill waits for a pid to leave the
+#: table), so a verb that is still running after ten minutes is one whose
+#: pane, ssh hop or poetry resolution has stopped answering, and the job
+#: closes failed with that fact instead of holding the tick.
+SESSION_JOB_TIMEOUT_SECONDS: Final[int] = 600
+
 
 def run_session_job(invocation: SessionInvocation) -> CommandResult:
-    """Run one session verb, blocking until session-audit reports.
+    """Run one session verb, blocking until session-audit reports or the deadline passes.
 
     Args:
         invocation: What :func:`session_invocation` composed.
@@ -319,9 +328,14 @@ def run_session_job(invocation: SessionInvocation) -> CommandResult:
         The invocation's exit status and captured streams. Exit 0 means the
         verb did what it names (RESTARTED, REVIVED, ENDED); anything else
         means it did not, and the stdout tail carries session-audit's own
-        outcome line saying why.
+        outcome line saying why. After :const:`SESSION_JOB_TIMEOUT_SECONDS`
+        it is the timed-out result.
     """
-    return _test_hooks.run(invocation["argv"], unset_env=SESSION_ENVIRONMENT_EXCLUDED)
+    return _test_hooks.run(
+        invocation["argv"],
+        timeout_seconds=SESSION_JOB_TIMEOUT_SECONDS,
+        unset_env=SESSION_ENVIRONMENT_EXCLUDED,
+    )
 
 
 def describe_result(result: CommandResult, mode: str) -> str:

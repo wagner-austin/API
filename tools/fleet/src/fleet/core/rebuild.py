@@ -107,17 +107,29 @@ def rebuild_argv(mcps_root: pathlib.Path, submitted_by: str) -> tuple[str, ...]:
     )
 
 
+#: The bake's deadline, in seconds.
+#:
+#: A cold rebuild of both base images is minutes of docker work under the
+#: fleet lock (the 2026-09-20 00:34Z deploy's bases phase took 90 seconds
+#: warm); half an hour holds a cold one with room and still ends a bake
+#: that has wedged on a registry pull long before the next operator looks.
+BUILD_BASES_TIMEOUT_SECONDS: Final[int] = 1800
+
+
 def run_build_bases(mcps_root: pathlib.Path, *, submitted_by: str) -> CommandResult:
-    """Run the bake, blocking until it finishes.
+    """Run the bake, blocking until it finishes or its deadline passes.
 
     Args:
         mcps_root: The MCPs checkout.
         submitted_by: The submitting label, stamped into the fleet journal.
 
     Returns:
-        The make invocation's exit status and captured streams.
+        The make invocation's exit status and captured streams, or the
+        timed-out result after :const:`BUILD_BASES_TIMEOUT_SECONDS`.
     """
-    return _test_hooks.run(rebuild_argv(mcps_root, submitted_by))
+    return _test_hooks.run(
+        rebuild_argv(mcps_root, submitted_by), timeout_seconds=BUILD_BASES_TIMEOUT_SECONDS
+    )
 
 
 def describe_result(result: CommandResult) -> str:

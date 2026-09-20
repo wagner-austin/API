@@ -69,6 +69,7 @@ class TestRestartLane:
                         "-- now pid 41324 as mcps-d4 on 2.1.270\n"
                     ),
                     stderr="",
+                    timed_out=False,
                 )
             ]
         )
@@ -95,6 +96,9 @@ class TestRestartLane:
         # The child must not inherit this agent's own poetry venv, or the
         # session-audit script resolves inside the wrong environment.
         assert runner.unset_env == [("VIRTUAL_ENV",)]
+        # And it carries the lane's deadline, so a pane or hop that stops
+        # answering closes the job failed instead of holding the tick.
+        assert runner.timeouts == [restart.SESSION_JOB_TIMEOUT_SECONDS] == [600]
         started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
@@ -127,6 +131,7 @@ class TestRestartLane:
                         "  departure  last ledger event: end (other) at 2026-09-16 10:31Z\n"
                     ),
                     stderr="",
+                    timed_out=False,
                 )
             ]
         )
@@ -209,7 +214,9 @@ class TestRestartLane:
         mcps = tmp_path / "mcps-checkout"
         mcps.mkdir()
         line = f"KILL - {outcome.format(target=TARGET)}\n"
-        runner = FakeRun([_test_hooks.CommandResult(returncode=0, stdout=line, stderr="")])
+        runner = FakeRun(
+            [_test_hooks.CommandResult(returncode=0, stdout=line, stderr="", timed_out=False)]
+        )
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -244,7 +251,7 @@ class TestRestartLane:
         mcps.mkdir()
         refused = f"KILL - REFUSED session {TARGET} (graceful): nothing typed: busy right now\n"
         _test_hooks.run = FakeRun(
-            [_test_hooks.CommandResult(returncode=1, stdout=refused, stderr="")]
+            [_test_hooks.CommandResult(returncode=1, stdout=refused, stderr="", timed_out=False)]
         )
         endpoint = FakeQueue(
             [
@@ -308,6 +315,7 @@ class TestRestartLane:
                         "-- was busy at apply time, not idle; untouched\n"
                     ),
                     stderr="",
+                    timed_out=False,
                 )
             ]
         )

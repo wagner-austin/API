@@ -26,7 +26,7 @@ from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, probe, records, remote
-from tests.conftest import FakeRun, failed, ok
+from tests.conftest import FakeRun, failed, ok, timed_out
 
 
 def _row(*, run_id: str = "run-1", node: str = "lavender", outcome: str = "running") -> LedgerEntry:
@@ -80,26 +80,77 @@ def _event(*, run_id: str = "run-1", kind: str = "started") -> FeedEvent:
     )
 
 
+#: A deadline no test command here comes near, so a real command's result
+#: is about the command and never about the clock.
+GENEROUS_SECONDS = 60
+
+
 class TestDefaultHooks:
     def test_run_executes_a_real_command_and_captures_output(self) -> None:
-        result = _test_hooks._default_run([sys.executable, "-c", "print('hello')"])
+        result = _test_hooks._default_run(
+            [sys.executable, "-c", "print('hello')"], timeout_seconds=GENEROUS_SECONDS
+        )
 
         assert result["returncode"] == 0
         assert result["stdout"].strip() == "hello"
+        assert result["timed_out"] is False
 
     def test_run_reports_a_non_zero_status_rather_than_raising(self) -> None:
         """check=False, so the caller decides what a failure means."""
-        result = _test_hooks._default_run([sys.executable, "-c", "raise SystemExit(3)"])
+        result = _test_hooks._default_run(
+            [sys.executable, "-c", "raise SystemExit(3)"], timeout_seconds=GENEROUS_SECONDS
+        )
 
         assert result["returncode"] == 3
+        assert result["timed_out"] is False
 
     def test_run_feeds_stdin_through(self) -> None:
         result = _test_hooks._default_run(
             [sys.executable, "-c", "import sys; print(sys.stdin.read().strip())"],
+            timeout_seconds=GENEROUS_SECONDS,
             stdin_bytes=b"piped",
         )
 
         assert result["stdout"].strip() == "piped"
+
+    def test_run_gives_a_child_no_bytes_a_closed_stdin(self) -> None:
+        """A child that reads stdin sees EOF at once, never this process's
+        own handle: under a scheduled task that handle is what a remote shell
+        waited on forever (board task 35940277, A2)."""
+        result = _test_hooks._default_run(
+            [sys.executable, "-c", "import sys; print(repr(sys.stdin.read()))"],
+            timeout_seconds=GENEROUS_SECONDS,
+        )
+
+        assert result["returncode"] == 0
+        assert result["stdout"].strip() == "''"
+
+    def test_run_ends_a_command_at_its_deadline_and_says_so(self) -> None:
+        """A real child that would sleep a minute is ended after one second
+        and reported as timed out, its stderr carrying the elapsed bound so
+        a caller that prints only stderr still says why it stopped."""
+        result = _test_hooks._default_run(
+            [
+                sys.executable,
+                "-c",
+                "import sys, time; sys.stderr.write('still working'); "
+                "sys.stderr.flush(); time.sleep(60)",
+            ],
+            timeout_seconds=1,
+        )
+
+        assert result["timed_out"] is True
+        assert result["returncode"] == _test_hooks.TIMED_OUT_RETURNCODE == -1
+        assert result["stderr"].endswith("timed out after 1 s")
+        assert result["stdout"] == ""
+
+    def test_run_at_its_deadline_with_nothing_on_stderr_carries_only_the_bound(self) -> None:
+        result = _test_hooks._default_run(
+            [sys.executable, "-c", "import time; time.sleep(60)"], timeout_seconds=1
+        )
+
+        assert result["timed_out"] is True
+        assert result["stderr"] == "timed out after 1 s"
 
     def test_run_withholds_named_variables_and_passes_every_other_one(self) -> None:
         """A real child, asked which of two variables it can see.
@@ -114,8 +165,10 @@ class TestDefaultHooks:
             "-c",
             "import os; print('PATH' in os.environ, len(os.environ) > 1)",
         ]
-        withheld = _test_hooks._default_run(probe, unset_env=("PATH",))
-        inherited = _test_hooks._default_run(probe)
+        withheld = _test_hooks._default_run(
+            probe, timeout_seconds=GENEROUS_SECONDS, unset_env=("PATH",)
+        )
+        inherited = _test_hooks._default_run(probe, timeout_seconds=GENEROUS_SECONDS)
 
         assert withheld["returncode"] == 0
         assert withheld["stdout"].split() == ["False", "True"]
@@ -277,6 +330,38 @@ class TestRemote:
         assert runner.calls[0][0] == "ssh"
         assert "BatchMode=yes" in runner.calls[0]
         assert runner.calls[0][-2:] == ("echo", "hi")
+
+    def test_every_ssh_carries_the_keepalive_and_a_deadline(self) -> None:
+        """The two bounds a dead or silent peer cannot escape (board tasks
+        35940277 and 41ac6ed2): ssh's own keepalive for a peer that went
+        away, and the seam's deadline for one that answers and never
+        finishes. Both the run and the send carry them."""
+        runner = FakeRun([ok(""), ok("")])
+        _test_hooks.run = runner
+
+        remote.run_ssh("pendragon", ("hostname",))
+        remote.send_script("pendragon", "C:/tmp/probe.ps1", "Get-Date", platform="windows")
+
+        for call in runner.calls:
+            # Every `-o Key=Value` pair the invocation carries, by key.
+            settings = [call[index + 1] for index, word in enumerate(call) if word == "-o"]
+            options = dict(setting.split("=", 1) for setting in settings)
+            assert options["ServerAliveInterval"] == "15"
+            assert options["ServerAliveCountMax"] == "4"
+            assert options["ConnectTimeout"] == "10"
+        assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS] * 2 == [120, 120]
+
+    def test_a_peer_that_stops_answering_is_unreachable_with_the_elapsed_seconds(self) -> None:
+        _test_hooks.run = FakeRun([timed_out(120)])
+
+        with pytest.raises(AppError) as excinfo:
+            remote.run_ssh("pendragon", ("powershell", "-File", "observe.ps1"))
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert excinfo.value.message == (
+            "ssh to pendragon timed out while running `powershell -File observe.ps1`: "
+            "timed out after 120 s"
+        )
 
     def test_ssh_failing_to_reach_the_node_is_its_own_code(self) -> None:
         """255 is ssh's own status, and the fix is the tailnet not the work."""

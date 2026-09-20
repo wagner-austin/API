@@ -21,6 +21,11 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.core import _test_hooks, dialect, dialect_windows, manifest, staging
 from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
 
+#: The deadline for the real tar calls these tests make over a tiny tree:
+#: no listing here comes near it, so a result is about the archive and
+#: never about the clock.
+TAR_LISTING_SECONDS = 60
+
 
 class TestArchive:
     def test_it_builds_a_real_archive_and_excludes_the_venv(
@@ -41,7 +46,9 @@ class TestArchive:
         # node is asked to match would be of something else.
         assert payload[:2] == b"\x1f\x8b"
         assert payload == destination.read_bytes()
-        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        listing = _test_hooks.run(
+            ["tar", "-tzf", str(destination)], timeout_seconds=TAR_LISTING_SECONDS
+        )["stdout"]
         assert "Makefile" in listing
         assert ".venv" not in listing
 
@@ -60,7 +67,9 @@ class TestArchive:
 
         staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
 
-        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        listing = _test_hooks.run(
+            ["tar", "-tzf", str(destination)], timeout_seconds=TAR_LISTING_SECONDS
+        )["stdout"]
         assert "registry.json" in listing
 
     def test_the_dependency_a_lockfile_resolves_against_is_inside(
@@ -77,7 +86,9 @@ class TestArchive:
 
         staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
 
-        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        listing = _test_hooks.run(
+            ["tar", "-tzf", str(destination)], timeout_seconds=TAR_LISTING_SECONDS
+        )["stdout"]
         assert f"{DEMO_DEPENDENCY}/pyproject.toml" in listing
 
     def test_the_shared_launcher_directory_is_inside(
@@ -88,7 +99,9 @@ class TestArchive:
 
         staging.archive(repo, manifest.build_tree(repo, DEMO_PROJECT), destination)
 
-        listing = _test_hooks.run(["tar", "-tzf", str(destination)])["stdout"]
+        listing = _test_hooks.run(
+            ["tar", "-tzf", str(destination)], timeout_seconds=TAR_LISTING_SECONDS
+        )["stdout"]
         for path in manifest.SHARED_PATHS:
             assert path in listing
 
@@ -105,7 +118,10 @@ class TestArchive:
         unpacked = tmp_path / "unpacked"
         unpacked.mkdir()
 
-        _test_hooks.run(["tar", "-xzmf", str(destination), "-C", str(unpacked)])
+        _test_hooks.run(
+            ["tar", "-xzmf", str(destination), "-C", str(unpacked)],
+            timeout_seconds=TAR_LISTING_SECONDS,
+        )
 
         declared = (unpacked / DEMO_PROJECT / "pyproject.toml").read_text(encoding="utf-8")
         assert 'path = "../base"' in declared

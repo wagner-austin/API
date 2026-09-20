@@ -12,11 +12,24 @@ question about the current time. A test that could not control the clock could
 only assert that an unexpired lease is unexpired, which is the case that never
 breaks. Controlling it is how the expiry boundary gets tested at all.
 
-NOTHING HERE CATCHES. ``subprocess.run`` is called with ``check=False`` and
-the return code is inspected explicitly, so a remote failure becomes a typed
-:class:`~platform_core.errors.AppError` at the call site that knows what the
-command was for, rather than a ``CalledProcessError`` caught and re-raised
-somewhere that does not.
+NOTHING HERE CATCHES, WITH ONE NAMED EXCEPTION. ``subprocess.run`` is called
+with ``check=False`` and the return code is inspected explicitly, so a
+remote failure becomes a typed :class:`~platform_core.errors.AppError` at
+the call site that knows what the command was for, rather than a
+``CalledProcessError`` caught and re-raised somewhere that does not. The
+exception is the deadline: ``subprocess`` reports an expired ``timeout``
+only by raising ``TimeoutExpired``, so :func:`_default_run` converts that
+one report into the result's own ``timed_out`` field at the boundary and
+returns it. Nothing is retried, softened or defaulted; the caller reads
+``timed_out`` exactly as it reads ``returncode``.
+
+EVERY COMMAND CARRIES A DEADLINE, AND THE PARAMETER HAS NO DEFAULT. Measured
+2026-09-17 11:15Z (board tasks 35940277 and 41ac6ed2): one ssh whose peer
+went away mid-command sat in ESTABLISHED for three days, the tick around it
+never exited, the scheduled task's IgnoreNew refused every later tick, and
+the dispatch queue drained nothing until the task's 72-hour execution limit
+ended the parent. A default would be the value a caller reaches for without
+deciding, which is how that ssh had none.
 """
 
 from __future__ import annotations
@@ -54,20 +67,33 @@ class EnvProtocol(Protocol):
         ...
 
 
+#: The ``returncode`` a result carries when the command was ended for
+#: outliving its deadline. Negative, so no caller reading ``returncode != 0``
+#: as failure can mistake it for success, and distinct from every status a
+#: process can exit with on its own; the fact itself is ``timed_out``.
+TIMED_OUT_RETURNCODE = -1
+
+
 class CommandResult(TypedDict):
     """What running a command produced.
 
     Attributes:
-        returncode: Process exit status.
+        returncode: Process exit status, or :const:`TIMED_OUT_RETURNCODE`
+            when the command was ended at its deadline.
         stdout: Standard output, decoded as UTF-8.
         stderr: Standard error, decoded as UTF-8. Carried because ssh puts
             the reason for a refusal here, and a failure that discards it
-            sends the reader to the node to rediscover what happened.
+            sends the reader to the node to rediscover what happened. For a
+            command ended at its deadline it ends with ``timed out after
+            <n> s``, so a caller that only prints stderr still says so.
+        timed_out: True when the command was ended for outliving its
+            ``timeout_seconds``; the streams then hold what it had produced.
     """
 
     returncode: int
     stdout: str
     stderr: str
+    timed_out: bool
 
 
 class RunProtocol(Protocol):
@@ -77,6 +103,7 @@ class RunProtocol(Protocol):
         self,
         argv: Sequence[str],
         *,
+        timeout_seconds: int,
         stdin_bytes: bytes | None = None,
         unset_env: Sequence[str] = (),
     ) -> CommandResult:
@@ -86,8 +113,14 @@ class RunProtocol(Protocol):
             argv: Executable and arguments. Never a shell string: a project
                 path or a node name is arbitrary text, and shell
                 interpretation of it would be a defect rather than a feature.
+            timeout_seconds: The deadline. A command still running when it
+                passes is ended and reported with ``timed_out`` set; the
+                caller names the value because only it knows what the
+                command is for. Required, so a call cannot omit the decision.
             stdin_bytes: Bytes to write to the process's standard input, or
-                None to provide none.
+                None to give the child a closed stdin (``DEVNULL``) rather
+                than this process's own, which under a scheduled task is a
+                handle a remote shell can wait on forever.
             unset_env: Names of environment variables the child must NOT
                 inherit; every other variable of this process reaches it
                 unchanged. Measured 2026-09-17: the agent itself runs under
@@ -265,9 +298,25 @@ class WriteTextProtocol(Protocol):
         """
 
 
+def _decode_captured(captured: bytes | None) -> str:
+    """Decode one captured stream.
+
+    Args:
+        captured: The bytes, or None when the process was ended before the
+            stream was collected, which ``TimeoutExpired`` reports that way.
+
+    Returns:
+        The text, decoded as UTF-8 with undecodable bytes replaced -- a
+        mangled character in a diagnostic is better than losing the
+        diagnostic -- and empty for None.
+    """
+    return "" if captured is None else captured.decode("utf-8", errors="replace")
+
+
 def _default_run(
     argv: Sequence[str],
     *,
+    timeout_seconds: int,
     stdin_bytes: bytes | None = None,
     unset_env: Sequence[str] = (),
 ) -> CommandResult:
@@ -275,30 +324,50 @@ def _default_run(
 
     Args:
         argv: Executable and arguments.
-        stdin_bytes: Bytes for standard input, or None.
+        timeout_seconds: The deadline; the child is killed when it passes.
+        stdin_bytes: Bytes for standard input, or None for a closed stdin.
         unset_env: Variable names withheld from the child's environment.
 
     Returns:
-        The command's exit status and captured streams, decoded as UTF-8 with
-        undecodable bytes replaced -- a mangled character in a diagnostic is
-        better than losing the diagnostic.
+        The command's exit status and captured streams, decoded through
+        :func:`_decode_captured`; or, when the deadline passed first,
+        :const:`TIMED_OUT_RETURNCODE`, whatever the streams held, stderr
+        ending ``timed out after <n> s``, and ``timed_out`` set.
     """
     withheld = frozenset(unset_env)
     # The parent environment comes from the monorepo's one permitted reader
     # (the ``env`` guard bans ``os.environ`` everywhere else); the copy it
     # hands back is filtered here, never mutated.
     parent = config_test_hooks.get_environment()
-    completed = subprocess.run(
-        list(argv),
-        check=False,
-        input=stdin_bytes,
-        capture_output=True,
-        env={name: value for name, value in parent.items() if name not in withheld},
-    )
+    environment = {name: value for name, value in parent.items() if name not in withheld}
+    # The one catch in this package, and it converts rather than recovers:
+    # subprocess has no non-raising way to report a deadline, so its report
+    # becomes the result's own field here, at the boundary, and propagates
+    # as a value the way every other outcome of a command does.
+    try:
+        completed = subprocess.run(
+            list(argv),
+            check=False,
+            input=stdin_bytes,
+            stdin=None if stdin_bytes is not None else subprocess.DEVNULL,
+            capture_output=True,
+            env=environment,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as expired:
+        partial = _decode_captured(expired.stderr).rstrip()
+        note = f"timed out after {timeout_seconds} s"
+        return CommandResult(
+            returncode=TIMED_OUT_RETURNCODE,
+            stdout=_decode_captured(expired.stdout),
+            stderr=note if not partial else f"{partial}\n{note}",
+            timed_out=True,
+        )
     return CommandResult(
         returncode=completed.returncode,
-        stdout=completed.stdout.decode("utf-8", errors="replace"),
-        stderr=completed.stderr.decode("utf-8", errors="replace"),
+        stdout=_decode_captured(completed.stdout),
+        stderr=_decode_captured(completed.stderr),
+        timed_out=False,
     )
 
 

@@ -18,7 +18,7 @@ from platform_core.mcp_client import McpCredentials
 from fleet.core import _test_hooks, dialect_windows, observe, remote
 from fleet.core.registry import RegistryNode
 from tests._queue_fakes import FakeQueue
-from tests.conftest import FakeRun, failed, ok
+from tests.conftest import FakeRun, failed, ok, timed_out
 
 BOARD = McpCredentials(url="http://127.0.0.1:8033/mcp", api_key="k", tenant_id="t")
 IDENTITY: JSONObject = {
@@ -287,6 +287,32 @@ def test_observe_node_reports_an_unreachable_node_as_an_outcome() -> None:
         ),
     )
     assert board.tools == []
+
+
+def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
+    """Board task 41ac6ed2, acceptance 2: the ssh to one node outlives its
+    deadline (the shape of the 2026-09-17 pendragon wedge), the pass reports
+    that node as not observed with the elapsed bound, and still records the
+    node after it instead of holding the tick."""
+    run = FakeRun([timed_out(120), ok(""), ok(document(harness_record()))])
+    _test_hooks.run = run
+    board = FakeQueue(["observed 1 session(s) for win32:serendipity (0 new row(s)) at t"])
+    _test_hooks.http_post = board
+    registry = {
+        "pendragon": node("pendragon", "worker", user="austi"),
+        "serendipity": node("serendipity", "worker"),
+    }
+
+    outcomes = observe.observe_pass(BOARD, registry, IDENTITY)
+
+    assert [observe.render_outcome(o) for o in outcomes] == [
+        "pendragon: not observed -- ssh to pendragon timed out while sending "
+        "C:/Users/austi/.fleet/observe-sessions.ps1: timed out after 120 s",
+        "serendipity: observed 1 session(s) for win32:serendipity (0 new row(s)) at t",
+    ]
+    assert [a["machine"] for a in board.arguments] == ["win32:serendipity"]
+    # Every ssh the pass made carried the deadline that ended the first one.
+    assert run.timeouts == [remote.SSH_TIMEOUT_SECONDS] * 3
 
 
 def test_observe_node_reports_a_node_without_a_provisioned_user() -> None:

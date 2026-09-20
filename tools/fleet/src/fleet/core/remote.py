@@ -99,6 +99,13 @@ def _failure_for(
         The failure, or None when the command succeeded.
     """
     detail = result["stderr"].strip() or "<no stderr>"
+    if result["timed_out"]:
+        # A peer that stopped answering mid-command is the tailnet's fault,
+        # not the work's: the same code as an ssh that never connected.
+        return RemoteFailure(
+            code=FleetErrorCode.NODE_UNREACHABLE,
+            message=f"ssh to {host} timed out while {context}: {detail}",
+        )
     if result["returncode"] == SSH_FAILURE:
         return RemoteFailure(
             code=FleetErrorCode.NODE_UNREACHABLE,
@@ -130,7 +137,33 @@ def _raise_on(failure: RemoteFailure | None) -> None:
 #: ``BatchMode=yes`` makes a missing key fail immediately instead of prompting
 #: for a password no automated caller can answer -- the failure is the point,
 #: because a prompt would hang a dispatch forever.
-SSH_OPTIONS = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+#:
+#: ``ServerAliveInterval`` and ``ServerAliveCountMax`` make ssh notice a peer
+#: that went away AFTER the handshake: ``ConnectTimeout`` bounds only the
+#: connection, and a laptop that sleeps mid-command leaves the TCP session
+#: ESTABLISHED with nothing on either end to say so. Measured 2026-09-17
+#: 11:15Z on pendragon (board tasks 35940277 and 41ac6ed2): one such ssh sat
+#: three days. Four missed probes fifteen seconds apart end it in a minute.
+SSH_OPTIONS = (
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "ServerAliveInterval=15",
+    "-o",
+    "ServerAliveCountMax=4",
+)
+
+#: The deadline every ssh this module runs carries, in seconds.
+#:
+#: The keepalive above ends a DEAD peer; this ends a LIVE one that will not
+#: finish, which the keepalive cannot see. Every command this module sends
+#: is short by construction -- a probe, a file write, a script that lists a
+#: directory or launches a detached run and returns -- so two minutes is
+#: generous for the work and still forty times shorter than the scheduled
+#: tick's old 72-hour ceiling.
+SSH_TIMEOUT_SECONDS = 120
 
 #: ssh's own exit status when it cannot reach the host or the connection dies.
 #:
@@ -152,7 +185,9 @@ def attempt_ssh(host: str, argv: tuple[str, ...]) -> RemoteOutcome:
     Returns:
         The command's standard output, or the reason there is none.
     """
-    result = _test_hooks.run(["ssh", *SSH_OPTIONS, host, *argv])
+    result = _test_hooks.run(
+        ["ssh", *SSH_OPTIONS, host, *argv], timeout_seconds=SSH_TIMEOUT_SECONDS
+    )
     failure = _failure_for(host, f"running `{' '.join(argv)}`", result)
     return RemoteOutcome(output="" if failure is not None else result["stdout"], failure=failure)
 
@@ -205,6 +240,7 @@ def attempt_send(
     """
     result = _test_hooks.run(
         ["ssh", *SSH_OPTIONS, host, dialect.for_platform(platform).write_command(remote_path)],
+        timeout_seconds=SSH_TIMEOUT_SECONDS,
         stdin_bytes=body.encode("utf-8"),
     )
     return _failure_for(host, f"sending {remote_path}", result)
@@ -277,6 +313,7 @@ def run_script(host: str, remote_path: str, body: str, *, platform: NodePlatform
 __all__ = [
     "SSH_FAILURE",
     "SSH_OPTIONS",
+    "SSH_TIMEOUT_SECONDS",
     "RemoteFailure",
     "RemoteOutcome",
     "attempt_script",

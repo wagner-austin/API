@@ -68,7 +68,10 @@ class TestDescribeResult:
     def test_carries_the_exit_code_and_the_combined_output(self) -> None:
         detail = rebuild.describe_result(
             _test_hooks.CommandResult(
-                returncode=2, stdout="Base images rebuilt.\n", stderr="warning: x\n"
+                returncode=2,
+                stdout="Base images rebuilt.\n",
+                stderr="warning: x\n",
+                timed_out=False,
             )
         )
 
@@ -80,7 +83,10 @@ class TestDescribeResult:
         head = "layer export line\n" * 400
         detail = rebuild.describe_result(
             _test_hooks.CommandResult(
-                returncode=1, stdout=head, stderr="make: *** [Makefile:73: build-bases] Error 1"
+                returncode=1,
+                stdout=head,
+                stderr="make: *** [Makefile:73: build-bases] Error 1",
+                timed_out=False,
             )
         )
 
