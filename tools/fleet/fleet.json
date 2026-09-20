@@ -57,10 +57,30 @@
         "max_disk_gb": 40.0
       },
       "enabled": true
+    },
+    "diphtheria": {
+      "host": "diphtheria",
+      "platform": "linux",
+      "stage_root": "/home/corvis/fleet/stage",
+      "logical_cores": 8,
+      "ram_gb": 31.0,
+      "gpu": {
+        "model": "NVIDIA RTX A2000 12GB",
+        "vram_mib": 12282,
+        "compute_capability": "8.6",
+        "driver_version": "595.91.07"
+      },
+      "budget": {
+        "reserved_cores": 4,
+        "reserved_ram_gb": 16.0,
+        "worker_ram_gb": 1.1,
+        "max_concurrent_runs": 1,
+        "max_disk_gb": 40.0
+      },
+      "enabled": true
     }
   },
   "not_dispatchable": {
-    "diphtheria": "Dell OptiPlex 7040 MT on Ubuntu 24.04.5 LTS, re-enrolled 2026-09-19 as user corvis at 100.119.95.50 and reachable from the hub. Measured 2026-09-19 over ssh: 8 logical cores, 31 GB RAM, 851 GB free on /, NVIDIA RTX A2000 12GB (12282 MiB, driver 595.91.07), Docker 29.8.1 with the NVIDIA container toolkit, and the fleet audit's Linux check set passes it (board task 74f52160). It is the dedicated corvis Docker host (board task a62ff32a), so a dispatch budget would have to leave the stack its cores and RAM, and it CANNOT take a dispatch as the dispatcher stands: launch.py sends build.ps1, register.ps1 and a Task Scheduler registration, collect.py polls with collect.ps1, cancel.py stops with stop-<run>.ps1, and all 56 Makefiles in ~/PROJECTS/MCPs that `make check` would run under are SHELL := powershell.exe. Moving this row into `nodes` needs a Linux launch path in the dispatcher (systemd-run or nohup in place of Task Scheduler, sh scripts in place of .ps1) AND shell-portable Makefiles, neither of which exists. This line is the hold, not the verdict.",
     "austinpc": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled in the identity registry because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it.",
     "lapis-lazuli": "An Android phone in Termux. A client of the fleet and never a target: it submits dispatches, it does not run them. Named here rather than left silent because that is a permanent decision, not a machine waiting to be onboarded.",
     "serendipity": "The operator's own Yoga 9 laptop, enrolled 2026-09-12 and reachable from the hub. Held out of dispatch UNTIL the operator says it takes work: it is a machine he uses, and a measured budget (cores, RAM, whether it stays on AC) has not been taken. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict.",
