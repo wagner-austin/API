@@ -168,6 +168,27 @@ jobs:
           echo "uncacheable: $uncacheable"
           echo "uncacheable=$uncacheable" >> "$GITHUB_OUTPUT"
 
+  # THE MAKEFILE GRAMMAR, ON EVERY PUSH, UNDER THE INTERPRETER THAT NEEDS NO
+  # VENV. Every package's `make lint` runs this same check, but a Makefile
+  # edit selects only its own package above, and a recipe that regressed to
+  # PowerShell-only syntax there would pass on this Linux runner only until
+  # the next Windows `make check` in that package. Running the whole-repo
+  # grammar here on every change is what makes the regression impossible to
+  # land. It is the launcher's own `lint-makefiles` command, run the way a
+  # Makefile runs it: the system python3, no poetry, no install.
+  lint-makefiles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Every tracked Makefile is in the portable grammar
+        run: python3 tools/maketools/scripts/run.py lint-makefiles
+
   check:
     needs: discover
     if: needs.discover.outputs.packages != '[]'
@@ -415,22 +436,30 @@ jobs:
           fi
           exit "$fail"
 
-      - name: Guards
-        run: poetry run python -m scripts.guard
+      # grandma-api only: its `make test` runs the web frontend's unit suite
+      # through `make -C web test` (npm run test:unit), which needs the
+      # frontend's node_modules. The lockfile install is what the frontend's
+      # own build does; nothing else in the matrix touches npm.
+      - name: Install the web frontend's dependencies
+        if: matrix.package == 'services/grandma-api'
+        run: npm ci --prefix web
 
-      - name: Lint
-        run: |
-          poetry run ruff check .
-          poetry run ruff format --check .
-
-      # Bare `mypy`, with no paths. Every one of the 43 packages declares
-      # `files = [...]` in its own `[tool.mypy]`, and naming paths here
-      # OVERRIDES that -- which broke libs/cleargbm_rs, whose `src/` is Rust
-      # and which correctly declares `files = ["tests", "scripts"]`. The
-      # package knows what it type-checks; this job should not second-guess it.
-      - name: Types
-        run: poetry run mypy
-
+      # ONE STEP, THE SAME GATE AS LOCALLY. Until 2026-09-20 this job spelled
+      # the four steps of `make check` itself -- guard, ruff, mypy, pytest --
+      # and every one of them drifted from the Makefile in some package: a
+      # bare `mypy` here against `mypy src tests scripts` there, a `-n`
+      # chosen here against a launcher that sweeps and caps threads there.
+      # Every Makefile is now in the portable grammar (scripts/make/shell.mk
+      # picks /bin/sh on a Linux runner) and calls tools/maketools for the
+      # shared work, so the runner runs exactly what a developer runs, and a
+      # gate that only CI knew about cannot exist.
+      #
+      # Two things the old steps carried that `make check` does not, kept
+      # here: the worker cap and the GPU mask. `make lint` also runs `ruff
+      # check --fix` and `ruff format` rather than `--check`, which on a
+      # runner would silently pass unformatted code; the step after this one
+      # is what makes the commit itself the thing under test.
+      #
       # HALF THE BOX PER JOB ON THE SELF-HOSTED POOL, because two runners
       # share one 16-core / 26GB VM and `-n auto` claims all sixteen cores
       # PER JOB. Run 34285840438 measured what 32 torch workers do to that
@@ -463,9 +492,32 @@ jobs:
       # the GPU and convicted the concurrency). The hosted 16GB VM
       # OOM-killed the runner at ~98% AT that 2-worker setting, which is
       # why the answer is 26GB at 2 workers rather than either half alone.
-      - name: Tests
-        run: >
-          ${{ matrix.package == 'services/handwriting-ai' && 'CUDA_VISIBLE_DEVICES=-1' || '' }}
-          poetry run pytest
-          -n ${{ matrix.package == 'services/handwriting-ai' && '2' || (contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer"]'), matrix.package) && '8' || 'auto') }}
-          --cov-branch --cov=src --cov=scripts --cov-report=term-missing
+      #
+      # The cap reaches pytest as PYTEST_XDIST_AUTO_NUM_WORKERS, which is
+      # what `-n auto` (the launcher's spelling) reads, and it is exported
+      # only when set: xdist reads the variable with int(), so an empty
+      # string would be a crash rather than "auto". The GPU mask is exported
+      # the same way, because an EMPTY CUDA_VISIBLE_DEVICES hides every card.
+      - name: make check
+        run: |
+          set -euo pipefail
+          workers='${{ matrix.package == 'services/handwriting-ai' && '2' || (contains(fromJSON('["clients/RustedWarfareBot", "services/Model-Trainer"]'), matrix.package) && '8' || '') }}'
+          if [ -n "$workers" ]; then
+            export PYTEST_XDIST_AUTO_NUM_WORKERS="$workers"
+          fi
+          if [ '${{ matrix.package }}' = 'services/handwriting-ai' ]; then
+            export CUDA_VISIBLE_DEVICES=-1
+          fi
+          make check
+
+      # THE COMMIT IS WHAT IS GATED, NOT THE TREE `make lint` LEFT BEHIND.
+      # `ruff check --fix` and `ruff format` rewrite files in place, so a
+      # commit that was not lint-clean would pass the step above with the
+      # fixes applied on the runner and thrown away. A non-empty diff here is
+      # that commit, and it fails the job the way `ruff format --check` used
+      # to. poetry.lock is excluded because `make lint` runs `poetry lock`,
+      # and a lockfile regenerated by a different poetry release than the one
+      # that wrote it can differ in metadata without meaning anything;
+      # `poetry sync` above already refused a lock that was actually stale.
+      - name: The commit was lint-clean
+        run: git diff --exit-code -- . ':!poetry.lock'

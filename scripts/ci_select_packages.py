@@ -64,7 +64,19 @@ PATH_DEPENDENCY = re.compile(r"""path\s*=\s*["']([^"']+)["']""")
 TORCH_DEPENDENCY = re.compile(r"^\s*torch(?:audio|vision)?\s*=", re.MULTILINE)
 
 #: Changes here can affect any package, so they select all of them.
-GLOBAL_PATHS = ("monorepo-guards.toml", "scripts/", ".github/workflows/packages.yml")
+#:
+#: ``tools/maketools/`` joined the list on 2026-09-20 with the portable
+#: Makefiles: every package's ``lint`` and ``test`` recipe calls that
+#: launcher, so a change to it changes what every ``make check`` does, the
+#: same way ``scripts/`` (now the shell prologue, ``scripts/make/shell.mk``)
+#: always has. It is also a gated package in its own right, which the
+#: owner lookup would select alone; the fan-out is the point.
+GLOBAL_PATHS = (
+    "monorepo-guards.toml",
+    "scripts/",
+    "tools/maketools/",
+    ".github/workflows/packages.yml",
+)
 
 
 def gated_packages(repo: pathlib.Path) -> list[str]:
