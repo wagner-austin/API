@@ -104,6 +104,7 @@ class TestClaim:
             "claimed_by": None,
             "submitted_by": "opus-dispatch-0905",
             "session_id": "11111111-aaaa-4aaa-8aaa-111111111111",
+            "session_target": None,
         }
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0] == {

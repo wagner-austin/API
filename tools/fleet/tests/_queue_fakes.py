@@ -142,6 +142,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "claimedBy": None,
         "submittedBy": "opus-dispatch-0905",
         "sessionId": "11111111-aaaa-4aaa-8aaa-111111111111",
+        "sessionTarget": None,
     }
     row.update(overrides)
     return row

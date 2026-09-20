@@ -88,6 +88,35 @@ class TestDecodeClaim:
         assert job["claimed_by"] == "fleet-runner-austinpc"
         assert job["submitted_by"] == "opus-dispatch-0905"
         assert job["session_id"] == "11111111-aaaa-4aaa-8aaa-111111111111"
+        assert job["session_target"] is None
+
+    def test_a_restart_row_carries_its_target(self) -> None:
+        """The one command with a target (MCPs mig 507); every other row
+        renders it as an explicit null, which the field above proves."""
+        job = claimed_job(
+            answer(
+                {
+                    "claimed": queue_job(
+                        command="restart-session",
+                        project="MCPs",
+                        requestedNode="austinpc",
+                        sessionTarget="934d9975-0d65-4e68-83de-b74f8c4df0c4",
+                    )
+                }
+            )
+        )
+
+        assert job["command"] == "restart-session"
+        assert job["session_target"] == "934d9975-0d65-4e68-83de-b74f8c4df0c4"
+
+    def test_a_missing_target_key_is_a_changed_contract_not_an_absent_target(self) -> None:
+        row = queue_job()
+        del row["sessionTarget"]
+        with pytest.raises(AppError) as raised:
+            decode_claim(answer({"claimed": row}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert "'sessionTarget' is missing" in raised.value.message
 
     def test_the_submitter_is_carried_because_the_ledger_row_needs_it(self) -> None:
         """A dispatch whose provenance was the RUNNER's label would record
@@ -240,3 +269,24 @@ class TestRendering:
 
     def test_a_queued_job_that_named_no_node_says_so(self) -> None:
         assert "@any node" in encode_job_line(claimed_job(answer({"claimed": queue_job()})))
+
+    def test_a_restart_names_its_session_rather_than_a_make_target(self) -> None:
+        """'make restart-session MCPs' would send the reader to a Makefile
+        for a rule they will not find."""
+        line = encode_job_line(
+            claimed_job(
+                answer(
+                    {
+                        "claimed": queue_job(
+                            command="restart-session",
+                            project="MCPs",
+                            requestedNode="austinpc",
+                            sessionTarget="934d9975-0d65-4e68-83de-b74f8c4df0c4",
+                        )
+                    }
+                )
+            )
+        )
+
+        assert "restart session 934d9975-0d65-4e68-83de-b74f8c4df0c4 @austinpc" in line
+        assert "make" not in line

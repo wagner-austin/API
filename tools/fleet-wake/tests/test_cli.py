@@ -28,6 +28,7 @@ def _write_workspace(tmp_path: pathlib.Path) -> str:
         "nodes": {
             "lavender": {
                 "host": "lavender",
+                "platform": "windows",
                 "stage_root": "C:/fleet/stage",
                 "logical_cores": 16,
                 "ram_gb": 32.0,
