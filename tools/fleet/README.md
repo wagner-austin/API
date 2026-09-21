@@ -32,11 +32,14 @@ structural — a shared mutable environment with no lock — not a rogue killer.
 ## The three files
 
 ```
-fleet.json        the workspace: where the nodes are, what each project costs
+fleet.json        the workspace: where the nodes are, what each project costs,
+                  and where each project's commits come from (source)
 runs/
   ledger.jsonl    append-only; every dispatch ever made from this machine
   feed.jsonl      append-only; the event stream subscribers tail
   leases.json     live state; who holds which project's environment
+  mirrors/        one bare git mirror per sourced project; the node runners
+                  fetch a submitted sha into it and archive it from there
 ```
 
 **`fleet.json` is tracked and the three records are not**, because they are
@@ -64,8 +67,10 @@ fleet-collect   --config fleet.json --run <run-id>
 fleet-watch     --config fleet.json                 # the event stream
 fleet-watch     --config fleet.json --run <run-id>
 fleet-cancel    --config fleet.json --run <run-id>
-fleet-agent     --config fleet.json \               # one tick of the queue runner
+fleet-agent     --config fleet.json \               # one tick of the HUB lane's runner
                 --agent <label> --session <uuid> --repo-root <path>
+poetry run python -m fleet.cli.node_agent \         # one tick of ONE node's runner
+                --config fleet.json --node <alias> [--announce]
 ```
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
@@ -114,15 +119,16 @@ the fleet is ever opened and no fleet credential ever lives on an
 internet-facing multi-tenant box. That is the whole reason the queue is
 inverted.
 
-A tick is three passes, in this order:
+**Since MCPs board task fd5cabfa the queue has two lanes and two kinds of
+runner** (the section after this one). `fleet-agent` is the HUB lane's: it
+claims `build-bases` and the four session verbs, runs each on the hub and
+closes it in the same tick. The make targets are the NODE lane's, claimed
+by one `fleet-node-agent` per enabled node. A `fleet-agent` tick is
+therefore two passes, in this order:
 
-1. **collect** — for every job this runner holds that is already running, ask
-   the node whether the suite finished and close it on *both* sides, the local
-   ledger and the queue. First, so a tick that also claims never leaves a
-   finished result unreported for a whole interval.
-2. **claim** — take at most one new job, choose a node with capacity, stage,
-   launch, and report it started.
-3. **observe** — read every enabled worker's Claude Code session records
+1. **claim** — take at most one hub-lane job (`dispatch_claim` with
+   `lane: "hub"` and no tags), run it here, report it started and closed.
+2. **observe** — read every enabled worker's Claude Code session records
    (`~/.claude/sessions/<pid>.json`) over ssh and hand them to the board's
    session ledger through `task_session_observe`, keyed by the machine they
    came from (MCPs board task `5a3865bf`). The script goes out in the
@@ -163,6 +169,99 @@ queue job carries the enqueueing session's label and UUID, and those are what
 **What a runner holds is asked of the queue, never remembered locally.** A
 runner that crashed between launching a suite and writing itself a note would
 otherwise strand a job on a node with nothing left that knows to collect it.
+
+## Two lanes, one runner per node: `fleet-node-agent`
+
+Until 2026-09-21 the queue had ONE runner, the hub's `fleet-agent`, claiming
+the oldest row once per tick whatever it was. Two defects followed from that
+shape and MCPs board task fd5cabfa names them: nine nodes behaved as one slow
+node, because a tick claimed one job and the next tick was three minutes
+away; and a session revive waited behind a queue of checks, because the FIFO
+had one head. Two changes end both.
+
+**The queue is partitioned into lanes** (MCPs migration 532, `packages/db`).
+A row's `command` decides its lane: `build-bases` and the session verbs are
+the `hub` lane, `check`/`lint`/`test` are the `node` lane, and
+`dispatch_claim` takes `lane` and claims only from that one. A revive never
+queues behind a check because no runner ever asks for both at once
+(`test_agent.py` pins the hub claim; `test_node_agent.py` the node claim).
+
+**Every enabled node has a runner of its own, on the hub.** `fleet-node-agent
+--config fleet.json --node <alias>` is one tick for one node
+(`fleet.cli.node_agent`; `scripts/register-node-agents.ps1` registers one
+`API-FleetNode-<alias>-3min` scheduled task per node `fleet.json` enables,
+with exactly the hub task's registration: the operator's account, S4U at
+RunLevel Limited, boot plus a 3-minute repetition, `IgnoreNew`, a 40-minute
+`ExecutionTimeLimit`, one log per node per day under `%LOCALAPPDATA%\Temp\claude`).
+The runners live on the hub and not on the nodes because the hub holds the
+git credentials and the ssh keys, and the tailnet policy lets a
+`tag:corvis-node` open no socket to it. Two checks submitted in one breath
+are claimed by two runners in one tick, which is the measurement A1 asks for
+and the wiki page (`fleet-check-runner`, mcps-codebase) carries.
+
+**A node claims only what its tags admit.** The claim sends the node's
+derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
+a CUDA device) and the queue's `required_tags <@ tags` containment returns
+only jobs the node satisfies. A job's `required_tags` are the project's from
+`fleet.json`; `dispatch_submit` takes them and the runner re-checks them
+against the registry line on claim, refusing `PROJECT_TAGS_MISMATCH` when a
+submitter named fewer than the project needs. The identity registry's
+measured `gpu` column and this workspace's declared `gpu` are reconciled by
+`fleet-nodes --registry` beside `enabled` and `platform`, so the tags the
+runners claim by are the tags the roster agrees on.
+
+**The identity is derived, never configured.** The label is
+`fleet-node-<alias>` and the session id is the version-5 UUID of
+`fleet-node-agent/<alias>`, so every tick of one node's runner is one session
+on the board's ledger and `held_by` finds its own claims across ticks. The
+registration script runs the tick once with `--announce`, which posts the
+check-in that registers that session (MCPs mig 530) and claims nothing.
+
+### What a node-lane job carries: a commit, not a working tree
+
+`dispatch_submit` for a `check`/`lint`/`test` REQUIRES a `sha` (forty hex; the
+queue's `fleet_dispatch_jobs_sha_pin` CHECK refuses a node-lane row without
+one) and the runner exports THAT commit:
+
+1. the project's `source` in `fleet.json` names its `remote`, the `path`
+   inside the repository the recipe runs in, and the `install` steps a clean
+   export needs before `make check` (argv lists under a grammar that admits
+   no shell syntax, rendered into the node's script as spelled);
+2. the sha is fetched from the remote into a bare mirror on the hub
+   (`runs/mirrors/<key with / as ->.git`, `git fetch --no-tags <remote>
+   <sha>`) BEFORE any lease is taken, so a sha the remote has never seen is
+   refused `SHA_NOT_ON_REMOTE` with nothing held, and a project with no
+   `source` is refused `PROJECT_REMOTE_MISSING` by name;
+3. `git archive --format=tar.gz <sha>` is staged through the same verified
+   transport every dispatch uses, so the tree on the node equals the commit
+   by construction;
+4. the build script points npm, poetry and Playwright at the node's caches
+   (`<stage_root>/cache/{npm,pypoetry,ms-playwright}`), runs the install
+   steps at the export root, and `make check` in `path`.
+
+`fleet-run` still dispatches the working tree (its own tarball, no sha) for
+the interactive case; the queue path never does.
+
+### The verdict is posted where the closure can cite it
+
+When the collect pass finds the suite finished it reads the result and the
+last 200 lines of the transcript off the node, composes one line
+(`fleet.core.verdict`) and posts it to the submitting task's thread, or to
+the `fleet` room addressed `@<submitter>` when the job named no task:
+
+```
+FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% log=lavender:C:/fleet/stage/<run>/result.txt.log run=<run>
+```
+
+`banner` is whether `=== ALL CHECKS PASSED ===` appeared; `tests` and
+`coverage` are read from vitest's or pytest-cov's own lines and say `unread`
+when neither printed them. The same line is the job's close `detail` on the
+queue, so a closure may quote it as its check evidence and the manager audit
+resolves it against the `fleet_dispatch_jobs` row it names.
+
+From an MCPs package, `make check-fleet` submits HEAD for the package with
+its tags and prints the job id (`packages/maketools/README.md`); `make check`
+stays local.
 
 ## Subscribing from a Claude session
 
@@ -271,7 +370,8 @@ because the directions call for opposite edits — and exit 1. This is detection
 not prevention: nothing stops somebody editing one file and not the other, it
 stops that going unnoticed.
 
-Four ways they can disagree:
+Six ways they can disagree, and on agreement the command says how many nodes
+it compared (`N node(s) agree with <path> on enabled, platform and gpu`):
 
 | disagreement | what it costs |
 |---|---|
@@ -279,6 +379,13 @@ Four ways they can disagree:
 | disabled here, enabled there | capacity that exists and is not being used |
 | here, and the registry never heard of it | unprovisioned, or renamed on one side |
 | enabled there, unmentioned here | capacity nobody has decided about |
+| platform differs | every script goes out in the wrong dialect; a parse error that reads as the node's fault |
+| gpu declared here, none measured there (or the reverse) | a `gpu` job matched on the declaration runs, or never runs, on the wrong box |
+
+The gpu row compares this file's declared `gpu` (a CUDA device or `null`)
+with the registry's measured column: a CUDA device iff its `probe` is
+`nvidia-smi`; `null`, or an adapter the Win32 video-controller probe found,
+is none.
 
 **The last one is why `fleet.json` has `not_dispatchable`.** A machine that is
 merely *absent* from `nodes` is indistinguishable from one nobody has got round
@@ -453,18 +560,21 @@ naming both platforms is refused at decode: no node is both, and the way to
 say "either" is to name neither.
 
 **`slime` is a project of another repository**, `github.com/wagner-austin/slime`
-(private, the same account as this one), not a path under `--repo-root`, and
-this runner stages a project from that root by its `pyproject.toml`. So today
-`fleet-preflight --project slime --node sedona` answers with a worker count
-(measured 2026-09-21: `slime would run on sedona with 10 worker(s)`), and a
-dispatch would be refused at staging with `PROJECT_MANIFEST_MISSING` naming
-the absent manifest. The fetch-a-sha-from-the-project's-remote export that
-makes it runnable is fleet board task fd5cabfa's A2; the entry is here now so
-`dispatch_submit` knows the project and the tag gate is measured against real
-nodes before that lands. Its `expected_minutes` is the full `make check` w1
-timed on austinpc that night (03:45Z to 03:53Z); its `worker_ram_gb` is an
-estimate for vitest's jsdom workers and should be re-pinned from the first
-fleet run's memory reading.
+(private, the same account as this one), not a path under `--repo-root`, so
+`fleet-run` (which stages the working tree under that root by its
+`pyproject.toml`) refuses it at staging with `PROJECT_MANIFEST_MISSING`. The
+queue path runs it: its `source` names that remote with `path: ""` and the
+two install steps a clean export needs (`npm ci`, then `npx playwright
+install chromium webkit`), and `fleet-node-agent` exports the submitted sha
+from it (fd5cabfa, A2). `fleet-preflight --project slime --node sedona`
+answers with a worker count (measured 2026-09-21: `slime would run on sedona
+with 10 worker(s)`). Its `expected_minutes` is the full `make check` w1 timed
+on austinpc that night (03:45Z to 03:53Z); its `worker_ram_gb` is an estimate
+for vitest's jsdom workers and should be re-pinned from the first fleet run's
+memory reading. The three MCPs packages declared beside it
+(`MCPs/packages/wiki-search`, `MCPs/mcp-shared-py`, `MCPs/packages/maketools`)
+are the same shape: another repository's remote, the package's directory as
+`path`, and the install its checkout needs at the repository root.
 
 ## The staged tree is made a git repository, and that is not decoration
 
@@ -479,8 +589,19 @@ while explicitly tracking the run documents beside them. The same tree with
 passes and `ruff check . --no-respect-gitignore` reports exactly 902 — the
 same number, which identifies the mechanism rather than suggesting it.
 
-So `staging.stage` initialises an empty repository after extracting, and
+So `staging.stage` initialises a repository after extracting, and
 `.gitignore` travels with the tree. Neither is any use without the other.
+
+**The index is filled as well, since the first fleet verdict** (board task
+`fd5cabfa`, 2026-09-21T10:03Z): `MCPs/packages/maketools` on diphtheria read
+`1 failed, 416 passed`, the one failure asserting that `git ls-files
+CLAUDE.md` names the file, which in a repository with an empty index it does
+not. A checkout's suite reads its own tracked set (maketools' `lint-makefiles`
+lints exactly the tracked Makefiles), so the init script runs `git add --all`
+under the tree's own `.gitignore`: an export is the tracked files by
+construction, and a working tree's ignored build output stays out the way it
+does in the checkout. Nothing is committed; no node has a git identity and
+nothing reads a commit.
 
 **The alternative was an `exclude` in the project's own ruff config, and it
 would have been wrong.** The repository already states which paths are build
