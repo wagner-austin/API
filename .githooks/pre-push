@@ -16,17 +16,19 @@
 # nothing was attempting the clean-checkout build. Making the record a side
 # effect of pushing removes the step that was being skipped.
 #
-# WHAT IT COSTS: one process per pushed tip, no network, one appended line.
+# WHAT IT COSTS: one process per pushed tip, one loopback POST inside a
+# session, one appended line.
 #
-# A session becomes addressable by exporting its board label once:
-#
-#   export BOARD_AGENT_LABEL=opus-ci-wake-0909
-#
-# The SAME variable hpc3 already reads when recording a submitter, so one
-# export covers both bridges. Without it the push is still enrolled and its
-# verdict is posted board-level -- a human pushing from a terminal has no
-# board label, and refusing their push would make this a hook people
-# disable.
+# A session is addressed by the label the BOARD bound to it, not by what the
+# shell says (MCPs board task 3843d29f): the enrolment reads
+# CLAUDE_CODE_SESSION_ID, which the harness exports into every shell it
+# spawns, asks task_whereis which label the board bound to that session,
+# fills an unset BOARD_AGENT_LABEL from the answer, and REFUSES the push when
+# the variable names a different label -- the same shape as
+# TASK_IDENTITY_MISMATCH, and the same variable hpc3 resolves when recording
+# a submitter. A human pushing from a terminal has no session id and no
+# board label; their push is still enrolled and its verdict is posted
+# board-level, because refusing it would make this a hook people disable.
 #
 # THE LOGIC IS NOT IN THIS FILE, deliberately, exactly as in `pre-commit`.
 # Everything decidable lives in tools/ci-wake, with its own guards, mypy and
