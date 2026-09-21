@@ -145,7 +145,8 @@ compressed into a line format:
 | `CORVIS_TENANT_ID` | the `tenants` row whose board is posted to |
 | `CI_WAKE_TASK_ID` | the standing task announcements land in |
 | `BOARD_WATCH_URL` | optional; defaults to loopback `:8033` |
-| `BOARD_AGENT_LABEL` | read by `ci-wake-enrol`, **not** by the cycle; the pushing session's board label |
+| `CLAUDE_CODE_SESSION_ID` | read by `ci-wake-enrol`, **not** by the cycle; the harness exports it into every shell, and the enrolment asks `task_whereis` which label the board bound to it (MCPs board task `3843d29f`) |
+| `BOARD_AGENT_LABEL` | read by `ci-wake-enrol`, **not** by the cycle; filled from the board's binding when unset inside a session, and REFUSED (`SESSION_LABEL_MISMATCH`) when it names a label other than that binding; outside a session it is taken as given |
 
 Credentials load through `board_watch.config.load_credentials` — same
 variables, same trimming, same error codes as both sibling bridges. The

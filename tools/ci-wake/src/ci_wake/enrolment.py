@@ -58,6 +58,7 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
+from platform_core.session_label import LABEL_VARIABLE
 from typing_extensions import TypedDict
 
 from ci_wake import _test_hooks
@@ -77,15 +78,6 @@ _AGENT = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 #: Shortest and longest agent label the board accepts.
 _AGENT_LENGTH: Final = (3, 64)
 
-#: Environment variable a session exports to be addressable in announcements.
-#:
-#: The SAME variable ``hpc3`` reads when recording a submitter, so a session
-#: exports one name once and is reachable from both bridges. A second
-#: variable for the second bridge would be a second thing to remember, and
-#: the one that was forgotten would look exactly like a session that had
-#: opted out.
-AGENT_VARIABLE: Final = "BOARD_AGENT_LABEL"
-
 
 class PushAttempt(TypedDict):
     """One ``git push`` observed by a ``pre-push`` hook.
@@ -98,11 +90,13 @@ class PushAttempt(TypedDict):
         ref: The ref being pushed, e.g. ``refs/heads/main``. Recorded but
             never queried on: a run is found by head sha, and the ref is
             here so a person reading the file can see what a stray row was.
-        agent: The pushing session's board label, or the empty string when
-            it exported none. Empty is a first-class case, not a defect: a
-            human pushing from a terminal has no board label, and the
-            announcement for their push is posted board-level rather than
-            addressed to nobody.
+        agent: The pushing session's board label as the board binds it,
+            resolved by :mod:`platform_core.session_label` (MCPs board
+            task 3843d29f), or the empty string when the session has none.
+            Empty is a first-class case, not a defect: a human pushing
+            from a terminal has no board label, and the announcement for
+            their push is posted board-level rather than addressed to
+            nobody.
         attempted_unix: When the hook ran, whole seconds since the epoch.
             The clock the abandonment horizon in :mod:`ci_wake.verdicts` is
             measured from.
@@ -193,8 +187,8 @@ def require_agent(value: str) -> str:
     """Validate a board label, accepting the empty string as "unaddressed".
 
     Args:
-        value: The label the pushing session exported, or the empty string
-            when it exported none.
+        value: The label the pushing session resolved to, or the empty
+            string when it resolved to none.
 
     Returns:
         The value unchanged.
@@ -211,7 +205,7 @@ def require_agent(value: str) -> str:
     low, high = _AGENT_LENGTH
     if _AGENT.match(value) is None or not low <= len(value) <= high:
         raise _refuse(
-            f"${AGENT_VARIABLE}",
+            f"${LABEL_VARIABLE}",
             value,
             f"a kebab-case board label of {low}-{high} characters",
         )
@@ -334,7 +328,6 @@ def append_attempt(path: pathlib.Path, record: PushAttempt) -> None:
 
 
 __all__ = [
-    "AGENT_VARIABLE",
     "PushAttempt",
     "append_attempt",
     "attempt_key",

@@ -300,8 +300,9 @@ def _mention_line(agent: str) -> str:
     """
     if agent == "":
         return (
-            "This push exported no BOARD_AGENT_LABEL, so there is nobody to tag. "
-            "Export it before pushing and the next verdict finds you."
+            "This push exported no BOARD_AGENT_LABEL and its shell had no session "
+            "the board has bound, so there is nobody to tag. A session that has "
+            "posted a checkin is addressed automatically; a terminal exports it."
         )
     return f"@{agent} your push has its CI verdict"
 

@@ -10,14 +10,22 @@ which the answer to "which session is waiting on this sha" exists anywhere,
 which is the whole argument of :mod:`ci_wake.enrolment`.
 
 Environment:
-    BOARD_AGENT_LABEL   the pushing session's board label. OPTIONAL, and its
-        absence is a first-class outcome rather than a failure: a human
-        pushing from a terminal has no board label, and their push is
-        announced board-level instead of addressed to nobody. A session that
-        wants to be woken exports it -- the same variable ``hpc3`` already
-        reads when recording a submitter, so one export covers both bridges.
+    CLAUDE_CODE_SESSION_ID   the acting session's id, exported by the harness
+        into every shell it spawns. When set, the board is asked which label
+        it bound to that session (MCPs board task 3843d29f): an unset
+        BOARD_AGENT_LABEL is filled from the answer, and one naming a
+        different label REFUSES the push, the same shape as the board's
+        TASK_IDENTITY_MISMATCH, because a wrong name enrolled here is a
+        wrong name the bridge @mentions for as long as the push is open.
+    BOARD_AGENT_LABEL   the pushing session's board label. Outside a session
+        (no session id: a human pushing from a terminal) it is taken as
+        given, and its absence is a first-class outcome rather than a
+        failure: that push is announced board-level instead of addressed
+        to nobody. The same variable ``hpc3`` resolves when recording a
+        submitter, so both bridges name the same session the same way.
 
-This command writes one line and exits. It does not reach the network, does
+This command writes one line and exits. Inside a session it reaches the
+taskboard on loopback to ask who the session is, and nothing else; it does
 not consult GitHub, and does not care whether the push it is recording will
 succeed -- see :mod:`ci_wake.enrolment` on why the record names an attempt.
 """
@@ -30,10 +38,10 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.config import _optional_env_str
+from platform_core.session_label import LABEL_VARIABLE, SESSION_ID_VARIABLE, resolve_label
 
 from ci_wake import _test_hooks
 from ci_wake.enrolment import (
-    AGENT_VARIABLE,
     PushAttempt,
     append_attempt,
     require_agent,
@@ -61,23 +69,37 @@ def main(argv: Sequence[str]) -> int:
 
     Raises:
         AppError: ``ENROLMENT_FIELD_MALFORMED`` when the repository, sha or
-            exported agent label cannot address anything.
+            resolved agent label cannot address anything;
+            ``SESSION_LABEL_MISMATCH`` when the shell's label is not the one
+            the board bound to the acting session; ``SESSION_ID_MALFORMED``
+            or ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot
+            be asked, and the :class:`McpClientErrorCode` failures when it
+            does not answer.
         ValueError: A missing or repeated flag.
         OSError: The enrolment record cannot be written.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
-    exported = _optional_env_str(AGENT_VARIABLE)
+    label = resolve_label(
+        session_id=_optional_env_str(SESSION_ID_VARIABLE),
+        exported=_optional_env_str(LABEL_VARIABLE),
+        read_text=_test_hooks.read_text,
+        post=_test_hooks.http_post,
+    )
     record = PushAttempt(
         repo=require_repository(cli_args.require_flag(parsed, REPO_FLAG)),
         sha=require_sha(cli_args.require_flag(parsed, SHA_FLAG)),
         ref=cli_args.require_flag(parsed, REF_FLAG),
-        agent=require_agent("" if exported is None else exported),
+        agent=require_agent(label),
         attempted_unix=_test_hooks.now(),
     )
     append_attempt(pathlib.Path(cli_args.require_flag(parsed, ENROLMENT_FLAG)), record)
     _test_hooks.emit(
         f"ci-wake: enrolled {record['sha'][:7]} in {record['repo']} for "
-        + (f"@{record['agent']}" if record["agent"] != "" else f"nobody (no ${AGENT_VARIABLE})")
+        + (
+            f"@{record['agent']}"
+            if record["agent"] != ""
+            else f"nobody (no ${LABEL_VARIABLE} and no board binding)"
+        )
     )
     return 0
 
