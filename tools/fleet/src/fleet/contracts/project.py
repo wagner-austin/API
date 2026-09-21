@@ -27,6 +27,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.resources import decode_names, encode_names
+from fleet.contracts.tags import NodeTag, decode_required_tags, encode_tags
 
 #: The recipe every dispatch runs. One string, in one place, so a dispatch and
 #: a local build cannot diverge.
@@ -76,6 +77,16 @@ class ProjectConfig(TypedDict):
             The declaration can drift from the code, and that is accepted
             rather than solved: the drift surfaces as a loud remote failure
             naming the missing file, which is how this field was found.
+        required_tags: What a node must carry for this suite to run on it,
+            from :data:`~fleet.contracts.tags.NODE_TAGS`; empty for a suite
+            any reachable node may run, which is every poetry project here.
+            REQUIRED, never defaulted: ``slime`` (MCPs board task 41f45bd7)
+            drives a real scene through Chromium on the machine's GPU with a
+            Windows-only ANGLE backend, and a project that needed that and
+            did not say so would be sent to a CPU-only linux box and time out
+            there in a way that reads as a regression in the change under
+            test. The planner refuses a node missing any of them by name
+            before it weighs memory, and auto-select skips such nodes.
     """
 
     worker_ram_gb: float
@@ -83,6 +94,7 @@ class ProjectConfig(TypedDict):
     expected_minutes: int
     exclusive_resources: tuple[str, ...]
     external_paths: tuple[str, ...]
+    required_tags: tuple[NodeTag, ...]
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -131,6 +143,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "expected_minutes": project["expected_minutes"],
         "exclusive_resources": encode_names(project["exclusive_resources"]),
         "external_paths": encode_names(project["external_paths"]),
+        "required_tags": encode_tags(project["required_tags"]),
     }
 
 
@@ -151,6 +164,8 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             project needing zero workers is not a project; and
             ``expected_minutes`` must be positive because it sizes the lease
             and a zero would produce one that has already expired.
+            ``required_tags`` must be present and is refused as
+            :func:`~fleet.contracts.tags.decode_required_tags` describes.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"project must be a JSON object, got {type(value).__name__}")
@@ -180,6 +195,9 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             value.get("exclusive_resources"), field="project.exclusive_resources"
         ),
         external_paths=decode_names(value.get("external_paths"), field="project.external_paths"),
+        required_tags=decode_required_tags(
+            value.get("required_tags"), field="project.required_tags"
+        ),
     )
 
 
