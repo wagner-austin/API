@@ -57,17 +57,66 @@ SESSION_RECORD: JSONObject = {
 }
 
 
+def _build(
+    *, path: str = DEMO_PROJECT, install: tuple[tuple[str, ...], ...] = (), workers: int = 6
+) -> str:
+    """Render the Windows build script for one run under the fixture's roots.
+
+    Args:
+        path: The recipe's directory inside the export.
+        install: The install steps.
+        workers: The worker count.
+
+    Returns:
+        The script's text.
+    """
+    return DIALECT.build_script(
+        target="C:/s/run-1", path=path, workers=workers, install=install, cache_root="C:/s/cache"
+    )
+
+
 class TestBuildScript:
     def test_it_runs_the_recipe_in_the_project(self) -> None:
-        body = DIALECT.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+        body = _build()
 
         assert f"Set-Location -LiteralPath 'C:/s/run-1/{DEMO_PROJECT}'" in body
-        assert "make check" in body
+        assert "make check *>> 'C:/s/run-1/result.txt.log'" in body
+
+    def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
+        body = _build(path="")
+
+        assert body.count("Set-Location -LiteralPath 'C:/s/run-1'") == 2
 
     def test_it_pins_the_worker_count(self) -> None:
-        body = DIALECT.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+        body = _build()
 
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS = '6'" in body
+
+    def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
+        """A clean export carries no dependencies; the node's cache is where
+        they are restored from, and every run on the node shares it."""
+        body = _build()
+
+        assert "$env:npm_config_cache = 'C:/s/cache/npm'" in body
+        assert "$env:POETRY_CACHE_DIR = 'C:/s/cache/pypoetry'" in body
+        assert "$env:PLAYWRIGHT_BROWSERS_PATH = 'C:/s/cache/ms-playwright'" in body
+
+    def test_install_steps_run_at_the_root_before_the_recipe_and_end_it_when_they_fail(
+        self,
+    ) -> None:
+        body = _build(install=(("npm", "ci"), ("npx", "playwright", "install", "chromium")))
+        lines = body.splitlines()
+
+        root = lines.index("Set-Location -LiteralPath 'C:/s/run-1'")
+        first = lines.index("npm ci *>> 'C:/s/run-1/result.txt.log'")
+        second = lines.index("npx playwright install chromium *>> 'C:/s/run-1/result.txt.log'")
+        recipe = lines.index(f"Set-Location -LiteralPath 'C:/s/run-1/{DEMO_PROJECT}'")
+        assert root < first < second < recipe
+        assert lines[first - 1] == "Write-Output '$ npm ci' *>> 'C:/s/run-1/result.txt.log'"
+        assert lines[first + 1] == (
+            "if ($LASTEXITCODE -ne 0) { $LASTEXITCODE | Set-Content -LiteralPath "
+            "'C:/s/run-1/result.txt'; exit 0 }"
+        )
 
     def test_it_records_the_status_last(self) -> None:
         """The result file's absence is how a run is known to be unfinished.
@@ -75,7 +124,7 @@ class TestBuildScript:
         Written after the recipe, so it can never exist while make is still
         going -- which is what lets `fleet-collect` treat absence as running.
         """
-        body = DIALECT.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+        body = _build()
         lines = [line for line in body.splitlines() if line.strip()]
 
         assert lines[-1].startswith("$LASTEXITCODE")
@@ -84,10 +133,18 @@ class TestBuildScript:
     def test_it_reads_the_exit_code_and_not_the_success_flag(self) -> None:
         """`make` writes to stderr on a passing run; under redirection that
         sets $? false in PS 5.1 while $LASTEXITCODE stays correct."""
-        body = DIALECT.build_script(target="C:/s/run-1", project=DEMO_PROJECT, workers=6)
+        body = _build()
 
         assert "$LASTEXITCODE" in body
         assert "$?" not in body
+
+
+class TestLogTailScript:
+    def test_it_reads_the_last_lines_of_the_transcript_or_nothing(self) -> None:
+        body = DIALECT.log_tail_script("C:/s/run-1", 200)
+
+        assert "if (Test-Path -LiteralPath 'C:/s/run-1/result.txt.log')" in body
+        assert "Get-Content -Tail 200 -LiteralPath 'C:/s/run-1/result.txt.log'" in body
 
 
 class TestLaunchScript:

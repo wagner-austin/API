@@ -68,6 +68,59 @@ TOOLCHAIN_PROBE_STEM = "fleet-toolchain"
 #: The install script, under a node's stage root.
 INSTALL_STEM = "fleet-install"
 
+#: The script the collector runs to read the tail of a build's transcript,
+#: the lines the verdict's counts are parsed from (MCPs board task fd5cabfa,
+#: A3).
+LOG_TAIL_STEM = "log-tail"
+
+#: The directory under a node's stage root that holds the package managers'
+#: caches for every export run on that node: npm's, poetry's and
+#: playwright's, pointed at by the build script's environment. A clean export
+#: has no dependencies of its own; these are where they are restored from,
+#: and they outlive every run directory beside them. Never a run id: run ids
+#: are ``<project>-<epoch>`` and the project grammar cannot spell this name
+#: alone.
+CACHE_DIRECTORY = "cache"
+
+
+def cache_root(stage_root: str) -> str:
+    """Where a node keeps the dependency caches its export runs share.
+
+    Args:
+        stage_root: The node's declared stage root.
+
+    Returns:
+        ``<stage_root>/cache``.
+    """
+    return f"{stage_root}/{CACHE_DIRECTORY}"
+
+
+def log_path(target: str) -> str:
+    """Where a build's transcript is written under its dispatch directory.
+
+    Args:
+        target: The dispatch's absolute remote directory.
+
+    Returns:
+        ``<target>/<RESULT_NAME>.log``, the one spelling the build writes
+        and the collector reads.
+    """
+    return f"{target}/{RESULT_NAME}.log"
+
+
+def recipe_directory(target: str, path: str) -> str:
+    """Where a project's recipe runs inside its export.
+
+    Args:
+        target: The dispatch's absolute remote directory, the export root.
+        path: The project's directory inside its repository, ``""`` for a
+            project that is the repository.
+
+    Returns:
+        ``<target>/<path>``, or ``target`` itself for the root.
+    """
+    return target if path == "" else f"{target}/{path}"
+
 
 def task_name(run_id: str) -> str:
     """Name the scheduled task or transient unit a dispatch owns.
@@ -118,6 +171,7 @@ def stop_stem(run_id: str) -> str:
 __all__ = [
     "ARCHIVE_NAME",
     "BUILD_STEM",
+    "CACHE_DIRECTORY",
     "CAPACITY_PROBE_STEM",
     "COLLECT_STEM",
     "ENCODED_NAME",
@@ -125,10 +179,14 @@ __all__ = [
     "INIT_REPOSITORY_STEM",
     "INSTALL_STEM",
     "LAUNCH_STEM",
+    "LOG_TAIL_STEM",
     "REASSEMBLE_STEM",
     "RESULT_NAME",
     "TOOLCHAIN_PROBE_STEM",
+    "cache_root",
+    "log_path",
     "make_directory_stem",
+    "recipe_directory",
     "stop_stem",
     "task_name",
 ]

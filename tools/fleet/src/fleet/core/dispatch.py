@@ -38,6 +38,9 @@ also fire on the way out of a success.
 from __future__ import annotations
 
 import pathlib
+from typing import Protocol
+
+from typing_extensions import TypedDict
 
 from fleet.contracts.feed import FeedEvent, FeedKind
 from fleet.contracts.lease import Lease
@@ -231,6 +234,110 @@ def emit(
     )
 
 
+class Payload(TypedDict):
+    """The archive a dispatch stages, and how the feed describes it.
+
+    Attributes:
+        data: The gzipped tar's bytes, which the node digests and unpacks.
+        description: What the archive holds, for the ``staged`` feed line:
+            counted, never listed (a working tree carries about forty-six
+            members; an export is one commit).
+    """
+
+    data: bytes
+    description: str
+
+
+class PayloadBuilder(Protocol):
+    """Builds the archive a dispatch stages, once the lease is held.
+
+    A callable rather than bytes, so the lease is taken BEFORE the archive
+    is built whichever tree it comes from: staging into a project another
+    dispatch holds would be pointless work at best.
+    """
+
+    def __call__(self, run_id: str) -> Payload:
+        """Build the archive for one run.
+
+        Args:
+            run_id: The dispatch, which names the scratch file.
+
+        Returns:
+            The archive and its description.
+        """
+        ...
+
+
+class Recipe(TypedDict):
+    """What the node runs once the tree is staged.
+
+    Attributes:
+        path: The project's directory inside the staged tree, ``""`` for the
+            root; the recipe's working directory.
+        install: The steps run at the tree's root before the recipe, each an
+            argv in the source grammar; empty when the recipe installs its
+            own dependencies.
+    """
+
+    path: str
+    install: tuple[tuple[str, ...], ...]
+
+
+def working_tree_payload(
+    project_root: pathlib.Path,
+    *,
+    project: str,
+    plan: ProjectConfig,
+    node_name: str,
+    archive_dir: pathlib.Path,
+) -> PayloadBuilder:
+    """The archive of the hub's working tree, as ``fleet-run`` dispatches it.
+
+    Args:
+        project_root: Absolute path to the monorepo root.
+        project: Repo-relative project path.
+        plan: The project's declaration, for its external paths.
+        node_name: The node's workspace name, part of the scratch file's
+            name.
+        archive_dir: Local directory to build the archive in, which must be
+            run output rather than anywhere a build reads --
+            :attr:`fleet.cli._config.LoadedWorkspace.archives` is where the
+            commands get it. An archive left where a project's tree is staged
+            FROM is carried by the next dispatch.
+
+    Returns:
+        A builder that computes the manifest and tars it when called.
+    """
+
+    def build(run_id: str) -> Payload:
+        members = manifest.build_tree(project_root, project, external=plan["external_paths"])
+        # Named by run AND node. A run id is the project and the second it
+        # started, so two sessions dispatching one project to two nodes in
+        # the same second produce the same id -- and with archives in one
+        # scratch directory rather than one per workspace, that is two
+        # writers on one file. The lease stops them sharing a node, not a
+        # filename.
+        data = staging.archive(project_root, members, archive_dir / f"{run_id}-{node_name}.tgz")
+        return Payload(data=data, description=f"{len(members)} member(s) of the working tree")
+
+    return build
+
+
+def working_tree_recipe(project: str) -> Recipe:
+    """The recipe a working-tree dispatch runs: ``make check`` in the
+    project's own directory, whose key IS its repo-relative path, with no
+    install steps because every poetry project here installs inside its
+    recipe.
+
+    Args:
+        project: Repo-relative project path.
+
+    Returns:
+        The recipe.
+    """
+    return Recipe(path=project, install=())
+
+
 def start(
     loaded_leases: pathlib.Path,
     loaded_ledger: pathlib.Path,
@@ -243,8 +350,8 @@ def start(
     workers: int,
     agent: str,
     session_id: str,
-    project_root: pathlib.Path,
-    archive_dir: pathlib.Path,
+    build_payload: PayloadBuilder,
+    recipe: Recipe,
 ) -> LedgerEntry:
     """Take the lease, stage the tree, launch the suite, and record it.
 
@@ -259,23 +366,20 @@ def start(
         workers: Test workers the capacity check granted.
         agent: Board label of the dispatching session.
         session_id: That session's UUID.
-        project_root: Absolute path to the monorepo root.
-        archive_dir: Local directory to build the archive in, which must be
-            run output rather than anywhere a build reads --
-            :attr:`fleet.cli._config.LoadedWorkspace.archives` is where the
-            commands get it. An archive left where a project's tree is staged
-            FROM is carried by the next dispatch. The file is
-            named after the run, so two concurrent dispatches cannot write
-            one archive over each other.
+        build_payload: Builds the archive once the lease is held:
+            :func:`working_tree_payload` for ``fleet-run``, the export of a
+            commit for the queue's node lane (:mod:`fleet.core.export`).
+        recipe: Where in the tree the recipe runs and what readies it.
 
     Returns:
         The running ledger row.
 
     Raises:
         AppError: With ``LEASE_HELD`` when another dispatch holds this
-            project on this node, ``STAGE_ARCHIVE_UNREADABLE`` or
-            ``STAGE_DIGEST_MISMATCH`` from staging, or ``NODE_UNREACHABLE``
-            or ``DISPATCH_FAILED`` from the transport.
+            project on this node, the builder's own codes
+            (``STAGE_ARCHIVE_UNREADABLE``, ``SHA_NOT_ON_REMOTE``,
+            ``EXPORT_FAILED``), ``STAGE_DIGEST_MISMATCH`` from staging, or
+            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the transport.
     """
     now_unix = _test_hooks.now()
     run_id = run_id_for(project, started_unix=now_unix)
@@ -299,19 +403,13 @@ def start(
         now_unix=now_unix,
     )
 
-    members = manifest.build_tree(project_root, project, external=plan["external_paths"])
-    # Named by run AND node. A run id is the project and the second it
-    # started, so two sessions dispatching one project to two nodes in the
-    # same second produce the same id -- and with archives in one scratch
-    # directory rather than one per workspace, that is two writers on one
-    # file. The lease stops them sharing a node, not a filename.
-    payload = staging.archive(project_root, members, archive_dir / f"{run_id}-{node_name}.tgz")
+    payload = build_payload(run_id)
     target = staging.stage(
         node["host"],
         platform=node["platform"],
         run_id=run_id,
         stage_root=node["stage_root"],
-        payload=payload,
+        payload=payload["data"],
     )
     emit(
         loaded_feed,
@@ -325,7 +423,7 @@ def start(
         # line into two thousand characters. The members are derivable from
         # `fleet.core.manifest`; the feed's job is to say a run reached this
         # step, with enough to spot a stage that carried the wrong amount.
-        detail=f"{len(payload)} bytes in {len(members)} member(s) to {target}",
+        detail=f"{len(payload['data'])} bytes, {payload['description']}, to {target}",
         now_unix=_test_hooks.now(),
     )
 
@@ -333,7 +431,13 @@ def start(
     remote.send_script(
         node["host"],
         spoken.script_path(target, names.BUILD_STEM),
-        spoken.build_script(target=target, project=project, workers=workers),
+        spoken.build_script(
+            target=target,
+            path=recipe["path"],
+            workers=workers,
+            install=recipe["install"],
+            cache_root=names.cache_root(node["stage_root"]),
+        ),
         platform=node["platform"],
     )
     remote.run_script(
@@ -433,6 +537,9 @@ _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
 
 __all__ = [
     "LEASE_SLACK",
+    "Payload",
+    "PayloadBuilder",
+    "Recipe",
     "closed_row",
     "emit",
     "finish",
@@ -440,4 +547,6 @@ __all__ = [
     "run_id_for",
     "start",
     "started_row",
+    "working_tree_payload",
+    "working_tree_recipe",
 ]

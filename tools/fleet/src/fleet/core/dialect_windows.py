@@ -255,28 +255,91 @@ class WindowsDialect:
             f"'{target}/{names.ARCHIVE_NAME}').Hash.ToLower()\n"
         )
 
-    def build_script(self, *, target: str, project: str, workers: int) -> str:
-        """Run the recipe in the project and write its status last.
+    def build_script(
+        self,
+        *,
+        target: str,
+        path: str,
+        workers: int,
+        install: tuple[tuple[str, ...], ...],
+        cache_root: str,
+    ) -> str:
+        """Ready the tree, run the recipe in the project, write its status last.
 
         ``$LASTEXITCODE`` rather than ``$?`` because the recipe is a native
         program: PowerShell sets ``$?`` false whenever a native command writes
         to a redirected stderr, which ``make`` does routinely on a passing run.
 
+        THE CACHES ARE THE NODE'S, NOT THE RUN'S. A clean export carries no
+        ``node_modules``, no ``.venv`` and no browsers, and installing them
+        from the network on every run would make a twelve-minute suite a
+        thirty-minute one. The three package managers each honour one
+        environment variable naming their cache, so the build points all
+        three at ``<stage_root>/cache`` (:func:`fleet.core.names.cache_root`),
+        which every run on the node shares and no run directory contains:
+        the first run fills it and every later run restores from it, which
+        is what "restores dependencies from the node's cache" means here.
+
+        THE INSTALL STEPS RUN AT THE EXPORT ROOT, before the recipe, each
+        appending to the same transcript; the first that exits non-zero ends
+        the build with ITS status in the result file, so a dependency that
+        will not install reads as an install failure in the log and never as
+        the suite's fault. Each token was held to the source grammar at
+        decode (:mod:`fleet.contracts.source`), so it is written bare.
+
         Args:
-            target: Absolute remote directory holding the staged tree.
-            project: Repo-relative project path.
+            target: Absolute remote directory holding the export, its root.
+            path: The project's directory inside the export, ``""`` for the
+                root.
             workers: Test workers the capacity check granted.
+            install: The project's declared install steps, argv each.
+            cache_root: The node's cache directory.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file.
         """
+        log = names.log_path(target)
+        result = f"{target}/{names.RESULT_NAME}"
+        lines = [
+            "$ErrorActionPreference = 'Continue'",
+            f"$env:npm_config_cache = '{cache_root}/npm'",
+            f"$env:POETRY_CACHE_DIR = '{cache_root}/pypoetry'",
+            f"$env:PLAYWRIGHT_BROWSERS_PATH = '{cache_root}/ms-playwright'",
+            f"$env:PYTEST_XDIST_AUTO_NUM_WORKERS = '{workers}'",
+            f"Set-Location -LiteralPath '{target}'",
+        ]
+        for step in install:
+            command = " ".join(step)
+            lines.append(f"Write-Output '$ {command}' *>> '{log}'")
+            lines.append(f"{command} *>> '{log}'")
+            lines.append(
+                f"if ($LASTEXITCODE -ne 0) {{ $LASTEXITCODE | Set-Content -LiteralPath "
+                f"'{result}'; exit 0 }}"
+            )
+        lines.append(f"Set-Location -LiteralPath '{names.recipe_directory(target, path)}'")
+        lines.append(f"make {MAKE_TARGET} *>> '{log}'")
+        lines.append(f"$LASTEXITCODE | Set-Content -LiteralPath '{result}'")
+        return "\n".join(lines) + "\n"
+
+    def log_tail_script(self, target: str, lines: int) -> str:
+        """Print the last lines of the build's transcript, or nothing.
+
+        Args:
+            target: Absolute remote directory holding the export.
+            lines: How many lines from the end.
+
+        Returns:
+            The script's text. An absent transcript prints nothing rather
+            than an error: the collector has already read the result file,
+            so an empty tail is a build that wrote no transcript, and the
+            verdict says so.
+        """
+        log = names.log_path(target)
         return (
-            f"$ErrorActionPreference = 'Continue'\n"
-            f"Set-Location -LiteralPath '{target}/{project}'\n"
-            f"$env:PYTEST_XDIST_AUTO_NUM_WORKERS = '{workers}'\n"
-            f"make {MAKE_TARGET} *> '{target}/{names.RESULT_NAME}.log'\n"
-            f"$LASTEXITCODE | Set-Content -LiteralPath '{target}/{names.RESULT_NAME}'\n"
+            f"if (Test-Path -LiteralPath '{log}') {{\n"
+            f"  Get-Content -Tail {lines} -LiteralPath '{log}'\n"
+            f"}}\n"
         )
 
     def launch_script(self, *, target: str, run_id: str) -> str:

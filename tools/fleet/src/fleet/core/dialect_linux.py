@@ -225,34 +225,78 @@ class LinuxDialect:
             f"sha256sum '{archive}' | cut -d ' ' -f 1\n"
         )
 
-    def build_script(self, *, target: str, project: str, workers: int) -> str:
-        """Run the recipe in the project and write its status last.
+    def build_script(
+        self,
+        *,
+        target: str,
+        path: str,
+        workers: int,
+        install: tuple[tuple[str, ...], ...],
+        cache_root: str,
+    ) -> str:
+        """Ready the tree, run the recipe in the project, write its status last.
 
-        Deliberately NOT under ``set -e`` for the recipe itself: a failing
-        suite is a result to record, not a fault in the script, so ``make``'s
-        status is captured and written rather than ending the script before
-        the write. Everything before it is still fail-fast.
+        Deliberately NOT under ``set -e`` for the install steps or the recipe
+        itself: a failing suite is a result to record, not a fault in the
+        script, so each status is captured and written rather than ending the
+        script before the write. Everything else is still fail-fast. The
+        caches, the install steps and their order are the Windows dialect's,
+        whose docstring carries the why.
 
         Args:
-            target: Absolute remote directory holding the staged tree.
-            project: Repo-relative project path.
+            target: Absolute remote directory holding the export, its root.
+            path: The project's directory inside the export, ``""`` for the
+                root.
             workers: Test workers the capacity check granted.
+            install: The project's declared install steps, argv each.
+            cache_root: The node's cache directory.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file.
         """
+        log = names.log_path(target)
         result = f"{target}/{names.RESULT_NAME}"
-        return (
-            f"{PROLOGUE}cd '{target}/{project}'\n"
-            f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'\n"
-            f"export PYTEST_XDIST_AUTO_NUM_WORKERS\n"
-            f"set +e\n"
-            f"make {MAKE_TARGET} > '{result}.log' 2>&1\n"
-            f"status=$?\n"
-            f"set -e\n"
-            f"printf '%s\\n' \"$status\" > '{result}'\n"
-        )
+        lines = [
+            f"{PROLOGUE}npm_config_cache='{cache_root}/npm'",
+            f"POETRY_CACHE_DIR='{cache_root}/pypoetry'",
+            f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
+            f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
+            "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
+            "PYTEST_XDIST_AUTO_NUM_WORKERS",
+            f"cd '{target}'",
+        ]
+        for step in install:
+            command = " ".join(step)
+            lines.append(f"printf '$ %s\\n' '{command}' >> '{log}'")
+            lines.append("set +e")
+            lines.append(f"{command} >> '{log}' 2>&1")
+            lines.append("status=$?")
+            lines.append("set -e")
+            lines.append(
+                f"if [ \"$status\" -ne 0 ]; then printf '%s\\n' \"$status\" > '{result}'; "
+                f"exit 0; fi"
+            )
+        lines.append(f"cd '{names.recipe_directory(target, path)}'")
+        lines.append("set +e")
+        lines.append(f"make {MAKE_TARGET} >> '{log}' 2>&1")
+        lines.append("status=$?")
+        lines.append("set -e")
+        lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
+        return "\n".join(lines) + "\n"
+
+    def log_tail_script(self, target: str, lines: int) -> str:
+        """Print the last lines of the build's transcript, or nothing.
+
+        Args:
+            target: Absolute remote directory holding the export.
+            lines: How many lines from the end.
+
+        Returns:
+            The script's text; an absent transcript prints nothing.
+        """
+        log = names.log_path(target)
+        return f"{PROLOGUE}if [ -f '{log}' ]; then tail -n {lines} '{log}'; fi\n"
 
     def launch_script(self, *, target: str, run_id: str) -> str:
         """Start the build as a transient user unit, and prove it began.

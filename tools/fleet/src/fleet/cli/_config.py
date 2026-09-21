@@ -19,7 +19,7 @@ from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, export
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
@@ -110,6 +110,21 @@ class LoadedWorkspace:
             left it there.
         """
         return _test_hooks.temp_root() / "fleet-archives"
+
+    @property
+    def mirrors(self) -> pathlib.Path:
+        """Directory holding one bare git mirror per exportable project.
+
+        Beside the ledger under ``runs/``, which the monorepo gitignores,
+        because a mirror is this machine's own cache of what the remotes
+        serve: history, not source, and never staged (the archive is read
+        out of it by ``git archive``, so the mirror itself is not in any
+        tree a dispatch carries).
+
+        Returns:
+            The resolved directory.
+        """
+        return self.ledger.parent / export.MIRRORS_DIRECTORY
 
     @property
     def leases(self) -> pathlib.Path:

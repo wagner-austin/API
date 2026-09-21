@@ -208,6 +208,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     project_root = pathlib.Path(cli_args.require_flag(parsed, ROOT_FLAG)).resolve()
 
     node_name, node, workers = choose(loaded, project=project, named=parsed.get(NODE_FLAG))
+    plan = require_project(loaded.workspace, project)
     row = dispatch.start(
         loaded.leases,
         loaded.ledger,
@@ -215,12 +216,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         node_name=node_name,
         node=node,
         project=project,
-        plan=require_project(loaded.workspace, project),
+        plan=plan,
         workers=workers,
         agent=agent,
         session_id=session_id,
-        project_root=project_root,
-        archive_dir=loaded.archives,
+        build_payload=dispatch.working_tree_payload(
+            project_root,
+            project=project,
+            plan=plan,
+            node_name=node_name,
+            archive_dir=loaded.archives,
+        ),
+        recipe=dispatch.working_tree_recipe(project),
     )
 
     _log.info(

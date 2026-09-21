@@ -141,17 +141,43 @@ class Dialect(Protocol):
         """
         ...
 
-    def build_script(self, *, target: str, project: str, workers: int) -> str:
-        """The script that runs the suite and records its status last.
+    def build_script(
+        self,
+        *,
+        target: str,
+        path: str,
+        workers: int,
+        install: tuple[tuple[str, ...], ...],
+        cache_root: str,
+    ) -> str:
+        """The script that readies the tree, runs the suite and records its
+        status last.
 
         Args:
-            target: Absolute remote directory holding the staged tree.
-            project: Repo-relative project path.
+            target: Absolute remote directory holding the staged tree, its
+                root.
+            path: The project's directory inside it, ``""`` for the root.
             workers: Test workers the capacity check granted.
+            install: The project's declared install steps, run at the root
+                before the recipe, each an argv in the source grammar.
+            cache_root: The node's cache directory, which the package
+                managers are pointed at.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
             to the result file, so the file's absence means running.
+        """
+        ...
+
+    def log_tail_script(self, target: str, lines: int) -> str:
+        """The script that prints the end of the build's transcript.
+
+        Args:
+            target: Absolute remote directory holding the staged tree.
+            lines: How many lines from the end.
+
+        Returns:
+            The script's text; an absent transcript prints nothing.
         """
         ...
 
@@ -265,15 +291,28 @@ def init_repository_script(target: str) -> str:
     copy that drifts is the one nobody looks at. Reproducing the environment
     a build is defined against is this package's job, not the project's.
 
+    THE INDEX IS FILLED TOO, since the first fleet verdict (MCPs board task
+    fd5cabfa, 2026-09-21T10:03Z): ``MCPs/packages/maketools`` at 9ee70275
+    on diphtheria read ``1 failed, 416 passed``, the one failure
+    ``test_git_lists_the_tracked_files_matching_a_pattern`` asserting that
+    ``git ls-files CLAUDE.md`` names the file, and in a repository with an
+    empty index it names nothing. A checkout's suite reads its own tracked
+    set (that package's ``lint-makefiles`` lints exactly the tracked
+    Makefiles), so a staged tree whose index is empty is not the tree the
+    suite was written against. ``git add --all`` under the tree's own
+    ``.gitignore`` indexes what a checkout tracks: an export is the tracked
+    files by construction, and a working tree's ignored build output stays
+    out the way it does in the checkout. Nothing is committed: no identity
+    is configured on a node, and nothing here reads a commit.
+
     Args:
         target: Absolute remote directory holding the staged tree.
 
     Returns:
-        The script's text. It initialises an empty repository and commits
-        nothing: the ignore rules are read from the working tree, so the
-        marker is all ruff needs.
+        The script's text: the repository initialised and the tree added to
+        its index.
     """
-    return f"git -C '{target}' init --quiet\n"
+    return f"git -C '{target}' init --quiet\ngit -C '{target}' add --all\n"
 
 
 __all__ = [

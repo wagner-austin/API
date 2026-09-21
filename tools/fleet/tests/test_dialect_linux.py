@@ -99,7 +99,8 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
     scripts = [
         DIALECT.make_directory_script(TARGET),
         DIALECT.reassemble_script(TARGET),
-        DIALECT.build_script(target=TARGET, project=DEMO_PROJECT, workers=4),
+        _build(workers=4),
+        DIALECT.log_tail_script(TARGET, 200),
         DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
         DIALECT.result_script(TARGET),
         DIALECT.stop_script(DEMO_RUN_ID),
@@ -113,25 +114,90 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         assert script.startswith(PROLOGUE)
 
 
+def _build(
+    *, path: str = DEMO_PROJECT, install: tuple[tuple[str, ...], ...] = (), workers: int = 6
+) -> str:
+    """Render the Linux build script for one run under the fixture's roots.
+
+    Args:
+        path: The recipe's directory inside the export.
+        install: The install steps.
+        workers: The worker count.
+
+    Returns:
+        The script's text.
+    """
+    return DIALECT.build_script(
+        target=TARGET, path=path, workers=workers, install=install, cache_root="/s/cache"
+    )
+
+
 class TestBuildScript:
     def test_it_runs_the_recipe_in_the_project_with_the_worker_count(self) -> None:
-        body = DIALECT.build_script(target=TARGET, project=DEMO_PROJECT, workers=6)
+        body = _build()
 
         assert f"cd '{TARGET}/{DEMO_PROJECT}'\n" in body
-        assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\nexport PYTEST_XDIST_AUTO_NUM_WORKERS\n" in body
-        assert f"make check > '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
+        assert "PYTEST_XDIST_AUTO_NUM_WORKERS='6'\n" in body
+        assert (
+            "export npm_config_cache POETRY_CACHE_DIR PLAYWRIGHT_BROWSERS_PATH "
+            "PYTEST_XDIST_AUTO_NUM_WORKERS\n"
+        ) in body
+        assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
+
+    def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
+        body = _build(path="")
+
+        assert body.count(f"cd '{TARGET}'\n") == 2
+
+    def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
+        body = _build()
+
+        assert "npm_config_cache='/s/cache/npm'\n" in body
+        assert "POETRY_CACHE_DIR='/s/cache/pypoetry'\n" in body
+        assert "PLAYWRIGHT_BROWSERS_PATH='/s/cache/ms-playwright'\n" in body
+
+    def test_install_steps_run_at_the_root_before_the_recipe_and_end_it_when_they_fail(
+        self,
+    ) -> None:
+        body = _build(install=(("npm", "ci"), ("npm", "rebuild")))
+        lines = body.splitlines()
+
+        log = f"{TARGET}/{names.RESULT_NAME}.log"
+        root = lines.index(f"cd '{TARGET}'")
+        first = lines.index(f"npm ci >> '{log}' 2>&1")
+        second = lines.index(f"npm rebuild >> '{log}' 2>&1")
+        recipe = lines.index(f"cd '{TARGET}/{DEMO_PROJECT}'")
+        assert root < first < second < recipe
+        assert lines[first - 2] == f"printf '$ %s\\n' 'npm ci' >> '{log}'"
+        assert lines[first - 1] == "set +e"
+        assert lines[first + 1] == "status=$?"
+        assert lines[first + 2] == "set -e"
+        assert lines[first + 3] == (
+            f'if [ "$status" -ne 0 ]; then printf \'%s\\n\' "$status" > '
+            f"'{TARGET}/{names.RESULT_NAME}'; exit 0; fi"
+        )
 
     def test_a_failing_suite_is_recorded_not_fatal(self) -> None:
         """The recipe runs with -e off and its status captured, so a red suite
         still writes the result file; everything around it stays fail-fast."""
-        body = DIALECT.build_script(target=TARGET, project=DEMO_PROJECT, workers=6)
+        body = _build()
         lines = body.splitlines()
 
-        recipe = f"make check > '{TARGET}/{names.RESULT_NAME}.log' 2>&1"
+        recipe = f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1"
         assert lines.index("set +e") < lines.index(recipe)
         assert lines.index(recipe) + 1 == lines.index("status=$?")
         assert lines.index("status=$?") + 1 == lines.index("set -e")
         assert lines[-1] == f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'"
+
+
+class TestLogTailScript:
+    def test_it_reads_the_last_lines_of_the_transcript_or_nothing(self) -> None:
+        body = DIALECT.log_tail_script(TARGET, 200)
+
+        assert body == (
+            f"{PROLOGUE}if [ -f '{TARGET}/{names.RESULT_NAME}.log' ]; then "
+            f"tail -n 200 '{TARGET}/{names.RESULT_NAME}.log'; fi\n"
+        )
 
 
 class TestLaunchScript:

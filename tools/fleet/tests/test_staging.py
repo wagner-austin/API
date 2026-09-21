@@ -235,7 +235,9 @@ class TestStage:
         assert runner.calls[3][-1].endswith(f"{target}/reassemble.sh'")
         assert b"sha256sum" in (runner.stdin[3] or b"")
         assert runner.stdin[5] == f"tar -xzmf '{target}/tree.tgz' -C '{target}'\n".encode()
-        assert runner.stdin[7] == f"git -C '{target}' init --quiet\n".encode()
+        assert runner.stdin[7] == (
+            f"git -C '{target}' init --quiet\ngit -C '{target}' add --all\n".encode()
+        )
         assert not any("powershell" in argument for call in runner.calls for argument in call)
 
     def test_the_staged_tree_becomes_a_git_repository(self) -> None:
