@@ -107,6 +107,7 @@ def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectC
         expected_minutes=expected_minutes,
         exclusive_resources=(),
         external_paths=(),
+        required_tags=(),
     )
 
 
@@ -302,6 +303,21 @@ class TestProject:
         """It sizes the lease; a zero produces one already expired."""
         with pytest.raises(JSONTypeError, match="expected_minutes must be at least 1"):
             decode_project_config({**encode_project_config(_project()), "expected_minutes": 0})
+
+    def test_required_tags_survive_encoding_in_order(self) -> None:
+        encoded = encode_project_config(_project())
+        decoded = decode_project_config({**encoded, "required_tags": ["gpu", "windows"]})
+
+        assert decoded["required_tags"] == ("gpu", "windows")
+        assert encode_project_config(decoded)["required_tags"] == ["gpu", "windows"]
+
+    def test_a_project_without_required_tags_is_refused(self) -> None:
+        """Absent is not empty: a GPU suite that forgot would land on a CPU box."""
+        encoded = encode_project_config(_project())
+        del encoded["required_tags"]
+
+        with pytest.raises(JSONTypeError, match=r"project\.required_tags is required: \[\]"):
+            decode_project_config(encoded)
 
 
 class TestLeaseSeconds:

@@ -66,6 +66,7 @@ def _workspace_document() -> JSONObject:
                 "worker_ram_gb": 1.1,
                 "minimum_workers": 2,
                 "expected_minutes": 5,
+                "required_tags": [],
             }
         },
         "ledger": "ledger.jsonl",

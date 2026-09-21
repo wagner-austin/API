@@ -11,9 +11,18 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, first_fit, plan_dispatch
+
+#: lavender's card as fleet.json declares it, for the nodes that carry one.
+GTX_1630 = NodeGpu(
+    model="NVIDIA GeForce GTX 1630",
+    vram_mib=4096,
+    compute_capability="7.5",
+    driver_version="591.86",
+)
 
 
 def _node(
@@ -24,6 +33,8 @@ def _node(
     reserved_ram_gb: float = 4.0,
     max_concurrent_runs: int = 2,
     max_disk_gb: float = 20.0,
+    platform: NodePlatform = "windows",
+    gpu: NodeGpu | None = None,
 ) -> NodeConfig:
     """Build a node declaration.
 
@@ -34,17 +45,19 @@ def _node(
         reserved_ram_gb: Memory left for the owner.
         max_concurrent_runs: Dispatches allowed at once.
         max_disk_gb: Disk reserved for staged trees.
+        platform: The node's dialect.
+        gpu: Its CUDA device, or None for a CPU-only node.
 
     Returns:
         The node.
     """
     return NodeConfig(
         host=host,
-        platform="windows",
+        platform=platform,
         stage_root="C:/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,
-        gpu=None,
+        gpu=gpu,
         enabled=True,
         budget=NodeBudget(
             reserved_cores=reserved_cores,
@@ -79,12 +92,18 @@ def _state(
     )
 
 
-def _project(*, minimum_workers: int = 4, worker_ram_gb: float = 1.1) -> ProjectConfig:
+def _project(
+    *,
+    minimum_workers: int = 4,
+    worker_ram_gb: float = 1.1,
+    required_tags: tuple[NodeTag, ...] = (),
+) -> ProjectConfig:
     """Build a project declaration.
 
     Args:
         minimum_workers: Fewest workers worth dispatching with.
         worker_ram_gb: Memory one worker of this suite holds.
+        required_tags: What the suite requires of a node.
 
     Returns:
         The project.
@@ -95,6 +114,7 @@ def _project(*, minimum_workers: int = 4, worker_ram_gb: float = 1.1) -> Project
         expected_minutes=5,
         exclusive_resources=(),
         external_paths=(),
+        required_tags=required_tags,
     )
 
 
@@ -137,6 +157,38 @@ class TestAssess:
         assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
         assert "affords 6 worker(s)" in verdict["reason"]
         assert "minimum of 8" in verdict["reason"]
+
+    def test_a_node_missing_a_required_tag_is_refused_before_capacity(self) -> None:
+        """A CPU-only linux box with every byte free is still the wrong machine."""
+        verdict = assess(
+            _node(host="diphtheria", platform="linux"),
+            _state(host="diphtheria"),
+            _project(required_tags=("gpu", "windows")),
+        )
+
+        assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
+        assert verdict["workers"] == 0
+        assert verdict["reason"].startswith("diphtheria lacks gpu, windows: ")
+        assert "requires gpu, windows and this node carries linux" in verdict["reason"]
+        assert "another node, never this one later" in verdict["reason"]
+
+    def test_the_tag_refusal_names_only_the_tags_missing(self) -> None:
+        verdict = assess(
+            _node(host="loki"), _state(host="loki"), _project(required_tags=("windows", "gpu"))
+        )
+
+        assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
+        assert verdict["reason"].startswith("loki lacks gpu: ")
+
+    def test_a_node_carrying_every_required_tag_is_weighed_on_capacity(self) -> None:
+        project = _project(required_tags=("gpu", "windows"))
+
+        assert assess(_node(gpu=GTX_1630), _state(), project)["workers"] == 14
+        full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project)
+        assert full["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+
+    def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
+        assert assess(_node(platform="linux"), _state(), _project())["workers"] == 14
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
         """What a worker costs is a property of the suite, not the machine."""
@@ -209,3 +261,39 @@ class TestFirstFit:
             first_fit((), _project())
 
         assert excinfo.value.code is FleetErrorCode.NODE_MEMORY_EXHAUSTED
+
+    def test_a_fleet_with_no_node_of_the_right_kind_says_so(self) -> None:
+        """Every node refused on its tags: nothing is full, and waiting fixes nothing."""
+        candidates = (
+            ("loki", _node(host="loki"), _state(host="loki")),
+            ("diphtheria", _node(host="diphtheria", platform="linux"), _state(host="diphtheria")),
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            first_fit(candidates, _project(required_tags=("gpu", "windows")))
+
+        assert excinfo.value.code is FleetErrorCode.NODE_LACKS_TAG
+        assert "loki lacks gpu:" in excinfo.value.message
+        assert "diphtheria lacks gpu, windows:" in excinfo.value.message
+
+    def test_one_full_node_of_the_right_kind_keeps_the_capacity_answer(self) -> None:
+        """A tagged node that is merely busy will take the work later, so the reader waits."""
+        candidates = (
+            ("loki", _node(host="loki"), _state(host="loki")),
+            ("lavender", _node(gpu=GTX_1630), _state(free_ram_gb=3.0)),
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            first_fit(candidates, _project(required_tags=("gpu",)))
+
+        assert excinfo.value.code is FleetErrorCode.NODE_MEMORY_EXHAUSTED
+        assert "loki lacks gpu:" in excinfo.value.message
+        assert "somebody is on this machine" in excinfo.value.message
+
+    def test_the_tagged_node_is_chosen_over_a_roomier_untagged_one(self) -> None:
+        candidates = (
+            ("loki", _node(host="loki", cores=32), _state(host="loki", free_ram_gb=60.0)),
+            ("lavender", _node(gpu=GTX_1630), _state()),
+        )
+
+        assert first_fit(candidates, _project(required_tags=("gpu",))) == ("lavender", 14)

@@ -49,6 +49,7 @@ def _plan() -> ProjectConfig:
         expected_minutes=5,
         exclusive_resources=(),
         external_paths=(),
+        required_tags=(),
     )
 
 
