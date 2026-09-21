@@ -7,7 +7,7 @@ import runpy
 import sys
 
 import pytest
-from platform_core.mcp_testing import FakeHttpPost, posted_ok
+from platform_core.mcp_testing import FakeHttpPost, announcing_poster
 
 from lock_wake import _test_hooks
 from lock_wake.cli import wake
@@ -25,7 +25,7 @@ class TestMain:
             + journal_line(ts="2026-09-09T19:28:05.0000000Z", kind="released")
         ).encode("utf-8")
         journal = stage_journal(tmp_path, content)
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
 
         assert wake.main(["--journal", str(journal)]) == 0
         assert read_offset(position_path(journal)) == len(content)

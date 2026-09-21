@@ -23,12 +23,17 @@ import pytest
 from platform_core.error_codes_tooling import BoardWatchErrorCode, CiWakeErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
-from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
+from platform_core.mcp_testing import (
+    FakeHttpPost,
+    announcing_poster,
+    notes_sent,
+    sent_arguments,
+)
 
 from ci_wake import _test_hooks
 from ci_wake.cycle import run_cycle
 from ci_wake.enrolment import PushAttempt, append_attempt, attempt_key
-from ci_wake.identity import IDENTITY
+from ci_wake.identity import HARNESS, IDENTITY, PURPOSE
 from ci_wake.position import position_path, read_announced
 from ci_wake.runs import jobs_argv, runs_argv
 from ci_wake.verdicts import NO_RUN_SECONDS
@@ -178,7 +183,7 @@ class TestNothingToDo:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
         run_cycle(enrolment)
 
         gh = FakeGh({})
@@ -223,14 +228,75 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(total=52, failed=("audit",)),
             }
         )
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
-        assert len(poster.bodies) == 1
+        assert len(notes_sent(poster)) == 1
         assert read_announced(position_path(enrolment)) == {attempt_key(REPO, SHA)}
         assert emitted[-1] == ("cycle: 1 enrolled, 1 outstanding, 1 announced, positions recorded")
+
+    def test_the_first_post_registers_the_bridge_on_the_session_ledger(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """THE OUTAGE OF 2026-09-16 TO 2026-09-21, pinned.
+
+        MCPs mig 514 made the board refuse a write from a session no
+        ledger surface knows. This bridge is exactly such a session, so
+        every tick for five days and fourteen hours died on
+        TASK_SESSION_UNLEDGERED with the traceback going only to
+        runs/cycle.log, and seven red CI runs on 2026-09-21 reached
+        nobody. The checkin that registers it has to come FIRST and has
+        to declare a harness, or the note behind it is refused again.
+        """
+        pin_env(CONFIGURED_ENV)
+        enrolment = tmp_path / "pushes.jsonl"
+        _enrol(enrolment)
+        _test_hooks.run_process = FakeGh(
+            {
+                runs_argv(REPO, SHA): _runs_reply(_run_entry()),
+                jobs_argv(REPO, RUN_ID): _jobs_reply(),
+            }
+        )
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(enrolment)
+
+        checkin = sent_arguments(poster.bodies[0])
+        assert checkin["kind"] == "checkin"
+        assert checkin["harness"] == HARNESS
+        assert checkin["agent"] == IDENTITY["agent"]
+        assert checkin["sessionId"] == IDENTITY["session_id"]
+        assert checkin["cwd"] == IDENTITY["cwd"]
+        # BOARD-LEVEL: a checkin belongs to the room, and one carrying a
+        # taskId would register nothing while looking like it had.
+        assert "taskId" not in checkin
+        assert PURPOSE in str(checkin["body"])
+
+    def test_a_cycle_with_nothing_to_say_registers_nothing(
+        self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
+    ) -> None:
+        """A checkin on every tick would be 480 board posts a day from
+        this bridge alone. The registration rides the announcement, so a
+        quiet tick makes no HTTP call at all -- asserted by scripting a
+        poster with no replies, which raises on the first one."""
+        pin_env(CONFIGURED_ENV)
+        enrolment = tmp_path / "pushes.jsonl"
+        _enrol(enrolment, ago=1)
+        poster = FakeHttpPost([])
+        _test_hooks.http_post = poster
+        _test_hooks.run_process = FakeGh(
+            {
+                runs_argv(REPO, SHA): _runs_reply(),
+                jobs_argv(REPO, RUN_ID): _jobs_reply(),
+            }
+        )
+
+        run_cycle(enrolment)
+
+        assert poster.bodies == []
 
     def test_the_post_carries_the_bridge_identity_and_the_standing_task(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
@@ -247,12 +313,12 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
-        arguments = sent_arguments(poster.bodies[0])
+        arguments = notes_sent(poster)[0]
         assert arguments["taskId"] == TASK_ID
         assert arguments["agent"] == IDENTITY["agent"]
         assert arguments["sessionId"] == IDENTITY["session_id"]
@@ -279,7 +345,7 @@ class TestAVerdictIsAnnounced:
             }
         )
         _test_hooks.run_process = gh
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
 
         run_cycle(enrolment)
 
@@ -301,12 +367,12 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, OTHER_RUN_ID): _jobs_reply(),
             }
         )
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
-        assert len(poster.bodies) == 1
+        assert len(notes_sent(poster)) == 1
         assert read_announced(position_path(enrolment)) == {
             attempt_key(REPO, SHA),
             attempt_key(REPO, OTHER_SHA),
@@ -324,7 +390,7 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
 
         run_cycle(enrolment)
 
@@ -342,7 +408,7 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
 
         run_cycle(enrolment)
 
@@ -360,12 +426,12 @@ class TestSilenceIsAnnounced:
         _enrol(enrolment, ago=NO_RUN_SECONDS + 1)
         gh = FakeGh({runs_argv(REPO, SHA): _runs_reply()})
         _test_hooks.run_process = gh
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
-        assert "NO RUN EVER APPEARED" in str(sent_arguments(poster.bodies[0])["body"])
+        assert "NO RUN EVER APPEARED" in str(notes_sent(poster)[0]["body"])
         assert read_announced(position_path(enrolment)) == {attempt_key(REPO, SHA)}
         assert gh.calls == [runs_argv(REPO, SHA)]
 
@@ -419,7 +485,7 @@ class TestNothingIsCaught:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         def _unwritable(path: pathlib.Path, line: str) -> None:
@@ -430,7 +496,7 @@ class TestNothingIsCaught:
         with pytest.raises(OSError, match="full disk"):
             run_cycle(enrolment)
 
-        assert len(poster.bodies) == 1
+        assert len(notes_sent(poster)) == 1
         _test_hooks.reset_hooks()
         assert read_announced(position_path(enrolment)) == frozenset()
 
@@ -452,11 +518,11 @@ class TestReEnrolment:
             }
         )
         _test_hooks.run_process = gh
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
         assert gh.calls.count(runs_argv(REPO, SHA)) == 1
-        assert "@opus-second-0909" in str(sent_arguments(poster.bodies[0])["body"])
+        assert "@opus-second-0909" in str(notes_sent(poster)[0]["body"])
         assert emitted[-1] == ("cycle: 1 enrolled, 1 outstanding, 1 announced, positions recorded")

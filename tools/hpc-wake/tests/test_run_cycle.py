@@ -7,12 +7,14 @@ suite covers the entry point without posting to the board.
 
 from __future__ import annotations
 
+import datetime
 import pathlib
 import subprocess
 from collections.abc import Generator, Mapping, Sequence
 
 import pytest
 from scripts import _test_hooks, run_cycle
+from scripts.pump_health import HEALTH_FILENAME, PublisherHealth, read_health
 
 
 class _Completed:
@@ -63,6 +65,75 @@ def _runner() -> Generator[_RecordingRunner, None, None]:
     _test_hooks.run_process = fake
     yield fake
     _test_hooks.run_process = subprocess.run
+
+
+class _FrozenClock:
+    """A clock a test can move, standing in for ``_test_hooks.now``."""
+
+    def __init__(self, instant: datetime.datetime) -> None:
+        self.instant = instant
+
+    def __call__(self) -> datetime.datetime:
+        """Return the instant this clock is currently set to.
+
+        Returns:
+            The instant.
+        """
+        return self.instant
+
+
+@pytest.fixture(name="clock")
+def _clock() -> Generator[_FrozenClock, None, None]:
+    """Freeze the tick's clock, and put the real one back afterwards.
+
+    The header stamp and the health record both read it, so a test that
+    asserted either against the wall clock would assert nothing.
+    """
+    frozen = _FrozenClock(datetime.datetime(2026, 9, 21, 20, 43, 15, tzinfo=datetime.UTC))
+    _test_hooks.now = frozen
+    yield frozen
+    _test_hooks.now = _test_hooks._utc_now
+
+
+def _health_path(root: pathlib.Path) -> pathlib.Path:
+    """Where the tick writes its health record.
+
+    Args:
+        root: The staged package root.
+
+    Returns:
+        The record's path.
+    """
+    return root / "runs" / HEALTH_FILENAME
+
+
+def _publisher(root: pathlib.Path, name: str) -> PublisherHealth:
+    """One publisher's row out of the record the tick just wrote.
+
+    Read through the module's own reader rather than by splitting the file
+    here, so a rendering this reader cannot read back fails the test.
+
+    Args:
+        root: The staged package root.
+        name: The publisher's marker.
+
+    Returns:
+        Its entry.
+    """
+    return read_health(_health_path(root))[name]
+
+
+def _written_line(root: pathlib.Path) -> str:
+    """The record's ``written`` field, as the file spells it.
+
+    Args:
+        root: The staged package root.
+
+    Returns:
+        The instant.
+    """
+    lines = _health_path(root).read_text(encoding="utf-8").splitlines()
+    return next(line.split("\t")[1] for line in lines if line.startswith("written\t"))
 
 
 def _staged_root(tmp_path: pathlib.Path, env_body: str) -> pathlib.Path:
@@ -233,6 +304,50 @@ class TestMain:
         kept = log.read_text(encoding="utf-8")
         assert kept.startswith(rotated)
         assert kept.count("== 20") == 2
+
+
+class TestHealthRecord:
+    """Every tick writes ``runs/pump-health.json``, and that file is the
+    only thing outside this machine's scheduler that can tell whether the
+    wake system is publishing. Between 2026-09-16 and 2026-09-21 all three
+    publishers failed on every tick and the only trace was a traceback in
+    cycle.log, which is truncated past 1 MB and had kept 80 minutes of it."""
+
+    def test_a_green_tick_records_every_publisher_as_succeeding(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
+    ) -> None:
+        root = _staged_root(tmp_path, GOOD_ENV)
+
+        run_cycle.main(["--package-root", str(root)])
+
+        assert _written_line(root) == "2026-09-21T20:43:15Z"
+        recorded = read_health(_health_path(root))
+        assert set(recorded) == {"hpc-wake", "ci-wake", "lock-wake"}
+        assert all(entry["consecutive_failures"] == 0 for entry in recorded.values())
+        assert all(entry["last_ok"] == "2026-09-21T20:43:15Z" for entry in recorded.values())
+
+    def test_a_publisher_failing_twice_is_recorded_as_a_streak_of_two(
+        self, tmp_path: pathlib.Path, runner: _RecordingRunner, clock: _FrozenClock
+    ) -> None:
+        """THE OUTAGE'S SHAPE, reproduced: ci-wake refused on consecutive
+        ticks while the pump itself went on running. The streak is what
+        tells a reader this is an outage rather than one bad minute."""
+        runner.results = [
+            _Completed("", "", 0),
+            _Completed("", "TASK_SESSION_UNLEDGERED\n", 1),
+            _Completed("", "", 0),
+        ] * 2
+        root = _staged_root(tmp_path, GOOD_ENV)
+
+        run_cycle.main(["--package-root", str(root)])
+        clock.instant = datetime.datetime(2026, 9, 21, 20, 46, 15, tzinfo=datetime.UTC)
+        run_cycle.main(["--package-root", str(root)])
+
+        failing = _publisher(root, "ci-wake")
+        assert failing["consecutive_failures"] == 2
+        assert failing["exit_code"] == 1
+        assert failing["last_ok"] == ""
+        assert _publisher(root, "lock-wake")["last_ok"] == "2026-09-21T20:46:15Z"
 
 
 class TestPublishers:

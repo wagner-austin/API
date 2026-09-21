@@ -188,6 +188,84 @@ def encode_board_post(identity: BoardIdentity, *, task_id: str, kind: str, body:
     }
 
 
+def encode_board_checkin(identity: BoardIdentity, *, harness: str, purpose: str) -> JSONObject:
+    """Render the one ``task_post`` call that registers a service session.
+
+    BOARD-LEVEL, SO NO ``taskId``: a checkin belongs to the room, not to a
+    thread, and the board treats the pair differently.
+
+    Args:
+        identity: Who is registering.
+        harness: The service's own slug, matching ``^[a-z][a-z0-9-]{1,31}$``
+            -- the ledger records what kind of writer this is (mig 530), and
+            a bridge is not ``claude-code``.
+        purpose: What this service does, in one sentence, for whoever reads
+            the ledger row later.
+
+    Returns:
+        The arguments object, ready for
+        :func:`platform_core.mcp_client.call_mcp_tool`.
+    """
+    return {
+        "room": BOARD_ROOM,
+        "kind": "checkin",
+        "harness": harness,
+        "body": f"{identity['agent']} checking in: {purpose}",
+        "agent": identity["agent"],
+        "sessionId": identity["session_id"],
+        "cwd": identity["cwd"],
+    }
+
+
+def register_service_session(
+    post: McpPostProtocol,
+    credentials: McpCredentials,
+    identity: BoardIdentity,
+    *,
+    harness: str,
+    purpose: str,
+) -> None:
+    """Put this service on the session ledger, before its first announcement.
+
+    THE OUTAGE THIS EXISTS FOR, 2026-09-16 to 2026-09-21. MCPs ``4cc4f155``
+    (mig 514) made the board refuse writes from a session no ledger surface
+    knows, with ``TASK_SESSION_UNLEDGERED``. A service session is exactly
+    such a session: it has no harness hook and no observer, so all three
+    wake bridges stopped posting the moment that migration deployed --
+    hpc-wake, ci-wake and lock-wake, every tick, for five days and fourteen
+    hours, roughly 2,700 refusals whose only trace was a traceback in
+    ``runs/cycle.log``. Seven red CI runs on 2026-09-21 reached nobody
+    because of it, and the session that broke the build pushed three more
+    times without ever being told.
+
+    A checkin is the one write that registers a session, so the bridges make
+    it, exactly as the pcsession observer does before its first halt note
+    (MCPs ``packages/db/src/session-ledger/halts.ts``). Called before the
+    first post of a cycle that HAS something to announce, not on every tick:
+    a checkin per three-minute tick would be 480 posts a day per bridge, and
+    a quiet bridge needs no ledger row.
+
+    Args:
+        post: The caller's HTTP seam, from its own ``_test_hooks``.
+        credentials: Endpoint and both board secrets.
+        identity: Who is registering.
+        harness: The service's own slug.
+        purpose: One sentence naming what this service does.
+
+    Raises:
+        AppError: Through :func:`platform_core.mcp_client.call_mcp_tool`.
+            Nothing is caught: a bridge that swallowed a failed registration
+            would go on to swallow every refused announcement after it, which
+            is the silence this function exists to end.
+    """
+    call_mcp_tool(
+        post,
+        credentials,
+        "task_post",
+        encode_board_checkin(identity, harness=harness, purpose=purpose),
+    )
+
+
 def post_to_task(
     post: McpPostProtocol,
     credentials: McpCredentials,
@@ -234,9 +312,11 @@ def post_to_task(
 __all__ = [
     "BOARD_ROOM",
     "BoardIdentity",
+    "encode_board_checkin",
     "encode_board_post",
     "mint_service_session_id",
     "post_to_task",
+    "register_service_session",
     "require_task_id",
     "service_identity",
 ]

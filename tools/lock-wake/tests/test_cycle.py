@@ -7,11 +7,16 @@ import pathlib
 import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import require_str
-from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
+from platform_core.mcp_testing import (
+    FakeHttpPost,
+    announcing_poster,
+    notes_sent,
+    sent_arguments,
+)
 
 from lock_wake import _test_hooks
 from lock_wake.cycle import run_cycle
-from lock_wake.identity import BRIDGE_AGENT
+from lock_wake.identity import BRIDGE_AGENT, HARNESS, IDENTITY, PURPOSE
 from lock_wake.position import position_path, read_offset, write_offset
 from tests.conftest import CONFIGURED_ENV, TASK_ID, journal_line, pin_env, stage_journal
 
@@ -28,12 +33,15 @@ class TestRunCycle:
     ) -> None:
         pin_env(CONFIGURED_ENV)
         journal = stage_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
-        poster = FakeHttpPost([posted_ok()])
+        poster = announcing_poster()
         _test_hooks.http_post = poster
 
         run_cycle(journal)
 
-        arguments = sent_arguments(poster.bodies[0])
+        # The registering checkin is bodies[0] since 2026-09-21; the
+        # digest is the post behind it. Its own shape is pinned by
+        # TestLedgerRegistration below.
+        arguments = notes_sent(poster)[0]
         assert arguments["taskId"] == TASK_ID
         assert arguments["agent"] == BRIDGE_AGENT
         body = require_str(arguments, "body")
@@ -70,11 +78,11 @@ class TestRunCycle:
         with pytest.raises(AppError):
             run_cycle(journal)
 
-        retry_poster = FakeHttpPost([posted_ok()])
+        retry_poster = announcing_poster()
         _test_hooks.http_post = retry_poster
         run_cycle(journal)
 
-        assert len(retry_poster.bodies) == 1
+        assert len(notes_sent(retry_poster)) == 1
         assert read_offset(position_path(journal)) == len(COMPLETED_HOLD.encode("utf-8"))
 
     def test_a_quiet_journal_posts_nothing_and_says_so(
@@ -120,7 +128,7 @@ class TestRunCycle:
             + journal_line(ts="2026-09-09T19:28:05.0000000Z", kind="released", agent=None)
         ).encode("utf-8")
         journal = stage_journal(tmp_path, content)
-        _test_hooks.http_post = FakeHttpPost([posted_ok()])
+        _test_hooks.http_post = announcing_poster()
 
         run_cycle(journal)
 
@@ -133,3 +141,46 @@ class TestRunCycle:
         with pytest.raises(AppError):
             run_cycle(tmp_path / "never-read.jsonl")
         assert emitted == []
+
+
+class TestLedgerRegistration:
+    """MCPs mig 514 refuses a write from a session no ledger surface knows,
+    and a service session is exactly one. All three wake bridges died on
+    TASK_SESSION_UNLEDGERED from 2026-09-16 to 2026-09-21, every tick, with
+    the traceback going only to runs/cycle.log."""
+
+    def test_the_digest_is_preceded_by_a_registering_checkin(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        pin_env(CONFIGURED_ENV)
+        journal = stage_journal(tmp_path, COMPLETED_HOLD.encode("utf-8"))
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
+
+        run_cycle(journal)
+
+        checkin = sent_arguments(poster.bodies[0])
+        assert checkin["kind"] == "checkin"
+        assert checkin["harness"] == HARNESS
+        assert checkin["agent"] == BRIDGE_AGENT
+        assert checkin["sessionId"] == IDENTITY["session_id"]
+        # Board-level: a checkin carrying a taskId registers nothing while
+        # looking like it had.
+        assert "taskId" not in checkin
+        assert PURPOSE in require_str(checkin, "body")
+
+    def test_a_quiet_journal_registers_nothing(
+        self, tmp_path: pathlib.Path, emitted: list[str]
+    ) -> None:
+        """A checkin per three-minute tick would be 480 board posts a day
+        from this bridge alone, so the registration rides the digest. The
+        poster is scripted with no replies, which raises on the first
+        call."""
+        pin_env(CONFIGURED_ENV)
+        journal = stage_journal(tmp_path, b"")
+        poster = FakeHttpPost([])
+        _test_hooks.http_post = poster
+
+        run_cycle(journal)
+
+        assert poster.bodies == []

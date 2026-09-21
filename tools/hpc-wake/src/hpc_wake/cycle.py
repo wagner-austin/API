@@ -37,11 +37,11 @@ from hpc3.core import ledger
 from hpc3.core.remote import run_remote_batched
 from hpc3.core.status import parse_sacct_output, sacct_commands
 from hpc3.core.triage import closures_for, open_entries
-from platform_core.board import post_to_task
+from platform_core.board import post_to_task, register_service_session
 
 from hpc_wake import _test_hooks, pending
 from hpc_wake.announce import announcements, group_key
-from hpc_wake.identity import IDENTITY, load_task_id
+from hpc_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from hpc_wake.pending import PendingClosure
 from hpc_wake.settling import partition_ripe
 
@@ -154,6 +154,20 @@ def run_cycle(connection: WorkspaceConnection, cluster: ClusterFacts) -> None:
         )
         return
 
+    # THE LEDGER GATE COMES FIRST, and it is why all three bridges went
+    # silent from 2026-09-16 to 2026-09-21: MCPs mig 514 refuses a write
+    # from a session no ledger surface knows, a service session is exactly
+    # one, and every tick since died on TASK_SESSION_UNLEDGERED with the
+    # traceback going only to runs/cycle.log, which nothing reads. Placed
+    # here rather than at the top of the cycle so a quiet tick stays
+    # quiet: by this line there is an announcement to make.
+    register_service_session(
+        _test_hooks.http_post,
+        credentials,
+        IDENTITY,
+        harness=HARNESS,
+        purpose=PURPOSE,
+    )
     for announcement in announcements([record["closure"] for record in ripe], entries_by_id):
         # CALLED DIRECTLY. Until the 2026-09-06 lift this package's board.py
         # held the argument-building and the transport call, and was a real

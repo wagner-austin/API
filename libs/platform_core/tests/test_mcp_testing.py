@@ -26,6 +26,8 @@ from platform_core.json_utils import (
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse, rpc_envelope
 from platform_core.mcp_testing import (
     FakeHttpPost,
+    announcing_poster,
+    notes_sent,
     posted_ok,
     sent_arguments,
     sse_body,
@@ -126,3 +128,56 @@ class TestSentArguments:
     def test_a_body_that_is_not_an_envelope_raises(self) -> None:
         with pytest.raises(Exception, match=r"params"):
             sent_arguments(dump_json_str({"jsonrpc": "2.0"}).encode("utf-8"))
+
+
+def _send(poster: FakeHttpPost, body: bytes) -> None:
+    """Make one call through the fake's real keyword-only signature.
+
+    Args:
+        poster: The fake to call.
+        body: The encoded request body.
+    """
+    poster("http://board.invalid/mcp", headers={}, body=body, timeout_seconds=5)
+
+
+class TestAnnouncingPoster:
+    """Every bridge cycle that announces now posts its registering checkin
+    first (MCPs mig 514), so the scripted reply count is ``notes + 1``.
+    Shared here because all three bridges learned it on the same day."""
+
+    def test_one_note_is_scripted_as_two_replies(self) -> None:
+        poster = announcing_poster()
+
+        _send(poster, b"checkin")
+        _send(poster, b"note")
+
+        with pytest.raises(AssertionError, match="unscripted POST"):
+            _send(poster, b"third")
+
+    def test_the_reply_count_follows_the_announcement_count(self) -> None:
+        poster = announcing_poster(notes=3)
+
+        for _ in range(4):
+            _send(poster, b"x")
+
+        with pytest.raises(AssertionError, match="unscripted POST"):
+            _send(poster, b"fifth")
+
+
+class TestNotesSent:
+    def test_it_drops_the_checkin_and_decodes_the_rest(self) -> None:
+        poster = announcing_poster(notes=2)
+        _send(poster, rpc_envelope("task_post", {"kind": "checkin"}))
+        _send(poster, rpc_envelope("task_post", {"kind": "note", "body": "one"}))
+        _send(poster, rpc_envelope("task_post", {"kind": "note", "body": "two"}))
+
+        assert notes_sent(poster) == [
+            {"kind": "note", "body": "one"},
+            {"kind": "note", "body": "two"},
+        ]
+
+    def test_a_cycle_that_posted_only_its_checkin_has_no_notes(self) -> None:
+        poster = announcing_poster()
+        _send(poster, rpc_envelope("task_post", {"kind": "checkin"}))
+
+        assert notes_sent(poster) == []

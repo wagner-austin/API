@@ -37,6 +37,19 @@ IDENTITY: Final[BoardIdentity] = service_identity(
     agent=BRIDGE_AGENT, service=_SESSION_NAME, cwd=_CWD
 )
 
+#: What kind of writer the ledger records this as (MCPs mig 530).
+#:
+#: The bridge's own name, not ``claude-code``: it has no harness, no
+#: transcript and no machine the observer watches, and a slug borrowed from
+#: something else would put a row on the ledger that no process answers for.
+HARNESS: Final = "ci-wake"
+
+#: One sentence on the ledger row, for whoever reads it months from now.
+PURPOSE: Final = (
+    "the GitHub Actions bridge, which announces each enrolled push's workflow "
+    "verdict on the standing CI task and mentions the session that pushed it."
+)
+
 
 def load_task_id() -> str:
     """Read the standing task's id from the environment.

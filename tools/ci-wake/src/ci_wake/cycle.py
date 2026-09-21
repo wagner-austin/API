@@ -33,12 +33,12 @@ from __future__ import annotations
 import pathlib
 
 from board_watch.config import load_credentials
-from platform_core.board import post_to_task
+from platform_core.board import post_to_task, register_service_session
 
 from ci_wake import _test_hooks
 from ci_wake.announce import PushReport, RunReport, announcements
 from ci_wake.enrolment import PushAttempt, attempt_key, latest_attempts, read_attempts
-from ci_wake.identity import IDENTITY, load_task_id
+from ci_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from ci_wake.position import AnnouncedPush, append_announced, position_path, read_announced
 from ci_wake.runs import decode_jobs, decode_runs, gh_json, jobs_argv, runs_argv
 from ci_wake.verdicts import PushVerdict, classify, is_announceable
@@ -119,6 +119,21 @@ def run_cycle(enrolment: pathlib.Path) -> None:
         _test_hooks.emit(f"{len(outstanding)} push(es) outstanding, none decided yet")
         return
 
+    # THE LEDGER GATE COMES FIRST, and it is why this bridge went silent
+    # from 2026-09-16 to 2026-09-21: MCPs mig 514 refuses a write from a
+    # session no ledger surface knows, a service session is exactly one,
+    # and every tick since died on TASK_SESSION_UNLEDGERED with the
+    # traceback going only to runs/cycle.log, which nothing reads. Placed
+    # here rather than at the top of the cycle so a quiet tick stays
+    # quiet: by this line there is an announcement to make, and before it
+    # there was not.
+    register_service_session(
+        _test_hooks.http_post,
+        credentials,
+        IDENTITY,
+        harness=HARNESS,
+        purpose=PURPOSE,
+    )
     for announcement in announcements(reports):
         post_to_task(
             _test_hooks.http_post,

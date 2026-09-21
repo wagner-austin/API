@@ -160,8 +160,45 @@ class FakeHttpPost:
         return self._replies.pop(0)
 
 
+def announcing_poster(notes: int = 1) -> FakeHttpPost:
+    """A poster scripted for a bridge cycle that HAS something to announce.
+
+    ``notes + 1`` replies, not ``notes``, since 2026-09-21: every bridge
+    registers itself on the session ledger with a checkin before its first
+    announcement, because the board refuses a write from a session no
+    ledger surface knows (MCPs mig 514) and a service session is one.
+    Shared here rather than copied into each bridge's suite, since all
+    three learned the same lesson on the same day.
+
+    Args:
+        notes: How many announcements the cycle will make.
+
+    Returns:
+        The poster.
+    """
+    return FakeHttpPost([posted_ok() for _ in range(notes + 1)])
+
+
+def notes_sent(poster: FakeHttpPost) -> list[JSONObject]:
+    """The announcements a cycle posted, without its registering checkin.
+
+    Named rather than spelled ``bodies[1:]`` at each call site: the offset
+    is the ledger checkin, and an index nobody explained is how a later
+    edit puts an assertion back on the wrong post.
+
+    Args:
+        poster: The cycle's scripted poster.
+
+    Returns:
+        One decoded arguments object per announcement, in order.
+    """
+    return [sent_arguments(body) for body in poster.bodies[1:]]
+
+
 __all__ = [
     "FakeHttpPost",
+    "announcing_poster",
+    "notes_sent",
     "posted_ok",
     "sent_arguments",
     "sse_body",

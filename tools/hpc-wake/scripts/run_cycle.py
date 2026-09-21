@@ -32,7 +32,6 @@ status so the scheduler's task history stays the health record.
 
 from __future__ import annotations
 
-import datetime
 import os
 import pathlib
 import re
@@ -42,7 +41,7 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
-from scripts import _test_hooks
+from scripts import _test_hooks, pump_health
 
 PACKAGE_ROOT_FLAG = "--package-root"
 
@@ -203,8 +202,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if log.exists() and log.stat().st_size > _LOG_LIMIT_BYTES:
         log.unlink()
 
-    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = _test_hooks.now()
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     worst = 0
+    outcomes: list[tuple[str, int]] = []
     with log.open("a", encoding="utf-8") as handle:
         handle.write(f"== {stamp}\n")
         for publisher in PUBLISHERS:
@@ -218,8 +219,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             handle.write(completed.stdout)
             handle.write(completed.stderr)
+            outcomes.append((publisher["name"], completed.returncode))
             if completed.returncode != 0 and worst == 0:
                 worst = completed.returncode
+    # THE HEALTH RECORD IS WRITTEN EVERY TICK, GREEN OR RED, and it is the
+    # only part of this function anything outside the machine's scheduler
+    # can read. The log above is where a five-day outage hid: it is
+    # truncated past 1 MB, so by the time anyone looked for the 2026-09-16
+    # start of it there were 80 minutes of ticks left. See scripts/pump_health.
+    health_path = package_root / "runs" / pump_health.HEALTH_FILENAME
+    pump_health.write_health(
+        health_path,
+        pump_health.next_health(pump_health.read_health(health_path), outcomes, now),
+    )
     return worst
 
 

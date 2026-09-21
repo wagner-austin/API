@@ -36,6 +36,19 @@ IDENTITY: Final[BoardIdentity] = service_identity(
     agent=BRIDGE_AGENT, service=_SESSION_NAME, cwd=_CWD
 )
 
+#: What kind of writer the ledger records this as (MCPs mig 530).
+#:
+#: The bridge's own name, not ``claude-code``: it has no harness, no
+#: transcript and no machine the observer watches, and a slug borrowed from
+#: something else would put a row on the ledger that no process answers for.
+HARNESS: Final = "lock-wake"
+
+#: One sentence on the ledger row, for whoever reads it months from now.
+PURPOSE: Final = (
+    "the fleet-lock bridge, which announces each acquisition and release "
+    "boundary in the lock journal and mentions the session that held it."
+)
+
 
 def load_task_id() -> str:
     """Read the standing task's id from the environment.

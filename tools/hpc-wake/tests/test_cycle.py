@@ -14,11 +14,17 @@ from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, require_str
 from platform_core.mcp_client import McpHttpResponse
-from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments
+from platform_core.mcp_testing import (
+    FakeHttpPost,
+    announcing_poster,
+    notes_sent,
+    sent_arguments,
+)
 
 from hpc_wake import _test_hooks
 from hpc_wake.announce import MARKER
 from hpc_wake.cycle import run_cycle
+from hpc_wake.identity import HARNESS, PURPOSE
 from hpc_wake.pending import PendingClosure, pending_path, read_pending, write_pending
 from hpc_wake.settling import MAX_HOLD_SECONDS, SETTLE_SECONDS
 from tests.conftest import (
@@ -200,7 +206,7 @@ class TestAnnouncingCycles:
         well against the per-job posting this replaced.
         """
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         path = _write_ledger(tmp_path, [_entry("101")])
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
@@ -214,7 +220,10 @@ class TestAnnouncingCycles:
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
-        arguments = sent_arguments(fake_http.bodies[0])
+        # The registering checkin is bodies[0] since 2026-09-21; the
+        # announcement is the post behind it, and TestLedgerRegistration
+        # pins the checkin's own shape.
+        arguments = notes_sent(fake_http)[0]
         # THE IDENTITY BINDING, asserted here since board.py was deleted.
         # That module existed to bind these two constants into the call and
         # was a wrapper doing nothing else; the binding itself is still worth
@@ -226,6 +235,22 @@ class TestAnnouncingCycles:
         assert arguments["cwd"] == "service://hpc-wake"
         assert arguments["taskId"] == TASK_ID
         assert arguments["kind"] == "note"
+
+        # THE LEDGER GATE, and it is why this bridge stopped announcing
+        # anything at all between 2026-09-16 and 2026-09-21: MCPs mig 514
+        # refuses a write from a session no ledger surface knows, which a
+        # service session is, so every tick died on
+        # TASK_SESSION_UNLEDGERED with the traceback going only to
+        # runs/cycle.log. The checkin that registers it comes FIRST, is
+        # board-level, and declares a harness, or the note above it is
+        # refused again.
+        checkin = sent_arguments(fake_http.bodies[0])
+        assert checkin["kind"] == "checkin"
+        assert checkin["harness"] == HARNESS
+        assert checkin["agent"] == "bridge-hpc-wake-0906"
+        assert checkin["sessionId"] == "b6048b2e-2e32-5247-a488-7b4ccc35f2cc"
+        assert "taskId" not in checkin
+        assert PURPOSE in require_str(checkin, "body")
 
         body = require_str(arguments, "body")
         assert body.startswith(f"{MARKER} abl: 1 job(s) ended (COMPLETED x1)")
@@ -290,7 +315,7 @@ class TestAnnouncingCycles:
         task it names; re-announcing the already-closed ones would repeat
         old news on every later cycle that sees the aggregate."""
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         path = _write_ledger(tmp_path, [_entry("555_2"), _entry("555_3")])
         ledger.append_closure(
@@ -308,7 +333,7 @@ class TestAnnouncingCycles:
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
-        body = require_str(sent_arguments(fake_http.bodies[0]), "body")
+        body = require_str(notes_sent(fake_http)[0], "body")
         assert "555_3" in body
         assert "555_2 " not in body
         closed = ledger.read_closures(ledger.closure_path(path))
@@ -324,7 +349,7 @@ class TestAnnouncingCycles:
         moving_clock: MovingClock,
     ) -> None:
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         _write_ledger(tmp_path, [_entry("101", submitter=None)])
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
@@ -333,7 +358,7 @@ class TestAnnouncingCycles:
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
-        body = require_str(sent_arguments(fake_http.bodies[0]), "body")
+        body = require_str(notes_sent(fake_http)[0], "body")
         assert "@" not in body
         assert emitted[1] == "posted abl: no submitter label on record"
 
@@ -360,7 +385,7 @@ class TestSettlingAcrossCycles:
         carrying all six, once the array stops and the group goes quiet.
         """
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         ids = [f"777_{index}" for index in range(6)]
         path = _write_ledger(tmp_path, [_entry(job_id) for job_id in ids])
@@ -382,8 +407,8 @@ class TestSettlingAcrossCycles:
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
-        assert len(fake_http.bodies) == 1
-        body = require_str(sent_arguments(fake_http.bodies[0]), "body")
+        assert len(notes_sent(fake_http)) == 1
+        body = require_str(notes_sent(fake_http)[0], "body")
         assert body.startswith(f"{MARKER} abl: 6 job(s) ended (COMPLETED x6)")
         for job_id in ids:
             assert job_id in body
@@ -406,7 +431,7 @@ class TestSettlingAcrossCycles:
         silence, which is the same bug pointing the other way.
         """
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         ids = [f"888_{index}" for index in range(MAX_HOLD_SECONDS // 180 + 2)]
         _write_ledger(tmp_path, [_entry(job_id) for job_id in ids])
@@ -418,7 +443,7 @@ class TestSettlingAcrossCycles:
                 break
             moving_clock.advance(180)
 
-        assert len(fake_http.bodies) == 1, "the hold ceiling never fired"
+        assert len(notes_sent(fake_http)) == 1, "the hold ceiling never fired"
         held_for = moving_clock.epoch - FROZEN_EPOCH
         assert held_for >= MAX_HOLD_SECONDS
 
@@ -443,7 +468,7 @@ class TestSettlingAcrossCycles:
         is the state the code must survive.
         """
         pin_env(CONFIGURED_ENV)
-        fake_http = FakeHttpPost([posted_ok()])
+        fake_http = announcing_poster()
         _test_hooks.http_post = fake_http
         path = _write_ledger(tmp_path, [_entry("101")])
         fake_run.add("sacct", stdout=_sacct_row("101", "COMPLETED") + "\n")
@@ -451,7 +476,7 @@ class TestSettlingAcrossCycles:
         run_cycle(_connection(tmp_path), HPC3)
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
-        assert len(fake_http.bodies) == 1
+        assert len(notes_sent(fake_http)) == 1
 
         # The crash: closures written, pending never cleared.
         stranded = PendingClosure(
@@ -462,5 +487,5 @@ class TestSettlingAcrossCycles:
         moving_clock.advance(SETTLE_SECONDS)
         run_cycle(_connection(tmp_path), HPC3)
 
-        assert len(fake_http.bodies) == 1, "the ending was announced a second time"
+        assert len(notes_sent(fake_http)) == 1, "the ending was announced a second time"
         assert read_pending(pending_path(path)) == []

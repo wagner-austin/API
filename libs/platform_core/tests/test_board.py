@@ -17,9 +17,11 @@ import pytest
 from platform_core.board import (
     BOARD_ROOM,
     BoardIdentity,
+    encode_board_checkin,
     encode_board_post,
     mint_service_session_id,
     post_to_task,
+    register_service_session,
     require_task_id,
     service_identity,
 )
@@ -142,6 +144,61 @@ class TestEncodeBoardPost:
         arguments = encode_board_post(IDENTITY, task_id=TASK_ID, kind="checkin", body="x")
 
         assert arguments["kind"] == "checkin"
+
+
+class TestEncodeBoardCheckin:
+    """The registering checkin, added 2026-09-21 after the ledger gate (MCPs
+    mig 514) silenced all three wake bridges for five days and fourteen
+    hours with TASK_SESSION_UNLEDGERED on every tick."""
+
+    def test_it_is_board_level_and_declares_a_harness(self) -> None:
+        arguments = encode_board_checkin(IDENTITY, harness="ci-wake", purpose="what it does.")
+
+        assert arguments == {
+            "room": BOARD_ROOM,
+            "kind": "checkin",
+            "harness": "ci-wake",
+            "body": "bridge-example-0906 checking in: what it does.",
+            "agent": "bridge-example-0906",
+            "sessionId": "00000000-0000-5000-8000-000000000000",
+            "cwd": "service://example",
+        }
+
+    def test_it_carries_no_task_id(self) -> None:
+        """A checkin belongs to the room. One carrying a ``taskId`` lands in
+        a thread and registers nothing, while looking exactly like a
+        registration that worked."""
+        arguments = encode_board_checkin(IDENTITY, harness="ci-wake", purpose="x.")
+
+        assert "taskId" not in arguments
+
+
+class TestRegisterServiceSession:
+    def test_the_request_carries_the_credentials_and_the_encoded_checkin(self) -> None:
+        fake = FakeHttpPost([posted_ok()])
+
+        register_service_session(fake, CREDENTIALS, IDENTITY, harness="ci-wake", purpose="x.")
+
+        assert fake.urls == ["http://127.0.0.1:8033/mcp"]
+        assert fake.headers[0]["x-api-key"] == "test-key"
+        assert sent_arguments(fake.bodies[0]) == encode_board_checkin(
+            IDENTITY, harness="ci-wake", purpose="x."
+        )
+
+    def test_a_refused_registration_raises_rather_than_going_on_to_post(self) -> None:
+        """Nothing is caught, and that is the whole lesson of the outage: a
+        bridge that swallowed a refused registration would go on to swallow
+        every refused announcement behind it, which is five days of a wake
+        bridge that looks alive in the scheduler and has published nothing."""
+        fake = FakeHttpPost(
+            [McpHttpResponse(status=401, body="unauthorized", content_type="text/plain")]
+        )
+
+        with pytest.raises(AppError) as caught:
+            register_service_session(fake, CREDENTIALS, IDENTITY, harness="ci-wake", purpose="x.")
+
+        assert caught.value.code is McpClientErrorCode.HTTP_STATUS
+        assert "401" in caught.value.message
 
 
 class TestPostToTask:

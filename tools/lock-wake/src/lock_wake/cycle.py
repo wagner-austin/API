@@ -25,11 +25,11 @@ from __future__ import annotations
 import pathlib
 
 from board_watch.config import load_credentials
-from platform_core.board import post_to_task
+from platform_core.board import post_to_task, register_service_session
 
 from lock_wake import _test_hooks
 from lock_wake.announce import announcement
-from lock_wake.identity import IDENTITY, load_task_id
+from lock_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from lock_wake.journal import read_journal_slice
 from lock_wake.position import position_path, read_offset, write_offset
 
@@ -73,6 +73,19 @@ def run_cycle(journal: pathlib.Path) -> None:
         )
         return
 
+    # THE LEDGER GATE COMES FIRST, and it is why all three bridges went
+    # silent from 2026-09-16 to 2026-09-21: MCPs mig 514 refuses a write
+    # from a session no ledger surface knows, a service session is exactly
+    # one, and every tick since died on TASK_SESSION_UNLEDGERED with the
+    # traceback going only to runs/cycle.log, which nothing reads. Placed
+    # after the quiet returns above so a quiet tick stays quiet.
+    register_service_session(
+        _test_hooks.http_post,
+        credentials,
+        IDENTITY,
+        harness=HARNESS,
+        purpose=PURPOSE,
+    )
     post_to_task(
         _test_hooks.http_post,
         credentials,
