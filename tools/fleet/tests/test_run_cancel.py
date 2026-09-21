@@ -50,6 +50,7 @@ def _plan() -> ProjectConfig:
         exclusive_resources=(),
         external_paths=(),
         required_tags=(),
+        source=None,
     )
 
 

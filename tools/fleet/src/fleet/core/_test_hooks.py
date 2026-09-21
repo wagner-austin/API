@@ -35,6 +35,7 @@ deciding, which is how that ssh had none.
 from __future__ import annotations
 
 import pathlib
+import socket
 import subprocess
 import tempfile
 import time
@@ -262,6 +263,22 @@ class TempRootProtocol(Protocol):
         """
 
 
+class HostnameProtocol(Protocol):
+    """Reports this machine's hostname, lowercased."""
+
+    def __call__(self) -> str:
+        """Read the hostname.
+
+        A hook because it reads the machine, and the one caller is the node
+        runner's registering check-in, which names the machine it runs on in
+        the harness's ``<platform>:<hostname>`` spelling (MCPs board task
+        fd5cabfa); a test binds a name rather than reading the test host's.
+
+        Returns:
+            The hostname, lowercased as the harness spells it.
+        """
+
+
 class MakeDirectoryProtocol(Protocol):
     """Creates a directory and every parent it needs."""
 
@@ -454,6 +471,16 @@ def _default_temp_root() -> pathlib.Path:
     return pathlib.Path(tempfile.gettempdir())
 
 
+def _default_hostname() -> str:
+    """Read the real hostname.
+
+    Returns:
+        ``socket.gethostname()`` lowercased, the spelling the session
+        observer's script uses on every node.
+    """
+    return socket.gethostname().lower()
+
+
 def _default_make_directory(path: pathlib.Path) -> None:
     """Create a real directory and its parents.
 
@@ -511,6 +538,7 @@ make_directory: MakeDirectoryProtocol = _default_make_directory
 temp_root: TempRootProtocol = _default_temp_root
 append_text: AppendTextProtocol = _default_append_text
 write_text: WriteTextProtocol = _default_write_text
+hostname: HostnameProtocol = _default_hostname
 
 
 __all__ = [
@@ -518,6 +546,7 @@ __all__ = [
     "CommandResult",
     "DirectoryExistsProtocol",
     "FileExistsProtocol",
+    "HostnameProtocol",
     "MakeDirectoryProtocol",
     "NowProtocol",
     "ReadBytesProtocol",
@@ -528,6 +557,7 @@ __all__ = [
     "append_text",
     "directory_exists",
     "file_exists",
+    "hostname",
     "make_directory",
     "now",
     "read_bytes",

@@ -103,6 +103,7 @@ def _project() -> ProjectConfig:
         exclusive_resources=(),
         external_paths=(),
         required_tags=(),
+        source=None,
     )
 
 

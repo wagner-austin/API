@@ -80,6 +80,7 @@ def _workspace_document() -> JSONObject:
                 "minimum_workers": 4,
                 "expected_minutes": 5,
                 "required_tags": [],
+                "source": None,
             }
         },
         "ledger": "ledger.jsonl",

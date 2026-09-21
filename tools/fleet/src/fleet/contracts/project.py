@@ -27,6 +27,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.resources import decode_names, encode_names
+from fleet.contracts.source import ProjectSource, decode_project_source, encode_project_source
 from fleet.contracts.tags import NodeTag, decode_required_tags, encode_tags
 
 #: The recipe every dispatch runs. One string, in one place, so a dispatch and
@@ -87,6 +88,14 @@ class ProjectConfig(TypedDict):
             there in a way that reads as a regression in the change under
             test. The planner refuses a node missing any of them by name
             before it weighs memory, and auto-select skips such nodes.
+        source: Where the project's commits are fetched from and what an
+            export of one needs before its recipe runs
+            (:class:`~fleet.contracts.source.ProjectSource`), or None for a
+            project with no remote, which ``fleet-run`` still stages from a
+            working tree and the queue's export runner refuses by name.
+            REQUIRED, null spelled out: an absent key on a project the queue
+            is asked to check would read as "no remote" and refuse a job
+            whose registry line was merely incomplete.
     """
 
     worker_ram_gb: float
@@ -95,6 +104,7 @@ class ProjectConfig(TypedDict):
     exclusive_resources: tuple[str, ...]
     external_paths: tuple[str, ...]
     required_tags: tuple[NodeTag, ...]
+    source: ProjectSource | None
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -144,6 +154,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "exclusive_resources": encode_names(project["exclusive_resources"]),
         "external_paths": encode_names(project["external_paths"]),
         "required_tags": encode_tags(project["required_tags"]),
+        "source": encode_project_source(project["source"]),
     }
 
 
@@ -165,10 +176,19 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             ``expected_minutes`` must be positive because it sizes the lease
             and a zero would produce one that has already expired.
             ``required_tags`` must be present and is refused as
-            :func:`~fleet.contracts.tags.decode_required_tags` describes.
+            :func:`~fleet.contracts.tags.decode_required_tags` describes;
+            ``source`` must be present (null or an object) and is refused
+            as :func:`~fleet.contracts.source.decode_project_source`
+            describes.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"project must be a JSON object, got {type(value).__name__}")
+    if "source" not in value:
+        raise JSONTypeError(
+            "project must declare 'source', using null for a project with no remote. An "
+            "absent key would read as no remote and refuse a queue job whose registry line "
+            "was merely incomplete"
+        )
     worker_ram_gb = require_float(value, "worker_ram_gb")
     if worker_ram_gb <= 0.0:
         raise JSONTypeError(
@@ -198,6 +218,7 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         required_tags=decode_required_tags(
             value.get("required_tags"), field="project.required_tags"
         ),
+        source=decode_project_source(value["source"], field="project.source"),
     )
 
 

@@ -92,7 +92,13 @@ class TestDecoding:
 
     def test_a_project_declaring_none_decodes_to_none(self) -> None:
         plan = decode_project_config(
-            {"worker_ram_gb": 1.0, "minimum_workers": 2, "expected_minutes": 5, "required_tags": []}
+            {
+                "worker_ram_gb": 1.0,
+                "minimum_workers": 2,
+                "expected_minutes": 5,
+                "required_tags": [],
+                "source": None,
+            }
         )
 
         assert plan["exclusive_resources"] == ()
@@ -105,6 +111,7 @@ class TestDecoding:
                 "expected_minutes": 5,
                 "exclusive_resources": [SHARED_DB],
                 "required_tags": [],
+                "source": None,
             }
         )
 

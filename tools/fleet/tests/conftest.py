@@ -302,6 +302,7 @@ def workspace_document() -> JSONObject:
                 "minimum_workers": 2,
                 "expected_minutes": 5,
                 "required_tags": [],
+                "source": None,
             }
         },
         # Records under a subdirectory, exactly as the real workspace has
@@ -422,6 +423,7 @@ def _restore() -> None:
     _test_hooks.temp_root = _test_hooks._default_temp_root
     _test_hooks.append_text = _test_hooks._default_append_text
     _test_hooks.write_text = _test_hooks._default_write_text
+    _test_hooks.hostname = _test_hooks._default_hostname
     # The queue seams. The poster's default lives in platform_core: the SEAM
     # is this package's, the transport behind it is shared with board-watch.
     _test_hooks.http_post = urllib_mcp_post

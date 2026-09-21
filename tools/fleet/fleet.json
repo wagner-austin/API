@@ -92,31 +92,96 @@
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
       "expected_minutes": 5,
-      "required_tags": []
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "tools/fleet",
+        "install": []
+      }
     },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
       "expected_minutes": 5,
-      "required_tags": []
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/platform_core",
+        "install": []
+      }
     },
     "libs/monorepo_guards": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
       "expected_minutes": 5,
-      "required_tags": []
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "libs/monorepo_guards",
+        "install": []
+      }
     },
     "services/Model-Trainer": {
       "worker_ram_gb": 1.1,
       "minimum_workers": 6,
       "expected_minutes": 4,
-      "required_tags": []
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/API.git",
+        "path": "services/Model-Trainer",
+        "install": []
+      }
     },
     "slime": {
       "worker_ram_gb": 0.5,
       "minimum_workers": 4,
       "expected_minutes": 12,
-      "required_tags": ["gpu", "windows"]
+      "required_tags": ["gpu", "windows"],
+      "source": {
+        "remote": "https://github.com/wagner-austin/slime.git",
+        "path": "",
+        "install": [
+          ["npm", "ci"],
+          ["npx", "playwright", "install", "chromium", "webkit"]
+        ]
+      }
+    },
+    "MCPs/packages/wiki-search": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 6,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "packages/wiki-search",
+        "install": [
+          ["npm", "ci"],
+          ["node", "scripts/ci-build-consumed-workspaces.mjs"],
+          ["npm", "rebuild"]
+        ]
+      }
+    },
+    "MCPs/mcp-shared-py": {
+      "worker_ram_gb": 0.3,
+      "minimum_workers": 4,
+      "expected_minutes": 6,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "mcp-shared-py",
+        "install": []
+      }
+    },
+    "MCPs/packages/maketools": {
+      "worker_ram_gb": 0.3,
+      "minimum_workers": 4,
+      "expected_minutes": 5,
+      "required_tags": [],
+      "source": {
+        "remote": "https://github.com/wagner-austin/MCPs.git",
+        "path": "packages/maketools",
+        "install": []
+      }
     }
   },
   "ledger": "runs/ledger.jsonl",

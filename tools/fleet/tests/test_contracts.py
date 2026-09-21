@@ -108,6 +108,7 @@ def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectC
         exclusive_resources=(),
         external_paths=(),
         required_tags=(),
+        source=None,
     )
 
 
