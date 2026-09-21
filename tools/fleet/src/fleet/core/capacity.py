@@ -168,6 +168,46 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
     return DispatchVerdict(workers=workers, code=None, reason="")
 
 
+def room_for_any(node: NodeConfig, state: NodeState) -> str | None:
+    """Whether a node could take SOME dispatch right now, before one is chosen.
+
+    The node runner's gate before it claims (board task fd5cabfa): a runner
+    that claimed first and asked its node second took the oldest job off
+    the queue and refused it, while a live node beside it found the lane
+    empty. Measured 2026-09-21T10:00:02Z: loki, asleep, claimed
+    ``libs/platform_core`` 48 ms before diphtheria claimed the next row,
+    and closed it ``NODE_UNREACHABLE``. So the three checks that do not
+    depend on the project run first, on the probe the runner has already
+    paid for, and a node that fails one claims nothing this tick. The
+    project-dependent checks (its tags, its minimum workers) still run after
+    the claim, on the same probe.
+
+    Args:
+        node: The node's declaration.
+        state: What it reported when probed this tick.
+
+    Returns:
+        None when the node could take a dispatch of its own default tenant
+        (concurrency under the limit, disk for a staged tree, memory for at
+        least one worker after the owner's reservation), else the
+        ``CODE: reason`` line saying why it can take nothing, worded as
+        :func:`assess` would word the same refusal.
+    """
+    default_tenant = ProjectConfig(
+        worker_ram_gb=node["budget"]["worker_ram_gb"],
+        minimum_workers=1,
+        expected_minutes=1,
+        exclusive_resources=(),
+        external_paths=(),
+        required_tags=(),
+        source=None,
+    )
+    verdict = assess(node, state, default_tenant)
+    if verdict["code"] is None:
+        return None
+    return f"{verdict['code'].value}: {verdict['reason']}"
+
+
 def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) -> int:
     """Decide how many workers one named node may give this project, or refuse.
 
@@ -308,4 +348,11 @@ def first_fit(
     return best_name, best_workers
 
 
-__all__ = ["DispatchVerdict", "Unassessed", "assess", "first_fit", "plan_dispatch"]
+__all__ = [
+    "DispatchVerdict",
+    "Unassessed",
+    "assess",
+    "first_fit",
+    "plan_dispatch",
+    "room_for_any",
+]

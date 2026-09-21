@@ -14,7 +14,7 @@ from fleet.contracts.budget import NodeBudget
 from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
-from fleet.core.capacity import assess, first_fit, plan_dispatch
+from fleet.core.capacity import assess, first_fit, plan_dispatch, room_for_any
 
 #: lavender's card as fleet.json declares it, for the nodes that carry one.
 GTX_1630 = NodeGpu(
@@ -115,6 +115,7 @@ def _project(
         exclusive_resources=(),
         external_paths=(),
         required_tags=required_tags,
+        source=None,
     )
 
 
@@ -297,3 +298,33 @@ class TestFirstFit:
         )
 
         assert first_fit(candidates, _project(required_tags=("gpu",))) == ("lavender", 14)
+
+
+class TestRoomForAny:
+    """The node runner's gate before it claims (board task fd5cabfa): the
+    three project-independent checks on the node's own default tenant."""
+
+    def test_a_node_with_room_for_one_default_worker_passes(self) -> None:
+        # 5.2 GB free: 1.2 GB past the 4.0 GB reservation, one 1.1 GB worker.
+        assert room_for_any(_node(), _state(free_ram_gb=5.2)) is None
+
+    def test_the_owners_reservation_is_named_when_nothing_is_left(self) -> None:
+        """lavender at 2.2 GB free on 2026-09-21T09:58Z."""
+        line = str(room_for_any(_node(), _state(free_ram_gb=2.2)))
+
+        assert line.startswith("NODE_OWNER_RESERVED: lavender has 2.2 GB free against a reserv")
+
+    def test_the_concurrency_limit_is_named(self) -> None:
+        line = str(room_for_any(_node(), _state(live_runs=2)))
+
+        assert line.startswith("NODE_OWNER_RESERVED: lavender already holds 2 fleet run(s)")
+
+    def test_a_full_disk_is_named(self) -> None:
+        line = str(room_for_any(_node(), _state(free_disk_gb=3.0)))
+
+        assert line.startswith("NODE_DISK_EXHAUSTED: lavender has 3 GB free")
+
+    def test_the_gate_never_asks_about_tags(self) -> None:
+        """A CPU-only linux node has room for something even though a gpu
+        project would be refused after the claim; tags are the project's."""
+        assert room_for_any(_node(gpu=None, platform="linux"), _state()) is None
