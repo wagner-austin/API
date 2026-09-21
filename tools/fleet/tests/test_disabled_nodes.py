@@ -58,6 +58,7 @@ def _registry_node(name: str, *, enabled: bool) -> JSONObject:
         "user": "austi",
         "enabled": enabled,
         "platform": "windows",
+        "gpu": None,
     }
 
 
@@ -235,8 +236,8 @@ class TestFleetNodesReportsAndReconciles:
             == 1
         )
 
-    def test_agreement_leaves_the_status_alone(
-        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
+    def test_agreement_leaves_the_status_alone_and_says_how_much_it_examined(
+        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         registry_path = tmp_path / "fleet-nodes.json"
         registry_path.write_text(
@@ -252,17 +253,21 @@ class TestFleetNodesReportsAndReconciles:
         )
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
-        assert (
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.REGISTRY_FLAG,
-                    str(registry_path),
-                ]
+        with caplog.at_level("INFO"):
+            assert (
+                nodes.main(
+                    [
+                        _config.CONFIG_FLAG,
+                        str(mixed_config),
+                        nodes.REGISTRY_FLAG,
+                        str(registry_path),
+                    ]
+                )
+                == 0
             )
-            == 0
-        )
+
+        messages = [record.getMessage() for record in caplog.records]
+        assert f"2 node(s) agree with {registry_path} on enabled, platform and gpu" in messages
 
     def test_without_the_flag_no_reconciliation_is_claimed(
         self, mixed_config: pathlib.Path

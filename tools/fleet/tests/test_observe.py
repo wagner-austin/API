@@ -84,7 +84,9 @@ def node(
     Returns:
         The node.
     """
-    return RegistryNode(name=name, enabled=enabled, role=role, user=user, platform=platform)
+    return RegistryNode(
+        name=name, enabled=enabled, role=role, user=user, platform=platform, cuda=False
+    )
 
 
 def document(*records: JSONObject, hostname: str = "serendipity", platform: str = "win32") -> str:

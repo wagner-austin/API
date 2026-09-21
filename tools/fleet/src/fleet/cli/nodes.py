@@ -199,6 +199,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     drift = _reconcile(loaded, registry_path)
     for line in drift:
         _log.info("REGISTRY DRIFT %s", line)
+    if registry_path is not None and not drift:
+        # A pass says how much it examined: silence here read the same as a
+        # reconciliation nobody asked for.
+        _log.info(
+            "%d node(s) agree with %s on enabled, platform and gpu",
+            len(loaded.workspace["nodes"]),
+            registry_path,
+        )
 
     if unreachable:
         _log.info("%d node(s) did not answer", unreachable)

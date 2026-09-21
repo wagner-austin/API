@@ -18,22 +18,44 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core import _test_hooks, registry
 from tests.conftest import workspace_document
 
+#: The registry's measured gpu column for a CUDA device, as the real file
+#: carries it for lavender.
+CUDA_GPU: JSONObject = {
+    "probe": "nvidia-smi",
+    "measured": "2026-09-20",
+    "adapter": "NVIDIA GeForce GTX 1630",
+    "vramMib": 4096,
+    "driver": "591.86",
+}
 
-def _registry_document(platform: str = "windows", **enabled: bool) -> str:
+#: The column for integrated graphics the Win32 probe found: an adapter, and
+#: not a CUDA device.
+INTEGRATED_GPU: JSONObject = {
+    "probe": "win32-videocontroller",
+    "measured": "2026-09-21",
+    "adapter": "Intel(R) Iris(R) Xe Graphics",
+    "vramMib": 1024,
+    "driver": "30.0.101.1122",
+}
+
+
+def _registry_document(platform: str = "windows", gpu: JSONValue = None, **enabled: bool) -> str:
     """Render an identity registry carrying the given nodes.
 
     Shaped like the real one: an object with a ``nodes`` ARRAY whose entries
-    carry ``name``, ``enabled``, ``role``, ``user`` and ``platform`` among
-    fields this package ignores.
+    carry ``name``, ``enabled``, ``role``, ``user``, ``platform`` and ``gpu``
+    among fields this package ignores.
 
     Args:
         platform: What the registry says every node here runs.
+        gpu: The measured gpu column every node here carries; null by
+            default, because the fixture workspace's lavender declares none.
         **enabled: Node name to whether the registry says it is expected to
             answer.
 
@@ -50,6 +72,7 @@ def _registry_document(platform: str = "windows", **enabled: bool) -> str:
                 "platform": platform,
                 "tailnetIp": "100.0.0.1",
                 "enabled": value,
+                "gpu": gpu,
                 "tunnel": None,
                 "notes": "carried by the real registry; ignored here",
             }
@@ -84,6 +107,28 @@ def _workspace(*, excluding: dict[str, str] | None = None, **enabled: bool) -> F
         node["enabled"] = value
         rebuilt[name] = node
     document["nodes"] = rebuilt
+    return decode_fleet_workspace(document)
+
+
+def _workspace_with_cuda() -> FleetWorkspace:
+    """The fixture workspace with lavender declaring the GTX 1630 it has.
+
+    Returns:
+        The decoded workspace.
+    """
+    document = workspace_document()
+    nodes = document["nodes"]
+    if not isinstance(nodes, dict):
+        raise AssertionError("the fixture workspace must declare nodes")
+    lavender = nodes["lavender"]
+    if not isinstance(lavender, dict):
+        raise AssertionError("the fixture workspace must declare lavender")
+    lavender["gpu"] = {
+        "model": "NVIDIA GeForce GTX 1630",
+        "vram_mib": 4096,
+        "compute_capability": "7.5",
+        "driver_version": "591.86",
+    }
     return decode_fleet_workspace(document)
 
 
@@ -162,6 +207,46 @@ class TestTheDriftThatHappened:
         assert lines[0].startswith("lavender: this workspace says windows, /x/r.json says linux.")
         assert "parse error" in lines[0]
 
+    def test_a_cuda_device_declared_here_and_unmeasured_there_is_drift(self) -> None:
+        """A workspace declaring a GTX 1630 disagrees with a registry whose
+        probe found only integrated graphics, and with one that measured
+        none (board task fd5cabfa, A1: the node runners claim gpu jobs by
+        the declaration)."""
+        for measured in (INTEGRATED_GPU, None):
+            drift = registry.compare(
+                _workspace_with_cuda(),
+                registry.decode_registry_nodes(_registry_document(gpu=measured, lavender=True)),
+            )
+
+            assert drift["gpu_disagrees"] == (("lavender", True, False),)
+            assert registry.has_drifted(drift) is True
+            lines = registry.describe(drift, registry_path="/x/r.json")
+            assert len(lines) == 1
+            assert lines[0].startswith(
+                "lavender: this workspace declares a CUDA device, /x/r.json measured none"
+            )
+            assert "runs, or never runs, on the wrong box" in lines[0]
+
+    def test_a_cuda_device_measured_there_and_undeclared_here_is_drift(self) -> None:
+        drift = registry.compare(
+            _workspace(lavender=True),
+            registry.decode_registry_nodes(_registry_document(gpu=CUDA_GPU, lavender=True)),
+        )
+
+        assert drift["gpu_disagrees"] == (("lavender", False, True),)
+        lines = registry.describe(drift, registry_path="/x/r.json")
+        assert lines[0].startswith(
+            "lavender: this workspace declares no gpu, /x/r.json measured one with nvidia-smi"
+        )
+
+    def test_a_cuda_device_on_both_sides_agrees(self) -> None:
+        drift = registry.compare(
+            _workspace_with_cuda(),
+            registry.decode_registry_nodes(_registry_document(gpu=CUDA_GPU, lavender=True)),
+        )
+
+        assert registry.has_drifted(drift) is False
+
     def test_a_registry_node_that_is_off_and_unmentioned_is_not_drift(self) -> None:
         """The registry holds every machine on the tailnet, including two
         boxes offline since August. Nothing dispatches to those and none of
@@ -211,19 +296,58 @@ class TestTheObserverReadsRoleAndUser:
         nodes = registry.decode_registry_nodes(_registry_document(loki=True))
 
         assert nodes["loki"] == registry.RegistryNode(
-            name="loki", enabled=True, role="worker", user="austi", platform="windows"
+            name="loki", enabled=True, role="worker", user="austi", platform="windows", cuda=False
         )
+
+    def test_a_cuda_device_the_nvidia_probe_measured_is_read_as_one(self) -> None:
+        nodes = registry.decode_registry_nodes(_registry_document(gpu=CUDA_GPU, lavender=True))
+
+        assert nodes["lavender"]["cuda"] is True
 
     def test_a_null_user_is_a_client_with_no_account_of_ours(self) -> None:
         """The phone, exactly as the live registry declares it."""
         nodes = registry.decode_registry_nodes(
             '{"nodes": [{"name": "phone", "role": "client", "user": null, "enabled": true, '
-            '"platform": "linux"}]}'
+            '"platform": "linux", "gpu": null}]}'
         )
 
-        assert nodes["phone"]["user"] is None
-        assert nodes["phone"]["role"] == "client"
-        assert nodes["phone"]["platform"] == "linux"
+        assert nodes["phone"] == registry.RegistryNode(
+            name="phone", enabled=True, role="client", user=None, platform="linux", cuda=False
+        )
+
+    def test_integrated_graphics_the_win32_probe_found_is_not_a_cuda_device(self) -> None:
+        nodes = registry.decode_registry_nodes(
+            _registry_document(gpu=INTEGRATED_GPU, serendipity=True)
+        )
+
+        assert nodes["serendipity"]["cuda"] is False
+
+    def test_a_node_missing_the_gpu_column_is_refused(self) -> None:
+        """The column was filled for every node on 2026-09-21 (board task
+        41f45bd7); an absent key is a shape change, never a machine without."""
+        with pytest.raises(AppError) as raised:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "loki", "role": "worker", "user": "austi", "enabled": true, '
+                '"platform": "windows"}]}'
+            )
+
+        assert raised.value.code is FleetErrorCode.NODE_REGISTRY_UNREADABLE
+        assert "node 'loki' carries no 'gpu' key (null means none)" in raised.value.message
+
+    def test_a_gpu_column_that_is_neither_null_nor_an_object_is_refused(self) -> None:
+        with pytest.raises(AppError) as raised:
+            registry.decode_registry_nodes(_registry_document(gpu="RTX 3090", loki=True))
+
+        assert raised.value.code is FleetErrorCode.NODE_REGISTRY_UNREADABLE
+        assert "node 'loki' 'gpu' is str, not an object" in raised.value.message
+
+    def test_a_gpu_object_without_a_probe_is_refused(self) -> None:
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                _registry_document(gpu={"adapter": "NVIDIA GeForce RTX 3090 Ti"}, loki=True)
+            )
+
+        assert "probe" in str(excinfo.value)
 
     def test_a_user_that_is_not_a_string_is_refused(self) -> None:
         with pytest.raises(Exception) as excinfo:

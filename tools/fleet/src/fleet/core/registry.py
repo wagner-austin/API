@@ -82,6 +82,15 @@ class RegistryNode(TypedDict):
             vocabulary is the same two words (``fleet-mcp``'s
             ``FLEET_PLATFORMS``; a phone is ``linux`` there), so nothing it
             can carry is lost by the narrowing.
+        cuda: Whether the registry's measured ``gpu`` column names a CUDA
+            device, which is what this workspace's ``gpu`` capability tag
+            means (:func:`fleet.contracts.tags.node_tags`): true when the
+            column is an object whose ``probe`` is ``nvidia-smi``, false
+            for ``null`` and for an adapter the Win32 video-controller probe
+            found (integrated graphics, no CUDA). The column is a
+            measurement (MCPs board task 41f45bd7) and this workspace's
+            ``gpu`` is a declaration, and a job tagged ``gpu`` is matched on
+            the declaration, so the two must agree (board task fd5cabfa, A1).
     """
 
     name: str
@@ -89,6 +98,7 @@ class RegistryNode(TypedDict):
     role: str
     user: str | None
     platform: NodePlatform
+    cuda: bool
 
 
 class RegistryDrift(TypedDict):
@@ -116,6 +126,12 @@ class RegistryDrift(TypedDict):
             found by a dispatch rather than a reconciler: every script goes
             out in the platform's dialect, and the wrong one is a parse
             error on the far side that reads as the node's fault.
+        gpu_disagrees: Nodes this workspace declares a CUDA device for that
+            the registry measured none on, or the reverse, as
+            ``(name, here, there)`` booleans. The node-lane runners claim
+            by the tags this workspace derives, so a ``gpu`` job would land
+            on a box whose measured adapter cannot run it, or never land on
+            one that could.
     """
 
     enabled_here_disabled_there: tuple[str, ...]
@@ -123,6 +139,39 @@ class RegistryDrift(TypedDict):
     missing_from_registry: tuple[str, ...]
     enabled_there_absent_here: tuple[str, ...]
     platform_disagrees: tuple[tuple[str, str, str], ...]
+    gpu_disagrees: tuple[tuple[str, bool, bool], ...]
+
+
+#: The registry's probe whose adapters are CUDA devices; the other probe,
+#: ``win32-videocontroller``, reports integrated graphics.
+CUDA_PROBE = "nvidia-smi"
+
+
+def _decode_cuda(entry: dict[str, JSONValue]) -> bool:
+    """Read whether a registry node's measured gpu is a CUDA device.
+
+    Args:
+        entry: The node's registry object.
+
+    Returns:
+        True iff ``gpu`` is an object whose ``probe`` is :data:`CUDA_PROBE`.
+
+    Raises:
+        AppError: ``NODE_REGISTRY_UNREADABLE`` when the ``gpu`` key is
+            absent (the column was filled for every node on 2026-09-21 and
+            an absent key is a shape change, not a machine without one) or
+            is neither null nor an object with a string ``probe``.
+    """
+    if "gpu" not in entry:
+        raise _unreadable(f"node {entry.get('name')!r} carries no 'gpu' key (null means none)")
+    gpu = entry["gpu"]
+    if gpu is None:
+        return False
+    if not isinstance(gpu, dict):
+        raise _unreadable(
+            f"node {entry.get('name')!r} 'gpu' is {type(gpu).__name__}, not an object"
+        )
+    return require_str(gpu, "probe") == CUDA_PROBE
 
 
 def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
@@ -162,6 +211,7 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
             # provisioned and has no account of ours to ssh in as.
             user=None if raw_user is None else narrow_json_to_str(raw_user),
             platform=decode_node_platform(require_str(entry, "platform")),
+            cuda=_decode_cuda(entry),
         )
     return declared
 
@@ -179,7 +229,8 @@ def _unreadable(detail: str) -> AppError[FleetErrorCode]:
         FleetErrorCode.NODE_REGISTRY_UNREADABLE,
         f"the fleet identity registry cannot be read: {detail}. Expected the shape "
         "fleet-mcp/fleet-nodes.json has always had -- an object with a 'nodes' array, "
-        "each entry carrying 'name', 'enabled', 'role' and 'platform'.",
+        "each entry carrying 'name', 'enabled', 'role', 'platform' and 'gpu' (null or an "
+        "object with a 'probe').",
     )
 
 
@@ -214,6 +265,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
     missing: list[str] = []
     undecided: list[str] = []
     platform_disagrees: list[tuple[str, str, str]] = []
+    gpu_disagrees: list[tuple[str, bool, bool]] = []
     for name, node in sorted(workspace["nodes"].items()):
         declared = registry.get(name)
         if declared is None:
@@ -225,6 +277,9 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
             disabled_here_enabled_there.append(name)
         if node["platform"] != declared["platform"]:
             platform_disagrees.append((name, node["platform"], declared["platform"]))
+        here_cuda = node["gpu"] is not None
+        if here_cuda != declared["cuda"]:
+            gpu_disagrees.append((name, here_cuda, declared["cuda"]))
     for name, declared in sorted(registry.items()):
         unmentioned = name not in workspace["nodes"] and name not in workspace["not_dispatchable"]
         if declared["enabled"] and unmentioned:
@@ -235,6 +290,7 @@ def compare(workspace: FleetWorkspace, registry: dict[str, RegistryNode]) -> Reg
         missing_from_registry=tuple(missing),
         enabled_there_absent_here=tuple(undecided),
         platform_disagrees=tuple(platform_disagrees),
+        gpu_disagrees=tuple(gpu_disagrees),
     )
 
 
@@ -245,7 +301,7 @@ def has_drifted(drift: RegistryDrift) -> bool:
         drift: What :func:`compare` found.
 
     Returns:
-        True when any of the five disagreements is non-empty.
+        True when any of the six disagreements is non-empty.
     """
     return bool(
         drift["enabled_here_disabled_there"]
@@ -253,6 +309,7 @@ def has_drifted(drift: RegistryDrift) -> bool:
         or drift["missing_from_registry"]
         or drift["enabled_there_absent_here"]
         or drift["platform_disagrees"]
+        or drift["gpu_disagrees"]
     )
 
 
@@ -298,6 +355,18 @@ def describe(drift: RegistryDrift, *, registry_path: str) -> tuple[str, ...]:
             f"{name}: this workspace says {here}, {registry_path} says {there}. Every "
             "script a dispatch sends is rendered for the declared platform, so the wrong "
             "one is a parse error on the node that reads as the node's fault."
+        )
+    for name, here_cuda, there_cuda in drift["gpu_disagrees"]:
+        here = "declares a CUDA device" if here_cuda else "declares no gpu"
+        there = (
+            f"measured one with {CUDA_PROBE}"
+            if there_cuda
+            else "measured none (null, or an adapter the Win32 probe found)"
+        )
+        lines.append(
+            f"{name}: this workspace {here}, {registry_path} {there}. The node runners "
+            "claim by the tags derived here, so a gpu job is matched on the declaration "
+            "and runs, or never runs, on the wrong box."
         )
     return tuple(lines)
 
