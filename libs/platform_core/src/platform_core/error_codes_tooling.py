@@ -227,6 +227,20 @@ class FleetErrorCode(ErrorCodeBase):
     PROJECT_MANIFEST_UNREADABLE = "PROJECT_MANIFEST_UNREADABLE"
     PROJECT_DEPENDENCY_ESCAPES_ROOT = "PROJECT_DEPENDENCY_ESCAPES_ROOT"
 
+    # Exporting one commit of a project for the queue's node lane (MCPs board
+    # task fd5cabfa, A2). Four codes, split where the reader's next action
+    # splits: a project the registry declares without a remote is a
+    # fleet.json line to write; a sha the remote does not have is a push the
+    # submitter has not made; a fetch or archive that failed for any other
+    # reason is git's own words, a network or credential question on the
+    # hub; and a job whose tags disagree with the registry's declaration for
+    # its project is a submitter that copied the wrong line, refused rather
+    # than run under the wrong capability.
+    PROJECT_REMOTE_MISSING = "PROJECT_REMOTE_MISSING"
+    SHA_NOT_ON_REMOTE = "SHA_NOT_ON_REMOTE"
+    EXPORT_FAILED = "EXPORT_FAILED"
+    PROJECT_TAGS_MISMATCH = "PROJECT_TAGS_MISMATCH"
+
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
     # Distinct from DISPATCH_FAILED, which is work that ran and exited
