@@ -447,6 +447,33 @@ class CiWakeErrorCode(ErrorCodeBase):
     ENROLMENT_FIELD_MALFORMED = "ENROLMENT_FIELD_MALFORMED"
 
 
+class SessionLabelErrorCode(ErrorCodeBase):
+    """Resolving the acting session's board label against the ledger.
+
+    Shared by every enrolling tool that records who asked for work --
+    ``hpc3`` at submit, ``ci-wake`` at ``pre-push`` -- through
+    :mod:`platform_core.session_label`, so the two cannot describe the same
+    refusal differently. Transport is :class:`McpClientErrorCode`'s; what is
+    here is what the resolution itself can find wrong.
+    """
+
+    # ``BOARD_AGENT_LABEL`` names a label other than the one the board bound
+    # to the acting session. The twin of the board's own
+    # ``TASK_IDENTITY_MISMATCH``, raised at enrolment so the wrong name is
+    # refused before a bridge posts under it (MCPs board task 3843d29f).
+    LABEL_MISMATCH = "SESSION_LABEL_MISMATCH"
+
+    # ``CLAUDE_CODE_SESSION_ID`` is set to something the harness could not
+    # have written, so the board cannot be asked about it.
+    SESSION_ID_MALFORMED = "SESSION_ID_MALFORMED"
+
+    # The stack's ``.env`` carries no taskboard key or no operator tenant, so
+    # the board cannot be asked at all. Named separately from
+    # :class:`BoardWatchErrorCode`'s pair because the fix is in a different
+    # place: that file, not the shell that runs a poller.
+    CREDENTIALS_MISSING = "SESSION_LABEL_CREDENTIALS_MISSING"
+
+
 class MaketoolsErrorCode(ErrorCodeBase):
     """What the Makefile recipes' launcher (``tools/maketools``) refuses.
 
@@ -489,4 +516,5 @@ __all__ = [
     "HpcWakeErrorCode",
     "MaketoolsErrorCode",
     "McpClientErrorCode",
+    "SessionLabelErrorCode",
 ]
