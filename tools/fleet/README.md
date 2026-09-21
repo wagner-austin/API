@@ -404,6 +404,68 @@ It is checked **before any node is probed**, by both `fleet-run` and
 Probing three nodes to collect three identical refusals costs three round
 trips and produces a message shaped like a capacity problem.
 
+## What a project requires of a node: `required_tags`
+
+Some suites cannot run on every kind of node, whatever is free on it. The
+first was `slime` (MCPs board task 41f45bd7, 2026-09-21): its browser project
+drives a real scene through headless Chromium on the machine's GPU with ANGLE
+over Direct3D 11, refuses every other platform by name
+(`slime/scripts/chromium-launch.ts`), and under the software rasteriser draws
+a frame every few seconds, so on a CPU-only or linux node it would not fail —
+it would time out, in a way that reads as a regression in the change under
+test. So a project declares what it needs, and the declaration is REQUIRED,
+`[]` for the ordinary suite any node may run:
+
+```json
+"slime": {
+  "worker_ram_gb": 0.5, "minimum_workers": 4, "expected_minutes": 12,
+  "required_tags": ["gpu", "windows"]
+}
+```
+
+**A node never declares tags.** Its tags are DERIVED from the two measured
+fields it already carries: `platform` gives `windows` or `linux`, and a `gpu`
+that is a device rather than `null` gives `gpu` (`fleet.contracts.tags`). A
+declared `tags` column would be a second copy of those facts, and the copy is
+the one that drifts: a box whose card was pulled would keep its `gpu` tag
+until somebody remembered the list. Derived, the tag is exactly as true as the
+measurement, and `gpu` keeps the meaning it has always had here — a CUDA
+device `nvidia-smi` reports, never an integrated adapter. The identity
+registry records both kinds per node with the probe that measured each
+(`fleet-nodes.json` `gpu`, same task), which is how "which windows nodes may
+carry this tag" is a recorded fact: austinpc, sedona and lavender, and
+diphtheria on linux, as of 2026-09-21.
+
+The planner checks tags **first**, before concurrency, disk and memory, and
+refuses with `NODE_LACKS_TAG` naming the tags missing:
+
+```
+diphtheria lacks windows: the project requires gpu, windows and this node
+carries gpu, linux. Tags are derived from the node's declared platform and
+gpu, so the answer is another node, never this one later.
+```
+
+Auto-select skips such nodes, and when EVERY node that answered refused on
+its tags the fleet-wide refusal is `NODE_LACKS_TAG` too — nothing is full and
+waiting fixes nothing — while one tagged node that is merely busy keeps the
+capacity answer, because that node will take the work later. A project
+naming both platforms is refused at decode: no node is both, and the way to
+say "either" is to name neither.
+
+**`slime` is a project of another repository**, `github.com/wagner-austin/slime`
+(private, the same account as this one), not a path under `--repo-root`, and
+this runner stages a project from that root by its `pyproject.toml`. So today
+`fleet-preflight --project slime --node sedona` answers with a worker count
+(measured 2026-09-21: `slime would run on sedona with 10 worker(s)`), and a
+dispatch would be refused at staging with `PROJECT_MANIFEST_MISSING` naming
+the absent manifest. The fetch-a-sha-from-the-project's-remote export that
+makes it runnable is fleet board task fd5cabfa's A2; the entry is here now so
+`dispatch_submit` knows the project and the tag gate is measured against real
+nodes before that lands. Its `expected_minutes` is the full `make check` w1
+timed on austinpc that night (03:45Z to 03:53Z); its `worker_ram_gb` is an
+estimate for vitest's jsdom workers and should be re-pinned from the first
+fleet run's memory reading.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A

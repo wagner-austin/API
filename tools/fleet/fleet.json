@@ -91,22 +91,32 @@
     "tools/fleet": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
-      "expected_minutes": 5
+      "expected_minutes": 5,
+      "required_tags": []
     },
     "libs/platform_core": {
       "worker_ram_gb": 0.3,
       "minimum_workers": 4,
-      "expected_minutes": 5
+      "expected_minutes": 5,
+      "required_tags": []
     },
     "libs/monorepo_guards": {
       "worker_ram_gb": 0.25,
       "minimum_workers": 4,
-      "expected_minutes": 5
+      "expected_minutes": 5,
+      "required_tags": []
     },
     "services/Model-Trainer": {
       "worker_ram_gb": 1.1,
       "minimum_workers": 6,
-      "expected_minutes": 4
+      "expected_minutes": 4,
+      "required_tags": []
+    },
+    "slime": {
+      "worker_ram_gb": 0.5,
+      "minimum_workers": 4,
+      "expected_minutes": 12,
+      "required_tags": ["gpu", "windows"]
     }
   },
   "ledger": "runs/ledger.jsonl",
