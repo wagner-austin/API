@@ -167,6 +167,13 @@ class FleetErrorCode(ErrorCodeBase):
     # and dispatching to it is a request that should never have left the
     # ground, not a fault to investigate on the tailnet.
     NODE_DISABLED = "NODE_DISABLED"
+    # The node lacks a tag the project requires (MCPs board task 41f45bd7):
+    # its platform is the other dialect, or the project needs a CUDA device
+    # and the node declares none. Distinct from the three capacity codes
+    # because no amount of waiting changes it, and from NODE_DISABLED because
+    # the node is on and fine -- it is the wrong kind of machine for this
+    # suite, and the answer is another node, never this one later.
+    NODE_LACKS_TAG = "NODE_LACKS_TAG"
     # The identity registry named by `fleet-nodes --registry` could not be
     # read. Drift itself has NO code, deliberately: it is reported as one
     # printed line per disagreement plus a non-zero exit, the same shape as an
