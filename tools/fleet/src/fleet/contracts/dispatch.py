@@ -30,6 +30,8 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from typing_extensions import TypedDict
 
+from fleet.contracts.tags import NODE_TAGS, NodeTag
+
 #: Every status a queue job can be in (MCPs migration 486's CHECK).
 DISPATCH_STATUSES: Final = (
     "queued",
@@ -78,6 +80,16 @@ DispatchCommand = Literal[
     "kill-session-hard",
 ]
 
+#: The two lanes a runner claims from (MCPs mig 532, board task fd5cabfa
+#: A5). ``hub`` is the rebuild and the four session verbs, run on the hub
+#: by ``fleet-agent``; ``node`` is the make targets a fleet node runs on a
+#: checked-out commit, claimed by ``fleet-node-agent``. The queue partitions
+#: its claims by lane, which is what stops a revive queueing behind a check.
+DISPATCH_LANES: Final = ("hub", "node")
+
+#: Narrow type for a runner's lane.
+DispatchLane = Literal["hub", "node"]
+
 #: The terminal statuses a runner may report.
 CLOSING_STATUSES: Final = ("passed", "failed", "refused")
 
@@ -114,6 +126,17 @@ class DispatchJob(TypedDict):
             None for every other command. The tool renders it as an explicit
             ``null`` on those, so a missing key is a changed contract, not
             an absent target.
+        sha: The commit a make-target job checks (MCPs mig 532), forty
+            lowercase hex, and None on the hub verbs. The export runner
+            fetches exactly this and a closure cites it.
+        required_tags: The node capabilities the job requires, from
+            :data:`~fleet.contracts.tags.NODE_TAGS`; the queue only hands a
+            node-lane runner a job whose tags its node carries, and the
+            runner re-checks the value against the registry's declaration
+            for the project before it exports.
+        task_id: The board task whose thread receives the verdict, or None
+            when the submitter named none, in which case the verdict is a
+            note addressed to the submitting label.
     """
 
     job_id: str
@@ -127,6 +150,9 @@ class DispatchJob(TypedDict):
     submitted_by: str
     session_id: str
     session_target: str | None
+    sha: str | None
+    required_tags: tuple[NodeTag, ...]
+    task_id: str | None
 
 
 def _malformed(detail: str, *, answer: str) -> AppError[FleetErrorCode]:
@@ -245,6 +271,42 @@ def _require_command(row: dict[str, JSONValue], *, answer: str) -> DispatchComma
     )
 
 
+def _require_tags(row: dict[str, JSONValue], *, answer: str) -> tuple[NodeTag, ...]:
+    """Read the ``requiredTags`` field against the tag vocabulary.
+
+    Args:
+        row: The decoded object.
+        answer: The whole answer, for the error message.
+
+    Returns:
+        The tags, in the queue's order.
+
+    Raises:
+        AppError: ``QUEUE_ANSWER_MALFORMED`` when the field is absent, not
+            an array, or names a tag this fleet does not derive: the queue's
+            CHECK and this vocabulary are twins, so a stranger here means
+            one of them moved without the other.
+    """
+    value = row.get("requiredTags")
+    if not isinstance(value, list):
+        raise _malformed(
+            f"field 'requiredTags' is {type(value).__name__}, not an array", answer=answer
+        )
+    tags: list[NodeTag] = []
+    for index, entry in enumerate(value):
+        matched: NodeTag | None = None
+        for tag in NODE_TAGS:
+            if entry == tag:
+                matched = tag
+        if matched is None:
+            raise _malformed(
+                f"requiredTags[{index}] {entry!r} is not one of {', '.join(NODE_TAGS)}",
+                answer=answer,
+            )
+        tags.append(matched)
+    return tuple(tags)
+
+
 def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
     """Decode one job object.
 
@@ -273,6 +335,9 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         submitted_by=_require_str(value, "submittedBy", answer=answer),
         session_id=_require_str(value, "sessionId", answer=answer),
         session_target=_require_optional_str(value, "sessionTarget", answer=answer),
+        sha=_require_optional_str(value, "sha", answer=answer),
+        required_tags=_require_tags(value, answer=answer),
+        task_id=_require_optional_str(value, "taskId", answer=answer),
     )
 
 
@@ -374,10 +439,13 @@ def encode_job_line(job: DispatchJob) -> str:
     # A restart is not a make; naming a target that does not exist would
     # send the reader to a Makefile for a rule they will not find.
     target = job["session_target"]
+    # A check names the commit it checks, abbreviated as git abbreviates,
+    # because the line is read beside git log; a hub verb has none.
+    at = f" at {job['sha'][:12]}" if job["sha"] is not None else ""
     verb = (
         f"restart session {target}"
         if target is not None
-        else f"make {job['command']} {job['project']}"
+        else f"make {job['command']} {job['project']}{at}"
     )
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
 
@@ -385,10 +453,12 @@ def encode_job_line(job: DispatchJob) -> str:
 __all__ = [
     "CLOSING_STATUSES",
     "DISPATCH_COMMANDS",
+    "DISPATCH_LANES",
     "DISPATCH_STATUSES",
     "ClosingStatus",
     "DispatchCommand",
     "DispatchJob",
+    "DispatchLane",
     "DispatchStatus",
     "decode_claim",
     "decode_job",

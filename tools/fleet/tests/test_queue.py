@@ -13,6 +13,7 @@ from platform_core.json_utils import dump_json_str
 
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import (
+    DEFAULT_SHA,
     QUEUE_CREDENTIALS,
     RUNNER_IDENTITY,
     FakeEnv,
@@ -75,6 +76,8 @@ class TestClaim:
         assert (
             queue.claim_next(
                 QUEUE_CREDENTIALS,
+                lane="hub",
+                tags=(),
                 node=None,
                 lease_seconds=3600,
                 identity=RUNNER_IDENTITY,
@@ -90,7 +93,12 @@ class TestClaim:
         _test_hooks.http_post = endpoint
 
         job = queue.claim_next(
-            QUEUE_CREDENTIALS, node=None, lease_seconds=900, identity=RUNNER_IDENTITY
+            QUEUE_CREDENTIALS,
+            lane="node",
+            tags=("windows", "gpu"),
+            node=None,
+            lease_seconds=900,
+            identity=RUNNER_IDENTITY,
         )
 
         assert job == {
@@ -105,9 +113,14 @@ class TestClaim:
             "submitted_by": "opus-dispatch-0905",
             "session_id": "11111111-aaaa-4aaa-8aaa-111111111111",
             "session_target": None,
+            "sha": DEFAULT_SHA,
+            "required_tags": (),
+            "task_id": None,
         }
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0] == {
+            "lane": "node",
+            "tags": ["windows", "gpu"],
             "leaseSeconds": 900,
             "agent": "fleet-runner-austinpc",
             "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
@@ -120,12 +133,31 @@ class TestClaim:
 
         queue.claim_next(
             QUEUE_CREDENTIALS,
+            lane="node",
+            tags=("windows",),
             node="lavender",
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
 
         assert endpoint.arguments[0]["node"] == "lavender"
+        assert endpoint.arguments[0]["lane"] == "node"
+
+    def test_a_hub_runner_sends_the_hub_lane_and_no_tags(self) -> None:
+        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        queue.claim_next(
+            QUEUE_CREDENTIALS,
+            lane="hub",
+            tags=(),
+            node=None,
+            lease_seconds=900,
+            identity=RUNNER_IDENTITY,
+        )
+
+        assert endpoint.arguments[0]["lane"] == "hub"
+        assert endpoint.arguments[0]["tags"] == []
 
 
 class TestReport:

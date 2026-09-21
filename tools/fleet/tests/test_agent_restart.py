@@ -47,6 +47,8 @@ def restart_row(**overrides: JSONValue) -> JSONObject:
         "requestedNode": "austinpc",
         "sessionTarget": TARGET,
         "submittedBy": "fable-dm-versionsplit-0912",
+        # A session verb acts on the hub, not on a commit (MCPs mig 532).
+        "sha": None,
     }
     fields.update(overrides)
     return queue_job(**fields)
@@ -76,7 +78,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row()}),
                 dump_json_str({"job": restart_row(status="running", node="austinpc")}),
                 dump_json_str({"job": restart_row(status="passed", node="austinpc")}),
@@ -86,12 +87,11 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        assert endpoint.tools == [
-            "dispatch_list",
-            "dispatch_claim",
-            "dispatch_report",
-            "dispatch_report",
-        ]
+        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
+        # The hub lane, with the hub's own tags: none. What keeps a revive
+        # out of a queue of checks (board task fd5cabfa, A5).
+        assert endpoint.arguments[0]["lane"] == "hub"
+        assert endpoint.arguments[0]["tags"] == []
         assert runner.calls == [restart.restart_argv(mcps, TARGET)]
         # The child must not inherit this agent's own poetry venv, or the
         # session-audit script resolves inside the wrong environment.
@@ -99,11 +99,11 @@ class TestRestartLane:
         # And it carries the lane's deadline, so a pane or hop that stops
         # answering closes the job failed instead of holding the tick.
         assert runner.timeouts == [restart.SESSION_JOB_TIMEOUT_SECONDS] == [600]
-        started = endpoint.arguments[2]
+        started = endpoint.arguments[1]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
         assert started["runId"] == f"restart-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[3]
+        closed = endpoint.arguments[2]
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
@@ -139,7 +139,6 @@ class TestRestartLane:
         revive_row = restart_row(command="revive-session")
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": revive_row}),
                 dump_json_str(
                     {
@@ -159,9 +158,9 @@ class TestRestartLane:
 
         assert runner.calls == [restart.revive_argv(mcps, TARGET, "fable-dm-versionsplit-0912")]
         assert runner.unset_env == [("VIRTUAL_ENV",)]
-        started = endpoint.arguments[2]
+        started = endpoint.arguments[1]
         assert started["runId"] == f"revive-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[3]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail.startswith("session-audit revive exited 0:")
@@ -177,7 +176,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str(
                     {"claimed": restart_row(command="revive-session", submittedBy="Not A Label")}
                 ),
@@ -189,7 +187,7 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == []
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
 
@@ -220,7 +218,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row(command=command)}),
                 dump_json_str(
                     {"job": restart_row(command=command, status="running", node="austinpc")}
@@ -238,8 +235,8 @@ class TestRestartLane:
             restart.kill_argv(mcps, TARGET, "fable-dm-versionsplit-0912", hard=hard)
         ]
         assert runner.unset_env == [("VIRTUAL_ENV",)]
-        assert endpoint.arguments[2]["runId"] == f"kill-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[3]
+        assert endpoint.arguments[1]["runId"] == f"kill-{DEFAULT_JOB_ID}"
+        closed = endpoint.arguments[2]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"session-audit kill exited 0: {line.strip()}"
@@ -255,7 +252,6 @@ class TestRestartLane:
         )
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row(command="kill-session")}),
                 dump_json_str(
                     {"job": restart_row(command="kill-session", status="running", node="austinpc")}
@@ -269,7 +265,7 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        closed = endpoint.arguments[3]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 1
         assert "KILL - REFUSED" in narrow_json_to_str(closed["detail"])
@@ -283,7 +279,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str(
                     {"claimed": restart_row(command="kill-session-hard", submittedBy="--hard; rm")}
                 ),
@@ -295,7 +290,7 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == []
-        assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(endpoint.arguments[2]["detail"])
+        assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(endpoint.arguments[1]["detail"])
 
     def test_a_skipped_or_failed_restart_closes_failed_with_session_audits_reason(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
@@ -321,7 +316,6 @@ class TestRestartLane:
         )
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row()}),
                 dump_json_str({"job": restart_row(status="running", node="austinpc")}),
                 dump_json_str({"job": restart_row(status="failed", node="austinpc")}),
@@ -331,7 +325,7 @@ class TestRestartLane:
 
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
-        closed = endpoint.arguments[3]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 1
         assert "SKIPPED    mcps-6e" in narrow_json_to_str(closed["detail"])
@@ -344,7 +338,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row()}),
                 dump_json_str({"job": restart_row(status="refused")}),
             ]
@@ -354,7 +347,7 @@ class TestRestartLane:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == []
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         assert "exitCode" not in closed
         assert "RESTART_ROOT_MISSING" in narrow_json_to_str(closed["detail"])
@@ -368,7 +361,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row(sessionTarget="mcps-99; rm -rf /")}),
                 dump_json_str({"job": restart_row(status="refused")}),
             ]
@@ -378,7 +370,7 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == []
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[1]
         assert "RESTART_TARGET_INVALID" in narrow_json_to_str(closed["detail"])
 
     def test_a_row_with_no_target_is_refused_by_name(
@@ -390,7 +382,6 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
-                dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": restart_row(sessionTarget=None)}),
                 dump_json_str({"job": restart_row(status="refused")}),
             ]
@@ -400,4 +391,4 @@ class TestRestartLane:
         assert agent.main(hub_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == []
-        assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[2]["detail"])
+        assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])

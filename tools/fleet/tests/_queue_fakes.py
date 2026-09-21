@@ -118,12 +118,17 @@ RUNNER_IDENTITY: JSONObject = {
 #: restating the literal.
 DEFAULT_JOB_ID = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
 
+#: The commit every :func:`queue_job` check names unless overridden (MCPs
+#: mig 532): forty lowercase hex, the shape the queue's pin admits.
+DEFAULT_SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
+
 
 def queue_job(**overrides: JSONValue) -> JSONObject:
     """Build one wire-shape job object, as ``dispatch_*`` renders it.
 
     Every field the decoder reads is present by default, so a test that omits
-    one is deliberately testing its absence.
+    one is deliberately testing its absence. The default row is a check, so it
+    carries :data:`DEFAULT_SHA`; a hub verb's row passes ``sha=None``.
 
     Args:
         **overrides: Fields to vary from the defaults.
@@ -143,6 +148,9 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "submittedBy": "opus-dispatch-0905",
         "sessionId": "11111111-aaaa-4aaa-8aaa-111111111111",
         "sessionTarget": None,
+        "sha": DEFAULT_SHA,
+        "requiredTags": [],
+        "taskId": None,
     }
     row.update(overrides)
     return row

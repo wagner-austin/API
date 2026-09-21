@@ -257,8 +257,28 @@ class TestRendering:
         )
 
         assert line == (
-            "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa running make check libs/demo "
+            "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa running make check libs/demo at 4e3c6bc1d9f0 "
             "@lavender run=libs-demo-1757000000"
+        )
+
+    def test_a_hub_verb_with_no_sha_names_none(self) -> None:
+        line = encode_job_line(
+            claimed_job(
+                answer(
+                    {
+                        "claimed": queue_job(
+                            command="build-bases",
+                            project="MCPs",
+                            requestedNode="austinpc",
+                            sha=None,
+                        )
+                    }
+                )
+            )
+        )
+
+        assert line == (
+            "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa queued make build-bases MCPs @austinpc"
         )
 
     def test_a_queued_job_names_the_node_it_asked_for(self) -> None:
