@@ -35,6 +35,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.budget import admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.tags import missing_tags, node_tags
 
 
 class Unassessed(TypedDict):
@@ -85,8 +86,11 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
     machine. The node's figure describes its default tenant; the project's
     describes this one.
 
-    Checks run cheapest-consequence first: concurrency, then disk, then
-    memory. Memory is last because its message is the most specific and a
+    Checks run cheapest-consequence first: the project's required tags, then
+    concurrency, then disk, then memory. Tags come first because a node of
+    the wrong kind is refused however idle it is, and a reader told "sedona
+    is full" about a linux-only suite would wait for a node that can never
+    take it. Memory is last because its message is the most specific and a
     reader should see it rather than a disk complaint that happens to also be
     true.
 
@@ -98,6 +102,19 @@ def assess(node: NodeConfig, state: NodeState, project: ProjectConfig) -> Dispat
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
+    missing = missing_tags(node, project["required_tags"])
+    if missing:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_LACKS_TAG,
+            reason=(
+                f"{node['host']} lacks {', '.join(missing)}: the project requires "
+                f"{', '.join(project['required_tags'])} and this node carries "
+                f"{', '.join(sorted(node_tags(node)))}. Tags are derived from the node's "
+                "declared platform and gpu, so the answer is another node, never this one "
+                "later."
+            ),
+        )
     if state["live_runs"] >= node["budget"]["max_concurrent_runs"]:
         return DispatchVerdict(
             workers=0,
@@ -163,12 +180,13 @@ def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) ->
         Workers to grant, never fewer than the project's minimum.
 
     Raises:
-        AppError: With ``NODE_OWNER_RESERVED`` when nothing is left after the
-            owner's reservation or the node is at its concurrency limit,
-            ``NODE_DISK_EXHAUSTED`` when the staged tree would not fit, or
-            ``NODE_MEMORY_EXHAUSTED`` when the node affords fewer workers
-            than the project can use. Distinct codes because the fixes
-            differ: wait, clean up, or use a bigger node.
+        AppError: With ``NODE_LACKS_TAG`` when the node is missing a tag the
+            project requires, ``NODE_OWNER_RESERVED`` when nothing is left
+            after the owner's reservation or the node is at its concurrency
+            limit, ``NODE_DISK_EXHAUSTED`` when the staged tree would not
+            fit, or ``NODE_MEMORY_EXHAUSTED`` when the node affords fewer
+            workers than the project can use. Distinct codes because the
+            fixes differ: another node, wait, clean up, or a bigger node.
     """
     verdict = assess(node, state, project)
     if verdict["code"] is not None:
@@ -179,25 +197,33 @@ def plan_dispatch(node: NodeConfig, state: NodeState, project: ProjectConfig) ->
 def _nothing_fits_code(
     candidates: tuple[tuple[str, NodeConfig, NodeState], ...],
     unassessed: tuple[Unassessed, ...],
+    refused_with: tuple[FleetErrorCode, ...],
 ) -> FleetErrorCode:
     """Classify a fleet-wide refusal by what actually happened.
 
-    Three answers, because they send a reader to three different places: the
-    tailnet, ``fleet.json``, or the clock. Order matters -- a node that was
-    asked and stayed silent outranks one nobody asked, because it is the only
-    one of the three with something to investigate.
+    Four answers, because they send a reader to four different places: the
+    tailnet, ``fleet.json``, the project's ``required_tags``, or the clock.
+    Order matters -- a node that was asked and stayed silent outranks one
+    nobody asked, because it is the only one of the four with something to
+    investigate.
 
     Args:
         candidates: Nodes that answered and were weighed.
         unassessed: Nodes that produced no verdict.
+        refused_with: The code each weighed node refused with, in order.
 
     Returns:
-        The code the refusal carries.
+        The code the refusal carries. ``NODE_LACKS_TAG`` only when EVERY
+        weighed node refused for its tags: one node short of memory beside
+        three of the wrong kind is still a capacity answer, because that one
+        node will take the work later and the reader should wait for it.
     """
     if not candidates and any(entry["asked"] for entry in unassessed):
         return FleetErrorCode.NODE_UNREACHABLE
     if not candidates and unassessed:
         return FleetErrorCode.NODE_DISABLED
+    if candidates and all(code is FleetErrorCode.NODE_LACKS_TAG for code in refused_with):
+        return FleetErrorCode.NODE_LACKS_TAG
     return FleetErrorCode.NODE_MEMORY_EXHAUSTED
 
 
@@ -237,7 +263,7 @@ def first_fit(
         The chosen node's name and its worker count.
 
     Raises:
-        AppError: With one of three codes, chosen by
+        AppError: With one of four codes, chosen by
             :func:`_nothing_fits_code` and all carrying EVERY node's own
             refusal rather than the first:
 
@@ -248,27 +274,35 @@ def first_fit(
             workspace declares is switched off in it. Nothing failed; look at
             ``fleet.json``.
 
-            ``NODE_MEMORY_EXHAUSTED`` -- nodes answered and all refused, or
-            the workspace declares no nodes at all, which is a configuration
-            fault rather than a fleet that is down.
+            ``NODE_LACKS_TAG`` -- nodes answered and every one of them is
+            the wrong kind for this project's ``required_tags``. Nothing is
+            full; the fleet has no node of that kind, or the declaration
+            asks for one it does not have.
 
-            The three are the point, not a detail. A single code would send
-            two thirds of its readers to the wrong file. It is the same
+            ``NODE_MEMORY_EXHAUSTED`` -- nodes answered and all refused, at
+            least one of them on capacity, or the workspace declares no
+            nodes at all, which is a configuration fault rather than a
+            fleet that is down.
+
+            The four are the point, not a detail. A single code would send
+            most of its readers to the wrong file. It is the same
             distinction ``refused`` draws against ``failed`` one layer up.
     """
     best_name = ""
     best_workers = 0
     refusals: list[str] = [f"{entry['name']}: {entry['reason']}" for entry in unassessed]
+    refused_with: list[FleetErrorCode] = []
     for name, node, state in candidates:
         verdict = assess(node, state, project)
         if verdict["code"] is not None:
             refusals.append(f"{name}: {verdict['reason']}")
+            refused_with.append(verdict["code"])
             continue
         if verdict["workers"] > best_workers:
             best_name, best_workers = name, verdict["workers"]
     if best_workers == 0:
         raise AppError(
-            _nothing_fits_code(candidates, unassessed),
+            _nothing_fits_code(candidates, unassessed, tuple(refused_with)),
             "no node can take this dispatch right now. " + " | ".join(refusals),
         )
     return best_name, best_workers
