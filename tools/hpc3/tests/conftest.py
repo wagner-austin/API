@@ -20,9 +20,10 @@ from collections.abc import Generator, Mapping, Sequence
 import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.mcp_testing import FakeHttpPost
+from platform_core.session_label import LABEL_VARIABLE
 
 from hpc3.cli import _test_hooks as cli_hooks
-from hpc3.cli._config import SUBMITTER_ENV
 from hpc3.clusters.hpc3 import HPC3
 from hpc3.contracts.cluster import ClusterFacts
 from hpc3.core import _test_hooks as core_hooks
@@ -128,12 +129,37 @@ class FakeRun:
         return [call.remote_command for call in self.calls]
 
 
+def _unset_environment(key: str) -> str | None:
+    """Every variable reads as unset.
+
+    Args:
+        key: The variable asked for.
+
+    Returns:
+        None, always.
+    """
+    return None
+
+
 @pytest.fixture(autouse=True)
 def _reset_hooks() -> Generator[None, None, None]:
-    """Rebind every hook to production before and after each test."""
+    """Rebind every hook to production before and after each test, with the
+    environment empty and the board unreachable in between.
+
+    The environment is pinned EMPTY for every test, not only the ones that
+    ask for a label: the submitter lookup reads ``CLAUDE_CODE_SESSION_ID``,
+    which the harness exports into the shell a suite runs in, and an
+    unpinned test would ask the real taskboard who the developer's session
+    is. The poster is a scripted fake with nothing scripted, so any such
+    ask raises ``unscripted POST`` rather than reaching loopback.
+    """
     core_hooks.reset_hooks()
     cli_hooks.reset_hooks()
+    previous_env = config_test_hooks.get_env
+    config_test_hooks.get_env = _unset_environment
+    cli_hooks.http_post = FakeHttpPost([])
     yield
+    config_test_hooks.get_env = previous_env
     core_hooks.reset_hooks()
     cli_hooks.reset_hooks()
 
@@ -227,14 +253,15 @@ def _make_declared_label() -> Generator[str, None, None]:
     package hook because ``platform_core.config`` is the workspace's one
     sanctioned environment reader -- there is no hpc3-side seam to pin. Every
     other variable reads as unset, so the test's environment is the fixture,
-    not the developer's shell.
+    not the developer's shell; in particular no session id is set, so the
+    label is taken as a terminal's export and the board is never asked.
 
     Yields:
         The label every submission in the test will record.
     """
 
     def _env(key: str) -> str | None:
-        return DECLARED_LABEL if key == SUBMITTER_ENV else None
+        return DECLARED_LABEL if key == LABEL_VARIABLE else None
 
     previous = config_test_hooks.get_env
     config_test_hooks.get_env = _env

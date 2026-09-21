@@ -16,7 +16,9 @@ import pathlib
 from platform_core import cli_args
 from platform_core.config import _optional_env_str
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.session_label import LABEL_VARIABLE, SESSION_ID_VARIABLE, resolve_label
 
+from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.contracts.workspace import (
     Workspace,
     WorkspaceConnection,
@@ -92,33 +94,60 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
     return decode_workspace(value, config_dir=config_dir)
 
 
-SUBMITTER_ENV = "BOARD_AGENT_LABEL"
-"""Where a session declares the board label its submissions record."""
+def _stack_env_text(path: pathlib.Path) -> str:
+    """Read the stack's ``.env`` through the core's byte seam.
+
+    Args:
+        path: The file :mod:`platform_core.session_label` asks for.
+
+    Returns:
+        Its text.
+    """
+    return core_hooks.read_bytes(path).decode("utf-8")
 
 
 def submitter_label() -> str:
-    """Read the submitting session's declared agent-board label.
+    """Resolve the submitting session's agent-board label against the board.
 
     Shared by every submitting entry point for the same reason
     :func:`load_workspace` is: the ledger's ``submitter`` field must mean
     one thing, not five slightly different readings of the environment.
 
+    THE ENVIRONMENT IS NOT BELIEVED ON ITS OWN (MCPs board task 3843d29f).
+    Inside a Claude Code session the harness exports the session's id, and
+    :func:`platform_core.session_label.resolve_label` asks ``task_whereis``
+    which label the board bound to it: an unset ``BOARD_AGENT_LABEL`` is
+    filled from the binding, and one naming a different label is refused
+    before anything is submitted, so a bridge never tags the wrong session
+    for a job's terminal state. Outside a session the export is taken as
+    given.
+
     Returns:
-        The label from :data:`SUBMITTER_ENV`, or ``""`` when the variable
-        is unset, empty, or whitespace -- the ledger's positive "declared
-        none". The spellings of not-declaring collapse deliberately: an
-        empty export names nobody to tag, exactly like no export. Read
+        The label the board binds the session to, else the label the shell
+        exported, else ``""`` -- the ledger's positive "declared none". The
+        spellings of not-declaring collapse deliberately: an empty export
+        names nobody to tag, exactly like no export. Both variables are read
         through :func:`platform_core.config._optional_env_str` because that
         is the workspace's one sanctioned environment reader; the guard
         bans a second one.
+
+    Raises:
+        AppError: ``SESSION_LABEL_MISMATCH`` when the shell's label is not
+            the one the board bound to the session; ``SESSION_ID_MALFORMED``
+            or ``SESSION_LABEL_CREDENTIALS_MISSING`` when the board cannot be
+            asked, and the :class:`McpClientErrorCode` failures when it does
+            not answer.
     """
-    value = _optional_env_str(SUBMITTER_ENV)
-    return "" if value is None else value
+    return resolve_label(
+        session_id=_optional_env_str(SESSION_ID_VARIABLE),
+        exported=_optional_env_str(LABEL_VARIABLE),
+        read_text=_stack_env_text,
+        post=cli_hooks.http_post,
+    )
 
 
 __all__ = [
     "CONFIG_FLAG",
-    "SUBMITTER_ENV",
     "load_workspace",
     "load_workspace_connection",
     "submitter_label",

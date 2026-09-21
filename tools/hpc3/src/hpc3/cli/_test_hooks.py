@@ -2,9 +2,12 @@
 
 The CLI's impure acts beyond what the core already routes through hooks are
 writing its report to stdout, its refusals to stderr, reading the wall clock,
-and -- for the follow mode -- sleeping between polls. All go through hooks so
-a test asserts what a command reported rather than what pytest managed to
-capture, and drives a polling loop without waiting through it.
+for the follow mode sleeping between polls, and -- for every submitting
+command -- one POST to the taskboard on loopback asking which board label
+the acting session is bound to (MCPs board task 3843d29f). All go through
+hooks so a test asserts what a command reported rather than what pytest
+managed to capture, drives a polling loop without waiting through it, and
+answers the board's question without a board.
 """
 
 from __future__ import annotations
@@ -13,6 +16,8 @@ import datetime
 import sys
 import time
 from collections.abc import Callable
+
+from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 
 def _default_emit(line: str) -> None:
@@ -62,15 +67,20 @@ emit: Callable[[str], None] = _default_emit
 emit_error: Callable[[str], None] = _default_emit_error
 now_iso: Callable[[], str] = _default_now_iso
 sleep: Callable[[float], None] = _default_sleep
+#: The MCP poster the submitter lookup asks the taskboard through: the same
+#: urllib poster every bridge in this monorepo uses, bound here rather than
+#: in ``platform_core`` so this package's seams stay in one module.
+http_post: McpPostProtocol = urllib_mcp_post
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global emit, emit_error, now_iso, sleep
+    global emit, emit_error, now_iso, sleep, http_post
     emit = _default_emit
     emit_error = _default_emit_error
     now_iso = _default_now_iso
     sleep = _default_sleep
+    http_post = urllib_mcp_post
 
 
-__all__ = ["emit", "emit_error", "now_iso", "reset_hooks", "sleep"]
+__all__ = ["emit", "emit_error", "http_post", "now_iso", "reset_hooks", "sleep"]

@@ -25,6 +25,7 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.json_utils import load_json_str
+from platform_core.session_label import LABEL_VARIABLE
 
 from hpc3.cli import _config, _fatal, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts, describe_gpu_request, partition_bills
@@ -155,10 +156,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         # the wake still did not arrive, because the one thing that decides it
         # is read at submit time and reported nowhere.
         _test_hooks.emit(
-            f"  note: {_config.SUBMITTER_ENV} is unset, so the ledger records no "
-            "submitter and a board bridge will announce this job's terminal "
-            "state without tagging anyone. Export it before submitting if you "
-            "want to be woken."
+            f"  note: {LABEL_VARIABLE} is unset and the board binds no label to "
+            "this shell's session, so the ledger records no submitter and a "
+            "board bridge will announce this job's terminal state without "
+            "tagging anyone. A session that has posted a checkin is addressed "
+            "automatically; a terminal exports it before submitting."
         )
     _test_hooks.emit(f"watch: hpc3-watch --config {parsed[_config.CONFIG_FLAG]} --job {job_id}")
     return 0

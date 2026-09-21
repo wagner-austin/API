@@ -94,8 +94,11 @@ class LedgerEntry(TypedDict):
 
             THREE states, mirroring ``image_digest`` for the same reason:
 
-            - a label -- the submitting session declared its board label
-              (``BOARD_AGENT_LABEL`` in its environment);
+            - a label -- the board's binding for the submitting session,
+              resolved by :mod:`platform_core.session_label` from the
+              session id the harness exports (MCPs board task 3843d29f),
+              or the ``BOARD_AGENT_LABEL`` a shell outside a session
+              exported;
             - ``""`` -- the submitter was asked and declared no label,
               which is a positive fact: the job is announceable but there
               is nobody specific to tag;
