@@ -253,6 +253,18 @@ class TestTheObserverReadsRoleAndUser:
 
         assert "platform" in str(excinfo.value)
 
+    def test_a_platform_with_no_dialect_is_refused(self) -> None:
+        """Every script the session observer sends is rendered in the
+        platform's dialect, so a word with none is refused at the edge rather
+        than found as a parse error on the far side (board task cd5010c4)."""
+        with pytest.raises(Exception) as excinfo:
+            registry.decode_registry_nodes(
+                '{"nodes": [{"name": "phone", "role": "client", "user": null, '
+                '"enabled": true, "platform": "android"}]}'
+            )
+
+        assert "platform must be one of windows, linux, got 'android'" in str(excinfo.value)
+
 
 class TestAnUnreadableRegistryIsRefused:
     def test_a_document_that_is_not_an_object(self) -> None:

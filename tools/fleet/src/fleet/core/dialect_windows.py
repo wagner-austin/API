@@ -129,6 +129,35 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 """
 
 
+#: The session-observer script, verbatim. Nothing is substituted into it.
+#:
+#: Written for :mod:`fleet.core.observe` (MCPs board task 5a3865bf) and
+#: moved here unchanged when the Linux dialect got its own (board task
+#: cd5010c4). ``platform`` is the literal ``win32`` because this text runs
+#: under PowerShell on Windows by construction. ``hostname`` is lowercased
+#: because that is how the harness spells ``pidDomain`` (measured on
+#: austinpc: ``$env:COMPUTERNAME`` is ``AUSTINPC``, the record says
+#: ``win32:austinpc``). Records are emitted UNTOUCHED so the decode on the
+#: hub sees exactly the bytes the harness wrote, and an absent directory is
+#: an empty array rather than an error.
+OBSERVE_SESSIONS_SCRIPT = """\
+$ErrorActionPreference = 'Stop'
+$dir = Join-Path $HOME '.claude\\sessions'
+$records = @()
+if (Test-Path -LiteralPath $dir) {
+    foreach ($file in Get-ChildItem -LiteralPath $dir -Filter '*.json' -File) {
+        $records += , (Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json)
+    }
+}
+$document = [pscustomobject]@{
+    platform = 'win32'
+    hostname = $env:COMPUTERNAME.ToLowerInvariant()
+    records  = @($records)
+}
+$document | ConvertTo-Json -Depth 8 -Compress
+"""
+
+
 class WindowsDialect:
     """The PowerShell rendering of every remote act."""
 
@@ -143,6 +172,27 @@ class WindowsDialect:
             The absolute path.
         """
         return f"{directory}/{stem}.ps1"
+
+    def fleet_directory(self, user: str) -> str:
+        """The provisioned account's ``.fleet`` directory.
+
+        Args:
+            user: The provisioned account.
+
+        Returns:
+            ``C:/Users/<user>/.fleet``, literal and absolute: the write
+            command expands nothing, so ``$env:USERPROFILE`` would name a
+            directory called that.
+        """
+        return f"C:/Users/{user}/.fleet"
+
+    def observe_sessions_script(self) -> str:
+        """The constant session-observer script.
+
+        Returns:
+            :data:`OBSERVE_SESSIONS_SCRIPT`.
+        """
+        return OBSERVE_SESSIONS_SCRIPT
 
     def write_command(self, path: str) -> str:
         """The remote command that writes standard input to a path.
@@ -353,6 +403,7 @@ class WindowsDialect:
 __all__ = [
     "CAPACITY_PROBE_SCRIPT",
     "LAUNCH_TIMEOUT_SECONDS",
+    "OBSERVE_SESSIONS_SCRIPT",
     "POWERSHELL_INVOCATION",
     "TASK_HAS_NOT_RUN",
     "TOOLCHAIN_PROBE_SCRIPT",

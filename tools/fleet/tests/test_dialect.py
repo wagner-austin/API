@@ -33,6 +33,9 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
         assert names.task_name("r") in spoken.stop_script("r")
         assert "free_ram_gb" in spoken.capacity_probe_script()
         assert "poetry" in spoken.toolchain_probe_script()
+        assert spoken.fleet_directory("austi") in {"C:/Users/austi/.fleet", "/home/austi/.fleet"}
+        assert ".claude" in spoken.observe_sessions_script()
+        assert "sessions" in spoken.observe_sessions_script()
 
 
 def test_the_shared_scripts_are_the_same_command_on_both_platforms() -> None:

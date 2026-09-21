@@ -15,18 +15,65 @@ from __future__ import annotations
 import base64
 import hashlib
 import pathlib
+import socket
 import subprocess
 import sys
 
 import pytest
+from platform_core.config import config_test_hooks
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
 from fleet.core import names
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect_linux import (
+    OBSERVE_SESSIONS_PYTHON,
+    OBSERVE_SESSIONS_SCRIPT,
+    PROLOGUE,
+    SH_INVOCATION,
+    LinuxDialect,
+)
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 DIALECT = LinuxDialect()
 
 TARGET = "/home/corvis/fleet/stage/run-1"
+
+#: One registration document in the shape the harness writes, as a Linux
+#: node would hold it: a POSIX cwd and a socket under the user's runtime dir.
+SESSION_RECORD: JSONObject = {
+    "sessionId": "d31e5228-3269-4a22-a27f-e535cbef1894",
+    "pid": 4242,
+    "startedAt": 1_789_000_000_000,
+    "updatedAt": 1_789_000_030_500,
+    "name": "api-7e",
+    "nameSource": "derived",
+    "cwd": "/home/corvis/PROJECTS/API",
+    "messagingSocketPath": "/run/user/1000/claude-cc-msg-abc",
+    "version": "2.1.278",
+    "status": "idle",
+    "pidDomain": "linux:diphtheria",
+}
+
+
+def home_with_sessions(tmp_path: pathlib.Path, *records: JSONObject) -> dict[str, str]:
+    """Lay out a home directory holding these session records.
+
+    Args:
+        tmp_path: The directory that becomes the home.
+        *records: The registration documents, written as ``<pid>.json``.
+
+    Returns:
+        The environment that makes ``~`` resolve there under both
+        ``os.path.expanduser`` spellings (``HOME`` on POSIX, ``USERPROFILE``
+        on Windows), over the parent environment read through the
+        monorepo's one permitted reader so the interpreter still starts.
+    """
+    if records:
+        sessions = tmp_path / ".claude" / "sessions"
+        sessions.mkdir(parents=True)
+        for record in records:
+            (sessions / f"{record['pid']}.json").write_text(dump_json_str(record), encoding="utf-8")
+    parent = config_test_hooks.get_environment()
+    return {**parent, "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}
 
 
 def fields_of(output: str) -> dict[str, str]:
@@ -58,6 +105,7 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         DIALECT.stop_script(DEMO_RUN_ID),
         DIALECT.capacity_probe_script(),
         DIALECT.toolchain_probe_script(),
+        DIALECT.observe_sessions_script(),
     ]
     assert PROLOGUE.startswith("set -eu\n")
     assert 'PATH="$HOME/.local/bin:$PATH"' in PROLOGUE
@@ -171,6 +219,90 @@ class TestTransportShape:
         assert "winget" not in body
         assert "choco" not in body
 
+    def test_the_fleet_directory_is_the_literal_home_path(self) -> None:
+        """The write command single-quotes the path, so ``~`` would be a
+        directory called ``~``; the account's home is spelled out."""
+        assert DIALECT.fleet_directory("corvis") == "/home/corvis/.fleet"
+        assert DIALECT.script_path(DIALECT.fleet_directory("corvis"), "observe-sessions") == (
+            "/home/corvis/.fleet/observe-sessions.sh"
+        )
+
+    def test_the_observe_script_feeds_python3_through_a_quoted_heredoc(self) -> None:
+        """sh cannot join files into one JSON array that survives an empty
+        directory or a quote in a field; python3 can, and it is on every
+        Linux node by the toolchain contract (board task cd5010c4)."""
+        body = DIALECT.observe_sessions_script()
+
+        assert body == OBSERVE_SESSIONS_SCRIPT
+        assert body == f"{PROLOGUE}python3 - <<'PY'\n{OBSERVE_SESSIONS_PYTHON}PY\n"
+        assert "'.claude', 'sessions'" in OBSERVE_SESSIONS_PYTHON
+        assert "if os.path.isdir(directory):" in OBSERVE_SESSIONS_PYTHON
+        assert "sorted(os.listdir(directory))" in OBSERVE_SESSIONS_PYTHON
+        assert "'platform': sys.platform" in OBSERVE_SESSIONS_PYTHON
+        assert "'hostname': socket.gethostname().lower()" in OBSERVE_SESSIONS_PYTHON
+        assert "separators=(',', ':')" in OBSERVE_SESSIONS_PYTHON
+
+
+class TestObserveBodyForReal:
+    """The python3 body of the observe script, run by this interpreter.
+
+    The sh around it is one heredoc and runs only where sh exists (the class
+    below); the body is what reads the directory and builds the document, and
+    it runs the same under every interpreter the fleet has, so it is executed
+    HERE, on the hub too, against a home laid out on disk.
+    """
+
+    def run_body(self, environment: dict[str, str]) -> JSONObject:
+        """Run the body exactly as the heredoc feeds it, and decode its line.
+
+        Args:
+            environment: The environment, with the home to read.
+
+        Returns:
+            The decoded document.
+        """
+        completed = subprocess.run(
+            [sys.executable, "-"],
+            input=OBSERVE_SESSIONS_PYTHON,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            env=environment,
+        )
+        assert completed.returncode == 0, completed.stderr
+        document: JSONValue = load_json_str(completed.stdout)
+        if not isinstance(document, dict):
+            raise AssertionError(f"the script printed {type(document).__name__}, not an object")
+        return document
+
+    def test_it_reports_every_record_verbatim_under_the_platform_and_lowercased_host(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        second: JSONObject = {
+            **SESSION_RECORD,
+            "pid": 31868,
+            "sessionId": "06e0b3cd-6de1-45ec-8aa2-c3b48a7f60fc",
+        }
+
+        document = self.run_body(home_with_sessions(tmp_path, second, SESSION_RECORD))
+
+        assert document == {
+            "platform": sys.platform,
+            "hostname": socket.gethostname().lower(),
+            "records": [second, SESSION_RECORD],
+        }
+
+    def test_it_reports_zero_records_for_a_home_that_never_ran_claude_code(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """diphtheria on 2026-09-21: no ``~/.claude`` at all. That is a node
+        with no sessions, not a fault."""
+        document = self.run_body(home_with_sessions(tmp_path))
+
+        assert document["records"] == []
+        assert document["platform"] == sys.platform
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the scripts are sh; run them where it exists")
 class TestForRealUnderSh:
@@ -226,3 +358,28 @@ class TestForRealUnderSh:
 
         assert output.strip() == hashlib.sha256(payload).hexdigest()
         assert (target / names.ARCHIVE_NAME).read_bytes() == payload
+
+    def test_the_observe_script_reports_the_records_under_the_home(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The whole script under sh: the prologue, the heredoc, the body."""
+        home = tmp_path / "home"
+        home.mkdir()
+        script = tmp_path / "observe-sessions.sh"
+        script.write_text(DIALECT.observe_sessions_script(), encoding="utf-8")
+
+        completed = subprocess.run(
+            [*SH_INVOCATION, str(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            env=home_with_sessions(home, SESSION_RECORD),
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        assert load_json_str(completed.stdout) == {
+            "platform": sys.platform,
+            "hostname": socket.gethostname().lower(),
+            "records": [SESSION_RECORD],
+        }

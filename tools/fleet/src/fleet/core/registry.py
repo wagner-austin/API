@@ -51,6 +51,7 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from fleet.contracts.node import NodePlatform, decode_node_platform
 from fleet.contracts.workspace import FleetWorkspace
 from fleet.core import _test_hooks
 
@@ -73,17 +74,21 @@ class RegistryNode(TypedDict):
         enabled: Whether it is expected to answer.
         role: ``hub``, ``vpn-jump``, ``worker`` or ``client``.
         user: The account the fleet provisioned on it, or None for a client.
-        platform: ``windows`` or ``linux``, as the registry spells it; read
-            as a plain string because the registry's set is its own (a phone
-            is ``linux`` there) and this workspace only compares it against
-            the platform it declared.
+        platform: ``windows`` or ``linux``, decoded into the closed set at
+            the edge (board task cd5010c4): the session observer renders its
+            script in this platform's dialect, so a value with no dialect is
+            a registry this workspace cannot act on and is refused here, not
+            discovered as a parse error on the far side. The registry's own
+            vocabulary is the same two words (``fleet-mcp``'s
+            ``FLEET_PLATFORMS``; a phone is ``linux`` there), so nothing it
+            can carry is lost by the narrowing.
     """
 
     name: str
     enabled: bool
     role: str
     user: str | None
-    platform: str
+    platform: NodePlatform
 
 
 class RegistryDrift(TypedDict):
@@ -156,7 +161,7 @@ def decode_registry_nodes(raw: str) -> dict[str, RegistryNode]:
             # ``null`` for a client such as the phone, which is never
             # provisioned and has no account of ours to ssh in as.
             user=None if raw_user is None else narrow_json_to_str(raw_user),
-            platform=require_str(entry, "platform"),
+            platform=decode_node_platform(require_str(entry, "platform")),
         )
     return declared
 

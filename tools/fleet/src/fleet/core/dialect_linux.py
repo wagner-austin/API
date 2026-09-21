@@ -90,6 +90,46 @@ TOOLCHAIN_PROBE_SCRIPT = (
 )
 
 
+#: The body of the session-observer script: what python3 runs, verbatim.
+#:
+#: THE DOCUMENT IS BUILT BY python3, NOT BY sh. The records go out verbatim
+#: inside one JSON array, and ``sh`` has no way to join files into one that
+#: survives an empty directory, a record without a trailing newline or a
+#: field with a quote in it; ``python3`` is on every Linux node by the
+#: toolchain contract (``report python python3`` above), on the PATH the
+#: prologue prepends. ``sys.platform`` is ``linux``, the same word Node's
+#: ``process.platform`` writes into the harness's ``pidDomain``; the
+#: hostname is lowercased as the harness spells it (measured on diphtheria
+#: 2026-09-21: ``hostname`` prints ``Diphtheria``). Records are read in file
+#: name order so two runs over one directory agree, and an absent directory
+#: is an empty array rather than an error. Kept apart from the ``sh`` that
+#: feeds it so a test can run exactly this text under the interpreter it has.
+OBSERVE_SESSIONS_PYTHON = (
+    "import json\n"
+    "import os\n"
+    "import socket\n"
+    "import sys\n"
+    "directory = os.path.join(os.path.expanduser('~'), '.claude', 'sessions')\n"
+    "records = []\n"
+    "if os.path.isdir(directory):\n"
+    "    for name in sorted(os.listdir(directory)):\n"
+    "        if name.endswith('.json'):\n"
+    "            with open(os.path.join(directory, name), encoding='utf-8') as handle:\n"
+    "                records.append(json.load(handle))\n"
+    "document = {\n"
+    "    'platform': sys.platform,\n"
+    "    'hostname': socket.gethostname().lower(),\n"
+    "    'records': records,\n"
+    "}\n"
+    "print(json.dumps(document, separators=(',', ':')))\n"
+)
+
+#: The session-observer script, verbatim: the prologue, then
+#: :data:`OBSERVE_SESSIONS_PYTHON` fed to ``python3`` through a quoted
+#: heredoc, so nothing in the body is expanded by ``sh`` on the way.
+OBSERVE_SESSIONS_SCRIPT = f"{PROLOGUE}python3 - <<'PY'\n{OBSERVE_SESSIONS_PYTHON}PY\n"
+
+
 class LinuxDialect:
     """The ``sh`` rendering of every remote act."""
 
@@ -104,6 +144,27 @@ class LinuxDialect:
             The absolute path.
         """
         return f"{directory}/{stem}.sh"
+
+    def fleet_directory(self, user: str) -> str:
+        """The provisioned account's ``.fleet`` directory.
+
+        Args:
+            user: The provisioned account.
+
+        Returns:
+            ``/home/<user>/.fleet``, literal and absolute, the path
+            :data:`WRITE_COMMAND` single-quotes: a ``~`` inside those quotes
+            would be a directory called ``~``.
+        """
+        return f"/home/{user}/.fleet"
+
+    def observe_sessions_script(self) -> str:
+        """The constant session-observer script.
+
+        Returns:
+            :data:`OBSERVE_SESSIONS_SCRIPT`.
+        """
+        return OBSERVE_SESSIONS_SCRIPT
 
     def write_command(self, path: str) -> str:
         """The remote command that writes standard input to a path.
@@ -286,6 +347,8 @@ class LinuxDialect:
 
 __all__ = [
     "CAPACITY_PROBE_SCRIPT",
+    "OBSERVE_SESSIONS_PYTHON",
+    "OBSERVE_SESSIONS_SCRIPT",
     "PROLOGUE",
     "SH_INVOCATION",
     "TOOLCHAIN_PROBE_SCRIPT",

@@ -125,8 +125,10 @@ A tick is three passes, in this order:
 3. **observe** — read every enabled worker's Claude Code session records
    (`~/.claude/sessions/<pid>.json`) over ssh and hand them to the board's
    session ledger through `task_session_observe`, keyed by the machine they
-   came from (MCPs board task `5a3865bf`). The hub is not visited: its own
-   directory is recorded by `pcsession-mcp`. Only when `--registry` names
+   came from (MCPs board task `5a3865bf`). The script goes out in the
+   node's dialect, PowerShell or `sh`, chosen from the registry's
+   `platform` like every other remote act (board task `cd5010c4`). The hub
+   is not visited: its own directory is recorded by `pcsession-mcp`. Only when `--registry` names
    `fleet-mcp/fleet-nodes.json`; without it the tick logs that observation
    was skipped. A node that is asleep is one logged line, not a failed tick.
    This pass writes to the **taskboard**, so it needs `TASKBOARD_MCP_API_KEY`

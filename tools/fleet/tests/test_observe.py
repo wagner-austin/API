@@ -15,7 +15,8 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import _test_hooks, dialect_windows, observe, remote
+from fleet.contracts.node import NodePlatform
+from fleet.core import _test_hooks, dialect_linux, dialect_windows, observe, remote
 from fleet.core.registry import RegistryNode
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok, timed_out
@@ -64,7 +65,12 @@ def harness_record(*, without: tuple[str, ...] = (), **overrides: JSONValue) -> 
 
 
 def node(
-    name: str, role: str, *, enabled: bool = True, user: str | None = "austin"
+    name: str,
+    role: str,
+    *,
+    enabled: bool = True,
+    user: str | None = "austin",
+    platform: NodePlatform = "windows",
 ) -> RegistryNode:
     """Build one identity-registry node.
 
@@ -73,37 +79,48 @@ def node(
         role: hub, worker, vpn-jump or client.
         enabled: Whether the registry says it should answer.
         user: The provisioned account, or None.
+        platform: What the registry says it runs.
 
     Returns:
         The node.
     """
-    return RegistryNode(name=name, enabled=enabled, role=role, user=user, platform="windows")
+    return RegistryNode(name=name, enabled=enabled, role=role, user=user, platform=platform)
 
 
-def document(*records: JSONObject, hostname: str = "serendipity") -> str:
+def document(*records: JSONObject, hostname: str = "serendipity", platform: str = "win32") -> str:
     """Render what the observe script prints for these records.
 
     Args:
         *records: The registration documents.
         hostname: The lowercased hostname the script reports.
+        platform: The harness platform tag the script reports.
 
     Returns:
         The compact JSON the script emits.
     """
-    return dump_json_str({"platform": "win32", "hostname": hostname, "records": list(records)})
+    return dump_json_str({"platform": platform, "hostname": hostname, "records": list(records)})
 
 
-def test_script_path_is_literal_and_absolute() -> None:
-    assert observe.script_path("austin") == "C:/Users/austin/.fleet/observe-sessions.ps1"
+def linux_record() -> JSONObject:
+    """One registration document as a Linux node's harness writes it.
+
+    Returns:
+        The record, with a POSIX cwd and socket and a ``linux:`` pidDomain.
+    """
+    return harness_record(
+        pidDomain="linux:diphtheria",
+        cwd="/home/corvis/PROJECTS/API",
+        messagingSocketPath="/run/user/1000/claude-cc-msg-abc",
+    )
 
 
-def test_script_reads_the_harness_directory_and_reports_zero_when_absent() -> None:
-    assert "'.claude\\sessions'" in observe.OBSERVE_SCRIPT
-    assert "if (Test-Path -LiteralPath $dir)" in observe.OBSERVE_SCRIPT
-    assert "-Filter '*.json'" in observe.OBSERVE_SCRIPT
-    assert "$env:COMPUTERNAME.ToLowerInvariant()" in observe.OBSERVE_SCRIPT
-    assert "platform = 'win32'" in observe.OBSERVE_SCRIPT
-    assert "ConvertTo-Json -Depth 8 -Compress" in observe.OBSERVE_SCRIPT
+def test_script_path_is_literal_absolute_and_in_the_platforms_dialect() -> None:
+    """The write command on the far side expands nothing, so the home is
+    spelled out; the extension is the dialect's (board task cd5010c4)."""
+    assert observe.script_path("austin", "windows") == (
+        "C:/Users/austin/.fleet/observe-sessions.ps1"
+    )
+    assert observe.script_path("corvis", "linux") == "/home/corvis/.fleet/observe-sessions.sh"
 
 
 def test_iso_from_millis_keeps_milliseconds_and_names_utc() -> None:
@@ -228,7 +245,7 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
         detail="observed 1 session(s) for win32:serendipity (1 new row(s)) at t",
     )
     # The script body went over stdin to the literal path, then ran by path.
-    assert run.stdin[0] == observe.OBSERVE_SCRIPT.encode("utf-8")
+    assert run.stdin[0] == dialect_windows.OBSERVE_SESSIONS_SCRIPT.encode("utf-8")
     assert "C:/Users/austin/.fleet/observe-sessions.ps1" in run.calls[0][-1]
     assert run.calls[1] == (
         "ssh",
@@ -269,6 +286,75 @@ def test_observe_node_records_an_empty_pass_for_a_node_with_no_sessions() -> Non
     assert outcome["recorded"] is True
     assert board.arguments[0]["machine"] == "win32:loki"
     assert board.arguments[0]["observations"] == []
+
+
+def test_observe_node_speaks_sh_to_a_linux_node_and_records_its_machine() -> None:
+    """Board task cd5010c4, acceptance 2: a Linux node in the registry gets
+    the sh script at the sh path, run by /bin/sh, and its records land on
+    the board under the ``linux:`` machine its own document spells."""
+    run = FakeRun([ok(""), ok(document(linux_record(), hostname="diphtheria", platform="linux"))])
+    _test_hooks.run = run
+    board = FakeQueue(["observed 1 session(s) for linux:diphtheria (1 new row(s)) at t"])
+    _test_hooks.http_post = board
+
+    outcome = observe.observe_node(
+        BOARD, node("diphtheria", "worker", user="corvis", platform="linux"), IDENTITY
+    )
+
+    assert outcome == observe.NodeOutcome(
+        node="diphtheria",
+        recorded=True,
+        detail="observed 1 session(s) for linux:diphtheria (1 new row(s)) at t",
+    )
+    path = "/home/corvis/.fleet/observe-sessions.sh"
+    assert run.stdin[0] == dialect_linux.OBSERVE_SESSIONS_SCRIPT.encode("utf-8")
+    assert run.calls[0] == (
+        "ssh",
+        *remote.SSH_OPTIONS,
+        "diphtheria",
+        dialect_linux.WRITE_COMMAND.format(path=path),
+    )
+    assert run.calls[1] == (
+        "ssh",
+        *remote.SSH_OPTIONS,
+        "diphtheria",
+        *dialect_linux.SH_INVOCATION,
+        path,
+    )
+    assert board.tools == ["task_session_observe"]
+    assert board.arguments[0]["machine"] == "linux:diphtheria"
+    assert board.arguments[0]["observations"] == [
+        {
+            "sessionId": SESSION,
+            "pid": 4242,
+            "processStartedAt": "2026-09-10T00:26:40.000+00:00",
+            "name": "api-7e",
+            "nameSource": "derived",
+            "cwd": "/home/corvis/PROJECTS/API",
+            "socketPath": "/run/user/1000/claude-cc-msg-abc",
+            "harnessVersion": "2.1.270",
+            "status": "idle",
+            "heartbeatAt": "2026-09-10T00:27:10.500+00:00",
+        }
+    ]
+
+
+def test_observe_node_records_a_linux_node_that_has_never_run_claude_code() -> None:
+    """diphtheria as measured on 2026-09-21: no ``~/.claude`` at all. The
+    honest line is zero sessions for ``linux:diphtheria``, and it is recorded,
+    which is what closes the ledger coverage gap the task was filed for."""
+    _test_hooks.run = FakeRun([ok(""), ok(document(hostname="diphtheria", platform="linux"))])
+    board = FakeQueue(["observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"])
+    _test_hooks.http_post = board
+
+    outcome = observe.observe_node(
+        BOARD, node("diphtheria", "worker", user="corvis", platform="linux"), IDENTITY
+    )
+
+    assert observe.render_outcome(outcome) == (
+        "diphtheria: observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"
+    )
+    assert board.arguments == [{"machine": "linux:diphtheria", "observations": [], **IDENTITY}]
 
 
 def test_observe_node_reports_an_unreachable_node_as_an_outcome() -> None:

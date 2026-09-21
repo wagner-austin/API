@@ -7,7 +7,11 @@ Docker host) is the first Linux node, and a dispatch to it needs the same
 twelve acts in ``sh`` -- how a file is written over ssh, how a script is run,
 how a directory is made, how the archive is reassembled and digested, how the
 suite is detached from the connection, how its result and the node's capacity
-are read, how a run is stopped. Board task 33bb86ce, Phase C step 3.
+are read, how a run is stopped. Board task 33bb86ce, Phase C step 3. The
+session observer's two acts joined the set under board task cd5010c4: its
+PowerShell script had been sent to every node regardless, and diphtheria
+answered ``powershell: command not found`` on every tick, logged as a node
+that did not answer.
 
 A DIALECT IS THE WHOLE SET, CHOSEN ONCE BY THE NODE'S DECLARED PLATFORM. The
 alternative -- an ``if platform == "linux"`` inside each of the seven modules
@@ -51,6 +55,35 @@ class Dialect(Protocol):
 
         Returns:
             The absolute path, with the platform's extension.
+        """
+        ...
+
+    def fleet_directory(self, user: str) -> str:
+        """The provisioned account's ``.fleet`` directory.
+
+        Where a script that belongs to no dispatch lands: the session
+        observer's, and anything else sent to the account rather than into a
+        staged tree. Spelled from the account name because the write command
+        on the far side expands nothing, so a home directory must be an
+        absolute literal path.
+
+        Args:
+            user: The provisioned account.
+
+        Returns:
+            The absolute directory, with no trailing separator.
+        """
+        ...
+
+    def observe_sessions_script(self) -> str:
+        """The constant script that reports the account's Claude Code sessions.
+
+        Returns:
+            The script's text. It prints ONE compact JSON document:
+            ``platform`` in the harness's own spelling (``win32``,
+            ``linux``), ``hostname`` lowercased, and ``records``, every
+            ``~/.claude/sessions/*.json`` verbatim. An absent directory is
+            zero records, not a fault.
         """
         ...
 

@@ -20,14 +20,18 @@ The two probes ARE run for real, on this machine, because it is a Windows hub.
 from __future__ import annotations
 
 import pathlib
+import socket
 import subprocess
 import sys
 
 import pytest
+from platform_core.config import config_test_hooks
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
 from fleet.core import names
 from fleet.core.dialect_windows import (
     LAUNCH_TIMEOUT_SECONDS,
+    OBSERVE_SESSIONS_SCRIPT,
     POWERSHELL_INVOCATION,
     TASK_HAS_NOT_RUN,
     WindowsDialect,
@@ -35,6 +39,22 @@ from fleet.core.dialect_windows import (
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 DIALECT = WindowsDialect()
+
+#: One registration document in the shape the harness writes on a Windows
+#: node: a drive-letter cwd and a named-pipe socket.
+SESSION_RECORD: JSONObject = {
+    "sessionId": "d31e5228-3269-4a22-a27f-e535cbef1894",
+    "pid": 4242,
+    "startedAt": 1_789_000_000_000,
+    "updatedAt": 1_789_000_030_500,
+    "name": "api-7e",
+    "nameSource": "derived",
+    "cwd": "C:\\Users\\serendipity\\PROJECTS\\API",
+    "messagingSocketPath": "\\\\.\\pipe\\LOCAL\\cc-msg-abc",
+    "version": "2.1.278",
+    "status": "idle",
+    "pidDomain": "win32:serendipity",
+}
 
 
 class TestBuildScript:
@@ -206,6 +226,31 @@ class TestTransportShape:
     def test_echo_is_write_output_of_a_quoted_literal(self) -> None:
         assert DIALECT.echo_command("installing make") == "Write-Output 'installing make'"
 
+    def test_the_fleet_directory_is_the_literal_profile_path(self) -> None:
+        """The write command expands nothing, so ``$env:USERPROFILE`` would
+        be a directory called that; the account's profile is spelled out."""
+        assert DIALECT.fleet_directory("austi") == "C:/Users/austi/.fleet"
+        assert DIALECT.script_path(DIALECT.fleet_directory("austi"), "observe-sessions") == (
+            "C:/Users/austi/.fleet/observe-sessions.ps1"
+        )
+
+    def test_the_observe_script_reads_the_harness_directory_and_reports_zero_when_absent(
+        self,
+    ) -> None:
+        """Moved here verbatim from the observe module when the Linux dialect
+        got its own rendering (board task cd5010c4); these are the properties
+        the observe pass was written against."""
+        body = DIALECT.observe_sessions_script()
+
+        assert body == OBSERVE_SESSIONS_SCRIPT
+        assert body.startswith("$ErrorActionPreference = 'Stop'\n")
+        assert "'.claude\\sessions'" in body
+        assert "if (Test-Path -LiteralPath $dir)" in body
+        assert "-Filter '*.json'" in body
+        assert "$env:COMPUTERNAME.ToLowerInvariant()" in body
+        assert "platform = 'win32'" in body
+        assert "ConvertTo-Json -Depth 8 -Compress" in body
+
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the probes are PowerShell; run them here")
 class TestProbesForReal:
@@ -262,3 +307,71 @@ class TestProbesForReal:
         assert fields["pip"].startswith("yes=pip ")
         for value in fields.values():
             assert value.startswith(("yes=", "no="))
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the script is PowerShell; run it here")
+class TestObserveScriptForReal:
+    """The observe script, run by PowerShell 5.1 against a profile on disk.
+
+    ``$HOME`` follows ``USERPROFILE`` (measured on the hub 2026-09-21), so
+    the script reads a directory this test laid out rather than the
+    operator's own sessions, and the document it prints is decoded the way
+    the hub decodes it.
+    """
+
+    def run_observe(self, tmp_path: pathlib.Path, profile: pathlib.Path) -> JSONObject:
+        """Run the script by path with ``profile`` as the home, decode its line.
+
+        Args:
+            tmp_path: Where the script is written.
+            profile: The directory ``$HOME`` resolves to.
+
+        Returns:
+            The decoded document.
+        """
+        script = tmp_path / "observe-sessions.ps1"
+        script.write_text(DIALECT.observe_sessions_script(), encoding="utf-8")
+        parent = config_test_hooks.get_environment()
+        completed = subprocess.run(
+            [*POWERSHELL_INVOCATION, str(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            env={**parent, "USERPROFILE": str(profile)},
+        )
+        assert completed.returncode == 0, completed.stderr
+        document: JSONValue = load_json_str(completed.stdout)
+        if not isinstance(document, dict):
+            raise AssertionError(f"the script printed {type(document).__name__}, not an object")
+        return document
+
+    def test_it_reports_every_record_verbatim_under_win32_and_the_lowercased_host(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        profile = tmp_path / "profile"
+        sessions = profile / ".claude" / "sessions"
+        sessions.mkdir(parents=True)
+        (sessions / "4242.json").write_text(dump_json_str(SESSION_RECORD), encoding="utf-8")
+
+        document = self.run_observe(tmp_path, profile)
+
+        assert document == {
+            "platform": "win32",
+            "hostname": socket.gethostname().lower(),
+            "records": [SESSION_RECORD],
+        }
+
+    def test_it_reports_zero_records_for_a_profile_that_never_ran_claude_code(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        profile = tmp_path / "profile"
+        profile.mkdir()
+
+        document = self.run_observe(tmp_path, profile)
+
+        assert document == {
+            "platform": "win32",
+            "hostname": socket.gethostname().lower(),
+            "records": [],
+        }

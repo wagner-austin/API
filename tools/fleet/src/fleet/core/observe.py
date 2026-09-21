@@ -10,12 +10,19 @@ the server deliberately does not hold, so it reads the same records there and
 hands them to ``task_session_observe``, which records them through the same
 canonical writer, keyed by the machine they came from.
 
-THE SCRIPT IS SENT AND RUN BY PATH, like every remote command in this package
--- :mod:`fleet.core.remote` carries the measured reason. It emits ONE JSON
+THE SCRIPT IS SENT AND RUN BY PATH, IN THE NODE'S DIALECT. Like every remote
+command in this package (:mod:`fleet.core.remote` carries the measured
+reason) it is a file the node runs by path, and like every other script it
+is rendered by :func:`fleet.core.dialect.for_platform` from the platform the
+identity registry declares for the node: PowerShell to a Windows node, ``sh``
+to a Linux one. Until board task cd5010c4 the PowerShell text went to every
+node, and diphtheria answered ``powershell: command not found`` on every
+tick, logged as a node that did not answer. Both renderings emit ONE JSON
 document: the node's platform and lowercased hostname (which together spell
-the harness's own ``pidDomain``, ``win32:serendipity``) and every record in
-the directory, verbatim. An absent directory is a node that has never run
-Claude Code, reported as zero records rather than as a fault.
+the harness's own ``pidDomain``, ``win32:serendipity``, ``linux:diphtheria``)
+and every record in the directory, verbatim. An absent directory is a node
+that has never run Claude Code, reported as zero records rather than as a
+fault.
 
 WHAT IS COPIED AND WHAT IS CHECKED. Every field the ledger stores is copied
 from the record; nothing is inferred. Two things are refused by name: a record
@@ -42,52 +49,27 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import queue, remote
+from fleet.contracts.node import NodePlatform
+from fleet.core import dialect, queue, remote
 from fleet.core.registry import RegistryNode
 
-#: What the script is called on the node, under the provisioned account's
-#: ``.fleet`` directory -- the same place-by-path convention the probe and
-#: dispatch scripts use, and a name that cannot collide with either.
-SCRIPT_NAME: Final = "observe-sessions.ps1"
+#: What the script is called on the node, before the dialect's extension,
+#: under the provisioned account's ``.fleet`` directory -- the same
+#: place-by-path convention the probe and dispatch scripts use, and a name
+#: that cannot collide with either.
+OBSERVE_STEM: Final = "observe-sessions"
 
 #: Roles whose sessions this pass records. The hub is observed by
 #: ``pcsession-mcp`` on its own mount; a client (the phone) is never
 #: provisioned and has no account of ours to ssh in as.
 OBSERVABLE_ROLES: Final = frozenset({"worker", "vpn-jump"})
 
-#: The script, rendered verbatim onto the node and run by path.
-#:
-#: ``platform`` is the literal ``win32`` because the runner that executes this
-#: is PowerShell on Windows by construction (it is sent in the Windows
-#: dialect, ``platform="windows"`` below); a node that cannot run it reports
-#: that as an unreachable outcome rather than as a platform. ``hostname`` is
-#: lowercased because that is how the harness spells
-#: ``pidDomain`` (measured on austinpc: ``$env:COMPUTERNAME`` is ``AUSTINPC``,
-#: the record says ``win32:austinpc``). Records are emitted UNTOUCHED so the
-#: decode on this side sees exactly the bytes the harness wrote.
-OBSERVE_SCRIPT: Final = """\
-$ErrorActionPreference = 'Stop'
-$dir = Join-Path $HOME '.claude\\sessions'
-$records = @()
-if (Test-Path -LiteralPath $dir) {
-    foreach ($file in Get-ChildItem -LiteralPath $dir -Filter '*.json' -File) {
-        $records += , (Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json)
-    }
-}
-$document = [pscustomobject]@{
-    platform = 'win32'
-    hostname = $env:COMPUTERNAME.ToLowerInvariant()
-    records  = @($records)
-}
-$document | ConvertTo-Json -Depth 8 -Compress
-"""
-
 
 class NodeSessions(TypedDict):
     """What the script reported from one node.
 
     Attributes:
-        platform: The harness platform tag, ``win32``.
+        platform: The harness platform tag, ``win32`` or ``linux``.
         hostname: The node's hostname, lowercased.
         records: Every registration document in the directory, untouched.
     """
@@ -132,17 +114,22 @@ class NodeOutcome(TypedDict):
     detail: str
 
 
-def script_path(user: str) -> str:
+def script_path(user: str, platform: NodePlatform) -> str:
     """Where the script lands on a node.
 
     Args:
         user: The provisioned account.
+        platform: The node's declared platform, which spells the account's
+            home and the script's extension.
 
     Returns:
-        An absolute, literal Windows path -- the write command on the far
-        side expands nothing, so this must be spelled out.
+        An absolute, literal path in the platform's dialect
+        (``C:/Users/austi/.fleet/observe-sessions.ps1``,
+        ``/home/corvis/.fleet/observe-sessions.sh``) -- the write command on
+        the far side expands nothing, so this must be spelled out.
     """
-    return f"C:/Users/{user}/.fleet/{SCRIPT_NAME}"
+    spoken = dialect.for_platform(platform)
+    return spoken.script_path(spoken.fleet_directory(user), OBSERVE_STEM)
 
 
 def _unreadable(host: str, detail: str) -> AppError[FleetErrorCode]:
@@ -348,8 +335,12 @@ def observe_node(board: McpCredentials, node: RegistryNode, identity: JSONObject
         return NodeOutcome(
             node=node["name"], recorded=False, detail="no provisioned user in the registry"
         )
+    platform = node["platform"]
     outcome = remote.attempt_script(
-        node["name"], script_path(user), OBSERVE_SCRIPT, platform="windows"
+        node["name"],
+        script_path(user, platform),
+        dialect.for_platform(platform).observe_sessions_script(),
+        platform=platform,
     )
     failure = outcome["failure"]
     if failure is not None:
@@ -411,8 +402,7 @@ def render_outcome(outcome: NodeOutcome) -> str:
 
 __all__ = [
     "OBSERVABLE_ROLES",
-    "OBSERVE_SCRIPT",
-    "SCRIPT_NAME",
+    "OBSERVE_STEM",
     "NodeOutcome",
     "NodeSessions",
     "SessionObservation",
