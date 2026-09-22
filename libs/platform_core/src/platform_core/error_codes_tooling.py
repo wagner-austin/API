@@ -228,7 +228,7 @@ class FleetErrorCode(ErrorCodeBase):
     PROJECT_DEPENDENCY_ESCAPES_ROOT = "PROJECT_DEPENDENCY_ESCAPES_ROOT"
 
     # Exporting one commit of a project for the queue's node lane (MCPs board
-    # task fd5cabfa, A2). Four codes, split where the reader's next action
+    # task fd5cabfa, A2). Five codes, split where the reader's next action
     # splits: a project the registry declares without a remote is a
     # fleet.json line to write; a sha the remote does not have is a push the
     # submitter has not made; a fetch or archive that failed for any other
@@ -240,6 +240,16 @@ class FleetErrorCode(ErrorCodeBase):
     SHA_NOT_ON_REMOTE = "SHA_NOT_ON_REMOTE"
     EXPORT_FAILED = "EXPORT_FAILED"
     PROJECT_TAGS_MISMATCH = "PROJECT_TAGS_MISMATCH"
+    # The fifth, added for the companion repositories a project's export
+    # carries beside it (MCPs board task 0515040d): a declared ref the
+    # companion's remote does not serve. Distinct from SHA_NOT_ON_REMOTE,
+    # and the split is the same one the four above are split on. A sha the remote lacks is
+    # the SUBMITTER's unpushed commit, one `git push` from checkable by the
+    # session that submitted it; a ref the remote lacks was written into
+    # fleet.json and is wrong for every job of that project until somebody
+    # edits that line. Sending the second reader to look for their own
+    # unpushed work would waste the one fact the refusal has.
+    COMPANION_REF_NOT_ON_REMOTE = "COMPANION_REF_NOT_ON_REMOTE"
 
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
