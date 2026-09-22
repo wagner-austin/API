@@ -235,9 +235,41 @@ one) and the runner exports THAT commit:
 3. `git archive --format=tar.gz <sha>` is staged through the same verified
    transport every dispatch uses, so the tree on the node equals the commit
    by construction;
-4. the build script points npm, poetry and Playwright at the node's caches
+4. every repository the project's `source` declares under `companions` is
+   exported BESIDE it, from its own mirror at the TIP of the declared `ref`,
+   into `<stage_root>/<directory>` — which is `../<directory>` from the
+   export root, the layout a workstation already has — and made a one-commit
+   git repository there;
+5. the build script points npm, poetry and Playwright at the node's caches
    (`<stage_root>/cache/{npm,pypoetry,ms-playwright}`), runs the install
    steps at the export root, and `make check` in `path`.
+
+**Why a companion exists and why a node cannot fetch one itself** (MCPs board
+task 0515040d). A repository whose check reads a second repository — `slime`
+lints its lifted code against the committed `MCPs` workspace beside it — has
+nothing to read on a node, which is handed that project's commit and nothing
+else; every `check-fleet` job for it died in `make lint` before a single
+test. The node cannot go and get it: both repositories are private and a node
+holds no git credential, measured on sedona 2026-09-22 as `git ls-remote`
+exiting 128 with "could not read Username for 'https://github.com'". So a
+companion travels from the hub with the work, through the same mirror,
+archive and digest-verified transport as the project's own commit. It names a
+`ref` and not a sha because the question such a check asks is whether the
+lifted code still matches the workspace AS IT STANDS; the resolved commit is
+recorded on the feed, so a verdict can be read against the workspace it was
+measured with. The directory is REPLACED each run rather than unpacked over,
+and the archive stays in a `<directory>.stage` beside it, so what the recipe
+reads is the export of one commit and nothing else. Every project declares
+`companions`, `[]` for all but `slime`.
+
+**Every remote script ends at the first command that failed**, which one
+shell does by default and the other has to be asked to
+(`Dialect.checked_script`). Measured on sedona 2026-09-22: `powershell -File`
+exits 0 even when a native command in the script exited non-zero, so a `tar`
+that unpacked nothing and a `git init` that never ran were both reported as a
+staged tree. PowerShell scripts now set `$ErrorActionPreference = 'Stop'` and
+check `$LASTEXITCODE` after every command; `sh` scripts carry `set -e`, which
+was always that rule.
 
 `fleet-run` still dispatches the working tree (its own tarball, no sha) for
 the interactive case; the queue path never does.
@@ -566,7 +598,10 @@ say "either" is to name neither.
 queue path runs it: its `source` names that remote with `path: ""` and the
 two install steps a clean export needs (`npm ci`, then `npx playwright
 install chromium webkit`), and `fleet-node-agent` exports the submitted sha
-from it (fd5cabfa, A2). `fleet-preflight --project slime --node sedona`
+from it (fd5cabfa, A2). It is also the one project that declares a
+COMPANION: `github.com/wagner-austin/MCPs` at ref `main`, staged as `MCPs`
+beside the export, because its `make lint` compares its lifted code against
+that workspace's committed copy and a node has no workspace (0515040d). `fleet-preflight --project slime --node sedona`
 answers with a worker count (measured 2026-09-21: `slime would run on sedona
 with 10 worker(s)`). Its `expected_minutes` is the full `make check` w1 timed
 on austinpc that night (03:45Z to 03:53Z); its `worker_ram_gb` is an estimate
