@@ -271,10 +271,16 @@ class TestTransportShape:
         assert "Split-Path -Parent 'C:/s/run-1/x.ps1'" in command
 
     def test_the_directory_and_reassembly_scripts_use_literal_paths(self) -> None:
+        """The directory is made by a .NET call, not by ``New-Item``: that
+        cmdlet has no ``-LiteralPath`` (measured on sedona 2026-09-22, "A
+        parameter cannot be found that matches parameter name
+        'LiteralPath'") and its ``-Path`` reads brackets as wildcards, so
+        the only spelling that is both valid and literal is this one."""
         made = DIALECT.make_directory_script("C:/s/run-[1]")
         rebuilt = DIALECT.reassemble_script("C:/s/run-1")
 
-        assert "-LiteralPath 'C:/s/run-[1]'" in made
+        assert "[IO.Directory]::CreateDirectory('C:/s/run-[1]')" in made
+        assert "New-Item" not in made
         assert f"C:/s/run-1/{names.ENCODED_NAME}" in rebuilt
         assert f"C:/s/run-1/{names.ARCHIVE_NAME}" in rebuilt
         assert "Get-FileHash -Algorithm SHA256" in rebuilt

@@ -23,12 +23,30 @@ asks :func:`for_platform` once and never reasons about the platform again.
 
 WHAT IS SHARED AND WHY IT IS HERE. ``tar -xzmf`` and the ``git`` acts -- the
 staged tree's ``init``, and the ``init`` plus ``commit`` that makes a
-companion readable as a workspace -- are the same commands on both platforms
+companion readable as a workspace -- are the same COMMANDS on both platforms
 (Windows ships bsdtar, every node has git), so they are functions in this
-module rather than methods repeated in two classes; the lifecycle modules
-call them directly. Everything else differs in at least one token that
-matters, which is why it is a method: replacing a directory is
-``Remove-Item -Recurse -Force`` on one platform and ``rm -rf`` on the other.
+module rather than methods repeated in two classes. Everything else differs
+in at least one token that matters, which is why it is a method: replacing a
+directory is ``Remove-Item -Recurse -Force`` on one platform and ``rm -rf``
+on the other.
+
+THE SAME COMMAND IS NOT THE SAME SCRIPT, AND THAT COST A SILENT FAILURE.
+Until 2026-09-22 those shared functions returned script TEXT, on the reading
+that a command which is identical needs no dialect. It is not identical in
+the one respect a runner depends on -- whether a failure is reported.
+Measured on sedona that day, staging a companion: ``New-Item`` was given
+``-LiteralPath``, a parameter it does not have (``-Path`` is the one), so the
+directory was never created; ``tar`` then wrote ``could not chdir to
+'C:/fleet/stage/MCPs'`` and exited non-zero; and ``powershell -File`` exited
+**0** anyway, because with ``-File`` a native command's status is not the
+script's unless the script says so. The transport saw success, the stage
+reported success, and the node held a companion directory that did not exist.
+``sh`` has the opposite default: the last command's status IS the script's,
+and ``set -e`` stops at the first failure. So the shared functions return
+COMMAND LINES and each dialect wraps them in its own status handling
+(:meth:`Dialect.checked_script`) -- one place per platform where "a command
+that failed ends the script with its status" is written down, rather than one
+per script where it can be forgotten.
 """
 
 from __future__ import annotations
@@ -138,6 +156,24 @@ class Dialect(Protocol):
 
         Returns:
             The script's text.
+        """
+        ...
+
+    def checked_script(self, commands: tuple[str, ...]) -> str:
+        """Render commands as a script that ends at the first failure.
+
+        The one place per platform where "a command that failed ends the
+        script with its status" is written down. The module docstring
+        carries the silent failure that put it here.
+
+        Args:
+            commands: Command lines, in order, each already quoted for a
+                shell that single-quotes a literal the same way on both
+                platforms.
+
+        Returns:
+            The script's text: every command in order, and a non-zero
+            status from any of them as the script's own.
         """
         ...
 
@@ -283,14 +319,15 @@ def for_platform(platform: NodePlatform) -> Dialect:
     return LinuxDialect()
 
 
-def extract_script(archive: str, destination: str) -> str:
-    """Render the script that unpacks a verified archive.
+def extract_commands(archive: str, destination: str) -> tuple[str, ...]:
+    """The command that unpacks a verified archive.
 
-    THE SAME ON BOTH PLATFORMS: Windows ships bsdtar and the flags agree.
-    ``-m`` makes extracted files take the node's clock rather than the
-    sender's. Without it a tree staged from a machine whose clock is ahead
-    produces make targets that look newer than their sources, and the build
-    does nothing at all -- which reads as a suite that passed instantly.
+    THE SAME COMMAND ON BOTH PLATFORMS: Windows ships bsdtar and the flags
+    agree. ``-m`` makes extracted files take the node's clock rather than
+    the sender's. Without it a tree staged from a machine whose clock is
+    ahead produces make targets that look newer than their sources, and the
+    build does nothing at all -- which reads as a suite that passed
+    instantly.
 
     THE TWO PATHS ARE SEPARATE because a companion's are: its archive stays
     in a staging directory of its own and only the repository lands in the
@@ -303,23 +340,23 @@ def extract_script(archive: str, destination: str) -> str:
         destination: Absolute remote directory to unpack it into.
 
     Returns:
-        The script's text.
+        The one command line, for a dialect's
+        :meth:`Dialect.checked_script`.
     """
-    return f"tar -xzmf '{archive}' -C '{destination}'\n"
+    return (f"tar -xzmf '{archive}' -C '{destination}'",)
 
 
-def companion_repository_script(target: str, sha: str) -> str:
-    """Render the script that makes a staged companion a one-commit repository.
+def companion_repository_commands(target: str, sha: str) -> tuple[str, ...]:
+    """The commands that make a staged companion a one-commit repository.
 
-    THE SAME ON BOTH PLATFORMS, and it COMMITS where
-    :func:`init_repository_script` deliberately does not. A companion exists
-    to be read as a workspace, and the thing that reads it reads HEAD --
-    slime's lift check compares its lifted files against
-    ``git show HEAD:<path>`` precisely so that an uncommitted edit in the
-    workspace is not mistaken for the code. On a node there is no HEAD until
-    one is made, so the export is committed here, and the identity is passed
-    with ``-c`` rather than configured: nothing this package does leaves
-    state on a node.
+    THEY COMMIT, where :func:`init_repository_commands` deliberately does
+    not. A companion exists to be read as a workspace, and the thing that
+    reads it reads HEAD -- slime's lift check compares its lifted files
+    against ``git show HEAD:<path>`` precisely so that an uncommitted edit
+    in the workspace is not mistaken for the code. On a node there is no
+    HEAD until one is made, so the export is committed here, and the
+    identity is passed with ``-c`` rather than configured: nothing this
+    package does leaves state on a node.
 
     ``--force`` on the add, which the project's tree does not use and must
     not: there the ``.gitignore`` is what makes a staged tree index the same
@@ -334,22 +371,22 @@ def companion_repository_script(target: str, sha: str) -> str:
             message so the tree on the node names what it is.
 
     Returns:
-        The script's text: the repository initialised, the export indexed
-        and committed.
+        The three command lines, in order, for a dialect's
+        :meth:`Dialect.checked_script`.
     """
     return (
-        f"git -C '{target}' init --quiet\n"
-        f"git -C '{target}' add --all --force\n"
+        f"git -C '{target}' init --quiet",
+        f"git -C '{target}' add --all --force",
         f"git -C '{target}' -c user.name='{COMPANION_AUTHOR_NAME}' "
         f"-c user.email='{COMPANION_AUTHOR_EMAIL}' commit --quiet "
-        f"--message 'fleet companion export {sha}'\n"
+        f"--message 'fleet companion export {sha}'",
     )
 
 
-def init_repository_script(target: str) -> str:
-    """Render the script that makes a staged tree a git repository.
+def init_repository_commands(target: str) -> tuple[str, ...]:
+    """The commands that make a staged tree a git repository.
 
-    THE SAME ON BOTH PLATFORMS, and without it a staged build lints
+    THE SAME ON BOTH PLATFORMS, and without them a staged build lints
     different files from a local one. Ruff honours ``.gitignore`` and applies
     it ONLY inside a git repository -- so a tree that carries the file but no
     ``.git`` silently widens what gets linted to include everything the
@@ -383,24 +420,24 @@ def init_repository_script(target: str) -> str:
     out the way it does in the checkout. Nothing is committed, because
     nothing reads a commit in the tree the recipe runs in; the one staged
     tree that IS read as a commit is a companion, and
-    :func:`companion_repository_script` says why it is the exception.
+    :func:`companion_repository_commands` says why it is the exception.
 
     Args:
         target: Absolute remote directory holding the staged tree.
 
     Returns:
-        The script's text: the repository initialised and the tree added to
-        its index.
+        The two command lines, in order, for a dialect's
+        :meth:`Dialect.checked_script`.
     """
-    return f"git -C '{target}' init --quiet\ngit -C '{target}' add --all\n"
+    return (f"git -C '{target}' init --quiet", f"git -C '{target}' add --all")
 
 
 __all__ = [
     "COMPANION_AUTHOR_EMAIL",
     "COMPANION_AUTHOR_NAME",
     "Dialect",
-    "companion_repository_script",
-    "extract_script",
+    "companion_repository_commands",
+    "extract_commands",
     "for_platform",
-    "init_repository_script",
+    "init_repository_commands",
 ]

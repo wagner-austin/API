@@ -18,7 +18,15 @@ import pathlib
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, dialect, dialect_windows, manifest, names, staging
+from fleet.core import (
+    _test_hooks,
+    dialect,
+    dialect_linux,
+    dialect_windows,
+    manifest,
+    names,
+    staging,
+)
 from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
 
 #: The commit a staged companion is the export of, in these tests.
@@ -237,9 +245,18 @@ class TestStage:
         assert runner.calls[1][-2:] == ("/bin/sh", made)
         assert runner.calls[3][-1].endswith(f"{target}/reassemble.sh'")
         assert b"sha256sum" in (runner.stdin[3] or b"")
-        assert runner.stdin[5] == f"tar -xzmf '{target}/tree.tgz' -C '{target}'\n".encode()
-        assert runner.stdin[7] == (
-            f"git -C '{target}' init --quiet\ngit -C '{target}' add --all\n".encode()
+        # Both carry sh's prologue, whose `set -e` is what ends the script at
+        # a command that failed -- the other dialect has to be asked for that
+        # and was not, which is the silent stage this pair now pins.
+        assert runner.stdin[5] == (
+            f"{dialect_linux.PROLOGUE}tar -xzmf '{target}/tree.tgz' -C '{target}'\n".encode()
+        )
+        assert (
+            runner.stdin[7]
+            == (
+                f"{dialect_linux.PROLOGUE}git -C '{target}' init --quiet\n"
+                f"git -C '{target}' add --all\n"
+            ).encode()
         )
         assert not any("powershell" in argument for call in runner.calls for argument in call)
 
@@ -279,9 +296,12 @@ class TestStage:
         # ignore rules to cover, and the .gitignore that gives them content
         # arrives with the tree.
         target = f"C:/fleet/stage/{DEMO_RUN_ID}"
+        spoken = dialect.for_platform("windows")
         assert sent.index(
-            dialect.extract_script(f"{target}/{names.ARCHIVE_NAME}", target).encode()
-        ) < (sent.index(dialect.init_repository_script(target).encode()))
+            spoken.checked_script(
+                dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)
+            ).encode()
+        ) < (sent.index(spoken.checked_script(dialect.init_repository_commands(target)).encode()))
 
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.
@@ -289,7 +309,7 @@ class TestStage:
         The build then does nothing, which reads as a suite that passed
         instantly.
         """
-        assert "-xzmf" in dialect.extract_script("C:/s/run-1/tree.tgz", "C:/s/run-1")
+        assert "-xzmf" in dialect.extract_commands("C:/s/run-1/tree.tgz", "C:/s/run-1")[0]
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
@@ -338,13 +358,19 @@ class TestStagingACompanion:
         assert where == "C:/fleet/stage/MCPs"
         assert sent[0] == dialect_windows.WindowsDialect().reset_directory_script(where).encode()
         assert sent[4] == staging.encode(payload).encode()
+        spoken = dialect.for_platform("windows")
         assert (
             sent[7]
-            == dialect.extract_script(
-                f"C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}", where
+            == spoken.checked_script(
+                dialect.extract_commands(f"C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}", where)
             ).encode()
         )
-        assert sent[9] == dialect.companion_repository_script(where, COMPANION_SHA).encode()
+        assert (
+            sent[9]
+            == spoken.checked_script(
+                dialect.companion_repository_commands(where, COMPANION_SHA)
+            ).encode()
+        )
 
     def test_the_archive_never_enters_the_tree_that_is_committed(self) -> None:
         """A ``tree.tgz`` at the root of a staged workspace would be a file the
@@ -387,10 +413,14 @@ class TestStagingACompanion:
         sent = [body or b"" for body in runner.stdin]
         assert b"rm -rf '/home/corvis/fleet/stage/MCPs'" in sent[0]
         assert sent.index(sent[0]) < sent.index(
-            dialect.extract_script(
-                f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
-                "/home/corvis/fleet/stage/MCPs",
-            ).encode()
+            dialect.for_platform("linux")
+            .checked_script(
+                dialect.extract_commands(
+                    f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
+                    "/home/corvis/fleet/stage/MCPs",
+                )
+            )
+            .encode()
         )
 
     def test_a_mismatched_digest_names_the_companion_and_unpacks_nothing(self) -> None:

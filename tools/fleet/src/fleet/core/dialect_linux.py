@@ -205,7 +205,22 @@ class LinuxDialect:
         Returns:
             ``mkdir -p`` of it.
         """
-        return f"{PROLOGUE}mkdir -p '{target}'\n"
+        return self.checked_script((f"mkdir -p '{target}'",))
+
+    def checked_script(self, commands: tuple[str, ...]) -> str:
+        """Render commands as a script that ends at the first failure.
+
+        Nothing is added per command: :data:`PROLOGUE`'s ``set -e`` already
+        ends the script at the first non-zero status and ``sh`` exits with
+        it, which is the default the other dialect has to be given.
+
+        Args:
+            commands: Command lines, in order.
+
+        Returns:
+            The script's text.
+        """
+        return PROLOGUE + "".join(f"{command}\n" for command in commands)
 
     def reset_directory_script(self, target: str) -> str:
         """The script that empties a companion's directory and creates it.
@@ -219,7 +234,7 @@ class LinuxDialect:
             read-only loose objects of the git repository a previous run
             made there.
         """
-        return f"{PROLOGUE}rm -rf '{target}'\nmkdir -p '{target}'\n"
+        return self.checked_script((f"rm -rf '{target}'", f"mkdir -p '{target}'"))
 
     def reassemble_script(self, target: str) -> str:
         """Decode the one-line base64 and print the SHA-256, extracting nothing.

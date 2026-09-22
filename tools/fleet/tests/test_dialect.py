@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from fleet.contracts.node import NODE_PLATFORMS, NodePlatform
-from fleet.core import dialect, names
+from fleet.core import dialect, dialect_linux, names
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 
@@ -43,25 +43,26 @@ def test_every_declared_platform_has_a_dialect_that_renders_every_act() -> None:
         assert "sessions" in spoken.observe_sessions_script()
 
 
-def test_the_shared_scripts_are_the_same_command_on_both_platforms() -> None:
+def test_the_shared_commands_are_the_same_on_both_platforms() -> None:
     """tar and git are spelled once because Windows ships bsdtar and every
     node has git; -m keeps a fast sender's clock from making targets look
     newer than their sources, git init is what makes ruff honour .gitignore
     on the node, and git add is what makes ``git ls-files`` answer as it
     does in a checkout (the first fleet verdict, fd5cabfa)."""
     archive = f"/s/run/{names.ARCHIVE_NAME}"
-    assert dialect.extract_script(archive, "/s/run") == f"tar -xzmf '{archive}' -C '/s/run'\n"
-    assert dialect.init_repository_script("/s/run") == (
-        "git -C '/s/run' init --quiet\ngit -C '/s/run' add --all\n"
+    assert dialect.extract_commands(archive, "/s/run") == (f"tar -xzmf '{archive}' -C '/s/run'",)
+    assert dialect.init_repository_commands("/s/run") == (
+        "git -C '/s/run' init --quiet",
+        "git -C '/s/run' add --all",
     )
 
 
-def test_the_extract_script_takes_the_archive_and_the_destination_separately() -> None:
+def test_the_extract_takes_the_archive_and_the_destination_separately() -> None:
     """A companion's archive stays in its staging directory and only the
     repository lands in the directory the recipe reads, so the tree committed
     there is the export and nothing else."""
-    assert dialect.extract_script("/s/MCPs.stage/tree.tgz", "/s/MCPs") == (
-        "tar -xzmf '/s/MCPs.stage/tree.tgz' -C '/s/MCPs'\n"
+    assert dialect.extract_commands("/s/MCPs.stage/tree.tgz", "/s/MCPs") == (
+        "tar -xzmf '/s/MCPs.stage/tree.tgz' -C '/s/MCPs'",
     )
 
 
@@ -70,13 +71,49 @@ def test_a_companion_is_committed_so_the_check_reading_it_has_a_head() -> None:
     an uncommitted edit in the workspace is not mistaken for the code. On a
     node there is no HEAD until one is made, and the identity is passed rather
     than configured so nothing is left behind on the machine."""
-    assert dialect.companion_repository_script("/s/MCPs", "a" * 40) == (
-        "git -C '/s/MCPs' init --quiet\n"
-        "git -C '/s/MCPs' add --all --force\n"
+    assert dialect.companion_repository_commands("/s/MCPs", "a" * 40) == (
+        "git -C '/s/MCPs' init --quiet",
+        "git -C '/s/MCPs' add --all --force",
         f"git -C '/s/MCPs' -c user.name='{dialect.COMPANION_AUTHOR_NAME}' "
         f"-c user.email='{dialect.COMPANION_AUTHOR_EMAIL}' commit --quiet "
-        f"--message 'fleet companion export {'a' * 40}'\n"
+        f"--message 'fleet companion export {'a' * 40}'",
     )
+
+
+class TestCheckedScript:
+    """A command that failed ends the script with its status, which is the
+    default in one shell and has to be asked for in the other. Measured on
+    sedona 2026-09-22: `New-Item -LiteralPath` (a parameter that cmdlet does
+    not have) left a directory uncreated, tar then wrote "could not chdir to
+    'C:/fleet/stage/MCPs'" and exited non-zero, and `powershell -File` exited
+    0 -- the transport saw success and the node held nothing."""
+
+    def test_powershell_checks_after_every_command_and_exits_with_its_status(self) -> None:
+        assert dialect.for_platform("windows").checked_script(("first", "second")) == (
+            "$ErrorActionPreference = 'Stop'\n"
+            "first\n"
+            "if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }\n"
+            "second\n"
+            "if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }\n"
+        )
+
+    def test_the_check_is_gt_so_an_unset_status_is_not_a_failure(self) -> None:
+        """``$LASTEXITCODE`` is unset until the first NATIVE command runs and
+        ``$null -ne 0`` is true, so ``-ne`` would end a script whose first
+        command is a cmdlet before its second ever ran."""
+        assert "-ne 0" not in dialect.for_platform("windows").checked_script(("only",))
+
+    def test_sh_needs_nothing_per_command_because_set_e_is_the_default_here(self) -> None:
+        assert dialect.for_platform("linux").checked_script(("first", "second")) == (
+            f"{dialect_linux.PROLOGUE}first\nsecond\n"
+        )
+
+    @pytest.mark.parametrize("platform", NODE_PLATFORMS)
+    def test_every_command_reaches_the_script_in_order(self, platform: NodePlatform) -> None:
+        rendered = dialect.for_platform(platform).checked_script(("alpha", "beta", "gamma"))
+
+        assert rendered.index("alpha") < rendered.index("beta") < rendered.index("gamma")
+        assert rendered.endswith("\n")
 
 
 def test_the_names_are_one_spelling() -> None:

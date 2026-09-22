@@ -104,6 +104,17 @@ def _companion_config(config_path: pathlib.Path) -> pathlib.Path:
     return config_path
 
 
+def _companion_commit_script() -> str:
+    """The script that makes lavender's staged companion a repository.
+
+    Returns:
+        Its text, as the dialect renders it for a Windows node.
+    """
+    return dialect.for_platform("windows").checked_script(
+        dialect.companion_repository_commands("C:/fleet/stage/MCPs", COMPANION_SHA)
+    )
+
+
 def _companion_replies(
     export_digest: str, companion_digest: str
 ) -> list[_test_hooks.CommandResult]:
@@ -200,10 +211,7 @@ class TestCompanions:
         assert runner.calls[7][3] == "archive"
         assert runner.calls[7][-1] == COMPANION_SHA
         sent = [body or b"" for body in runner.stdin]
-        assert (
-            dialect.companion_repository_script("C:/fleet/stage/MCPs", COMPANION_SHA).encode()
-            in sent
-        )
+        assert _companion_commit_script().encode() in sent
 
     def test_the_companion_lands_before_the_build_script_is_sent(
         self, config_path: pathlib.Path
@@ -229,9 +237,7 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         sent = [body or b"" for body in runner.stdin]
-        committed = sent.index(
-            dialect.companion_repository_script("C:/fleet/stage/MCPs", COMPANION_SHA).encode()
-        )
+        committed = sent.index(_companion_commit_script().encode())
         built = next(index for index, body in enumerate(sent) if b"make check" in body)
         assert committed < built
 

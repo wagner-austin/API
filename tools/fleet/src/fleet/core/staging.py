@@ -271,13 +271,13 @@ def stage_companion(
     remote.run_script(
         host,
         spoken.script_path(staged, names.EXTRACT_STEM),
-        dialect.extract_script(f"{staged}/{names.ARCHIVE_NAME}", tree),
+        spoken.checked_script(dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", tree)),
         platform=platform,
     )
     remote.run_script(
         host,
         spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
-        dialect.companion_repository_script(tree, sha),
+        spoken.checked_script(dialect.companion_repository_commands(tree, sha)),
         platform=platform,
     )
     return tree
@@ -326,13 +326,13 @@ def stage(
     remote.run_script(
         host,
         spoken.script_path(target, names.EXTRACT_STEM),
-        dialect.extract_script(f"{target}/{names.ARCHIVE_NAME}", target),
+        spoken.checked_script(dialect.extract_commands(f"{target}/{names.ARCHIVE_NAME}", target)),
         platform=platform,
     )
     remote.run_script(
         host,
         spoken.script_path(target, names.INIT_REPOSITORY_STEM),
-        dialect.init_repository_script(target),
+        spoken.checked_script(dialect.init_repository_commands(target)),
         platform=platform,
     )
     return target

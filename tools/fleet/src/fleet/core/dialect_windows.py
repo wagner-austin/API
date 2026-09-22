@@ -224,17 +224,63 @@ class WindowsDialect:
         """
         return f"Write-Output '{text}'"
 
+    def checked_script(self, commands: tuple[str, ...]) -> str:
+        """Render commands as a script that ends at the first failure.
+
+        TWO MECHANISMS BECAUSE POWERSHELL HAS TWO KINDS OF FAILURE, and
+        neither one alone catches the other. ``$ErrorActionPreference =
+        'Stop'`` makes a CMDLET's error terminating, which exits the script
+        non-zero; a NATIVE program's non-zero status is not an error at all
+        to PowerShell, and with ``-File`` it is not the script's status
+        either, so each command is followed by an explicit check.
+
+        ``-gt 0`` rather than ``-ne 0`` because ``$LASTEXITCODE`` is unset
+        until the first native command runs, and ``$null -ne 0`` is true:
+        with ``-ne`` a script whose first command is a cmdlet would exit
+        before its second. A stale value cannot survive into a later check,
+        since any non-zero status exits at the check that follows it.
+
+        Args:
+            commands: Command lines, in order.
+
+        Returns:
+            The script's text.
+        """
+        lines = ["$ErrorActionPreference = 'Stop'"]
+        for command in commands:
+            lines.append(command)
+            lines.append("if ($LASTEXITCODE -gt 0) { exit $LASTEXITCODE }")
+        return "\n".join(lines) + "\n"
+
     def make_directory_script(self, target: str) -> str:
         """The script that creates a dispatch's directory.
+
+        ``[IO.Directory]::CreateDirectory`` RATHER THAN ``New-Item``, and
+        the reason is a parameter that does not exist. This read ``New-Item
+        -ItemType Directory -Force -LiteralPath`` from the day the dialect
+        was written; ``New-Item`` has no ``-LiteralPath`` (``Set-Content``,
+        ``Remove-Item`` and ``Test-Path`` do, which is how it looked right),
+        and measured on sedona 2026-09-22 it fails with "A parameter cannot
+        be found that matches parameter name 'LiteralPath'". Nothing noticed
+        for two weeks because the write command (:data:`WRITE_COMMAND`)
+        creates a file's parent itself, so every directory this script was
+        meant to make was made by the next step anyway -- until a companion,
+        whose directory is filled by ``tar`` rather than by a write, and
+        whose ``tar`` then reported "could not chdir".
+
+        The .NET call rather than ``-Path``, which is the parameter that
+        does exist, because ``-Path`` reads ``[`` and ``]`` as wildcards:
+        the literal-path intent behind the original was right and only its
+        spelling was wrong. It also creates parents and is silent about a
+        directory that is already there, which is what ``-Force`` was for.
 
         Args:
             target: Absolute remote directory for this dispatch.
 
         Returns:
-            ``New-Item -Force`` with ``-LiteralPath``, so brackets in a path
-            are not read as wildcards.
+            The script's text.
         """
-        return f"New-Item -ItemType Directory -Force -LiteralPath '{target}' | Out-Null\n"
+        return self.checked_script((f"[IO.Directory]::CreateDirectory('{target}') | Out-Null",))
 
     def reset_directory_script(self, target: str) -> str:
         """The script that empties a companion's directory and creates it.
@@ -253,10 +299,12 @@ class WindowsDialect:
             ``Remove-Item`` of a path that does not exist is an error and the
             first run on a node is exactly that case.
         """
-        return (
-            f"if (Test-Path -LiteralPath '{target}') {{ "
-            f"Remove-Item -Recurse -Force -LiteralPath '{target}' }}\n"
-            f"New-Item -ItemType Directory -Force -LiteralPath '{target}' | Out-Null\n"
+        return self.checked_script(
+            (
+                f"if (Test-Path -LiteralPath '{target}') "
+                f"{{ Remove-Item -Recurse -Force -LiteralPath '{target}' }}",
+                f"[IO.Directory]::CreateDirectory('{target}') | Out-Null",
+            )
         )
 
     def reassemble_script(self, target: str) -> str:
