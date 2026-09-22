@@ -148,13 +148,7 @@
           ["npm", "ci"],
           ["npx", "playwright", "install", "chromium", "webkit"]
         ],
-        "companions": [
-          {
-            "remote": "https://github.com/wagner-austin/MCPs.git",
-            "ref": "main",
-            "directory": "MCPs"
-          }
-        ]
+        "companions": []
       }
     },
     "MCPs/packages/wiki-search": {

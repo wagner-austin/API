@@ -245,8 +245,7 @@ one) and the runner exports THAT commit:
    steps at the export root, and `make check` in `path`.
 
 **Why a companion exists and why a node cannot fetch one itself** (MCPs board
-task 0515040d). A repository whose check reads a second repository — `slime`
-lints its lifted code against the committed `MCPs` workspace beside it — has
+task 0515040d). A repository whose check reads a second repository has
 nothing to read on a node, which is handed that project's commit and nothing
 else; every `check-fleet` job for it died in `make lint` before a single
 test. The node cannot go and get it: both repositories are private and a node
@@ -254,13 +253,14 @@ holds no git credential, measured on sedona 2026-09-22 as `git ls-remote`
 exiting 128 with "could not read Username for 'https://github.com'". So a
 companion travels from the hub with the work, through the same mirror,
 archive and digest-verified transport as the project's own commit. It names a
-`ref` and not a sha because the question such a check asks is whether the
-lifted code still matches the workspace AS IT STANDS; the resolved commit is
-recorded on the feed, so a verdict can be read against the workspace it was
+`ref` for checks that intentionally follow an upstream branch; the resolved
+commit is recorded on the feed, so a verdict can be read against the workspace it was
 measured with. The directory is REPLACED each run rather than unpacked over,
 and the archive stays in a `<directory>.stage` beside it, so what the recipe
 reads is the export of one commit and nothing else. Every project declares
-`companions`, `[]` for all but `slime`.
+`companions`. All current projects declare `[]`: slime now verifies a committed
+integrity lock offline instead of reading a second checkout (20e977b6).
+The companion transport remains available for projects that genuinely need it.
 
 **Every remote script ends at the first command that failed**, which one
 shell does by default and the other has to be asked to
@@ -598,10 +598,10 @@ say "either" is to name neither.
 queue path runs it: its `source` names that remote with `path: ""` and the
 two install steps a clean export needs (`npm ci`, then `npx playwright
 install chromium webkit`), and `fleet-node-agent` exports the submitted sha
-from it (fd5cabfa, A2). It is also the one project that declares a
-COMPANION: `github.com/wagner-austin/MCPs` at ref `main`, staged as `MCPs`
-beside the export, because its `make lint` compares its lifted code against
-that workspace's committed copy and a node has no workspace (0515040d). `fleet-preflight --project slime --node sedona`
+from it (fd5cabfa, A2). Its source declares no companions: the vendored code
+and published-revision integrity lock travel in slime's own export, and its
+normal lint does not read or fetch MCPs (20e977b6).
+`fleet-preflight --project slime --node sedona`
 answers with a worker count (measured 2026-09-21: `slime would run on sedona
 with 10 worker(s)`). Its `expected_minutes` is the full `make check` w1 timed
 on austinpc that night (03:45Z to 03:53Z); its `worker_ram_gb` is an estimate
