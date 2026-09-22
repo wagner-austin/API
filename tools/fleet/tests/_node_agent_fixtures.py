@@ -15,15 +15,23 @@ import pathlib
 import pytest
 from board_watch import _test_hooks as board_watch_hooks
 from board_watch import config as board_config
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
+from fleet.contracts.source import ProjectCompanion, ProjectSource, encode_project_source
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import DEFAULT_SHA, FakeEnv
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, PROBE_OK, failed, ok, workspace_document
 
 REMOTE = "https://github.com/wagner-austin/API.git"
 VERDICT_TASK = "fd5cabfa-a328-48f4-b5e9-3a02dd531ea5"
+
+#: The workspace a project can declare as exported beside it, and the commit
+#: its ref resolves to in these tests (MCPs board task 0515040d).
+COMPANION_REMOTE = "https://github.com/wagner-austin/MCPs.git"
+COMPANION_REF = "main"
+COMPANION_DIRECTORY = "MCPs"
+COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 
 #: The pre-claim probe every claiming tick pays: the script sent, then run,
 #: with lavender answering room for a dispatch.
@@ -49,11 +57,20 @@ def _credentials_in_env() -> None:
     )
 
 
-def sourced_document(install: list[JSONValue]) -> JSONObject:
+def sourced_document(
+    install: tuple[tuple[str, ...], ...],
+    companions: tuple[ProjectCompanion, ...] = (),
+) -> JSONObject:
     """The shared workspace with the demo project given a source.
 
+    Built through ``encode_project_source`` rather than spelled as a literal:
+    a required field added to the source is then a type error in one place
+    here instead of a runtime refusal in two dozen tests, which is how
+    ``source`` itself landed red (commit f95338cd).
+
     Args:
-        install: The install steps to declare, each a list of tokens.
+        install: The install steps to declare.
+        companions: The repositories to declare as exported beside it.
 
     Returns:
         The document.
@@ -63,7 +80,9 @@ def sourced_document(install: list[JSONValue]) -> JSONObject:
     assert isinstance(projects, dict)
     project = projects[DEMO_PROJECT]
     assert isinstance(project, dict)
-    project["source"] = {"remote": REMOTE, "path": DEMO_PROJECT, "install": install}
+    project["source"] = encode_project_source(
+        ProjectSource(remote=REMOTE, path=DEMO_PROJECT, install=install, companions=companions)
+    )
     return document
 
 
@@ -77,7 +96,7 @@ def _sourced_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    config_path.write_text(dump_json_str(sourced_document([["npm", "ci"]])), encoding="utf-8")
+    config_path.write_text(dump_json_str(sourced_document((("npm", "ci"),))), encoding="utf-8")
     return config_path
 
 
@@ -106,6 +125,27 @@ def prebuilt_export(config_path: pathlib.Path) -> bytes:
     destination = loaded.archives / f"{DEMO_RUN_ID}-lavender.tgz"
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = b"\x1f\x8b" + b"export-of-" + DEFAULT_SHA.encode("ascii")
+    destination.write_bytes(payload)
+    return payload
+
+
+def prebuilt_companion(config_path: pathlib.Path) -> bytes:
+    """Write the archive a companion's ``git archive`` would have, where the
+    tick reads it.
+
+    Named by the companion's own commit rather than by the run, which is the
+    name :func:`fleet.core.export.export_companions` writes.
+
+    Args:
+        config_path: The workspace document.
+
+    Returns:
+        The archive bytes.
+    """
+    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+    destination = loaded.archives / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.tgz"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    payload = b"\x1f\x8b" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)
     return payload
 
@@ -149,12 +189,17 @@ def claim_replies(digest: str, *, commit_present: bool) -> list[_test_hooks.Comm
 
 
 __all__ = [
+    "COMPANION_DIRECTORY",
+    "COMPANION_REF",
+    "COMPANION_REMOTE",
+    "COMPANION_SHA",
     "PASSING_TAIL",
     "PROBED",
     "REMOTE",
     "VERDICT_TASK",
     "claim_replies",
     "node_argv",
+    "prebuilt_companion",
     "prebuilt_export",
     "sourced_document",
 ]

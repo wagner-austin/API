@@ -381,6 +381,7 @@ def claim_pass(
         agent=job["submitted_by"],
         session_id=job["session_id"],
         build_payload=build,
+        companions=prepared["companions"],
         recipe=dispatch.Recipe(
             path=prepared["source"]["path"], install=prepared["source"]["install"]
         ),
@@ -404,12 +405,15 @@ class Prepared(TypedDict):
         plan: The project's declaration.
         source: Its source, present by construction here.
         mirror: The mirror on the hub, holding the commit.
+        companions: The archives of the repositories staged beside the
+            export, each at the commit its declared ref names now.
         workers: Test workers the capacity check granted on this node.
     """
 
     plan: ProjectConfig
     source: ProjectSource
     mirror: pathlib.Path
+    companions: tuple[export.CompanionExport, ...]
     workers: int
 
 
@@ -448,9 +452,12 @@ def prepare(
 
     In this order because each step is cheaper than the next and each
     refusal is more the submitter's than the last: the registry line, the
-    tags against it, the remote, the commit on the remote, and only then
-    the project's fit on this node, judged on the probe the claim pass
-    already took, so no second ssh is paid.
+    tags against it, the remote, the commit on the remote, the companions
+    the project's check reads beside it, and only then the project's fit on
+    this node, judged on the probe the claim pass already took, so no second
+    ssh is paid. The companions are fetched and archived HERE, with the
+    commit, so a declared ref the remote does not serve refuses with no
+    lease held and nothing copied to a node.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -465,7 +472,8 @@ def prepare(
 
     Raises:
         AppError: ``WORKSPACE_PROJECT_UNKNOWN``, ``PROJECT_REMOTE_MISSING``,
-            ``SHA_NOT_ON_REMOTE``, ``EXPORT_FAILED``, ``RESOURCE_HELD`` from
+            ``SHA_NOT_ON_REMOTE``, ``COMPANION_REF_NOT_ON_REMOTE``,
+            ``EXPORT_FAILED``, ``RESOURCE_HELD`` from
             :func:`fleet.cli.run.require_resources_free`, or the capacity
             codes :func:`fleet.core.capacity.plan_dispatch` raises; every
             one a local refusal the caller reports to the queue verbatim.
@@ -478,9 +486,10 @@ def prepare(
     mirror = export.prepare_mirror(
         loaded.mirrors, project=job["project"], remote=source["remote"], sha=sha
     )
+    companions = export.export_companions(loaded.mirrors, loaded.archives, source["companions"])
     run_cli.require_resources_free(loaded, plan)
     workers = capacity.plan_dispatch(node, state, plan)
-    return Prepared(plan=plan, source=source, mirror=mirror, workers=workers)
+    return Prepared(plan=plan, source=source, mirror=mirror, companions=companions, workers=workers)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

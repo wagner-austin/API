@@ -59,6 +59,20 @@ EXTRACT_STEM = "extract"
 #: The script that makes the staged tree a git repository.
 INIT_REPOSITORY_STEM = "init-repo"
 
+#: The script that makes a staged companion a one-commit repository.
+COMPANION_REPOSITORY_STEM = "companion-repo"
+
+#: What a companion's staging directory is called: its own directory's name
+#: and this suffix, beside it under the node's stage root.
+#:
+#: THE TRANSPORT FILES ARE KEPT OUT OF THE COMPANION ITSELF. A dispatch's
+#: archive lands inside the directory it unpacks into, which is harmless for
+#: a project -- nothing reads that tree as a repository. A companion IS read
+#: as one, and its whole claim is that it is an export of a commit and
+#: nothing else; a ``tree.tgz`` committed at its root would be a file the
+#: workspace does not have, sitting in the tree a check compares against it.
+COMPANION_STAGE_SUFFIX = ".stage"
+
 #: The constant capacity probe, under a node's stage root.
 CAPACITY_PROBE_STEM = "fleet-capacity"
 
@@ -108,6 +122,73 @@ def log_path(target: str) -> str:
     return f"{target}/{RESULT_NAME}.log"
 
 
+def companion_directory(stage_root: str, directory: str) -> str:
+    """Where one companion's repository lands on a node.
+
+    BESIDE THE EXPORTS, NOT INSIDE ONE, and never named after a run. A
+    recipe reaches its companion as ``../<directory>`` from its own root,
+    which is where a workstation keeps the same checkout, so the project's
+    Makefile names one path and neither end has to know which machine it is
+    on. The cost is that a companion is shared by every run on that node and
+    replaced by each of them, rather than copied per run: nothing sweeps a
+    stage root, and a per-run copy of a workspace this size would spend a
+    node's whole disk budget in a handful of runs.
+
+    Args:
+        stage_root: The node's declared stage root.
+        directory: The companion's declared directory name, one segment.
+
+    Returns:
+        ``<stage_root>/<directory>``.
+    """
+    return f"{stage_root}/{directory}"
+
+
+def companion_stage_name(directory: str) -> str:
+    """What one companion's staging directory is called.
+
+    A name and not a path, because it is both: the directory beside the
+    companion, and the string the scripts that make it are named after.
+
+    Args:
+        directory: The companion's declared directory name, one segment.
+
+    Returns:
+        ``<directory>.stage``.
+    """
+    return f"{directory}{COMPANION_STAGE_SUFFIX}"
+
+
+def companion_stage_directory(stage_root: str, directory: str) -> str:
+    """Where one companion's archive and scripts land while it is staged.
+
+    Args:
+        stage_root: The node's declared stage root.
+        directory: The companion's declared directory name, one segment.
+
+    Returns:
+        ``<stage_root>/<directory>.stage``, beside the companion and never
+        inside it.
+    """
+    return f"{stage_root}/{companion_stage_name(directory)}"
+
+
+def reset_directory_stem(directory: str) -> str:
+    """Name the script that replaces one companion's directory.
+
+    It lives under the stage ROOT, like the script that makes a dispatch's
+    directory, because the directory it replaces is what it is about to
+    delete.
+
+    Args:
+        directory: The companion's declared directory name.
+
+    Returns:
+        The stem.
+    """
+    return f"reset-{directory}"
+
+
 def recipe_directory(target: str, path: str) -> str:
     """Where a project's recipe runs inside its export.
 
@@ -140,20 +221,21 @@ def task_name(run_id: str) -> str:
     return f"fleet-{run_id}"
 
 
-def make_directory_stem(run_id: str) -> str:
-    """Name the script that creates one dispatch's directory.
+def make_directory_stem(name: str) -> str:
+    """Name the script that creates one staged directory.
 
-    It lives under the stage ROOT rather than the dispatch directory, which
-    does not exist until it has run; named per run so two dispatches staging
-    at once cannot overwrite each other's.
+    It lives under the stage ROOT rather than the directory it creates,
+    which does not exist until it has run; named after that directory so two
+    stagings at once cannot overwrite each other's script.
 
     Args:
-        run_id: The dispatch.
+        name: The directory's name under the stage root: a run id for a
+            dispatch's export, a companion's staging directory otherwise.
 
     Returns:
         The stem.
     """
-    return f"mkdir-{run_id}"
+    return f"mkdir-{name}"
 
 
 def stop_stem(run_id: str) -> str:
@@ -174,6 +256,8 @@ __all__ = [
     "CACHE_DIRECTORY",
     "CAPACITY_PROBE_STEM",
     "COLLECT_STEM",
+    "COMPANION_REPOSITORY_STEM",
+    "COMPANION_STAGE_SUFFIX",
     "ENCODED_NAME",
     "EXTRACT_STEM",
     "INIT_REPOSITORY_STEM",
@@ -184,9 +268,13 @@ __all__ = [
     "RESULT_NAME",
     "TOOLCHAIN_PROBE_STEM",
     "cache_root",
+    "companion_directory",
+    "companion_stage_directory",
+    "companion_stage_name",
     "log_path",
     "make_directory_stem",
     "recipe_directory",
+    "reset_directory_stem",
     "stop_stem",
     "task_name",
 ]

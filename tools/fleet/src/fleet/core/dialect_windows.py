@@ -236,6 +236,29 @@ class WindowsDialect:
         """
         return f"New-Item -ItemType Directory -Force -LiteralPath '{target}' | Out-Null\n"
 
+    def reset_directory_script(self, target: str) -> str:
+        """The script that empties a companion's directory and creates it.
+
+        ``-Force`` on the removal is load-bearing rather than defensive: the
+        directory being replaced holds a git repository this package made
+        there, and every loose object under ``.git/objects`` is written
+        READ-ONLY. Without it the second run carrying a companion stops on
+        the first object file.
+
+        Args:
+            target: Absolute remote directory to replace.
+
+        Returns:
+            The script's text, guarded by ``Test-Path`` because
+            ``Remove-Item`` of a path that does not exist is an error and the
+            first run on a node is exactly that case.
+        """
+        return (
+            f"if (Test-Path -LiteralPath '{target}') {{ "
+            f"Remove-Item -Recurse -Force -LiteralPath '{target}' }}\n"
+            f"New-Item -ItemType Directory -Force -LiteralPath '{target}' | Out-Null\n"
+        )
+
     def reassemble_script(self, target: str) -> str:
         """Decode the one-line base64 and print the SHA-256, extracting nothing.
 

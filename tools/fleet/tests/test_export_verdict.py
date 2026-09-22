@@ -17,7 +17,7 @@ import socket
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import ProjectCompanion, ProjectSource
 from fleet.core import _test_hooks, export, verdict
 from tests.conftest import FakeRun, failed, ok
 
@@ -192,7 +192,9 @@ class TestArchiveCommit:
 
 class TestRequireSourceAndPrepare:
     def test_a_declared_source_is_handed_back(self) -> None:
-        source = ProjectSource(remote=REMOTE, path="packages/wiki-search", install=())
+        source = ProjectSource(
+            remote=REMOTE, path="packages/wiki-search", install=(), companions=()
+        )
 
         assert export.require_source(PROJECT, source) is source
 
@@ -218,6 +220,139 @@ class TestRequireSourceAndPrepare:
         assert runner.calls[1][3] == "cat-file"
         assert runner.calls[2][3] == "fetch"
         assert len(runner.calls) == 3
+
+
+class TestCompanionMirrorKey:
+    @pytest.mark.parametrize(
+        "remote",
+        [
+            "https://github.com/wagner-austin/MCPs.git",
+            "git@github.com:wagner-austin/MCPs.git",
+            "ssh://git@github.com/wagner-austin/MCPs.git",
+        ],
+    )
+    def test_every_spelling_of_one_repository_names_one_mirror(self, remote: str) -> None:
+        """The three remote forms of a repository are that repository, so they
+        share the mirror rather than fetching it three times."""
+        assert export.companion_mirror_key(remote) == "companion-wagner-austin-MCPs"
+
+    def test_two_repositories_of_one_name_do_not_share_a_mirror(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The key is the remote and not the directory a companion lands in:
+        one mirror serving two repositories would flip between them under one
+        ref, and the tree staged would be whichever fetched last."""
+        ours = export.companion_mirror_key("https://github.com/wagner-austin/MCPs.git")
+        theirs = export.companion_mirror_key("https://github.com/someone-else/MCPs.git")
+
+        assert ours != theirs
+        assert export.mirror_path(tmp_path, ours) != export.mirror_path(tmp_path, theirs)
+
+
+class TestFetchRef:
+    def test_the_tip_is_fetched_into_a_ref_and_resolved_to_a_commit(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Into a ref rather than off FETCH_HEAD, so the commit is referenced
+        between the fetch and the archive; and never skipped the way a sha is,
+        because a ref's tip is a moving answer."""
+        runner = FakeRun([ok(""), ok(f"{SHA}\n")])
+        _test_hooks.run = runner
+
+        assert export.fetch_ref(tmp_path, REMOTE, "main") == SHA
+        assert runner.calls == [
+            (
+                "git",
+                "-C",
+                str(tmp_path),
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--force",
+                REMOTE,
+                f"+main:{export.COMPANION_REF}",
+            ),
+            ("git", "-C", str(tmp_path), "rev-parse", f"{export.COMPANION_REF}^{{commit}}"),
+        ]
+        assert runner.timeouts == [export.FETCH_TIMEOUT_SECONDS, export.INIT_TIMEOUT_SECONDS]
+
+    @pytest.mark.parametrize("marker", export.NOT_ON_REMOTE_MARKERS)
+    def test_a_ref_the_remote_lacks_is_its_own_code_and_not_the_shas(
+        self, tmp_path: pathlib.Path, marker: str
+    ) -> None:
+        """A sha the remote lacks is the submitter's unpushed commit; a ref it
+        lacks is a fleet.json line that is wrong for every job of that project,
+        so the two send their readers to different places."""
+        _test_hooks.run = FakeRun([failed(128, f"fatal: {marker} main")])
+
+        with pytest.raises(AppError) as raised:
+            export.fetch_ref(tmp_path, REMOTE, "main")
+
+        assert raised.value.code is FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE
+        assert raised.value.message.startswith(f"{REMOTE} does not serve 'main'")
+        assert "fleet.json" in raised.value.message
+        assert f"git said: fatal: {marker} main" in raised.value.message
+
+    def test_any_other_fetch_failure_carries_gits_words(self, tmp_path: pathlib.Path) -> None:
+        _test_hooks.run = FakeRun([failed(128, "fatal: unable to access: Could not resolve host")])
+
+        with pytest.raises(AppError) as raised:
+            export.fetch_ref(tmp_path, REMOTE, "main")
+
+        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
+        assert raised.value.message == (
+            f"git fetch {REMOTE} main into {tmp_path}: fatal: unable to access: Could not "
+            "resolve host"
+        )
+
+    def test_a_ref_that_resolves_to_no_commit_is_an_export_failure(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A tag object pointing at a tree, or a ref written by something that
+        is not git: the fetch succeeds and there is still no commit to
+        archive, which is not the same as a fetch that failed."""
+        _test_hooks.run = FakeRun([ok(""), failed(128, "fatal: not a valid object name")])
+
+        with pytest.raises(AppError) as raised:
+            export.fetch_ref(tmp_path, REMOTE, "main")
+
+        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
+        assert raised.value.message.startswith(f"git rev-parse {export.COMPANION_REF} in ")
+
+
+class TestExportingCompanions:
+    def test_a_companion_is_mirrored_fetched_and_archived_at_its_tip(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The whole path one declaration takes on the hub, in order: the
+        mirror made, the ref's tip fetched and resolved, and the archive of
+        THAT commit read back as the bytes a node is staged with."""
+        payload = b"\x1f\x8b\x08\x00companion"
+        archives = tmp_path / "archives"
+        archives.mkdir()
+        (archives / f"companion-wagner-austin-MCPs-{SHA}.tgz").write_bytes(payload)
+        runner = FakeRun([ok(""), ok(""), ok(f"{SHA}\n"), ok("")])
+        _test_hooks.run = runner
+
+        exported = export.export_companions(
+            tmp_path / "mirrors",
+            archives,
+            (ProjectCompanion(remote=REMOTE, ref="main", directory="MCPs"),),
+        )
+
+        assert exported == (export.CompanionExport(directory="MCPs", sha=SHA, data=payload),)
+        assert runner.calls[0][:2] == ("git", "init")
+        assert runner.calls[1][3] == "fetch"
+        assert runner.calls[2][3] == "rev-parse"
+        assert runner.calls[3][3] == "archive"
+        assert runner.calls[3][-1] == SHA
+
+    def test_a_project_declaring_none_asks_git_nothing(self, tmp_path: pathlib.Path) -> None:
+        runner = FakeRun([])
+        _test_hooks.run = runner
+
+        assert export.export_companions(tmp_path, tmp_path, ()) == ()
+        assert runner.calls == []
 
 
 class TestReadingTheTail:

@@ -21,11 +21,14 @@ noticing. Here the :class:`Dialect` protocol names every act, both
 implementations must supply all of them or fail to type-check, and a caller
 asks :func:`for_platform` once and never reasons about the platform again.
 
-WHAT IS SHARED AND WHY IT IS HERE. ``tar -xzmf`` and ``git init`` are the
-same command on both platforms (Windows ships bsdtar, every node has git), so
-they are functions in this module rather than methods repeated in two
-classes; the lifecycle modules call them directly. Everything else differs
-in at least one token that matters, which is why it is a method.
+WHAT IS SHARED AND WHY IT IS HERE. ``tar -xzmf`` and the ``git`` acts -- the
+staged tree's ``init``, and the ``init`` plus ``commit`` that makes a
+companion readable as a workspace -- are the same commands on both platforms
+(Windows ships bsdtar, every node has git), so they are functions in this
+module rather than methods repeated in two classes; the lifecycle modules
+call them directly. Everything else differs in at least one token that
+matters, which is why it is a method: replacing a directory is
+``Remove-Item -Recurse -Force`` on one platform and ``rm -rf`` on the other.
 """
 
 from __future__ import annotations
@@ -33,9 +36,19 @@ from __future__ import annotations
 from typing import Protocol
 
 from fleet.contracts.node import NodePlatform
-from fleet.core import names
 from fleet.core.dialect_linux import LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
+
+#: Who a companion's one commit is authored by, passed to ``git`` with
+#: ``-c`` on the commit itself.
+#:
+#: A node has no git identity and is not given one: a dispatch that
+#: configured ``user.email`` would leave that setting behind on somebody's
+#: workstation, and the next thing they committed there would carry it. The
+#: address is in the reserved ``.invalid`` domain (RFC 2606), so it cannot
+#: reach anybody even if a tree staged here were ever pushed.
+COMPANION_AUTHOR_NAME = "fleet"
+COMPANION_AUTHOR_EMAIL = "fleet@corvis.invalid"
 
 
 class Dialect(Protocol):
@@ -125,6 +138,26 @@ class Dialect(Protocol):
 
         Returns:
             The script's text.
+        """
+        ...
+
+    def reset_directory_script(self, target: str) -> str:
+        """The script that empties a directory and creates it.
+
+        For the companion trees, which land at a path derived from a
+        declared name rather than from a run id, so one node's directory is
+        written by every run that carries that companion. Extracting over
+        what the last run left would leave a file the workspace has since
+        deleted sitting in a tree that is then committed AS the workspace,
+        and the check reading it would be comparing against a tree nobody
+        has.
+
+        Args:
+            target: Absolute remote directory to replace.
+
+        Returns:
+            The script's text; a directory that does not exist yet is
+            created, not an error.
         """
         ...
 
@@ -250,7 +283,7 @@ def for_platform(platform: NodePlatform) -> Dialect:
     return LinuxDialect()
 
 
-def extract_script(target: str) -> str:
+def extract_script(archive: str, destination: str) -> str:
     """Render the script that unpacks a verified archive.
 
     THE SAME ON BOTH PLATFORMS: Windows ships bsdtar and the flags agree.
@@ -259,13 +292,58 @@ def extract_script(target: str) -> str:
     produces make targets that look newer than their sources, and the build
     does nothing at all -- which reads as a suite that passed instantly.
 
+    THE TWO PATHS ARE SEPARATE because a companion's are: its archive stays
+    in a staging directory of its own and only the repository lands in the
+    directory the recipe reads, so the tree committed there is the export
+    and nothing else. A project's dispatch passes its own directory for
+    both, which is where its archive already sits.
+
     Args:
-        target: Absolute remote directory for this dispatch.
+        archive: Absolute path to the ``.tgz`` on the node.
+        destination: Absolute remote directory to unpack it into.
 
     Returns:
         The script's text.
     """
-    return f"tar -xzmf '{target}/{names.ARCHIVE_NAME}' -C '{target}'\n"
+    return f"tar -xzmf '{archive}' -C '{destination}'\n"
+
+
+def companion_repository_script(target: str, sha: str) -> str:
+    """Render the script that makes a staged companion a one-commit repository.
+
+    THE SAME ON BOTH PLATFORMS, and it COMMITS where
+    :func:`init_repository_script` deliberately does not. A companion exists
+    to be read as a workspace, and the thing that reads it reads HEAD --
+    slime's lift check compares its lifted files against
+    ``git show HEAD:<path>`` precisely so that an uncommitted edit in the
+    workspace is not mistaken for the code. On a node there is no HEAD until
+    one is made, so the export is committed here, and the identity is passed
+    with ``-c`` rather than configured: nothing this package does leaves
+    state on a node.
+
+    ``--force`` on the add, which the project's tree does not use and must
+    not: there the ``.gitignore`` is what makes a staged tree index the same
+    files a checkout tracks. Here the directory holds the archive of a
+    commit and nothing else, so the tracked set is already decided, and an
+    ignore rule that skipped one of those files would leave the check
+    reporting a workspace file as missing when the workspace has it.
+
+    Args:
+        target: Absolute remote directory holding the extracted companion.
+        sha: The commit the archive was written from, recorded in the
+            message so the tree on the node names what it is.
+
+    Returns:
+        The script's text: the repository initialised, the export indexed
+        and committed.
+    """
+    return (
+        f"git -C '{target}' init --quiet\n"
+        f"git -C '{target}' add --all --force\n"
+        f"git -C '{target}' -c user.name='{COMPANION_AUTHOR_NAME}' "
+        f"-c user.email='{COMPANION_AUTHOR_EMAIL}' commit --quiet "
+        f"--message 'fleet companion export {sha}'\n"
+    )
 
 
 def init_repository_script(target: str) -> str:
@@ -302,8 +380,10 @@ def init_repository_script(target: str) -> str:
     suite was written against. ``git add --all`` under the tree's own
     ``.gitignore`` indexes what a checkout tracks: an export is the tracked
     files by construction, and a working tree's ignored build output stays
-    out the way it does in the checkout. Nothing is committed: no identity
-    is configured on a node, and nothing here reads a commit.
+    out the way it does in the checkout. Nothing is committed, because
+    nothing reads a commit in the tree the recipe runs in; the one staged
+    tree that IS read as a commit is a companion, and
+    :func:`companion_repository_script` says why it is the exception.
 
     Args:
         target: Absolute remote directory holding the staged tree.
@@ -316,7 +396,10 @@ def init_repository_script(target: str) -> str:
 
 
 __all__ = [
+    "COMPANION_AUTHOR_EMAIL",
+    "COMPANION_AUTHOR_NAME",
     "Dialect",
+    "companion_repository_script",
     "extract_script",
     "for_platform",
     "init_repository_script",

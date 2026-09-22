@@ -227,6 +227,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             node_name=node_name,
             archive_dir=loaded.archives,
         ),
+        # None, and that is a statement about this lane rather than an
+        # omission: a companion is exported from a remote by commit, and this
+        # command stages the hub's own working tree of THIS monorepo. The
+        # projects in it read no second repository; the one that does is
+        # dispatched from the queue, where the export lives.
+        companions=(),
         recipe=dispatch.working_tree_recipe(project),
     )
 

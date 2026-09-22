@@ -96,7 +96,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "tools/fleet",
-        "install": []
+        "install": [],
+        "companions": []
       }
     },
     "libs/platform_core": {
@@ -107,7 +108,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "libs/platform_core",
-        "install": []
+        "install": [],
+        "companions": []
       }
     },
     "libs/monorepo_guards": {
@@ -118,7 +120,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "libs/monorepo_guards",
-        "install": []
+        "install": [],
+        "companions": []
       }
     },
     "services/Model-Trainer": {
@@ -129,7 +132,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/API.git",
         "path": "services/Model-Trainer",
-        "install": []
+        "install": [],
+        "companions": []
       }
     },
     "slime": {
@@ -143,6 +147,13 @@
         "install": [
           ["npm", "ci"],
           ["npx", "playwright", "install", "chromium", "webkit"]
+        ],
+        "companions": [
+          {
+            "remote": "https://github.com/wagner-austin/MCPs.git",
+            "ref": "main",
+            "directory": "MCPs"
+          }
         ]
       }
     },
@@ -158,7 +169,8 @@
           ["npm", "ci"],
           ["node", "scripts/ci-build-consumed-workspaces.mjs"],
           ["npm", "rebuild"]
-        ]
+        ],
+        "companions": []
       }
     },
     "MCPs/mcp-shared-py": {
@@ -169,7 +181,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "mcp-shared-py",
-        "install": []
+        "install": [],
+        "companions": []
       }
     },
     "MCPs/packages/maketools": {
@@ -180,7 +193,8 @@
       "source": {
         "remote": "https://github.com/wagner-austin/MCPs.git",
         "path": "packages/maketools",
-        "install": []
+        "install": [],
+        "companions": []
       }
     }
   },

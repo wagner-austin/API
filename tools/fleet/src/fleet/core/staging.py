@@ -165,6 +165,124 @@ def encode(payload: bytes) -> str:
     return base64.b64encode(payload).decode("ascii")
 
 
+def send_verified(
+    host: str,
+    *,
+    platform: NodePlatform,
+    into: str,
+    payload: bytes,
+    described_as: str,
+) -> None:
+    """Send an archive to a directory on a node and verify it lands whole.
+
+    The half of staging that is the same for a project's export and for a
+    companion beside it: the encoded archive lands, the node reassembles and
+    digests it WITHOUT extracting, and the sender compares. Nothing is
+    unpacked here -- the caller decides where the verified bytes go, which
+    is the one thing the two cases do differently.
+
+    Args:
+        host: SSH destination.
+        platform: The node's declared platform.
+        into: Absolute remote directory, which must already exist, holding
+            the encoded archive and then the archive.
+        payload: The archive bytes.
+        described_as: What the archive is, for the mismatch's message.
+
+    Raises:
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
+            transport, or ``STAGE_DIGEST_MISMATCH`` when the node's digest
+            differs from the sender's. The mismatch is fatal rather than
+            retried: a transfer that truncated once will do it again, and a
+            retry loop turns a diagnosable fault into an intermittent one.
+    """
+    spoken = dialect.for_platform(platform)
+    remote.send_script(host, f"{into}/{names.ENCODED_NAME}", encode(payload), platform=platform)
+    received = remote.run_script(
+        host,
+        spoken.script_path(into, names.REASSEMBLE_STEM),
+        spoken.reassemble_script(into),
+        platform=platform,
+    ).strip()
+    expected = digest(payload)
+    if received != expected:
+        raise AppError(
+            FleetErrorCode.STAGE_DIGEST_MISMATCH,
+            f"{host} reassembled {described_as} digesting {received or '<nothing>'} where "
+            f"{expected} was sent; nothing has been unpacked",
+        )
+
+
+def stage_companion(
+    host: str,
+    *,
+    platform: NodePlatform,
+    stage_root: str,
+    directory: str,
+    sha: str,
+    payload: bytes,
+) -> str:
+    """Put one companion repository on a node, beside the exports.
+
+    The directory is REPLACED rather than unpacked over, and the archive
+    never enters it: :func:`fleet.core.names.companion_directory` and
+    :data:`fleet.core.names.COMPANION_STAGE_SUFFIX` carry the reasons. What
+    lands is the export of one commit and nothing else, committed on the
+    node so the check that reads it reads a HEAD.
+
+    Args:
+        host: SSH destination.
+        platform: The node's declared platform.
+        stage_root: Absolute directory on the node holding staged trees.
+        directory: The companion's declared directory name.
+        sha: The commit the archive was written from.
+        payload: The archive bytes.
+
+    Returns:
+        The absolute remote directory the companion was extracted into.
+
+    Raises:
+        AppError: As :func:`send_verified` describes, and from the transport
+            for any of the scripts around it.
+    """
+    spoken = dialect.for_platform(platform)
+    tree = names.companion_directory(stage_root, directory)
+    staged = names.companion_stage_directory(stage_root, directory)
+    staged_stem = names.make_directory_stem(names.companion_stage_name(directory))
+    remote.run_script(
+        host,
+        spoken.script_path(stage_root, names.reset_directory_stem(directory)),
+        spoken.reset_directory_script(tree),
+        platform=platform,
+    )
+    remote.run_script(
+        host,
+        spoken.script_path(stage_root, staged_stem),
+        spoken.make_directory_script(staged),
+        platform=platform,
+    )
+    send_verified(
+        host,
+        platform=platform,
+        into=staged,
+        payload=payload,
+        described_as=f"the {directory} companion at {sha}",
+    )
+    remote.run_script(
+        host,
+        spoken.script_path(staged, names.EXTRACT_STEM),
+        dialect.extract_script(f"{staged}/{names.ARCHIVE_NAME}", tree),
+        platform=platform,
+    )
+    remote.run_script(
+        host,
+        spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
+        dialect.companion_repository_script(tree, sha),
+        platform=platform,
+    )
+    return tree
+
+
 def stage(
     host: str,
     *,
@@ -193,11 +311,8 @@ def stage(
         The absolute remote directory the tree was extracted into.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            transport, or ``STAGE_DIGEST_MISMATCH`` when the node's digest
-            differs from the sender's. The mismatch is fatal rather than
-            retried: a transfer that truncated once will do it again, and a
-            retry loop turns a diagnosable fault into an intermittent one.
+        AppError: As :func:`send_verified` describes, and from the transport
+            for any of the scripts around it.
     """
     spoken = dialect.for_platform(platform)
     target = f"{stage_root}/{run_id}"
@@ -207,26 +322,11 @@ def stage(
         spoken.make_directory_script(target),
         platform=platform,
     )
-    remote.send_script(host, f"{target}/{names.ENCODED_NAME}", encode(payload), platform=platform)
-
-    received = remote.run_script(
-        host,
-        spoken.script_path(target, names.REASSEMBLE_STEM),
-        spoken.reassemble_script(target),
-        platform=platform,
-    ).strip()
-    expected = digest(payload)
-    if received != expected:
-        raise AppError(
-            FleetErrorCode.STAGE_DIGEST_MISMATCH,
-            f"{host} reassembled an archive digesting {received or '<nothing>'} where "
-            f"{expected} was sent; nothing has been unpacked",
-        )
-
+    send_verified(host, platform=platform, into=target, payload=payload, described_as="an archive")
     remote.run_script(
         host,
         spoken.script_path(target, names.EXTRACT_STEM),
-        dialect.extract_script(target),
+        dialect.extract_script(f"{target}/{names.ARCHIVE_NAME}", target),
         platform=platform,
     )
     remote.run_script(
@@ -243,5 +343,7 @@ __all__ = [
     "archive",
     "digest",
     "encode",
+    "send_verified",
     "stage",
+    "stage_companion",
 ]

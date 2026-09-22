@@ -27,13 +27,23 @@ from __future__ import annotations
 import pathlib
 
 from platform_core.errors import AppError, FleetErrorCode
+from typing_extensions import TypedDict
 
-from fleet.contracts.source import ProjectSource
+from fleet.contracts.source import ProjectCompanion, ProjectSource
 from fleet.core import _test_hooks
 
 #: The directory under the workspace's ``runs`` that holds one bare mirror
 #: per project, named after the project key with its slashes folded.
 MIRRORS_DIRECTORY = "mirrors"
+
+#: The local ref a companion's declared ref is fetched into, inside that
+#: companion's own mirror.
+#:
+#: Fetched into a ref rather than read off ``FETCH_HEAD``, so the commit is
+#: REFERENCED between the fetch and the archive: an unreferenced tip is
+#: exactly what ``git gc`` is entitled to remove, and the window would be
+#: rare enough to be undebuggable.
+COMPANION_REF = "refs/fleet/companion"
 
 #: A fetch's deadline, in seconds. A first fetch of a large repository over
 #: the operator's uplink is minutes; ten holds it and ends a hung remote
@@ -70,6 +80,27 @@ def mirror_path(mirrors_root: pathlib.Path, project: str) -> pathlib.Path:
         nothing else a path could misread.
     """
     return mirrors_root / f"{project.replace('/', '-')}.git"
+
+
+def companion_mirror_key(remote: str) -> str:
+    """Name the bare mirror one companion remote is fetched into.
+
+    Derived from the REMOTE and not from the directory a companion lands in,
+    because the directory is a per-project choice: two projects could both
+    stage a companion as ``MCPs`` from different remotes, and one mirror
+    serving both would flip between two repositories under one ref. The
+    remote's owner and repository name identify it the way a clone does.
+
+    Args:
+        remote: The companion's declared remote, in the source grammar.
+
+    Returns:
+        ``companion-<owner>-<repository>``; the grammar admits only
+        characters :func:`mirror_path` can spell.
+    """
+    trimmed = remote.removesuffix(".git").replace(":", "/")
+    owner, repository = trimmed.rsplit("/", 2)[-2:]
+    return f"companion-{owner}-{repository}"
 
 
 def _failure(code: FleetErrorCode, verb: str, stderr: str) -> AppError[FleetErrorCode]:
@@ -160,6 +191,70 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
             ),
         )
     raise _failure(FleetErrorCode.EXPORT_FAILED, f"git fetch {remote} {sha} into {mirror}", stderr)
+
+
+def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
+    """Fetch a ref's tip into the mirror and answer the commit it names.
+
+    Never skipped the way :func:`fetch_commit` is: a sha the mirror holds is
+    that sha forever, while a ref's tip is a moving answer and the question
+    a companion asks is what it points at NOW.
+
+    Args:
+        mirror: The companion's mirror, already initialised.
+        remote: The companion's declared remote.
+        ref: The declared ref, ``main`` or ``refs/heads/main``.
+
+    Returns:
+        The forty-hex commit the ref names.
+
+    Raises:
+        AppError: ``COMPANION_REF_NOT_ON_REMOTE`` when the remote does not
+            serve the ref (one of :data:`NOT_ON_REMOTE_MARKERS` in git's
+            words), which is a fleet.json line to correct rather than a
+            commit to push; ``EXPORT_FAILED`` for any other non-zero fetch
+            or for a fetched ref that does not resolve to a commit, git's
+            words verbatim.
+    """
+    fetched = _test_hooks.run(
+        (
+            "git",
+            "-C",
+            str(mirror),
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "--force",
+            remote,
+            f"+{ref}:{COMPANION_REF}",
+        ),
+        timeout_seconds=FETCH_TIMEOUT_SECONDS,
+    )
+    if fetched["returncode"] != 0:
+        stderr = fetched["stderr"]
+        if any(marker in stderr for marker in NOT_ON_REMOTE_MARKERS):
+            raise AppError(
+                code=FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE,
+                message=(
+                    f"{remote} does not serve {ref!r}, which fleet.json declares as a "
+                    f"companion ref; every job of the project carrying it fails here until "
+                    f"that line names a ref the remote has. git said: {stderr.strip()[:300]}"
+                ),
+            )
+        raise _failure(
+            FleetErrorCode.EXPORT_FAILED, f"git fetch {remote} {ref} into {mirror}", stderr
+        )
+    resolved = _test_hooks.run(
+        ("git", "-C", str(mirror), "rev-parse", f"{COMPANION_REF}^{{commit}}"),
+        timeout_seconds=INIT_TIMEOUT_SECONDS,
+    )
+    if resolved["returncode"] != 0:
+        raise _failure(
+            FleetErrorCode.EXPORT_FAILED,
+            f"git rev-parse {COMPANION_REF} in {mirror}",
+            resolved["stderr"],
+        )
+    return resolved["stdout"].strip()
 
 
 def archive_commit(mirror: pathlib.Path, sha: str, destination: pathlib.Path) -> bytes:
@@ -255,17 +350,119 @@ def prepare_mirror(
     return mirror
 
 
+class PreparedCompanion(TypedDict):
+    """A companion's mirror on the hub and the commit its ref names now.
+
+    Attributes:
+        mirror: The bare mirror, holding that commit under
+            :data:`COMPANION_REF`.
+        sha: The commit the declared ref resolved to on this fetch, which
+            the feed records so a verdict can be read against the workspace
+            it was measured with.
+    """
+
+    mirror: pathlib.Path
+    sha: str
+
+
+class CompanionExport(TypedDict):
+    """One companion's archive, ready to be staged beside an export.
+
+    Bytes and not a builder, unlike a project's payload: a companion's
+    archive is named by its own commit rather than by the run, and it is
+    built where the ref is resolved -- before any lease is taken, so a ref
+    the remote does not serve refuses with nothing held.
+
+    Attributes:
+        directory: The declared directory it lands in on the node.
+        sha: The commit its ref resolved to on this fetch.
+        data: The gzipped tar's bytes.
+    """
+
+    directory: str
+    sha: str
+    data: bytes
+
+
+def export_companions(
+    mirrors_root: pathlib.Path,
+    archive_dir: pathlib.Path,
+    companions: tuple[ProjectCompanion, ...],
+) -> tuple[CompanionExport, ...]:
+    """Fetch and archive every companion a project's export carries.
+
+    Args:
+        mirrors_root: The mirrors directory under the workspace's records.
+        archive_dir: Local directory the archives are written in, which must
+            be run output rather than anywhere a build reads.
+        companions: The project's declarations, in order.
+
+    Returns:
+        One export per companion, in the same order.
+
+    Raises:
+        AppError: As :func:`prepare_companion` and :func:`archive_commit`
+            describe.
+    """
+    exported: list[CompanionExport] = []
+    for companion in companions:
+        prepared = prepare_companion(mirrors_root, companion)
+        key = companion_mirror_key(companion["remote"])
+        exported.append(
+            CompanionExport(
+                directory=companion["directory"],
+                sha=prepared["sha"],
+                data=archive_commit(
+                    prepared["mirror"],
+                    prepared["sha"],
+                    archive_dir / f"{key}-{prepared['sha']}.tgz",
+                ),
+            )
+        )
+    return tuple(exported)
+
+
+def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -> PreparedCompanion:
+    """Make sure a companion's mirror exists and holds its ref's tip.
+
+    The twin of :func:`prepare_mirror`, and called in the same place for the
+    same reason: before any lease is taken, so a ref the remote does not
+    serve is refused with nothing held.
+
+    Args:
+        mirrors_root: The mirrors directory under the workspace's records.
+        companion: The declaration, from the project's source.
+
+    Returns:
+        The mirror and the commit its ref names.
+
+    Raises:
+        AppError: As :func:`ensure_mirror` and :func:`fetch_ref` describe.
+    """
+    mirror = mirror_path(mirrors_root, companion_mirror_key(companion["remote"]))
+    ensure_mirror(mirror)
+    sha = fetch_ref(mirror, companion["remote"], companion["ref"])
+    return PreparedCompanion(mirror=mirror, sha=sha)
+
+
 __all__ = [
     "ARCHIVE_TIMEOUT_SECONDS",
+    "COMPANION_REF",
     "FETCH_TIMEOUT_SECONDS",
     "INIT_TIMEOUT_SECONDS",
     "MIRRORS_DIRECTORY",
     "NOT_ON_REMOTE_MARKERS",
+    "CompanionExport",
+    "PreparedCompanion",
     "archive_commit",
+    "companion_mirror_key",
     "ensure_mirror",
+    "export_companions",
     "fetch_commit",
+    "fetch_ref",
     "has_commit",
     "mirror_path",
+    "prepare_companion",
     "prepare_mirror",
     "require_source",
 ]

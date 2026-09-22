@@ -47,7 +47,17 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig, lease_seconds
-from fleet.core import _test_hooks, dialect, leases, manifest, names, records, remote, staging
+from fleet.core import (
+    _test_hooks,
+    dialect,
+    export,
+    leases,
+    manifest,
+    names,
+    records,
+    remote,
+    staging,
+)
 
 #: How much longer than its estimate a dispatch may hold its lease.
 #:
@@ -351,6 +361,7 @@ def start(
     agent: str,
     session_id: str,
     build_payload: PayloadBuilder,
+    companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
 ) -> LedgerEntry:
     """Take the lease, stage the tree, launch the suite, and record it.
@@ -369,6 +380,9 @@ def start(
         build_payload: Builds the archive once the lease is held:
             :func:`working_tree_payload` for ``fleet-run``, the export of a
             commit for the queue's node lane (:mod:`fleet.core.export`).
+        companions: The repositories staged beside the export, in declared
+            order, before the build script is sent. Empty for a project
+            whose check reads only its own tree.
         recipe: Where in the tree the recipe runs and what readies it.
 
     Returns:
@@ -426,6 +440,33 @@ def start(
         detail=f"{len(payload['data'])} bytes, {payload['description']}, to {target}",
         now_unix=_test_hooks.now(),
     )
+    # BEFORE the build script is sent, because the install steps are part of
+    # that script and a project whose install reads its companion would find
+    # nothing there. Each one is its own feed line naming the commit it is,
+    # so a verdict can be read against the workspace it was measured with --
+    # a companion is the tip of a ref, so two runs of one sha can legitimately
+    # measure different things, and the line is where that shows.
+    for companion in companions:
+        beside = staging.stage_companion(
+            node["host"],
+            platform=node["platform"],
+            stage_root=node["stage_root"],
+            directory=companion["directory"],
+            sha=companion["sha"],
+            payload=companion["data"],
+        )
+        emit(
+            loaded_feed,
+            run_id=run_id,
+            node=node_name,
+            project=project,
+            kind="staged",
+            detail=(
+                f"{len(companion['data'])} bytes, the {companion['directory']} companion "
+                f"at {companion['sha']}, to {beside}"
+            ),
+            now_unix=_test_hooks.now(),
+        )
 
     spoken = dialect.for_platform(node["platform"])
     remote.send_script(

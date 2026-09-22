@@ -207,6 +207,20 @@ class LinuxDialect:
         """
         return f"{PROLOGUE}mkdir -p '{target}'\n"
 
+    def reset_directory_script(self, target: str) -> str:
+        """The script that empties a companion's directory and creates it.
+
+        Args:
+            target: Absolute remote directory to replace.
+
+        Returns:
+            The script's text. ``rm -rf`` needs no guard for an absent path,
+            which is the first run on a node, and ``-f`` removes the
+            read-only loose objects of the git repository a previous run
+            made there.
+        """
+        return f"{PROLOGUE}rm -rf '{target}'\nmkdir -p '{target}'\n"
+
     def reassemble_script(self, target: str) -> str:
         """Decode the one-line base64 and print the SHA-256, extracting nothing.
 

@@ -19,7 +19,11 @@ from fleet.contracts.source import (
     INSTALL_TOKEN,
     PATH_PATTERN,
     REMOTE_PATTERN,
+    ProjectCompanion,
     ProjectSource,
+    decode_companion_directory,
+    decode_companion_ref,
+    decode_companions,
     decode_install,
     decode_path,
     decode_project_source,
@@ -36,16 +40,22 @@ SSH_SCP = "git@github.com:wagner-austin/MCPs.git"
 SSH_URL = "ssh://git@github.com/wagner-austin/MCPs.git"
 
 
-def _source(install: tuple[tuple[str, ...], ...] = (("npm", "ci"),)) -> ProjectSource:
+def _source(
+    install: tuple[tuple[str, ...], ...] = (("npm", "ci"),),
+    companions: tuple[ProjectCompanion, ...] = (),
+) -> ProjectSource:
     """A source for the MCPs wiki-search package.
 
     Args:
         install: The install steps.
+        companions: The repositories exported beside it.
 
     Returns:
         The source.
     """
-    return ProjectSource(remote=HTTPS, path="packages/wiki-search", install=install)
+    return ProjectSource(
+        remote=HTTPS, path="packages/wiki-search", install=install, companions=companions
+    )
 
 
 class TestRemote:
@@ -142,6 +152,102 @@ class TestInstall:
         assert decode_install([["npm", token]], field="source.install") == (("npm", token),)
 
 
+class TestCompanions:
+    """The repositories a project's export carries beside it (MCPs board task
+    0515040d). Every refusal here is a fleet.json line somebody will write
+    wrong once, and the message is what that person reads."""
+
+    def test_a_declaration_decodes_to_its_three_fields(self) -> None:
+        assert decode_companions(
+            [{"remote": HTTPS, "ref": "main", "directory": "MCPs"}], field="source.companions"
+        ) == (ProjectCompanion(remote=HTTPS, ref="main", directory="MCPs"),)
+
+    def test_an_empty_list_is_a_project_whose_check_reads_its_own_tree(self) -> None:
+        assert decode_companions([], field="source.companions") == ()
+
+    def test_two_companions_in_two_directories_decode_in_declared_order(self) -> None:
+        """Order is kept because it is the order they are staged in, and two
+        different directories are exactly what the repeat check must allow."""
+        assert decode_companions(
+            [
+                {"remote": HTTPS, "ref": "main", "directory": "MCPs"},
+                {"remote": SSH_URL, "ref": "refs/heads/main", "directory": "workspace"},
+            ],
+            field="source.companions",
+        ) == (
+            ProjectCompanion(remote=HTTPS, ref="main", directory="MCPs"),
+            ProjectCompanion(remote=SSH_URL, ref="refs/heads/main", directory="workspace"),
+        )
+
+    def test_an_absent_key_is_refused_rather_than_read_as_none(self) -> None:
+        with pytest.raises(JSONTypeError, match=r"source\.companions is required: \[\]"):
+            decode_companions(None, field="source.companions")
+
+    def test_a_non_list_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="must be a list of companions, got str"):
+            decode_companions(HTTPS, field="source.companions")
+
+    def test_an_element_that_is_not_an_object_is_refused_by_index(self) -> None:
+        with pytest.raises(JSONTypeError, match=r"source\.companions\[0\] must be an object"):
+            decode_companions([HTTPS], field="source.companions")
+
+    def test_two_companions_in_one_directory_are_refused_by_index(self) -> None:
+        """The second would stage over the first and the recipe would read
+        whichever finished last."""
+        with pytest.raises(
+            JSONTypeError, match=r"source\.companions\[1\]\.directory repeats 'MCPs'"
+        ):
+            decode_companions(
+                [
+                    {"remote": HTTPS, "ref": "main", "directory": "MCPs"},
+                    {"remote": SSH_URL, "ref": "master", "directory": "MCPs"},
+                ],
+                field="source.companions",
+            )
+
+    @pytest.mark.parametrize("ref", ["main", "master", "refs/heads/main", "release-1.2"])
+    def test_the_refs_a_registry_would_name_pass(self, ref: str) -> None:
+        assert decode_companion_ref(ref, field="source.companions[0].ref") == ref
+
+    @pytest.mark.parametrize(
+        "ref",
+        ["", "/main", "main/", "../main", "-main", "refs//heads", "ma in", "main;rm", "$HEAD"],
+    )
+    def test_a_ref_outside_the_grammar_is_refused_with_the_two_spellings(self, ref: str) -> None:
+        with pytest.raises(JSONTypeError, match=r"such as 'main' or 'refs/heads/main'"):
+            decode_companion_ref(ref, field="source.companions[0].ref")
+
+    @pytest.mark.parametrize("directory", ["MCPs", "workspace-1", "a.b_c-d"])
+    def test_one_segment_passes_as_a_directory(self, directory: str) -> None:
+        assert (
+            decode_companion_directory(directory, field="source.companions[0].directory")
+            == directory
+        )
+
+    @pytest.mark.parametrize(
+        "directory", ["", "..", "../MCPs", "a/b", "/MCPs", "C:/fleet/stage/MCPs", ".hidden", "-x"]
+    )
+    def test_a_directory_that_is_a_path_is_refused(self, directory: str) -> None:
+        """It is joined to the node's stage root, so a value that could spell
+        ``..`` or an absolute path would write outside the staging area the
+        runner owns."""
+        with pytest.raises(JSONTypeError, match=r"must be ONE directory name"):
+            decode_companion_directory(directory, field="source.companions[0].directory")
+
+    def test_a_source_carrying_one_survives_encoding(self) -> None:
+        original = _source(
+            companions=(ProjectCompanion(remote=HTTPS, ref="main", directory="MCPs"),)
+        )
+
+        assert encode_project_source(original) == {
+            "remote": HTTPS,
+            "path": "packages/wiki-search",
+            "install": [["npm", "ci"]],
+            "companions": [{"remote": HTTPS, "ref": "main", "directory": "MCPs"}],
+        }
+        assert decode_project_source(encode_project_source(original), field="source") == original
+
+
 class TestProjectSource:
     def test_a_source_survives_encoding(self) -> None:
         original = _source()
@@ -160,6 +266,7 @@ class TestProjectSource:
             "remote": HTTPS,
             "path": "packages/wiki-search",
             "install": [],
+            "companions": [],
         }
         assert decode_project_source(encode_project_source(original), field="source") == original
 

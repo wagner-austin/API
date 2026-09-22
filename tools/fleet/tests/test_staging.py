@@ -18,8 +18,11 @@ import pathlib
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, dialect, dialect_windows, manifest, staging
+from fleet.core import _test_hooks, dialect, dialect_windows, manifest, names, staging
 from tests.conftest import DEMO_DEPENDENCY, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok
+
+#: The commit a staged companion is the export of, in these tests.
+COMPANION_SHA = "9f1c0b7a2d3e4f5061728394a5b6c7d8e9f01234"
 
 #: The deadline for the real tar calls these tests make over a tiny tree:
 #: no listing here comes near it, so a result is about the archive and
@@ -275,9 +278,10 @@ class TestStage:
         # After the tree lands: before extraction there is nothing for the
         # ignore rules to cover, and the .gitignore that gives them content
         # arrives with the tree.
-        assert sent.index(dialect.extract_script(f"C:/fleet/stage/{DEMO_RUN_ID}").encode()) < (
-            sent.index(dialect.init_repository_script(f"C:/fleet/stage/{DEMO_RUN_ID}").encode())
-        )
+        target = f"C:/fleet/stage/{DEMO_RUN_ID}"
+        assert sent.index(
+            dialect.extract_script(f"{target}/{names.ARCHIVE_NAME}", target).encode()
+        ) < (sent.index(dialect.init_repository_script(target).encode()))
 
     def test_the_extract_script_keeps_the_node_s_clock(self) -> None:
         """Without -m, a tree from a fast clock makes targets look fresh.
@@ -285,7 +289,7 @@ class TestStage:
         The build then does nothing, which reads as a suite that passed
         instantly.
         """
-        assert "-xzmf" in dialect.extract_script("C:/s/run-1")
+        assert "-xzmf" in dialect.extract_script("C:/s/run-1/tree.tgz", "C:/s/run-1")
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
@@ -303,4 +307,109 @@ class TestStage:
 
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
         assert "nothing has been unpacked" in excinfo.value.message
+        assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+
+
+class TestStagingACompanion:
+    """The repository a project's check reads BESIDE its export (MCPs board
+    task 0515040d): what the node is asked to do, in what order, and what the
+    directory it lands in is guaranteed to hold."""
+
+    def test_the_tree_lands_beside_the_exports_and_is_committed_at_its_sha(self) -> None:
+        """``<stage_root>/<directory>`` is ``../<directory>`` from an export
+        root, which is where a workstation keeps the same checkout, so the
+        recipe names one path on either machine. The commit is what a check
+        reading ``git show HEAD:`` needs, and it is made here because a node
+        has no HEAD until one is."""
+        payload = b"companion-bytes"
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        _test_hooks.run = runner
+
+        where = staging.stage_companion(
+            "lavender",
+            platform="windows",
+            stage_root="C:/fleet/stage",
+            directory="MCPs",
+            sha=COMPANION_SHA,
+            payload=payload,
+        )
+
+        sent = [body or b"" for body in runner.stdin]
+        assert where == "C:/fleet/stage/MCPs"
+        assert sent[0] == dialect_windows.WindowsDialect().reset_directory_script(where).encode()
+        assert sent[4] == staging.encode(payload).encode()
+        assert (
+            sent[7]
+            == dialect.extract_script(
+                f"C:/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}", where
+            ).encode()
+        )
+        assert sent[9] == dialect.companion_repository_script(where, COMPANION_SHA).encode()
+
+    def test_the_archive_never_enters_the_tree_that_is_committed(self) -> None:
+        """A ``tree.tgz`` at the root of a staged workspace would be a file the
+        workspace does not have, sitting in the tree a check compares against
+        it, so the transport files stay in a staging directory beside it."""
+        payload = b"companion-bytes"
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        _test_hooks.run = runner
+
+        staging.stage_companion(
+            "lavender",
+            platform="windows",
+            stage_root="C:/fleet/stage",
+            directory="MCPs",
+            sha=COMPANION_SHA,
+            payload=payload,
+        )
+
+        written = [argument for call in runner.calls for argument in call]
+        assert not any(f"C:/fleet/stage/MCPs/{names.ENCODED_NAME}" in text for text in written)
+        assert any(f"C:/fleet/stage/MCPs.stage/{names.ENCODED_NAME}" in text for text in written)
+
+    def test_the_directory_is_replaced_rather_than_unpacked_over(self) -> None:
+        """Every run carrying a companion writes the same directory, so a file
+        the workspace has since deleted would otherwise survive into a tree
+        that is then committed AS the workspace."""
+        payload = b"companion-bytes"
+        runner = FakeRun([ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 4)
+        _test_hooks.run = runner
+
+        staging.stage_companion(
+            "diphtheria",
+            platform="linux",
+            stage_root="/home/corvis/fleet/stage",
+            directory="MCPs",
+            sha=COMPANION_SHA,
+            payload=payload,
+        )
+
+        sent = [body or b"" for body in runner.stdin]
+        assert b"rm -rf '/home/corvis/fleet/stage/MCPs'" in sent[0]
+        assert sent.index(sent[0]) < sent.index(
+            dialect.extract_script(
+                f"/home/corvis/fleet/stage/MCPs.stage/{names.ARCHIVE_NAME}",
+                "/home/corvis/fleet/stage/MCPs",
+            ).encode()
+        )
+
+    def test_a_mismatched_digest_names_the_companion_and_unpacks_nothing(self) -> None:
+        """The message says WHICH archive disagreed, because a dispatch now
+        carries more than one and a mismatch that named none would leave a
+        reader looking at the wrong transfer."""
+        runner = FakeRun([ok("")] * 6 + [ok("0" * 64)])
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as excinfo:
+            staging.stage_companion(
+                "lavender",
+                platform="windows",
+                stage_root="C:/fleet/stage",
+                directory="MCPs",
+                sha=COMPANION_SHA,
+                payload=b"bytes",
+            )
+
+        assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
+        assert f"the MCPs companion at {COMPANION_SHA}" in excinfo.value.message
         assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
