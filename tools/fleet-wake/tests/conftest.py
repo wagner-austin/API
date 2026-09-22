@@ -22,11 +22,16 @@ time.
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import Generator
 from typing import Final
 
 import pytest
+from fleet.contracts.budget import NodeBudget
+from fleet.contracts.node import NodeConfig, encode_node_config
+from fleet.contracts.project import ProjectConfig, encode_project_config
 from platform_core.config import config_test_hooks
+from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet_wake import _test_hooks
 from fleet_wake.identity import TASK_ID_VARIABLE
@@ -43,6 +48,81 @@ CONFIGURED_ENV: Final[dict[str, str]] = {
     "CORVIS_TENANT_ID": "2e137b5f-0000-4000-8000-000000000000",
     TASK_ID_VARIABLE: TASK_ID,
 }
+
+
+def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Path:
+    """Write a one-node, one-project workspace THROUGH FLEET'S OWN ENCODERS.
+
+    THE DRIFT THIS REMOVES, and it cost fleet-wake eleven hours of red CI
+    on 2026-09-21. Both suites hand-built this document as a literal, and
+    both spelled the project entry as three keys. `339c66e30` then made
+    `source` a required field of `ProjectConfig` (board task fd5cabfa, A2),
+    the literals did not follow, and all fourteen cycle and CLI cases died
+    inside `decode_project_config` before reaching a line of this package.
+    The suite that proves fleet-wake reads a workspace cannot be the one
+    place that invents what a workspace looks like.
+
+    `encode_node_config` and `encode_project_config` are the writers the
+    registry itself round-trips through, and `NodeConfig`/`ProjectConfig`
+    are total TypedDicts, so the NEXT required field fails mypy here rather
+    than fourteen tests at runtime. The same reasoning as the ledger rows
+    this module's header describes: produced the way production produces
+    them, never invented beside them.
+
+    Args:
+        tmp_path: Directory the workspace's records resolve into.
+        project: The project key, which the tests assert dispatch rows and
+            board posts against.
+
+    Returns:
+        Path to the written document.
+    """
+    document: JSONObject = {
+        "nodes": {
+            "lavender": encode_node_config(
+                NodeConfig(
+                    host="lavender",
+                    platform="windows",
+                    stage_root="C:/fleet/stage",
+                    logical_cores=16,
+                    ram_gb=32.0,
+                    gpu=None,
+                    enabled=True,
+                    budget=NodeBudget(
+                        reserved_cores=2,
+                        reserved_ram_gb=4.0,
+                        worker_ram_gb=1.1,
+                        max_concurrent_runs=2,
+                        max_disk_gb=20.0,
+                    ),
+                )
+            )
+        },
+        "not_dispatchable": {},
+        "projects": {
+            project: encode_project_config(
+                ProjectConfig(
+                    worker_ram_gb=1.1,
+                    minimum_workers=2,
+                    expected_minutes=5,
+                    exclusive_resources=(),
+                    external_paths=(),
+                    required_tags=(),
+                    # NULL, SPELLED OUT: this bridge announces dispatch
+                    # outcomes and never checks anything out, so the
+                    # fixture states the contract's "no remote" rather
+                    # than implying a remote nothing here would fetch.
+                    source=None,
+                )
+            )
+        },
+        "ledger": "runs/ledger.jsonl",
+        "feed": "runs/feed.jsonl",
+        "leases": "runs/leases.json",
+    }
+    path = tmp_path / "fleet.json"
+    path.write_text(dump_json_str(document), encoding="utf-8")
+    return path
 
 
 @pytest.fixture(autouse=True)

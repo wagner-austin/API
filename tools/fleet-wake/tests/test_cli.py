@@ -7,16 +7,20 @@ import runpy
 import sys
 
 import pytest
-from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.mcp_testing import FakeHttpPost, posted_ok
 
 from fleet_wake import _test_hooks
 from fleet_wake.cli import wake as wake_cli
-from tests.conftest import CONFIGURED_ENV, pin_env
+from tests.conftest import CONFIGURED_ENV, pin_env, write_fleet_workspace
 
 
 def _write_workspace(tmp_path: pathlib.Path) -> str:
     """Write a minimal fleet workspace document.
+
+    Built by :func:`tests.conftest.write_fleet_workspace` through fleet's own
+    encoders, and shared with the cycle suite: this file held a second copy
+    of the same literal until 2026-09-21, and the two drifted from the
+    project contract together.
 
     Args:
         tmp_path: Directory the records resolve into.
@@ -24,39 +28,7 @@ def _write_workspace(tmp_path: pathlib.Path) -> str:
     Returns:
         The document's path, ready to pass as ``--config``.
     """
-    document: JSONObject = {
-        "nodes": {
-            "lavender": {
-                "host": "lavender",
-                "platform": "windows",
-                "stage_root": "C:/fleet/stage",
-                "logical_cores": 16,
-                "ram_gb": 32.0,
-                "gpu": None,
-                "enabled": True,
-                "budget": {
-                    "reserved_cores": 2,
-                    "reserved_ram_gb": 4.0,
-                    "worker_ram_gb": 1.1,
-                    "max_concurrent_runs": 2,
-                    "max_disk_gb": 20.0,
-                },
-            }
-        },
-        "not_dispatchable": {},
-        "projects": {
-            "tools/fleet": {
-                "worker_ram_gb": 1.1,
-                "minimum_workers": 2,
-                "expected_minutes": 5,
-            }
-        },
-        "ledger": "runs/ledger.jsonl",
-        "feed": "runs/feed.jsonl",
-        "leases": "runs/leases.json",
-    }
-    path = tmp_path / "fleet.json"
-    path.write_text(dump_json_str(document), encoding="utf-8")
+    path = write_fleet_workspace(tmp_path, project="tools/fleet")
     return str(path)
 
 
