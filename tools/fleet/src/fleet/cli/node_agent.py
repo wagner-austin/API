@@ -231,6 +231,7 @@ def claim_pass(
     if gap is not None:
         _log.info("%s cannot build; claiming nothing: %s: %s", alias, gap.code, gap.message)
         return None
+    _log.info("%s toolchain ready: %s", alias, toolchain.ready_summary(answered))
     job = queue.claim_next(
         credentials,
         lane="node",
