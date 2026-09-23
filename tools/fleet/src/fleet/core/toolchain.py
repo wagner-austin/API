@@ -32,6 +32,7 @@ from fleet.contracts.toolchain import (
     install_command,
     missing,
     python_is_right,
+    version_number,
 )
 from fleet.core import dialect, names, remote
 
@@ -205,6 +206,34 @@ def readiness_gap(
     return None
 
 
+def ready_summary(reports: tuple[ToolReport, ...]) -> str:
+    """Say what a ready node's toolchain was judged on.
+
+    A gate that passes says how much it examined: "ready" alone reads the
+    same for a node that reported six tools and for one whose probe named
+    one, and only the first is a pass.
+
+    Only python's version is printed because only python's version is
+    judged; the trailing-token rule that reads it would call bsdtar's banner
+    ``libb2/bundled``, so the other tools are named, not versioned.
+
+    Args:
+        reports: What a node answered, already judged ready.
+
+    Returns:
+        ``python <number>; <tool>, <tool> present``, the other required tools
+        in the contract's order, e.g. ``python 3.11.9; poetry, git, make,
+        node, tar present``.
+    """
+    present = [
+        tool["name"]
+        for tool in REQUIRED_TOOLS
+        if tool["name"] != "python"
+        and any(report["name"] == tool["name"] and report["present"] for report in reports)
+    ]
+    return f"python {version_number(_python_version(reports))}; {', '.join(present)} present"
+
+
 def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]) -> None:
     """Refuse a node that cannot run a build.
 
@@ -343,5 +372,6 @@ __all__ = [
     "probe_toolchain",
     "read_reports",
     "readiness_gap",
+    "ready_summary",
     "require_ready",
 ]
