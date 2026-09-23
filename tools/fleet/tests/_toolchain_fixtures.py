@@ -3,8 +3,10 @@
 THE FIXTURES ARE THE REAL MEASUREMENT. ``sedona``, ``lavender`` and ``loki``
 answered these exact shapes on 2026-09-04, and one node of the three could
 have run a ``make check``. ``diphtheria`` answered on 2026-09-20, the first
-Linux node. A test written against an invented "node with everything" would
-have proved the happy path and nothing about the fleet that actually exists.
+Linux node. The ``_2026_09_23`` answers are the probe that also asks for
+``node`` and reads the Store alias as no python, run on each node that day.
+A test written against an invented "node with everything" would have proved
+the happy path and nothing about the fleet that actually exists.
 """
 
 from __future__ import annotations
@@ -63,6 +65,68 @@ DIPHTHERIA = (
     "pipx=yes=1.4.3\n"
 )
 
+#: What lavender answered the probe that asks for node, 2026-09-23, verbatim:
+#: ready, after its python.org 3.11.9 was installed at user scope by the
+#: winget command the contract now carries.
+LAVENDER_2026_09_23 = (
+    "python=yes=Python 3.11.9\n"
+    "poetry=yes=Poetry (version 2.4.2)\n"
+    "git=yes=git version 2.55.0.windows.5\n"
+    "make=yes=GNU Make 4.4.1\n"
+    "node=yes=v24.20.0\n"
+    "tar=yes=bsdtar 3.8.8 - libarchive 3.8.8 zlib/1.2.13.1-motley liblzma/5.8.1 "
+    "bz2lib/1.0.8 libzstd/1.5.7 cng/2.0 libb2/bundled\n"
+    "winget=yes=v1.29.290\n"
+    "choco=yes=2.7.4\n"
+    "pip=yes=pip 24.0 from C:\\Users\\austi\\AppData\\Local\\Programs\\Python\\Python311"
+    "\\Lib\\site-packages\\pip (python 3.11)\n"
+)
+
+#: The same probe on lavender, the same day, with the Python311 directories
+#: taken off PATH: the state its build runner met from 2026-09-22 20:18Z to
+#: 2026-09-23 05:39Z. ``python`` resolved to the WindowsApps Store alias,
+#: which the probe reports absent, and poetry and pip went with it.
+LAVENDER_STORE_STUB = (
+    "python=no=\n"
+    "poetry=no=\n"
+    "git=yes=git version 2.55.0.windows.5\n"
+    "make=yes=GNU Make 4.4.1\n"
+    "node=yes=v24.20.0\n"
+    "tar=yes=bsdtar 3.8.8 - libarchive 3.8.8 zlib/1.2.13.1-motley liblzma/5.8.1 "
+    "bz2lib/1.0.8 libzstd/1.5.7 cng/2.0 libb2/bundled\n"
+    "winget=yes=v1.29.290\n"
+    "choco=yes=2.7.4\n"
+    "pip=no=\n"
+)
+
+#: What sedona answered the same probe, 2026-09-23, verbatim.
+SEDONA_2026_09_23 = (
+    "python=yes=Python 3.11.9\n"
+    "poetry=yes=Poetry (version 2.4.2)\n"
+    "git=yes=git version 2.55.0.windows.5\n"
+    "make=yes=GNU Make 4.4.1\n"
+    "node=yes=v24.20.0\n"
+    "tar=yes=bsdtar 3.8.8 - libarchive 3.8.8 zlib/1.2.13.1-motley liblzma/5.8.3 "
+    "bz2lib/1.0.8 libzstd/1.5.7 cng/2.0 libb2/bundled\n"
+    "winget=yes=v1.29.380\n"
+    "choco=yes=2.7.4\n"
+    "pip=yes=pip 24.0 from C:\\Users\\austi\\AppData\\Local\\Programs\\Python\\Python311"
+    "\\Lib\\site-packages\\pip (python 3.11)\n"
+)
+
+#: What diphtheria answered the Linux probe that asks for node, 2026-09-23,
+#: verbatim: 3.11 as ``python3`` now, and NodeSource's Node 24.
+DIPHTHERIA_2026_09_23 = (
+    "python=yes=Python 3.11.15\n"
+    "poetry=yes=Poetry (version 2.5.1)\n"
+    "git=yes=git version 2.43.0\n"
+    "make=yes=GNU Make 4.3\n"
+    "node=yes=v24.21.0\n"
+    "tar=yes=tar (GNU tar) 1.35\n"
+    "apt-get=yes=apt 2.8.3 (amd64)\n"
+    "pipx=yes=1.4.3\n"
+)
+
 #: A node carrying the wrong interpreter, which no probed Windows node did.
 WRONG_PYTHON = LOKI.replace("Python 3.11.9", "Python 3.12.4")
 
@@ -94,4 +158,15 @@ def node(host: str = "lavender") -> NodeConfig:
     )
 
 
-__all__ = ["DIPHTHERIA", "LAVENDER", "LOKI", "SEDONA", "WRONG_PYTHON", "node"]
+__all__ = [
+    "DIPHTHERIA",
+    "DIPHTHERIA_2026_09_23",
+    "LAVENDER",
+    "LAVENDER_2026_09_23",
+    "LAVENDER_STORE_STUB",
+    "LOKI",
+    "SEDONA",
+    "SEDONA_2026_09_23",
+    "WRONG_PYTHON",
+    "node",
+]

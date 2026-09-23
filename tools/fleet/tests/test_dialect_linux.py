@@ -289,7 +289,7 @@ class TestTransportShape:
         body = DIALECT.toolchain_probe_script()
 
         assert "report python python3\n" in body
-        for tool in ("poetry", "git", "make", "tar", "apt-get", "pipx"):
+        for tool in ("poetry", "git", "make", "node", "tar", "apt-get", "pipx"):
             assert f"report {tool} {tool}\n" in body
         assert "winget" not in body
         assert "choco" not in body
@@ -416,7 +416,7 @@ class TestForRealUnderSh:
     def test_the_toolchain_probe_reports_every_tool(self, tmp_path: pathlib.Path) -> None:
         fields = fields_of(self.run_script(tmp_path, DIALECT.toolchain_probe_script()))
 
-        assert set(fields) == {"python", "poetry", "git", "make", "tar", "apt-get", "pipx"}
+        assert set(fields) == {"python", "poetry", "git", "make", "node", "tar", "apt-get", "pipx"}
         assert fields["python"].startswith("yes=Python 3.")
         for value in fields.values():
             assert value.startswith(("yes=", "no="))

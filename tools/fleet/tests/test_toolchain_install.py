@@ -13,12 +13,25 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.toolchain import (
     PACKAGE_MANAGERS,
+    PINNED_PYTHON,
+    PYTHON_REGISTERED_GUARD,
+    REQUIRED_PYTHON,
     ToolReport,
     available_managers,
     install_command,
+    missing,
+    python_is_right,
 )
 from fleet.core import _test_hooks, toolchain
-from tests._toolchain_fixtures import LOKI, SEDONA, node
+from tests._toolchain_fixtures import (
+    DIPHTHERIA_2026_09_23,
+    LAVENDER_2026_09_23,
+    LAVENDER_STORE_STUB,
+    LOKI,
+    SEDONA,
+    SEDONA_2026_09_23,
+    node,
+)
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -59,9 +72,39 @@ class TestManagerSelection:
         assert install_command("poetry", ("pip", "winget")).startswith("python -m pip")
 
     def test_a_tool_this_package_never_installs_has_no_command(self) -> None:
-        """python and tar are decisions about a machine, not packages."""
-        assert install_command("python", ("winget", "choco")) == ""
+        """tar ships with the platform; apt-get's python and node are not the
+        versions the fleet runs, so a Linux node's are installed by hand."""
         assert install_command("tar", ("winget", "choco")) == ""
+        assert install_command("python", ("pipx", "apt-get")) == ""
+        assert install_command("node", ("pipx", "apt-get")) == ""
+
+    def test_python_installs_the_pinned_python_org_build_at_user_scope(self) -> None:
+        """THE DECISION MADE 2026-09-23: the version every node carried, at
+        the path every node carried it, with no elevation."""
+        by_winget = install_command("python", ("pip", "winget", "choco"))
+
+        assert by_winget == (
+            f"{PYTHON_REGISTERED_GUARD}winget install --id Python.Python.3.11 "
+            f"--version {PINNED_PYTHON} -e --scope user --source winget --silent "
+            "--accept-package-agreements --accept-source-agreements --disable-interactivity"
+        )
+        assert install_command("python", ("choco",)) == (
+            f"{PYTHON_REGISTERED_GUARD}choco install python311 --version {PINNED_PYTHON} -y"
+        )
+        assert PINNED_PYTHON.startswith(REQUIRED_PYTHON)
+
+    def test_both_python_installs_stop_where_the_version_is_registered(self) -> None:
+        """LAVENDER, 2026-09-23: a second install of the same version moved the
+        Actions runner's copy out of its tool cache."""
+        assert PYTHON_REGISTERED_GUARD.startswith("if (Get-ItemProperty 'HKLM:")
+        assert f"-like 'Python {PINNED_PYTHON} Core Interpreter*'" in PYTHON_REGISTERED_GUARD
+        assert PYTHON_REGISTERED_GUARD.endswith("exit 1 }; ")
+
+    def test_node_installs_the_managers_lts(self) -> None:
+        assert install_command("node", ("winget", "choco")).startswith(
+            "winget install --id OpenJS.NodeJS.LTS -e --source winget"
+        )
+        assert install_command("node", ("choco",)) == "choco install nodejs-lts -y"
 
     def test_an_unknown_tool_has_no_command(self) -> None:
         assert install_command("kubectl", ("winget", "choco")) == ""
@@ -69,8 +112,7 @@ class TestManagerSelection:
 
 class TestInstall:
     def test_only_tools_with_a_command_are_installable(self) -> None:
-        """Python and tar carry none: which interpreter a machine should have
-        is a decision, not a package."""
+        """tar carries none: it ships with the platform."""
         reports = (
             ToolReport(name="python", present=False, version=""),
             ToolReport(name="make", present=False, version=""),
@@ -78,7 +120,33 @@ class TestInstall:
             ToolReport(name="choco", present=True, version="2.7.4"),
         )
 
-        assert toolchain.installable(reports) == ("make",)
+        assert toolchain.installable(reports) == ("python", "make")
+
+    def test_a_node_behind_the_store_alias_is_offered_the_real_python(self) -> None:
+        """LAVENDER'S RUNNER, 2026-09-22/23: python resolved to the WindowsApps
+        alias, the probe reads that as absent, and the command offered is the
+        guarded winget install of the pinned python.org build. On lavender
+        itself the guard would have stopped it, since the Actions tool cache
+        had registered 3.11.9 there, which is the outcome that protects the
+        runner. poetry follows through pip only once there is a python to run
+        it, which is why a second bootstrap pass is the one that finishes a
+        node."""
+        reports = toolchain.parse_probe(LAVENDER_STORE_STUB)
+
+        assert toolchain.installable(reports) == ("python",)
+        body = toolchain.install_script(
+            ("python",), available_managers(reports), platform="windows"
+        )
+        assert "Write-Output 'installing python'" in body
+        assert f"--version {PINNED_PYTHON} -e --scope user" in body
+        assert "choco" not in body
+
+    def test_todays_nodes_need_nothing(self) -> None:
+        for answer in (LAVENDER_2026_09_23, SEDONA_2026_09_23, DIPHTHERIA_2026_09_23):
+            reports = toolchain.parse_probe(answer)
+            assert toolchain.installable(reports) == ()
+            assert missing(reports) == ()
+            assert python_is_right(reports)
 
     def test_a_node_without_the_needed_manager_cannot_install_it(self) -> None:
         """A gap to report, not a failure to raise.

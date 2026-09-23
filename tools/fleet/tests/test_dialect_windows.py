@@ -20,6 +20,7 @@ The two probes ARE run for real, on this machine, because it is a Windows hub.
 from __future__ import annotations
 
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -28,6 +29,11 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
+from fleet.contracts.toolchain import (
+    PINNED_PYTHON,
+    PYTHON_REGISTERED_GUARD,
+    PYTHON_REGISTERED_MESSAGE,
+)
 from fleet.core import names
 from fleet.core.dialect_windows import (
     LAUNCH_TIMEOUT_SECONDS,
@@ -39,6 +45,39 @@ from fleet.core.dialect_windows import (
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 DIALECT = WindowsDialect()
+
+
+def _python_registered_here(prefix: str) -> bool:
+    """Whether an uninstall entry on this machine starts with ``prefix``.
+
+    Read through ``reg.exe`` rather than PowerShell, so the guard under test is
+    checked against an answer it did not compute. ``reg query /f /d`` matches
+    the text anywhere in a value's data and exits 0 when it found one.
+
+    Args:
+        prefix: The start of the entry's DisplayName.
+
+    Returns:
+        True when any entry under HKLM or HKCU carries it.
+    """
+    uninstall = "\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    for hive in ("HKLM", "HKCU"):
+        found = subprocess.run(
+            ["reg", "query", hive + uninstall, "/s", "/f", prefix, "/d"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+        if found.returncode == 0:
+            return True
+    return False
+
+
+#: Where Windows puts the App Execution Alias for ``python``, per account.
+WINDOWSAPPS_PYTHON = (
+    pathlib.Path.home() / "AppData" / "Local" / "Microsoft" / "WindowsApps" / "python.exe"
+)
 
 #: One registration document in the shape the harness writes on a Windows
 #: node: a drive-letter cwd and a named-pipe socket.
@@ -353,11 +392,81 @@ class TestProbesForReal:
     ) -> None:
         fields = self.run_probe(tmp_path, DIALECT.toolchain_probe_script())
 
-        assert set(fields) == {"python", "poetry", "git", "make", "tar", "winget", "choco", "pip"}
+        assert set(fields) == {
+            "python",
+            "poetry",
+            "git",
+            "make",
+            "node",
+            "tar",
+            "winget",
+            "choco",
+            "pip",
+        }
         assert fields["python"].startswith("yes=Python 3.")
         assert fields["pip"].startswith("yes=pip ")
+        assert fields["node"].startswith("yes=v")
         for value in fields.values():
             assert value.startswith(("yes=", "no="))
+
+    def test_the_python_install_guard_stops_exactly_where_the_version_is_registered(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Run on this hub, against its own registry, read independently."""
+        script = tmp_path / "guard.ps1"
+        script.write_text(PYTHON_REGISTERED_GUARD + "Write-Output 'clear'\n", encoding="utf-8")
+
+        completed = subprocess.run(
+            [*POWERSHELL_INVOCATION, str(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        if _python_registered_here(f"Python {PINNED_PYTHON} Core Interpreter"):
+            assert completed.returncode == 1
+            assert completed.stderr.strip() == PYTHON_REGISTERED_MESSAGE
+            assert completed.stdout.strip() == ""
+        else:
+            assert completed.returncode == 0, completed.stderr
+            assert completed.stdout.strip() == "clear"
+
+    @pytest.mark.skipif(not WINDOWSAPPS_PYTHON.is_file(), reason="no WindowsApps python here")
+    def test_a_python_only_under_windowsapps_is_absent_and_never_run(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """LAVENDER'S RUNNER, 2026-09-22/23, reproduced on this hub: with no
+        real interpreter ahead of it, ``python`` resolves to the WindowsApps
+        alias. The probe reports it absent, and pip with it, without running
+        it: here that alias is the Python Install Manager, which a run could
+        answer by installing something."""
+        script = tmp_path / "probe.ps1"
+        script.write_text(DIALECT.toolchain_probe_script(), encoding="utf-8")
+        powershell = shutil.which(POWERSHELL_INVOCATION[0])
+        if powershell is None:
+            pytest.fail("the probes run through powershell, and it is not on this hub's PATH")
+        shell_directory = pathlib.Path(powershell).parent
+        system = shell_directory.parent.parent
+        path = (WINDOWSAPPS_PYTHON.parent, system, shell_directory)
+        parent = config_test_hooks.get_environment()
+        env = {
+            **{key: value for key, value in parent.items() if key.upper() != "PATH"},
+            "PATH": ";".join(str(entry) for entry in path),
+        }
+        completed = subprocess.run(
+            [*POWERSHELL_INVOCATION, str(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            env=env,
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        lines = completed.stdout.splitlines()
+        assert "python=no=" in lines
+        assert "pip=no=" in lines
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the script is PowerShell; run it here")
