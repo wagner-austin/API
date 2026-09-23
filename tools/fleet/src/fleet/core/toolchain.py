@@ -36,8 +36,47 @@ from fleet.contracts.toolchain import (
 from fleet.core import dialect, names, remote
 
 
+def read_reports(output: str) -> tuple[ToolReport, ...]:
+    """Read a toolchain probe's output into one report per recognised line.
+
+    Args:
+        output: The probe script's standard output.
+
+    Returns:
+        One report per line naming a required tool or a package manager, in
+        the order the node emitted them. Empty when no line did.
+    """
+    reports: list[ToolReport] = []
+    wanted = {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS)
+    for line in output.splitlines():
+        parts = line.strip().split("=", 2)
+        if len(parts) != 3 or parts[0] not in wanted:
+            continue
+        reports.append(
+            ToolReport(name=parts[0], present=parts[1] == "yes", version=parts[2].strip())
+        )
+    return tuple(reports)
+
+
+def _unrecognised(output: str) -> str:
+    """Explain an answer that names no tool.
+
+    Args:
+        output: The probe script's standard output.
+
+    Returns:
+        The explanation, quoting the whole answer.
+    """
+    return (
+        f"a toolchain probe returned nothing recognisable, so the node was never asked: "
+        f"{output.strip()!r}"
+    )
+
+
 def parse_probe(output: str) -> tuple[ToolReport, ...]:
     """Read a toolchain probe's output into one report per tool.
+
+    The raising boundary over :func:`read_reports`.
 
     Args:
         output: The probe script's standard output.
@@ -51,26 +90,59 @@ def parse_probe(output: str) -> tuple[ToolReport, ...]:
             probe that did not run, and reporting every tool as absent would
             send the reader to install five things that are already there.
     """
-    reports: list[ToolReport] = []
-    wanted = {tool["name"] for tool in REQUIRED_TOOLS} | set(PACKAGE_MANAGERS)
-    for line in output.splitlines():
-        parts = line.strip().split("=", 2)
-        if len(parts) != 3 or parts[0] not in wanted:
-            continue
-        reports.append(
-            ToolReport(name=parts[0], present=parts[1] == "yes", version=parts[2].strip())
-        )
+    reports = read_reports(output)
     if not reports:
-        raise AppError(
-            FleetErrorCode.NODE_TOOL_MISSING,
-            f"a toolchain probe returned nothing recognisable, so the node was never asked: "
-            f"{output.strip()!r}",
+        raise AppError(FleetErrorCode.NODE_TOOL_MISSING, _unrecognised(output))
+    return reports
+
+
+def attempt_toolchain(node: NodeConfig) -> tuple[ToolReport, ...] | remote.RemoteFailure:
+    """Ask a node what it has installed, reporting failure as a value.
+
+    THE VALUE FORM EXISTS FOR THE NODE RUNNER. A runner deciding whether to
+    claim this tick treats a node that did not answer the way it treats one
+    that answered "python absent": it claims nothing and says why, and a
+    tick that raised on either would stop on the condition it exists to
+    report. :func:`probe_toolchain` raises on top of this for a caller that
+    named the node, ``fleet-bootstrap``.
+
+    Args:
+        node: The node to probe.
+
+    Returns:
+        Its reports, never empty; or the typed reason there are none: the
+        transport's ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``, or
+        ``NODE_TOOL_MISSING`` when it answered with no line this package
+        recognises.
+    """
+    # Under the stage root rather than the node's TEMP: ``$env:TEMP`` was
+    # tried first and is wrong, because the writer's single-quoted literal
+    # does not expand it and a node would grow a directory of that name. The
+    # writer creates the parent, so nothing needs to exist before the very
+    # first probe.
+    spoken = dialect.for_platform(node["platform"])
+    outcome = remote.attempt_script(
+        node["host"],
+        spoken.script_path(node["stage_root"], names.TOOLCHAIN_PROBE_STEM),
+        spoken.toolchain_probe_script(),
+        platform=node["platform"],
+    )
+    failure = outcome["failure"]
+    if failure is not None:
+        return failure
+    reports = read_reports(outcome["output"])
+    if not reports:
+        return remote.RemoteFailure(
+            code=FleetErrorCode.NODE_TOOL_MISSING,
+            message=f"{node['host']}: {_unrecognised(outcome['output'])}",
         )
-    return tuple(reports)
+    return reports
 
 
 def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
     """Ask a node what it has installed.
+
+    The raising boundary over :func:`attempt_toolchain`.
 
     Args:
         node: The node to probe.
@@ -83,37 +155,30 @@ def probe_toolchain(node: NodeConfig) -> tuple[ToolReport, ...]:
             ``DISPATCH_FAILED`` if the probe exits non-zero, or
             ``NODE_TOOL_MISSING`` if its answer cannot be read.
     """
-    # Under the stage root rather than the node's TEMP: ``$env:TEMP`` was
-    # tried first and is wrong, because the writer's single-quoted literal
-    # does not expand it and a node would grow a directory of that name. The
-    # writer creates the parent, so nothing needs to exist before the very
-    # first probe.
-    spoken = dialect.for_platform(node["platform"])
-    return parse_probe(
-        remote.run_script(
-            node["host"],
-            spoken.script_path(node["stage_root"], names.TOOLCHAIN_PROBE_STEM),
-            spoken.toolchain_probe_script(),
-            platform=node["platform"],
-        )
-    )
+    outcome = attempt_toolchain(node)
+    if isinstance(outcome, tuple):
+        return outcome
+    raise AppError(outcome["code"], outcome["message"])
 
 
-def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]) -> None:
-    """Refuse a node that cannot run a build.
+def readiness_gap(
+    node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]
+) -> AppError[FleetErrorCode] | None:
+    """What stands between a node and a build, as a value.
 
     Args:
         node_name: The node's workspace name.
         node: Its declaration, for the host in the message.
         reports: What it answered.
 
-    Raises:
-        AppError: With ``NODE_TOOL_MISSING`` when a required tool is absent,
-            naming every one and what would install it, or
-            ``NODE_PYTHON_MISMATCH`` when everything is present but the
-            interpreter is the wrong minor version. Two codes because the
-            fixes differ: one is a package manager, the other is a decision
-            about which Python that machine should carry.
+    Returns:
+        ``None`` when the node can build. Otherwise the refusal, not
+        raised: ``NODE_TOOL_MISSING`` naming every absent tool, why a build
+        needs it and what would install it on THIS node, or
+        ``NODE_PYTHON_MISMATCH`` when everything is present but the
+        interpreter is the wrong minor version. Two codes because the fixes
+        differ: one is a package manager, the other is a decision about which
+        Python that machine should carry.
     """
     absent = missing(reports)
     if absent:
@@ -125,18 +190,37 @@ def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, .
             for name in absent
             if name in wanted
         )
-        raise AppError(
+        return AppError(
             FleetErrorCode.NODE_TOOL_MISSING,
             f"{node_name} ({node['host']}) cannot run a build: {detail}",
         )
     if not python_is_right(reports):
-        raise AppError(
+        return AppError(
             FleetErrorCode.NODE_PYTHON_MISMATCH,
             f"{node_name} ({node['host']}) reports Python "
             f"{_python_version(reports)!r} where {REQUIRED_PYTHON} is required; every project "
             "resolves its lockfile against that minor version, so a build here would fail "
             "resolving rather than testing",
         )
+    return None
+
+
+def require_ready(node_name: str, node: NodeConfig, reports: tuple[ToolReport, ...]) -> None:
+    """Refuse a node that cannot run a build.
+
+    The raising boundary over :func:`readiness_gap`.
+
+    Args:
+        node_name: The node's workspace name.
+        node: Its declaration, for the host in the message.
+        reports: What it answered.
+
+    Raises:
+        AppError: The refusal :func:`readiness_gap` names, with its code.
+    """
+    gap = readiness_gap(node_name, node, reports)
+    if gap is not None:
+        raise gap
 
 
 def _python_version(reports: tuple[ToolReport, ...]) -> str:
@@ -251,10 +335,13 @@ def install_missing(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[
 
 
 __all__ = [
+    "attempt_toolchain",
     "install_missing",
     "install_script",
     "installable",
     "parse_probe",
     "probe_toolchain",
+    "read_reports",
+    "readiness_gap",
     "require_ready",
 ]
